@@ -654,11 +654,16 @@ mod tests {
 
     use anyhow::{Context, anyhow};
     use insta::assert_ron_snapshot;
+    use ruff_db::Db as _;
     use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
+    use ruff_db::files::File;
+    #[cfg(unix)]
+    use ruff_db::system::{OsSystem, System, SystemPath, WritableSystem};
     use ruff_db::system::{SystemPathBuf, TestSystem};
     use ruff_db::testing::assert_function_query_was_not_run_by_name;
     use ruff_python_ast::PythonVersion;
     use ruff_ranged_value::ValueSource;
+    use ty_python_core::program::UseDefaultStrategy;
     use ty_python_semantic::PythonVersionSource;
 
     use crate::db::{ProjectDatabase, testing::TestDb};
@@ -666,6 +671,8 @@ mod tests {
         Options, python_version::SupportedPythonVersion, uv::UvMetadata, value::RelativePathBuf,
     };
     use crate::uv::{DependencyMetadataError, UvWorkspace};
+    #[cfg(unix)]
+    use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
     use crate::{Db as _, ProjectMetadata, ProjectMetadataError};
 
     /// Without a `pyproject.toml` or `ty.toml`, the selected directory is the project root.
@@ -1151,6 +1158,312 @@ unclosed table, expected `]`
             diagnostics[0].concise_message().to_string(),
             "Failed to load uv dependency metadata: uv did not provide a Python environment"
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn dependency_metadata_tracks_environment_changes() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from(if cfg!(windows) { "C:/app" } else { "/app" });
+        let uv_environment = root.join("uv-venv");
+        let selected_environment = root.join("selected-venv");
+        system
+            .memory_file_system()
+            .create_directory_all(&uv_environment)?;
+        let input = serde_json::json!({
+            "schema": {"version": "preview"},
+            "workspace_root": root,
+            "environment": {"root": uv_environment},
+        });
+        let mut metadata = ProjectMetadata::new("app", root);
+        metadata.apply_uv_workspace(
+            &system,
+            UvWorkspace {
+                metadata: Some(UvMetadata::from_metadata(
+                    &serde_json::to_vec(&input)?,
+                    &system,
+                )?),
+                error: None,
+            },
+        )?;
+        metadata.set_override_options(Options::from_toml_str(
+            &format!("[environment]\npython = '{selected_environment}'"),
+            ValueSource::Cli,
+        )?);
+        let mut db = ProjectDatabase::use_defaults(metadata, system.clone());
+        let project = db.project();
+        assert_matches!(
+            project.dependency_metadata(&db),
+            Err(DependencyMetadataError::EnvironmentResolution(_))
+        );
+
+        // Creating the selected environment refreshes program settings without changing metadata.
+        system.memory_file_system().write_file_all(
+            selected_environment.join("pyvenv.cfg"),
+            "home = /missing\nversion = 3.13.0\ninclude-system-site-packages = false",
+        )?;
+        system
+            .memory_file_system()
+            .create_directory_all(selected_environment.join(if cfg!(windows) {
+                "Lib/site-packages"
+            } else {
+                "lib/python3.13/site-packages"
+            }))?;
+        let (settings, _) = project
+            .metadata(&db)
+            .to_merged_options()
+            .to_program_settings(&system, db.vendored(), &UseDefaultStrategy)?;
+        project.update_program(&mut db, settings);
+        assert_matches!(
+            project.dependency_metadata(&db),
+            Err(DependencyMetadataError::EnvironmentMismatch { selected, .. })
+                if selected == &selected_environment
+        );
+
+        // Directory availability is tracked independently of the resolved program settings.
+        system
+            .memory_file_system()
+            .remove_directory(&uv_environment)?;
+        File::sync_path(&mut db, &uv_environment);
+        assert_matches!(
+            project.dependency_metadata(&db),
+            Err(DependencyMetadataError::InvalidEnvironment { .. })
+        );
+
+        system
+            .memory_file_system()
+            .create_directory_all(&uv_environment)?;
+        File::sync_path(&mut db, &uv_environment);
+        assert_matches!(
+            project.dependency_metadata(&db),
+            Err(DependencyMetadataError::EnvironmentMismatch { .. })
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn dependency_metadata_tracks_environment_symlink() -> anyhow::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let root = SystemPath::from_std_path(temp.path()).context("non-UTF-8 temporary path")?;
+        let system = OsSystem::new(root);
+        let root = system.canonicalize_path(root)?;
+        let environment = root.join("environment");
+        let link = root.join(".venv");
+        system.create_directory_all(&environment.join("lib/python3.13/site-packages"))?;
+        system.write_file(
+            &environment.join("pyvenv.cfg"),
+            "home = /missing\nversion = 3.13.0\ninclude-system-site-packages = false",
+        )?;
+        std::os::unix::fs::symlink(&environment, &link)?;
+        let input = serde_json::json!({
+            "schema": {"version": "preview"},
+            "workspace_root": root,
+            "environment": {"root": link},
+            "members": [{"id": "app", "name": "app", "path": root}],
+            "resolution": {"app": {"kind": "package", "name": "app", "dependencies": []}},
+        });
+        let mut metadata = ProjectMetadata::new("app", root);
+        metadata.apply_uv_workspace(
+            &system,
+            UvWorkspace {
+                metadata: Some(UvMetadata::from_metadata(
+                    &serde_json::to_vec(&input)?,
+                    &system,
+                )?),
+                error: None,
+            },
+        )?;
+        let mut db = ProjectDatabase::fallible(metadata, system.clone())?;
+        let project = db.project();
+        assert_matches!(project.dependency_metadata(&db), Ok(Some(_)));
+
+        // The selected prefix is canonical, but uv's original path must remain available too.
+        std::fs::remove_file(&link)?;
+        File::sync_path(&mut db, &link);
+        assert_matches!(
+            project.dependency_metadata(&db),
+            Err(DependencyMetadataError::InvalidEnvironment { .. })
+        );
+
+        std::os::unix::fs::symlink(&environment, &link)?;
+        File::sync_path(&mut db, &link);
+        assert_matches!(project.dependency_metadata(&db), Ok(Some(_)));
+
+        // Syncing only the target must invalidate the query without refreshing program settings.
+        std::fs::remove_dir_all(&environment)?;
+        File::sync_path(&mut db, &environment);
+        assert_matches!(
+            project.dependency_metadata(&db),
+            Err(DependencyMetadataError::InvalidEnvironment { .. })
+        );
+
+        system.create_directory_all(&environment)?;
+        File::sync_path(&mut db, &environment);
+        assert_matches!(project.dependency_metadata(&db), Ok(Some(_)));
+
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn dependency_metadata_tracks_failed_selected_environment_refresh() -> anyhow::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let root = SystemPath::from_std_path(temp.path()).context("non-UTF-8 temporary path")?;
+        let system = OsSystem::new(root);
+        let root = system.canonicalize_path(root)?;
+        let environment = root.join("environment");
+        let uv_link = root.join(".venv");
+        let selected_link = root.join("selected");
+        system.create_directory_all(&environment.join("lib/python3.13/site-packages"))?;
+        system.write_file(
+            &environment.join("pyvenv.cfg"),
+            "home = /missing\nversion = 3.13.0\ninclude-system-site-packages = false",
+        )?;
+        std::os::unix::fs::symlink(&environment, &uv_link)?;
+        std::os::unix::fs::symlink(&environment, &selected_link)?;
+        let input = serde_json::json!({
+            "schema": {"version": "preview"},
+            "workspace_root": root,
+            "environment": {"root": uv_link},
+            "members": [{"id": "app", "name": "app", "path": root}],
+            "resolution": {"app": {"kind": "package", "name": "app", "dependencies": []}},
+        });
+        let mut metadata = ProjectMetadata::new("app", root.clone());
+        metadata.apply_uv_workspace(
+            &system,
+            UvWorkspace {
+                metadata: Some(UvMetadata::from_metadata(
+                    &serde_json::to_vec(&input)?,
+                    &system,
+                )?),
+                error: None,
+            },
+        )?;
+        metadata.set_override_options(Options::from_toml_str(
+            &format!("[environment]\npython = '{selected_link}'"),
+            ValueSource::Cli,
+        )?);
+        let mut db = ProjectDatabase::fallible(metadata, system)?;
+        let project = db.project();
+        assert_matches!(project.dependency_metadata(&db), Ok(Some(_)));
+        let search_paths = project.program_settings(&db).search_paths.clone();
+
+        // Repeated failures must retain the checking program and the environment used for watching.
+        std::fs::remove_file(&selected_link)?;
+        for _ in 0..2 {
+            let workspace = project.metadata(&db).uv_workspace().clone();
+            project.rediscover(&mut db, &root, workspace)?;
+            assert_matches!(
+                project.dependency_metadata(&db),
+                Err(DependencyMetadataError::EnvironmentResolution(message))
+                    if message.contains(selected_link.as_str())
+            );
+            assert_eq!(project.program_settings(&db).search_paths, search_paths);
+            assert_eq!(
+                project.program_settings(&db).virtual_environment(),
+                Some(environment.as_path()),
+            );
+        }
+
+        std::os::unix::fs::symlink(&environment, &selected_link)?;
+        // A different settings error must clear the stale environment error, too.
+        let system = OsSystem::new(&root);
+        system.create_directory_all(&root.join("broken-typeshed/stdlib"))?;
+        system.write_file(
+            &root.join("pyproject.toml"),
+            "[tool.ty.environment]\ntypeshed = 'broken-typeshed'\n",
+        )?;
+        let workspace = project.metadata(&db).uv_workspace().clone();
+        project.rediscover(&mut db, &root, workspace)?;
+        assert_matches!(
+            project
+                .metadata(&db)
+                .to_merged_options()
+                .to_program_settings(db.system(), db.vendored(), &super::FallibleStrategy),
+            Err(super::ToProgramSettingsError::SearchPaths(_))
+        );
+        assert_eq!(project.program_settings(&db).search_paths, search_paths);
+        assert_matches!(project.dependency_metadata(&db), Ok(Some(_)));
+
+        std::fs::remove_file(root.join("pyproject.toml"))?;
+        let workspace = project.metadata(&db).uv_workspace().clone();
+        project.rediscover(&mut db, &root, workspace)?;
+        assert_matches!(project.dependency_metadata(&db), Ok(Some(_)));
+
+        std::fs::remove_file(&selected_link)?;
+        db.apply_changes(&[ChangeEvent::Deleted {
+            path: selected_link.clone(),
+            kind: DeletedKind::File,
+        }]);
+        assert_matches!(
+            project.dependency_metadata(&db),
+            Err(DependencyMetadataError::EnvironmentResolution(_))
+        );
+
+        std::os::unix::fs::symlink(&environment, &selected_link)?;
+        db.apply_changes(&[ChangeEvent::Created {
+            path: selected_link,
+            kind: CreatedKind::Any,
+        }]);
+        assert_matches!(project.dependency_metadata(&db), Ok(Some(_)));
+
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn dependency_metadata_rechecks_uv_symlink_after_program_change() -> anyhow::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let root = SystemPath::from_std_path(temp.path()).context("non-UTF-8 temporary path")?;
+        let system = OsSystem::new(root);
+        let root = system.canonicalize_path(root)?;
+        let old_environment = root.join("old");
+        let selected_environment = root.join("selected");
+        let uv_link = root.join(".venv");
+        system.create_directory_all(&old_environment)?;
+        system.create_directory_all(&selected_environment.join("lib/python3.13/site-packages"))?;
+        system.write_file(
+            &selected_environment.join("pyvenv.cfg"),
+            "home = /missing\nversion = 3.13.0\ninclude-system-site-packages = false",
+        )?;
+        std::os::unix::fs::symlink(&old_environment, &uv_link)?;
+        let input = serde_json::json!({
+            "schema": {"version": "preview"},
+            "workspace_root": root,
+            "environment": {"root": uv_link},
+            "members": [{"id": "app", "name": "app", "path": root}],
+            "resolution": {"app": {"kind": "package", "name": "app", "dependencies": []}},
+        });
+        let input = serde_json::to_vec(&input)?;
+        let mut metadata = ProjectMetadata::new("app", root);
+        metadata.apply_uv_workspace(
+            &system,
+            UvWorkspace {
+                metadata: Some(UvMetadata::from_metadata(&input, &system)?),
+                error: None,
+            },
+        )?;
+        metadata.set_override_options(Options::from_toml_str(
+            &format!("[environment]\npython = '{selected_environment}'"),
+            ValueSource::Cli,
+        )?);
+        let mut db = ProjectDatabase::fallible(metadata, system)?;
+        let project = db.project();
+        assert_matches!(
+            project.dependency_metadata(&db),
+            Err(DependencyMetadataError::EnvironmentMismatch { .. })
+        );
+
+        std::fs::remove_file(&uv_link)?;
+        std::os::unix::fs::symlink(&selected_environment, &uv_link)?;
+        // An unrelated program change invalidates the query without refreshing uv metadata.
+        let mut settings = project.program_settings(&db).clone();
+        settings.python_version.version = PythonVersion::PY312;
+        project.update_program(&mut db, settings);
+        assert_matches!(project.dependency_metadata(&db), Ok(Some(_)));
 
         Ok(())
     }

@@ -109,11 +109,16 @@ mod stable {
         forall types s, t. s.is_subtype_of(db, env, t) && t.is_subtype_of(db, env, s) => s.is_equivalent_to(db, env, t)
     );
 
+    // Reusing a negation cache across targets gives the same results as explicitly negating `S`.
     type_property_test!(
-        structural_negation_subtyping_matches_materialized_negation, db, env,
-        forall types s, t. {
+        negation_subtyping_matches_materialized_negation, db, env,
+        forall types s, t, u. {
+            let negated = s.negate(db, env);
             let mut cache = None;
-            s.negation_is_subtype_of_cached(db, env, t, &mut cache) == s.negate(db, env).is_subtype_of(db, env, t)
+            [t, u].into_iter().all(|target| {
+                s.negation_is_subtype_of_cached(db, env, target, &mut cache)
+                    == negated.is_subtype_of(db, env, target)
+            })
         }
     );
 

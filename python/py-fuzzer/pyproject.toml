@@ -5,6 +5,7 @@ description = "Run Ruff or ty on randomly generated Python source files."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "jinja2>=3.1.6",
     "pysource-codegen>=0.6.0",
     "pysource-minimize>=0.8.0",
     "rich-argparse>=1.7.0",
@@ -32,6 +33,9 @@ strict = true
 warn_unreachable = true
 local_partial_types = true
 enable_error_code = "ignore-without-code,redundant-expr,truthy-bool"
+
+[tool.ty.analysis]
+return-type-inference = "always"
 
 [tool.ty.rules]
 blanket-ignore-comment = "error"
@@ -98,7 +102,14 @@ split-on-trailing-comma = false
 
 [tool.uv]
 no-build = true
+require-build-hashes = true
 no-binary-package = ["py-fuzzer"]
 # Pin the isolated build environment for source-build exceptions.
-build-constraint-dependencies = ["flit-core==3.12.0"]
+build-constraint-dependencies = [
+    { requirement = "flit-core==3.12.0", hashes = [
+        "sha256:18f63100d6f94385c6ed57a72073443e1a71a4acb4339491615d0f16d6ff01b2",
+        "sha256:e7a0304069ea895172e3c7bb703292e992c5d1555dd1233ab7b5621b5b69e62c",
+    ] },
+]
 exclude-newer = "P7D"
+preview-features = ["build-dependency-hashes"]

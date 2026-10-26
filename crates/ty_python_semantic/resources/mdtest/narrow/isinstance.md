@@ -1984,3 +1984,57 @@ def narrow_aliased_typed_dict_to_dict(value: PayloadAlias) -> None:
         # error: [unresolved-attribute]
         value.clear()
 ```
+
+## Iterable element types with permissive generic narrowing
+
+After narrowing `Iterable[T] | T` to a non-sized iterable, `T` might itself be an iterable whose
+items have a different type. Permissive narrowing represents that possibility with `Unknown`, so the
+constructor infers `list[T | Unknown]`. Its acceptance as `Collection[T] | T` is unsound; it does
+not establish that all elements have type `T`. The same inferred type appears with and without a
+return context.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = false
+```
+
+```py
+from collections.abc import Collection, Iterable, Sized
+
+def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
+    if isinstance(value, Iterable) and not isinstance(value, Sized):
+        # revealed: list[T@maybe_iterable_to_list | Unknown]
+        reveal_type(list(value))
+        # revealed: list[T@maybe_iterable_to_list | Unknown]
+        return reveal_type(list(value))
+    raise NotImplementedError
+```
+
+## Iterable element types with strict generic narrowing
+
+Strict narrowing represents the unknown iterable element type with `object`. The constructor
+therefore infers `list[object]`, and returning it as `Collection[T] | T` is correctly rejected.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from collections.abc import Collection, Iterable, Sized
+
+def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
+    if isinstance(value, Iterable) and not isinstance(value, Sized):
+        # revealed: list[object]
+        reveal_type(list(value))
+        # error: [invalid-return-type]
+        # revealed: list[object]
+        return reveal_type(list(value))
+    raise NotImplementedError
+```

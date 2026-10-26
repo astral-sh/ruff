@@ -219,6 +219,50 @@ def _(target: FooSub | str):
     reveal_type(y)  # revealed: Literal[1, 3, 4]
 ```
 
+### Tuple subclasses
+
+Expanding the possible element types of a tuple subclass preserves its class identity. A class
+pattern matching that subclass is exhaustive, including when it appears inside a sequence pattern.
+
+```py
+from typing import NamedTuple, final
+
+class Point(NamedTuple):
+    x: bool
+
+def named_tuple(value: Point) -> int:  # no diagnostic
+    match value:
+        case Point():
+            return 42
+
+def nested_named_tuple(value: tuple[Point]) -> int:  # no diagnostic
+    match value:
+        case [Point()]:
+            return 42
+
+@final
+class TupleSubclass(tuple[bool]): ...
+
+def tuple_subclass(value: TupleSubclass) -> int:  # no diagnostic
+    match value:
+        case TupleSubclass():
+            return 42
+```
+
+A guard or a refutable attribute pattern can still leave values unmatched:
+
+```py
+def guarded(value: Point, flag: bool) -> int:  # error: [invalid-return-type] "can implicitly return `None`"
+    match value:
+        case Point() if flag:
+            return 42
+
+def refutable(value: Point) -> int:  # error: [invalid-return-type] "can implicitly return `None`"
+    match value:
+        case Point(x=True):
+            return 42
+```
+
 ### Dynamic class
 
 A dynamically typed class expression may match any value, but we cannot prove which values it does

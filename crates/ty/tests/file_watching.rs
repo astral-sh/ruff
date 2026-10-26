@@ -7,9 +7,7 @@ use insta::assert_snapshot;
 #[cfg(feature = "test-uv")]
 use insta::internals::SettingsBindDropGuard;
 use ruff_db::Db as _;
-use ruff_db::diagnostic::{
-    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics,
-};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FileError, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{
@@ -20,7 +18,7 @@ use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::textwrap::dedent;
 use ruff_ranged_value::{RangedValue, ValueSource};
 use ty_module_resolver::{Module, ModuleName};
-use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions};
+use ty_project::metadata::options::{EnvironmentOptions, Options, OutputFormat, SrcOptions};
 use ty_project::metadata::pyproject::{PyProject, Tool};
 use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::{RelativeGlobPattern, RelativePathBuf};
@@ -318,12 +316,9 @@ impl TestCase {
     }
 
     fn render_diagnostics(&self, diagnostics: &[Diagnostic]) -> String {
-        DisplayDiagnostics::new(
-            self.db(),
-            &DisplayDiagnosticConfig::new("ty").format(DiagnosticFormat::Concise),
-            diagnostics,
-        )
-        .to_string()
+        OutputFormat::Concise
+            .display(self.db(), &DisplayDiagnosticConfig::new("ty"), diagnostics)
+            .to_string()
     }
 }
 
@@ -1973,7 +1968,7 @@ fn recreating_default_environment_updates_inferred_python_version() -> anyhow::R
     case.apply_changes(&changes);
     assert_snapshot!(
         case.render_diagnostics(&case.db().check()),
-        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[14]]`"
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[15]]`"
     );
 
     case.write_virtual_environment(&environment, PythonVersion::PY311)?;
@@ -2010,7 +2005,7 @@ fn repairing_default_environment_updates_inferred_python_version() -> anyhow::Re
     })?;
     assert_snapshot!(
         case.render_diagnostics(&case.db().check()),
-        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[14]]`"
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[15]]`"
     );
 
     // Write a valid `pyvenv.cfg`.
@@ -2057,7 +2052,7 @@ fn creating_site_packages_after_metadata_updates_inferred_python_version() -> an
     case.apply_changes(&changes);
     assert_snapshot!(
         case.render_diagnostics(&case.db().check()),
-        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[14]]`"
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[15]]`"
     );
 
     let library = case.project_path(".venv").join(library);
@@ -2112,7 +2107,7 @@ fn moving_configured_interpreter_parent_into_project_updates_inferred_python_ver
     })?;
     assert_snapshot!(
         case.render_diagnostics(&case.db().check()),
-        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[14]]`"
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[15]]`"
     );
 
     // Moving the parent can produce a single directory event for the whole environment.
@@ -2164,7 +2159,7 @@ fn repairing_activated_environment_updates_inferred_python_version() -> anyhow::
     )?;
     assert_snapshot!(
         case.render_diagnostics(&case.db().check()),
-        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[14]]`"
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[15]]`"
     );
 
     case.write_virtual_environment(case.project_path("active-env"), PythonVersion::PY311)?;
@@ -2250,7 +2245,7 @@ fn reloading_options_updates_inferred_python_version_diagnostics_when_metadata_i
 
     assert_snapshot!(
         case.render_diagnostics(&case.db().check()),
-        @".venv/pyvenv.cfg: warning[unsupported-python-version] Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.14 instead."
+        @".venv/pyvenv.cfg: warning[unsupported-python-version] Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.15 instead."
     );
 
     std::fs::rename(
@@ -3370,7 +3365,7 @@ mod uv_metadata {
         let diagnostics = case.db().check();
         assert_snapshot!(
             case.render_diagnostics(&diagnostics),
-            @"pyproject.toml: warning[uv-metadata] Failed to load uv metadata: Failed to parse: `pyproject.toml`"
+            @"pyproject.toml: warning[uv-metadata] Failed to load uv metadata: Failed to parse: pyproject.toml"
         );
         assert_eq!(project.program_settings(case.db()), &program_settings);
 

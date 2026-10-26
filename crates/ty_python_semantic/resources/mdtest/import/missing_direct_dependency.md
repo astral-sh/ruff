@@ -4,9 +4,10 @@ An installed package is not necessarily a declared dependency. The `missing-dire
 checks imports against the current project's direct dependencies when dependency metadata is
 available.
 
-## Without dependency metadata
+## Direct dependency declarations
 
-Enabling the rule has no effect when the package manager has not supplied dependency metadata.
+The project declares `direct-dependency`, but also has the undeclared `indirect-distribution`
+installed.
 
 ```toml
 [environment]
@@ -14,6 +15,27 @@ python = "/.venv"
 
 [rules]
 missing-direct-dependency = "warn"
+
+[dependency-metadata]
+projects = [{ path = "/src", dependencies = ["direct"] }]
+
+[dependency-metadata.distributions]
+direct = { name = "direct-dependency" }
+indirect = { name = "indirect-distribution" }
+
+[dependency-metadata.module-owners]
+direct = ["direct"]
+indirect = ["indirect"]
+```
+
+### Plain imports
+
+Importing a declared dependency is allowed. Importing an installed distribution that the project
+does not declare reports a missing direct dependency.
+
+`/.venv/<path-to-site-packages>/direct/__init__.py`:
+
+```py
 ```
 
 `/.venv/<path-to-site-packages>/indirect/__init__.py`:
@@ -24,45 +46,26 @@ missing-direct-dependency = "warn"
 `main.py`:
 
 ```py
+import direct  # no diagnostic
+
+# snapshot: missing-direct-dependency
 import indirect
 ```
 
-## Direct dependency declarations
-
-The project declares `direct-dependency`, which provides `direct` and `facade`. It also has
-`indirect-distribution` installed, but does not declare that distribution as a direct dependency.
-
-```toml
-[environment]
-python = "/.venv"
-
-[rules]
-missing-direct-dependency = "warn"
-
-[dependency-metadata]
-projects = [{ path = "/src", distribution = "app", dependencies = ["direct"] }]
-
-[dependency-metadata.distributions]
-app = { name = "app-project" }
-direct = { name = "direct-dependency" }
-indirect = { name = "indirect-distribution" }
-
-[dependency-metadata.module-owners]
-app = ["app"]
-direct = ["direct"]
-facade = ["direct"]
-indirect = ["indirect"]
+```snapshot
+warning[missing-direct-dependency]: Import of `indirect` requires a direct dependency on `indirect-distribution`
+ --> src/main.py:4:8
+  |
+4 | import indirect
+  |        ^^^^^^^^
+help: Declare `indirect-distribution` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`
+info: See https://docs.astral.sh/uv/concepts/projects/dependencies/
 ```
 
-### Plain and aliased imports
+### Aliases and submodules
 
-Importing a declared dependency is allowed. Imports of an undeclared distribution are reported,
-including aliases and imports of its submodules.
-
-`/.venv/<path-to-site-packages>/direct/__init__.py`:
-
-```py
-```
+Aliases and imports of submodules require the same direct dependency as a plain import. Each import
+is reported, even when the same module has already been imported.
 
 `/.venv/<path-to-site-packages>/indirect/__init__.py`:
 
@@ -78,23 +81,10 @@ value = 1
 `main.py`:
 
 ```py
-import direct
-
-# snapshot: missing-direct-dependency
-import indirect
+import indirect  # error: [missing-direct-dependency]
 import indirect as alias  # error: [missing-direct-dependency] "Import of `indirect` requires a direct dependency on `indirect-distribution`"
 import indirect.child  # error: [missing-direct-dependency]
 from indirect.child import value  # error: [missing-direct-dependency]
-```
-
-```snapshot
-warning[missing-direct-dependency]: Import of `indirect` requires a direct dependency on `indirect-distribution`
- --> src/main.py:4:8
-  |
-4 | import indirect
-  |        ^^^^^^^^
-help: Declare `indirect-distribution` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`
-info: See https://docs.astral.sh/uv/concepts/projects/dependencies/
 ```
 
 ### From imports and star imports
@@ -124,11 +114,12 @@ from indirect import *  # error: [missing-direct-dependency]
 from indirect import *  # error: [missing-direct-dependency]
 ```
 
-### Star imports without exported names
+### Type-checking imports
 
-A star import of an empty module still uses its distribution, even though it binds no names.
+Imports guarded by `TYPE_CHECKING` do not introduce runtime dependencies. A later runtime import
+still requires a direct dependency.
 
-`/.venv/<path-to-site-packages>/indirect.py`:
+`/.venv/<path-to-site-packages>/indirect/__init__.py`:
 
 ```py
 ```
@@ -136,10 +127,179 @@ A star import of an empty module still uses its distribution, even though it bin
 `main.py`:
 
 ```py
-from indirect import *  # error: [missing-direct-dependency]
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import indirect  # no diagnostic
+
+import indirect  # error: [missing-direct-dependency]
 ```
 
-### Imports inside functions and classes
+### Stub files
+
+Imports in a stub describe types, not runtime dependencies. They do not require declarations in the
+project's runtime dependencies.
+
+`/.venv/<path-to-site-packages>/indirect/__init__.py`:
+
+```py
+class Value: ...
+```
+
+`main.pyi`:
+
+```pyi
+import indirect  # no diagnostic
+from indirect import Value  # no diagnostic
+```
+
+## Dependency groups
+
+The project declares `direct-dependency` as a runtime dependency and `development-tool` in a
+dependency group. Package code cannot rely on a dependency group. Tests can use direct group
+dependencies, but not packages installed only as their transitive dependencies.
+
+```toml
+[environment]
+python = "/.venv"
+
+[rules]
+missing-direct-dependency = "warn"
+
+[dependency-metadata]
+projects = [{ path = "/src", distribution = "app", dependencies = ["direct"], group-dependencies = ["dev"] }]
+
+[dependency-metadata.distributions]
+app = { name = "app-project" }
+direct = { name = "direct-dependency" }
+dev = { name = "development-tool" }
+indirect = { name = "indirect-distribution" }
+
+[dependency-metadata.module-owners]
+app = ["app"]
+direct = ["direct"]
+devtool = ["dev"]
+indirect = ["indirect"]
+```
+
+`/.venv/<path-to-site-packages>/direct/__init__.py`:
+
+```py
+```
+
+`/.venv/<path-to-site-packages>/devtool/__init__.py`:
+
+```py
+```
+
+`/.venv/<path-to-site-packages>/indirect/__init__.py`:
+
+```py
+```
+
+`app/__init__.py`:
+
+```py
+import direct  # no diagnostic
+import devtool  # error: [missing-direct-dependency] "direct dependency on `development-tool`"
+```
+
+`tests/test_app.py`:
+
+```py
+import direct  # no diagnostic
+import devtool  # no diagnostic
+import indirect  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
+```
+
+## Script dependency declarations
+
+A PEP 723 script declares runtime dependencies in its inline `dependencies` list. It can import
+`direct-dependency`, but importing the installed `indirect-distribution` requires its own
+declaration. Imports guarded by `TYPE_CHECKING` do not count. Each runtime import of an undeclared
+dependency is reported.
+
+```toml
+[environment]
+python = "/.venv"
+```
+
+`/.venv/<path-to-site-packages>/direct/__init__.py`:
+
+```py
+```
+
+`/.venv/<path-to-site-packages>/indirect/__init__.py`:
+
+```py
+```
+
+`script.py`:
+
+```py
+# /// script
+# dependencies = ["direct-dependency"]
+# [tool.ty.rules]
+# missing-direct-dependency = "warn"
+# [tool.ty.dependency-metadata]
+# projects = [{ path = "/src/script.py", dependencies = ["direct"] }]
+# [tool.ty.dependency-metadata.distributions]
+# direct = { name = "direct-dependency" }
+# indirect = { name = "indirect-distribution" }
+# [tool.ty.dependency-metadata.module-owners]
+# direct = ["direct"]
+# indirect = ["indirect"]
+# ///
+
+from typing import TYPE_CHECKING
+
+import direct  # no diagnostic
+
+if TYPE_CHECKING:
+    import indirect  # no diagnostic
+
+# snapshot: missing-direct-dependency
+import indirect
+import indirect as alias  # error: [missing-direct-dependency] "Import of `indirect` requires a direct dependency on `indirect-distribution`"
+```
+
+```snapshot
+warning[missing-direct-dependency]: Import of `indirect` requires a direct dependency on `indirect-distribution`
+  --> src/script.py:23:8
+   |
+23 | import indirect
+   |        ^^^^^^^^
+help: Declare `indirect-distribution` in the script's inline `dependencies` metadata
+info: See https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies
+```
+
+## Edge cases
+
+### Import resolution and nested scopes
+
+```toml
+[environment]
+python = "/.venv"
+
+[rules]
+missing-direct-dependency = "warn"
+
+[dependency-metadata]
+projects = [{ path = "/src", distribution = "app", dependencies = ["direct"] }]
+
+[dependency-metadata.distributions]
+app = { name = "app-project" }
+direct = { name = "direct-dependency" }
+indirect = { name = "indirect-distribution" }
+
+[dependency-metadata.module-owners]
+app = ["app"]
+direct = ["direct"]
+facade = ["direct"]
+indirect = ["indirect"]
+```
+
+#### Imports inside functions and classes
 
 Imports in nested scopes require direct dependencies just like imports at module scope. Imports in
 functions and classes are reported independently of imports at module scope.
@@ -173,10 +333,10 @@ def use_dependency():
 import indirect  # error: [missing-direct-dependency]
 ```
 
-### Type-checking and unreachable imports
+#### Unreachable imports and guards in nested scopes
 
-Imports guarded by `TYPE_CHECKING` do not introduce runtime dependencies. Unreachable imports are
-also ignored, including in nested scopes. Neither hides a later runtime import's diagnostic.
+Unreachable imports and imports guarded by `TYPE_CHECKING` are ignored, including in nested scopes.
+Neither hides a later runtime import's diagnostic.
 
 `/.venv/<path-to-site-packages>/indirect/__init__.py`:
 
@@ -188,40 +348,34 @@ also ignored, including in nested scopes. Neither hides a later runtime import's
 ```py
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    import indirect
-
 if False:
-    import indirect
+    import indirect  # no diagnostic
 
 def use_dependency():
     if TYPE_CHECKING:
-        import indirect
+        import indirect  # no diagnostic
     if False:
-        import indirect
+        import indirect  # no diagnostic
 
 import indirect  # error: [missing-direct-dependency]
 ```
 
-### Stub files
+#### Star imports without exported names
 
-Imports in a stub describe types, not runtime dependencies. They do not require declarations in the
-project's runtime dependencies.
+A star import of an empty module still uses its distribution, even though it binds no names.
 
-`/.venv/<path-to-site-packages>/indirect/__init__.py`:
+`/.venv/<path-to-site-packages>/indirect.py`:
 
 ```py
-class Value: ...
 ```
 
-`main.pyi`:
+`main.py`:
 
-```pyi
-import indirect
-from indirect import Value
+```py
+from indirect import *  # error: [missing-direct-dependency]
 ```
 
-### Unresolved imports and unknown ownership
+#### Unresolved imports and unknown ownership
 
 An import that cannot be resolved receives only `unresolved-import`. A resolved module with no known
 distribution owner is not enough evidence to report a missing dependency. Standard-library imports
@@ -236,11 +390,11 @@ do not require project dependencies either.
 
 ```py
 import indirect  # error: [unresolved-import]
-import unowned
-import sys
+import unowned  # no diagnostic
+import sys  # no diagnostic
 ```
 
-### Local modules and self-imports
+#### Local modules and self-imports
 
 A first-party module can shadow an installed module with the same name. Imports of that local
 module, or of the project itself, do not require another dependency declaration.
@@ -263,11 +417,11 @@ module, or of the project itself, do not require another dependency declaration.
 `main.py`:
 
 ```py
-import indirect
-import app
+import indirect  # no diagnostic
+import app  # no diagnostic
 ```
 
-### Re-exported values
+#### Re-exported values
 
 A declared dependency can expose values implemented by one of its dependencies. Importing the public
 value from the declared dependency does not require a direct dependency on its implementation.
@@ -287,10 +441,10 @@ from indirect import Value
 `main.py`:
 
 ```py
-from facade import Value
+from facade import Value  # no diagnostic
 ```
 
-## Module ownership
+### Module ownership
 
 Import names can differ from distribution names. Namespace packages can also contain modules from
 several distributions, so the most specific known owner determines the dependency to declare.
@@ -323,7 +477,7 @@ shared_namespace = ["indirect"]
 typed = ["runtime"]
 ```
 
-### Namespace children
+#### Namespace children
 
 The namespace itself has no unique owner. Its children do, including children imported with
 `from ns import ...`. Distinct missing distributions in one statement receive separate diagnostics.
@@ -352,8 +506,8 @@ value = 1
 `main.py`:
 
 ```py
-import ns
-import ns.core
+import ns  # no diagnostic
+import ns.core  # no diagnostic
 
 # error: [missing-direct-dependency] "direct dependency on `storage-distribution`"
 # error: [missing-direct-dependency] "direct dependency on `other-distribution`"
@@ -363,10 +517,10 @@ import ns.storage  # error: [missing-direct-dependency] "direct dependency on `s
 from ns.storage import value  # error: [missing-direct-dependency] "direct dependency on `storage-distribution`"
 
 # `ns.storage` is not a module-name prefix of `ns.storage_extra`.
-import ns.storage_extra
+import ns.storage_extra  # no diagnostic
 ```
 
-### Namespaces containing local and installed modules
+#### Namespaces containing local and installed modules
 
 A namespace can contain both local modules and modules from an installed distribution. Ownership of
 the installed part does not imply ownership of the namespace or its local children. Only imports of
@@ -385,15 +539,15 @@ the external child require that distribution as a dependency.
 `main.py`:
 
 ```py
-import shared_namespace
-from shared_namespace import local
-import shared_namespace.local
+import shared_namespace  # no diagnostic
+from shared_namespace import local  # no diagnostic
+import shared_namespace.local  # no diagnostic
 
 from shared_namespace import external  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
 import shared_namespace.external  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
 ```
 
-### Shared namespaces with inline stubs
+#### Shared namespaces with inline stubs
 
 An installed `__init__.pyi` does not change which modules share the namespace at runtime. Imports of
 the namespace and its local child remain allowed; imports of its installed child require a
@@ -417,15 +571,15 @@ dependency.
 `main.py`:
 
 ```py
-import shared_namespace
-from shared_namespace import local
-import shared_namespace.local
+import shared_namespace  # no diagnostic
+from shared_namespace import local  # no diagnostic
+import shared_namespace.local  # no diagnostic
 
 from shared_namespace import external  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
 import shared_namespace.external  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
 ```
 
-### Ambiguous ownership
+#### Ambiguous ownership
 
 When multiple distributions claim the same module, the rule does not guess which one to declare.
 
@@ -440,10 +594,10 @@ candidate distributions in the diagnostic.
 `main.py`:
 
 ```py
-import shared
+import shared  # no diagnostic
 ```
 
-### Runtime distributions with separate stubs
+#### Runtime distributions with separate stubs
 
 Type checking can resolve an import through a stub package. The runtime module's distribution still
 determines the dependency required by a runtime import.
@@ -469,7 +623,7 @@ from typed import value  # error: [missing-direct-dependency] "direct dependency
 reveal_type(value)  # revealed: int
 ```
 
-### Package stubs for runtime namespaces
+#### Package stubs for runtime namespaces
 
 An `__init__.pyi` does not make a regular package at runtime. The resulting namespace may include
 files from other locations, so importing it does not identify a missing dependency.
@@ -483,14 +637,14 @@ value: int
 `main.py`:
 
 ```py
-import typed
-from typed import value
+import typed  # no diagnostic
+from typed import value  # no diagnostic
 
 reveal_type(typed.value)  # revealed: int
 reveal_type(value)  # revealed: int
 ```
 
-### Native runtime distributions with visible stubs
+#### Native runtime distributions with visible stubs
 
 For a native runtime module, ty may only resolve a `.pyi` file. Ownership supplied by the package
 manager still identifies the runtime dependency, while the stub supplies its types.
@@ -509,10 +663,10 @@ import typed  # error: [missing-direct-dependency] "direct dependency on `runtim
 reveal_type(typed.value)  # revealed: int
 ```
 
-## Projects and dependency groups
+### Projects and dependency groups
 
-The root project declares `direct-dependency` as a runtime dependency and `development-tool` in a
-dependency group. A nested project has its own dependency declarations.
+The root project declares `direct-dependency` as a runtime dependency. A nested project has its own
+dependency declarations.
 
 ```toml
 [environment]
@@ -523,7 +677,7 @@ missing-direct-dependency = "warn"
 
 [dependency-metadata]
 projects = [
-    { path = "/src", distribution = "app", dependencies = ["direct"], group-dependencies = ["dev"] },
+    { path = "/src", distribution = "app", dependencies = ["direct"] },
     { path = "/src/nested", distribution = "nested", dependencies = ["indirect"] },
 ]
 
@@ -531,7 +685,6 @@ projects = [
 app = { name = "app-project" }
 nested = { name = "nested-project" }
 direct = { name = "direct-dependency" }
-dev = { name = "development-tool" }
 indirect = { name = "indirect-distribution" }
 editable = { name = "editable-distribution", editable-path = "/editable/lib" }
 
@@ -539,46 +692,10 @@ editable = { name = "editable-distribution", editable-path = "/editable/lib" }
 app = ["app"]
 nested = ["nested"]
 direct = ["direct"]
-devtool = ["dev"]
 indirect = ["indirect"]
 ```
 
-### Package code and tests
-
-Package code cannot rely on a dependency group. Tests can use direct group dependencies, but not
-packages installed only as their transitive dependencies.
-
-`/.venv/<path-to-site-packages>/direct/__init__.py`:
-
-```py
-```
-
-`/.venv/<path-to-site-packages>/devtool/__init__.py`:
-
-```py
-```
-
-`/.venv/<path-to-site-packages>/indirect/__init__.py`:
-
-```py
-```
-
-`app/__init__.py`:
-
-```py
-import direct
-import devtool  # error: [missing-direct-dependency] "direct dependency on `development-tool`"
-```
-
-`tests/test_app.py`:
-
-```py
-import direct
-import devtool
-import indirect  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
-```
-
-### Nested workspace members
+#### Nested workspace members
 
 The nearest containing project supplies the dependency declarations. Neither project can borrow the
 other's direct dependencies.
@@ -596,18 +713,18 @@ other's direct dependencies.
 `main.py`:
 
 ```py
-import direct
+import direct  # no diagnostic
 import indirect  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
 ```
 
 `nested/main.py`:
 
 ```py
-import indirect
+import indirect  # no diagnostic
 import direct  # error: [missing-direct-dependency] "direct dependency on `direct-dependency`"
 ```
 
-### Editable dependencies
+#### Editable dependencies
 
 An editable distribution can expose a module whose name differs from its distribution name. Its
 source path identifies the owner even without an entry in the module-owner map.
@@ -629,7 +746,7 @@ source path identifies the owner even without an entry in the module-owner map.
 import lib_module  # error: [missing-direct-dependency] "direct dependency on `editable-distribution`"
 ```
 
-### Editable legacy namespaces
+#### Editable legacy namespaces
 
 Two editable distributions contribute to the same legacy namespace. The project directly depends on
 the distribution providing `ns.child`, but not on the distribution providing `ns/__init__.py`.
@@ -680,9 +797,9 @@ value = 2
 `main.py`:
 
 ```py
-import ns.child
-from ns.child import value
-from ns import child
+import ns.child  # no diagnostic
+from ns.child import value  # no diagnostic
+from ns import child  # no diagnostic
 ```
 
 Importing an attribute of the parent still requires its distribution, even when the same statement
@@ -702,7 +819,7 @@ Star imports also require the parent's distribution.
 from ns import *  # error: [missing-direct-dependency] "direct dependency on `parent-distribution`"
 ```
 
-### Editable source roots also configured explicitly
+#### Editable source roots also configured explicitly
 
 The `.pth` file identifies package code even when the same directory is configured in `extra-paths`.
 Tests outside that source directory can use direct dependency-group dependencies.
@@ -746,10 +863,10 @@ import devtool  # error: [missing-direct-dependency] "direct dependency on `deve
 `tests/test_app.py`:
 
 ```py
-import devtool
+import devtool  # no diagnostic
 ```
 
-### Flat editable roots
+#### Flat editable roots
 
 An editable search path covering the whole member also makes its tests and development scripts
 importable. Without module ownership, that path does not identify which files belong to the
@@ -795,84 +912,23 @@ indirect = ["indirect"]
 `member/app/__init__.py`:
 
 ```py
-import devtool
+import devtool  # no diagnostic
 ```
 
 `member/tests/test_app.py`:
 
 ```py
-import devtool
+import devtool  # no diagnostic
 ```
 
 `member/scripts/develop.py`:
 
 ```py
-import devtool
+import devtool  # no diagnostic
 import indirect  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
 ```
 
-## Script dependency declarations
-
-A PEP 723 script declares runtime dependencies in its inline `dependencies` list. It can import
-`direct-dependency`, but importing the installed `indirect-distribution` requires its own
-declaration. Imports guarded by `TYPE_CHECKING` do not count. Each runtime import of an undeclared
-dependency is reported.
-
-```toml
-[environment]
-python = "/.venv"
-```
-
-`/.venv/<path-to-site-packages>/direct/__init__.py`:
-
-```py
-```
-
-`/.venv/<path-to-site-packages>/indirect/__init__.py`:
-
-```py
-```
-
-`script.py`:
-
-```py
-# /// script
-# dependencies = ["direct-dependency"]
-# [tool.ty.rules]
-# missing-direct-dependency = "warn"
-# [tool.ty.dependency-metadata]
-# projects = [{ path = "/src/script.py", dependencies = ["direct"] }]
-# [tool.ty.dependency-metadata.distributions]
-# direct = { name = "direct-dependency" }
-# indirect = { name = "indirect-distribution" }
-# [tool.ty.dependency-metadata.module-owners]
-# direct = ["direct"]
-# indirect = ["indirect"]
-# ///
-
-from typing import TYPE_CHECKING
-
-import direct
-
-if TYPE_CHECKING:
-    import indirect
-
-# snapshot: missing-direct-dependency
-import indirect
-import indirect as alias  # error: [missing-direct-dependency] "Import of `indirect` requires a direct dependency on `indirect-distribution`"
-```
-
-```snapshot
-warning[missing-direct-dependency]: Import of `indirect` requires a direct dependency on `indirect-distribution`
-  --> src/script.py:23:8
-   |
-23 | import indirect
-   |        ^^^^^^^^
-help: Declare `indirect-distribution` in the script's inline `dependencies` metadata
-info: See https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies
-```
-
-## Script and workspace isolation
+### Script and workspace isolation
 
 The project and two scripts have different declarations. An import is allowed only when the file's
 own declarations include its distribution.
@@ -909,7 +965,7 @@ script_dep = ["script"]
 `main.py`:
 
 ```py
-import project_dep
+import project_dep  # no diagnostic
 import script_dep  # error: [missing-direct-dependency] "direct dependency on `script-dependency`"
 ```
 
@@ -933,7 +989,7 @@ The first script declares only `script-dependency`. The project's declaration of
 # script_dep = ["script"]
 # ///
 
-import script_dep
+import script_dep  # no diagnostic
 import project_dep  # error: [missing-direct-dependency] "direct dependency on `project-dependency`"
 ```
 
@@ -957,11 +1013,11 @@ of `script-dependency`.
 # script_dep = ["script"]
 # ///
 
-import project_dep
+import project_dep  # no diagnostic
 import script_dep  # error: [missing-direct-dependency] "direct dependency on `script-dependency`"
 ```
 
-## Dependencies imported by local modules
+### Dependencies imported by local modules
 
 Script dependency checks currently cover imports in the script itself. They do not check imports in
 local modules against the script's declarations, a limitation tracked in
@@ -993,7 +1049,7 @@ attrs = ["attrs"]
 `b.py`:
 
 ```py
-import attrs
+import attrs  # no diagnostic
 ```
 
 Importing `b` does not report its dependency on `attrs` as missing from the script. Importing
@@ -1014,11 +1070,34 @@ Importing `b` does not report its dependency on `attrs` as missing from the scri
 # attrs = ["attrs"]
 # ///
 
-import b
+import b  # no diagnostic
 import attrs  # error: [missing-direct-dependency] "Import of `attrs` requires a direct dependency on `attrs`"
 ```
 
-## Unavailable script metadata
+### Without dependency metadata
+
+Enabling the rule has no effect when the package manager has not supplied dependency metadata.
+
+```toml
+[environment]
+python = "/.venv"
+
+[rules]
+missing-direct-dependency = "warn"
+```
+
+`/.venv/<path-to-site-packages>/indirect/__init__.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import indirect  # no diagnostic
+```
+
+### Unavailable script metadata
 
 Without metadata for a script's environment, the rule cannot establish module ownership. It skips
 that script even when the enclosing project has dependency metadata.
@@ -1060,10 +1139,10 @@ import indirect  # error: [missing-direct-dependency]
 # missing-direct-dependency = "warn"
 # ///
 
-import indirect
+import indirect  # no diagnostic
 ```
 
-## Disabled rule
+### Disabled rule
 
 Dependency metadata does not make the rule mandatory. It can be disabled through rule selection.
 
@@ -1092,5 +1171,5 @@ indirect = ["indirect"]
 `main.py`:
 
 ```py
-import indirect
+import indirect  # no diagnostic
 ```

@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_semantic::BindingKind;
 use ruff_text_size::TextRange;
 
 use crate::Violation;
@@ -66,6 +67,21 @@ pub(crate) fn builtin_variable_shadowing(checker: &Checker, name: &str, range: T
         name,
         "__doc__" | "__name__" | "__loader__" | "__package__" | "__spec__"
     ) {
+        return;
+    }
+
+    // In class scope, attribute bindings (e.g., `id = 1`) are covered by
+    // `builtin-attribute-shadowing` (A003), but other bindings (e.g., a `for`
+    // target or `:=`) are not and still shadow the builtin.
+    let scope = checker.semantic().current_scope();
+    if scope.kind.is_class()
+        && scope.get(name).is_none_or(|binding_id| {
+            matches!(
+                checker.semantic().binding(binding_id).kind,
+                BindingKind::Assignment | BindingKind::Annotation
+            )
+        })
+    {
         return;
     }
 

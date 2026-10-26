@@ -10,14 +10,15 @@ request already addresses the issue, do not submit a competing one without maint
 
 ## PR conventions
 
-Before opening a PR, inspect the repository's available GitHub labels and the current Rooster
-configuration, including required and ignored labels, in the `[tool.rooster]` and
+Before opening a PR, inspect the repository's available GitHub labels and their descriptions,
+excluding archived labels. Also inspect the current Rooster configuration, including required and
+ignored labels, in the `[tool.rooster]` and
 `[tool.rooster.section-labels]` sections of [Ruff's `pyproject.toml`](pyproject.toml) and
 [ty's `pyproject.toml`](https://github.com/astral-sh/ty/blob/main/pyproject.toml). Labels such as
 `internal`, `testing`, and `ci` can exclude a PR from a changelog. Decide whether and how the change
-should appear in each changelog, then select appropriate labels.
+should appear in each changelog, then select appropriate labels for the PR's content.
 
-When working on ty, PR titles should start with `[ty]`. Add the `ty` GitHub label.
+When working on ty, PR titles should start with `[ty]`. If you can, add the `ty` GitHub label.
 
 If you have permission, apply the selected labels when creating the PR or afterward, then verify
 that the PR's actual labels include them and have the intended effect on each changelog. If the
@@ -57,18 +58,18 @@ Preserve useful human-written comments unless the code change makes them inaccur
 
 ## Running Tests
 
-Run all tests (using `nextest` for faster execution and setting `INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1` to ensure all snapshots are updated):
+File-watcher tests rely on operating-system events that some execution environments do not deliver. Do not run tests that depend on these events in a Codex sandbox or another sandbox where these events may not be delivered; for example, the `ty` crate's `file_watching` integration tests can time out waiting for them. The commands below exclude that test binary. It is usually unnecessary to run file-watcher tests locally before filing a change unless you are certain that the change affects file-watching behavior. To run the `file_watching` binary, use an environment that delivers file-watcher events and run `cargo nextest run -p ty --test file_watching` or `cargo test -p ty --test file_watching`, using the snapshot environment variables shown below.
+
+Run the workspace tests except `file_watching` (using `nextest` for faster execution and setting `INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1` to ensure all snapshots are updated):
 
 ```sh
-INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run
+INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run --workspace -E 'not binary(=file_watching)'
 ```
 
-File-watcher tests do not work inside the sandbox. It is usually unnecessary to run them locally before filing a change unless you are certain that the change affects file-watching behavior.
-
-Run tests for a specific crate:
+Run tests for a specific crate. Keep the filter when substituting another crate, including `ty`:
 
 ```sh
-INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic
+INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic -E 'not binary(=file_watching)'
 ```
 
 Run a single mdtest file. The path to the mdtest file should be relative to the `crates/ty_python_semantic/resources/mdtest` folder. Include `--test mdtest` to avoid building unrelated test binaries:
@@ -85,12 +86,19 @@ MDTEST_TEST_FILTER="<filter>" INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDA
 
 ### Fallback without nextest
 
-If `cargo nextest` is not available, use `cargo test` with the same environment variables:
+If `cargo nextest` is not available, use `cargo test` with the same environment variables. For the workspace, exclude `ty` and then run its other test targets explicitly. If new non-watcher test targets are added to `ty`, add them to the `ty` command below; `cargo metadata --no-deps --format-version 1` lists each crate's targets:
 
 ```sh
-# Run all tests.
-INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo test
+# Run workspace tests outside the ty crate.
+INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo test --workspace --exclude ty
 
+# Run ty tests except file_watching.
+INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty --lib --bins --test cli --test self_environment
+```
+
+To run tests for one crate, use the `ty` command above for `ty`; for other crates, use:
+
+```sh
 # Run tests for a specific crate.
 INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty_python_semantic
 
@@ -113,7 +121,7 @@ Never edit snapshot files or inline snapshot bodies manually. Regenerate them by
 
 - Write mdtests as readable, literate specifications, and minimize the context a reader must hold in mind. Prefer short, focused code blocks, and define types, fixtures, and helpers close to the assertions that use them. Sections and subsections can be long when they develop a coherent topic through many short examples interspersed with prose. Do not split a subsection, or flag it in review, solely because of its length. Give independent scenarios separate sibling Markdown test headings at the same level; only introduce child headings if any existing code beneath their parent is first moved into child sections. When scenarios need shared setup, interleave short prose-and-code blocks under the same heading.
 - Code blocks for the same file within a section are concatenated into one file. For inline snapshots, keep each example's code block close to its `# snapshot` block. Ideally, any given code block only has one snapshot in it, but one codeblock containing several snapshots is also acceptable. Repeating a short, independent function definition, including one with the same name, is fine if it keeps the code triggering a snapshot close to the snapshot demonstrating the expected diagnostic on that code. Reuse shared setup when clearer, and check that repeated names do not affect other examples.
-- When a Python statement in an mdtest is included only or primarily to check that ty does not emit a diagnostic for it, normally add a `# no diagnostic` comment on or above the statement. Statements used as setup for later assertions do not necessarily need such comments.
+- When a Python statement in an mdtest is included only or primarily to check that ty does not emit a diagnostic for it, normally add a `# no diagnostic` comment on or above the statement. Statements used as setup for later assertions do not need such comments.
 - Prioritize document structure and readability over avoiding duplicated setup. Add a test to an existing section when its heading accurately describes the new scenario, adding or improving introductory prose as needed; otherwise, create a separate sibling section, even if that requires repeating a small fixture.
 - Order mdtests from basic, common behavior to more specialized cases. Place narrow regression tests alongside closely related examples when they fit naturally; otherwise, put them near the end of the relevant section or file. Do not put an obscure special case at the beginning simply because it is the newest regression.
 - Aim for readable documents that serve as both documentation and tests. Use prose to explain the key type checker behavior and its rationale where helpful. A sentence or fragment may suffice; avoid repeating what the heading, surrounding explanation, or assertions already make clear. Use clear, precise terminology. Avoid using jargon where it's unnecessary, and avoid inventing new jargon if there's an existing term of art used in that file. Avoid long paragraphs covering multiple scenarios followed by a single long code block.
@@ -196,10 +204,6 @@ but ask for guidance from the user if this would require significant refactoring
 For Salsa-cached values, avoid retaining excess collection capacity. Prefer boxed slices; otherwise shrink collections that may have spare capacity before returning them. In particular, inspect `HashMap` and `HashSet` values constructed via `extend`, `collect`, explicit reservation, or removal, since those operations can leave capacity that insert-only construction does not.
 
 Salsa caching can occur due to a function/method having `#[salsa::tracked]` on it, or due to a struct with `#[salsa::interned]` being constructed.
-
-## Generated Release Workflow
-
-Parts of `.github/workflows/release.yml` are generated by cargo-dist from `dist-workspace.toml`. Before editing the release workflow, check whether the relevant section is generated. Prefer changing `dist-workspace.toml` or the referenced reusable workflow instead of editing generated YAML. After modifying cargo-dist configuration, regenerate the workflow with the cargo-dist version pinned in `dist-workspace.toml` and inspect the resulting diff to ensure the change will survive future regenerations.
 
 ## Development Guidelines
 

@@ -42,14 +42,14 @@ from _typeshed import (
     SupportsRichComparisonT,
     SupportsWrite,
 )
-from collections.abc import Awaitable, Callable, Iterable, Iterator, MutableSet, Set as AbstractSet, Sized
+from collections.abc import Awaitable, Callable, Hashable, Iterable, Iterator, MutableSet, Set as AbstractSet, Sized
 from io import BufferedRandom, BufferedReader, BufferedWriter, FileIO, TextIOWrapper
 from os import PathLike
 from types import CellType, CodeType, EllipsisType, GenericAlias, NotImplementedType, TracebackType, UnionType
 
 # mypy crashes if any of {ByteString, Sequence, MutableSequence, Mapping, MutableMapping}
 # are imported from collections.abc in builtins.pyi
-from typing import (  # noqa: Y022,UP035
+from typing import (  # noqa: Y022  # ruff: ignore[deprecated-import]
     IO,
     Any,
     BinaryIO,
@@ -77,7 +77,8 @@ from typing import (  # noqa: Y022,UP035
 )
 
 # we can't import `Literal` from typing or mypy crashes: see #11247
-from typing_extensions import Literal, LiteralString, Self, TypeIs, TypeVarTuple, deprecated, disjoint_base  # noqa: Y023, UP035
+# ruff: ignore[deprecated-import]
+from typing_extensions import Literal, LiteralString, Self, TypeIs, TypeVarTuple, deprecated, disjoint_base  # noqa: Y023
 
 if sys.version_info >= (3, 14):
     from _typeshed import AnnotateFunc
@@ -103,11 +104,11 @@ _P = ParamSpec("_P")
 
 # Type variables for slice
 _StartT_co = TypeVar("_StartT_co", covariant=True, default=Any)  # slice -> slice[Any, Any, Any]
-_StopT_co = TypeVar("_StopT_co", covariant=True, default=_StartT_co)  #  slice[A] -> slice[A, A, A]
+_StopT_co = TypeVar("_StopT_co", covariant=True, default=_StartT_co)  # slice[A] -> slice[A, A, A]
 # NOTE: step could differ from start and stop, (e.g. datetime/timedelta)l
 #   the default (start|stop) is chosen to cater to the most common case of int/index slices.
 # FIXME: https://github.com/python/typing/issues/213 (replace step=start|stop with step=start&stop)
-_StepT_co = TypeVar("_StepT_co", covariant=True, default=_StartT_co | _StopT_co)  #  slice[A,B] -> slice[A, B, A|B]
+_StepT_co = TypeVar("_StepT_co", covariant=True, default=_StartT_co | _StopT_co)  # slice[A,B] -> slice[A, B, A|B]
 
 @disjoint_base
 class object:
@@ -1489,7 +1490,10 @@ class str(Sequence[str]):
     def __mod__(self: LiteralString, value: LiteralString | tuple[LiteralString, ...], /) -> LiteralString:
         """Return self%value."""
     @overload
-    def __mod__(self, value: Any, /) -> str: ...
+    def __mod__(self, value: object, /) -> str: ...
+
+    def __rmod__(self, value: str, /) -> str:
+        """Return value%self."""
 
     @overload
     def __mul__(self: LiteralString, value: SupportsIndex, /) -> LiteralString:
@@ -1970,8 +1974,12 @@ class bytes(Sequence[int]):
     def __rmul__(self, value: SupportsIndex, /) -> bytes:
         """Return value*self."""
 
+    # The format string chooses the conversion, including numbers and %a/%r (PEP 461).
     def __mod__(self, value: Any, /) -> bytes:
         """Return self%value."""
+
+    def __rmod__(self, value: bytes, /) -> bytes:
+        """Return value%self."""
 
     # Incompatible with Sequence.__contains__
     def __contains__(self, key: SupportsIndex | ReadableBuffer, /) -> bool:  # type: ignore[override]
@@ -2523,8 +2531,12 @@ class bytearray(MutableSequence[int]):
     def __imul__(self, value: SupportsIndex, /) -> Self:
         """Implement self*=value."""
 
-    def __mod__(self, value: Any, /) -> bytes:
+    # The format string chooses the conversion, including numbers and %a/%r (PEP 461).
+    def __mod__(self, value: Any, /) -> bytearray:
         """Return self%value."""
+
+    def __rmod__(self, value: bytearray, /) -> bytearray:
+        """Return value%self."""
 
     # Incompatible with Sequence.__contains__
     def __contains__(self, key: SupportsIndex | ReadableBuffer, /) -> bool:  # type: ignore[override]
@@ -2626,7 +2638,7 @@ class memoryview(Sequence[_I]):
     def __enter__(self) -> Self: ...
     def __exit__(
         self,
-        exc_type: type[BaseException] | None,  # noqa: PYI036 # This is the module declaring BaseException
+        exc_type: type[BaseException] | None,  # ruff: ignore[bad-exit-annotation] # This is the module declaring BaseException
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
         /,
@@ -2877,7 +2889,7 @@ class tuple(Sequence[_T_co]):
     def __gt__(self, value: tuple[_T_co, ...], /) -> bool: ...
     def __ge__(self, value: tuple[_T_co, ...], /) -> bool: ...
     def __eq__(self, value: object, /) -> bool: ...
-    def __hash__(self) -> int: ...
+    def __hash__(self: tuple[Hashable, ...]) -> int: ...
 
     @overload
     def __add__(self, value: tuple[_T_co, ...], /) -> tuple[_T_co, ...]:
@@ -3225,15 +3237,16 @@ class dict(MutableMapping[_KT, _VT]):
 if sys.version_info >= (3, 15):
     @disjoint_base
     class frozendict(Mapping[_KT, _VT]):
-        """dict() -> new empty dictionary
-        dict(mapping) -> new dictionary initialized from a mapping object's
-            (key, value) pairs
-        dict(iterable) -> new dictionary initialized as if via:
+        """frozendict() -> new empty immutable dictionary
+        frozendict(mapping) -> new immutable dictionary initialized from a mapping
+            object's (key, value) pairs
+        frozendict(iterable) -> new immutable dictionary initialized as if via:
             d = {}
             for k, v in iterable:
                 d[k] = v
-        dict(**kwargs) -> new dictionary initialized with the name=value pairs
-            in the keyword argument list.  For example:  dict(one=1, two=2)
+            d = frozendict(d)
+        frozendict(**kwargs) -> new immutable dictionary initialized with the name=value
+            pairs in the keyword argument list.  For example:  frozendict(one=1, two=2)
         """
 
         @overload
@@ -3385,11 +3398,23 @@ class set(MutableSet[_T]):
     def __iand__(self, value: AbstractSet[object], /) -> Self:
         """Return self&=value."""
 
+    @overload
+    def __rand__(self, value: set[_S], /) -> set[_S]:
+        """Return value&self."""
+    @overload
+    def __rand__(self, value: frozenset[_S], /) -> frozenset[_S]: ...
+
     def __or__(self, value: AbstractSet[_S], /) -> set[_T | _S]:
         """Return self|value."""
 
     def __ior__(self, value: AbstractSet[_T], /) -> Self:  # type: ignore[override,misc]
         """Return self|=value."""
+
+    @overload
+    def __ror__(self, value: set[_S], /) -> set[_T | _S]:
+        """Return value|self."""
+    @overload
+    def __ror__(self, value: frozenset[_S], /) -> frozenset[_T | _S]: ...
 
     def __sub__(self, value: AbstractSet[object], /) -> set[_T]:
         """Return self-value."""
@@ -3397,11 +3422,23 @@ class set(MutableSet[_T]):
     def __isub__(self, value: AbstractSet[object], /) -> Self:
         """Return self-=value."""
 
+    @overload
+    def __rsub__(self, value: set[_S], /) -> set[_S]:
+        """Return value-self."""
+    @overload
+    def __rsub__(self, value: frozenset[_S], /) -> frozenset[_S]: ...
+
     def __xor__(self, value: AbstractSet[_S], /) -> set[_T | _S]:
         """Return self^value."""
 
     def __ixor__(self, value: AbstractSet[_T], /) -> Self:  # type: ignore[override,misc]
         """Return self^=value."""
+
+    @overload
+    def __rxor__(self, value: set[_S], /) -> set[_T | _S]:
+        """Return value^self."""
+    @overload
+    def __rxor__(self, value: frozenset[_S], /) -> frozenset[_T | _S]: ...
 
     def __le__(self, value: AbstractSet[object], /) -> bool: ...
     def __lt__(self, value: AbstractSet[object], /) -> bool: ...
@@ -3457,14 +3494,38 @@ class frozenset(AbstractSet[_T_co]):
     def __and__(self, value: AbstractSet[object], /) -> frozenset[_T_co]:
         """Return self&value."""
 
+    @overload
+    def __rand__(self, value: set[_S], /) -> set[_S]:
+        """Return value&self."""
+    @overload
+    def __rand__(self, value: frozenset[_S], /) -> frozenset[_S]: ...
+
     def __or__(self, value: AbstractSet[_S], /) -> frozenset[_T_co | _S]:
         """Return self|value."""
+
+    @overload
+    def __ror__(self, value: set[_S], /) -> set[_T_co | _S]:
+        """Return value|self."""
+    @overload
+    def __ror__(self, value: frozenset[_S], /) -> frozenset[_T_co | _S]: ...
 
     def __sub__(self, value: AbstractSet[object], /) -> frozenset[_T_co]:
         """Return self-value."""
 
+    @overload
+    def __rsub__(self, value: set[_S], /) -> set[_S]:
+        """Return value-self."""
+    @overload
+    def __rsub__(self, value: frozenset[_S], /) -> frozenset[_S]: ...
+
     def __xor__(self, value: AbstractSet[_S], /) -> frozenset[_T_co | _S]:
         """Return self^value."""
+
+    @overload
+    def __rxor__(self, value: set[_S], /) -> set[_T_co | _S]:
+        """Return value^self."""
+    @overload
+    def __rxor__(self, value: frozenset[_S], /) -> frozenset[_T_co | _S]: ...
 
     def __le__(self, value: AbstractSet[object], /) -> bool: ...
     def __lt__(self, value: AbstractSet[object], /) -> bool: ...
@@ -4880,8 +4941,8 @@ def __build_class__(func: Callable[[], CellType | Any], name: str, /, *bases: An
     Internal helper function used by the class statement.
     """
 
-# Backwards compatibility hack for folks who relied on the ellipsis type
-# existing in typeshed in Python 3.9 and earlier.
+# Temporary compatibility hack: Pydantic 2.13 uses this legacy typeshed alias in Field overloads,
+# although it does not exist at runtime; remove in early/mid 2027?
 ellipsis = EllipsisType
 
 Ellipsis: EllipsisType

@@ -423,6 +423,9 @@ PERF403 [*] Use a dictionary comprehension instead of a for-loop
 232 |     ) in ["a", "b", "c"]:
 233 |         result[k] = k
     |         ^^^^^^^^^^^^^
+234 |
+235 | def f(values):
+    |
 help: Replace for loop with dict comprehension
     |
 228 |     # comment duplication in target (https://github.com/astral-sh/ruff/issues/18787)
@@ -433,5 +436,88 @@ help: Replace for loop with dict comprehension
     -         result[k] = k
 229 +     # comment
 230 +     result = {k: k for k in ["a", "b", "c"]}
+231 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:239:9
+    |
+237 |     result = {}
+238 |     for key, value in [values] if isinstance(values, tuple) else values:
+239 |         result[key] = value
+    |         ^^^^^^^^^^^^^^^^^^^
+240 |     return result
+    |
+help: Replace for loop with dict comprehension
+    |
+236 |     # ternary iterable must be parenthesized (https://github.com/astral-sh/ruff/issues/29365)
+    -     result = {}
+    -     for key, value in [values] if isinstance(values, tuple) else values:
+    -         result[key] = value
+237 +     result = {key: value for key, value in ([values] if isinstance(values, tuple) else values)}
+238 |     return result
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use `dict.update` instead of a for-loop
+   --> PERF403.py:246:9
+    |
+244 |     result = {0: 0}
+245 |     for key, value in ([values] if isinstance(values, tuple) else values):
+246 |         result[key] = value
+    |         ^^^^^^^^^^^^^^^^^^^
+247 |     return result
+    |
+help: Replace for loop with `dict.update`
+    |
+244 |     result = {0: 0}
+    -     for key, value in ([values] if isinstance(values, tuple) else values):
+    -         result[key] = value
+245 +     result.update({key: value for key, value in ([values] if isinstance(values, tuple) else values)})
+246 |     return result
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:253:9
+    |
+251 |     result = {}
+252 |     for key, value in lambda: values:
+253 |         result[key] = value
+    |         ^^^^^^^^^^^^^^^^^^^
+254 |     return result
+    |
+help: Replace for loop with dict comprehension
+    |
+250 |     # lambda iterable
+    -     result = {}
+    -     for key, value in lambda: values:
+    -         result[key] = value
+251 +     result = {key: value for key, value in (lambda: values)}
+252 |     return result
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:276:9
+    |
+274 |         values if values else ()
+275 |     ):
+276 |         result[key] = value
+    |         ^^^^^^^^^^^^^^^^^^^
+277 |     return result
+    |
+help: Replace for loop with dict comprehension
+    |
+271 |     # comment inside the iterable's parentheses is kept with the iterable, not duplicated
+    -     result = {}
+    -     for key, value in (  # comment
+272 +     result = {key: value for key, value in (  # comment
+273 |         values if values else ()
+    -     ):
+    -         result[key] = value
+274 +     )}
+275 |     return result
     |
 note: This is an unsafe fix and may change runtime behavior

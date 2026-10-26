@@ -767,6 +767,248 @@ fn github_diagnostics() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn sarif_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            division-by-zero = "warn"
+            unused-ignore-comment = "error"
+
+            [[overrides]]
+            include = ["a.py"]
+
+            [overrides.rules]
+            unresolved-reference = "warn"
+            "#,
+        ),
+        ("a.py", "print(x)"),
+        (
+            "b.py",
+            r#"
+            print(x)
+            1 / 0  # ty: ignore[unresolved-reference]
+            "#,
+        ),
+    ])?
+    .with_filter(
+        r#"("fullDescription": \{\s*"text": ")[^\n]*(")"#,
+        "$1[DESCRIPTION]$2",
+    )
+    .with_filter(r#"(?m)^(\s{10}"version": ")[^"]+"#, "$1[VERSION]")
+    .with_filter(r#"file://[^"]*/project/"#, "file://<temp_dir>/");
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=sarif"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    {
+      "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+      "runs": [
+        {
+          "results": [
+            {
+              "level": "warning",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/a.py"
+                    },
+                    "region": {
+                      "endColumn": 8,
+                      "endLine": 1,
+                      "startColumn": 7,
+                      "startLine": 1
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Name `x` used when not defined"
+              },
+              "ruleId": "unresolved-reference"
+            },
+            {
+              "level": "error",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/b.py"
+                    },
+                    "region": {
+                      "endColumn": 8,
+                      "endLine": 2,
+                      "startColumn": 7,
+                      "startLine": 2
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Name `x` used when not defined"
+              },
+              "ruleId": "unresolved-reference"
+            },
+            {
+              "level": "warning",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/b.py"
+                    },
+                    "region": {
+                      "endColumn": 6,
+                      "endLine": 3,
+                      "startColumn": 1,
+                      "startLine": 3
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Cannot divide object of type `Literal[1]` by zero"
+              },
+              "ruleId": "division-by-zero"
+            },
+            {
+              "fixes": [
+                {
+                  "artifactChanges": [
+                    {
+                      "artifactLocation": {
+                        "uri": "file://<temp_dir>/b.py"
+                      },
+                      "replacements": [
+                        {
+                          "deletedRegion": {
+                            "endColumn": 42,
+                            "endLine": 3,
+                            "startColumn": 6,
+                            "startLine": 3
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "description": {
+                    "text": "Remove the unused suppression comment"
+                  }
+                }
+              ],
+              "level": "error",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/b.py"
+                    },
+                    "region": {
+                      "endColumn": 42,
+                      "endLine": 3,
+                      "startColumn": 8,
+                      "startLine": 3
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Unused `ty: ignore` directive"
+              },
+              "ruleId": "unused-ignore-comment"
+            }
+          ],
+          "tool": {
+            "driver": {
+              "informationUri": "https://github.com/astral-sh/ty",
+              "name": "ty",
+              "rules": [
+                {
+                  "defaultConfiguration": {
+                    "enabled": false
+                  },
+                  "fullDescription": {
+                    "text": "[DESCRIPTION]"
+                  },
+                  "help": {
+                    "text": "detects division by zero"
+                  },
+                  "helpUri": "https://ty.dev/rules#division-by-zero",
+                  "id": "division-by-zero",
+                  "properties": {
+                    "id": "division-by-zero",
+                    "kind": null,
+                    "name": "division-by-zero",
+                    "problem.severity": "warning"
+                  },
+                  "shortDescription": {
+                    "text": "detects division by zero"
+                  }
+                },
+                {
+                  "defaultConfiguration": {
+                    "enabled": true,
+                    "level": "error"
+                  },
+                  "fullDescription": {
+                    "text": "[DESCRIPTION]"
+                  },
+                  "help": {
+                    "text": "detects references to names that are not defined"
+                  },
+                  "helpUri": "https://ty.dev/rules#unresolved-reference",
+                  "id": "unresolved-reference",
+                  "properties": {
+                    "id": "unresolved-reference",
+                    "kind": null,
+                    "name": "unresolved-reference",
+                    "problem.severity": "error"
+                  },
+                  "shortDescription": {
+                    "text": "detects references to names that are not defined"
+                  }
+                },
+                {
+                  "defaultConfiguration": {
+                    "enabled": true,
+                    "level": "warning"
+                  },
+                  "fullDescription": {
+                    "text": "[DESCRIPTION]"
+                  },
+                  "help": {
+                    "text": "detects unused `ty: ignore` comments"
+                  },
+                  "helpUri": "https://ty.dev/rules#unused-ignore-comment",
+                  "id": "unused-ignore-comment",
+                  "properties": {
+                    "id": "unused-ignore-comment",
+                    "kind": null,
+                    "name": "unused-ignore-comment",
+                    "problem.severity": "error"
+                  },
+                  "shortDescription": {
+                    "text": "detects unused `ty: ignore` comments"
+                  }
+                }
+              ],
+              "version": "[VERSION]"
+            }
+          }
+        }
+      ],
+      "version": "2.1.0"
+    }
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
 /// This tests the diagnostic format for revealed type.
 ///
 /// This test was introduced because changes were made to

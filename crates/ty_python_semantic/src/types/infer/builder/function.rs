@@ -1,6 +1,6 @@
 use crate::{
     Db, DisplaySettings, FxIndexMap, ProgramEnvironment,
-    reachability::ReachabilityConstraintsExtension,
+    reachability::is_end_of_scope_reachable,
     types::{
         Binding, CallArguments, CallableType, ClassBase, ClassLiteral, ClassType, DynamicType,
         IntersectionBuilder, KnownClass, KnownInstanceType, ParamSpecAttrKind, SpecialFormType,
@@ -18,7 +18,8 @@ use crate::{
             add_type_expression_reference_link, is_invalid_typed_dict_literal,
             report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
             report_implicit_return_type, report_invalid_generator_function_return_type,
-            report_invalid_return_type, report_invalid_total_ordering_call,
+            report_invalid_return_type, report_invalid_runtime_checkable,
+            report_invalid_total_ordering_call,
             report_issubclass_check_against_protocol_with_non_method_members,
             report_runtime_check_against_non_runtime_checkable_protocol,
             report_runtime_check_against_typed_dict, report_shadowed_type_variable,
@@ -59,7 +60,7 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_python_edits::unwrapped_call_argument;
 use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
 use ty_python_core::{
-    Truthiness, UseDefMap,
+    Truthiness,
     definition::{Definition, DefinitionKind},
     scope::NodeWithScopeRef,
 };
@@ -207,23 +208,12 @@ impl<'db> ExpectedReturnType<'db> {
 
         check(self.public)
             .or(db, &builder, || check(self.lexical))
-            .is_always_satisfied(db, env)
+            .is_always_satisfied(db, env, TypeVarSet::None)
     }
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
-        fn can_implicitly_return_none<'db>(db: &'db dyn Db, use_def: &UseDefMap<'db>) -> bool {
-            !use_def
-                .reachability_constraints()
-                .evaluate(
-                    db,
-                    use_def.predicates(),
-                    use_def.end_of_scope_reachability(),
-                )
-                .is_always_false()
-        }
-
         let env = self.program_environment();
         let db = self.db();
 
@@ -337,9 +327,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
 
-                    let use_def = self.index.use_def_map(scope_id);
-
-                    if can_implicitly_return_none(db, use_def)
+                    if is_end_of_scope_reachable(db, self.scope())
                         && !Type::none(db, env).is_assignable_to(db, env, expected_return_ty)
                     {
                         let no_return = self.return_types_and_ranges.is_empty();
@@ -406,8 +394,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            let use_def = self.index.use_def_map(scope_id);
-            if can_implicitly_return_none(db, use_def)
+            if is_end_of_scope_reachable(db, self.scope())
                 && !Type::none(db, env).is_assignable_to(db, env, expected_ty)
             {
                 let no_return = self.return_types_and_ranges.is_empty();
@@ -449,14 +436,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let decorator_inference =
             (!decorator_list.is_empty()).then(|| function_known_decorators(self.db(), definition));
         if let Some(decorator_inference) = decorator_inference.as_ref() {
-            self.context.extend(decorator_inference.diagnostics());
+            self.context.extend(decorator_inference.context_result());
             self.expressions
                 .extend(decorator_inference.expression_types());
             self.bindings.extend(decorator_inference.bindings());
             self.called_functions
                 .extend(decorator_inference.called_functions().iter().copied());
-            self.implicit_aliases
-                .extend(decorator_inference.implicit_aliases().iter().copied());
+            self.legacy_aliases
+                .extend(decorator_inference.legacy_aliases().iter().copied());
         }
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
@@ -839,7 +826,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let annotation = param_with_default
                 .annotation()
                 .map(|annotation| function_signature_expression_type(db, definition, annotation));
-            self.infer_expression(default, TypeContext::new(annotation));
+            self.infer_expression(default, TypeContext::declared(annotation));
         }
 
         self.deferred_state = previous_deferred_state;
@@ -1813,7 +1800,10 @@ impl KnownFunction {
                         .is_none_or(|value_expr| {
                             builder
                                 .speculate_without_diagnostics()
-                                .infer_expression(value_expr, TypeContext::new(Some(casted_type)))
+                                .infer_expression(
+                                    value_expr,
+                                    TypeContext::declared(Some(casted_type)),
+                                )
                                 .is_disjoint_from(db, env, casted_type)
                         })
                     && let Some(diagnostic) =
@@ -1903,6 +1893,14 @@ impl KnownFunction {
                     source_type
                         .disjointness_error_context(db, env, casted_type)
                         .attach_to(db, env, &mut diagnostic);
+                }
+            }
+
+            KnownFunction::RuntimeCheckable => {
+                if let [Some(Type::ClassLiteral(class))] = parameter_types
+                    && !class.is_protocol(builder.db())
+                {
+                    report_invalid_runtime_checkable(&builder.context, call_expression, *class);
                 }
             }
 

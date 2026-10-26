@@ -1259,13 +1259,19 @@ attribute narrows the subject to the subclass whose attribute can match:
 
 ```py
 class Holder:
-    value: object
+    @property
+    def value(self) -> object:
+        return None
 
 class IntHolder(Holder):
-    value: int
+    @property
+    def value(self) -> int:
+        return 0
 
 class StrHolder(Holder):
-    value: str
+    @property
+    def value(self) -> str:
+        return ""
 
 def filter_holders(holder: IntHolder | StrHolder) -> None:
     match holder:
@@ -2069,7 +2075,7 @@ class GenericOverlapB(Generic[OverlapT]):
     member: OverlapT
 
 class GenericOverlapC(GenericOverlapB[str], GenericOverlapA):
-    member: str
+    member: str  # error: [invalid-attribute-override]
 
 class GenericListOverlapA: ...
 
@@ -2175,22 +2181,27 @@ def test_match_mapping_uses_get(value: CustomGet) -> None:
     match value:
         case {"item": item}:
             reveal_type(item)  # revealed: object
+```
 
+A callable stored on the instance can also provide `get`. The captured value still has type
+`object`.
+
+```py
 class InstanceGet(Protocol):
     @overload
-    def __call__(self, key: object) -> str | None: ...
+    def __call__(self, key: object) -> int | str | None: ...
     @overload
-    def __call__(self, key: object, default: Default) -> str | Default: ...
+    def __call__(self, key: object, default: Default) -> int | str | Default: ...
 
 class InstanceGetImpl:
     @overload
-    def __call__(self, key: object) -> str | None: ...
+    def __call__(self, key: object) -> int | str | None: ...
     @overload
-    def __call__(self, key: object, default: Default) -> str | Default: ...
+    def __call__(self, key: object, default: Default) -> int | str | Default: ...
     def __call__(self, key: object, default: object = None) -> object:
         return "custom" if key == "item" else default
 
-class InstanceGetMapping(Mapping[str, int]):
+class InstanceGetMapping(Mapping[str, int | str]):
     def __init__(self) -> None:
         self.get: InstanceGet = InstanceGetImpl()
 

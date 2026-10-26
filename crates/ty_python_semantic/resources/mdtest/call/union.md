@@ -153,10 +153,7 @@ def construct(use_fancy: bool):
     factory = FancyDict if use_fancy else dict
     result = factory({"answer": 42})
 
-    # TODO(#27337): `T@FancyDict` should not escape the `FancyDict` constructor arm.
-    # TODO: revealed: FancyDict[int] | dict[str, int]
-    # revealed: FancyDict[int] | dict[str, T@FancyDict | int]
-    reveal_type(result)
+    reveal_type(result)  # revealed: dict[str, int]
 ```
 
 ## Constructor checking through `type[]` in a union
@@ -205,7 +202,9 @@ def _(factory: type[IntDiag] | type[StrDiag]):
 ## Any non-callable variant
 
 ```py
-def f1(a: int): ...
+from typing import Any
+
+def f1(a: int) -> Any: ...
 def _(flag: bool):
     if flag:
         f = f1
@@ -214,14 +213,16 @@ def _(flag: bool):
 
     # error: [call-non-callable] "Object of type `Literal["This is a string literal"]` is not callable"
     x = f(3)
-    reveal_type(x)  # revealed: Unknown
+    reveal_type(x)  # revealed: Any
 ```
 
 ## Union of binding errors
 
 ```py
-def f1(): ...
-def f2(): ...
+from typing import Any
+
+def f1() -> Any: ...
+def f2() -> Any: ...
 def _(flag: bool):
     if flag:
         f = f1
@@ -231,15 +232,17 @@ def _(flag: bool):
     # error: [too-many-positional-arguments] "Too many positional arguments to function `f1`: expected 0, got 1"
     # error: [too-many-positional-arguments] "Too many positional arguments to function `f2`: expected 0, got 1"
     x = f(3)
-    reveal_type(x)  # revealed: Unknown
+    reveal_type(x)  # revealed: Any
 ```
 
 ## One not-callable, one wrong argument
 
 ```py
+from typing import Any
+
 class C: ...
 
-def f1(): ...
+def f1() -> Any: ...
 def _(flag: bool):
     if flag:
         f = f1
@@ -249,7 +252,7 @@ def _(flag: bool):
     # error: [too-many-positional-arguments] "Too many positional arguments to function `f1`: expected 0, got 1"
     # error: [call-non-callable] "Object of type `C` is not callable"
     x = f(3)
-    reveal_type(x)  # revealed: Unknown
+    reveal_type(x)  # revealed: Any
 ```
 
 ## Union including a special-cased function

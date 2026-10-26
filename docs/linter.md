@@ -26,8 +26,8 @@ For the full list of supported options, run `ruff check --help`.
 The set of enabled rules is controlled via the [`lint.select`](settings.md#lint_select),
 [`lint.extend-select`](settings.md#lint_extend-select), and [`lint.ignore`](settings.md#lint_ignore) settings.
 
-Ruff's linter mirrors Flake8's rule code system, in which each rule code consists of a one-to-three
-letter prefix, followed by three digits (e.g., `F401`). The prefix indicates that "source" of the rule
+Ruff's linter uses Flake8-style rule codes: an alphabetic prefix followed by digits (e.g., `F401`).
+The prefix indicates the source of the rule
 (e.g., `F` for Pyflakes, `E` for pycodestyle, `ANN` for flake8-annotations).
 
 Rule selectors like [`lint.select`](settings.md#lint_select) and [`lint.ignore`](settings.md#lint_ignore) accept either
@@ -356,7 +356,7 @@ $ python -m timeit "head = next(iter(range(99999999)))"
 5000000 loops, best of 5: 70.8 nsec per loop
 ```
 
-However, when the collection is empty, this raised exception changes from an `IndexError` to `StopIteration`:
+However, when the collection is empty, the raised exception changes from an `IndexError` to `StopIteration`:
 
 ```console
 $ python -c 'list(range(0))[0]'
@@ -374,18 +374,20 @@ StopIteration
 
 Since the change in exception type could break error handling upstream, this fix is categorized as unsafe.
 
-Ruff only enables safe fixes by default. Unsafe fixes can be enabled by settings [`unsafe-fixes`](settings.md#unsafe-fixes) in your configuration file or passing the `--unsafe-fixes` flag to `ruff check`:
+Ruff only applies safe fixes by default. To apply unsafe fixes as well, enable [`unsafe-fixes`](settings.md#unsafe-fixes) in your configuration file or pass the `--unsafe-fixes` flag alongside `--fix`:
 
 ```console
-# Show unsafe fixes
-ruff check --unsafe-fixes
-
 # Apply unsafe fixes
 ruff check --fix --unsafe-fixes
 ```
 
-By default, Ruff will display a hint when unsafe fixes are available but not enabled. The suggestion can be silenced
-by setting the [`unsafe-fixes`](settings.md#unsafe-fixes) setting to `false` or using the `--no-unsafe-fixes` flag.
+The default `full` output format shows all suggested fixes, regardless of the `unsafe-fixes` setting.
+This includes fixes that require manual review and cannot be applied automatically, even with
+`--unsafe-fixes`.
+
+By default, Ruff will display a hint to use `--unsafe-fixes` when unsafe fixes are available but not
+applied. The suggestion can be silenced by setting the [`unsafe-fixes`](settings.md#unsafe-fixes)
+setting to `false` or using the `--no-unsafe-fixes` flag.
 
 The safety of fixes can be adjusted per rule using the [`lint.extend-safe-fixes`](settings.md#lint_extend-safe-fixes) and [`lint.extend-unsafe-fixes`](settings.md#lint_extend-unsafe-fixes) settings.
 
@@ -618,7 +620,7 @@ def foo():
 foo()
 ```
 
-It is strongly suggested to use explicit range suppressions, in order to prevent
+We strongly suggest using explicit range suppressions to prevent
 accidental suppressions of violations, especially at global module scope.
 For this reason, a `RUF104` diagnostic will also be produced for any implicit range.
 If implicit range suppressions are desired, the `RUF104` rule can be disabled,
@@ -677,7 +679,7 @@ line, at global module scope, and preferably near the top of the file:
 # ruff: file-ignore[F401, ARG001]
 ```
 
-The full-level suppression comment specification is as follows:
+The file-level suppression comment specification is as follows:
 
 - An own-line comment starting with case sensitive `#ruff:`, with optional whitespace
   after the `#` symbol and `:` symbol, followed by `file-ignore[`, any rules to

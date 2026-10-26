@@ -24,6 +24,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use self::constructor::{ConstructorBinding, ConstructorContext};
+use super::ambiguous::merge_ambiguous_returns;
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
@@ -31,13 +32,18 @@ use crate::lint::LintMetadata;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::subscript::PyIndex;
 use crate::types::ProgramEnvironment;
-use crate::types::call::arguments::{CallArgumentExpansions, CallArgumentTypes, Expansion};
+use crate::types::call::arguments::{
+    CallArgument, CallArgumentExpansions, Expansion, KeywordArgument, VariadicArgument,
+};
 use crate::types::callable::CallableTypeKind;
+use crate::types::constraints::projection::{ProjectionTypeBudget, SolutionBudget};
+use crate::types::constraints::resolution::SolutionType;
 use crate::types::constraints::{
-    CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintSet,
-    ConstraintSetBuilder, PathBoundSolution, SolutionPaths, Solutions,
+    CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintProvenance,
+    ConstraintSet, ConstraintSetBuilder, PathBoundSolution, SolutionPaths, Solutions,
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
+use crate::types::cyclic::PairVisitor;
 use crate::types::dedicated::pydantic::{self, ConfigBoolean};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_DATACLASS,
@@ -52,6 +58,7 @@ use crate::types::function::{
 };
 use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
+    TypeVarInferenceSolutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::known_instance::{
@@ -62,12 +69,12 @@ use crate::types::signatures::{
     PartialApplication, PartialSignatureApplication,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableSegment};
-use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator, TypeVarSet};
+use crate::types::typed_dict::TypedDictOpenness;
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarKind, TypeVarNonceGenerator, TypeVarSet};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
-    TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
-    walk_type_with_recursion_guard,
+    TypeCollector, TypeKind, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
+    walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
@@ -1507,7 +1514,7 @@ impl<'db> Bindings<'db> {
         argument_index: usize,
     ) -> Type<'db> {
         let argument_types = call_arguments
-            .argument_types(argument_index)
+            .source_types(argument_index)
             .expect("argument index should be valid");
 
         // If there is a single matching parameter, return the argument type inferred against
@@ -2019,7 +2026,9 @@ impl<'db> Bindings<'db> {
                             {
                                 return ty;
                             }
-                            call_arguments.iter().find_map(|(arg, types)| {
+                            call_arguments.iter().find_map(|argument| {
+                                let arg = argument.kind();
+                                let types = argument.source_types();
                                 if matches!(arg, Argument::Keyword(arg_name) if arg_name == name) {
                                     types.get_default()
                                 } else {
@@ -2050,6 +2059,18 @@ impl<'db> Bindings<'db> {
                                     ConfigBoolean::Unspecified
                                 } else {
                                     ConfigBoolean::from_type(strict)
+                                }
+                            },
+                        );
+                        // Unlike `strict=None`, `Field(frozen=None)` is an explicit value that
+                        // leaves the field mutable and overrides an earlier `frozen=True`.
+                        let frozen = get_argument_type("frozen", false).map_or(
+                            ConfigBoolean::Unspecified,
+                            |frozen| {
+                                if frozen.is_none(db) {
+                                    ConfigBoolean::Disabled
+                                } else {
+                                    ConfigBoolean::from_type(frozen)
                                 }
                             },
                         );
@@ -2192,7 +2213,7 @@ impl<'db> Bindings<'db> {
                         // to `T`. Otherwise, we would error on `name: str = field(default="")`.
                         overload.set_return_type(Type::KnownInstance(KnownInstanceType::Field(
                             FieldInstance::new(
-                                db, default_ty, init, kw_only, alias, converter, strict,
+                                db, default_ty, init, kw_only, alias, converter, strict, frozen,
                             ),
                         )));
                     }
@@ -2719,9 +2740,10 @@ impl<'db> Bindings<'db> {
                                 .or_else(|| {
                                     // Older `__dataclass_transform__` signatures can accept
                                     // extensions through `**kwargs`.
-                                    call_arguments.iter().find_map(|(arg, types)| {
-                                        if matches!(arg, Argument::Keyword(name) if name == "slots_default") {
-                                            types.get_default()
+                                    call_arguments.iter().find_map(|argument| {
+                                        if let Argument::Keyword("slots_default") = argument.kind()
+                                        {
+                                            argument.source_type()
                                         } else {
                                             None
                                         }
@@ -2815,18 +2837,18 @@ impl<'db> Bindings<'db> {
                                 let mut flags = dataclass_params.flags(db);
 
                                 for (param, flag) in DATACLASS_FLAGS {
-                                    if let Some(ty) =
-                                        call_arguments.iter().find_map(|(arg, arg_types)| {
-                                            if let Argument::Keyword(arg_name) = arg
-                                                && *arg_name == **param
-                                            {
-                                                arg_types.get_default()
-                                            } else {
-                                                None
-                                            }
-                                        })
-                                        && let Some(LiteralValueTypeKind::Bool(value)) =
-                                            ty.as_literal_value_kind()
+                                    if let Some(ty) = call_arguments.iter().find_map(|argument| {
+                                        let arg = argument.kind();
+                                        let arg_types = argument.source_types();
+                                        if let Argument::Keyword(arg_name) = arg
+                                            && *arg_name == **param
+                                        {
+                                            arg_types.get_default()
+                                        } else {
+                                            None
+                                        }
+                                    }) && let Some(LiteralValueTypeKind::Bool(value)) =
+                                        ty.as_literal_value_kind()
                                     {
                                         flags.set(*flag, value);
                                     }
@@ -2926,6 +2948,7 @@ impl<'db> Bindings<'db> {
                                 db,
                                 env,
                                 constraints,
+                                ConstraintProvenance::Evidence,
                                 typevar,
                                 lower,
                             )
@@ -2954,6 +2977,7 @@ impl<'db> Bindings<'db> {
                                 db,
                                 env,
                                 constraints,
+                                ConstraintProvenance::Evidence,
                                 typevar,
                                 upper,
                             )
@@ -2982,6 +3006,7 @@ impl<'db> Bindings<'db> {
                                 db,
                                 env,
                                 constraints,
+                                ConstraintProvenance::Evidence,
                                 typevar,
                                 value,
                             )
@@ -3013,6 +3038,7 @@ impl<'db> Bindings<'db> {
                                 db,
                                 env,
                                 constraints,
+                                ConstraintProvenance::Evidence,
                                 typevar,
                                 lower,
                                 upper,
@@ -3077,14 +3103,9 @@ impl<'db> Bindings<'db> {
 
                         let constraints = ConstraintSetBuilder::new();
                         let result = constraints.into_owned(|constraints| {
-                            ty_a.when_subtype_of_assuming(
-                                db,
-                                env,
-                                ty_b,
-                                constraints.load(db, env, tracked.constraints(db)),
-                                constraints,
-                                TypeVarSet::None,
-                            )
+                            constraints
+                                .load(db, env, tracked.constraints(db))
+                                .implies_subtype_of(db, env, constraints, ty_a, ty_b)
                         });
                         let tracked = InternedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
@@ -3188,6 +3209,59 @@ impl<'db> Bindings<'db> {
                         overload.set_return_type(result);
                     }
 
+                    Type::KnownBoundMethod(
+                        method @ (KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(tracked)
+                        | KnownBoundMethodType::ConstraintSetIsNeverSatisfied(tracked)),
+                    ) => {
+                        let [Some(inferable)] = overload.parameter_types() else {
+                            continue;
+                        };
+                        let Type::NominalInstance(inferable) = inferable.project_type_form(db, env)
+                        else {
+                            continue;
+                        };
+                        let Some(inferable) = inferable_typevars_from_tuple(db, env, &inferable)
+                        else {
+                            continue;
+                        };
+
+                        let result = tracked.constraints(db).query(|_builder, set| {
+                            if matches!(
+                                method,
+                                KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
+                            ) {
+                                set.is_always_satisfied_bounded(db, env, inferable)
+                            } else {
+                                set.is_never_satisfied_bounded(db, env, inferable)
+                            }
+                        });
+                        overload.set_return_type(result.map_or_else(
+                            || KnownClass::Bool.to_instance(db, env),
+                            Type::bool_literal,
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(
+                        method @ (KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(
+                            tracked,
+                        )
+                        | KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(
+                            tracked,
+                        )),
+                    ) => {
+                        let result = tracked.constraints(db).query(|_builder, set| {
+                            if matches!(
+                                method,
+                                KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_)
+                            ) {
+                                set.is_trivially_always_satisfied()
+                            } else {
+                                set.is_trivially_never_satisfied()
+                            }
+                        });
+                        overload.set_return_type(Type::bool_literal(result));
+                    }
+
                     Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSolutions(
                         tracked,
                     )) => {
@@ -3237,11 +3311,14 @@ impl<'db> Bindings<'db> {
                     Type::ClassLiteral(class) => match class.known(db) {
                         Some(KnownClass::Bool) => match overload.parameter_types() {
                             [Some(arg)] => {
-                                overload.set_return_type(Type::from_truthiness(
-                                    db,
-                                    env,
-                                    arg.bool(db, env),
-                                ));
+                                // Keep the constructor's declared return type when its argument
+                                // cannot produce a value. Reachability tracks non-completion.
+                                let truthiness = arg.bool(db, env);
+                                if !truthiness.is_uninhabited() {
+                                    overload.set_return_type(Type::from_truthiness(
+                                        db, env, truthiness,
+                                    ));
+                                }
                             }
                             [None] => overload.set_return_type(Type::bool_literal(false)),
                             _ => {}
@@ -3328,17 +3405,23 @@ impl<'db> Bindings<'db> {
                 }
             }
 
-            // Known method overrides can resolve ambiguous return types.
+            // Known method overrides can resolve ambiguity or change the shared return structure.
             if matches!(
                 binding.overload_call_result,
-                Some(OverloadCallResult::Ambiguous)
-            ) && binding
-                .matching_overloads()
-                .map(|(_, overload)| overload.return_type())
-                .all_equal_value()
-                .is_ok()
-            {
-                binding.overload_call_result = None;
+                Some(OverloadCallResult::Ambiguous(_))
+            ) {
+                binding.overload_call_result = if binding
+                    .matching_overloads()
+                    .map(|(_, overload)| overload.return_type())
+                    .all_equal_value()
+                    .is_ok()
+                {
+                    None
+                } else {
+                    Some(OverloadCallResult::Ambiguous(
+                        binding.merge_ambiguous_return_types(db, env),
+                    ))
+                };
             }
         }
 
@@ -3424,7 +3507,8 @@ pub(crate) struct CallableBinding<'db> {
     /// overloads for the expanded argument lists. We also retain the overloads selected for
     /// deprecation reporting without discarding the other matches used for argument inference.
     ///
-    /// For (2) and (3), the final return type is [`Unknown`].
+    /// For (2), shared structure in the return types is preserved, with differing parts replaced
+    /// by [`Unknown`]. For (3), the final return type is [`Unknown`].
     ///
     /// [`Unknown`]: crate::types::DynamicType::Unknown
     overload_call_result: Option<OverloadCallResult<'db>>,
@@ -3835,54 +3919,42 @@ impl<'db> CallableBinding<'db> {
         // `*arg` where `arg` is a union of a 2-tuple and a 3-tuple, we shouldn't eliminate any
         // overload for arity reasons before trying argument expansion.
         let argument_expansions = call_arguments.expansions(db, env);
-        let (should_retry_after_provisional_arity, overloads_for_expansion) =
-            if self.should_retry_after_provisional_arity(&argument_expansions) {
-                // We will retry all overloads after argument expansion.
-                (true, (0..self.overloads.len()).collect())
-            } else {
-                match self.matching_overload_index() {
-                    MatchingOverloadIndex::None => {
-                        // If no candidate overloads remain from the arity check, we can stop here. We
-                        // still perform type checking for non-overloaded function to provide better
-                        // user experience.
-                        if let [overload] = self.overloads.as_mut_slice() {
-                            overload.check_types(
-                                db,
-                                env,
-                                constraints,
-                                call_arguments.as_ref(),
-                                call_expression_tcx,
-                            );
-                        }
-                        return;
+        let (should_retry_after_provisional_arity, overloads_for_expansion) = if self
+            .should_retry_after_provisional_arity(&argument_expansions)
+        {
+            // We will retry all overloads after argument expansion.
+            (true, (0..self.overloads.len()).collect())
+        } else {
+            match self.matching_overload_index() {
+                MatchingOverloadIndex::None => {
+                    // If no candidate overloads remain from the arity check, we can stop here. We
+                    // still perform type checking for non-overloaded function to provide better
+                    // user experience.
+                    if let [overload] = self.overloads.as_mut_slice() {
+                        overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
                     }
-                    MatchingOverloadIndex::Single(index) => {
-                        // If only one candidate overload remains, it is the winning match. Evaluate
-                        // it as a regular (non-overloaded) call.
-                        self.matching_overload_before_type_checking = Some(index);
-                        self.overloads[index].check_types(
-                            db,
-                            env,
-                            constraints,
-                            call_arguments.as_ref(),
-                            call_expression_tcx,
-                        );
-                        return;
-                    }
-                    MatchingOverloadIndex::Multiple(indexes) => (false, indexes),
+                    return;
                 }
-            };
+                MatchingOverloadIndex::Single(index) => {
+                    // If only one candidate overload remains, it is the winning match. Evaluate
+                    // it as a regular (non-overloaded) call.
+                    self.matching_overload_before_type_checking = Some(index);
+                    self.overloads[index].check_types(
+                        db,
+                        env,
+                        call_arguments.as_ref(),
+                        call_expression_tcx,
+                    );
+                    return;
+                }
+                MatchingOverloadIndex::Multiple(indexes) => (false, indexes),
+            }
+        };
 
         // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
         // whether it is compatible with the supplied argument list.
         for (_, overload) in self.matching_overloads_mut() {
-            overload.check_types(
-                db,
-                env,
-                constraints,
-                call_arguments.as_ref(),
-                call_expression_tcx,
-            );
+            overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
         }
 
         tracing::trace!(
@@ -3961,24 +4033,28 @@ impl<'db> CallableBinding<'db> {
         // This heuristic tries to detect if there's any need to perform argument type expansion or
         // not by checking whether there are any non-expandable argument type that cannot be
         // assigned to any of the overloads.
-        for (argument_index, (argument, argument_types)) in call_arguments.iter().enumerate() {
+        for (argument_index, call_argument) in call_arguments.iter().enumerate() {
+            let argument = call_argument.kind();
             // TODO: Remove `Keywords` once `**kwargs` support is added
             if matches!(argument, Argument::Synthetic | Argument::Keywords) {
                 continue;
             }
             // TODO: For types inferred multiple times with distinct type context, we currently only
             // expand the default inference.
-            let Some(argument_type) = argument_types.get_default() else {
+            let Some(argument_type) = call_argument.source_type() else {
                 continue;
             };
-            if argument_expansions.argument_types(argument_index).is_some() {
+            if argument_expansions
+                .argument_alternatives(argument_index)
+                .is_some()
+            {
                 continue;
             }
             let is_argument_assignable_to_any_overload = self.overloads.iter().any(|overload| {
                 let matched_parameters = &overload.argument_matches[argument_index].parameters;
                 if matched_parameters.is_empty() {
-                    return matches!(argument, Argument::Variadic)
-                        && argument_type.iterate(db, env).len().minimum() == 0;
+                    return matches!(call_argument, CallArgument::Variadic(variadic)
+                        if variadic.sequence(db, env).is_some_and(|sequence| sequence.len().minimum() == 0));
                 }
 
                 // A starred argument contributes its individual element types, not the type of
@@ -3994,9 +4070,9 @@ impl<'db> CallableBinding<'db> {
                     let parameter_type = matched_parameter
                         .expected_type
                         .unwrap_or_else(|| parameter.annotated_type());
-                    let argument_type = matched_parameter
-                        .argument_type
-                        .unwrap_or_else(|| argument_types.get_for_declared_type(parameter_type));
+                    let argument_type = call_argument
+                        .matched_type(parameter_type, matched_parameter.argument_type)
+                        .unwrap_or(Type::unknown());
 
                     argument_type
                         .when_assignable_to(
@@ -4006,7 +4082,7 @@ impl<'db> CallableBinding<'db> {
                             constraints,
                             overload.inferable_typevars,
                         )
-                        .is_always_satisfied(db, env)
+                        .is_always_satisfied(db, env, overload.inferable_typevars)
                 })
             });
             if !is_argument_assignable_to_any_overload {
@@ -4063,13 +4139,7 @@ impl<'db> CallableBinding<'db> {
                 );
 
                 for (_, overload) in self.matching_overloads_mut() {
-                    overload.check_types(
-                        db,
-                        env,
-                        constraints,
-                        expanded_arguments,
-                        call_expression_tcx,
-                    );
+                    overload.check_types(db, env, expanded_arguments, call_expression_tcx);
                 }
 
                 tracing::trace!(
@@ -4262,8 +4332,8 @@ impl<'db> CallableBinding<'db> {
                 let slots = overload
                     .argument_matches
                     .iter()
-                    .zip(arguments.iter_types())
-                    .flat_map(move |(matched_argument, argument_types)| {
+                    .zip(arguments.iter())
+                    .flat_map(move |(matched_argument, argument)| {
                         matched_argument.iter().map(move |matched_parameter| {
                             // TODO: For an unannotated `self` / `cls` parameter, the type should be
                             // `typing.Self` / `type[typing.Self]`
@@ -4278,7 +4348,9 @@ impl<'db> CallableBinding<'db> {
                                 parameter: parameter_type,
                                 // Argument types are cached by the raw parameter type, even when
                                 // they were inferred using a return-context specialization.
-                                argument: argument_types.get_for_declared_type(raw_parameter_type),
+                                argument: argument
+                                    .source_types()
+                                    .get_for_declared_type(raw_parameter_type),
                                 variadic_argument: matched_parameter.argument_type,
                             }
                         })
@@ -4304,7 +4376,7 @@ impl<'db> CallableBinding<'db> {
                     (Some(first_parameter_type), Some(current_parameter_type)) => {
                         if !first_parameter_type
                             .when_equivalent_to(db, env, current_parameter_type, constraints)
-                            .is_always_satisfied(db, env)
+                            .is_always_satisfied(db, env, TypeVarSet::None)
                         {
                             participating_slot_indices.insert(slot_index);
                         }
@@ -4388,15 +4460,10 @@ impl<'db> CallableBinding<'db> {
                 }),
             );
 
+            let inferable = self.overloads[*current_index].inferable_typevars;
             if top_materialized_argument_type
-                .when_assignable_to(
-                    db,
-                    env,
-                    parameter_types,
-                    constraints,
-                    self.overloads[*current_index].inferable_typevars,
-                )
-                .is_always_satisfied(db, env)
+                .when_assignable_to(db, env, parameter_types, constraints, inferable)
+                .is_always_satisfied(db, env, inferable)
             {
                 filter_remaining_overloads = true;
             }
@@ -4415,7 +4482,7 @@ impl<'db> CallableBinding<'db> {
                     overload
                         .return_type()
                         .when_equivalent_to(db, env, first_overload_return_type, constraints)
-                        .is_always_satisfied(db, env)
+                        .is_always_satisfied(db, env, TypeVarSet::None)
                 })
             } else {
                 // No matching overload
@@ -4425,8 +4492,22 @@ impl<'db> CallableBinding<'db> {
 
         if !are_return_types_equivalent_for_all_matching_overloads {
             // Overload matching is ambiguous.
-            self.overload_call_result = Some(OverloadCallResult::Ambiguous);
+            self.overload_call_result = Some(OverloadCallResult::Ambiguous(
+                self.merge_ambiguous_return_types(db, env),
+            ));
         }
+    }
+
+    fn merge_ambiguous_return_types(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        let return_types: SmallVec<[_; 4]> = self
+            .matching_overloads()
+            .map(|(_, overload)| overload.return_type())
+            .collect();
+        merge_ambiguous_returns(db, env, &return_types)
     }
 
     fn as_result(&self) -> Result<(), CallErrorKind> {
@@ -4545,7 +4626,7 @@ impl<'db> CallableBinding<'db> {
                     .cases
                     .iter()
                     .any(|case| case.selected_overloads.contains(index)),
-                OverloadCallResult::Ambiguous => true,
+                OverloadCallResult::Ambiguous(_) => true,
                 OverloadCallResult::ArgumentTypeExpansionLimitReached(_) => false,
             }
         }))
@@ -4633,7 +4714,7 @@ impl<'db> CallableBinding<'db> {
             return match overload_call_result {
                 OverloadCallResult::ArgumentTypeExpansion(expanded) => expanded.return_type,
                 OverloadCallResult::ArgumentTypeExpansionLimitReached(_) => Type::unknown(),
-                OverloadCallResult::Ambiguous => Type::Dynamic(DynamicType::AmbiguousOverload),
+                OverloadCallResult::Ambiguous(return_type) => *return_type,
             };
         }
         if let Some((_, first_overload)) = self.matching_overloads().next() {
@@ -4889,8 +4970,10 @@ enum OverloadCallResult<'db> {
     ArgumentTypeExpansion(Box<ExpandedOverloadCall<'db>>),
     /// Argument expansion stopped at this argument's expansion limit.
     ArgumentTypeExpansionLimitReached(usize),
-    /// Several overloads remain with non-equivalent return types.
-    Ambiguous,
+    /// Several overloads remain with non-equivalent return types. Their shared structure is
+    /// preserved, with each differing part replaced by `DynamicType::AmbiguousOverload`, which
+    /// displays as `Unknown`.
+    Ambiguous(Type<'db>),
 }
 
 /// The combined return type and selected overloads from successful argument expansion.
@@ -4955,9 +5038,10 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         parameters: &'a Parameters<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
     ) -> Self {
-        let explicit_keyword_parameters: FxHashSet<usize> = arguments
+        let mut explicit_keyword_parameters: FxHashSet<usize> = arguments
             .iter()
-            .filter_map(|(argument, _)| {
+            .filter_map(|argument| {
+                let argument = argument.kind();
                 if let Argument::Keyword(name) = argument {
                     parameters.keyword_by_name(name).map(|(idx, _)| idx)
                 } else {
@@ -4965,6 +5049,15 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 }
             })
             .collect();
+        for argument in arguments.iter() {
+            if let CallArgument::Keywords(keywords) = argument {
+                explicit_keyword_parameters.extend(
+                    keywords.explicit_keyword_names().filter_map(|name| {
+                        parameters.keyword_by_name(name).map(|(index, _)| index)
+                    }),
+                );
+            }
+        }
 
         Self {
             arguments,
@@ -4985,12 +5078,49 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         self.arguments
             .iter()
             .skip(argument_index + 1)
-            .any(|(argument, _)| {
+            .any(|argument| {
+                let argument = argument.kind();
                 matches!(
                     argument,
                     Argument::Synthetic | Argument::Positional | Argument::Variadic
                 )
             })
+    }
+
+    /// Returns the minimum number of positional values supplied by the arguments after the
+    /// argument at `argument_index`.
+    ///
+    /// In `f(*args, x, *tail)`, this counts one value for `x` plus the minimum length of `tail`.
+    /// Unlike [`Self::has_later_positional_input`], this ignores iterables that might be empty.
+    fn later_minimum_positional_count(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        argument_index: usize,
+    ) -> usize {
+        self.arguments
+            .iter()
+            .skip(argument_index + 1)
+            .map(|argument| match argument {
+                CallArgument::Synthetic(_) | CallArgument::Positional(_) => 1,
+                CallArgument::Variadic(variadic) => variadic
+                    .sequence(db, env)
+                    .map_or(0, |sequence| sequence.len().minimum()),
+                CallArgument::Keyword { .. } | CallArgument::Keywords(_) => 0,
+            })
+            .sum()
+    }
+
+    /// Returns the number of positional parameters, starting at `next_positional`, that can still
+    /// be filled positionally. This stops at the first parameter that has an explicit keyword
+    /// argument, or that cannot be filled positionally (a keyword-only or variadic parameter).
+    fn available_positional_parameter_count(&self) -> usize {
+        (self.next_positional..self.parameters.len())
+            .take_while(|index| {
+                self.parameters.get_positional(*index).is_some()
+                    && !self.explicit_keyword_parameters.contains(index)
+            })
+            .count()
     }
 
     fn get_argument_index(&self, argument_index: usize) -> Option<usize> {
@@ -5024,7 +5154,8 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             && !matches!(
                 argument,
                 Argument::Keyword(name)
-                    if self.arguments.iter().take(argument_index).any(|(previous, _)| {
+                    if self.arguments.iter().take(argument_index).any(|previous| {
+                        let previous = previous.kind();
                         matches!(previous, Argument::Keyword(previous_name) if previous_name == name)
                     })
             )
@@ -5136,143 +5267,49 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         argument_index: usize,
-        argument: Argument<'a>,
-        argument_type: Option<Type<'db>>,
+        variadic: &VariadicArgument<'db>,
     ) -> Result<(), ()> {
-        enum VariadicArgumentType<'db> {
-            ParamSpec(Type<'db>),
-            /// A union type where each element has been individually iterated into a tuple spec.
-            /// We pre-compute the per-position union types, length bounds, and variable element
-            /// so the rest of the matching logic can handle unions without special-casing.
-            Union {
-                argument_types: Vec<Type<'db>>,
-                length: TupleLength,
-                variable_element: Option<Type<'db>>,
-            },
-            Other {
-                argument_types: Vec<Type<'db>>,
-                length: TupleLength,
-                variable_element: Option<Type<'db>>,
-            },
-            None,
+        let argument = Argument::Variadic;
+        let has_variadic_parameter = self.parameters.variadic().is_some();
+        let reserved_positional_parameters = if !has_variadic_parameter {
+            self.later_minimum_positional_count(db, env, argument_index)
+        } else {
+            // For `def f(a: str, *args: object)`, a later argument could fill `a` or `args`.
+            // Keep matching greedily until we can consider both possibilities.
+            0
+        };
+        // Correlations between tuple-union lengths and element types are only safe to
+        // combine when later arguments cannot shift their positional slots.
+        let mut unpacked = variadic.matching(
+            db,
+            env,
+            !has_variadic_parameter && !self.has_later_positional_input(argument_index),
+        );
+        // Choose an unpacked length that leaves room for later positional values. Resizing
+        // preserves both fixed ends: truncating the element iterator could discard a required
+        // suffix, or treat the variable element as a required value when that segment is empty.
+        // Keep at least the minimum length so excess required elements are still reported.
+        if reserved_positional_parameters > 0
+            && unpacked.length.is_variable()
+            && unpacked.variable_element.is_some()
+            && let Some(sequence) = variadic.sequence(db, env)
+            && let Ok(sequence) = sequence.resize(
+                db,
+                env,
+                TupleLength::Fixed(
+                    self.available_positional_parameter_count()
+                        .saturating_sub(reserved_positional_parameters)
+                        .max(unpacked.length.minimum()),
+                ),
+            )
+        {
+            unpacked.types = sequence.iter_element_types(db).collect();
+            unpacked.length = sequence.len();
+            unpacked.variable_element = None;
         }
-
-        let variadic_type = match argument_type {
-            Some(argument_type) => match argument_type.as_paramspec_typevar(db) {
-                // If the argument is a `ParamSpec` `P.args`, we should not call `iterate` on it.
-                // This would lose the `ParamSpec` information and just flatten to `object` from
-                // the upper bound. What we want is to always use the `P.args` type to perform type
-                // checking against the parameter type. This will allow us to error when `*args:
-                // P.args` is matched against, for example, `n: int` and correctly type check when
-                // `*args: P.args` is matched against `*args: P.args` (another `ParamSpec`).
-                Some(paramspec) => VariadicArgumentType::ParamSpec(paramspec),
-                None => match argument_type {
-                    // `Type::iterate` unions tuple specs in a way that can invent additional
-                    // arities. Iterate each union element individually and compute per-position
-                    // union types, length bounds, and variable element so that the rest of the
-                    // matching logic handles unions correctly.
-                    //
-                    // The per-position union loses the correlation between tuple length and the
-                    // later element types. `match_variadic` accounts for that by treating
-                    // positions beyond the guaranteed minimum as only conditionally present: they
-                    // can satisfy optional parameters, but any required positional parameter
-                    // beyond the minimum still causes the match to fail provisionally. This is
-                    // only sound when no later argument can still contribute more positional
-                    // slots; otherwise, a later positional argument could shift left differently
-                    // for different union members.
-                    Type::Union(union)
-                        if self.parameters.variadic().is_none()
-                            && !self.has_later_positional_input(argument_index) =>
-                    {
-                        let tuple_specs: Vec<_> = union
-                            .elements(db)
-                            .iter()
-                            .map(|ty| ty.iterate(db, env))
-                            .collect();
-
-                        let min_len = tuple_specs
-                            .iter()
-                            .map(|s| s.len().minimum())
-                            .min()
-                            .unwrap_or(0);
-
-                        let any_variable = tuple_specs.iter().any(|s| s.len().is_variable());
-                        let max_elements = tuple_specs
-                            .iter()
-                            .map(|s| s.iter_element_types(db).count())
-                            .max()
-                            .unwrap_or(0);
-
-                        let variable_element = {
-                            let var_types: Vec<_> = tuple_specs
-                                .iter()
-                                .filter_map(|s| s.variable_element_type(db))
-                                .collect();
-                            if var_types.is_empty() {
-                                None
-                            } else {
-                                Some(UnionType::from_elements_leave_aliases(db, env, var_types))
-                            }
-                        };
-
-                        let max_elements = i32::try_from(max_elements).unwrap_or(i32::MAX);
-                        let mut argument_types_vec = Vec::new();
-                        for index in 0..max_elements {
-                            let positional_types: Vec<_> = tuple_specs
-                                .iter()
-                                .filter_map(|s| s.py_index(db, env, index).ok())
-                                .collect();
-                            if positional_types.is_empty() {
-                                break;
-                            }
-                            argument_types_vec.push(UnionType::from_elements_leave_aliases(
-                                db,
-                                env,
-                                positional_types,
-                            ));
-                        }
-
-                        let length = if any_variable || argument_types_vec.len() > min_len {
-                            TupleLength::Variable(min_len, 0)
-                        } else {
-                            TupleLength::Fixed(min_len)
-                        };
-
-                        VariadicArgumentType::Union {
-                            argument_types: argument_types_vec,
-                            length,
-                            variable_element,
-                        }
-                    }
-                    _ => {
-                        let tuple = argument_type.iterate(db, env);
-                        VariadicArgumentType::Other {
-                            argument_types: tuple.iter_element_types(db).collect(),
-                            length: tuple.len(),
-                            variable_element: tuple.variable_element_type(db),
-                        }
-                    }
-                },
-            },
-            None => VariadicArgumentType::None,
-        };
-
-        let (argument_types, length, variable_element) = match &variadic_type {
-            VariadicArgumentType::ParamSpec(paramspec) => {
-                ([].as_slice(), TupleLength::unknown(), Some(*paramspec))
-            }
-            VariadicArgumentType::Union {
-                argument_types,
-                length,
-                variable_element,
-            } => (argument_types.as_slice(), *length, *variable_element),
-            VariadicArgumentType::Other {
-                argument_types,
-                length,
-                variable_element,
-            } => (argument_types.as_slice(), *length, *variable_element),
-            VariadicArgumentType::None => ([].as_slice(), TupleLength::unknown(), None),
-        };
+        let argument_types = unpacked.types;
+        let length = unpacked.length;
+        let variable_element = unpacked.variable_element;
 
         let mut argument_types = argument_types.iter().copied();
         // This can be true either if we have a true variable-length tuple (in which case
@@ -5285,15 +5322,25 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         }
         let has_fixed_union_tail = is_variable && variable_element.is_none();
 
-        // We must be able to match up the fixed-length portion of the argument with positional
-        // parameters, so we pass on any errors that occur.
+        // Count all elements of a fixed sequence, including excess arguments, so the
+        // diagnostic reports the complete argument count.
+        let mut matched = true;
         for _ in 0..length.minimum() {
-            self.match_positional(
-                argument_index,
-                argument,
-                argument_types.next().or(variable_element),
-                is_variable,
-            )?;
+            matched &= self
+                .match_positional(
+                    argument_index,
+                    argument,
+                    argument_types.next().or(variable_element),
+                    is_variable,
+                )
+                .is_ok();
+            if !matched && is_variable {
+                return Err(());
+            }
+        }
+        if !is_variable {
+            self.argument_matches[argument_index].matched = matched;
+            return matched.then_some(()).ok_or(());
         }
 
         // For a union of fixed-length tuples, positions beyond the guaranteed minimum are only
@@ -5318,24 +5365,18 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // If the tuple is truly variable-length, we assume that it will soak up all remaining
         // positional parameters, stopping only when we reach a parameter that has an explicit
         // keyword argument or a parameter that can only be provided via keyword argument, or if
-        // we run out of `argument_types` and have no `variable_element`.
-        } else if is_variable {
-            while self
-                .parameters
-                .get_positional(self.next_positional)
-                .is_some()
-            {
-                if self
-                    .explicit_keyword_parameters
-                    .contains(&self.next_positional)
-                {
+        // we run out of `argument_types` and have no `variable_element`. If the callable has no
+        // variadic parameter, we also leave room for the minimum number of positional values
+        // supplied by later arguments, since the unpacked iterable could be short enough to fit.
+        } else {
+            let available = self
+                .available_positional_parameter_count()
+                .saturating_sub(reserved_positional_parameters);
+            for _ in 0..available {
+                let Some(argument_type) = argument_types.next().or(variable_element) else {
                     break;
-                }
-                let arg_type = argument_types.next().or(variable_element);
-                if arg_type.is_none() {
-                    break;
-                }
-                self.match_positional(argument_index, argument, arg_type, is_variable)?;
+                };
+                self.match_positional(argument_index, argument, Some(argument_type), is_variable)?;
             }
         }
 
@@ -5356,17 +5397,12 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // argument types to it, but only if there is at least one remaining argument type. This is
         // because a variadic parameter is optional, so if this was done unconditionally, ty could
         // raise a false positive as "too many arguments".
-        if self.parameters.variadic().is_some() {
-            if let Some(argument_type) = argument_types.next().or(variable_element) {
+        if has_variadic_parameter
+            && let Some(argument_type) = argument_types.next().or(variable_element)
+        {
+            self.match_positional(argument_index, argument, Some(argument_type), is_variable)?;
+            for argument_type in argument_types {
                 self.match_positional(argument_index, argument, Some(argument_type), is_variable)?;
-                for argument_type in argument_types {
-                    self.match_positional(
-                        argument_index,
-                        argument,
-                        Some(argument_type),
-                        is_variable,
-                    )?;
-                }
             }
         }
 
@@ -5378,21 +5414,25 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         argument_index: usize,
-        argument_type: Option<Type<'db>>,
+        keywords: &KeywordArgument<'db>,
     ) {
-        if let Some(unpacked) =
-            argument_type.and_then(|ty| extract_unpacked_typed_dict_from_value_type(db, env, ty))
-        {
+        if let Some(unpacked) = keywords.unpack(db, env) {
             let openness = unpacked.openness;
+            let mut matched = true;
 
-            // Special case TypedDict-shaped values because we know which keys are present.
+            // An unknown key must not prevent later keys from matching their parameters.
             for (name, unpacked_key) in unpacked.keys {
-                let _ = self.match_keyword(
-                    argument_index,
-                    Argument::Keywords,
-                    Some(unpacked_key.value_ty),
-                    name.as_str(),
-                );
+                matched &= self
+                    .match_keyword(
+                        argument_index,
+                        Argument::Keywords,
+                        Some(unpacked_key.value_ty),
+                        name.as_str(),
+                    )
+                    .is_ok();
+            }
+            if keywords.is_complete() {
+                self.argument_matches[argument_index].matched = matched;
             }
             self.match_typed_dict_openness(argument_index, openness);
         } else {
@@ -5413,14 +5453,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     .keyword_name()
                     .map(Name::as_str);
 
-                let value_type = match argument_type {
-                    Some(argument_type) => argument_type
-                        .as_paramspec_typevar(db)
-                        .or_else(|| argument_type.getitem_dunder_call(db, env, parameter_name))
-                        .unwrap_or(Type::unknown()),
-
-                    None => Type::unknown(),
-                };
+                let value_type = keywords.value_type(db, env, parameter_name);
 
                 self.assign_argument(
                     argument_index,
@@ -5669,6 +5702,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     parameter_tys: &'a mut [Option<Type<'db>>],
     parameter_ty_builders: Vec<Option<UnionBuilder<'db>>>,
     call_expression_tcx: TypeContext<'db>,
+    /// Final return type after applying this call's inferred type arguments.
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
 
@@ -5676,6 +5710,21 @@ struct ArgumentTypeChecker<'a, 'db> {
 
     /// Type arguments inferred before argument validation begins.
     inference: Option<TypeVarInference<'db>>,
+
+    /// Whether validated specializations provided the call's return type. The later
+    /// `check_argument_type` pass uses the union-merged specialization, which can reject a call
+    /// that is valid under the separate alternatives.
+    ///
+    /// For example, suppose `Sink[T]` is contravariant, and `ASink` and `BSink` inherit from
+    /// `Sink[A]` and `Sink[B]`, respectively. Passing an `ASink & BSink` to a `Sink[T]` parameter
+    /// is valid with either `T = A` or `T = B`. But merging those assignments gives `Sink[A | B]`,
+    /// which neither intersection member is assignable to. Rechecking that merged specialization
+    /// would incorrectly report an argument error after both alternatives have passed validation.
+    ///
+    /// This flag skips only the merged assignability check; parameter-type bookkeeping and other
+    /// argument checks still run. It can be removed once argument validation consistently uses
+    /// the separate inference alternatives instead of their merged specialization.
+    arguments_validated: bool,
 
     /// Argument indices for which specialization inference has already produced a sufficiently
     /// precise argument mismatch. We can then silence `check_argument_type` for those arguments to
@@ -5760,7 +5809,7 @@ fn validate_keyword_unpack_key_type<'db>(
             constraints,
             inferable_typevars,
         )
-        .is_always_satisfied(db, env)
+        .is_always_satisfied(db, env, inferable_typevars)
     {
         KeywordUnpackKeyTypeCheck::Valid
     } else {
@@ -5787,6 +5836,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let InferredCall {
             inferable_typevars,
             inference,
+            refined_return_ty,
             errors: inference_errors,
             constraint_set_errors,
         } = inferred;
@@ -5802,10 +5852,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             parameter_tys,
             parameter_ty_builders: Vec::new(),
             call_expression_tcx,
-            return_ty,
+            return_ty: refined_return_ty.unwrap_or_else(|| {
+                return_ty.apply_optional_specialization(
+                    db,
+                    inference.map(|inference| inference.merged_specialization(db)),
+                )
+            }),
             errors,
             inferable_typevars,
             inference,
+            arguments_validated: refined_return_ty.is_some(),
             constraint_set_errors,
         }
     }
@@ -5818,13 +5874,14 @@ fn enumerate_argument_types<'a, 'db>(
         usize,
         Option<usize>,
         Argument<'a>,
-        &'a CallArgumentTypes<'db>,
+        &'a CallArgument<'a, 'db>,
     ),
 > + 'a {
     let mut iter = arguments.iter().enumerate();
     let mut num_synthetic_args = 0;
     std::iter::from_fn(move || {
-        let (argument_index, (argument, argument_types)) = iter.next()?;
+        let (argument_index, call_argument) = iter.next()?;
+        let argument = call_argument.kind();
         let adjusted_argument_index = if matches!(argument, Argument::Synthetic) {
             // If we are erroring on a synthetic argument, we'll just emit the
             // diagnostic on the entire Call node, since there's no argument node for
@@ -5840,7 +5897,7 @@ fn enumerate_argument_types<'a, 'db>(
             argument_index,
             adjusted_argument_index,
             argument,
-            argument_types,
+            call_argument,
         ))
     })
 }
@@ -5852,6 +5909,8 @@ struct InferredCall<'db> {
     inferable_typevars: TypeVarSet<'db>,
     /// Inferred type arguments, or `None` when the signature is not generic.
     inference: Option<TypeVarInference<'db>>,
+    /// Return type projected from specializations that each validate the original arguments.
+    refined_return_ty: Option<Type<'db>>,
     /// Inference errors retained after any retry without the expected return type.
     errors: Vec<BindingError<'db>>,
     /// Flags indexed by call argument, including synthetic receivers, to suppress duplicate errors.
@@ -5875,6 +5934,7 @@ struct CallInference<'a, 'db> {
     return_ty: Type<'db>,
     /// Whether a partial may leave variadic arguments for a later call.
     is_partial_application: bool,
+    is_constructor: bool,
     /// Type variables from the signature that this call is allowed to solve.
     inferable_typevars: TypeVarSet<'db>,
 }
@@ -5905,9 +5965,8 @@ impl<'a, 'db> CallInference<'a, 'db> {
                         let declared_type = matched_parameter
                             .expected_type
                             .unwrap_or_else(|| parameter.annotated_type());
-                        let argument_type = matched_parameter
-                            .argument_type
-                            .or_else(|| argument_types.try_get_for_declared_type(declared_type))?;
+                        let argument_type = argument_types
+                            .matched_type(declared_type, matched_parameter.argument_type)?;
 
                         Some(ArgumentRelation::new(
                             argument_index,
@@ -5985,7 +6044,9 @@ impl<'db> ArgumentTypeChecker<'_, 'db> {
                     .find_map(|matched_parameter| {
                         let declared_type =
                             self.signature.parameters()[matched_parameter.index].annotated_type();
-                        let argument_type = argument_types.get_for_declared_type(declared_type);
+                        let argument_type = argument_types
+                            .source_types()
+                            .get_for_declared_type(declared_type);
                         let paramspec_prefix_len = |candidate: Type<'db>| {
                             candidate
                                 .try_upcast_to_callable(db, env)?
@@ -6086,6 +6147,359 @@ impl<'db> ArgumentTypeChecker<'_, 'db> {
 }
 
 impl<'db> CallInference<'_, 'db> {
+    /// Conservatively checks whether two inferred returns differ in an invariant component.
+    /// Matching tuple positions and generic arguments can vary independently of fixed mutable
+    /// components, as in `tuple[A, list[int]]` versus `tuple[B, list[int]]`.
+    fn has_invariant_return_difference(
+        &self,
+        left: Type<'db>,
+        right: Type<'db>,
+        visitor: &PairVisitor<'db, (), bool>,
+    ) -> bool {
+        let db = self.db;
+        let env = self.env;
+        let left = left.resolve_type_alias(db);
+        let right = right.resolve_type_alias(db);
+        if left == right {
+            return false;
+        }
+        visitor.visit(db, (left, right), || {
+            let class_specialization = |ty| match ty {
+                Type::GenericAlias(alias) => Some((alias.origin(db), alias.specialization(db))),
+                Type::NominalInstance(_) => ty.class_specialization(db, env),
+                // A pending protocol materialization affects its members, not just its arguments.
+                Type::ProtocolInstance(protocol) if protocol.materialization_kind(db).is_none() => {
+                    ty.class_specialization(db, env)
+                }
+                _ => None,
+            };
+            let has_invariant_component = |ty| {
+                any_over_type_expanding_aliases(db, env, ty, |nested| {
+                    // TypedDict fields and protocol members can be invariant without generic
+                    // parameters. Treat distinct structural types conservatively without forcing
+                    // their lazy definitions: even a read-only member can contain a mutable value.
+                    // Callables can also capture state linking their inputs and outputs: a closure
+                    // that remembers its first argument can have type `(A) -> A` or `(B) -> B`,
+                    // but giving it both signatures would let it store an A and return it as a B.
+                    matches!(
+                        nested,
+                        Type::TypedDict(_)
+                            | Type::ProtocolInstance(_)
+                            | Type::Callable(_)
+                            | Type::FunctionLiteral(_)
+                            | Type::BoundMethod(_)
+                            | Type::KnownBoundMethod(_)
+                            | Type::KnownInstance(
+                                KnownInstanceType::FunctoolsPartial(_)
+                                    | KnownInstanceType::FunctoolsPartialCall(_)
+                                    | KnownInstanceType::MethodWrapper(_)
+                            )
+                    ) || class_specialization(nested).is_some_and(|(_, specialization)| {
+                        specialization
+                            .generic_context(db)
+                            .variables(db)
+                            .any(|variable| variable.variance(db) == TypeVarVariance::Invariant)
+                    })
+                })
+            };
+            if !has_invariant_component(left) && !has_invariant_component(right) {
+                return false;
+            }
+
+            if left.is_union() || right.is_union() {
+                // Immutable union members can vary when all invariant-bearing members agree
+                // as whole types. For example, `P` and `P | int` share the same protocol `P`.
+                // Do not just check that one union contains the other: comparing `list[A] | list[B]`
+                // with each of `list[A]` and `list[B]` must still detect the incompatible lists.
+                let invariant_elements = |ty| {
+                    let elements = match ty {
+                        Type::Union(union) => union.elements(db),
+                        _ => std::slice::from_ref(&ty),
+                    };
+                    elements
+                        .iter()
+                        .copied()
+                        .filter(|&element| has_invariant_component(element))
+                        .collect::<FxHashSet<_>>()
+                };
+                return invariant_elements(left) != invariant_elements(right);
+            }
+
+            if let (Some(left), Some(right)) = (
+                left.exact_tuple_instance_spec(db),
+                right.exact_tuple_instance_spec(db),
+            ) && let (TupleSpec::Fixed(left), TupleSpec::Fixed(right)) = (&*left, &*right)
+                && left.len() == right.len()
+            {
+                return left.iter_all_elements().zip(right.iter_all_elements()).any(
+                    |(left, right)| self.has_invariant_return_difference(left, right, visitor),
+                );
+            }
+
+            if matches!(
+                (left, right),
+                (Type::NominalInstance(_), Type::NominalInstance(_))
+                    | (Type::GenericAlias(_), Type::GenericAlias(_))
+                    | (Type::ProtocolInstance(_), Type::ProtocolInstance(_))
+            ) && let (Some((left_class, left)), Some((right_class, right))) =
+                (class_specialization(left), class_specialization(right))
+                && left_class == right_class
+                && left.generic_context(db) == right.generic_context(db)
+                && left.materialization_kind(db) == right.materialization_kind(db)
+                && left.tuple(db).is_none()
+                && right.tuple(db).is_none()
+            {
+                return left
+                    .generic_context(db)
+                    .variables(db)
+                    .zip(left.types(db).iter().zip(right.types(db)))
+                    .any(|(variable, (&left, &right))| {
+                        if variable.variance(db) == TypeVarVariance::Invariant {
+                            left != right
+                        } else {
+                            self.has_invariant_return_difference(left, right, visitor)
+                        }
+                    });
+            }
+
+            // Do not match invariant descendants by membership alone. In particular, union
+            // alternatives can correlate the same mutable types with different sibling types.
+            true
+        })
+    }
+
+    /// Refines the return using resolved alternatives that each validate every original argument.
+    ///
+    /// Returns `None` when correlated inference is unavailable or incomplete.
+    fn refined_return_type(&self, inference: TypeVarInference<'db>) -> Option<Type<'db>> {
+        let db = self.db;
+        let env = self.env;
+        // TODO: Project correlated alternatives through constructor stages and partial signatures.
+        // Their remaining parameters and return types must use the same specialization.
+        if self.is_partial_application || self.is_constructor {
+            return None;
+        }
+        let TypeVarInferenceSolutions::Alternatives(alternatives) = inference.solutions(db) else {
+            // `Single` already has the same specialization under either projection.
+            return None;
+        };
+        let resolved_type = |binding| match binding {
+            SolutionType::Resolved(ty) => Some(ty),
+            SolutionType::Unresolved(_) => None,
+        };
+        let generic_context = inference.generic_context(db);
+        // TODO: Account for parameter-list and variadic-tuple bindings when refining returns.
+        // In particular, `Callable[P, R]` can capture state linking its inputs and output.
+        if generic_context
+            .variables(db)
+            .any(|variable| variable.is_paramspec(db) || variable.is_typevartuple(db))
+        {
+            return None;
+        }
+        let mentions_inferable = |ty| {
+            any_over_type_expanding_aliases(
+                db,
+                env,
+                ty,
+                |nested| matches!(nested, Type::TypeVar(variable) if variable.is_inferable(db, self.inferable_typevars)),
+            )
+        };
+        // An unresolved dependency does not make an alternative invalid. Keep the merged fallback
+        // for the whole call rather than silently dropping that sibling.
+        // Unresolved bindings can contain cycles, so none may reach recursive specialization.
+        if alternatives.iter().any(|types| {
+            types
+                .iter()
+                .flatten()
+                .any(|binding| matches!(binding, SolutionType::Unresolved(_)))
+        }) {
+            return None;
+        }
+        let return_variables: SmallVec<[_; 4]> = generic_context
+            .variables(db)
+            .enumerate()
+            .filter(|(_, variable)| {
+                any_over_type_expanding_aliases(db, env, self.return_ty, |ty| {
+                    matches!(ty, Type::TypeVar(return_variable) if return_variable.identity(db) == variable.identity(db))
+                })
+            })
+            .collect();
+        // A return variable missing from every alternative can use its default (or `Unknown`)
+        // while other variables refine the return. The resulting specializations must still
+        // validate every argument. Partial bindings still require the merged fallback.
+        for &(index, variable) in &return_variables {
+            if alternatives.iter().all(|types| types[index].is_some()) {
+                continue;
+            }
+            if !matches!(
+                variable.kind(db),
+                TypeVarKind::LegacyTypeVar | TypeVarKind::Pep695TypeVar
+            ) || alternatives.iter().any(|types| types[index].is_some())
+            {
+                return None;
+            }
+        }
+
+        // Apply defaults separately in each alternative, preserving dependencies such as
+        // `U = list[T]` before validating arguments or projecting the return type.
+        let specializations = alternatives.iter().map(|types| {
+            generic_context.specialize_recursive(
+                db,
+                types.iter().map(|binding| binding.and_then(resolved_type)),
+            )
+        });
+
+        let relations: Vec<_> = self
+            .argument_relations()
+            .map(|relation| {
+                let contributes_to_inference = [relation.declared_type, relation.argument_type]
+                    .into_iter()
+                    .any(mentions_inferable);
+                (relation, contributes_to_inference)
+            })
+            .collect();
+
+        let mut validated = Vec::with_capacity(specializations.len());
+        'specializations: for specialization in specializations {
+            // Recheck the original relations, including requirements that recursive protocol
+            // inference may omit.
+            for (relation, contributes_to_inference) in &relations {
+                let actual = relation
+                    .argument_type
+                    .apply_specialization(db, specialization);
+                let formal = relation
+                    .declared_type
+                    .apply_specialization(db, specialization);
+                let accepts = if *contributes_to_inference {
+                    // Gradual assignability alone can accept different materializations in
+                    // each alternative: `Any` matching both `int` and `str` does not prove
+                    // that the argument has type `int & str`.
+                    // TODO: If the constraint solver tracks internally which paths depend on
+                    // gradual evidence, then we shouldn't need to re-check for that here.
+                    // TODO: Ordinary callable subtyping can match a later, shadowed overload.
+                    // Account for overload order before intersecting the inferred returns.
+                    actual.is_subtype_of(db, env, formal)
+                } else {
+                    actual.is_assignable_to(db, env, formal)
+                };
+                if !accepts {
+                    continue 'specializations;
+                }
+            }
+            validated.push(specialization);
+        }
+
+        if validated.is_empty() {
+            return None;
+        }
+        self.specialized_return_type(inference, &validated, &return_variables)
+    }
+
+    /// Projects the return type from specializations that each validate the whole call.
+    fn specialized_return_type(
+        &self,
+        inference: TypeVarInference<'db>,
+        specializations: &[Specialization<'db>],
+        return_variables: &[(usize, BoundTypeVarInstance<'db>)],
+    ) -> Option<Type<'db>> {
+        let db = self.db;
+        let env = self.env;
+
+        let mut returns = Vec::with_capacity(specializations.len());
+        let mut budget = ProjectionTypeBudget::new(SolutionBudget::default().type_terms);
+        for &specialization in specializations {
+            let return_ty = self.return_ty.apply_specialization(db, specialization);
+            budget.charge_type(db, return_ty).ok()?;
+            // Expose aliased unions to the intersection constructor's expansion budget.
+            returns.push(match return_ty.resolve_type_alias(db) {
+                Type::Union(union) => union.expand_aliases(db, env),
+                ty => ty,
+            });
+        }
+
+        // If one valid specialization's return type is a subtype of all the others, use it
+        // directly. For example, `int` can be selected over `int | list[int]`, even though the
+        // invariant-type check below would otherwise prevent intersecting them. Compare complete
+        // return types: substituting a narrower type argument can produce an incomparable
+        // (`list[T]`) or wider (`Callable[[T], None]`) return type.
+        //
+        // Find a candidate in one pass, then check it against every return type; two
+        // incomparable returns may still have a later return that is a subtype of both.
+        let mut candidate = *returns.first()?;
+        for &return_ty in returns.iter().skip(1) {
+            if return_ty != candidate && return_ty.is_subtype_of(db, env, candidate) {
+                candidate = return_ty;
+            }
+        }
+        if returns
+            .iter()
+            .all(|&return_ty| candidate == return_ty || candidate.is_subtype_of(db, env, return_ty))
+        {
+            return Some(candidate);
+        }
+
+        // A fresh invariant container can receive its specialization from context: the same
+        // expression `[]` is valid as either `list[A]` or `list[B]`. These typings make different,
+        // mutually exclusive choices for the allocated list's static element type, rather than
+        // establish simultaneous properties of one returned value. Their intersection is `Never`,
+        // which would incorrectly imply that the function cannot return.
+        // Apply this check only to valid specializations: a rejected sibling cannot prevent a
+        // single remaining specialization from providing its own return type.
+        // Combine the return variances of all variables whose bindings differ: `Callable[[T], U]`
+        // can capture state linking its input and output even though neither variable is invariant
+        // on its own. Output-only callables can still refine their covariant return types.
+        let mut variance = TypeVarVariance::Bivariant;
+        let invariant_visitor = PairVisitor::new(true);
+        let mut remaining_comparisons = SolutionBudget::default().visits;
+        let has_invariant_difference = return_variables.iter().any(|&(index, variable)| {
+            let types = specializations
+                .iter()
+                .map(|specialization| specialization.types(db)[index])
+                .unique();
+            if types.clone().all_equal() {
+                return false;
+            }
+            variance = variance.join(
+                self.return_ty
+                    .variance_of(db, env, variable.identity(db))
+                    .evaluate(db),
+            );
+            variance == TypeVarVariance::Invariant
+                // Whole-union comparisons are more conservative than tuple decomposition,
+                // so compatibility with one alternative is not transitive. Check every
+                // pair, falling back conservatively if the quadratic work exceeds budget.
+                || types.array_combinations().any(|[left, right]| {
+                    let Some(remaining) = remaining_comparisons.checked_sub(1) else {
+                        return true;
+                    };
+                    remaining_comparisons = remaining;
+                    self.has_invariant_return_difference(left, right, &invariant_visitor)
+                })
+        });
+
+        if has_invariant_difference {
+            let merged = inference.merged_specialization(db);
+            // Preserve the existing merged return when that specialization accepts the call.
+            // Otherwise, use the separate valid returns rather than an invalid merged mapping.
+            if self.argument_relations().all(|relation| {
+                relation
+                    .argument_type
+                    .apply_specialization(db, merged)
+                    .is_assignable_to(
+                        db,
+                        env,
+                        relation.declared_type.apply_specialization(db, merged),
+                    )
+            }) {
+                Some(self.return_ty.apply_specialization(db, merged))
+            } else {
+                Some(UnionType::from_elements(db, env, returns))
+            }
+        } else {
+            IntersectionType::bounded_from_elements(db, env, returns)
+        }
+    }
+
     fn infer(self, constraints: &ConstraintSetBuilder<'db>) -> InferredCall<'db> {
         let db = self.db;
         let mut constraint_set_errors = vec![false; self.arguments.len()];
@@ -6093,14 +6507,37 @@ impl<'db> CallInference<'_, 'db> {
             return InferredCall {
                 inferable_typevars: self.inferable_typevars,
                 inference: None,
+                refined_return_ty: None,
                 errors: Vec::new(),
                 constraint_set_errors,
             };
         };
 
-        let return_with_tcx = Some(self.return_ty).zip(self.call_expression_tcx.annotation);
-
         let mut builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
+
+        // TODO: ParamSpec and TypeVarTuple inference still uses legacy type mappings, which
+        // cannot distinguish validity constraints from inference evidence.
+        let use_legacy_solver = self.call_expression_tcx.is_declared()
+            || generic_context
+                .variables(db)
+                .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db));
+
+        let declared_return_context = match self.call_expression_tcx.annotation {
+            Some(tcx) if !use_legacy_solver => {
+                let validity = self
+                    .return_ty
+                    .when_constraint_set_assignable_to_with_provenance(
+                        db,
+                        self.env,
+                        tcx,
+                        constraints,
+                        ConstraintProvenance::Validity,
+                    );
+                builder.record_constraint_set(validity);
+                None
+            }
+            tcx => tcx,
+        };
 
         // Type variables for which we inferred a declared type based on a partially specialized
         // type from an outer generic context. For these type variables, we may infer types that
@@ -6127,8 +6564,8 @@ impl<'db> CallInference<'_, 'db> {
         // tension between type context preferences and argument constraints. If the combined set
         // is unsatisfiable, we will fall back to argument constraints alone (which the current
         // code does via `assignable_to_declared_type`).
-        let (preferred_type_mappings, preferred_solutions_incomplete) = return_with_tcx
-            .and_then(|(return_ty, tcx)| {
+        let (preferred_type_mappings, preferred_solutions_incomplete) = declared_return_context
+            .and_then(|tcx| {
                 if !tcx
                     .filter_union(db, self.env, |ty| ty.may_prefer_declared_type(db, self.env))
                     .may_prefer_declared_type(db, self.env)
@@ -6136,7 +6573,8 @@ impl<'db> CallInference<'_, 'db> {
                     return None;
                 }
 
-                let return_ty = return_ty
+                let return_ty = self
+                    .return_ty
                     .discard_disjoint_union_elements(db, self.env, tcx, self.inferable_typevars)
                     .or_never();
                 let tcx = tcx
@@ -6154,17 +6592,29 @@ impl<'db> CallInference<'_, 'db> {
                     self.inferable_typevars,
                 );
 
-                // Use `solve_with` to determine per-typevar variance from the raw
-                // lower/upper bounds on each BDD path.
-                let mut variance_map: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
-                    FxHashMap::default();
                 let solutions = path_bounds.solve_with(|variance, path_bound| {
-                    let identity = path_bound.bound_typevar.identity(db);
-                    variance_map
-                        .entry(identity)
-                        .and_modify(|current| *current = current.join(variance))
-                        .or_insert(variance);
-                    CandidateSolutions::preliminary_solve(db, self.env, constraints, path_bound)
+                    let outcome = CandidateSolutions::preliminary_solve(
+                        db,
+                        self.env,
+                        constraints,
+                        path_bound,
+                    );
+                    // Each path has already combined its lower and upper evidence; having both
+                    // makes its variance invariant. Paths are alternatives, so invariant evidence
+                    // on one path cannot justify selecting an upper-only preference on another.
+                    // Apply the contextual-preference policy per path, without discarding
+                    // unsatisfiability or incomplete-solution status.
+                    if variance.is_covariant() {
+                        match outcome {
+                            PathBoundSolution::Solved(_) => PathBoundSolution::Unsolved,
+                            PathBoundSolution::BudgetExceeded { .. } => {
+                                PathBoundSolution::BudgetExceeded { fallback: None }
+                            }
+                            outcome => outcome,
+                        }
+                    } else {
+                        outcome
+                    }
                 });
 
                 let Solutions::Constrained(solutions) = solutions else {
@@ -6177,17 +6627,6 @@ impl<'db> CallInference<'_, 'db> {
                 for solution in solutions.as_slice() {
                     for binding in &solution.solved_typevars {
                         let identity = binding.bound_typevar.identity(db);
-
-                        // Avoid unnecessarily widening the return type based on a covariant
-                        // type parameter from the type context, as it can lead to argument
-                        // assignability errors if the type variable is constrained by a narrower
-                        // parameter type.
-                        if variance_map
-                            .get(&identity)
-                            .is_some_and(|v| v.is_covariant())
-                        {
-                            continue;
-                        }
 
                         // Filter out inferable typevars (cross-typevar references from
                         // SequentMap transitivity) and provisional markers.
@@ -6298,6 +6737,7 @@ impl<'db> CallInference<'_, 'db> {
         InferredCall {
             inferable_typevars: self.inferable_typevars,
             inference: Some(inference),
+            refined_return_ty: self.refined_return_type(inference),
             errors: specialization_errors,
             constraint_set_errors,
         }
@@ -6644,7 +7084,7 @@ impl<'db> CallInference<'_, 'db> {
         let mut actual = TupleSpecBuilder::with_capacity(self.arguments.len());
         // Source indices of the first and last arguments matched to the variadic parameter.
         let mut argument_indices: Option<(usize, usize)> = None;
-        for (argument_index, adjusted_argument_index, argument, argument_types) in
+        for (argument_index, adjusted_argument_index, _, argument_types) in
             enumerate_argument_types(self.arguments)
         {
             let matches = &self.argument_matches[argument_index];
@@ -6660,9 +7100,8 @@ impl<'db> CallInference<'_, 'db> {
                     Some((argument_indices.map_or(index, |(first, _)| first), index));
             }
 
-            if matches!(argument, Argument::Variadic) {
-                let argument_type = argument_types.get_default()?;
-                let mut argument_tuple = argument_type.iterate(db, self.env);
+            if let CallArgument::Variadic(variadic) = argument_types {
+                let mut argument_tuple = variadic.sequence(db, self.env)?;
                 let consumed_prefix = matches
                     .parameters
                     .iter()
@@ -6687,9 +7126,9 @@ impl<'db> CallInference<'_, 'db> {
                     .expected_type
                     .unwrap_or_else(|| parameter.annotated_type());
                 actual.push(
-                    matched
-                        .argument_type
-                        .unwrap_or_else(|| argument_types.get_for_declared_type(declared_type)),
+                    argument_types
+                        .matched_type(declared_type, matched.argument_type)
+                        .unwrap_or(Type::unknown()),
                 );
             }
         }
@@ -6889,7 +7328,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // building them in an earlier separate step.
         //
         // An unresolved `*Ts` still has no per-element expected type.
-        if !self.constraint_set_errors[argument_index]
+        if !self.arguments_validated
+            && !self.constraint_set_errors[argument_index]
             && !constructor_receiver
             && (!has_starred_annotation || matched_parameter.expected_type.is_some())
             && !is_valid_isinstance_target()
@@ -6901,7 +7341,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     constraints,
                     self.inferable_typevars,
                 )
-                .is_never_satisfied(db, self.env)
+                .is_never_satisfied(db, self.env, self.inferable_typevars)
             && !self.should_defer_typevartuple_callable_check(
                 parameter.annotated_type(),
                 expected_ty,
@@ -7023,13 +7463,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 
     fn check_argument_types(&mut self, constraints: &ConstraintSetBuilder<'db>) {
-        let db = self.db;
         let paramspec = self.signature.parameters().as_paramspec_with_prefix();
         let paramspec_component_start = paramspec.and_then(|(prefix, paramspec)| {
             let prefix_len = prefix.len();
             let paramspec_argument_indices = self.paramspec_argument_indices(prefix_len);
             if paramspec_argument_indices.is_empty() {
-                self.evaluate_paramspec_sub_call(constraints, None, paramspec);
+                self.evaluate_paramspec_sub_call(constraints, None, prefix_len, paramspec);
                 return None;
             }
 
@@ -7037,31 +7476,28 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 paramspec_argument_indices
                     .iter()
                     .any(|(argument_index, _)| {
-                        let [parameter_index] =
-                            self.argument_matches[*argument_index].parameters.as_slice()
-                        else {
-                            return false;
-                        };
-
-                        let Type::TypeVar(typevar) =
-                            self.signature.parameters()[parameter_index.index].annotated_type()
-                        else {
-                            return false;
-                        };
-
-                        typevar.is_paramspec(db)
+                        let matches = &self.argument_matches[*argument_index].parameters;
+                        // Complete keyword sets are projected onto the ParamSpec in the sub-call.
+                        // Other arguments must belong entirely to the ParamSpec.
+                        matches!(
+                            self.arguments.get(*argument_index),
+                            Some(CallArgument::Keywords(keywords)) if keywords.is_complete()
+                        ) || matches
+                            .iter()
+                            .all(|parameter| parameter.index >= prefix_len)
                     });
 
             if has_paramspec_component_argument
                 && self.evaluate_paramspec_sub_call(
                     constraints,
                     Some(&paramspec_argument_indices),
+                    prefix_len,
                     paramspec,
                 )
             {
                 Some(prefix_len)
             } else {
-                self.evaluate_paramspec_sub_call(constraints, None, paramspec);
+                self.evaluate_paramspec_sub_call(constraints, None, prefix_len, paramspec);
                 None
             }
         });
@@ -7082,20 +7518,19 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 continue;
             }
 
-            match argument {
-                Argument::Variadic => self.check_variadic_argument_type(
+            match argument_types {
+                CallArgument::Variadic(_) => self.check_variadic_argument_type(
                     constraints,
                     argument_index,
                     adjusted_argument_index,
                     argument,
                     paramspec_component_start,
                 ),
-                Argument::Keywords => self.check_keyword_variadic_argument_type(
+                CallArgument::Keywords(keywords) => self.check_keyword_variadic_argument_type(
                     constraints,
                     argument_index,
                     adjusted_argument_index,
-                    // Splatted arguments are inferred without type context.
-                    argument_types.get_default().unwrap_or(Type::unknown()),
+                    keywords,
                     paramspec_component_start,
                 ),
                 _ => {
@@ -7107,8 +7542,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         }
 
                         let parameter = &self.signature.parameters()[parameter_index];
-                        let argument_type =
-                            argument_types.get_for_declared_type(parameter.annotated_type());
+                        let argument_type = argument_types
+                            .matched_type(parameter.annotated_type(), None)
+                            .unwrap_or(Type::unknown());
                         let relation = ArgumentRelation::new(
                             argument_index,
                             adjusted_argument_index,
@@ -7144,6 +7580,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         &mut self,
         constraints: &ConstraintSetBuilder<'db>,
         paramspec_arguments: Option<&[(usize, Option<usize>)]>,
+        prefix_len: usize,
         paramspec: BoundTypeVarInstance<'db>,
     ) -> bool {
         let db = self.db;
@@ -7169,7 +7606,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     paramspec_arguments.iter().copied().unzip();
 
                 (
-                    self.arguments.select(&paramspec_argument_indices),
+                    self.arguments.select_for_paramspec(
+                        &paramspec_argument_indices,
+                        self.signature.parameters(),
+                        prefix_len,
+                    ),
                     Some(error_argument_indices),
                 )
             } else {
@@ -7226,7 +7667,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             *error_parameter_source = Some(parameter_source);
                         } else if let Some(parameter_index) = argument_index
                             .and_then(|index| paramspec_arguments?.get(index))
-                            .and_then(|(index, _)| argument_matches[*index].parameters.first())
+                            .and_then(|(index, _)| {
+                                argument_matches[*index]
+                                    .parameters
+                                    .iter()
+                                    .find(|parameter| parameter.index >= prefix_len)
+                            })
                             .map(|parameter| parameter.index)
                         {
                             parameter.signature_parameter_index = parameter_index;
@@ -7306,11 +7752,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         constraints: &ConstraintSetBuilder<'db>,
         argument_index: usize,
         adjusted_argument_index: Option<usize>,
-        argument_type: Type<'db>,
+        keywords: &KeywordArgument<'db>,
         paramspec_component_start: Option<usize>,
     ) {
         let db = self.db;
-        if extract_unpacked_typed_dict_from_value_type(db, self.env, argument_type).is_some() {
+        if keywords.unpack(db, self.env).is_some() {
             self.check_variadic_argument_type(
                 constraints,
                 argument_index,
@@ -7321,6 +7767,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return;
         }
 
+        let argument_type = keywords.source_type().unwrap_or(Type::unknown());
         let value_type_paramspec = if let Some(paramspec) = argument_type.as_paramspec_typevar(db) {
             Some(paramspec)
         } else {
@@ -7357,9 +7804,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     .keyword_name()
                     .map(Name::as_str);
 
-                argument_type
-                    .getitem_dunder_call(db, self.env, parameter_name)
-                    .unwrap_or(Type::unknown())
+                keywords.value_type(db, self.env, parameter_name)
             };
 
             let relation = ArgumentRelation::new(
@@ -7385,12 +7830,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        let return_ty = self.return_ty.apply_optional_specialization(
-            self.db,
-            self.inference
-                .map(|inference| inference.merged_specialization(self.db)),
-        );
-        (self.inferable_typevars, self.inference, return_ty)
+        (self.inferable_typevars, self.inference, self.return_ty)
     }
 }
 
@@ -7440,9 +7880,8 @@ pub(crate) enum ArgumentTypeContext<'db> {
     Standard {
         /// The raw parameter type from the overload signature.
         raw_parameter_type: Type<'db>,
-        /// The parameter type to use as context, possibly specialized from the call expression's
-        /// declared type.
-        parameter_type: Type<'db>,
+        /// The expected parameter type, possibly specialized from the call expression's context.
+        context: TypeContext<'db>,
     },
 
     ParamSpec {
@@ -7456,12 +7895,12 @@ pub(crate) enum ArgumentTypeContext<'db> {
 impl<'db> ArgumentTypeContext<'db> {
     /// Creates a context for ordinary parameter annotations.
     ///
-    /// `raw_parameter_type` is the lookup key used by later type checking. `parameter_type` is the
+    /// `raw_parameter_type` is the lookup key used by later type checking. `context` is the
     /// possibly-specialized context used to infer the argument expression.
-    fn standard(raw_parameter_type: Type<'db>, parameter_type: Type<'db>) -> Self {
+    fn standard(raw_parameter_type: Type<'db>, context: TypeContext<'db>) -> Self {
         Self::Standard {
             raw_parameter_type,
-            parameter_type,
+            context,
         }
     }
 
@@ -7480,11 +7919,8 @@ impl<'db> ArgumentTypeContext<'db> {
     /// Returns the type context used for inferring the argument expression.
     pub(crate) fn type_context(self) -> TypeContext<'db> {
         match self {
-            Self::Standard { parameter_type, .. }
-            | Self::ParamSpec {
-                declared_type: parameter_type,
-                ..
-            } => TypeContext::new(Some(parameter_type)),
+            Self::Standard { context, .. } => context,
+            Self::ParamSpec { declared_type, .. } => TypeContext::declared(Some(declared_type)),
         }
     }
 
@@ -7494,12 +7930,13 @@ impl<'db> ArgumentTypeContext<'db> {
     /// for that type. `ParamSpec` arguments are cached by the concrete forwarded parameter type,
     /// but still inserted through their full context so the original `P.args` or `P.kwargs` lookup
     /// key is populated too.
-    pub(crate) fn inference_cache_key(self) -> Type<'db> {
+    pub(crate) fn inference_cache_key(self) -> TypeContext<'db> {
         match self {
             Self::Standard {
-                raw_parameter_type, ..
-            } => raw_parameter_type,
-            Self::ParamSpec { declared_type, .. } => declared_type,
+                raw_parameter_type,
+                context,
+            } => context.with_annotation(Some(raw_parameter_type)),
+            Self::ParamSpec { declared_type, .. } => TypeContext::declared(Some(declared_type)),
         }
     }
 
@@ -7862,7 +8299,11 @@ impl<'db> Binding<'db> {
             callable.signatures(db).iter().cloned(),
         );
 
-        let mut sub_arguments = arguments_types.select(&paramspec_argument_indices);
+        let mut sub_arguments = arguments_types.select_for_paramspec(
+            &paramspec_argument_indices,
+            self.signature.parameters(),
+            prefix.len(),
+        );
         // Clear the previously inferred type for this argument, if it was inferred in the previous
         // fixpoint iteration.
         sub_arguments.clear_types(sub_argument_index);
@@ -7948,11 +8389,9 @@ impl<'db> Binding<'db> {
             || arguments_types
                 .iter()
                 .take(argument_index)
-                .any(|(argument, types)| {
-                    matches!(argument, Argument::Variadic)
-                        && types
-                            .get_default()
-                            .is_none_or(|ty| ty.iterate(db, env).len().maximum().is_none())
+                .any(|argument| {
+                    matches!(argument, CallArgument::Variadic(variadic)
+                        if variadic.sequence(db, env).is_none_or(|sequence| sequence.len().maximum().is_none()))
                 })
         {
             return None;
@@ -8032,7 +8471,7 @@ impl<'db> Binding<'db> {
         {
             return Some(ArgumentTypeContext::standard(
                 original_parameter_type,
-                bound,
+                TypeContext::validity(bound),
             ));
         }
 
@@ -8085,9 +8524,18 @@ impl<'db> Binding<'db> {
             }
         }
 
+        // A parameter specialized using the declared type of an outer type variable should remain
+        // as validity type context.
+        let context =
+            if !call_expression_tcx.is_declared() && parameter_type != original_parameter_type {
+                TypeContext::validity(parameter_type)
+            } else {
+                TypeContext::declared(Some(parameter_type))
+            };
+
         Some(ArgumentTypeContext::standard(
             original_parameter_type,
-            parameter_type,
+            context,
         ))
     }
 
@@ -8236,37 +8684,24 @@ impl<'db> Binding<'db> {
         let parameters = self.signature.parameters();
         let mut matcher = ArgumentMatcher::new(arguments, parameters, &mut self.errors);
         let mut keywords_arguments = vec![];
-        for (argument_index, (argument, argument_types)) in arguments.iter().enumerate() {
+        for (argument_index, argument) in arguments.iter().enumerate() {
             match argument {
-                Argument::Positional | Argument::Synthetic => {
-                    let _ = matcher.match_positional(argument_index, argument, None, false);
+                CallArgument::Positional(_) | CallArgument::Synthetic(_) => {
+                    let _ = matcher.match_positional(argument_index, argument.kind(), None, false);
                 }
-                Argument::Keyword(name) => {
-                    let _ = matcher.match_keyword(argument_index, argument, None, name);
+                CallArgument::Keyword { name, .. } => {
+                    let _ = matcher.match_keyword(argument_index, argument.kind(), None, name);
                 }
-                Argument::Variadic => {
-                    let _ = matcher.match_variadic(
-                        db,
-                        env,
-                        argument_index,
-                        argument,
-                        // Splatted arguments are inferred without type context.
-                        argument_types.get_default(),
-                    );
+                CallArgument::Variadic(variadic) => {
+                    let _ = matcher.match_variadic(db, env, argument_index, variadic);
                 }
-                Argument::Keywords => {
-                    keywords_arguments.push((argument_index, argument_types));
+                CallArgument::Keywords(keywords) => {
+                    keywords_arguments.push((argument_index, keywords));
                 }
             }
         }
         for (keywords_index, keywords_type) in keywords_arguments {
-            matcher.match_keyword_variadic(
-                db,
-                env,
-                keywords_index,
-                // Splatted arguments are inferred without type context.
-                keywords_type.get_default(),
-            );
+            matcher.match_keyword_variadic(db, env, keywords_index, keywords_type);
         }
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
         self.variadic_argument_matched_to_variadic_parameter =
@@ -8278,10 +8713,23 @@ impl<'db> Binding<'db> {
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
         arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
     ) {
+        // Each overload is an independent inference problem. Two candidates can contain
+        // typevars with the same identity but different specialized bounds, so sharing a
+        // builder would make the second candidate reuse the first candidate's bounds.
+        //
+        // TODO: Ideally reuse of a `ConstraintSetBuilder` across any inference scope would be
+        // semantically safe. Currently this is not true because the `ConstraintSetBuilder` interns
+        // typevars by identity and pulls bounds/constraints off the first interned instance of a
+        // given identity, but our current typevar representation explicitly allows multiple
+        // `TypeVarInstance` for a single `TypeVarIdentity`, with bounds/constraints carried by the
+        // `TypeVarInstance`. And we have cases (`Self` specialization, materialization) where we
+        // create multiple instances of a single typevar identity with different
+        // bounds/constraints. We should reconcile the invariants expected by the constraint solver
+        // with those actually enforced by our typevar representation.
+        let constraints = &ConstraintSetBuilder::new();
         let parameters = self.signature.parameters();
 
         if parameters.is_top() {
@@ -8309,6 +8757,7 @@ impl<'db> Binding<'db> {
             call_expression_tcx,
             return_ty: self.return_ty,
             is_partial_application: self.is_partial_application,
+            is_constructor: self.constructor_context.is_some(),
             inferable_typevars: self
                 .signature
                 .generic_context
@@ -8343,7 +8792,8 @@ impl<'db> Binding<'db> {
     ) {
         let mut num_synthetic_args = 0;
 
-        for (argument_index, (argument, argument_types)) in arguments.iter().enumerate() {
+        for (argument_index, call_argument) in arguments.iter().enumerate() {
+            let argument = call_argument.kind();
             let adjusted_argument_index = if matches!(argument, Argument::Synthetic) {
                 num_synthetic_args += 1;
                 None
@@ -8351,11 +8801,11 @@ impl<'db> Binding<'db> {
                 Some(argument_index - num_synthetic_args)
             };
 
-            if !matches!(argument, Argument::Keywords) {
+            let CallArgument::Keywords(keywords) = call_argument else {
                 continue;
-            }
+            };
 
-            let argument_type = argument_types.get_default().unwrap_or(Type::unknown());
+            let argument_type = keywords.source_type().unwrap_or(Type::unknown());
             if let KeywordUnpackKeyTypeCheck::Invalid(provided_ty) =
                 validate_keyword_unpack_key_type(
                     db,
@@ -8460,10 +8910,8 @@ impl<'db> Binding<'db> {
         let parameters = self.signature.parameters().as_slice();
         let mut partial_application = PartialApplication::new(parameters.len());
 
-        for ((argument, argument_ty), argument_matches) in
-            arguments.iter().zip(&self.argument_matches)
-        {
-            match argument {
+        for (argument, argument_matches) in arguments.iter().zip(&self.argument_matches) {
+            match argument.kind() {
                 Argument::Positional | Argument::Synthetic | Argument::Variadic => {
                     for matched_parameter in argument_matches.iter() {
                         let parameter_index = matched_parameter.index;
@@ -8495,9 +8943,9 @@ impl<'db> Binding<'db> {
                         partial_application.bind_by_keyword(
                             parameter_index,
                             (parameter.annotated_type() != Type::Never).then(|| {
-                                matched_parameter.argument_type.unwrap_or_else(|| {
-                                    argument_ty.get_default().unwrap_or_else(Type::unknown)
-                                })
+                                argument
+                                    .matched_type(None, matched_parameter.argument_type)
+                                    .unwrap_or_else(Type::unknown)
                             }),
                         );
                     }
@@ -8579,11 +9027,11 @@ impl<'db> Binding<'db> {
                     .iter()
                     .any(|parameter| parameter.index == parameter_index)
             })
-            .map(move |((argument, argument_types), _)| {
+            .map(move |(argument, _)| {
                 let declared_type = self.signature.parameters()[parameter_index].annotated_type();
                 (
-                    argument,
-                    argument_types.get_for_declared_type(declared_type),
+                    argument.kind(),
+                    argument.source_types().get_for_declared_type(declared_type),
                 )
             })
     }
@@ -8602,7 +9050,19 @@ impl<'db> Binding<'db> {
         compound_diag: Option<&dyn CompoundDiagnostic>,
         matching_overload: Option<&MatchingOverloadLiteral<'db>>,
     ) {
+        let mut reported_argument_errors: FxHashMap<_, SmallVec<[_; 1]>> = FxHashMap::default();
         for error in &self.errors {
+            // Multiple elements of one starred argument can produce the same type error for a
+            // variadic parameter. Deduplicate only when reporting: overload selection uses the
+            // number of binding errors, so removing errors earlier could change inference.
+            if let BindingError::InvalidArgumentType { argument_index, .. } = error {
+                let reported = reported_argument_errors.entry(argument_index).or_default();
+                if reported.contains(&error) {
+                    continue;
+                }
+                reported.push(error);
+            }
+
             error.report_diagnostic(
                 context,
                 node,
@@ -10476,8 +10936,6 @@ impl<'db> ClassInfoValidator<'_, 'db> {
     }
 }
 
-// TODO: Replace these tests with mdtests once correlated alternatives affect call inference's
-// return types or diagnostics, making retained correlations and completeness observable.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -10514,52 +10972,7 @@ mod tests {
             .ok_or_else(|| anyhow::anyhow!("expected generic call inference"))
     }
 
-    #[test]
-    fn overloaded_argument_retains_correlated_inference() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/a.py",
-            r#"
-from typing import Callable, overload
-
-# Restrict T to the overload inputs, excluding the vacuous T = Never solution.
-def infer_pair[T: (int, str), U](converter: Callable[[T], U]) -> tuple[T, U]:
-    raise NotImplementedError
-
-@overload
-def swap(value: int) -> str: ...
-@overload
-def swap(value: str) -> int: ...
-def swap(value: int | str) -> int | str:
-    raise NotImplementedError
-"#,
-        )?;
-        let db = &db;
-        let env = db.program_environment();
-        let file = system_path_to_file(db, "/src/a.py")?;
-        let file = ProgramFile::new(db, file, env.program(db));
-        let callable = global_symbol(db, file, "infer_pair").place.expect_type();
-        let argument = global_symbol(db, file, "swap").place.expect_type();
-        let inference = call_inference(db, callable, [argument], TypeContext::default())?;
-        let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
-            anyhow::bail!(
-                "expected correlated alternatives, got {:?}",
-                inference.solutions(db)
-            );
-        };
-        let int = KnownClass::Int.to_instance(db, &env);
-        let str = KnownClass::Str.to_instance(db, &env);
-
-        assert_eq!(
-            paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
-            FxHashSet::from_iter([
-                [Some(Resolved(int)), Some(Resolved(str))].as_slice(),
-                [Some(Resolved(str)), Some(Resolved(int))].as_slice(),
-            ])
-        );
-        Ok(())
-    }
-
+    // TODO: Replace this with an mdtest once callback revalidation exposes the correlated return.
     #[test]
     fn generic_callback_resolves_dependencies_per_alternative() -> anyhow::Result<()> {
         let mut db = setup_db();

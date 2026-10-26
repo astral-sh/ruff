@@ -62,6 +62,16 @@ impl UvMetadata {
             None => None,
         };
 
+        let mut module_owners = metadata.module_owners;
+        // If uv emits both fields, `modules` takes precedence per module, including empty owner
+        // lists that prevent dependency checks from falling back to a parent module's owners.
+        module_owners.extend(
+            metadata
+                .modules
+                .into_iter()
+                .map(|(name, module)| (name, module.owners)),
+        );
+
         Ok(Self {
             workspace_root,
             members: metadata.members,
@@ -70,7 +80,7 @@ impl UvMetadata {
             workspace: metadata.workspace,
             script: metadata.script,
             resolution: metadata.resolution,
-            module_owners: metadata.module_owners,
+            module_owners,
         })
     }
 }
@@ -179,6 +189,13 @@ struct WorkspaceMetadata {
     resolution: BTreeMap<CharStr, ResolutionNode>,
     #[serde(default, deserialize_with = "string_interner::deserialize_map")]
     module_owners: BTreeMap<CharStr, Box<[ModuleOwner]>>,
+    #[serde(default, deserialize_with = "string_interner::deserialize_map")]
+    modules: BTreeMap<CharStr, ModuleMetadata>,
+}
+
+#[derive(Deserialize)]
+struct ModuleMetadata {
+    owners: Box<[ModuleOwner]>,
 }
 
 #[derive(Deserialize)]
@@ -314,8 +331,8 @@ mod tests {
                 },
                 (dependency_id): {"kind": "package", "name": name, "dependencies": []}
             },
-            "module_owners": {
-                (name): [{"package_id": dependency_id}]
+            "modules": {
+                (name): {"owners": [{"package_id": dependency_id}]}
             }
         }))?;
 

@@ -410,8 +410,8 @@ annotations and preserve the class binding, so constructor calls can still be ch
 ```pyi
 from typing_extensions import reveal_type
 
-# error: [invalid-type-form] "Variable of type `Example` is not allowed in a parameter annotation"
-# error: [invalid-type-form] "Variable of type `Example` is not allowed in a return type annotation"
+# error: [invalid-type-form] "Variable `annotation` cannot be used as a type"
+# error: [invalid-type-form] "Variable `annotation` cannot be used as a type"
 def identity(value: annotation) -> annotation: ...
 
 @identity
@@ -467,8 +467,8 @@ on the decorated class.
 from dataclasses import dataclass
 from typing_extensions import reveal_type
 
-# error: [invalid-type-form] "Variable of type `Example` is not allowed in a parameter annotation"
-# error: [invalid-type-form] "Variable of type `Example` is not allowed in a return type annotation"
+# error: [invalid-type-form] "Variable `annotation` cannot be used as a type"
+# error: [invalid-type-form] "Variable `annotation` cannot be used as a type"
 def identity(value: annotation) -> annotation: ...
 
 @dataclass
@@ -648,6 +648,11 @@ class Bar: ...
 
 ## Known class instances with a shadowed typing module
 
+```toml
+[environment]
+python-version = "3.10"
+```
+
 String members retain their types when a local `typing.py` introduces an inference cycle. Resolving
 `str`'s bases looks up `Sequence` in that module. Determining whether the assignment is reachable
 requires inferring `trigger`'s return annotation. Resolving `C.attribute` requires determining `C`'s
@@ -674,6 +679,11 @@ Sequence = object
 ```
 
 ## Known class instances after checking the shadowing module
+
+```toml
+[environment]
+python-version = "3.10"
+```
 
 String members retain their types when the shadowing module is checked first, as they do when the
 consumer is checked first.
