@@ -647,6 +647,17 @@ def _(x: MyList[int]):
     reveal_type(head(x))  # revealed: int
 ```
 
+A sibling argument can supply the element type for a list literal passed to an aliased parameter.
+Here, `value` widens the element type of `[n]` to `int | str`.
+
+```py
+def append[T](items: MyList[T], value: T) -> None:
+    items.append(value)
+
+def _(n: int, value: int | str):
+    append([n], value)  # no diagnostic
+```
+
 ## Bidirectional type inference with union type aliases
 
 When a PEP 695 type alias expands to a union, bidirectional type inference should still work

@@ -1,5 +1,34 @@
 # Generic type aliases: legacy syntax
 
+## Solving generics with type alias parameters
+
+A sibling argument can supply the element type for a list literal passed to an aliased parameter.
+Here, `value` widens the element type of `[n]` to `int | str`.
+
+```py
+from typing import TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+MyList = TypeAliasType("MyList", list[T], type_params=(T,))
+
+def append(items: MyList[T], value: T) -> None:
+    items.append(value)
+
+def _(n: int, value: int | str):
+    append([n], value)  # no diagnostic
+```
+
+The list literal also receives this context through a recursive alias.
+
+```py
+Nested = list[T] | tuple["Nested[T]"]
+
+def accept_nested(items: Nested[T], value: T) -> None: ...
+def _(n: int, value: int | str):
+    accept_nested([n], value)  # no diagnostic
+```
+
 ## Ambiguous overload returns through generic aliases
 
 Aliases are expanded when comparing the structure of ambiguous return types. Recursive aliases

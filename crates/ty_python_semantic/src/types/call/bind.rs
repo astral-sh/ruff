@@ -58,17 +58,19 @@ use crate::types::function::{
 };
 use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
-    TypeVarInferenceSolutions,
+    TypeVarInferenceSolutions, walk_specialization_types,
 };
 use crate::types::infer::original_class_type;
 use crate::types::known_instance::{
     FieldInstance, InternedConstraintSetSolution, MethodWrapper, MethodWrapperKind,
 };
+use crate::types::recursive::RecursiveType;
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
     PartialApplication, PartialSignatureApplication,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableSegment};
+use crate::types::type_alias::{TypeAliasType, walk_type_alias_arguments};
 use crate::types::typed_dict::TypedDictOpenness;
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarKind, TypeVarNonceGenerator, TypeVarSet};
 use crate::types::variance::VarianceInferable;
@@ -7991,6 +7993,9 @@ struct ParamSpecArgumentContext<'a, 'call, 'db> {
 }
 
 /// Returns the number of occurrences of inferable type variables in the provided type.
+///
+/// Counting the `T` in `Alias[T]` keeps the argument in the convergence check when a sibling
+/// constrains `T`. This only requires visiting the supplied arguments, even for recursive aliases.
 fn inferable_typevar_occurrences<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -8036,6 +8041,16 @@ fn inferable_typevar_occurrences<'db>(
             self.stack.borrow_mut().push(ty);
             walk_non_atomic_type(db, non_atomic_type, self);
             self.stack.borrow_mut().pop();
+        }
+
+        fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+            walk_type_alias_arguments(db, alias, self);
+        }
+
+        fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+            if let Some(arguments) = recursive.arguments(db) {
+                walk_specialization_types(db, arguments, self);
+            }
         }
     }
 
