@@ -21,6 +21,14 @@ pub(crate) fn run(args: &ServerCommand) -> Result<ExitStatus> {
     if args.find_executable {
         return find_executable();
     }
+
+    // Transparent huge pages improve cold checks, but inflate the resident size of
+    // the language server's long-lived heap. Respect an explicit allocator setting.
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    if !std::env::vars_os().any(|(name, _)| name.eq_ignore_ascii_case("MIMALLOC_ALLOW_THP")) {
+        let _ = nix::sys::prctl::set_thp_disable(true);
+    }
+
     ty_server::run_server()?;
     Ok(ExitStatus::Success)
 }
