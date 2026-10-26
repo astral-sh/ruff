@@ -3957,6 +3957,26 @@ box.accept("invalid", other=1)
 box.accept(1, other="invalid")
 ```
 
+## Constrained type variables in bound method receivers
+
+The argument to `list.extend` can constrain its receiver. A `list[T]` cannot stand in for a
+`list[int]` when `T` could be `str`, including when a type alias refers to `T`.
+
+```py
+def extend[T: (int, str)](values: list[T], other: list[T]) -> None:
+    values.extend(other)
+
+    # error: 5 [invalid-argument-type] "Expected `list[int]`, found `list[T@extend]`"
+    # error: 19 [invalid-argument-type] "Expected `Iterable[T@extend]`, found `list[int]`"
+    values.extend([1])
+
+    type Item = T
+    aliased: list[Item] = values
+    # error: 5 [invalid-argument-type] "Expected `list[int]`, found `list[Item]`"
+    # error: 20 [invalid-argument-type] "Expected `Iterable[Item]`, found `list[int]`"
+    aliased.extend([1])
+```
+
 ## `~T` is never assignable to `T`
 
 ```py

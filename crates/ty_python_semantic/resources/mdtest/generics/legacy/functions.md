@@ -562,6 +562,23 @@ info: Type variable defined here
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
+## Constrained type variables in bound method receivers
+
+The argument to `list.extend` must be valid for every possible element type of the receiver.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+
+def extend(values: list[T], other: list[T]) -> None:
+    values.extend(other)
+
+    # error: 5 [invalid-argument-type] "Expected `list[int]`, found `list[T@extend]`"
+    # error: 19 [invalid-argument-type] "Expected `Iterable[T@extend]`, found `list[int]`"
+    values.extend([1])
+```
+
 ## Inferring a constrained typevar from a callback parameter
 
 A callback must accept every value of at least one declared constraint. A callback accepting only
