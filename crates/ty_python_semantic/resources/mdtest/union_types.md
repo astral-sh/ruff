@@ -94,6 +94,24 @@ def _(
     reveal_type(u4)  # revealed: str | bytes
 ```
 
+## Extending unions of literals
+
+Extending a union preserves literal grouping and removes duplicates, even when other types separate
+the literals:
+
+```py
+from typing import Literal
+
+Ints = Literal[1] | bytes | Literal[2] | Literal[1]
+Strings = Literal["a"] | int | Literal["b"] | Literal["a"]
+Bytes = Literal[b"a"] | str | Literal[b"b"] | Literal[b"a"]
+
+def f(ints: Ints, strings: Strings, byte_strings: Bytes):
+    reveal_type(ints)  # revealed: Literal[1, 2] | bytes
+    reveal_type(strings)  # revealed: Literal["a", "b"] | int
+    reveal_type(byte_strings)  # revealed: Literal[b"a", b"b"] | str
+```
+
 ## Boolean literals
 
 The union `Literal[True] | Literal[False]` is exactly equivalent to `bool`:
@@ -148,6 +166,15 @@ def _(
 ):
     reveal_type(u1)  # revealed: Literal[Color.RED]
     reveal_type(u2)  # revealed: Literal[Color.RED]
+```
+
+Adding the remaining members of an enum collapses the literal group to the enum type:
+
+```py
+Colors = Literal[Color.RED] | bytes | Literal[Color.GREEN] | Literal[Color.BLUE]
+
+def f(value: Colors):
+    reveal_type(value)  # revealed: Color | bytes
 ```
 
 ## Do not erase `Unknown`
@@ -372,6 +399,16 @@ def _(
     reveal_type(f)  # revealed: Contravariant[Any]
     reveal_type(g)  # revealed: Invariant[Any] | Invariant[Any | str]
     reveal_type(h)  # revealed: Invariant[Any | str] | Invariant[Any]
+```
+
+In a union, `Covariant[int]` subsumes an earlier `Covariant[bool]` even when another type separates
+them:
+
+```py
+Alias = Covariant[bool] | bytes | Covariant[int] | str
+
+def extended(value: Alias):
+    reveal_type(value)  # revealed: Covariant[int] | bytes | str
 ```
 
 A type alias does not make a gradual type argument static. Covariant unions simplify the same way
