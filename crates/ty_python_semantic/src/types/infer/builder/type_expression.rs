@@ -1295,7 +1295,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             ast::Expr::Call(call_expr) => {
                 if !self.in_string_annotation() {
-                    self.infer_call_expression(call_expr, TypeContext::default());
+                    let callee = self.infer_callee(&call_expr.func);
+                    self.infer_call_expression(call_expr, callee, TypeContext::default());
                 }
                 self.report_invalid_type_expression(
                     expression,

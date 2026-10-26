@@ -7,6 +7,7 @@ use crate::types::function::OverloadLiteral;
 use crate::types::visitor::any_over_type;
 use crate::types::{MemberLookupPolicy, PropertyInstanceType};
 use crate::{Program, ProgramEnvironment};
+use itertools::Itertools;
 use ruff_python_ast as ast;
 
 mod ambiguous;
@@ -150,7 +151,7 @@ impl<'db> Type<'db> {
             }
             _ => self,
         };
-        let signatures = match callable {
+        match callable {
             Type::FunctionLiteral(function) => {
                 let ([], Some(implementation)) = function.overloads_and_implementation(db) else {
                     return None;
@@ -162,31 +163,32 @@ impl<'db> Type<'db> {
                 {
                     return None;
                 }
-                function.signature(db)
             }
-            Type::Callable(callable) if callable.is_regular(db) => callable.signatures(db),
+            Type::Callable(callable) if callable.is_regular(db) => {}
             _ => return None,
-        };
-        let [signature] = signatures.overloads.as_slice() else {
-            return None;
-        };
-        // Type guards record the narrowed argument. Aliases and recursive types are lazy and
-        // can hide type variables, so leave them to ordinary binding.
-        let ty = signature.return_ty;
-        // A gradual return provides no concrete type to resolve a cycle. Keep the argument
-        // dependencies for recovery when, for example, an untyped plugin returns `Any`.
-        if ty.is_dynamic() {
-            return None;
         }
+
+        // Use the same signature that full call binding selects, including its bound receiver.
+        let bindings = self.bindings(db, env);
+        let overload = bindings
+            .iter_flat()
+            .flat_map(CallableBinding::overloads)
+            .exactly_one()
+            .ok()?;
+        let ty = overload.signature.return_ty;
+        // Only these types and their components are known to survive argument inference
+        // unchanged. In particular, a lazy alias can hide a type variable.
         let needs_binding = any_over_type(db, env, ty, false, |ty| {
-            matches!(
+            !matches!(
                 ty,
-                Type::TypeVar(_)
-                    | Type::TypeIs(_)
-                    | Type::TypeGuard(_)
-                    | Type::TypeAlias(_)
-                    | Type::Recursive(_)
-                    | Type::Divergent(_)
+                Type::NominalInstance(_)
+                    | Type::ClassLiteral(_)
+                    | Type::GenericAlias(_)
+                    | Type::SubclassOf(_)
+                    | Type::LiteralValue(_)
+                    | Type::Union(_)
+                    | Type::Intersection(_)
+                    | Type::Never
             )
         });
         (!needs_binding).then_some(ty)

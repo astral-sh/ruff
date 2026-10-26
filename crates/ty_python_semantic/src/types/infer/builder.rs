@@ -3701,10 +3701,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Some(KnownClass::Sentinel) => self
                                 .infer_sentinel_expression(target, call_expr, definition)
                                 .unwrap_or_else(|| {
-                                    self.infer_call_expression_impl(call_expr, callable_type, tcx)
+                                    self.infer_call_expression(call_expr, callable_type, tcx)
                                 }),
                             Some(_) | None => {
-                                self.infer_call_expression_impl(call_expr, callable_type, tcx)
+                                self.infer_call_expression(call_expr, callable_type, tcx)
                             }
                         }
                     };
@@ -6902,7 +6902,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::Lambda(lambda_expression) => {
                 self.infer_lambda_expression(lambda_expression, tcx)
             }
-            ast::Expr::Call(call_expression) => self.infer_call_expression(call_expression, tcx),
+            ast::Expr::Call(call) => {
+                let callee = self.infer_callee(&call.func);
+                self.infer_call_expression(call, callee, tcx)
+            }
             ast::Expr::Starred(starred) => self.infer_starred_expression(starred, tcx),
             ast::Expr::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
             ast::Expr::YieldFrom(yield_from) => self.infer_yield_from_expression(yield_from),
@@ -9312,28 +9315,46 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // The caller only requests a type. Full inference owns diagnostics for this call.
         self.context.suppress_diagnostics();
         self.context.defuse();
-        // Class bodies can give an ordinary field-specifier function special call semantics.
-        if call.arguments.is_empty()
-            || self
-                .index
-                .scope(self.scope().file_scope_id(self.db()))
-                .kind()
-                == ScopeKind::Class
-        {
+        if !self.can_defer_call_arguments(call) {
             return None;
         }
         let callee = self.infer_callee(&call.func);
         callee.call_return_type_without_arguments(self.db(), self.program_environment())
     }
 
+    fn can_defer_call_arguments(&self, call: &ast::ExprCall) -> bool {
+        if call.arguments.is_empty() {
+            return false;
+        }
+        // Class bodies can give an ordinary field-specifier function special call semantics.
+        let scope = self.scope().file_scope_id(self.db());
+        self.index.scope(scope).kind() != ScopeKind::Class
+    }
+
     fn infer_call_expression(
         &mut self,
         call_expression: &ast::ExprCall,
+        callable_type: Type<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let callable_type = self.infer_callee(&call_expression.func);
-
-        self.infer_call_expression_impl(call_expression, callable_type, tcx)
+        let result = self.infer_call_with_arguments(call_expression, callable_type, tcx);
+        // Check agreement from the full path so a type-only lookup still skips the arguments in tests.
+        #[cfg(feature = "testing")]
+        if self.can_defer_call_arguments(call_expression)
+            && let Some(fixed) = callable_type
+                .call_return_type_without_arguments(self.db(), self.program_environment())
+        {
+            let db = self.db();
+            let env = self.program_environment();
+            assert!(
+                fixed == result,
+                "`{}` returns `{}` without argument inference and `{}` after checking its arguments",
+                callable_type.display(db, env),
+                fixed.display(db, env),
+                result.display(db, env),
+            );
+        }
+        result
     }
 
     /// Infer a callable expression without introducing new type variable bindings.
@@ -9433,7 +9454,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }))
     }
 
-    fn infer_call_expression_impl(
+    fn infer_call_with_arguments(
         &mut self,
         call_expression: &ast::ExprCall,
         mut callable_type: Type<'db>,
