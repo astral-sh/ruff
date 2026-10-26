@@ -25,6 +25,7 @@ use crate::types::infer::{
     infer_legacy_type_alias, legacy_type_alias_definition, legacy_type_alias_parameters,
     non_alias_type_expression_diagnostics,
 };
+use crate::types::set_theoretic::builder::NormalizedUnion;
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
@@ -47,6 +48,21 @@ enum LegacyTypeAliasReference<'db> {
     Invalid,
     /// Use ordinary value-to-type conversion, including recovery for invalid type arguments.
     ValueFallback,
+}
+
+/// Results that an enclosing annotation can reuse while inferring the same expression tree.
+struct InferredTypeExpression<'db> {
+    ty: Type<'db>,
+    normalized_union: Option<NormalizedUnion<'db>>,
+    // Root and nested type expressions can infer different runtime values.
+    runtime_value: Option<(InferenceFlags, Type<'db>)>,
+}
+
+impl<'db> InferredTypeExpression<'db> {
+    fn runtime_value(&self, builder: &TypeInferenceBuilder<'db, '_>) -> Option<Type<'db>> {
+        let (flags, ty) = self.runtime_value?;
+        (flags == builder.inference_flags() && builder.cycle_recovery.is_none()).then_some(ty)
+    }
 }
 
 /// Type expressions
@@ -193,6 +209,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        self.infer_type_expression_result(expression, false).ty
+    }
+
+    fn infer_type_expression_result(
+        &mut self,
+        expression: &ast::Expr,
+        retain_runtime_value: bool,
+    ) -> InferredTypeExpression<'db> {
         let previous_deferred_state = self.deferred_state;
         let was_in_type_expression = self
             .inference_flags()
@@ -214,7 +238,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.replace_deferred_state(DeferredExpressionState::Deferred);
         }
 
-        let ty = self.infer_type_expression_no_store(expression);
+        let result = self.infer_type_expression_result_no_store(expression, retain_runtime_value);
         self.deferred_state = previous_deferred_state;
         self.context.inference_flags.set(
             InferenceFlags::IN_NESTED_TYPE_EXPRESSION,
@@ -224,8 +248,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             InferenceFlags::IN_TYPE_EXPRESSION,
             previously_in_type_expression,
         );
-        self.store_expression_type(expression, ty);
-        ty
+        self.store_expression_type(expression, result.ty);
+        result
     }
 
     /// Similar to [`infer_type_expression`], but accepts a [`DeferredExpressionState`].
@@ -415,6 +439,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Infer the type of a type expression without storing the result.
     pub(super) fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
+        self.infer_type_expression_result_no_store(expression, false)
+            .ty
+    }
+
+    fn infer_type_expression_result_no_store(
+        &mut self,
+        expression: &ast::Expr,
+        retain_runtime_value: bool,
+    ) -> InferredTypeExpression<'db> {
         let db = self.db();
         let env = self.program_environment();
         let ignore_runtime_errors = |builder: &Self| {
@@ -428,7 +461,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
-        match expression {
+        let mut normalized_union = None;
+        let mut runtime_value = None;
+        let ty = match expression {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => {
                     let (ty, definition) = self.infer_type_expression_reference(expression);
@@ -530,21 +565,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 match binary.op {
                     // PEP-604 unions are okay, e.g., `int | str`
                     ast::Operator::BitOr => {
-                        let left_ty = self.infer_type_expression(&binary.left);
-                        let right_ty = self.infer_type_expression(&binary.right);
+                        let left = self.infer_type_expression_result(&binary.left, true);
+                        let right = self.infer_type_expression_result(&binary.right, true);
 
                         // Detect runtime errors from e.g. `int | "bytes"` on Python <3.14 without `__future__` annotations.
                         if !ignore_runtime_errors(self) {
                             let mut speculative_builder = self.speculate_without_diagnostics();
-                            // If the left-hand side of the union is itself a PEP-604 union,
-                            // we'll already have checked whether it can be used with `|` in a previous inference step
-                            // and emitted a diagnostic if it was appropriate. We should skip inferring it here to
-                            // avoid duplicate diagnostics; just assume that the l.h.s. is a `UnionType` instance
-                            // in that case.
-                            let left_type_value = speculative_builder
-                                .infer_expression(&binary.left, TypeContext::default());
-                            let right_type_value = speculative_builder
-                                .infer_expression(&binary.right, TypeContext::default());
+                            let flags = self.inference_flags();
+                            let left_type_value =
+                                left.runtime_value(&speculative_builder).unwrap_or_else(|| {
+                                    speculative_builder
+                                        .infer_expression(&binary.left, TypeContext::default())
+                                });
+                            let right_type_value = right
+                                .runtime_value(&speculative_builder)
+                                .unwrap_or_else(|| {
+                                    speculative_builder
+                                        .infer_expression(&binary.right, TypeContext::default())
+                                });
 
                             let dunder_fails = Type::try_call_bin_op(
                                 db,
@@ -668,9 +706,36 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     }
                                 }
                             }
+
+                            // Keep runtime results local to this annotation traversal. The shared
+                            // expression cache can also serve inference that needs diagnostics.
+                            if retain_runtime_value
+                                && self.expression_cache.is_none()
+                                && speculative_builder.cycle_recovery.is_none()
+                            {
+                                let value = speculative_builder
+                                    .infer_binary_expression_with_operands(
+                                        binary,
+                                        TypeContext::default(),
+                                        [Some(left_type_value), Some(right_type_value)],
+                                    );
+                                if speculative_builder.cycle_recovery.is_none() {
+                                    runtime_value = Some((flags, value));
+                                }
+                            }
                         }
 
-                        UnionType::from_elements_leave_aliases(db, env, [left_ty, right_ty])
+                        let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
+                        for operand in [left, right] {
+                            builder = if let Some(normalized) = operand.normalized_union {
+                                builder.add_normalized(normalized)
+                            } else {
+                                builder.add(operand.ty)
+                            };
+                        }
+                        let normalized = builder.build_normalized();
+                        normalized_union = Some(normalized);
+                        normalized.ty()
                     }
                     ast::Operator::BitAnd => {
                         if let Some(builder) =
@@ -1371,6 +1436,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Starred(starred) => self.infer_starred_type_expression(starred),
+        };
+        InferredTypeExpression {
+            ty,
+            normalized_union,
+            runtime_value,
         }
     }
 

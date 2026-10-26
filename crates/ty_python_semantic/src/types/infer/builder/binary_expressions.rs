@@ -161,6 +161,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         binary: &ast::ExprBinOp,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        self.infer_binary_expression_with_operands(binary, tcx, [None, None])
+    }
+
+    /// Infer a binary expression, reusing operands inferred in the same type context.
+    pub(super) fn infer_binary_expression_with_operands(
+        &mut self,
+        binary: &ast::ExprBinOp,
+        tcx: TypeContext<'db>,
+        inferred: [Option<Type<'db>>; 2],
+    ) -> Type<'db> {
         if tcx.is_typealias() {
             return self.infer_pep_604_union_type_alias(binary, tcx);
         }
@@ -174,7 +184,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } = binary;
 
         let (left_ty, right_ty) =
-            match self.infer_binary_expression_operand_types(left, *op, right, tcx) {
+            match self.infer_binary_expression_operand_types(left, *op, right, tcx, inferred) {
                 BinaryExpressionOperandTypes::TypedDictResult(ty) => return ty,
                 BinaryExpressionOperandTypes::Inferred(left_ty, right_ty) => (left_ty, right_ty),
             };
@@ -239,6 +249,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         op: ast::Operator,
         right: &ast::Expr,
         tcx: TypeContext<'db>,
+        inferred: [Option<Type<'db>>; 2],
     ) -> BinaryExpressionOperandTypes<'db> {
         let db = self.db();
         // As a special case, pass `tcx` to binary operands that are collection literals/displays.
@@ -269,7 +280,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // so we can use bidirectional inference on the literal before calling the synthesized
         // `__or__`/`__ror__` method on the TypedDict side.
         if op == ast::Operator::BitOr && matches!(left, ast::Expr::Dict(_)) {
-            let right_ty = self.infer_expression(right, operand_tcx(right));
+            let right_ty =
+                inferred[1].unwrap_or_else(|| self.infer_expression(right, operand_tcx(right)));
             if let Type::TypedDict(typed_dict) = right_ty
                 && let Some(ty) = self.try_typed_dict_pep_584_dunder(
                     left,
@@ -284,12 +296,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // If the TypedDict update path rejects the literal, fall back to ordinary inference
             // even though that means re-inferring the literal without TypedDict context.
             return BinaryExpressionOperandTypes::Inferred(
-                self.infer_expression(left, operand_tcx(left)),
+                inferred[0].unwrap_or_else(|| self.infer_expression(left, operand_tcx(left))),
                 right_ty,
             );
         }
 
-        let left_ty = self.infer_expression(left, operand_tcx(left));
+        let left_ty = inferred[0].unwrap_or_else(|| self.infer_expression(left, operand_tcx(left)));
         if op == ast::Operator::BitOr
             && let Type::TypedDict(typed_dict) = left_ty
             && matches!(right, ast::Expr::Dict(_))
@@ -305,7 +317,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         BinaryExpressionOperandTypes::Inferred(
             left_ty,
-            self.infer_expression(right, operand_tcx(right)),
+            inferred[1].unwrap_or_else(|| self.infer_expression(right, operand_tcx(right))),
         )
     }
 

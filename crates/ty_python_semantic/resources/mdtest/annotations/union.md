@@ -155,6 +155,44 @@ class X:
 reveal_type(X().value)  # revealed: partial[(x: int) -> int] | Unknown
 ```
 
+## Runtime checks in nested annotations
+
+A union can simplify to a single annotation type while still producing a union object at runtime.
+Subsequent operators use that runtime value, including when the expression is nested on the right.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`operators.pyi`:
+
+```pyi
+class Parent: ...
+class Child(Parent): ...
+class Other: ...
+
+class InvalidMeta(type):
+    def __or__(self, other: str) -> str: ...
+    def __ror__(self, other: str) -> str: ...
+
+class A(metaclass=InvalidMeta): ...
+class B(metaclass=InvalidMeta): ...
+```
+
+```py
+from operators import A, B, Child, Other, Parent
+
+def f(left: Child | Parent | Parent | Other, right: Other | (Child | Parent | Parent)):
+    reveal_type(left)  # revealed: Parent | Other
+    reveal_type(right)  # revealed: Other | Parent
+
+# An invalid operator within a union produces a diagnostic on that operation.
+# error: [unsupported-operator] "Operator `|` is unsupported between objects of type `<class 'A'>` and `<class 'B'>`"
+def invalid(value: A | B | Other):
+    reveal_type(value)  # revealed: A | B | Other
+```
+
 ## Runtime class
 
 ### Python 3.13 and earlier
