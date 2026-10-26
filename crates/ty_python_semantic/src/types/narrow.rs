@@ -88,7 +88,7 @@ pub(crate) fn infer_narrowing_constraints<'db>(
     Option<NarrowingConstraint<'db>>,
 ) {
     let constraints = match predicate.node {
-        PredicateNode::Expression { expression, .. } | PredicateNode::Condition(expression) => {
+        PredicateNode::Expression(expression) => {
             let constraints = all_narrowing_constraints_for_expression(db, expression);
             (constraints.get(place, true), constraints.get(place, false))
         }
@@ -153,10 +153,7 @@ fn all_narrowing_constraints_for_expression<'db>(
     let python_file = program_file.python_file(db);
     let env = ProgramEnvironment::from_file(program_file);
     let module = parsed_module(db, python_file).load(db);
-    let predicate = PredicateNode::Expression {
-        expression,
-        truthiness_from_type: false,
-    };
+    let predicate = PredicateNode::Expression(expression);
     let mut positive = NarrowingConstraintsBuilder::new(db, &env, &module, predicate, true);
     let positive_constraints = positive.finish();
     let mut negative = NarrowingConstraintsBuilder::new(db, &env, &module, predicate, false);
@@ -691,18 +688,7 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
                     env,
                     instance
                         .value_expression_types(db, env)
-                        .ok()?
-                        .map(|element| {
-                            // A special case is made for `None` at runtime
-                            // (it's implicitly converted to `NoneType` in `int | None`)
-                            // which means that `isinstance(x, int | None)` works even though
-                            // `None` is not a class literal.
-                            if element.is_none(db) {
-                                self.generate(db, KnownClass::NoneType.to_class_literal(db, env))
-                            } else {
-                                self.generate(db, element)
-                            }
-                        }),
+                        .map(|element| self.generate(db, element)),
                 )
             }
 
@@ -1731,7 +1717,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     fn finish(&mut self) -> Option<FrozenNarrowingConstraints<'db>> {
         let constraints: Option<NarrowingConstraints<'db>> = match self.predicate {
-            PredicateNode::Expression { expression, .. } | PredicateNode::Condition(expression) => {
+            PredicateNode::Expression(expression) => {
                 self.evaluate_expression_predicate(expression, self.is_positive)
             }
             PredicateNode::Pattern(pattern) => {
@@ -3495,8 +3481,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     fn scope(&self) -> ScopeId<'db> {
         let db = self.db;
         match self.predicate {
-            PredicateNode::Expression { expression, .. }
-            | PredicateNode::Condition(expression)
+            PredicateNode::Expression(expression)
             | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
             PredicateNode::Pattern(pattern) => pattern.scope(db),
             PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,

@@ -54,7 +54,7 @@ enum ComparisonResult<'db> {
     /// The comparison allows the operand being constrained to be narrowed to the wrapped type.
     ///
     /// For example, if an object of type `LiteralString` compares equal to an object of type
-    /// `Literal["foo"]`, the equality branch can safely narrow either operand to `Literal["foo"]`.
+    /// `Literal["foo"]`, the equality branch narrows the `LiteralString` operand to `Literal["foo"]`.
     CanNarrow(Type<'db>),
 
     /// The comparison may evaluate to true or false, depending on runtime values.
@@ -743,10 +743,8 @@ fn evaluate_structural_comparison<'db>(
                 None => narrow_literal_comparison(
                     db,
                     env,
-                    left,
-                    right,
-                    left_literal.kind(),
-                    right_literal.kind(),
+                    left_literal,
+                    right_literal,
                     operator.condition_expects_equality(branch),
                 ),
             }
@@ -1434,28 +1432,20 @@ fn finite_alternatives<'db>(
 
 /// Return a constraint for literal pairs whose equality cannot be decided statically.
 ///
-/// This primarily handles `LiteralString`, which can be constrained by a concrete string literal
-/// or a string-valued enum member without having a single statically known runtime value.
+/// A concrete string or string-valued enum member can constrain a `LiteralString` operand.
+/// In the reverse direction, the unknown string value places no constraint on the concrete operand.
 fn narrow_literal_comparison<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    left: Type<'db>,
-    right: Type<'db>,
-    left_literal: LiteralValueTypeKind<'db>,
-    right_literal: LiteralValueTypeKind<'db>,
+    left: LiteralValueType<'db>,
+    right: LiteralValueType<'db>,
     equality_is_positive: bool,
 ) -> ComparisonResult<'db> {
-    match (left_literal, right_literal) {
+    match (left.kind(), right.kind()) {
         (LiteralValueTypeKind::LiteralString, LiteralValueTypeKind::String(_)) => {
-            ComparisonResult::CanNarrow(right.negate_if(db, env, !equality_is_positive))
-        }
-        (LiteralValueTypeKind::String(_), LiteralValueTypeKind::LiteralString) => {
-            ComparisonResult::CanNarrow(left.negate_if(db, env, !equality_is_positive))
+            ComparisonResult::CanNarrow(Type::from(right).negate_if(db, env, !equality_is_positive))
         }
         (LiteralValueTypeKind::LiteralString, LiteralValueTypeKind::Enum(enum_literal)) => {
-            narrow_literal_string_against_enum(db, env, enum_literal, equality_is_positive)
-        }
-        (LiteralValueTypeKind::Enum(enum_literal), LiteralValueTypeKind::LiteralString) => {
             narrow_literal_string_against_enum(db, env, enum_literal, equality_is_positive)
         }
         _ => ComparisonResult::Ambiguous,

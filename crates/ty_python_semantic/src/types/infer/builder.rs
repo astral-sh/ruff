@@ -1534,7 +1534,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.context.inference_flags |= InferenceFlags::CHECK_UNBOUND_TYPEVARS;
                 self.infer_expression_impl(expression.node_ref(self.db()).node(self.module()), tcx);
             }
-            ExpressionKind::Normal => {
+            ExpressionKind::Normal | ExpressionKind::Predicate { .. } => {
                 self.infer_expression_impl(expression.node_ref(self.db()).node(self.module()), tcx);
             }
             ExpressionKind::TypeExpression => {
@@ -12335,25 +12335,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     pub(super) fn finish_function_decorator_inference(mut self) -> FunctionDecoratorInference<'db> {
+        // Specializing a nominal return type can change a descriptor's type arguments, but it
+        // cannot turn the descriptor into an abstract function, bound method, or property.
+        fn returns_nominal_instance<'db>(db: &'db dyn Db, decorator: Type<'db>) -> bool {
+            let Type::Callable(callable) = decorator else {
+                return false;
+            };
+            if callable.kind(db) != CallableTypeKind::Regular {
+                return false;
+            }
+            let [signature] = callable.signatures(db).overloads.as_slice() else {
+                return false;
+            };
+            matches!(signature.return_ty, Type::NominalInstance(_))
+        }
+
         self.infer_region();
 
         let mut known_decorators = FunctionDecorators::empty();
-        let mut has_unknown_decorators = true;
+        let mut may_produce_abstract_method = true;
         if let InferenceRegion::FunctionDecorators(definition) = self.region
             && let DefinitionKind::Function(function) = definition.kind(self.db())
         {
-            has_unknown_decorators = false;
-            for decorator in &function.node(self.module()).decorator_list {
+            may_produce_abstract_method = false;
+            let decorators = &function.node(self.module()).decorator_list;
+            for decorator in decorators {
                 let ty = self.expression_type(&decorator.expression);
                 let flags = FunctionDecorators::from_decorator_type(self.db(), ty);
                 known_decorators |= flags;
                 if flags.is_empty()
                     && !matches!(ty, Type::ClassLiteral(class)
                         if class.known(self.db()) == Some(KnownClass::Property))
+                    && !(decorators.len() == 1 && returns_nominal_instance(self.db(), ty))
                 {
-                    has_unknown_decorators = true;
+                    may_produce_abstract_method = true;
                 }
             }
+            may_produce_abstract_method |=
+                known_decorators.contains(FunctionDecorators::ABSTRACT_METHOD);
         }
 
         let Self {
@@ -12395,7 +12414,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
             known_decorators,
-            has_unknown_decorators,
+            may_produce_abstract_method,
             context,
         }
     }
@@ -13011,6 +13030,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
         });
 
         ExpressionInference {
+            predicate_truthiness: Truthiness::Ambiguous,
             expressions: FrozenMap::from(self.expressions),
             extra,
             #[cfg(debug_assertions)]

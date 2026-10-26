@@ -226,7 +226,7 @@ class Author(models.Model):
 
 class Book(models.Model):
     author = models.ForeignKey(Author, on_delete=models.CASCADE)
-    editor = models.ForeignKey(Author, on_delete=models.SET_NULL, null=True, related_name="edited_books")
+    editor = models.ForeignKey(to=Author, on_delete=models.SET_NULL, null=True, related_name="edited_books")
 
 def _(book: Book):
     reveal_type(book.author)  # revealed: Author
@@ -234,6 +234,9 @@ def _(book: Book):
 
     reveal_type(book.editor)  # revealed: Author | None
     reveal_type(book.editor_id)  # revealed: int | None
+
+    book.editor = None
+    book.author = None  # error: [invalid-assignment]
 ```
 
 A `ForeignKey` adds a reverse accessor to the related model. By default, its name is the lowercase

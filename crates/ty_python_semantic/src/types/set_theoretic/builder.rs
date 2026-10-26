@@ -1116,8 +1116,19 @@ impl<'db> UnionBuilder<'db> {
                     merge_truthiness_guarded_pair(db, &self.env, ty, element_type)
             {
                 to_remove.push(i);
-                ty = merged_type;
-                continue;
+                // A nominal core can replace the first element in place; no earlier elements
+                // need to be reconsidered.
+                if i == 0 && merged_type.is_nominal_instance() && !merged_type.is_object() {
+                    ty = merged_type;
+                    continue;
+                }
+                for index in to_remove.into_iter().rev() {
+                    self.elements.swap_remove(index);
+                }
+                // The merged type can also subsume earlier elements, such as `bool` when
+                // the truthy and falsy parts of `int` merge.
+                self.add_in_place_impl(merged_type, seen_aliases);
+                return;
             }
 
             if !self.cycle_recovery
@@ -1350,9 +1361,9 @@ impl<'db> IntersectionBuilder<'db> {
     /// by default to preserve existing intersection normalization.
     ///
     /// Unfolding aliases after their mapping has completed can repeatedly insert a recursive
-    /// type into itself, so mapped intersections retain positive aliases as well. The builder still
-    /// expands set operations to distribute and flatten them, and simplifies elements using their
-    /// alias values.
+    /// type into itself, so mapped intersections retain positive aliases as well. Direct unions and
+    /// intersections still distribute and flatten, and elements are simplified using their alias
+    /// values.
     pub(crate) fn preserve_positive_aliases(mut self, preserve: bool) -> Self {
         self.preserve_positive_aliases = preserve;
         self
@@ -1594,7 +1605,16 @@ impl<'db> IntersectionBuilder<'db> {
             Type::TypeAlias(_) | Type::Recursive(_) => {
                 self.add_negative_impl::<L>(ty, seen_aliases)?;
             }
-            Type::Union(union) => {
+            // Retain recursive unions of instance types: their negations expose no positive
+            // constraints or literal exclusions, and unfolding during mapping can repeatedly
+            // insert the alias's body. Other members still need normalization, for example
+            // `bool & ~(Literal[True] | list[A])` simplifies to `Literal[False]`.
+            Type::Union(union)
+                if !union.elements(db).iter().all(|element| {
+                    matches!(element.resolve_type_alias(db), Type::NominalInstance(_))
+                }) || (!matches!(original, Type::Recursive(_))
+                    && !matches!(original, Type::TypeAlias(alias) if alias.is_recursive(db))) =>
+            {
                 for elem in union.elements(db) {
                     self.add_negative_impl::<L>(*elem, seen_aliases)?;
                 }

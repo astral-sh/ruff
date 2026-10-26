@@ -1444,6 +1444,48 @@ fn benchmark_typed_dict_get_large_literal_union(criterion: &mut Criterion) {
     );
 }
 
+fn benchmark_union_construction(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 256;
+
+    let mut construction = String::new();
+    let mut type_form =
+        String::from("from typing_extensions import TypeForm\nclass CommonBase: ...\n");
+    for index in 0..NUM_CLASSES {
+        writeln!(construction, "class C{index}[T]: ...").ok();
+        writeln!(type_form, "class C{index}[T](CommonBase): ...").ok();
+    }
+    let members = (0..NUM_CLASSES)
+        .map(|index| format!("C{index}[int]"))
+        .join(" | ");
+
+    // The unused alias measures the cost of building a runtime union in a single expression.
+    // Nothing asks for the type it denotes, so the union can stay unnormalized.
+    writeln!(construction, "Alias = {members}").ok();
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[generic_union_construction_256]",
+        &construction,
+    );
+
+    // Storing the union in an unannotated tuple makes ty infer it in a value context. The later
+    // assignment forces ty to normalize the stored union to check it against `TypeForm[CommonBase]`.
+    writeln!(type_form, "stored = ({members},)").ok();
+    type_form.push_str("checked: tuple[TypeForm[CommonBase], ...] = stored\n");
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[generic_union_type_form_256]",
+        &type_form,
+    );
+
+    // Each assignment extends a previously inferred union by one literal. The final union is unused,
+    // but rescanning the growing prefix at each assignment would still make construction quadratic.
+    let mut split = String::from("from typing import Literal\nU1 = Literal[0] | Literal[1]\n");
+    for i in 2..=1024 {
+        writeln!(split, "U{i} = U{} | Literal[{i}]", i - 1).ok();
+    }
+    benchmark_micro_case(criterion, "ty_micro[split_literal_union_1024]", &split);
+}
+
 /// Benchmark for narrowing a large union type through multiple match statements.
 ///
 /// This is extracted from egglog-python's `pretty.py`, where a ~30-class union type
@@ -1519,6 +1561,51 @@ fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
     );
 
     benchmark_micro_case(criterion, "ty_micro[large_union_narrowing]", &code);
+}
+
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4815>.
+///
+/// The three OR patterns stay fixed as the subject union grows. Using `typing.Union` avoids
+/// the separate cost of inferring a long chain of `|` expressions.
+fn benchmark_class_or_pattern_captures(criterion: &mut Criterion) {
+    for num_classes in [45, 90] {
+        let mut code = "
+            from typing import Union"
+            .to_string();
+
+        for i in 0..num_classes {
+            writeln!(
+                code,
+                "
+            class C{i}:
+                value: int"
+            )
+            .ok();
+        }
+
+        let members = (0..num_classes).map(|i| format!("C{i}")).join(", ");
+        writeln!(
+            code,
+            "
+            def get_value(subject: Union[{members}]) -> int | None:
+                match subject:
+                    case C0(value=v) | C1(value=v) | C2(value=v):
+                        return v
+                    case C3(value=v) | C4(value=v) | C5(value=v):
+                        return v
+                    case C6(value=v) | C7(value=v) | C8(value=v):
+                        return v
+                    case _:
+                        return None"
+        )
+        .ok();
+
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[class_or_pattern_captures_{num_classes}]"),
+            &code,
+        );
+    }
 }
 
 /// Benchmark for narrowing through a long `isinstance` elif chain.
@@ -2617,7 +2704,9 @@ criterion_group!(
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,
+    benchmark_union_construction,
     benchmark_large_union_narrowing,
+    benchmark_class_or_pattern_captures,
     benchmark_large_isinstance_narrowing,
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,

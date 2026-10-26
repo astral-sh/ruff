@@ -6363,11 +6363,13 @@ impl<'db> CallInference<'_, 'db> {
                     // Gradual assignability alone can accept different materializations in
                     // each alternative: `Any` matching both `int` and `str` does not prove
                     // that the argument has type `int & str`.
+                    // Generic callbacks can match through a specialization of their own
+                    // type variables.
                     // TODO: If the constraint solver tracks internally which paths depend on
                     // gradual evidence, then we shouldn't need to re-check for that here.
                     // TODO: Ordinary callable subtyping can match a later, shadowed overload.
                     // Account for overload order before intersecting the inferred returns.
-                    actual.is_subtype_of(db, env, formal)
+                    actual.is_constraint_set_subtype_of(db, env, formal)
                 } else {
                     actual.is_assignable_to(db, env, formal)
                 };
