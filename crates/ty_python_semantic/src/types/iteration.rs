@@ -391,7 +391,7 @@ impl<'db> Type<'db> {
                 Type::Divergent(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
 
                 Type::FunctionLiteral(_)
-                | Type::GenericAlias(_)
+                | Type::SpecializedClass(_)
                 | Type::BoundMethod(_)
                 | Type::KnownBoundMethod(_)
                 | Type::WrapperDescriptor(_)
@@ -402,6 +402,7 @@ impl<'db> Type<'db> {
                 | Type::SubclassOf(_)
                 | Type::ProtocolInstance(_)
                 | Type::SpecialForm(_)
+                | Type::GenericAlias(_)
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
                 | Type::SlotDescriptor(_)

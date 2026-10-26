@@ -102,7 +102,7 @@ pub(super) fn check_class<'db>(
     if configuration.check_liskov_violations() {
         let generic_bases: FxHashMap<_, _> = bases
             .iter()
-            .filter_map(|base| base.into_class()?.into_generic_alias())
+            .filter_map(|base| base.into_class()?.into_class_specialization())
             .map(|base| (base.origin(db), base))
             .collect();
         if !generic_bases.is_empty() {
@@ -112,7 +112,7 @@ pub(super) fn check_class<'db>(
             bases.extend(
                 class_specialized
                     .iter_explicit_ancestors(db, env)
-                    .filter_map(ClassType::into_generic_alias)
+                    .filter_map(ClassType::into_class_specialization)
                     .filter(|ancestor| {
                         generic_bases
                             .get(&ancestor.origin(db))

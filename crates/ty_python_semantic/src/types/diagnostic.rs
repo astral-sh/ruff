@@ -6,7 +6,7 @@ use super::call::CallErrorKind;
 use super::context::InferContext;
 use super::mro::DuplicateBaseError;
 use super::{
-    CallArguments, CallDunderError, ClassBase, ClassLiteral, GenericAlias, KnownClass,
+    CallArguments, CallDunderError, ClassBase, ClassLiteral, ClassSpecialization, KnownClass,
     ModuleLiteralType, StaticClassLiteral, add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::dependency::is_direct_dependency;
@@ -3129,7 +3129,7 @@ pub(super) fn report_possibly_missing_attribute(
             "Attribute `{attribute}` may be missing on class `{}`",
             class.name(db),
         )),
-        Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
+        Type::SpecializedClass(alias) => builder.into_diagnostic(format_args!(
             "Attribute `{attribute}` may be missing on class `{}`",
             alias.display(db, env),
         )),
@@ -4886,7 +4886,7 @@ struct GenericBaseParameter<'db> {
 #[derive(Debug)]
 struct GenericBaseConstraint<'db> {
     argument: Type<'db>,
-    alias: GenericAlias<'db>,
+    alias: ClassSpecialization<'db>,
     /// The index in the class's explicit bases list, used to locate the diagnostic annotation.
     base_index: usize,
 }
@@ -4922,7 +4922,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
 
     for (base_index, base) in explicit_bases.iter().enumerate() {
         let base_class = match base {
-            Type::GenericAlias(alias) => ClassType::Generic(*alias),
+            Type::SpecializedClass(alias) | Type::GenericAlias(alias) => ClassType::Generic(*alias),
             Type::ClassLiteral(class) if class.generic_context(db).is_none() => {
                 ClassType::NonGeneric(*class)
             }
@@ -4968,7 +4968,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                     ));
                     let later_is_direct = matches!(
                         base,
-                        Type::GenericAlias(alias) if alias.origin(db) == origin
+                        Type::SpecializedClass(alias) | Type::GenericAlias(alias) if alias.origin(db) == origin
                     );
 
                     if let (Some(earlier_base), Some(later_base)) = (

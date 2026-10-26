@@ -8,14 +8,14 @@ use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
 use crate::types::{
-    BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
-    GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
-    PropertyInstanceType, ProtocolInstanceType, RecursiveType, SlotDescriptorType,
-    StaticClassLiteral, SubclassOfType, Type, TypeAliasType, TypeFormType, TypeGuardType,
-    TypeIsType, TypedDictType, UnionType,
+    BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, ClassSpecialization,
+    EnumComplementType, IntersectionType, KnownBoundMethodType, KnownInstanceType,
+    NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, RecursiveType,
+    SlotDescriptorType, StaticClassLiteral, SubclassOfType, Type, TypeAliasType, TypeFormType,
+    TypeGuardType, TypeIsType, TypedDictType, UnionType,
     bound_super::walk_bound_super_type,
     callable::walk_callable_type,
-    class::walk_generic_alias,
+    class::walk_class_specialization,
     cyclic::{ActiveRecursionDetector, TypeIdentity},
     function::{FunctionType, walk_function_type},
     generics::{GenericContext, walk_specialization_types},
@@ -93,8 +93,8 @@ pub(crate) trait TypeVisitor<'db> {
         walk_subclass_of_type(db, subclass_of, self);
     }
 
-    fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
-        walk_generic_alias(db, alias, self);
+    fn visit_class_specialization(&self, db: &'db dyn Db, alias: ClassSpecialization<'db>) {
+        walk_class_specialization(db, alias, self);
     }
 
     fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
@@ -172,7 +172,7 @@ pub(super) enum NonAtomicType<'db> {
     BoundSuper(BoundSuperType<'db>),
     MethodWrapper(KnownBoundMethodType<'db>),
     Callable(CallableType<'db>),
-    GenericAlias(GenericAlias<'db>),
+    ClassSpecialization(ClassSpecialization<'db>),
     KnownInstance(KnownInstanceType<'db>),
     SubclassOf(SubclassOfType<'db>),
     NominalInstance(NominalInstanceType<'db>),
@@ -232,7 +232,9 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
                 TypeKind::NonAtomic(NonAtomicType::MethodWrapper(method_wrapper))
             }
             Type::Callable(callable) => TypeKind::NonAtomic(NonAtomicType::Callable(callable)),
-            Type::GenericAlias(alias) => TypeKind::NonAtomic(NonAtomicType::GenericAlias(alias)),
+            Type::SpecializedClass(alias) | Type::GenericAlias(alias) => {
+                TypeKind::NonAtomic(NonAtomicType::ClassSpecialization(alias))
+            }
             Type::KnownInstance(known_instance) => {
                 TypeKind::NonAtomic(NonAtomicType::KnownInstance(known_instance))
             }
@@ -299,8 +301,8 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         NonAtomicType::Callable(callable) => {
             visitor.visit_callable_type(db, callable);
         }
-        NonAtomicType::GenericAlias(alias) => {
-            visitor.visit_generic_alias_type(db, alias);
+        NonAtomicType::ClassSpecialization(alias) => {
+            visitor.visit_class_specialization(db, alias);
         }
         NonAtomicType::KnownInstance(known_instance) => {
             visitor.visit_known_instance_type(db, known_instance);
@@ -571,11 +573,11 @@ pub(super) fn dynamic_content_impl<'db>(
             }
         }
 
-        fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+        fn visit_class_specialization(&self, db: &'db dyn Db, alias: ClassSpecialization<'db>) {
             // Use `walk_specialization_types` rather than `walk_specialization` to avoid walking
             // the bounds/constraints/defaults of the generic context.
             // Only the types the class was actually specialized with are relevant to whether
-            // the `GenericAlias` contains a dynamic type.
+            // the class specialization contains a dynamic type.
             walk_specialization_types(db, alias.specialization(db), self);
         }
 

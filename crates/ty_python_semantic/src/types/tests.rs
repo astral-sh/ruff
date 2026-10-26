@@ -262,12 +262,12 @@ fn list_alias<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     argument: Type<'db>,
-) -> GenericAlias<'db> {
+) -> ClassSpecialization<'db> {
     KnownClass::List
         .to_specialized_class_type(db, env, &[argument])
         .expect("`list` should accept one type argument")
-        .into_generic_alias()
-        .expect("a specialized `list` should be a generic alias")
+        .into_class_specialization()
+        .expect("a specialized `list` should have a class specialization")
 }
 
 fn oscillating_generic_alias_cycle_recover<'db>(
@@ -289,7 +289,7 @@ fn oscillating_generic_alias_cycle_recover<'db>(
 fn oscillating_generic_alias<'db>(db: &'db dyn Db, program: Program<'db>) -> Type<'db> {
     let env = ProgramEnvironment::from_program(program);
     let previous = oscillating_generic_alias(db, program);
-    let argument = if let Type::GenericAlias(alias) = previous
+    let argument = if let Type::SpecializedClass(alias) = previous
         && alias.specialization(db).types(db) == [Type::unknown()]
     {
         KnownClass::Int.to_instance(db, &env)
@@ -297,13 +297,13 @@ fn oscillating_generic_alias<'db>(db: &'db dyn Db, program: Program<'db>) -> Typ
         Type::unknown()
     };
 
-    list_alias(db, &env, argument).into()
+    Type::SpecializedClass(list_alias(db, &env, argument))
 }
 
 #[test]
 fn generic_alias_cycle_recovery_normalizes_same_origin_unknown_oscillation() {
     let db = setup_db();
-    let Type::GenericAlias(alias) = oscillating_generic_alias(&db, db.program()) else {
+    let Type::SpecializedClass(alias) = oscillating_generic_alias(&db, db.program()) else {
         panic!("cycle recovery should preserve the generic alias");
     };
 

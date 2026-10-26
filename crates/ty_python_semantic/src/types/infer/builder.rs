@@ -3200,6 +3200,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::LiteralValue(..)
             | Type::SpecialForm(..)
             | Type::ClassLiteral(..)
+            | Type::SpecializedClass(..)
             | Type::GenericAlias(..)
             | Type::SubclassOf(..)
             | Type::KnownInstance(..)
@@ -5691,6 +5692,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::DataclassTransformer(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
+                | Type::SpecializedClass(_)
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::NominalInstance(_)
@@ -7087,7 +7089,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     alias
                 }
-                Type::GenericAlias(alias) => alias,
+                Type::SpecializedClass(alias) | Type::GenericAlias(alias) => alias,
                 _ => return None,
             };
 
@@ -7109,7 +7111,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         class_type
-            .map(Type::GenericAlias)
+            .map(Type::SpecializedClass)
             .filter(|class_type| !class_type.has_provisional_marker(db, env))
             .unwrap_or(ty)
     }
@@ -7806,7 +7808,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let collection_alias = collection_class
                 .try_to_class_literal(db, env)?
                 .identity_specialization(db)
-                .into_generic_alias()?;
+                .into_class_specialization()?;
 
             let generic_context = collection_alias
                 .specialization(self.db())
@@ -9527,7 +9529,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let class = match callable_type {
             Type::ClassLiteral(class) => Some(ClassType::NonGeneric(class)),
-            Type::GenericAlias(generic) => Some(ClassType::Generic(generic)),
+            Type::SpecializedClass(generic) | Type::GenericAlias(generic) => {
+                Some(ClassType::Generic(generic))
+            }
             Type::SubclassOf(subclass) => subclass.subclass_of().into_class(db, env),
             _ => None,
         };
@@ -11313,10 +11317,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             "Class `{}` has no attribute `{attr_name}`",
                             class.name(db),
                         )),
-                        Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
-                            "Class `{}` has no attribute `{attr_name}`",
-                            alias.display(db, env),
-                        )),
+                        Type::SpecializedClass(alias) | Type::GenericAlias(alias) => builder
+                            .into_diagnostic(format_args!(
+                                "Class `{}` has no attribute `{attr_name}`",
+                                alias.display(db, env),
+                            )),
                         Type::FunctionLiteral(function) => builder.into_diagnostic(format_args!(
                             "Function `{}` has no attribute `{attr_name}`",
                             function.name(db),
@@ -11808,6 +11813,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BoundMethod(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
+                | Type::SpecializedClass(_)
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::NominalInstance(_)

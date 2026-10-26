@@ -607,8 +607,9 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
                     SubclassOfInner::Class(ClassType::NonGeneric(class_literal)) => {
                         Some(constraint_from_class_literal(class_literal))
                     }
-                    // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
-                    // e.g. `isinstance(x, list[int])` fails at runtime.
+                    // TODO: Narrow positively against the unspecialized origin, as for other
+                    // class objects. The specialization does not constrain which instances
+                    // pass a runtime check, and the class may be a subclass of the origin.
                     SubclassOfInner::Class(ClassType::Generic(_)) => None,
                     SubclassOfInner::Dynamic(dynamic) => Some(Type::Dynamic(dynamic)),
                     // TODO: This narrowing is not fully sound:
@@ -671,9 +672,9 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
                 }
             }
 
-            // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
-            // e.g. `isinstance(x, list[int])` fails at runtime.
-            Type::GenericAlias(_) => None,
+            // TODO: Narrow against the unspecialized origin. A specialized class object
+            // identifies that exact class, but runtime checks do not inspect its type arguments.
+            Type::SpecializedClass(_) => None,
 
             Type::NominalInstance(nominal) if let Some(tuple) = nominal.tuple_spec(db, env) => {
                 UnionType::try_from_elements(
@@ -751,6 +752,7 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
             | Type::SlotDescriptor(_)
+            | Type::GenericAlias(_)
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
@@ -5509,11 +5511,12 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         | Type::Callable(_)
         | Type::ModuleLiteral(_)
         | Type::ClassLiteral(_)
-        | Type::GenericAlias(_)
+        | Type::SpecializedClass(_)
         | Type::SubclassOf(_)
         | Type::NominalInstance(_)
         | Type::ProtocolInstance(_)
         | Type::SpecialForm(_)
+        | Type::GenericAlias(_)
         | Type::KnownInstance(_)
         | Type::PropertyInstance(_)
         | Type::SlotDescriptor(_)

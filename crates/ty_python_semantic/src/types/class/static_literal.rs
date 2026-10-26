@@ -22,8 +22,8 @@ use crate::{
     reachability::{DeclarationsIteratorExtension, ReachabilityConstraintsExtension},
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallArguments,
-        CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags,
-        DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
+        CallableType, ClassBase, ClassLiteral, ClassSpecialization, ClassType, DATACLASS_FLAGS,
+        DataclassFlags, DataclassParams, GenericContext, KnownClass, KnownInstanceType,
         MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
         Parameter, Parameters, PropertyInstanceType, SelfTypeVarOrigin, Signature, SpecialFormType,
         StaticMroError, SubclassOfType, Type, TypeContext, TypeMapping, TypeVarVariance,
@@ -479,7 +479,7 @@ impl<'db> StaticClassLiteral<'db> {
                     .explicit_bases(db)
                     .iter()
                     .copied()
-                    .filter(|ty| matches!(ty, Type::GenericAlias(_))),
+                    .filter(Type::is_specialized_class_or_alias),
             )
         }
 
@@ -557,7 +557,7 @@ impl<'db> StaticClassLiteral<'db> {
                 self.typevars.borrow_mut().insert(bound_typevar);
             }
 
-            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+            fn visit_class_specialization(&self, db: &'db dyn Db, alias: ClassSpecialization<'db>) {
                 // The generic context contains the base class's formal type parameters, not type
                 // variables referenced by this class's base expression.
                 for ty in alias.specialization(db).types(db) {
@@ -624,7 +624,7 @@ impl<'db> StaticClassLiteral<'db> {
             Some(generic_context) => {
                 let specialization = f(generic_context);
 
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
+                ClassType::Generic(ClassSpecialization::new(db, self, specialization))
             }
         }
     }
@@ -869,7 +869,7 @@ impl<'db> StaticClassLiteral<'db> {
     ) -> Result<&'db Mro<'db>, &'db StaticMroError<'db>> {
         match specialization {
             None => self.try_mro_unspecialized(db),
-            Some(specialization) => GenericAlias::new(db, self, specialization).try_mro(db),
+            Some(specialization) => ClassSpecialization::new(db, self, specialization).try_mro(db),
         }
         .map_err(Box::as_ref)
     }
@@ -1258,12 +1258,18 @@ impl<'db> StaticClassLiteral<'db> {
 
             let module = parsed_module(db, python_file).load(db);
 
-            let explicit_metaclass = class.explicit_metaclass(db, &module);
+            let explicit_metaclass =
+                class
+                    .explicit_metaclass(db, &module)
+                    .map(|metaclass| match metaclass {
+                        Type::GenericAlias(alias) => Type::SpecializedClass(alias),
+                        metaclass => metaclass,
+                    });
 
             // Generic metaclasses parameterized by type variables are not supported.
             // `metaclass=Meta[int]` is fine, but `metaclass=Meta[T]` is not.
             // See: https://typing.python.org/en/latest/spec/generics.html#generic-metaclasses
-            if let Some(Type::GenericAlias(alias)) = explicit_metaclass {
+            if let Some(Type::SpecializedClass(alias)) = explicit_metaclass {
                 let specialization_has_typevars = alias
                     .specialization(db)
                     .types(db)
@@ -3249,7 +3255,8 @@ impl<'db> StaticClassLiteral<'db> {
                 for explicit_base in class.explicit_bases(db) {
                     let explicit_base_class_literal = match explicit_base {
                         Type::ClassLiteral(class_literal) => class_literal.as_static(),
-                        Type::GenericAlias(generic_alias) => Some(generic_alias.origin(db)),
+                        Type::SpecializedClass(generic_alias)
+                        | Type::GenericAlias(generic_alias) => Some(generic_alias.origin(db)),
                         _ => continue,
                     };
                     let Some(explicit_base_class_literal) = explicit_base_class_literal else {
