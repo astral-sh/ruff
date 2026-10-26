@@ -2887,6 +2887,42 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         (predicate, predicate_id)
     }
 
+    /// Retain captures that bind the entire subject to its original name. These definitions
+    /// still refer to the saved subject if a guard fails, so later cases can narrow them.
+    fn extend_match_subject_bindings(
+        &self,
+        pattern: &ast::Pattern,
+        symbol: ScopedSymbolId,
+        bindings: &mut SmallVec<[ScopedDefinitionId; 2]>,
+    ) {
+        match pattern {
+            ast::Pattern::MatchAs(pattern) => {
+                if let Some(name) = &pattern.name
+                    && let Some(definition) = self
+                        .definitions_by_node
+                        .get(&name.into())
+                        .and_then(|definitions| definitions.first())
+                {
+                    let use_def = self.current_use_def_map();
+                    bindings.extend(use_def.symbol_binding_definition_ids(symbol).filter(
+                        |binding| use_def.definition(*binding).definition() == Some(*definition),
+                    ));
+                }
+                if let Some(pattern) = &pattern.pattern {
+                    self.extend_match_subject_bindings(pattern, symbol, bindings);
+                }
+            }
+            ast::Pattern::MatchOr(pattern) => {
+                for pattern in &pattern.patterns {
+                    self.extend_match_subject_bindings(pattern, symbol, bindings);
+                }
+            }
+            // Structural patterns can capture extracted values. Identifying whole-subject
+            // captures in class patterns requires type information.
+            _ => {}
+        }
+    }
+
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
     /// standalone (type narrowing tests, RHS of an assignment.)
     fn add_standalone_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
@@ -4922,6 +4958,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     };
                     subject_targets.push((place, bindings));
                 }
+                let subject_place = PlaceExpr::try_from_expr(subject.as_ref())
+                    .and_then(|place| self.current_place_table().place_id((&place).into()));
                 let places = self.current_place_table();
                 let ast_ids = self.current_ast_ids();
                 let mut sequence_subject_targets =
@@ -4974,6 +5012,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.record_exception_checkpoint_if(Self::pattern_can_raise(&case.pattern));
                     self.visit_pattern(&case.pattern);
                     self.current_match_case = None;
+                    if let Some((ScopedPlaceId::Symbol(symbol), bindings)) = subject_targets
+                        .iter_mut()
+                        .find(|(place, _)| Some(*place) == subject_place)
+                    {
+                        self.extend_match_subject_bindings(&case.pattern, *symbol, bindings);
+                    }
                     // unlike in [Stmt::If], we don't reset [no_case_matched]
                     // here because the effects of visiting a pattern is binding
                     // symbols, and this doesn't occur unless the pattern
