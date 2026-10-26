@@ -13,16 +13,13 @@ use crate::codes::Category;
 /// functions in `time` and `asyncio`.
 ///
 /// ## Why is this bad?
-/// Python modules are shared within a process. Patching `time.sleep` also affects
-/// other threads that call it. Patching `asyncio.sleep` can affect unrelated tasks.
-/// Those callers can consume a mock's finite `side_effect` sequence, add unexpected
-/// calls to assertions, or lose the delays that normally prevent busy loops.
+/// If `worker` uses `import time`, then `worker.time` and `time` refer to
+/// the same module. Patching `worker.time.sleep` can make an
+/// `assert_called_once()` check fail when another thread calls `time.sleep`.
+/// The same can happen when another task calls a patched `asyncio.sleep`.
 ///
-/// Qualifying the target with a consuming module, as in `worker.time.sleep`, still
-/// changes the shared function if `worker` imports `time`. Instead, replace the
-/// consuming module's `time` or `asyncio` binding with a private object. Preserve
-/// any other attributes used by that module, and use an asynchronous replacement
-/// for `asyncio.sleep`.
+/// To keep the patch local to `worker`, replace `worker.time` or
+/// `worker.asyncio` with an object that provides the functions `worker` uses.
 ///
 /// ## Example
 /// ```python
@@ -48,17 +45,10 @@ use crate::codes::Category;
 /// ```
 ///
 /// ## Known problems
-/// This rule recognizes `unittest.mock.patch`, `patch.object`, pytest-mock's
-/// conventional fixture names, and pytest's `monkeypatch.setattr` and
-/// `monkeypatch.delattr`, including locally constructed `pytest.MonkeyPatch`
-/// instances.
-///
-/// Targets ending in `.time` or `.asyncio` are assumed to refer to the corresponding
-/// standard-library module, except for attributes directly on `self` or `cls`.
-/// This can produce false positives when an attribute
-/// already holds a private clock, for example when a pytest fixture replaced
-/// the consuming module's binding before the test ran. Dynamic string targets
-/// and aliases of these attributes may not be recognized.
+/// Ruff can flag a patch to `worker.time.sleep` even if a fixture has
+/// replaced `worker.time` with a private clock. It can miss a patch when
+/// the target is a dynamically built string or when the test assigns
+/// `clock = worker.time` and then patches `clock.sleep`.
 ///
 /// ## References
 /// - [Python documentation: Where to patch](https://docs.python.org/3/library/unittest.mock.html#where-to-patch)
