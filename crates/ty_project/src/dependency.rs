@@ -1,4 +1,4 @@
-//! Checks which declared dependencies are imported by a workspace member.
+//! Checks which declared dependencies are imported by a workspace member or a standalone script.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
@@ -7,14 +7,17 @@ use char_str::CharStr;
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
+use ty_module_resolver::Module;
 use ty_python_core::ProgramFile;
 use ty_python_semantic::dependency::{
-    DependencyMetadata, DependencyProject, DependencyProjectKind, UNUSED_DEPENDENCY,
-    imported_modules,
+    DependencyMetadata, DependencyProject, DependencyProjectKind, ImportedModule,
+    UNUSED_DEPENDENCY, imported_modules,
 };
 use ty_python_semantic::lint::LintId;
 
+use crate::script::{Script, script_tag};
 use crate::{Db, Project};
 
 #[cfg(test)]
@@ -159,12 +162,100 @@ fn member_dependency_usage(db: &dyn Db, manifest: File) -> Option<Box<[CharStr]>
     Some(used.into_iter().collect())
 }
 
+pub(crate) fn script_dependency_diagnostics(db: &dyn Db, script: Script<'_>) -> Vec<Diagnostic> {
+    let file = script.file(db);
+    let Some(severity) = db
+        .rule_selection(file)
+        .severity(LintId::of(&UNUSED_DEPENDENCY))
+    else {
+        return Vec::new();
+    };
+    let Ok(Some(metadata)) = script.dependency_metadata(db) else {
+        return Vec::new();
+    };
+    let Some(member) = file
+        .path(db)
+        .as_system_path()
+        .and_then(|path| metadata.project_for_path(path))
+        .filter(|member| {
+            member.kind == DependencyProjectKind::Script && !member.dependencies.is_empty()
+        })
+    else {
+        return Vec::new();
+    };
+    let candidates = candidate_declarations(metadata, member, &importable_ids(metadata));
+    if candidates.is_empty() {
+        return Vec::new();
+    }
+    let Some(tag) = script_tag(db, file) else {
+        return Vec::new();
+    };
+    let Some(used) = script_dependency_usage(db, script) else {
+        return Vec::new();
+    };
+    unused_diagnostics(
+        &candidates,
+        used,
+        Span::from(file).with_range(tag.range()),
+        severity,
+    )
+    .collect()
+}
+
+/// Follow local helpers using the script's import paths, including when a helper has its own
+/// inline script metadata.
+#[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
+fn script_dependency_usage(db: &dyn Db, script: Script<'_>) -> Option<Box<[CharStr]>> {
+    let metadata = script.dependency_metadata(db).as_ref().ok()?.as_deref()?;
+    let editable_roots: Vec<_> = metadata
+        .distributions
+        .values()
+        .filter_map(|distribution| distribution.editable_path.as_deref())
+        .collect();
+    let program = script.program(db);
+    let entry = script.file(db);
+    let mut pending = vec![entry];
+    let mut seen = FxHashSet::from_iter([entry]);
+    let mut used = BTreeSet::new();
+
+    while let Some(file) = pending.pop() {
+        db.unwind_if_revision_cancelled();
+        let imports = record_imports(db, program.program_file(db, file), metadata, &mut used)?;
+        for import in imports {
+            // Both a helper's type stub and the implementation it describes can import dependencies.
+            for module in std::iter::once(import.target).chain(import.typing_target) {
+                if let Some(helper) = local_helper(db, module, &editable_roots)
+                    && seen.insert(helper)
+                {
+                    pending.push(helper);
+                }
+            }
+        }
+    }
+    Some(used.into_iter().collect())
+}
+
+fn local_helper(db: &dyn Db, module: Module<'_>, editable_roots: &[&SystemPath]) -> Option<File> {
+    let search_path = module.search_path(db)?;
+    if search_path.is_site_packages()
+        || search_path.is_standard_library()
+        || search_path.is_editable()
+    {
+        return None;
+    }
+    let file = module.file(db)?;
+    let path = file.path(db).as_system_path()?;
+    // An ordinary search root can overlap an editable install. Its imports belong to that
+    // distribution, even when the script can reach them through the local search root.
+    (!editable_roots.iter().any(|root| path.starts_with(root))).then_some(file)
+}
+
 fn record_imports<'db>(
     db: &'db dyn Db,
     file: ProgramFile<'db>,
     metadata: &DependencyMetadata,
     used: &mut BTreeSet<CharStr>,
-) -> Option<()> {
+) -> Option<&'db [ImportedModule<'db>]> {
     let imports = imported_modules(db, file);
     if imports.incomplete {
         return None;
@@ -180,7 +271,7 @@ fn record_imports<'db>(
     for name in &imports.unresolved {
         used.extend(metadata.module_owners_for_name(name).iter().cloned());
     }
-    Some(())
+    Some(&imports.modules)
 }
 
 fn importable_ids(metadata: &DependencyMetadata) -> FxHashSet<&CharStr> {

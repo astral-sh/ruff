@@ -6,15 +6,17 @@ use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath};
 use ruff_db::testing::assert_function_query_was_not_run;
 use ruff_ranged_value::ValueSource;
 use serde_json::{Value, json};
+use ty_python_semantic::Db as _;
 
 use crate::db::testing::TestDb;
 use crate::metadata::options::Options;
-use crate::uv::testing::{apply_metadata, dependency_fixture, workspace};
+use crate::script::Script;
+use crate::uv::testing::{apply_metadata, as_script, dependency_fixture, workspace};
 use crate::{Db as _, ProjectMetadata, UseUv};
 
 use super::{
     candidate_declarations, importable_ids, member_dependency_usage, member_files,
-    project_dependency_diagnostics, unused_names,
+    project_dependency_diagnostics, script_dependency_usage, unused_names,
 };
 
 const ROOT: &str = if cfg!(windows) {
@@ -201,5 +203,63 @@ fn failed_uv_refresh_skips_stale_declarations() -> anyhow::Result<()> {
     assert!(project_dependency_diagnostics(&db).is_empty());
     apply_metadata(&mut db, &metadata)?;
     assert_eq!(project_dependency_diagnostics(&db).len(), 1);
+    Ok(())
+}
+
+#[test]
+fn script_usage_follows_reachable_stubs_and_implementations() -> anyhow::Result<()> {
+    let root = SystemPath::new(ROOT);
+    let path = root.join("script.py");
+    let tag = "# /// script
+# dependencies = ['shared-lib']
+# [tool.ty.rules]
+# unused-dependency = 'warn'
+# [tool.ty.environment]
+# root = ['helpers']
+# ///";
+    let source = format!("{tag}\nimport helper\n");
+    let (mut db, mut metadata) = fixture("")?;
+    let implementation = root.join("helpers/helper.py");
+    let stub = root.join("helpers/helper.pyi");
+    db.write_files([
+        (path.clone(), source.as_str()),
+        (root.join("helper.py"), ""),
+        (stub.clone(), ""),
+        (implementation.clone(), "import other\n"),
+        (
+            root.join("helpers/other.py"),
+            "import helper\nimport shared_lib\n",
+        ),
+        (root.join("unrelated.py"), "import shared_lib\n"),
+    ])?;
+    as_script(&mut metadata, &path);
+    apply_metadata(&mut db, &metadata)?;
+    let file = system_path_to_file(&db, &path)?;
+    assert!(db.check_file(file).is_empty());
+    db.take_salsa_events();
+    db.write_file(root.join("unrelated.py"), "")?;
+    assert!(db.check_file(file).is_empty());
+    let events = db.take_salsa_events();
+    let script = Script::for_file(&db, file).context("standalone script")?;
+    assert_function_query_was_not_run(&db, script_dependency_usage, script, &events);
+
+    db.write_file(&implementation, "")?;
+    let diagnostics = db.check_file(file);
+    assert_eq!(diagnostics.len(), 1);
+    assert!(diagnostics[0].id().is_lint_named("unused-dependency"));
+    let range = diagnostics[0]
+        .primary_span()
+        .and_then(|span| span.range())
+        .context("script metadata span")?;
+    assert_eq!(&source[range], tag);
+    db.write_file(&stub, "import shared_lib\n")?;
+    assert!(db.check_file(file).is_empty());
+    db.write_file(&stub, "")?;
+    db.write_file(&path, format!("# ty: ignore[unused-dependency]\n{source}"))?;
+    assert!(db.check_file(file).is_empty());
+    db.write_file(&implementation, "import shared_lib\n")?;
+    let diagnostics = db.check_file(file);
+    assert_eq!(diagnostics.len(), 1);
+    assert!(diagnostics[0].id().is_lint_named("unused-ignore-comment"));
     Ok(())
 }

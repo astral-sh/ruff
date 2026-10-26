@@ -324,8 +324,7 @@ impl DependencyMetadataError {
     ) -> Option<Diagnostic> {
         if matches!(self, Self::MissingPackageInventory)
             && !is_lint_enabled(LintId::of(&MISSING_DIRECT_DEPENDENCY))
-            && (kind != DependencyProjectKind::Project
-                || !is_lint_enabled(LintId::of(&UNUSED_DEPENDENCY)))
+            && !is_lint_enabled(LintId::of(&UNUSED_DEPENDENCY))
         {
             return None;
         }

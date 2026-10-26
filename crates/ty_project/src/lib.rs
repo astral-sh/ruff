@@ -1025,17 +1025,18 @@ pub(crate) fn check_file_impl(
     {
         let db = AssertUnwindSafe(db);
         match catch(&**db, source_file, || {
-            let script = Script::for_file(*db, source_file);
-            if let Some(script) = script
-                && !script.has_valid_settings(*db)
-            {
+            let Some(script) = Script::for_file(*db, source_file) else {
+                return ty_python_semantic::check_file(*db, file, Vec::new());
+            };
+            if !script.has_valid_settings(*db) {
                 return Ok(script.settings_diagnostics(*db).to_vec().into_boxed_slice());
             }
 
-            let diagnostics = ty_python_semantic::check_file(*db, file)?;
-            let Some(script) = script else {
-                return Ok(diagnostics);
-            };
+            let diagnostics = ty_python_semantic::check_file(
+                *db,
+                file,
+                dependency::script_dependency_diagnostics(*db, script),
+            )?;
 
             let settings_diagnostics = script.settings_diagnostics(*db);
             let dependency_diagnostic =

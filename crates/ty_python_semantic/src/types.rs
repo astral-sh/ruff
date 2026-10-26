@@ -197,6 +197,14 @@ mod property_tests;
 mod subscript;
 
 pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
+    check_types_with_diagnostics(db, file, Vec::new())
+}
+
+pub(crate) fn check_types_with_diagnostics(
+    db: &dyn Db,
+    file: ProgramFile<'_>,
+    additional_lints: Vec<Diagnostic>,
+) -> Vec<Diagnostic> {
     let source_file = file.file(db);
     let _span = tracing::trace_span!("check_types", ?source_file).entered();
     tracing::debug!("Checking file '{path}'", path = source_file.path(db));
@@ -265,7 +273,7 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
             .map(|error| Diagnostic::invalid_syntax(source_file, error, error)),
     );
 
-    let diagnostics = check_suppressions(db, file.python_file(db), diagnostics);
+    let diagnostics = check_suppressions(db, file.python_file(db), diagnostics, additional_lints);
 
     let elapsed = start.elapsed();
     if elapsed >= Duration::from_millis(100) {

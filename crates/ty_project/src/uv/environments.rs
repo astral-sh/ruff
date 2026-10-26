@@ -859,7 +859,11 @@ mod tests {
     fn older_uv_still_type_checks_scripts() -> anyhow::Result<()> {
         let (mut db, path, mut metadata) = script_test_environment()?;
         metadata["environment"] = json!({"root": metadata["environment"]["root"]});
-        for rule in ["", "missing-direct-dependency = 'error'"] {
+        for rule in [
+            "",
+            "missing-direct-dependency = 'error'",
+            "unused-dependency = 'error'",
+        ] {
             db.write_dedented(
                 path.as_str(),
                 &format!(
