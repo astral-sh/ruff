@@ -1442,6 +1442,19 @@ def _(colors: list[Color]):
     reveal_type(inline)  # revealed: list[Color]
 ```
 
+Membership succeeds for the plain integer `1` as well as for the enum member `Code.OK`.
+
+```py
+from enum import IntEnum
+
+class Code(IntEnum):
+    OK = 1
+
+def check_membership(value: int):
+    if value in (Code.OK,):
+        reveal_type(value)  # revealed: int
+```
+
 An enum that can have additional runtime members can still be narrowed by a membership test against
 an explicit member. The other branch excludes that member without assuming that the declared members
 are exhaustive.
