@@ -1515,7 +1515,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.context.inference_flags |= InferenceFlags::CHECK_UNBOUND_TYPEVARS;
                 self.infer_expression_impl(expression.node_ref(self.db()).node(self.module()), tcx);
             }
-            ExpressionKind::Normal => {
+            ExpressionKind::Normal | ExpressionKind::Predicate { .. } => {
                 self.infer_expression_impl(expression.node_ref(self.db()).node(self.module()), tcx);
             }
             ExpressionKind::TypeExpression => {
@@ -12949,6 +12949,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
         });
 
         ExpressionInference {
+            predicate_truthiness: Truthiness::Ambiguous,
             expressions: FrozenMap::from(self.expressions),
             extra,
             #[cfg(debug_assertions)]
