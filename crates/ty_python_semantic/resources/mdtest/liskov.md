@@ -2993,6 +2993,69 @@ class PropertyOverride(Base):
         return Base.Inner
 ```
 
+## Overriding nested data descriptors
+
+An override preserves the setter contract of a nested class acting as a data descriptor, even when
+both getters return the same type.
+
+```py
+class IntSetter(type):
+    def __get__(cls, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(cls, instance: object, value: int) -> None: ...
+
+class StrSetter(type):
+    def __get__(cls, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(cls, instance: object, value: str) -> None: ...
+
+class Base:
+    class Inner(metaclass=IntSetter): ...
+
+class Child(Base):
+    class Inner(metaclass=StrSetter): ...  # error: [invalid-mutable-override]
+```
+
+## Overriding setter-only nested descriptors
+
+A nested class whose metaclass defines `__set__` but no `__get__` exposes the class object on reads.
+Overrides still preserve the setter's accepted values.
+
+```py
+class Setter(type):
+    def __set__(cls, instance: object, value: int) -> None: ...
+
+class Base:
+    class Inner(metaclass=Setter): ...
+
+class Replacement:
+    def __get__(self, instance: object, owner: type | None = None) -> type[Base.Inner]:
+        return Base.Inner
+
+    def __set__(self, instance: object, value: str) -> None: ...
+
+class Child(Base):
+    Inner: Replacement = Replacement()  # error: [invalid-mutable-override]
+
+def write(base: Base):
+    base.Inner = 1  # no diagnostic
+```
+
+A receiver annotation does not replace the setter contract of a descriptor stored on the class.
+
+```py
+class Annotated:
+    Inner: type[Base.Inner] = Base.Inner
+
+    def __init__(self):
+        self.Inner: type[Base.Inner]
+
+class AnnotatedChild(Annotated):
+    Inner: Replacement = Replacement()  # error: [invalid-mutable-override]
+```
+
 ## Nested classes overriding writable attributes
 
 A nested class cannot replace a writable attribute: the override removes writes permitted by the

@@ -201,14 +201,16 @@ fn unbound_member_contract<'db>(
                 .place
                 .ignore_possibly_undefined()
                 .is_none_or(|ty| {
-                    ty.class_member_with_policy(
-                        db,
-                        env,
-                        "__get__",
-                        MemberLookupPolicy::REQUIRE_CONCRETE,
-                    )
-                    .place
-                    .is_undefined()
+                    !ty.may_be_data_descriptor(db, env)
+                        && ty
+                            .class_member_with_policy(
+                                db,
+                                env,
+                                "__get__",
+                                MemberLookupPolicy::REQUIRE_CONCRETE,
+                            )
+                            .place
+                            .is_undefined()
                 })
     {
         // An unannotated default may inherit an ancestor's type. It must not hide the
@@ -224,10 +226,10 @@ fn unbound_member_contract<'db>(
     }
     let qualifiers = class_member.qualifiers | instance_member.qualifiers;
     let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
-    let is_slot = matches!(own_place.ty, Type::SlotDescriptor(_));
+    // A descriptor can define a write contract without defining `__get__`.
     let is_descriptor = !is_class_var
         && !class_member.place.is_undefined()
-        && (is_slot
+        && (own_place.ty.may_be_data_descriptor(db, env)
             || own_place
                 .ty
                 .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
@@ -272,7 +274,7 @@ fn bind_attribute<'db>(
     let is_nested_class = qualifiers.contains(TypeQualifiers::NESTED_CLASS);
     let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
     let (read, write) = if is_descriptor {
-        let read = Type::resolve_descriptor_access(
+        let member = Type::resolve_descriptor_access(
             db,
             env,
             class_member,
@@ -281,15 +283,18 @@ fn bind_attribute<'db>(
             InstanceFallbackShadowsNonDataDescriptor::No,
         )
         .ok()?
-        .member(db)
-        .place
-        .ignore_possibly_undefined()?
-        .bind_self_typevars(db, env, receiver);
-        // Explicit `staticmethod(f)` and `classmethod(f)` assignments expose method
-        // signatures, just like decorated definitions; the function's identity can change.
-        let read = if is_method
+        .member(db);
+        let read = member
+            .place
+            .ignore_possibly_undefined()?
+            .bind_self_typevars(db, env, receiver);
+        let read = if member.qualifiers.contains(TypeQualifiers::NESTED_CLASS) {
+            read.promote_class_literals(db, env)
+        } else if is_method
             || matches!(ty, Type::KnownInstance(KnownInstanceType::MethodWrapper(_)))
         {
+            // Explicit `staticmethod(f)` and `classmethod(f)` assignments expose method
+            // signatures, just like decorated definitions; the function's identity can change.
             read.try_upcast_to_callable(db, env)?.to_type(db, env)
         } else {
             read
@@ -334,7 +339,7 @@ fn bind_attribute<'db>(
         // writability of these attributes.
         write: if owner.is_object(db)
             || qualifiers.contains(TypeQualifiers::FINAL)
-            || is_nested_class
+            || is_nested_class && !ty.is_data_descriptor(db, env)
             || !is_class_var && is_frozen
         {
             None
@@ -439,8 +444,8 @@ fn attribute_violation<'db>(
             target: target.read,
         });
     }
-    // Nested classes promise a class object through both class and instance access. A property
-    // that returns a compatible class on instances does not preserve the class-side operation.
+    // Nested class declarations also constrain class access. A property returning a compatible
+    // value on instances does not necessarily preserve the class-side operation.
     if target.qualifiers.contains(TypeQualifiers::NESTED_CLASS)
         && let (Some(source), Some(target)) = (
             receiver

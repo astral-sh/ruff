@@ -2506,6 +2506,71 @@ static_assert(not is_assignable_to(TypeOf[Namespace], Writable))
 static_assert(not is_assignable_to(Namespace, ClassWritable))
 ```
 
+### Nested class descriptors
+
+A nested class with a descriptor setter permits instance writes accepted by that setter. Without a
+getter, reads through either the instance or its class still expose the nested class object.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Setter(type):
+    def __set__(cls, instance: object, value: type) -> None: ...
+
+class HasDescriptor(Protocol):
+    class attribute(metaclass=Setter): ...
+
+def access(obj: HasDescriptor, cls: type[HasDescriptor]):
+    reveal_type(obj.attribute)  # revealed: type[attribute]
+    reveal_type(cls.attribute)  # revealed: type[attribute]
+    obj.attribute = int  # no diagnostic
+    obj.attribute = 1  # error: [invalid-assignment]
+    cls.attribute = HasDescriptor.attribute  # error: [invalid-assignment]
+```
+
+An instance property cannot satisfy the class-side read contract.
+
+```py
+class InstanceOnly:
+    @property
+    def attribute(self) -> type[HasDescriptor.attribute]:
+        return HasDescriptor.attribute
+
+    @attribute.setter
+    def attribute(self, value: type) -> None: ...
+
+static_assert(not is_subtype_of(InstanceOnly, HasDescriptor))
+```
+
+When the metaclass also defines `__get__`, its return type determines instance reads.
+
+```py
+class GetterSetter(Setter):
+    def __get__(cls, instance: object, owner: type | None = None) -> str:
+        return "value"
+
+class HasGetter(Protocol):
+    class attribute(metaclass=GetterSetter): ...
+
+def access(obj: HasGetter):
+    reveal_type(obj.attribute)  # revealed: str
+    obj.attribute = int  # no diagnostic
+    obj.attribute = 1  # error: [invalid-assignment]
+```
+
+Defining `__set__` on the nested class itself does not make the class object a descriptor.
+
+```py
+class NotDescriptor(Protocol):
+    class attribute:
+        def __set__(self, instance: object, value: type) -> None: ...
+
+def access(obj: NotDescriptor):
+    obj.attribute = NotDescriptor.attribute  # error: [invalid-assignment]
+```
+
 ## Declared instance attribute members
 
 Declared protocol instance attributes should be available both on protocol-typed values and through

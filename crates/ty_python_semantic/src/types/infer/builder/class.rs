@@ -436,12 +436,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         self.undecorated_type = undecorated_ty;
 
-        let qualifiers =
-            if self.index.scope(self.scope().file_scope_id(db)).kind() == ScopeKind::Class {
-                TypeQualifiers::NESTED_CLASS
-            } else {
-                TypeQualifiers::empty()
-            };
+        // A decorator can replace a nested class with an ordinary writable value.
+        let qualifiers = if self.index.scope(self.scope().file_scope_id(db)).kind()
+            == ScopeKind::Class
+            && inferred_ty.is_subtype_of(db, env, KnownClass::Type.to_instance(db, env))
+        {
+            TypeQualifiers::NESTED_CLASS
+        } else {
+            TypeQualifiers::empty()
+        };
         self.add_declaration_with_binding(
             class_node.into(),
             definition,

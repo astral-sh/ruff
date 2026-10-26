@@ -1520,9 +1520,9 @@ reveal_type(Derived().pure_undeclared)  # revealed: str
 
 ## Nested class attributes
 
-A nested class is a read-only attribute. Access through an instance or an unknown subclass exposes
-`type[Inner]`, since a subclass can override it with a subclass of `Inner`. Access on the defining
-class retains the exact class object.
+A nested class is a read-only attribute. Access through an instance or an unspecified subclass
+exposes `type[Inner]`, since a subclass can override it with a subclass of `Inner`. Access on the
+defining class retains the exact class object.
 
 ```py
 class Outer:
@@ -1587,6 +1587,10 @@ class Writable(Base):
     def __init__(self):
         self.Inner: type[Base.Inner] = Base.Inner  # no diagnostic
 
+class Invalid(Base):
+    def __init__(self):
+        self.Inner: type[Base.Inner] = str  # error: [invalid-assignment]
+
 class OtherInner(Base.Inner): ...
 class Inherited(Writable): ...
 
@@ -1620,7 +1624,7 @@ def write_again(obj: ReadOnly):
 ## Abstract nested classes
 
 A subclass can override an abstract nested class with a concrete subclass. Calls through an instance
-or an unknown subclass therefore do not assume that the nested class is abstract.
+or an unspecified subclass therefore do not assume that the nested class is abstract.
 
 ```py
 from abc import ABC, abstractmethod

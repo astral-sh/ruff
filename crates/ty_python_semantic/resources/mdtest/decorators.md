@@ -694,6 +694,89 @@ class DeprecatedThenUnannotated: ...
 DeprecatedThenUnannotated()  # error: [deprecated] "use OtherClass"
 ```
 
+## Nested classes replaced by decorators
+
+A decorator that replaces a nested class with a non-class value creates an ordinary writable
+attribute.
+
+```py
+def replace(cls: type) -> int:
+    return 1
+
+class Outer:
+    @replace
+    class Inner: ...
+
+reveal_type(Outer.Inner)  # revealed: int
+Outer.Inner = 2  # no diagnostic
+
+def check(obj: Outer):
+    reveal_type(obj.Inner)  # revealed: int
+    obj.Inner = 3  # no diagnostic
+    obj.Inner = "wrong"  # error: [invalid-assignment]
+    del obj.Inner  # no diagnostic
+```
+
+An explicit `Any` return type also permits replacing the attribute.
+
+```py
+from typing import Any
+
+def dynamic(cls: type) -> Any:
+    return cls
+
+class DynamicOuter:
+    @dynamic
+    class Inner: ...
+
+def check(obj: DynamicOuter):
+    obj.Inner = 1  # no diagnostic
+```
+
+## Nested classes preserved by decorators
+
+An identity decorator preserves the read-only nested class attribute, including when the decorator
+is unannotated.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(cls: type[T]) -> type[T]:
+    return cls
+
+def unannotated(cls):
+    return cls
+
+class Outer:
+    @identity
+    class Inner: ...
+
+    @unannotated
+    class Other: ...
+
+def check(obj: Outer):
+    reveal_type(obj.Inner)  # revealed: type[Inner]
+    obj.Inner = Outer.Inner  # error: [invalid-assignment]
+    obj.Other = Outer.Other  # error: [invalid-assignment]
+```
+
+A decorator that returns a different class also produces a read-only attribute.
+
+```py
+def replace(cls: type) -> type[int]:
+    return int
+
+class ReplacedOuter:
+    @replace
+    class Inner: ...
+
+def check(obj: ReplacedOuter):
+    reveal_type(obj.Inner)  # revealed: type[int]
+    obj.Inner = int  # error: [invalid-assignment]
+```
+
 ## Unknown return annotations on class decorators
 
 An unresolved return annotation produces `Unknown`. This preserves the class binding and allows

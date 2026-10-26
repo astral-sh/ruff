@@ -3326,9 +3326,7 @@ nested class through an instance or an unspecified subclass accounts for possibl
 
 ```py
 class Outer:
-    class Inner[T]:
-        def __init__(self, value: T) -> None:
-            self.value = value
+    class Inner[T]: ...
 
 reveal_type(Outer.Inner)  # revealed: <class 'Inner'>
 
@@ -3340,13 +3338,10 @@ def inspect(obj: Outer, cls: type[Outer]) -> None:
 The nested class can be used in annotations, explicit specializations, and base classes.
 
 ```py
-def accept(value: Outer.Inner[int]) -> int:
-    return value.value
+class Integer(Outer.Inner[int]): ...  # no diagnostic
 
-class Integer(Outer.Inner[int]): ...
-
-reveal_type(Outer.Inner[int](1))  # revealed: Inner[int]
-reveal_type(accept(Integer(1)))  # revealed: int
+value: Outer.Inner[int] = Integer()  # no diagnostic
+reveal_type(Outer.Inner[int]())  # revealed: Inner[int]
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
