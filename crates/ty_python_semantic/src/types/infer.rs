@@ -577,11 +577,33 @@ pub(crate) fn infer_expression_types<'db>(
     infer_expression_types_impl(db, InferExpression::new(db, expression, tcx))
 }
 
-/// Read the predicate's outcome from the same inference result as its operand types.
+/// A loop predicate can depend on bindings it guards in the previous iteration.
+/// Reading inference directly keeps the extra truthiness query out of that cycle.
 pub(crate) fn infer_predicate_truthiness<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> Truthiness {
+    if matches!(
+        expression.kind(db),
+        ExpressionKind::Predicate { in_loop: true, .. }
+    ) {
+        recorded_predicate_truthiness(db, expression)
+    } else {
+        cached_predicate_truthiness(db, expression)
+    }
+}
+
+/// Keep reachability queries cached when an operand's type changes but its truthiness stays the same.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _| Truthiness::Ambiguous,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn cached_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+    recorded_predicate_truthiness(db, expression)
+}
+
+fn recorded_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
     infer_expression_types_impl(db, InferExpression::Bare(expression)).predicate_truthiness
 }
 
@@ -2085,7 +2107,7 @@ impl<'db> ExpressionInference<'db> {
         let InferExpression::Bare(expression) = input else {
             return;
         };
-        let ExpressionKind::Predicate(context) = expression.kind(db) else {
+        let ExpressionKind::Predicate { context, .. } = expression.kind(db) else {
             return;
         };
         let module = parsed_module(db, expression.python_file(db)).load(db);

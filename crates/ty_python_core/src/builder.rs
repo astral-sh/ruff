@@ -2895,7 +2895,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         node: &ast::Expr,
         context: ExpressionContext,
     ) -> Expression<'db> {
-        self.add_standalone_expression_impl(node, ExpressionKind::Predicate(context), None)
+        self.add_standalone_expression_impl(
+            node,
+            ExpressionKind::Predicate {
+                context,
+                in_loop: self.in_loop_context(),
+            },
+            None,
+        )
     }
 
     /// Record an expression that is immediately assigned to a target, and that needs to be a Salsa
@@ -4605,6 +4612,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // Visit the test expression after creating loop headers, so that loop-back values
                 // are visible.
+                let outer_loop = self.push_loop();
                 self.visit_condition(test);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
 
@@ -4618,7 +4626,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
                 self.record_reachability_constraint_id(predicate_id);
 
-                let outer_loop = self.push_loop();
                 self.visit_body(body);
                 let this_loop = self.pop_loop(outer_loop);
 
