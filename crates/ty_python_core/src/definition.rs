@@ -26,7 +26,8 @@ use crate::{Db, Program, SemanticIndex};
 /// A definition of a place.
 ///
 /// ## ID stability
-/// The `Definition`'s ID is stable when the only field that change is its `kind` (AST node).
+/// Edits to the AST preserve a definition's ID as long as its place, re-export state, and
+/// whether it assigns a call to a name remain the same.
 ///
 /// The `Definition` changes when the `file`, `scope`, or `place` change. This can be
 /// because a new scope gets inserted before the `Definition` or a new place is inserted
@@ -46,7 +47,7 @@ pub struct Definition<'db> {
     #[returns(copy)]
     pub scope_id: ScopeId<'db>,
 
-    /// The place ID and re-export state of the definition.
+    /// The place ID, re-export state, and call-assignment flag for this definition.
     #[returns(copy)]
     place_info: DefinitionPlace,
 
@@ -68,11 +69,14 @@ impl<'db> Definition<'db> {
         place: ScopedPlaceId,
         kind: DefinitionKind<'db>,
         is_reexported: bool,
+        module: &ParsedModuleRef,
     ) -> Self {
+        let is_call_assignment = matches!(&kind, DefinitionKind::Assignment(assignment)
+            if assignment.unpack().is_none() && assignment.value(module).is_call_expr());
         Self::new_internal(
             db,
             scope_id,
-            DefinitionPlace::new(place, is_reexported),
+            DefinitionPlace::new(place, is_reexported, is_call_assignment),
             kind,
         )
     }
@@ -107,6 +111,17 @@ impl<'db> Definition<'db> {
 
     pub fn is_reexported(self, db: &'db dyn Db) -> bool {
         self.place_info(db).is_reexported()
+    }
+
+    /// Whether this definition binds a name directly to the result of a call.
+    pub fn is_call_assignment(self, db: &'db dyn Db) -> bool {
+        matches!(
+            self.place_info(db),
+            DefinitionPlace::Symbol {
+                is_call_assignment: true,
+                ..
+            }
+        )
     }
 
     pub fn full_range(self, db: &'db dyn Db, module: &ParsedModuleRef) -> FileRange {
@@ -184,16 +199,15 @@ impl<'db> Definition<'db> {
     }
 }
 
-/// The identity of the place defined by a [`Definition`] and whether it is re-exported.
+/// The identity of the place and the properties that callers can read without accessing its AST.
 ///
-/// Keeping the re-export state in the enum lets it share the place ID's otherwise-unused
-/// representation space. Storing it as a separate field on [`Definition`] would add padding to
-/// every tracked definition.
+/// These flags share the place ID's otherwise-unused representation space.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub enum DefinitionPlace {
     Symbol {
         id: ScopedSymbolId,
         is_reexported: bool,
+        is_call_assignment: bool,
     },
     Member {
         id: ScopedMemberId,
@@ -202,9 +216,13 @@ pub enum DefinitionPlace {
 }
 
 impl DefinitionPlace {
-    fn new(place: ScopedPlaceId, is_reexported: bool) -> Self {
+    fn new(place: ScopedPlaceId, is_reexported: bool, is_call_assignment: bool) -> Self {
         match place {
-            ScopedPlaceId::Symbol(id) => Self::Symbol { id, is_reexported },
+            ScopedPlaceId::Symbol(id) => Self::Symbol {
+                id,
+                is_reexported,
+                is_call_assignment,
+            },
             ScopedPlaceId::Member(id) => Self::Member { id, is_reexported },
         }
     }

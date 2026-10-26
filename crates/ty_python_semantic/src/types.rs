@@ -277,8 +277,12 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
 
 /// The inferred type of a binding, after applying any declarations on the target.
 pub(crate) fn binding_type<'db>(db: &'db dyn Db, binding: Definition<'db>) -> Type<'db> {
-    infer::infer_fixed_call_binding(db, binding)
-        .unwrap_or_else(|| infer_definition_types(db, binding).binding_type(binding))
+    if binding.is_call_assignment(db)
+        && let Some(ty) = infer::infer_fixed_call_binding(db, binding)
+    {
+        return ty;
+    }
+    infer_definition_types(db, binding).binding_type(binding)
 }
 
 /// Returns whether a definition may represent a value that exists at runtime.

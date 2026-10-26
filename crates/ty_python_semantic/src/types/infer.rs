@@ -287,18 +287,13 @@ pub(super) fn infer_fixed_call_binding<'db>(
     definition: Definition<'db>,
 ) -> Option<Type<'db>> {
     let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
-        return None;
+        unreachable!("expected a call assignment");
     };
-    if assignment.unpack().is_some() {
-        return None;
-    }
     let module = parsed_module(db, definition.python_file(db)).load(db);
-    let ast::Expr::Call(call) = assignment.value(&module) else {
-        return None;
-    };
-    if !assignment.target(&module).is_name_expr() {
-        return None;
-    }
+    let call = assignment
+        .value(&module)
+        .as_call_expr()
+        .expect("expected a call");
     let env = ProgramEnvironment::from_scope(definition.scope(db));
     TypeInferenceBuilder::for_definition(db, &env, definition, &module)
         .infer_call_assignment_binding(assignment, definition, call)

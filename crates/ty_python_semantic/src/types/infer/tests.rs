@@ -1958,6 +1958,9 @@ fn fixed_call_result_does_not_depend_on_its_argument() -> anyhow::Result<()> {
 
     db.write_dedented("src/argument.py", "value: int = 1")?;
     assert_file_diagnostics(&db, "src/producer.py", &[]);
+
+    db.write_dedented("src/producer.py", "result = 1")?;
+    assert_revealed_type(&db, "src/consumer.py", "Literal[1]");
     Ok(())
 }
 

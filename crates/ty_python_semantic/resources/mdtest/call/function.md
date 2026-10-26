@@ -36,6 +36,24 @@ def run(parser: Parser, callback: Callable[[int], str]):
     reveal_type(count)  # revealed: int
 ```
 
+## Recursive return types
+
+A type variable can occur inside a recursive return type. Binding the call specializes it to the
+argument type.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Nested = dict[str, "Nested[T]"] | T
+
+def nested(value: T) -> Nested[T]:
+    return value
+
+result = nested(1)
+reveal_type(result)  # revealed: Nested[int]
+```
+
 ## Gradual variadic parameters
 
 ```py

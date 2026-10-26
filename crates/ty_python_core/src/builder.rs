@@ -1610,8 +1610,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let is_loop_header = kind.is_loop_header();
         let is_reexported = kind.is_reexported();
 
-        let definition: Definition<'db> =
-            Definition::new(self.db, self.current_scope_id(), place, kind, is_reexported);
+        let definition: Definition<'db> = Definition::new(
+            self.db,
+            self.current_scope_id(),
+            place,
+            kind,
+            is_reexported,
+            self.module,
+        );
 
         let num_definitions = if is_loop_header {
             // Loop headers are internal use-def definitions. They are retrieved through the loop
@@ -1963,6 +1969,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     nested_declarations: declarations,
                 })),
                 false,
+                self.module,
             );
 
             // Adding a binding typically invalidates narrowing aliases like
@@ -2053,6 +2060,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     nested_declarations: declarations,
                 })),
                 false,
+                self.module,
             );
             let previous = if binding_status == LiveBindingStatus::Bound {
                 PreviousDefinitions::AreShadowed

@@ -170,9 +170,14 @@ impl<'db> Type<'db> {
         let [signature] = signatures.overloads.as_slice() else {
             return None;
         };
-        // Type guards record the narrowed argument. An alias can hide a type variable or a
-        // type guard, so leave aliases to ordinary binding rather than evaluating them here.
+        // Type guards record the narrowed argument. Aliases and recursive types are lazy and
+        // can hide type variables, so leave them to ordinary binding.
         let ty = signature.return_ty;
+        // A gradual return provides no concrete type to resolve a cycle. Keep the argument
+        // dependencies for recovery when, for example, an untyped plugin returns `Any`.
+        if ty.is_dynamic() {
+            return None;
+        }
         let needs_binding = any_over_type(db, env, ty, false, |ty| {
             matches!(
                 ty,
@@ -180,6 +185,7 @@ impl<'db> Type<'db> {
                     | Type::TypeIs(_)
                     | Type::TypeGuard(_)
                     | Type::TypeAlias(_)
+                    | Type::Recursive(_)
                     | Type::Divergent(_)
             )
         });
