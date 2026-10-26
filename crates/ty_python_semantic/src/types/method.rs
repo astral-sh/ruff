@@ -144,9 +144,13 @@ impl<'db> BoundMethodType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        let func = self
-            .func(db)
-            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        let func = self.func(db);
+        // The function supplies the bound method's outer signature. Its receiver is a nested type.
+        let func = if type_mapping.without_bindings().is_some() {
+            func.map_type(db, type_mapping, tcx, visitor)
+        } else {
+            func.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+        };
         Self::new_internal(
             db,
             func,

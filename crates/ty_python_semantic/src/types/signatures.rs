@@ -438,7 +438,7 @@ impl<'db> CallableSignature<'db> {
         {
             Self::from_overloads(self.overloads.iter().flat_map(|signature| {
                 if let Some((prefix, paramspec)) = signature.parameters.as_paramspec_with_prefix()
-                    && let Some(value) = specialization.get(db, paramspec)
+                    && let Some(value) = specialization.get_parameter_list(db, paramspec)
                     && let Some(value) = value.as_paramspec_value(db)
                     && let Some(result) = try_apply_type_mapping_for_paramspec(
                         db,

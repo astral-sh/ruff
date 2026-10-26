@@ -9666,6 +9666,10 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        // Each nested type is specialized independently of the parameter lists selected for
+        // the enclosing callable (e.g., the return type of `Callable[P, Callable[P, None]]`).
+        let underlying = type_mapping.without_bindings();
+        let type_mapping = underlying.as_ref().unwrap_or(type_mapping);
         if let TypeMapping::GeneralizeLocalTypes(scope) = type_mapping {
             let is_local = |definition: Definition<'db>| {
                 definition.program_file(db) == scope.program_file(db)
@@ -9743,6 +9747,8 @@ impl<'db> Type<'db> {
         | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } =
             type_mapping
         {
+            const MAX_PARAMSPEC_EXPANSION: usize = 64;
+
             let function_signatures = |function: FunctionType<'db>| {
                 if specialization.preserves_lazy_signatures() {
                     function.updated_signature(db)
@@ -9780,30 +9786,33 @@ impl<'db> Type<'db> {
                         None
                     }
                 })
-                .filter(|(typevar, _)| seen.insert(typevar.identity(db)))
-                .collect::<Vec<_>>();
+                .filter(|(typevar, _)| seen.insert(typevar.identity(db)));
 
-            if let Some((typevar, value)) = intersection_paramspecs.first() {
-                // Independent intersections can produce a Cartesian product. Count all leaves
-                // before expanding the first variable so recursive expansion shares this bound.
-                const MAX_PARAMSPEC_EXPANSION: usize = 64;
-                let mut expansion_size = 1usize;
-                for (_, value) in &intersection_paramspecs {
-                    let mut count = 0usize;
-                    let counted = value.try_map(db, visitor.env, &mut |value| {
-                        count += 1;
-                        (count <= MAX_PARAMSPEC_EXPANSION).then_some(Type::from(value))
-                    });
-                    expansion_size = expansion_size.saturating_mul(count);
-                    if counted.is_none() || expansion_size > MAX_PARAMSPEC_EXPANSION {
-                        return Type::Callable(CallableType::unknown(db));
-                    }
+            // Independent parameter lists produce a Cartesian product. Bound the number of
+            // combinations before specializing any of the callable's signatures.
+            let mut choices = Vec::new();
+            let mut expansion_size = 1usize;
+            for (paramspec, value) in intersection_paramspecs {
+                let mut members = Vec::new();
+                let collected = value.try_map(db, visitor.env, &mut |member| {
+                    let member = Type::from(member);
+                    members.push((paramspec, member));
+                    (members.len() <= MAX_PARAMSPEC_EXPANSION).then_some(member)
+                });
+                expansion_size = expansion_size.saturating_mul(members.len());
+                if collected.is_none() || expansion_size > MAX_PARAMSPEC_EXPANSION {
+                    return Type::Callable(CallableType::unknown(db));
                 }
+                choices.push(members);
+            }
 
+            if !choices.is_empty() {
+                // All branches specialize the same input type, so cache the finished intersection.
                 return visitor.visit(db, self, type_mapping, || {
-                    value
-                        .try_map(db, visitor.env, &mut |value| {
-                            let bindings = [(*typevar, Type::from(value))];
+                    let callables = choices
+                        .into_iter()
+                        .multi_cartesian_product()
+                        .map(|bindings| {
                             let specialization = ApplySpecialization::WithBindings {
                                 specialization,
                                 bindings: &bindings,
@@ -9818,16 +9827,32 @@ impl<'db> Type<'db> {
                                 },
                                 _ => TypeMapping::ApplySpecialization(specialization),
                             };
-
-                            // A fresh visitor distinguishes the overridden binding. Other
-                            // intersection-valued ParamSpecs are expanded recursively.
-                            Some(self.apply_type_mapping(db, visitor.env, &mapping, tcx))
+                            self.map_type(db, &mapping, tcx, visitor)
                         })
+                        .collect::<Vec<_>>();
+                    IntersectionType::bounded_from_elements(db, visitor.env, callables)
                         .unwrap_or_else(|| Type::Callable(CallableType::unknown(db)))
                 });
             }
         }
 
+        let map = || self.map_type(db, type_mapping, tcx, visitor);
+        if matches!(self, Type::Callable(_) | Type::FunctionLiteral(_)) {
+            visitor.visit(db, self, type_mapping, map)
+        } else {
+            map()
+        }
+    }
+
+    /// Maps the current node. The caller handles expansion and caching, so each branch of an
+    /// expanded callable can supply its own bindings while sharing the visitor for nested types.
+    fn map_type(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
         match self {
             Type::TypeVar(bound_typevar) => {
                 bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor)
@@ -9843,27 +9868,24 @@ impl<'db> Type<'db> {
                 reference.apply_type_mapping_impl(db, type_mapping, visitor)
             }
 
-            Type::FunctionLiteral(function) => visitor.visit(db, self, type_mapping, || {
-                match type_mapping {
-                    // Promote the types within the signature before promoting the signature to its
-                    // callable form.
-                    TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
-                        Type::FunctionLiteral(function.apply_type_mapping_impl(
-                            db,
-                            type_mapping,
-                            tcx,
-                            visitor,
-                        ))
-                        .promote_impl(db, visitor.env)
-                    }
-                    _ => Type::FunctionLiteral(function.apply_type_mapping_impl(
-                        db,
-                        type_mapping,
-                        tcx,
-                        visitor,
-                    )),
+            Type::FunctionLiteral(function) => {
+                let function = Type::FunctionLiteral(function.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                ));
+                // Promote the types within the signature before promoting the signature to its
+                // callable form.
+                if matches!(
+                    type_mapping,
+                    TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
+                ) {
+                    function.promote_impl(db, visitor.env)
+                } else {
+                    function
                 }
-            }),
+            }
 
             Type::BoundMethod(method) => {
                 Type::BoundMethod(method.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
@@ -9964,9 +9986,9 @@ impl<'db> Type<'db> {
                 ))
             }
 
-            Type::Callable(callable) => visitor.visit(db, self, type_mapping, || {
+            Type::Callable(callable) => {
                 Type::Callable(callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-            }),
+            }
 
             Type::GenericAlias(generic) => {
                 Type::GenericAlias(generic.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
@@ -11459,6 +11481,23 @@ pub enum TypeMapping<'a, 'db> {
 }
 
 impl<'db> TypeMapping<'_, 'db> {
+    /// Returns the mapping for nested types when a callable has selected outer parameter lists.
+    fn without_bindings(&self) -> Option<Self> {
+        match self {
+            Self::ApplySpecialization(ApplySpecialization::WithBindings {
+                specialization, ..
+            }) => Some(Self::ApplySpecialization(**specialization)),
+            Self::ApplySpecializationWithMaterialization {
+                specialization: ApplySpecialization::WithBindings { specialization, .. },
+                materialization_kind,
+            } => Some(Self::ApplySpecializationWithMaterialization {
+                specialization: **specialization,
+                materialization_kind: *materialization_kind,
+            }),
+            _ => None,
+        }
+    }
+
     /// Updates the generic context of a [`Signature`] according to the current type mapping.
     ///
     /// Returns `None` if the mapping removes all type variables from the context.
