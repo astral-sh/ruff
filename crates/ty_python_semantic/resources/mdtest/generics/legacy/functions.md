@@ -126,7 +126,7 @@ reveal_type(takes_in_type(int))  # revealed: type[int]
 def takes_in_type_of_list(x: type[list[T]]) -> T:
     raise NotImplementedError
 
-reveal_type(takes_in_type_of_list(list[int]))  # revealed: int
+reveal_type(takes_in_type_of_list(type(list[int]())))  # revealed: int
 ```
 
 This also works when passing in arguments that are subclasses of the parameter type.
@@ -142,7 +142,7 @@ reveal_type(takes_in_list(GenericSub[str]()))  # revealed: list[str]
 reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: str
 
 reveal_type(takes_in_type_of_list(Sub))  # revealed: int
-reveal_type(takes_in_type_of_list(GenericSub[str]))  # revealed: str
+reveal_type(takes_in_type_of_list(type(GenericSub[str]())))  # revealed: str
 
 class ExplicitSub(ExplicitlyImplements[int]): ...
 class ExplicitGenericSub(ExplicitlyImplements[T]): ...
@@ -275,7 +275,7 @@ class Final(Generic[T]): ...
 def infer(cls: type[Final[T]]) -> T:
     raise NotImplementedError
 
-reveal_type(infer(Final[int]))  # revealed: int
+reveal_type(infer(type(Final[int]())))  # revealed: int
 ```
 
 ## Inferring tuple parameter types

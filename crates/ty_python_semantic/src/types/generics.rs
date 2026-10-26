@@ -19,6 +19,7 @@ use crate::types::constraints::{
     SolutionPaths, SolutionViolation, SolutionViolationKind, Solutions, TypeVarSolution,
 };
 use crate::types::cyclic::{ActiveRecursionDetector, CycleDetector, HasIdentity, TypeIdentity};
+use crate::types::dedicated::numpy;
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
@@ -4085,6 +4086,21 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // possible when adding any new heuristics here. See the `Callable` clause below for an
         // example.
 
+        // TODO: Remove this NumPy inference workaround together with `numpy::is_scalar_alias`.
+        let actual_elements = match actual {
+            Type::Union(union) => union.elements(db),
+            _ => std::slice::from_ref(&actual),
+        };
+        if actual_elements
+            .iter()
+            .any(|ty| matches!(ty, Type::GenericAlias(alias) if numpy::is_scalar_alias(db, *alias)))
+        {
+            // NumPy scalar aliases are assignable to class types despite being disjoint from
+            // them. Infer through that relation before filtering disjoint union elements.
+            let when = self.constraint_for_relation(formal, actual, polarity);
+            return self.infer_from_constraint_set(when);
+        }
+
         // Remove the union elements from `actual` that are not related to `formal`, and vice
         // versa.
         //
@@ -4173,7 +4189,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 | Type::SubclassOf(_)),
             ) => {
                 let variance = TypeVarVariance::Covariant.compose(polarity);
-                if let Some(actual_instance) = actual.to_instance_approximation(db, self.env) {
+                let actual_instance = match actual {
+                    Type::GenericAlias(alias) => {
+                        Some(Type::instance(db, self.env, ClassType::Generic(alias)))
+                    }
+                    _ => actual.to_instance_approximation(db, self.env),
+                };
+                if let Some(actual_instance) = actual_instance {
                     return self.infer_map_impl(
                         formal_typeform.type_argument(db),
                         actual_instance,
@@ -4609,7 +4631,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 Type::SubclassOf(formal_subclass),
                 actual @ (Type::ClassLiteral(_)
                 | Type::SpecializedClass(_)
-                | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::Union(_)),
             ) if let SubclassOfInner::Protocol(protocol) = formal_subclass.subclass_of() => {
@@ -4634,10 +4655,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
 
             (
-                formal @ (Type::SubclassOf(_) | Type::SpecializedClass(_) | Type::GenericAlias(_)),
+                formal @ (Type::SubclassOf(_) | Type::SpecializedClass(_)),
                 Type::ClassLiteral(_)
                 | Type::SpecializedClass(_)
-                | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::Union(_),
             ) if formal.is_specialized_class_or_alias()

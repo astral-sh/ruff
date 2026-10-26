@@ -1847,6 +1847,12 @@ impl KnownComparisonSemantics {
                 instance.instance_fallback(db, env),
                 operator,
             ),
+            Type::GenericAlias(_) => KnownComparisonSemantics::of_instance(
+                db,
+                env,
+                KnownClass::GenericAlias.to_instance(db, env),
+                operator,
+            ),
             _ => None,
         }
     }

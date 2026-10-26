@@ -9,7 +9,6 @@ use crate::types::{
     diagnostic::NOT_ITERABLE,
     function::function_has_stub_body,
     infer::infer_expression_types,
-    todo_type,
     tuple::{TupleSpec, TupleSpecBuilder},
 };
 use compact_str::ToCompactString;
@@ -262,9 +261,6 @@ impl<'db> Type<'db> {
                 Type::NewTypeInstance(newtype) => {
                     non_async_special_case(db, env, newtype.concrete_base_type(db))
                 }
-                Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => Some(Cow::Owned(
-                    TupleSpec::homogeneous(todo_type!("*tuple[] annotations")),
-                )),
                 Type::LiteralValue(literal) => match literal.kind() {
                     LiteralValueTypeKind::Bytes(bytes) => {
                         let bytes_literal = bytes.value(db);

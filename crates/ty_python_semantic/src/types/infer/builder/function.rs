@@ -2132,6 +2132,24 @@ impl KnownFunction {
                 overload.set_return_type(Type::module_literal(db, builder.program_file(), module));
             }
 
+            KnownFunction::SingleDispatchRegister => {
+                // The overload for bare decorator usage accepts any callable. A generic alias
+                // must also be usable as a class to supply a dispatch type.
+                let env = builder.program_environment();
+                if let [_, Some(alias @ Type::GenericAlias(_)), ..] = parameter_types
+                    // This check preserves the NumPy exception in the assignability relation.
+                    // TODO: Remove this check when the NumPy assignability exception is removed.
+                    && !alias.is_assignable_to(db, env, KnownClass::Type.to_instance(db, env))
+                    && let Some(diagnostic) = builder
+                        .context
+                        .report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                {
+                    diagnostic.into_diagnostic(
+                        "Generic aliases cannot be registered with `singledispatch`",
+                    );
+                }
+            }
+
             KnownFunction::TotalOrdering => {
                 // When `total_ordering(cls)` is called as a function (not as a decorator),
                 // check that the class defines at least one ordering method.
@@ -2141,9 +2159,7 @@ impl KnownFunction {
 
                 let class = match class_type {
                     Type::ClassLiteral(class) => ClassType::NonGeneric(*class),
-                    Type::SpecializedClass(generic) | Type::GenericAlias(generic) => {
-                        ClassType::Generic(*generic)
-                    }
+                    Type::SpecializedClass(generic) => ClassType::Generic(*generic),
                     _ => return,
                 };
 
@@ -2501,6 +2517,10 @@ fn report_invalid_union_type_elements<'db>(
     ) {
         match ty {
             Type::ClassLiteral(_) => {}
+            // This arm accepts scalar aliases through the NumPy assignability exception.
+            // TODO: Remove this arm when the NumPy assignability exception is removed.
+            Type::GenericAlias(_)
+                if ty.is_assignable_to(db, env, KnownClass::Type.to_instance(db, env)) => {}
             Type::NominalInstance(instance)
                 if instance.has_known_class(db, KnownClass::NoneType) => {}
             Type::SpecialForm(special_form) if special_form.is_valid_isinstance_target() => {}
