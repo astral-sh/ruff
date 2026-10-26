@@ -6,7 +6,7 @@ Released on 2026-10-26.
 
 ### Preview features
 
-- [suspicious] Add `shared-clock-mock` ([#29074](https://github.com/astral-sh/ruff/pull/29074))
+- \[`suspicious`\] Add `shared-clock-mock` ([#29074](https://github.com/astral-sh/ruff/pull/29074))
 
 ### Bug fixes
 
@@ -21,10 +21,6 @@ Released on 2026-10-26.
 ### Documentation
 
 - \[`flake8-bandit`\] Describe what the rule actually checks for `httpx` (`S113`) ([#27936](https://github.com/astral-sh/ruff/pull/27936))
-
-### Other changes
-
-- Bump black from 26.3.1 to 26.10.1 in /scripts/benchmarks ([#29657](https://github.com/astral-sh/ruff/pull/29657))
 
 ### Contributors
 
