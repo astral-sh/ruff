@@ -6,12 +6,12 @@ use ty_python_core::{
     place_table, use_def_map,
 };
 
-use crate::place::known_module_symbol;
+use crate::place::{Place, Provenance, known_module_symbol};
 use crate::types::member::class_member;
 use crate::types::{
-    BindingContext, BoundTypeVarInstance, ClassBase, GenericContext, KnownClass, Parameter,
-    Parameters, SelfTypeVarOrigin, Signature, Specialization, StaticClassLiteral, Type, UnionType,
-    binding_type, definition_expression_type,
+    BindingContext, BoundTypeVarInstance, ClassBase, GenericContext, KnownClass,
+    MemberLookupPolicy, Parameter, Parameters, SelfTypeVarOrigin, Signature, Specialization,
+    StaticClassLiteral, Type, UnionType, binding_type, definition_expression_type,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -226,10 +226,42 @@ fn primary_key_member<'db>(
         }
     }
 
+    // Abstract models do not have an automatic primary key.
+    if is_abstract_model(db, env, class) {
+        return None;
+    }
+
     known_module_symbol(db, env, KnownModule::DjangoDbModelsFields, "AutoField")
         .place
         .ignore_possibly_undefined()?
         .to_instance_approximation(db, env)
+}
+
+fn is_abstract_model<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: StaticClassLiteral<'db>,
+) -> bool {
+    // Subclasses do not inherit `abstract = True`, so only inspect this model's own Meta.
+    let Some(meta) = class_member(db, class.body_scope(db), "Meta")
+        .ignore_possibly_undefined()
+        .and_then(Type::as_class_literal)
+    else {
+        return false;
+    };
+
+    let Place::Defined(abstract_flag) = meta
+        .class_member(db, env, "abstract", MemberLookupPolicy::default())
+        .place
+    else {
+        return false;
+    };
+    // The public type of a mutable boolean attribute is widened to `bool`.
+    // Its binding retains the literal value that Django reads during model construction.
+    let Provenance::SingleDefinition(definition) = abstract_flag.provenance else {
+        return false;
+    };
+    binding_type(db, definition) == Type::bool_literal(true)
 }
 
 /// Find a field constructed with `primary_key=True` in this class body.
