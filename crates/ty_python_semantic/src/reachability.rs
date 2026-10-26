@@ -1421,7 +1421,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         type Id = ScopedNarrowingConstraint;
         enum Action {
             Visit(Id),
-            AnalyzeNonTerminal(Id),
+            VisitBranches(Id),
             FinishNonTerminal { id: Id, branch: Id },
             FinishPredicate(Id),
         }
@@ -1482,26 +1482,32 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         self.project_cache.insert((id, self.base_ty), projected);
                         continue;
                     }
-                    let is_control_flow_gate = matches!(
+                    actions.push(Action::VisitBranches(id));
+                    actions.push(Action::Visit(node.if_uncertain));
+                }
+                Action::VisitBranches(id) => {
+                    let node = self.constraints.get_interior_node(id);
+                    // This path bypasses the predicate. If it admits every value, the
+                    // conditional paths cannot narrow this place.
+                    if self.projected_node(node.if_uncertain)
+                        == ProjectedNarrowingNodeId::ALWAYS_TRUE
+                    {
+                        self.project_cache
+                            .insert((id, self.base_ty), ProjectedNarrowingNodeId::ALWAYS_TRUE);
+                        continue;
+                    }
+                    let predicate = self.predicates[node.atom];
+                    if !matches!(
                         predicate.node,
                         PredicateNode::IsNonTerminalCall(_)
                             | PredicateNode::ContextManagerSuppresses { .. }
                             | PredicateNode::FinallyNormalPathImpossible { .. }
-                    );
-
-                    if is_control_flow_gate {
-                        actions.push(Action::AnalyzeNonTerminal(id));
-                        actions.push(Action::Visit(node.if_uncertain));
-                    } else {
+                    ) {
                         actions.push(Action::FinishPredicate(id));
                         actions.push(Action::Visit(node.if_false));
-                        actions.push(Action::Visit(node.if_uncertain));
                         actions.push(Action::Visit(node.if_true));
+                        continue;
                     }
-                }
-                Action::AnalyzeNonTerminal(id) => {
-                    let node = self.constraints.get_interior_node(id);
-                    let predicate = self.predicates[node.atom];
                     let branch = match analyze_single(db, self.env, &predicate) {
                         Truthiness::AlwaysTrue => node.if_true,
                         Truthiness::AlwaysFalse => node.if_false,
@@ -1528,6 +1534,14 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let if_true = self.projected_node(node.if_true);
                     let if_uncertain = self.projected_node(node.if_uncertain);
                     let if_false = self.projected_node(node.if_false);
+                    // If the bypass already covers both conditional branches, their
+                    // predicate cannot affect the projection.
+                    if [if_true, if_false].into_iter().all(|branch| {
+                        branch == ProjectedNarrowingNodeId::ALWAYS_FALSE || branch == if_uncertain
+                    }) {
+                        self.project_cache.insert((id, self.base_ty), if_uncertain);
+                        continue;
+                    }
                     let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
 
                     let projected = if pos_constraint.is_none() && neg_constraint.is_none() {
