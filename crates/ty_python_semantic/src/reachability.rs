@@ -219,8 +219,9 @@ use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, EvaluationMode,
     FileScopeId, NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, SemanticIndex,
     Truthiness, UseDefMap,
+    ast_node_ref::AstNodeRef,
     definition::{DefinitionKind, DefinitionState},
-    expression::{Expression, ExpressionContext},
+    expression::{Expression, ExpressionContext, ExpressionKind},
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
     place::ScopedPlaceId,
     place_table,
@@ -1925,10 +1926,75 @@ fn context_manager_suppresses<'db>(
     evaluation_mode: EvaluationMode,
 ) -> bool {
     let env = ProgramEnvironment::from_scope(expression.scope(db));
+    if let Some(return_ty) = fixed_context_manager_factory_return(db, &env, expression)
+        && !return_ty.can_suppress_exceptions(db, &env, evaluation_mode)
+    {
+        return false;
+    }
     infer_same_file_expression_type(db, expression, TypeContext::default()).can_suppress_exceptions(
         db,
         &env,
         evaluation_mode,
+    )
+}
+
+/// A single concrete `Callable` return cannot acquire a suppressing exit method from an argument.
+/// Overload selection, type-variable inference, and calls with special typing behavior still
+/// require the type of the whole call.
+fn fixed_context_manager_factory_return<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    expression: Expression<'db>,
+) -> Option<Type<'db>> {
+    // A file selected for diagnostics will validate the whole call anyway. Keep its normal
+    // inference path and reserve the shortcut for a lazily read dependency, whose arguments
+    // may otherwise be pulled in solely to determine whether the caller can reach a binding.
+    if expression.kind(db) != ExpressionKind::ContextManagerFactory
+        || db.should_check_file(expression.file(db))
+    {
+        return None;
+    }
+    let callee = context_manager_factory_callee(db, expression);
+    let Type::Callable(factory) =
+        infer_same_file_expression_type(db, callee, TypeContext::default())
+    else {
+        return None;
+    };
+    if factory.is_regular(db)
+        && let [signature] = factory.signatures(db).overloads.as_slice()
+        && signature.is_non_generic()
+        && matches!(
+            signature.return_ty,
+            Type::NominalInstance(_) | Type::ProtocolInstance(_)
+        )
+        && !signature.return_ty.has_typevar(db, env)
+    {
+        Some(signature.return_ty)
+    } else {
+        None
+    }
+}
+
+/// Materialize the callee only when reachability needs it. Keeping its identity in a query
+/// that depends on syntax lets a recursive suppression query change its answer on later edits
+/// without deleting a callee that is still used by another participant in the cycle.
+#[salsa::tracked(returns(copy), heap_size = get_size2::GetSize::get_heap_size)]
+fn context_manager_factory_callee<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+) -> Expression<'db> {
+    let module = parsed_module(db, expression.python_file(db)).load(db);
+    let call = expression
+        .node_ref(db)
+        .node(&module)
+        .as_call_expr()
+        .expect("a context manager factory expression is a call");
+    Expression::new(
+        db,
+        expression.scope(db),
+        AstNodeRef::new(&module, call.func.as_ref()),
+        None,
+        ExpressionKind::Callee,
     )
 }
 

@@ -1236,6 +1236,128 @@ mod tests {
     }
 
     #[test]
+    fn context_manager_factory_argument_is_only_inferred_when_checking_its_owner()
+    -> anyhow::Result<()> {
+        let root = SystemPathBuf::from("/project");
+        let mut db = TestDb::new(ProjectMetadata::new("test", root.clone()));
+        let project = db.project();
+        project.set_included_paths(&mut db, vec![root.join("main.py")]);
+        db.write_file("/project/dependency.py", "argument = object()")?;
+        db.write_dedented(
+            "/project/model.py",
+            r#"
+            from collections.abc import Callable
+            from contextlib import AbstractContextManager
+
+            def work() -> None: ...
+            class Anchor:
+                field: int
+
+            class Model:
+                def build(self, manager: Callable[[object], AbstractContextManager[None]]):
+                    anchor = Anchor()
+                    from dependency import argument
+                    with manager(argument):
+                        work()
+                    self.value = anchor.field
+            "#,
+        )?;
+        db.write_file(
+            "/project/main.py",
+            "from model import Model\ndef read(model: Model) -> int:\n    return model.value",
+        )?;
+        let dependency = system_path_to_file(&db, "/project/dependency.py")?;
+        let owner = system_path_to_file(&db, "/project/model.py")?;
+        let consumer = system_path_to_file(&db, "/project/main.py")?;
+        assert!(!crate::should_check_file(&db, owner));
+        db.take_salsa_events();
+        assert!(db.check_file(consumer).is_empty());
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run(
+            &db,
+            ty_python_core::semantic_index,
+            db.program_file(dependency),
+            &events,
+        );
+
+        // The owner still type-checks the original call and all of its arguments.
+        project.open_file(&mut db, owner);
+        assert!(db.check_file(owner).is_empty());
+        let events = db.take_salsa_events();
+        ruff_db::testing::assert_function_query_was_run(
+            &db,
+            ty_python_core::semantic_index,
+            db.program_file(dependency),
+            &events,
+        );
+        assert!(project.close_file(&mut db, owner));
+        assert!(!crate::should_check_file(&db, owner));
+        assert!(db.check_file(consumer).is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn context_manager_factory_exit_change_with_recursive_argument() -> anyhow::Result<()> {
+        let root = SystemPathBuf::from("/project");
+        let mut db = TestDb::new(ProjectMetadata::new("test", root.clone()));
+        db.project()
+            .set_included_paths(&mut db, vec![root.join("main.py")]);
+        let factory = r#"
+            from collections.abc import Callable
+            from typing import Literal, Never
+
+            class Manager:
+                def __enter__(self) -> None: ...
+                def __exit__(self, typ: object, value: object, tb: object) -> Literal[True]: ...
+            class Public:
+                make: Callable[[object], Manager]
+            v: Public
+            def stop() -> Never: ...
+            class Anchor:
+                field: int
+        "#;
+        db.write_dedented("/project/factory.pyi", factory)?;
+        db.write_dedented(
+            "/project/model.py",
+            r#"
+            from factory import Anchor, stop, v
+
+            class Model:
+                def build(self) -> None:
+                    anchor = Anchor()
+                    with v.make(self.value):
+                        stop()
+                    self.value = anchor.field
+            "#,
+        )?;
+        db.write_file(
+            "/project/main.py",
+            "from model import Model\ndef read(model: Model):\n    model.value",
+        )?;
+        let consumer = system_path_to_file(&db, "/project/main.py")?;
+        assert!(!crate::should_check_file(
+            &db,
+            system_path_to_file(&db, "/project/model.py")?
+        ));
+        assert!(db.check_file(consumer).is_empty());
+
+        // The manager's argument is the very attribute whose assignment it controls.
+        db.write_dedented(
+            "/project/factory.pyi",
+            &factory.replace("Literal[True]", "Literal[False]"),
+        )?;
+        let diagnostics = db.check_file(consumer);
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+        assert_eq!(
+            diagnostics[0].headline_message(),
+            "Object of type `Model` has no attribute `value`"
+        );
+        db.write_dedented("/project/factory.pyi", factory)?;
+        assert!(db.check_file(consumer).is_empty());
+        Ok(())
+    }
+
+    #[test]
     fn explicit_nested_included_file_is_a_literal_match() {
         let root = SystemPathBuf::from("/project");
         let explicit_file = root.join("build/keep.txt");

@@ -91,6 +91,8 @@ pub enum ExpressionContext {
 pub enum ExpressionKind {
     /// An ordinary value expression, such as `1` in `self.x: int = 1`.
     Normal,
+    /// A call supplying a context manager whose arguments may not be needed for reachability.
+    ContextManagerFactory,
     /// The callable part of a call, such as `list[T]` in `list[T]()`.
     ///
     /// Type variables used to specialize the callable must already be bound. A constructor call

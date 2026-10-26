@@ -2908,6 +2908,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.add_standalone_expression_impl(expression_node, ExpressionKind::Normal, None)
     }
 
+    fn add_context_manager_expression(&mut self, expression: &ast::Expr) -> Expression<'db> {
+        let kind = if expression
+            .as_call_expr()
+            .is_some_and(|call| !call.arguments.is_empty())
+        {
+            ExpressionKind::ContextManagerFactory
+        } else {
+            ExpressionKind::Normal
+        };
+        self.add_standalone_expression_impl(expression, kind, None)
+    }
+
     /// Record an expression that is immediately assigned to a target, and that needs to be a Salsa
     /// ingredient, because we need to infer its type standalone (type narrowing tests, RHS of an
     /// assignment.)
@@ -4697,7 +4709,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         .push_context_manager_context();
 
                     if let Some(optional_vars) = optional_vars.as_deref() {
-                        let context_manager = self.add_standalone_expression(context_expr);
+                        let context_manager = self.add_context_manager_expression(context_expr);
                         self.add_unpackable_assignment(
                             &Unpackable::WithItem {
                                 item,
@@ -4728,7 +4740,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             .expressions_by_node
                             .get(&ExpressionNodeKey::from(context_expr))
                             .copied()
-                            .unwrap_or_else(|| self.add_standalone_expression(context_expr));
+                            .unwrap_or_else(|| self.add_context_manager_expression(context_expr));
                         let predicate = PredicateOrLiteral::Predicate(Predicate {
                             node: PredicateNode::ContextManagerSuppresses {
                                 expression,
