@@ -1484,6 +1484,14 @@ fn benchmark_union_construction(criterion: &mut Criterion) {
         writeln!(split, "U{i} = U{} | Literal[{i}]", i - 1).ok();
     }
     benchmark_micro_case(criterion, "ty_micro[split_literal_union_1024]", &split);
+
+    // Extending a union stored in a tuple should still reuse the prefix, even when the prefix
+    // contains a generic type.
+    let mut stored = String::from("from typing import Literal\nU1 = (list[int] | Literal[1],)\n");
+    for i in 2..=1024 {
+        writeln!(stored, "U{i} = (U{}[0] | Literal[{i}],)", i - 1).ok();
+    }
+    benchmark_micro_case(criterion, "ty_micro[split_stored_union_1024]", &stored);
 }
 
 /// Benchmark for narrowing a large union type through multiple match statements.

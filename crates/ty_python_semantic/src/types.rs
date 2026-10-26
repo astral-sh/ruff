@@ -3798,7 +3798,7 @@ impl<'db> Type<'db> {
         // A marker refers to a particular query's owner binding. Intermediate expressions and
         // markers belonging to other cycle heads cannot supply its defining equation.
         let markers = RefCell::new(FxOrderSet::default());
-        any_over_type_including_alias_arguments(db, env, self, |ty| {
+        visitor::any_over_types_for_binding_projections(db, env, [self], |ty| {
             if let Type::Divergent(divergent) = ty
                 && divergent.binding(db) == Some(definition)
                 && let Some(projection) = divergent.projection(db)
