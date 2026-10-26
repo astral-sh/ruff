@@ -2250,34 +2250,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             return PredicateOrLiteral::Literal(literal);
         }
 
-        // A name or literal needs only its inferred type. Other predicates also depend on
-        // whether their operands can produce a value.
-        let kind = match (context, predicate_node) {
-            (
-                ExpressionContext::Condition,
-                ast::Expr::BoolOp(_)
-                | ast::Expr::If(_)
-                | ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                    op: ast::UnaryOp::Not,
-                    ..
-                }),
-            ) => ExpressionKind::Predicate(ExpressionContext::Condition),
-            (ExpressionContext::Condition, ast::Expr::Compare(compare))
-                if compare.ops.len() > 1 =>
-            {
-                ExpressionKind::Predicate(ExpressionContext::Condition)
-            }
-            _ if predicate_node.is_name_expr() || predicate_node.is_literal_expr() => {
-                ExpressionKind::Normal
-            }
-            _ => ExpressionKind::Predicate(ExpressionContext::Value),
-        };
-        let expression = self.add_standalone_expression_impl(predicate_node, kind, None);
+        let expression = self.add_predicate_expression(predicate_node, context);
         PredicateOrLiteral::Predicate(Predicate {
-            node: PredicateNode::Expression {
-                expression,
-                truthiness_from_type: kind == ExpressionKind::Normal,
-            },
+            node: PredicateNode::Expression(expression),
             is_positive: true,
         })
     }
@@ -2411,7 +2386,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let place_table = self.current_place_table();
 
                 match pred.node {
-                    PredicateNode::Expression { expression, .. } => {
+                    PredicateNode::Expression(expression) => {
                         let expression_node = expression.node_ref(self.db).node(self.module);
                         let mut places = PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .expression(expression_node);
@@ -2843,7 +2818,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // See the comment in TypeInferenceBuilder::infer_match_pattern for more details.
 
         let kind = self.predicate_kind(pattern);
-        let guard = guard.map(|guard| self.add_standalone_expression(guard));
+        let guard =
+            guard.map(|guard| self.add_predicate_expression(guard, ExpressionContext::Condition));
 
         PatternPredicate::new(
             self.db,
@@ -2911,6 +2887,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// standalone (type narrowing tests, RHS of an assignment.)
     fn add_standalone_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
         self.add_standalone_expression_impl(expression_node, ExpressionKind::Normal, None)
+    }
+
+    /// Record a predicate in the context in which Python tests it.
+    fn add_predicate_expression(
+        &mut self,
+        node: &ast::Expr,
+        context: ExpressionContext,
+    ) -> Expression<'db> {
+        self.add_standalone_expression_impl(node, ExpressionKind::Predicate(context), None)
     }
 
     /// Record an expression that is immediately assigned to a target, and that needs to be a Salsa

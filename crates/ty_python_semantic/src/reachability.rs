@@ -204,12 +204,11 @@ use crate::{
         CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, KnownInstanceType,
         NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
         definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
-        expand_type, infer_expression_types, infer_narrowing_constraints,
+        expand_type, infer_narrowing_constraints, infer_predicate_truthiness,
         infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
         sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
-use ruff_db::parsed::parsed_module;
 use ruff_index::{Idx, IndexSlice};
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
@@ -220,7 +219,7 @@ use ty_python_core::{
     FileScopeId, NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, SemanticIndex,
     Truthiness, UseDefMap,
     definition::{DefinitionKind, DefinitionState},
-    expression::{Expression, ExpressionContext},
+    expression::Expression,
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
     place::ScopedPlaceId,
     place_table,
@@ -313,7 +312,7 @@ fn pattern_guard_allows_all_matches(db: &dyn Db, predicate: PatternPredicate<'_>
     // Condition analysis recovers cycles as ambiguous, so an unresolved guard cannot exclude values.
     predicate
         .guard(db)
-        .is_none_or(|guard| match_guard_truthiness(db, guard).is_always_true())
+        .is_none_or(|guard| infer_predicate_truthiness(db, guard).is_always_true())
 }
 
 /// Narrow `subject_ty` by a match pattern.
@@ -595,7 +594,7 @@ const CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL: usize = 16;
 const NARROWING_EVALUATION_CHECKPOINT_INTERVAL: usize = 8;
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
-        PredicateNode::Expression { expression, .. }
+        PredicateNode::Expression(expression)
         | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
         PredicateNode::IsNonTerminalCall(call) => call.callable(db).scope(db),
         PredicateNode::Pattern(pattern) => pattern.scope(db),
@@ -1931,38 +1930,6 @@ fn context_manager_suppresses<'db>(
     )
 }
 
-/// A match pattern stores its guard as a standalone value expression. Evaluate it as a
-/// condition so short-circuiting chooses a branch without testing the result a second time.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial = |_, _, _| Truthiness::Ambiguous,
-    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _| widen_truthiness(cycle, *previous, result),
-    heap_size = get_size2::GetSize::get_heap_size
-)]
-fn match_guard_truthiness<'db>(db: &'db dyn Db, guard: Expression<'db>) -> Truthiness {
-    let env = ProgramEnvironment::from_scope(guard.scope(db));
-    let module = parsed_module(db, guard.python_file(db)).load(db);
-    let inference = infer_expression_types(db, guard, TypeContext::default());
-    let node = guard.node_ref(db).node(&module);
-    inference.expression_truthiness(db, &env, node, ExpressionContext::Condition)
-}
-
-pub(crate) fn widen_truthiness(
-    cycle: &salsa::Cycle,
-    previous: Truthiness,
-    result: Truthiness,
-) -> Truthiness {
-    // A condition can control whether one of its own inputs is reachable. Expression inference
-    // can lose its previous result when it ceases to be a cycle head, so its type widening alone
-    // does not ensure that the condition's truthiness converges. Delay widening here to avoid
-    // retaining imprecise results from the first few iterations.
-    if cycle.iteration() > crate::TAINTED_CYCLES {
-        previous.union(result)
-    } else {
-        result
-    }
-}
-
 /// Evaluate a predicate, returning `Uninhabited` when it cannot produce a boolean outcome.
 ///
 /// Unlike ambiguous truthiness, an uninhabited condition does not make either branch reachable.
@@ -1972,22 +1939,8 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
     match predicate.node {
-        PredicateNode::Expression {
-            expression,
-            truthiness_from_type,
-        } => {
-            let inference = infer_expression_types(db, expression, TypeContext::default());
-            let truthiness = if truthiness_from_type {
-                let ty = inference.expression_type(expression.node_ref(db));
-                if ty.is_equivalent_to(db, env, Type::Never) {
-                    Truthiness::Uninhabited
-                } else {
-                    ty.bool(db, env)
-                }
-            } else {
-                inference.predicate_truthiness()
-            };
-            truthiness.negate_if(!predicate.is_positive)
+        PredicateNode::Expression(expression) => {
+            infer_predicate_truthiness(db, expression).negate_if(!predicate.is_positive)
         }
         PredicateNode::ContextManagerSuppresses {
             expression,
@@ -2419,15 +2372,7 @@ class TargetB:
                 let predicate = use_def
                     .predicates()
                     .iter()
-                    .find(|predicate| {
-                        matches!(
-                            predicate.node,
-                            PredicateNode::Expression {
-                                truthiness_from_type: true,
-                                ..
-                            }
-                        )
-                    })
+                    .find(|predicate| matches!(predicate.node, PredicateNode::Expression(_)))
                     .unwrap();
                 let predicates: Predicates = std::iter::repeat_n(*predicate, DEPTH).collect();
 

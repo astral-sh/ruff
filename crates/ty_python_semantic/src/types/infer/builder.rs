@@ -12916,7 +12916,6 @@ impl<'db> FullExpressionCacheEntry<'db> {
             self.collection_use_constraints.shrink_to_fit();
             self.context.diagnostics.shrink_to_fit();
             Box::new(ExpressionInferenceExtra {
-                predicate_truthiness: None,
                 legacy_aliases: self.legacy_aliases.into_iter().collect(),
                 string_annotations: FrozenSet::from(self.string_annotations),
                 comparison_truthiness: FrozenMap::from(self.comparison_truthiness),
@@ -12931,6 +12930,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
         });
 
         ExpressionInference {
+            predicate_truthiness: Truthiness::Ambiguous,
             expressions: FrozenMap::from(self.expressions),
             extra,
             #[cfg(debug_assertions)]

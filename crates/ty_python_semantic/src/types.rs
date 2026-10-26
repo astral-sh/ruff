@@ -40,7 +40,8 @@ pub use self::diagnostic::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
     InferredDeclaration, TypeContext, infer_complete_scope_types, infer_deferred_types,
     infer_definition_types, infer_expression_type, infer_expression_types,
-    infer_same_file_expression_type, infer_scope_types, is_discarded_dict_key_assignment,
+    infer_predicate_truthiness, infer_same_file_expression_type, infer_scope_types,
+    is_discarded_dict_key_assignment,
 };
 use self::infer::{
     infer_function_default_types, infer_legacy_type_alias, legacy_type_alias_parameters,

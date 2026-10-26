@@ -68,7 +68,7 @@ use crate::{Db, FxIndexSet};
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_core::expression::{Expression, ExpressionContext, ExpressionKind};
+use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::statement::StatementInner;
 use ty_python_core::unpack::Unpack;
@@ -577,20 +577,21 @@ pub(crate) fn infer_expression_types<'db>(
     infer_expression_types_impl(db, InferExpression::new(db, expression, tcx))
 }
 
+/// Read the predicate's outcome from the same inference result as its operand types.
+pub(crate) fn infer_predicate_truthiness<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+) -> Truthiness {
+    infer_expression_types_impl(db, InferExpression::Bare(expression)).predicate_truthiness
+}
+
 #[salsa::tracked(
     returns(ref),
     cycle_initial=expression_cycle_initial,
     cycle_fn=|db, cycle, previous: &ExpressionInference<'db>, inference: ExpressionInference<'db>, input: InferExpression<'db>| {
-        let (expression, tcx) = input.into_inner(db);
+        let (expression, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(expression.scope(db));
-        let mut inference = inference.cycle_normalized(db, &env, previous, cycle);
-        if tcx.annotation.is_none() && let ExpressionKind::Predicate(context) = expression.kind(db) {
-            let module = parsed_module(db, expression.python_file(db)).load(db);
-            // Normalizing the operand types can change whether the expression can complete.
-            let result = inference.expression_truthiness(db, &env, expression.node_ref(db).node(&module), context);
-            inference.set_predicate_truthiness(crate::reachability::widen_truthiness(cycle, previous.predicate_truthiness(), result));
-        }
-        inference
+        inference.cycle_normalized(db, &env, previous, cycle, input)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -625,17 +626,7 @@ pub(super) fn infer_expression_types_impl<'db>(
         &module,
     )
     .finish_expression();
-    if tcx.annotation.is_none()
-        && let ExpressionKind::Predicate(context) = expression.kind(db)
-    {
-        let truthiness = inference.expression_truthiness(
-            db,
-            &env,
-            expression.node_ref(db).node(&module),
-            context,
-        );
-        inference.set_predicate_truthiness(truthiness);
-    }
+    inference.record_predicate_truthiness(db, &env, input);
     inference
 }
 
@@ -2013,6 +2004,9 @@ pub(crate) struct ExpressionInference<'db> {
     /// The types of every expression in this region.
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
+    /// The predicate's possible outcomes in its evaluation context.
+    predicate_truthiness: Truthiness,
+
     extra: Option<Box<ExpressionInferenceExtra<'db>>>,
 
     /// The scope this region is part of.
@@ -2023,9 +2017,6 @@ pub(crate) struct ExpressionInference<'db> {
 /// Extra data that only exists for few inferred expression regions.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ExpressionInferenceExtra<'db> {
-    /// Truthiness of the root predicate. An ambiguous outcome needs no storage.
-    predicate_truthiness: Option<Truthiness>,
-
     /// Aliases whose type-expression diagnostics are needed by this region.
     legacy_aliases: Box<[Definition<'db>]>,
 
@@ -2084,38 +2075,27 @@ struct ExpressionInferenceExtra<'db> {
 }
 
 impl<'db> ExpressionInference<'db> {
-    pub(crate) fn expression_truthiness(
-        &self,
+    /// Reachability always asks for a predicate's truthiness without an expected type.
+    fn record_predicate_truthiness(
+        &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        node: &ast::Expr,
-        context: ExpressionContext,
-    ) -> Truthiness {
-        TruthinessAnalyzer::new(
+        input: InferExpression<'db>,
+    ) {
+        let InferExpression::Bare(expression) = input else {
+            return;
+        };
+        let ExpressionKind::Predicate(context) = expression.kind(db) else {
+            return;
+        };
+        let module = parsed_module(db, expression.python_file(db)).load(db);
+        self.predicate_truthiness = TruthinessAnalyzer::new(
             db,
             env,
             |node| self.expression_type(node),
             |node| self.comparison_truthiness(node),
         )
-        .truthiness(node, context)
-    }
-
-    /// An initial cycle result has no operand types yet, so its predicate is ambiguous.
-    pub(crate) fn predicate_truthiness(&self) -> Truthiness {
-        self.extra
-            .as_deref()
-            .and_then(|extra| extra.predicate_truthiness)
-            .unwrap_or(Truthiness::Ambiguous)
-    }
-
-    fn set_predicate_truthiness(&mut self, truthiness: Truthiness) {
-        if truthiness.is_ambiguous() {
-            if let Some(extra) = &mut self.extra {
-                extra.predicate_truthiness = None;
-            }
-        } else {
-            self.extra.get_or_insert_default().predicate_truthiness = Some(truthiness);
-        }
+        .truthiness(expression.node_ref(db).node(&module), context);
     }
 
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
@@ -2125,6 +2105,7 @@ impl<'db> ExpressionInference<'db> {
                 cycle_recovery: Some(cycle_recovery),
                 ..ExpressionInferenceExtra::default()
             })),
+            predicate_truthiness: Truthiness::Ambiguous,
             expressions: FrozenMap::default(),
             #[cfg(debug_assertions)]
             scope,
@@ -2137,6 +2118,7 @@ impl<'db> ExpressionInference<'db> {
         env: &ProgramEnvironment<'db>,
         previous: &ExpressionInference<'db>,
         cycle: &salsa::Cycle,
+        input: InferExpression<'db>,
     ) -> ExpressionInference<'db> {
         if let Some(extra) = self.extra.as_mut() {
             for (binding, binding_ty) in &mut extra.bindings {
@@ -2160,6 +2142,15 @@ impl<'db> ExpressionInference<'db> {
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous.expression_type(*expr);
             *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
+        }
+
+        // Normalizing the operands can change whether the predicate completes. Once the first
+        // provisional results have cleared, retain earlier outcomes so the predicate converges.
+        self.record_predicate_truthiness(db, env, input);
+        if cycle.iteration() > crate::TAINTED_CYCLES {
+            self.predicate_truthiness = previous
+                .predicate_truthiness
+                .union(self.predicate_truthiness);
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES

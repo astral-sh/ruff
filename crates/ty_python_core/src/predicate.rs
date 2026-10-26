@@ -161,12 +161,7 @@ impl<'ast> StatementCall<'ast> {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PredicateNode<'db> {
     /// The truthiness of an expression in its evaluation context.
-    Expression {
-        expression: Expression<'db>,
-        /// Names and literals need only their inferred type. Other predicates record their
-        /// truthiness during expression inference.
-        truthiness_from_type: bool,
-    },
+    Expression(Expression<'db>),
     /// Whether a context manager's exit return type allows an exception to be suppressed.
     ///
     /// Resolved during type inference because the context manager's type is unavailable during
