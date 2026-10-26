@@ -1298,6 +1298,50 @@ def overwritten_target(value: object):
         reveal_type(value)  # revealed: TypeGuard[list[int] @ value] & ~AlwaysTruthy
 ```
 
+## Negative TypeIs narrowing with recursive unions
+
+Excluding a recursive union still exposes its literal exclusions. Removing `True` from `bool` leaves
+a value whose truthiness is known.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal, assert_type
+from typing_extensions import TypeIs
+
+type RecursiveBool = Literal[True] | list[RecursiveBool]
+
+def is_recursive_bool(value: object) -> TypeIs[RecursiveBool]:
+    raise NotImplementedError
+
+def f(value: bool):
+    if not is_recursive_bool(value):
+        assert_type(bool(value), Literal[False])
+```
+
+Excluding an enum member also narrows the remaining members' `name` and `value` attributes.
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+type RecursiveColor = Literal[Color.RED] | list[RecursiveColor]
+
+def is_recursive_color(value: object) -> TypeIs[RecursiveColor]:
+    raise NotImplementedError
+
+def f(value: Color):
+    if not is_recursive_color(value):
+        assert_type(value.name, Literal["BLUE"])
+        assert_type(value.value, Literal[2])
+```
+
 ## Recursive TypeIs targets
 
 An unresolved recursive `TypeIs` target does not make the negative branch unreachable. We retain the

@@ -3545,6 +3545,95 @@ def match_tuple_expression_guard_rebinding(
             reveal_type(b)  # revealed: TupleSubjectB1
 ```
 
+## Captures of the subject across cases
+
+### Narrowing guards
+
+Capturing the subject under its original name keeps its value. If the guard fails, later patterns
+can still narrow that capture.
+
+```py
+def narrow_after_capture(value: int | str | bytes) -> None:
+    match value:
+        case value if isinstance(value, int):
+            reveal_type(value)  # revealed: int
+        case str():
+            reveal_type(value)  # revealed: str
+        case bytes():
+            reveal_type(value)  # revealed: bytes
+```
+
+### Constrained `as` patterns
+
+If the first pattern matches but its guard fails, the captured integer cannot reach the string case.
+
+```py
+def narrow_after_as_capture(value: int | str, flag: bool) -> None:
+    match value:
+        case int() as value if flag:
+            pass
+        case str():
+            reveal_type(value)  # revealed: str
+```
+
+### Or pattern alternatives
+
+Each alternative can capture the whole subject under its original name.
+
+```py
+def narrow_after_or_capture(value: int | str | bytes, flag: bool) -> None:
+    match value:
+        case (int() as value) | (str() as value) if flag:
+            pass
+        case str():
+            reveal_type(value)  # revealed: str
+```
+
+A capture can also refer to the whole subject in one alternative and an extracted element in
+another. Matching the original tuple in a later case does not make its captured integer unreachable.
+
+```py
+def mixed_or_captures(subject: int | tuple[int], flag: bool) -> None:
+    value = subject
+    match value:
+        case (int() as value) | [value] if flag:
+            pass
+        case tuple():
+            reveal_type(value)  # revealed: int
+```
+
+### Reassignment in guards
+
+A guard can assign a different value to the captured name. Later cases still match the saved
+subject, so their patterns do not narrow that assignment.
+
+```py
+def reassign_capture(value: int | str, flag: bool) -> None:
+    match value:
+        case value if (value := "changed") and flag:
+            pass
+        case int():
+            reveal_type(value)  # revealed: Literal["changed"]
+```
+
+### Member subjects
+
+Capturing an attribute under the name of its owner replaces the owner with the attribute value.
+Narrowing the saved attribute does not narrow this new binding of the owner's name.
+
+```py
+class Holder:
+    attr: int | str
+
+def capture_member(holder: Holder) -> None:
+    value = holder
+    match value.attr:
+        case value if False:
+            pass
+        case int():
+            reveal_type(value)  # revealed: int | str
+```
+
 ## Named-expression subjects
 
 A named expression creates a new binding for the subject. The successful pattern narrows that
@@ -3566,6 +3655,17 @@ def match_named_expression_subject_capture(value: tuple[int]) -> None:
     match subject := value:
         case [subject]:
             # The capture shadows the named-expression binding and receives the element type.
+            reveal_type(subject)  # revealed: int
+```
+
+Capturing the entire subject under its new name preserves narrowing in later cases.
+
+```py
+def match_named_expression_guarded_capture(value: int | str) -> None:
+    match subject := value:
+        case subject if False:
+            pass
+        case int():
             reveal_type(subject)  # revealed: int
 ```
 
