@@ -2272,25 +2272,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             _ => ExpressionKind::Predicate(ExpressionContext::Value),
         };
-        // Within a loop the predicate can depend on bindings from an earlier iteration:
-        // let its truthiness and operand types converge in the same inference query.
-        // Elsewhere a dedicated scalar query is cheaper to read on repeated graph walks.
-        let record = self.in_loop_context() && matches!(kind, ExpressionKind::Predicate(_));
-        let expression = self.add_standalone_expression_impl(
-            predicate_node,
-            if record { kind } else { ExpressionKind::Normal },
-            None,
-        );
+        let expression = self.add_standalone_expression_impl(predicate_node, kind, None);
         PredicateOrLiteral::Predicate(Predicate {
-            node: if record {
-                PredicateNode::RecordedTruthiness(expression)
-            } else if kind == ExpressionKind::Predicate(ExpressionContext::Condition) {
-                PredicateNode::Condition(expression)
-            } else {
-                PredicateNode::Expression {
-                    expression,
-                    truthiness_from_type: kind == ExpressionKind::Normal,
-                }
+            node: PredicateNode::Expression {
+                expression,
+                truthiness_from_type: kind == ExpressionKind::Normal,
             },
             is_positive: true,
         })
@@ -2425,9 +2411,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let place_table = self.current_place_table();
 
                 match pred.node {
-                    PredicateNode::Expression { expression, .. }
-                    | PredicateNode::Condition(expression)
-                    | PredicateNode::RecordedTruthiness(expression) => {
+                    PredicateNode::Expression { expression, .. } => {
                         let expression_node = expression.node_ref(self.db).node(self.module);
                         let mut places = PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .expression(expression_node);

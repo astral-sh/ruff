@@ -220,7 +220,7 @@ use ty_python_core::{
     FileScopeId, NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, SemanticIndex,
     Truthiness, UseDefMap,
     definition::{DefinitionKind, DefinitionState},
-    expression::{Expression, ExpressionContext, ExpressionKind},
+    expression::{Expression, ExpressionContext},
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
     place::ScopedPlaceId,
     place_table,
@@ -311,9 +311,9 @@ fn type_narrowed_after_pattern<'db>(
 /// Whether the guard cannot reject a value matched by the pattern.
 fn pattern_guard_allows_all_matches(db: &dyn Db, predicate: PatternPredicate<'_>) -> bool {
     // Condition analysis recovers cycles as ambiguous, so an unresolved guard cannot exclude values.
-    predicate.guard(db).is_none_or(|guard| {
-        predicate_truthiness(db, guard, ExpressionContext::Condition).is_always_true()
-    })
+    predicate
+        .guard(db)
+        .is_none_or(|guard| match_guard_truthiness(db, guard).is_always_true())
 }
 
 /// Narrow `subject_ty` by a match pattern.
@@ -596,8 +596,6 @@ const NARROWING_EVALUATION_CHECKPOINT_INTERVAL: usize = 8;
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
         PredicateNode::Expression { expression, .. }
-        | PredicateNode::Condition(expression)
-        | PredicateNode::RecordedTruthiness(expression)
         | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
         PredicateNode::IsNonTerminalCall(call) => call.callable(db).scope(db),
         PredicateNode::Pattern(pattern) => pattern.scope(db),
@@ -1933,45 +1931,20 @@ fn context_manager_suppresses<'db>(
     )
 }
 
-/// Test an expression's result object, accounting for operands that cannot complete.
-/// Separate value and condition queries use the expression directly as their Salsa key, avoiding
-/// an additional interner for pairs of expressions and evaluation contexts.
+/// A match pattern stores its guard as a standalone value expression. Evaluate it as a
+/// condition so short-circuiting chooses a branch without testing the result a second time.
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _| Truthiness::Ambiguous,
     cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _| widen_truthiness(cycle, *previous, result),
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn tracked_value_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
-    expression_truthiness(db, expression, ExpressionContext::Value)
-}
-
-/// Follow short-circuit conditions without testing their result objects again.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial = |_, _, _| Truthiness::Ambiguous,
-    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _| widen_truthiness(cycle, *previous, result),
-    heap_size = get_size2::GetSize::get_heap_size
-)]
-fn tracked_condition_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
-    expression_truthiness(db, expression, ExpressionContext::Condition)
-}
-
-/// Reuse the truthiness computed from the same operands as the predicate's type. Other
-/// consumers, such as a match guard, can request a different evaluation context.
-fn predicate_truthiness<'db>(
-    db: &'db dyn Db,
-    expression: Expression<'db>,
-    context: ExpressionContext,
-) -> Truthiness {
-    if expression.kind(db) == ExpressionKind::Predicate(context) {
-        infer_expression_types(db, expression, TypeContext::default()).predicate_truthiness()
-    } else {
-        match context {
-            ExpressionContext::Value => tracked_value_truthiness(db, expression),
-            ExpressionContext::Condition => tracked_condition_truthiness(db, expression),
-        }
-    }
+fn match_guard_truthiness<'db>(db: &'db dyn Db, guard: Expression<'db>) -> Truthiness {
+    let env = ProgramEnvironment::from_scope(guard.scope(db));
+    let module = parsed_module(db, guard.python_file(db)).load(db);
+    let inference = infer_expression_types(db, guard, TypeContext::default());
+    let node = guard.node_ref(db).node(&module);
+    inference.expression_truthiness(db, &env, node, ExpressionContext::Condition)
 }
 
 pub(crate) fn widen_truthiness(
@@ -1990,19 +1963,6 @@ pub(crate) fn widen_truthiness(
     }
 }
 
-/// Compute truthiness for expressions whose inference did not record the requested context.
-fn expression_truthiness<'db>(
-    db: &'db dyn Db,
-    expression: Expression<'db>,
-    context: ExpressionContext,
-) -> Truthiness {
-    let env = ProgramEnvironment::from_scope(expression.scope(db));
-    let module = parsed_module(db, expression.python_file(db)).load(db);
-    let inference = infer_expression_types(db, expression, TypeContext::default());
-    let node = expression.node_ref(db).node(&module);
-    inference.expression_truthiness(db, &env, node, context)
-}
-
 /// Evaluate a predicate, returning `Uninhabited` when it cannot produce a boolean outcome.
 ///
 /// Unlike ambiguous truthiness, an uninhabited condition does not make either branch reachable.
@@ -2013,29 +1973,21 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
 
     match predicate.node {
         PredicateNode::Expression {
-            expression: test_expr,
-            truthiness_from_type: true,
+            expression,
+            truthiness_from_type,
         } => {
-            let inference = infer_expression_types(db, test_expr, TypeContext::default());
-            let ty = inference.expression_type(test_expr.node_ref(db));
-            if ty.is_equivalent_to(db, env, Type::Never) {
-                Truthiness::Uninhabited
+            let inference = infer_expression_types(db, expression, TypeContext::default());
+            let truthiness = if truthiness_from_type {
+                let ty = inference.expression_type(expression.node_ref(db));
+                if ty.is_equivalent_to(db, env, Type::Never) {
+                    Truthiness::Uninhabited
+                } else {
+                    ty.bool(db, env)
+                }
             } else {
-                ty.bool(db, env).negate_if(!predicate.is_positive)
-            }
-        }
-        PredicateNode::Expression {
-            expression: test_expr,
-            truthiness_from_type: false,
-        } => tracked_value_truthiness(db, test_expr).negate_if(!predicate.is_positive),
-        PredicateNode::Condition(test_expr) => {
-            tracked_condition_truthiness(db, test_expr).negate_if(!predicate.is_positive)
-        }
-        PredicateNode::RecordedTruthiness(test_expr) => {
-            debug_assert!(matches!(test_expr.kind(db), ExpressionKind::Predicate(_)));
-            infer_expression_types(db, test_expr, TypeContext::default())
-                .predicate_truthiness()
-                .negate_if(!predicate.is_positive)
+                inference.predicate_truthiness()
+            };
+            truthiness.negate_if(!predicate.is_positive)
         }
         PredicateNode::ContextManagerSuppresses {
             expression,
