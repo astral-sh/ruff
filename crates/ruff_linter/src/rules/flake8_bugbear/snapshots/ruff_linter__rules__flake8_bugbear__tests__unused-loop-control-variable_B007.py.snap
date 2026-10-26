@@ -184,3 +184,31 @@ B007 Loop control variable `line_` not used within loop body
    |     ^^^^^
 99 |     fp.readline()
    |
+
+B007 [*] Loop control variable `comprehension_value` not used within loop body
+   --> B007.py:110:5
+    |
+109 | # Regression test for #14113: a comprehension's target does not use the outer loop variable.
+110 | for comprehension_value in ls:  # B007
+    |     ^^^^^^^^^^^^^^^^^^^
+111 |     print([comprehension_value for comprehension_value in otherls])
+    |
+help: Rename unused `comprehension_value` to `_comprehension_value`
+    |
+109 | # Regression test for #14113: a comprehension's target does not use the outer loop variable.
+    - for comprehension_value in ls:  # B007
+110 + for _comprehension_value in ls:  # B007
+111 |     print([comprehension_value for comprehension_value in otherls])
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B007 Loop control variable `nested_loop_value` not used within loop body
+   --> B007.py:115:5
+    |
+114 | # A nested loop target shadows the outer loop variable.
+115 | for nested_loop_value in ls:  # B007
+    |     ^^^^^^^^^^^^^^^^^
+116 |     for nested_loop_value in otherls:
+117 |         print(nested_loop_value)
+    |
+help: Rename unused `nested_loop_value` to `_nested_loop_value`
