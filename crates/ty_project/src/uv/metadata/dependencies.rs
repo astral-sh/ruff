@@ -9,6 +9,7 @@ use thiserror::Error;
 use ty_module_resolver::ModuleName;
 use ty_python_semantic::dependency::{
     DependencyDistribution, DependencyMetadata, DependencyProject, DependencyProjectKind,
+    UNUSED_DEPENDENCY,
 };
 use ty_python_semantic::lint::LintId;
 use ty_python_semantic::types::MISSING_DIRECT_DEPENDENCY;
@@ -319,10 +320,12 @@ impl DependencyMetadataError {
     pub(crate) fn to_diagnostic(
         &self,
         kind: DependencyProjectKind,
-        is_lint_enabled: impl FnOnce(LintId) -> bool,
+        is_lint_enabled: impl Fn(LintId) -> bool,
     ) -> Option<Diagnostic> {
         if matches!(self, Self::MissingPackageInventory)
             && !is_lint_enabled(LintId::of(&MISSING_DIRECT_DEPENDENCY))
+            && (kind != DependencyProjectKind::Project
+                || !is_lint_enabled(LintId::of(&UNUSED_DEPENDENCY)))
         {
             return None;
         }

@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 use anyhow::Context;
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{DbWithTestSystem, System, SystemPath, TestSystem};
+use ruff_python_ast::PythonVersion;
 use salsa::Setter;
 use serde_json::{Map, Value, json};
 
@@ -13,9 +14,11 @@ use crate::db::testing::TestDb;
 
 use super::{UvMetadata, UvWorkspace, script_environment};
 
+pub const PYTHON_VERSION: PythonVersion = PythonVersion::PY313;
+
 /// Create an environment and uv metadata for the given installed distributions.
 /// A module with children becomes a namespace package; all other modules get an empty `.py` file.
-pub(super) fn dependency_fixture<S: AsRef<str>>(
+pub fn dependency_fixture<S: AsRef<str>>(
     system: &TestSystem,
     root: &SystemPath,
     packages: impl IntoIterator<Item = (S, Vec<S>)>,
@@ -83,7 +86,7 @@ pub(super) fn dependency_fixture<S: AsRef<str>>(
 }
 
 /// Use the fixture's direct dependencies as the declarations of a standalone script.
-pub(super) fn as_script(input: &mut Value, path: &SystemPath) {
+pub fn as_script(input: &mut Value, path: &SystemPath) {
     input["members"] = json!([]);
     input["script"] = json!({"id": "app", "path": path.as_str()});
     let dependencies = input["resolution"]["app"]["dependencies"].take();
@@ -91,7 +94,7 @@ pub(super) fn as_script(input: &mut Value, path: &SystemPath) {
 }
 
 /// Parse simulated uv command output without invoking uv.
-fn workspace(input: &Value, system: &dyn System) -> anyhow::Result<UvWorkspace> {
+pub fn workspace(input: &Value, system: &dyn System) -> anyhow::Result<UvWorkspace> {
     Ok(UvWorkspace {
         metadata: Some(UvMetadata::from_metadata(
             &serde_json::to_vec(input)?,
@@ -102,7 +105,7 @@ fn workspace(input: &Value, system: &dyn System) -> anyhow::Result<UvWorkspace> 
 }
 
 /// Apply a simulated sync to a running test database.
-pub(super) fn apply_metadata(db: &mut TestDb, input: &Value) -> anyhow::Result<()> {
+pub fn apply_metadata(db: &mut TestDb, input: &Value) -> anyhow::Result<()> {
     let workspace = workspace(input, db.test_system())?;
     if let Some(path) = input.pointer("/script/path").and_then(Value::as_str) {
         let file = system_path_to_file(db, path)?;

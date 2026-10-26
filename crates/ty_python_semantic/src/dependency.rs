@@ -9,11 +9,21 @@ use ty_module_resolver::{
 };
 use ty_python_core::ProgramFile;
 
-use crate::Db;
+use crate::lint::{Level, LintStatus};
+use crate::{Db, declare_lint};
 
 mod imports;
 
 pub use imports::{ImportedModule, ImportedModules, imported_modules};
+
+declare_lint! {
+    #[doc = include_str!("../resources/lint_docs/unused-dependency.md")]
+    pub static UNUSED_DEPENDENCY = {
+        summary: "detects declared dependencies that are not imported",
+        status: LintStatus::preview("0.0.92"),
+        default_level: Level::Ignore,
+    }
+}
 
 /// Returns the missing dependency for this import, if one can be identified.
 ///
@@ -150,9 +160,12 @@ pub struct DependencyMetadata {
 }
 
 impl DependencyMetadata {
-    /// Find a script's declarations or the nearest containing project's declarations.
     fn project_for_file(&self, db: &dyn Db, file: ProgramFile<'_>) -> Option<&DependencyProject> {
-        let path = file.file(db).path(db).as_system_path()?;
+        self.project_for_path(file.file(db).path(db).as_system_path()?)
+    }
+
+    /// Find a script's declarations or the nearest containing project's declarations.
+    pub fn project_for_path(&self, path: &SystemPath) -> Option<&DependencyProject> {
         self.projects
             .iter()
             .filter(|project| match project.kind {

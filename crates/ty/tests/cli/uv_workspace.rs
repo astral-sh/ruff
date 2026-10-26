@@ -250,6 +250,25 @@ fn indirect_dependencies_use_uv_module_ownership() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "test-uv")]
+#[test]
+fn unused_dependency_in_a_workspace_member() -> anyhow::Result<()> {
+    let case = dependency_workspace_case()?;
+    case.write_files([("packages/member/member.py", "")])?;
+    let mut command = uv_sync_command(&case, None)?;
+    command.args(["packages/member", "--error", "unused-dependency"]);
+    assert_cmd_snapshot!(command, @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    packages/member/pyproject.toml: error[unused-dependency] Dependency `direct-dependency` is declared but never imported
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
 /// Dependency checks reflect changed declarations even before the environment is synchronized
 /// again. A transitive dependency can become direct without changing the installed packages.
 #[cfg(feature = "test-uv")]
