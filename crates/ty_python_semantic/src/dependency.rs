@@ -6,11 +6,14 @@ use char_str::CharStr;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ty_module_resolver::{
     ImportingFile, Module, ModuleName, editable_search_paths, file_to_module,
-    resolve_real_shadowable_module,
 };
 use ty_python_core::ProgramFile;
 
 use crate::Db;
+
+mod imports;
+
+pub use imports::{ImportedModule, ImportedModules, imported_modules};
 
 /// Returns the missing dependency for this import, if one can be identified.
 ///
@@ -219,26 +222,48 @@ impl DependencyMetadata {
         importing_file: ProgramFile<'db>,
         imported_module: Module<'db>,
     ) -> Option<&str> {
-        let runtime_module = resolve_real_shadowable_module(
+        let import = ImportedModule::resolve(
             db,
             ImportingFile::File(
                 importing_file.file(db),
                 importing_file.resolver_environment(db),
             ),
             imported_module.name(db),
-        )
-        .unwrap_or(imported_module);
-        self.owner(db, runtime_module)
-    }
-
-    fn owner<'db>(&self, db: &'db dyn Db, module: Module<'db>) -> Option<&str> {
+            Some(imported_module),
+        )?;
         // A namespace can also contain local modules that the package manager doesn't know about.
         // Only attribute concrete modules; inference checks the children of `from ns import x`.
-        let search_path = module.search_path(db)?;
+        import.target.search_path(db)?;
+        match self.import_owners(db, importing_file, import.target) {
+            [owner] => Some(owner.as_str()),
+            _ => None,
+        }
+    }
+
+    /// The distributions that could own a resolved runtime module. A namespace can have several.
+    pub fn import_owners<'db>(
+        &self,
+        db: &'db dyn Db,
+        importing_file: ProgramFile<'db>,
+        module: Module<'db>,
+    ) -> &[CharStr] {
+        let Some(search_path) = module.search_path(db) else {
+            let importing_file = ImportingFile::File(
+                importing_file.file(db),
+                importing_file.resolver_environment(db),
+            );
+            let nearest_parent = imports::concrete_parents(db, importing_file, module.name(db))
+                .next()
+                .map(|(_, path)| path);
+            if !imports::can_import_installed_child(nearest_parent) {
+                return &[];
+            }
+            return self.module_owners_for_name(module.name(db));
+        };
         if search_path.is_standard_library() {
             // ty bundles typing_extensions stubs, but the runtime module is third-party.
             if module.name(db).first_component() != "typing_extensions" {
-                return None;
+                return &[];
             }
         } else if !search_path.is_site_packages() {
             if let Some(path) = module
@@ -246,37 +271,36 @@ impl DependencyMetadata {
                 .and_then(|file| file.path(db).as_system_path())
                 && let Some(owner) = self.editable_owner(path)
             {
-                return Some(owner);
+                return std::slice::from_ref(owner);
             }
 
             // A local module can shadow an installed distribution with the same import name.
             // Its name alone is not evidence that the import uses that distribution.
             if !search_path.is_editable() {
-                return None;
+                return &[];
             }
 
             // A wheel can own another child of the same namespace. Without an editable source
             // root, only an entry for this exact module can identify its distribution.
-            return self.module_owner([module.name(db).clone()]);
+            return self
+                .module_owners
+                .get(module.name(db))
+                .map_or(&[], Box::as_ref);
         }
 
-        self.module_owner(module.name(db).ancestors())
+        self.module_owners_for_name(module.name(db))
     }
 
-    fn module_owner(&self, names: impl IntoIterator<Item = ModuleName>) -> Option<&str> {
-        let owners = names
-            .into_iter()
-            .find_map(|name| self.module_owners.get(&name))?;
-
-        // In particular, importing a namespace shared by several distributions doesn't establish
-        // which of them is required. A more specific submodule may have an unambiguous owner.
-        match owners.as_ref() {
-            [owner] => Some(owner.as_str()),
-            _ => None,
-        }
+    /// For unresolved names, uv can still identify an installed provider (e.g., a native extension).
+    /// For resolved modules, use [`Self::import_owners`] so local modules can shadow installed ones.
+    pub fn module_owners_for_name(&self, module: &ModuleName) -> &[CharStr] {
+        module
+            .ancestors()
+            .find_map(|name| self.module_owners.get(&name))
+            .map_or(&[], Box::as_ref)
     }
 
-    fn editable_owner(&self, path: &SystemPath) -> Option<&str> {
+    fn editable_owner(&self, path: &SystemPath) -> Option<&CharStr> {
         let mut owner = None;
         let mut longest_root = 0;
 
@@ -291,7 +315,7 @@ impl DependencyMetadata {
             match root.as_str().len().cmp(&longest_root) {
                 std::cmp::Ordering::Greater => {
                     longest_root = root.as_str().len();
-                    owner = Some(id.as_str());
+                    owner = Some(id);
                 }
                 std::cmp::Ordering::Equal => owner = None,
                 std::cmp::Ordering::Less => {}
@@ -312,7 +336,7 @@ impl DependencyMetadata {
         };
 
         if let Some(module) = file_to_module(db, file.resolver_file(db))
-            && self.module_owner(module.name(db).ancestors()) == Some(id.as_str())
+            && self.module_owners_for_name(module.name(db)) == std::slice::from_ref(id)
         {
             return true;
         }
