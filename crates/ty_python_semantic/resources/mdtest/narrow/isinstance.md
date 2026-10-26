@@ -285,6 +285,20 @@ def _(x: int | str | bytes | memoryview | range):
         reveal_type(x)  # revealed: range
 ```
 
+A class object that may be `Foo` or one of its subclasses can appear in a `classinfo` union without
+an invalid-argument diagnostic:
+
+```py
+class Foo: ...
+
+def check_class_objects(value: object, cls: type[Foo], choices: type[Foo] | type[str]):
+    if isinstance(value, cls | int):  # no diagnostic
+        reveal_type(value)  # revealed: Foo | int
+    issubclass(Foo, cls | int)  # no diagnostic
+    isinstance(value, (str, cls | int))  # no diagnostic
+    isinstance(value, choices | int)  # no diagnostic
+```
+
 Although `isinstance()` usually only works if all elements in the `UnionType` are class objects, at
 runtime a special exception is made for `None` so that `isinstance(x, int | None)` can work:
 
@@ -298,9 +312,9 @@ def _(x: int | str | bytes | range | None):
 
 ## `classinfo` is an invalid PEP-604 union of types
 
-Except for the `None` special case mentioned above, narrowing can only take place if all elements in
-the PEP-604 union are class literals. If any elements are generic aliases or other types, the
-`isinstance()` call may fail at runtime, so no narrowing can take place:
+Except for the `None` special case mentioned above, ty narrows only if all elements in the PEP-604
+union are valid `isinstance()` targets. If any elements are generic aliases or other invalid
+targets, the `isinstance()` call may fail at runtime, and ty does not narrow:
 
 ```toml
 [environment]

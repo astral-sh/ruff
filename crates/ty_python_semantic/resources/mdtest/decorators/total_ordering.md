@@ -532,6 +532,152 @@ class HasOrderingMethod:
 # No error (class defines `__lt__`).
 ValidOrderedClass = total_ordering(HasOrderingMethod)
 reveal_type(ValidOrderedClass)  # revealed: type[HasOrderingMethod]
+
+total_ordering(1)  # error: [invalid-argument-type]
+```
+
+## Function calls with `type[...]` arguments
+
+An argument annotated as `type[Unordered]` may be `Unordered` itself, so the call may raise
+`ValueError`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import total_ordering
+from typing import TypeVar
+
+class Unordered: ...
+
+class Ordered:
+    def __lt__(self, other: object) -> bool:
+        return True
+
+def check(cls: type[Unordered]):
+    total_ordering(cls)  # snapshot: invalid-total-ordering
+```
+
+```snapshot
+error[invalid-total-ordering]: `functools.total_ordering` requires at least one ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`) to be defined
+  --> src/mdtest_snippet.py:11:5
+   |
+11 |     total_ordering(cls)  # snapshot: invalid-total-ordering
+   |     ^^^^^^^^^^^^^^^^^^^ `Unordered` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`
+info: The function may raise `ValueError` at runtime
+```
+
+```py
+def check_union(cls: type[Unordered] | type[Ordered]):
+    total_ordering(cls)  # error: [invalid-total-ordering]
+
+T = TypeVar("T", bound=Unordered)
+
+def check_legacy_bounded(cls: type[T]):
+    total_ordering(cls)  # error: [invalid-total-ordering]
+
+def check_bounded[T: Unordered](cls: type[T]):
+    total_ordering(cls)  # error: [invalid-total-ordering]
+
+def check_ordered(cls: type[Ordered]):
+    total_ordering(cls)  # no diagnostic
+
+class AlsoOrdered:
+    def __gt__(self, other: object) -> bool:
+        return True
+
+def check_valid_union(flag: bool):
+    total_ordering(Ordered if flag else AlsoOrdered)  # no diagnostic
+
+Constrained = TypeVar("Constrained", Ordered, AlsoOrdered)
+
+def check_constrained(cls: type[Constrained]):
+    total_ordering(cls)  # no diagnostic
+
+PossiblyUnordered = TypeVar("PossiblyUnordered", Ordered, Unordered)
+
+def check_partly_ordered(cls: type[PossiblyUnordered]):
+    total_ordering(cls)  # error: [invalid-total-ordering] "`Unordered` does not define"
+```
+
+When only one possible argument lacks an ordering method, the call may raise `ValueError`:
+
+```py
+def check_union_literals(flag: bool):
+    total_ordering(Unordered if flag else Ordered)  # snapshot: invalid-total-ordering
+```
+
+```snapshot
+error[invalid-total-ordering]: `functools.total_ordering` requires at least one ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`) to be defined
+  --> src/mdtest_snippet.py:43:5
+   |
+43 |     total_ordering(Unordered if flag else Ordered)  # snapshot: invalid-total-ordering
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Unordered` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`
+info: The function may raise `ValueError` at runtime
+```
+
+Both possible arguments lack ordering methods, so the call raises `ValueError` whichever one is
+chosen:
+
+```py
+class OtherUnordered: ...
+
+def check_invalid_union(flag: bool):
+    total_ordering(Unordered if flag else OtherUnordered)  # snapshot: invalid-total-ordering
+```
+
+```snapshot
+error[invalid-total-ordering]: `functools.total_ordering` requires at least one ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`) to be defined
+  --> src/mdtest_snippet.py:47:5
+   |
+47 |     total_ordering(Unordered if flag else OtherUnordered)  # snapshot: invalid-total-ordering
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Unordered` and `OtherUnordered` do not define `__lt__`, `__le__`, `__gt__`, or `__ge__`
+info: The function will raise `ValueError` at runtime
+```
+
+A subclass of `OtherUnordered` may define an ordering method, so the call may succeed when `flag` is
+false:
+
+```py
+def check_union_with_subclass(flag: bool, cls: type[OtherUnordered]):
+    total_ordering(Unordered if flag else cls)  # snapshot: invalid-total-ordering
+```
+
+```snapshot
+error[invalid-total-ordering]: `functools.total_ordering` requires at least one ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`) to be defined
+  --> src/mdtest_snippet.py:49:5
+   |
+49 |     total_ordering(Unordered if flag else cls)  # snapshot: invalid-total-ordering
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Unordered` and `OtherUnordered` do not define `__lt__`, `__le__`, `__gt__`, or `__ge__`
+info: The function may raise `ValueError` at runtime
+```
+
+The same check applies when the argument has a type variable bounded by a class-object type:
+
+```py
+def check_class_bound[T: type[Unordered]](cls: T):
+    total_ordering(cls)  # snapshot: invalid-total-ordering
+```
+
+```snapshot
+error[invalid-total-ordering]: `functools.total_ordering` requires at least one ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`) to be defined
+  --> src/mdtest_snippet.py:51:5
+   |
+51 |     total_ordering(cls)  # snapshot: invalid-total-ordering
+   |     ^^^^^^^^^^^^^^^^^^^ `Unordered` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`
+info: The function may raise `ValueError` at runtime
+```
+
+```py
+ClassBound = TypeVar("ClassBound", bound=type[Unordered])
+
+def check_legacy_class_bound(cls: ClassBound):
+    total_ordering(cls)  # error: [invalid-total-ordering]
+
+def check_ordered_class_bound[T: type[Ordered]](cls: T):
+    total_ordering(cls)  # no diagnostic
 ```
 
 ## Function call form with `type()`
