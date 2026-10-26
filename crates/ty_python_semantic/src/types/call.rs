@@ -4,9 +4,12 @@ use crate::Db;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
 use crate::types::function::OverloadLiteral;
+use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{MemberLookupPolicy, PropertyInstanceType};
 use crate::{Program, ProgramEnvironment};
 use ruff_python_ast as ast;
+use ty_python_core::scope::ScopeKind;
+use ty_python_core::semantic_index;
 
 mod ambiguous;
 mod arguments;
@@ -15,6 +18,45 @@ pub(super) use arguments::{Argument, CallArguments};
 pub(super) use bind::{
     Binding, Bindings, CallDiagnosticOverride, CallableBinding, MatchedArgument,
 };
+
+/// Infers a call's return type when its arguments cannot affect the result. The caller
+/// must still check the full call to validate its arguments.
+pub(super) fn infer_call_return_type_without_arguments<'db>(
+    context: &InferContext<'db, '_>,
+    call: &ast::ExprCall,
+) -> Option<Type<'db>> {
+    let db = context.db();
+    call.func.as_name_expr()?;
+    let index = semantic_index(db, context.program_file());
+    // In a class body, even a plain function can act as a dataclass field specifier.
+    if index.scope(context.scope().file_scope_id(db)).kind() != ScopeKind::Function {
+        return None;
+    }
+    let callee = index.try_expression(&call.func)?;
+    let function = infer_same_file_expression_type(db, callee, TypeContext::default())
+        .as_function_literal()?;
+
+    let ([], Some(implementation)) = function.overloads_and_implementation(db) else {
+        return None;
+    };
+    if function.known(db).is_some()
+        || function.file(db).is_stub(db)
+        || !implementation.decorators(db).is_empty()
+        || function.dataclass_transformer_params(db).is_some()
+        || !implementation.has_explicit_return_annotation(db)
+    {
+        return None;
+    }
+    let [signature] = function.signature(db).overloads.as_slice() else {
+        return None;
+    };
+    // A type guard, for example, binds its result to an argument even without a type variable.
+    let return_ty = signature.return_ty;
+    (signature.is_non_generic()
+        && return_ty.as_nominal_instance().is_some()
+        && !return_ty.has_typevar(db, context.program_environment()))
+    .then_some(return_ty)
+}
 
 /// The return type and deprecations retained from binary operator resolution.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]

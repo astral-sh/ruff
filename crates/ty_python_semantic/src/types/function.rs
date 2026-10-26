@@ -1701,6 +1701,16 @@ impl<'db> FunctionType<'db> {
         self.literal(db).iter_overloads_and_implementation(db)
     }
 
+    /// If multiple definitions have `@dataclass_transform`, call binding uses the last one.
+    pub(super) fn dataclass_transformer_params(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<DataclassTransformerParams<'db>> {
+        self.iter_overloads_and_implementation(db)
+            .rev()
+            .find_map(|overload| overload.dataclass_transformer_params(db))
+    }
+
     pub(crate) fn first_overload_or_implementation(self, db: &'db dyn Db) -> OverloadLiteral<'db> {
         self.iter_overloads_and_implementation(db)
             .next()

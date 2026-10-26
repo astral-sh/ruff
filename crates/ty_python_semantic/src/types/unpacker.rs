@@ -1,5 +1,6 @@
 use crate::ProgramEnvironment;
 use std::borrow::Cow;
+use std::cell::LazyCell;
 use std::debug_assert_matches;
 
 use ruff_db::parsed::ParsedModuleRef;
@@ -11,8 +12,9 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::Ranged;
 
 use crate::Db;
+use crate::types::call::infer_call_return_type_without_arguments;
 use crate::types::dict::dict_literal_key_value_types;
-use crate::types::infer::{FrozenMap, infer_same_file_expression_type};
+use crate::types::infer::FrozenMap;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{
     ResizeTupleError, Tuple, TupleBuilder, TupleElement, TupleLength, TupleSpec,
@@ -79,6 +81,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     /// Unpack the value to the target expression.
     pub(crate) fn unpack(&mut self, target: &ast::Expr, value: UnpackValue<'db>) {
         let db = self.db();
+        let env = self.context.program_environment();
         debug_assert_matches!(
             target,
             ast::Expr::List(_) | ast::Expr::Tuple(_),
@@ -86,33 +89,31 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         );
 
         let value_expr = value.expression().node_ref(db).node(self.module());
-        let inference = std::cell::OnceCell::new();
-        let expression_type = |expression: &ast::Expr| {
-            inference
-                .get_or_init(|| {
-                    infer_expression_types(db, value.expression(), TypeContext::default())
-                })
-                .expression_type(expression)
-        };
-        let value_type = (matches!(value.kind(), UnpackKind::Assign))
-            .then(|| self.fixed_call_result(value_expr))
-            .flatten()
-            .unwrap_or_else(|| expression_type(value_expr));
-
+        let inference = LazyCell::new(|| {
+            infer_expression_types(db, value.expression(), TypeContext::default())
+        });
+        let expression_type = |expression: &ast::Expr| inference.expression_type(expression);
         let value_type = match value.kind() {
             UnpackKind::Assign => {
                 if self.context.in_stub() && value_expr.is_ellipsis_literal_expr() {
                     Type::unknown()
+                } else if let ast::Expr::Call(call) = value_expr
+                    && let Some(ty) = infer_call_return_type_without_arguments(&self.context, call)
+                    && ty.tuple_instance_spec(db, env).is_some()
+                {
+                    // In a loop such as `a, b = f(a)`, following the argument would lead
+                    // back to this assignment. The statement checks the full call separately.
+                    ty
                 } else {
-                    value_type
+                    expression_type(value_expr)
                 }
             }
             UnpackKind::Iterable { mode } => {
-                let env = self.context.program_environment();
+                let value_type = expression_type(value_expr);
                 if !mode.is_async()
                     && let ast::Expr::Dict(dict) = value_expr
                     && let Some((keys, _)) =
-                        dict_literal_key_value_types(db, env, dict, |expr| expression_type(expr))
+                        dict_literal_key_value_types(db, env, dict, expression_type)
                 {
                     keys
                 } else {
@@ -130,7 +131,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 }
             }
             UnpackKind::ContextManager { mode } => {
-                let env = self.context.program_environment();
+                let value_type = expression_type(value_expr);
                 value_type
                     .try_enter_with_mode(db, env, mode)
                     .unwrap_or_else(|err| {
@@ -154,47 +155,6 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             },
             &expression_type,
         );
-    }
-
-    /// For a plain call with one concrete tuple return annotation, argument inference cannot affect an
-    /// unpacked target's type. The assignment statement separately checks the full RHS, including
-    /// its arguments. Avoiding that dependency here breaks cycles such as `a, b = f(a)` in a loop.
-    fn fixed_call_result(&self, value: &ast::Expr) -> Option<Type<'db>> {
-        let db = self.db();
-        let call = value.as_call_expr()?;
-        if !call.func.is_name_expr() || self.context.scope().node(db).as_function().is_none() {
-            return None;
-        }
-        let index = ty_python_core::semantic_index(db, self.context.program_file());
-        let callee = index.try_expression(&call.func)?;
-        let Type::FunctionLiteral(function) =
-            infer_same_file_expression_type(db, callee, TypeContext::default())
-        else {
-            return None;
-        };
-
-        // Call binding can override the annotated return type for known functions and dataclass
-        // transformers. Overloaded and generic calls can also depend on their arguments.
-        let ([], Some(implementation)) = function.overloads_and_implementation(db) else {
-            return None;
-        };
-        if implementation.known(db).is_some()
-            || function.file(db).is_stub(db)
-            || !implementation.decorators(db).is_empty()
-            || implementation.dataclass_transformer_params(db).is_some()
-            || !implementation.has_explicit_return_annotation(db)
-        {
-            return None;
-        }
-        let [signature] = function.signature(db).overloads.as_slice() else {
-            return None;
-        };
-        let ty = signature.return_ty;
-        let env = self.context.program_environment();
-        (signature.generic_context.is_none()
-            && ty.tuple_instance_spec(db, env).is_some()
-            && !ty.has_typevar(db, env))
-        .then_some(ty)
     }
 
     /// Records `Unknown` for a malformed unpack target and all of its descendant expressions.

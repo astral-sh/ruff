@@ -2817,18 +2817,7 @@ impl<'db> Bindings<'db> {
                         }
 
                         _ => {
-                            // Ideally, either the implementation, or exactly one of the overloads
-                            // of the function can have the dataclass_transform decorator applied.
-                            // However, we do not yet enforce this, and in the case of multiple
-                            // applications of the decorator, we will only consider the last one.
-                            let transformer_params = function_type
-                                .iter_overloads_and_implementation(db)
-                                .rev()
-                                .find_map(|function_overload| {
-                                    function_overload.dataclass_transformer_params(db)
-                                });
-
-                            if let Some(params) = transformer_params {
+                            if let Some(params) = function_type.dataclass_transformer_params(db) {
                                 // If this function was called with a keyword argument like
                                 // `order=False`, we extract the argument type and overwrite
                                 // the corresponding flag in `dataclass_params`.
