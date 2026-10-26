@@ -1057,6 +1057,8 @@ mod uv_metadata {
     #[cfg(feature = "test-uv")]
     use ty_project::uv_test_env_vars;
 
+    #[cfg(feature = "test-uv")]
+    use crate::TestServer;
     use crate::TestServerBuilder;
 
     #[cfg(feature = "test-uv")]
@@ -1163,11 +1165,13 @@ package = "invalid"
 
     #[cfg(feature = "test-uv")]
     #[test]
-    fn unused_dependency_updates_closed_manifest_after_python_edits() -> Result<()> {
-        let main = SystemPath::new("src/main.py");
+    fn shared_manifest_tracks_unsaved_imports_in_both_workspace_folders() -> Result<()> {
+        let a = SystemPath::new("src/a/main.py");
+        let b = SystemPath::new("src/b/main.py");
         let manifest = SystemPath::new("src/pyproject.toml");
         let builder = TestServerBuilder::new()?
-            .with_workspace(SystemPath::new("src"), None)?
+            .with_workspace(SystemPath::new("src/a"), None)?
+            .with_workspace(SystemPath::new("src/b"), None)?
             .with_file(
                 manifest,
                 r#"
@@ -1175,13 +1179,13 @@ package = "invalid"
 name = "example"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = ["attrs==25.4.0"]
+dependencies = ["attrs==25.4.0", "idna==3.10"]
 
 [tool.ty.rules]
 unused-dependency = "warn"
 "#,
             )?
-            .with_file(main, "pass\n")?
+            .with_files([(a, ""), (b, "")])?
             .with_real_uv(UseUv::On)?;
 
         let output = Command::new("uv")
@@ -1197,34 +1201,46 @@ unused-dependency = "warn"
         );
 
         let mut server = builder.build().wait_until_workspaces_are_initialized();
-        let diagnostic = server.await_notification::<PublishDiagnosticsNotification>();
-        assert_eq!(diagnostic.uri, server.file_uri(manifest));
-        assert_eq!(diagnostic.diagnostics.len(), 1);
-        assert_eq!(
-            diagnostic.diagnostics[0].code,
-            Some(Code::String("unused-dependency".into()))
-        );
+        let uri = server.file_uri(manifest);
+        // Each workspace folder publishes a report for the same manifest. They must agree.
+        let next_report = |server: &mut TestServer| {
+            let report = server.await_notification::<PublishDiagnosticsNotification>();
+            assert_eq!(report.uri, uri);
+            assert_eq!(
+                server.await_notification::<PublishDiagnosticsNotification>(),
+                report
+            );
+            report.diagnostics
+        };
+        let initial = next_report(&mut server);
+        assert_eq!(initial.len(), 2);
+        assert!(initial.iter().all(|diagnostic| {
+            diagnostic.code == Some(Code::String("unused-dependency".into()))
+        }));
 
-        // The manifest stays closed, but an unsaved import in the Python file still clears its
-        // dependency diagnostic.
-        server.open_text_document(main, "import attrs\n", 1);
-        let cleared = server.await_notification::<PublishDiagnosticsNotification>();
-        assert_eq!(cleared.uri, server.file_uri(manifest));
-        assert!(cleared.diagnostics.is_empty());
+        server.open_text_document(a, "import attrs\n", 1);
+        let unused_idna = next_report(&mut server);
+        assert_eq!(unused_idna.len(), 1);
+        assert_eq!(
+            unused_idna[0].message,
+            Message::String("Dependency `idna` is declared but never imported".into())
+        );
+        server.open_text_document(b, "import idna\n", 1);
+        assert!(next_report(&mut server).is_empty());
 
         server.change_text_document(
-            main,
+            b,
             vec![
                 TextDocumentContentChangeWholeDocument {
-                    text: "pass\n".to_string(),
+                    text: String::new(),
                 }
                 .into(),
             ],
             2,
         );
-        let restored = server.await_notification::<PublishDiagnosticsNotification>();
-        assert_eq!(restored.uri, diagnostic.uri);
-        assert_eq!(restored.diagnostics, diagnostic.diagnostics);
+        assert_eq!(next_report(&mut server), unused_idna);
+        server.close_text_document(a);
+        assert_eq!(next_report(&mut server), initial);
 
         Ok(())
     }

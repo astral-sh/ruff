@@ -1406,7 +1406,11 @@ impl Session {
 
         match path {
             AnySystemPath::System(system_path) => {
-                self.apply_changes(client, path, &[ChangeEvent::Opened(system_path.clone())]);
+                document.apply_change_in_databases(
+                    self,
+                    client,
+                    ChangeEvent::Opened(system_path.clone()),
+                );
 
                 if is_not_python {
                     return;
@@ -2126,24 +2130,32 @@ impl OpenDocumentHandle {
         change: ChangeEvent,
     ) {
         let path = self.notebook_or_file_path();
-        let changes = [change];
-        let is_external = matches!(path, AnySystemPath::System(system_path)
-            if session.workspaces().for_path(system_path).is_none());
-
-        if !is_external {
-            // A containing workspace determines the project for a system file, while virtual
-            // documents select a single, arbitrary project. Neither selection depends on import
-            // search paths, so update only the selected database.
-            session.apply_changes(client, path, &changes);
-        } else {
-            // This is both a system file and an external file (it has no containing workspace
-            // that defines how to select a single project for it). For external files, a change in
-            // import search paths can change the selected project, so here we update all databases
-            // to keep previously selected projects' cached contents fresh.
-            let roots: Vec<_> = session.projects.keys().cloned().collect();
-            for root in roots {
-                session.apply_changes(client, &AnySystemPath::System(root), &changes);
-            }
+        let Some(file) = path.as_system().filter(|_| session.projects.len() > 1) else {
+            session.apply_changes(client, path, &[change]);
+            return;
+        };
+        // Only the selected project marks the document open. Other projects that can read the
+        // file must also see the editor contents, even when their workspace folders are siblings.
+        // For an external file, changes to import search paths can change the selected project.
+        let external = session.workspaces().for_path(file).is_none();
+        let roots: Vec<_> = session
+            .projects
+            .iter()
+            .filter_map(|(root, state)| {
+                let db = &state.db;
+                (external
+                    || file.starts_with(root)
+                    || db.files().try_system(db, file).is_some()
+                    || db.project().is_file_included(db, file).is_included())
+                .then(|| root.clone())
+            })
+            .collect();
+        for root in roots {
+            session.apply_changes(
+                client,
+                &AnySystemPath::System(root),
+                std::slice::from_ref(&change),
+            );
         }
     }
 
