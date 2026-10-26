@@ -1521,6 +1521,51 @@ fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
     benchmark_micro_case(criterion, "ty_micro[large_union_narrowing]", &code);
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4815>.
+///
+/// The three OR patterns stay fixed as the subject union grows. Using `typing.Union` avoids
+/// the separate cost of inferring a long chain of `|` expressions.
+fn benchmark_class_or_pattern_captures(criterion: &mut Criterion) {
+    for num_classes in [45, 90] {
+        let mut code = "
+            from typing import Union"
+            .to_string();
+
+        for i in 0..num_classes {
+            writeln!(
+                code,
+                "
+            class C{i}:
+                value: int"
+            )
+            .ok();
+        }
+
+        let members = (0..num_classes).map(|i| format!("C{i}")).join(", ");
+        writeln!(
+            code,
+            "
+            def get_value(subject: Union[{members}]) -> int | None:
+                match subject:
+                    case C0(value=v) | C1(value=v) | C2(value=v):
+                        return v
+                    case C3(value=v) | C4(value=v) | C5(value=v):
+                        return v
+                    case C6(value=v) | C7(value=v) | C8(value=v):
+                        return v
+                    case _:
+                        return None"
+        )
+        .ok();
+
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[class_or_pattern_captures_{num_classes}]"),
+            &code,
+        );
+    }
+}
+
 /// Benchmark for narrowing through a long `isinstance` elif chain.
 ///
 /// This pattern is common in visitor-style dispatch code (e.g. koda-validate's
@@ -2618,6 +2663,7 @@ criterion_group!(
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
+    benchmark_class_or_pattern_captures,
     benchmark_large_isinstance_narrowing,
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
