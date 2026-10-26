@@ -2185,6 +2185,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     target_typeform.type_argument(db),
                 ),
 
+            (
+                Type::KnownInstance(KnownInstanceType::UnionType(source)),
+                Type::KnownInstance(KnownInstanceType::UnionType(target)),
+            ) => ConstraintSet::from_bool(self.constraints, source.same_value(db, env, target)),
+
             (Type::KnownInstance(source_instance), Type::TypeForm(target_typeform))
                 if let Some(source_argument) = source_instance.type_form_argument(db, env) =>
             {
@@ -4024,6 +4029,13 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                         right_partial.wrapped(db).inner(db),
                     )
                 })
+            }),
+
+            (
+                Type::KnownInstance(KnownInstanceType::UnionType(left)),
+                Type::KnownInstance(KnownInstanceType::UnionType(right)),
+            ) => nontrivial_check(self, || {
+                ConstraintSet::from_bool(self.constraints, left.is_disjoint_from(db, env, right))
             }),
 
             (

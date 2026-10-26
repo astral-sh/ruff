@@ -1645,6 +1645,45 @@ fn declared_instance_attribute_avoids_inferring_method_assignments() -> anyhow::
 }
 
 #[test]
+fn inherited_class_defaults_avoid_inferring_instance_assignments() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file("/src/dependency.py", "value = 'updated'")?;
+    db.write_dedented(
+        "/src/bases.py",
+        r#"
+        class First:
+            value: int = 0
+
+        class Second:
+            value: str = ""
+
+            def reset(self):
+                from dependency import value
+                self.value = value
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from bases import First, Second
+
+        class Child(First, Second): ...
+        "#,
+    )?;
+
+    let dependency = system_path_to_file(&db, "/src/dependency.py")?;
+    db.clear_salsa_events();
+    assert_file_diagnostics(
+        &db,
+        "/src/main.py",
+        &["Incompatible inherited attribute `value`"],
+    );
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run(&db, semantic_index, program_file(&db, dependency), &events);
+    Ok(())
+}
+
+#[test]
 fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
     fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
         let file_main = system_path_to_file(db, "/src/main.py").unwrap();

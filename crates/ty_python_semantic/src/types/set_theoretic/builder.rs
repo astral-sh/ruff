@@ -1141,8 +1141,19 @@ impl<'db> UnionBuilder<'db> {
                     merge_truthiness_guarded_pair(db, &self.env, ty, element_type)
             {
                 to_remove.push(i);
-                ty = merged_type;
-                continue;
+                // A nominal core can replace the first element in place; no earlier elements
+                // need to be reconsidered.
+                if i == 0 && merged_type.is_nominal_instance() && !merged_type.is_object() {
+                    ty = merged_type;
+                    continue;
+                }
+                for index in to_remove.into_iter().rev() {
+                    self.elements.swap_remove(index);
+                }
+                // The merged type can also subsume earlier elements, such as `bool` when
+                // the truthy and falsy parts of `int` merge.
+                self.add_in_place_impl(merged_type, seen_aliases);
+                return;
             }
 
             if !self.cycle_recovery

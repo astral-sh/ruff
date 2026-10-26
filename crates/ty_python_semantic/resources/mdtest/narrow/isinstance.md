@@ -328,9 +328,11 @@ info: A `UnionType` instance can only be used as the second argument to `isinsta
 info: Element `<class 'list[int]'>` in the union is not a class object
 ```
 
+The repeated `list[int]` appears once in the diagnostic, before `Literal[42]`.
+
 ```py
     # snapshot: invalid-argument-type
-    elif isinstance(x, Literal[42] | list[int] | bytes):
+    elif isinstance(x, list[int] | (Literal[42] | list[int]) | bytes):
         reveal_type(x)  # revealed: int | list[int] | bytes
 ```
 
@@ -338,12 +340,12 @@ info: Element `<class 'list[int]'>` in the union is not a class object
 error[invalid-argument-type]: Invalid second argument to `isinstance`
  --> src/mdtest_snippet.py:8:10
   |
-8 |     elif isinstance(x, Literal[42] | list[int] | bytes):
-  |          ^^^^^^^^^^^^^^-------------------------------^
+8 |     elif isinstance(x, list[int] | (Literal[42] | list[int]) | bytes):
+  |          ^^^^^^^^^^^^^^---------------------------------------------^
   |                        |
   |                        This `UnionType` instance contains non-class elements
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
-info: Elements `<special-form 'Literal[42]'>` and `<class 'list[int]'>` in the union are not class objects
+info: Elements `<class 'list[int]'>` and `<special-form 'Literal[42]'>` in the union are not class objects
 ```
 
 ```py

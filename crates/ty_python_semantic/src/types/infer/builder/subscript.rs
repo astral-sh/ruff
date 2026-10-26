@@ -344,15 +344,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return Ok(ty);
                     }
                     return Ok(Type::KnownInstance(KnownInstanceType::UnionType(
-                        UnionTypeInstance::new(
+                        UnionTypeInstance::from_type_expression(
                             db,
-                            None,
-                            Ok(UnionType::from_two_elements(
-                                db,
-                                env,
-                                ty,
-                                Type::none(db, env),
-                            )),
+                            UnionType::from_two_elements(db, env, ty, Type::none(db, env)),
                         ),
                     )));
                 }
@@ -361,10 +355,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let elements = tuple.iter().map(|elt| self.infer_type_expression(elt));
 
                         let union_type = Type::KnownInstance(KnownInstanceType::UnionType(
-                            UnionTypeInstance::new(
+                            UnionTypeInstance::from_type_expression(
                                 db,
-                                None,
-                                Ok(UnionType::from_elements(db, env, elements)),
+                                UnionType::from_elements(db, env, elements),
                             ),
                         ));
 
@@ -1177,7 +1170,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Type::GenericAlias(_) => true,
                         Type::KnownInstance(KnownInstanceType::UnionType(union)) => union
                             .value_expression_types(db, env)
-                            .is_ok_and(|mut tys| tys.any(|ty| ty.is_generic_alias())),
+                            .any(|ty| ty.is_generic_alias()),
                         _ => value_ty.is_specialized_generic(db),
                     };
                     if already_specialized {

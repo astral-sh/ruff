@@ -4011,7 +4011,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 f.with_type(KnownClass::UnionType.to_class_literal(db, self.env))
                     .write_str("types.UnionType")?;
                 f.write_str(" special-form")?;
-                if let Ok(ty) = union.union_type(db) {
+                if let Ok(ty) = union.union_type(db, self.env) {
                     f.write_str(" '")?;
                     ty.display(db, self.env).fmt_detailed(f)?;
                     f.write_char('\'')?;

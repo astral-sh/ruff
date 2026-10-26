@@ -1061,6 +1061,33 @@ impl<'db> IntersectionType<'db> {
         intersection_from_two_elements(db, TypePair::new(db, env.program(db), a, b))
     }
 
+    /// Create `positive & ~negative` directly so the positive operand can prune branches
+    /// while distributing the complement.
+    pub(crate) fn from_positive_and_negative(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        positive: Type<'db>,
+        negative: Type<'db>,
+    ) -> Type<'db> {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
+                result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
+            },
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn difference<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
+            let env = ProgramEnvironment::from_program(types.program(db));
+            IntersectionBuilder::new(db, &env)
+                .add_positive(types.first(db))
+                .add_negative(types.second(db))
+                .build()
+        }
+
+        difference(db, TypePair::new(db, env.program(db), positive, negative))
+    }
+
     pub(crate) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,

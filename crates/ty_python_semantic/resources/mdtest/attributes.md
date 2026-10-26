@@ -1303,6 +1303,57 @@ reveal_type(C.variable_with_class_default1)  # revealed: Literal["overwritten on
 reveal_type(c_instance.variable_with_class_default1)  # revealed: Literal["value set on instance"]
 ```
 
+#### Instance storage for annotated descriptor defaults
+
+A non-data descriptor can be shadowed by instance storage. An ordinary receiver assignment or
+annotation establishes that storage; assignments in static or class methods do not. An augmented
+assignment also reads the descriptor before writing its result.
+
+```py
+def flag() -> bool:
+    return True
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> str:
+        return ""
+
+    def __iadd__(self, other: str):
+        return self
+
+class Model:
+    ordinary: Descriptor = Descriptor()
+    annotated: Descriptor = Descriptor()
+    static_only: Descriptor = Descriptor()
+    class_only: Descriptor = Descriptor()
+    augmented: Descriptor = Descriptor()
+    if flag():
+        conditional: Descriptor = Descriptor()
+
+    def assign(self, value: Descriptor):
+        self.ordinary = value
+        self.annotated: Descriptor
+        self.augmented += "!"  # error: [invalid-assignment]
+        # error: [possibly-missing-attribute]
+        self.conditional = b"instance"  # error: [invalid-assignment]
+
+    @staticmethod
+    def assign_static(receiver):
+        receiver.static_only = Descriptor()
+
+    @classmethod
+    def assign_class(cls):
+        cls.class_only = Descriptor()
+
+m = Model()
+reveal_type(m.ordinary)  # revealed: str | Descriptor
+reveal_type(m.annotated)  # revealed: str | Descriptor
+reveal_type(m.static_only)  # revealed: str
+reveal_type(m.class_only)  # revealed: str
+reveal_type(m.augmented)  # revealed: str | Descriptor
+# error: [possibly-missing-attribute]
+reveal_type(m.conditional)  # revealed: str | Descriptor | bytes
+```
+
 #### Augmented assignments to overriding class-level defaults
 
 An unannotated class-level default retains the inherited declaration, including through a diamond.

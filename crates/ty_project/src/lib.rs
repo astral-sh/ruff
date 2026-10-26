@@ -826,6 +826,16 @@ impl Project {
         }
     }
 
+    /// Returns the scripts whose uv environments need preparing at startup or after a reload.
+    pub fn scripts_to_synchronize(self, db: &dyn Db) -> Vec<File> {
+        // Discovering scripts reads every project file. Keep the index lazy when
+        // no environment synchronization will be requested.
+        if !self.metadata(db).use_uv().script_environments_enabled() {
+            return Vec::new();
+        }
+        self.script_files(db).iter().collect()
+    }
+
     fn reload_files(self, db: &mut dyn Db) {
         tracing::debug!("Reloading files for project `{}`", self.name(db));
 

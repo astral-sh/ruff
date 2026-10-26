@@ -351,7 +351,7 @@ impl MainLoop {
         let (check_sender, check_receiver) = crossbeam_channel::bounded(1);
 
         // Initialize the uv environment for all scripts
-        let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+        let scripts = db.project().scripts_to_synchronize(db);
         self.synchronize_scripts(db, &scripts);
 
         request_check(&check_sender);
@@ -512,7 +512,7 @@ impl MainLoop {
                                 files_changed: true,
                             }
                         ) {
-                            let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+                            let scripts = db.project().scripts_to_synchronize(db);
                             self.synchronize_scripts(db, &scripts);
                         }
                     }
