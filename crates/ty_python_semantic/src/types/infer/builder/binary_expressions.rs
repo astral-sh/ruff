@@ -195,7 +195,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
-        let env = self.program_environment();
         let ast::ExprBinOp {
             left,
             op,
@@ -218,17 +217,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // `TypeAlias`, which uses `X | Y` syntax, where the returned type is not actually a union.
         // And attempting to enforce this more tightly showed a lot of potential false positives in
         // the ecosystem.
-        if left_ty.is_equivalent_to(db, env, right_ty) {
-            left_ty
-        } else {
-            UnionTypeInstance::from_value_expression_types(
-                db,
-                [left_ty, right_ty],
-                self.scope(),
-                self.typevar_binding_context,
-                self.inference_flags(),
-            )
-        }
+        UnionTypeInstance::from_value_expression_types(
+            db,
+            [left_ty, right_ty],
+            self.scope(),
+            self.typevar_binding_context,
+            self.inference_flags(),
+        )
     }
 
     /// Returns a `TypedDict` result when a PEP 584 special case succeeds, otherwise the inferred
@@ -1089,22 +1084,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             // PEP 604-style union types using the `|` operator.
             (left, right, ast::Operator::BitOr)
-                if is_union_type_operand(left) && is_union_type_operand(right) =>
-            {
-                if left_ty.is_equivalent_to(db, env, right_ty) {
-                    Some(left_ty)
-                } else {
-                    Some(UnionTypeInstance::from_value_expression_types(
-                        db,
-                        [left_ty, right_ty],
-                        self.scope(),
-                        self.typevar_binding_context,
-                        self.inference_flags(),
-                    ))
-                }
-            }
-            (left, right, ast::Operator::BitOr)
-                if (is_union_type_operand(left) && right.is_none(db))
+                if (is_union_type_operand(left)
+                    && (is_union_type_operand(right) || right.is_none(db)))
                     || (left.is_none(db) && is_union_type_operand(right)) =>
             {
                 Some(UnionTypeInstance::from_value_expression_types(

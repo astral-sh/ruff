@@ -5,7 +5,7 @@ use crate::{
         Binding, CallArguments, CallableType, ClassBase, ClassLiteral, ClassType, DynamicType,
         IntersectionBuilder, KnownClass, KnownInstanceType, ParamSpecAttrKind, SpecialFormType,
         SubclassOfInner, SubclassOfType, Type, TypeContext, TypeVarBoundOrConstraints, TypeVarKind,
-        UnionBuilder, UnionType,
+        UnionBuilder, UnionType, UnionTypeInstance,
         callable::CallableTypeKind,
         constraints::ConstraintSetBuilder,
         context::InferContext,
@@ -2222,13 +2222,13 @@ fn check_classinfo_in_isinstance<'db>(
             diagnostic
                 .set_primary_annotation_message("This call will raise `TypeError` at runtime");
         }
-        Type::KnownInstance(KnownInstanceType::UnionType(_)) => {
+        Type::KnownInstance(KnownInstanceType::UnionType(union)) => {
             report_invalid_union_type_elements(
                 db,
                 context,
                 call_expression,
                 function,
-                classinfo,
+                union,
                 classinfo_expr,
             );
         }
@@ -2483,42 +2483,22 @@ fn report_invalid_union_type_elements<'db>(
     context: &InferContext<'db, '_>,
     call_expression: &ast::ExprCall,
     function: KnownFunction,
-    union_type: Type<'db>,
+    union: UnionTypeInstance<'db>,
     union_type_expr: Option<&ast::Expr>,
 ) {
-    fn find_invalid_elements<'db>(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        function: KnownFunction,
-        ty: Type<'db>,
-        invalid_elements: &mut Vec<Type<'db>>,
-    ) {
-        match ty {
-            Type::ClassLiteral(_) => {}
-            Type::NominalInstance(instance)
-                if instance.has_known_class(db, KnownClass::NoneType) => {}
-            Type::SpecialForm(special_form) if special_form.is_valid_isinstance_target() => {}
-            // `Any` can be used in `issubclass()` calls but not `isinstance()` calls
-            Type::SpecialForm(SpecialFormType::Any) if function == KnownFunction::IsSubclass => {}
-            Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
-                match instance.value_expression_types(db, env) {
-                    Ok(value_expression_types) => {
-                        for element in value_expression_types {
-                            find_invalid_elements(db, env, function, element, invalid_elements);
-                        }
-                    }
-                    Err(_) => {
-                        invalid_elements.push(ty);
-                    }
-                }
-            }
-            _ => invalid_elements.push(ty),
-        }
-    }
-
-    let mut invalid_elements = vec![];
     let env = context.program_environment();
-    find_invalid_elements(db, env, function, union_type, &mut invalid_elements);
+    let invalid_elements: Vec<_> = union
+        .value_expression_types(db, env)
+        .filter(|element| match element {
+            Type::ClassLiteral(_) => false,
+            Type::SpecialForm(special_form) if special_form.is_valid_isinstance_target() => false,
+            // `Any` can be used in `issubclass()` calls but not `isinstance()` calls.
+            Type::SpecialForm(SpecialFormType::Any) if function == KnownFunction::IsSubclass => {
+                false
+            }
+            _ => true,
+        })
+        .collect();
 
     let Some((first_invalid_element, other_invalid_elements)) = invalid_elements.split_first()
     else {
@@ -2546,15 +2526,12 @@ fn report_invalid_union_type_elements<'db>(
 
     // When we have a secondary annotation pointing at the UnionType expression,
     // "the union" is unambiguous. Otherwise, spell out the union type in the message.
-    let env = context.program_environment();
-    let union_suffix = match (&union_type_expr, union_type) {
-        (None, Type::KnownInstance(KnownInstanceType::UnionType(instance))) => {
-            match instance.union_type(db) {
-                Ok(ty) => format!(" `{}`", ty.display(db, env)),
-                Err(_) => String::new(),
-            }
-        }
-        _ => String::new(),
+    let union_suffix = if union_type_expr.is_none()
+        && let Ok(ty) = union.union_type(db, env)
+    {
+        format!(" `{}`", ty.display(db, env))
+    } else {
+        String::new()
     };
 
     match other_invalid_elements {

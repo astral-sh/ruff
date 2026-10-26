@@ -91,9 +91,7 @@ use crate::types::function::{
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{ApplySpecialization, Specialization, bind_typevar};
 use crate::types::infer::InferenceFlags;
-use crate::types::known_instance::{
-    InternedConstraintSet, InternedType, SentinelInstance, UnionTypeInstance,
-};
+use crate::types::known_instance::{InternedConstraintSet, InternedType, SentinelInstance};
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
@@ -111,6 +109,7 @@ pub(crate) use crate::types::typevar::{
 };
 pub use crate::types::typevar::{BoundTypeVarInstance, TypeVarKind};
 use crate::types::typevar::{TypeVarInstance, TypeVarSet};
+use crate::types::union_type_instance::UnionTypeInstance;
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::visitor::{
@@ -183,6 +182,7 @@ mod type_expansion;
 mod type_form;
 mod typed_dict;
 mod typevar;
+mod union_type_instance;
 mod unpacker;
 mod variance;
 mod visitor;
@@ -9029,11 +9029,7 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec_inline![InvalidTypeExpression::NamedTupleSpec],
                     fallback_type: Type::unknown(),
                 }),
-                KnownInstanceType::UnionType(instance) => {
-                    // Cloning here is cheap if the result is a `Type` (which is `Copy`). It's more
-                    // expensive if there are errors.
-                    instance.union_type(db).clone()
-                }
+                KnownInstanceType::UnionType(instance) => instance.union_type(db, env),
                 KnownInstanceType::Literal(ty) => Ok(ty.inner(db)),
                 KnownInstanceType::Annotated(ty) => Ok(ty.inner(db)),
                 KnownInstanceType::TypeGenericAlias(instance) => {
@@ -10294,7 +10290,7 @@ impl<'db> Type<'db> {
 
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::UnionType(instance) => {
-                    if let Ok(union_type) = instance.union_type(db) {
+                    if let Ok(union_type) = instance.union_type(db, env) {
                         union_type.find_legacy_typevars_impl(
                             db,
                             env,

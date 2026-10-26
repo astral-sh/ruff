@@ -87,6 +87,10 @@ invalid_module_self_forms: tuple[TypeForm[Any], ...] = module_self_forms  # erro
 
 bad_forms: list[TypeForm[int]] = [str]  # error: [invalid-assignment]
 bad_config: Config = {"form": str}  # error: [invalid-argument-type]
+
+# Bare `Literal` prevents the stored union from denoting a type.
+invalid_union_forms = (bytes | Literal | str,)
+type_forms: tuple[TypeForm[object], ...] = invalid_union_forms  # error: [invalid-assignment]
 ```
 
 `TypeForm` is covariant in its type argument:

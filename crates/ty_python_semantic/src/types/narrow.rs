@@ -691,18 +691,7 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
                     env,
                     instance
                         .value_expression_types(db, env)
-                        .ok()?
-                        .map(|element| {
-                            // A special case is made for `None` at runtime
-                            // (it's implicitly converted to `NoneType` in `int | None`)
-                            // which means that `isinstance(x, int | None)` works even though
-                            // `None` is not a class literal.
-                            if element.is_none(db) {
-                                self.generate(db, KnownClass::NoneType.to_class_literal(db, env))
-                            } else {
-                                self.generate(db, element)
-                            }
-                        }),
+                        .map(|element| self.generate(db, element)),
                 )
             }
 
