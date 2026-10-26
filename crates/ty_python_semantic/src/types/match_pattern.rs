@@ -20,8 +20,8 @@ use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
-    Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
+    CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, IntersectionType,
+    KnownClass, Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
     TypeVarBoundOrConstraints, TypedDictType, UnionType, binding_type, equality_truthiness,
     infer_same_file_expression_type,
 };
@@ -932,12 +932,10 @@ fn pattern_fallthrough_type<'db>(
         }
     }
 
-    IntersectionBuilder::new(db, env)
-        .add_positive(subject_ty)
-        .add_negative(definite_match_pattern_type_for_subject(
-            db, env, kind, subject_ty,
-        ))
-        .build()
+    // Reachability and capture inference both walk OR patterns in order. Caching the difference
+    // lets them reuse the remaining subject type after each alternative fails.
+    let definitely_matched = definite_match_pattern_type_for_subject(db, env, kind, subject_ty);
+    IntersectionType::from_positive_and_negative(db, env, subject_ty, definitely_matched)
 }
 
 /// Return the fallthrough type for a binding that can reach a later match case.
