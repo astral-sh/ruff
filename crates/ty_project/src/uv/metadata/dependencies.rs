@@ -10,6 +10,8 @@ use ty_module_resolver::ModuleName;
 use ty_python_semantic::dependency::{
     DependencyDistribution, DependencyMetadata, DependencyProject, DependencyProjectKind,
 };
+use ty_python_semantic::lint::LintId;
+use ty_python_semantic::types::MISSING_DIRECT_DEPENDENCY;
 
 use super::{NodeKind, ResolutionNode, UvMetadata};
 
@@ -17,6 +19,10 @@ impl UvMetadata {
     pub(crate) fn dependency_metadata(
         &self,
     ) -> Result<DependencyMetadata, DependencyMetadataError> {
+        let installed_packages = self
+            .installed_packages
+            .as_ref()
+            .ok_or(DependencyMetadataError::MissingPackageInventory)?;
         let root = self.workspace_root();
         let mut distributions = BTreeMap::new();
         let mut extra_packages = BTreeMap::new();
@@ -34,7 +40,7 @@ impl UvMetadata {
                 .as_ref()
                 .and_then(|source| source.editable.clone())
                 .filter(|_| {
-                    self.installed_packages
+                    installed_packages
                         .get(id)
                         .is_some_and(|package| package.editable)
                 });
@@ -217,7 +223,7 @@ impl UvMetadata {
         // Packages may remain installed after their declarations are removed, or may have been
         // installed outside uv. Keep them for module ownership checks; installation alone does
         // not make them declared dependencies.
-        for (id, package) in &self.installed_packages {
+        for (id, package) in installed_packages {
             distributions
                 .entry(id.clone())
                 .or_insert_with(|| DependencyDistribution {
@@ -233,7 +239,7 @@ impl UvMetadata {
             };
             let owners = owners
                 .iter()
-                .filter(|owner| self.installed_packages.contains_key(&owner.package_id))
+                .filter(|owner| installed_packages.contains_key(&owner.package_id))
                 .map(|owner| owner.package_id.clone())
                 .collect::<BTreeSet<_>>();
             // Keep an empty entry when all owners are unknown. Omitting the entry would allow a
@@ -286,6 +292,10 @@ pub(crate) enum DependencyMetadataError {
     MissingProjects,
     #[error("uv did not provide a Python environment")]
     MissingEnvironment,
+    #[error(
+        "uv metadata is missing the installed package inventory; upgrade to uv 0.13.2 or newer"
+    )]
+    MissingPackageInventory,
     #[error("could not read uv's Python environment `{path}`: {message}")]
     InvalidEnvironment {
         path: SystemPathBuf,
@@ -306,7 +316,16 @@ pub(crate) enum DependencyMetadataError {
 }
 
 impl DependencyMetadataError {
-    pub(crate) fn to_diagnostic(&self, kind: DependencyProjectKind) -> Diagnostic {
+    pub(crate) fn to_diagnostic(
+        &self,
+        kind: DependencyProjectKind,
+        is_lint_enabled: impl FnOnce(LintId) -> bool,
+    ) -> Option<Diagnostic> {
+        if matches!(self, Self::MissingPackageInventory)
+            && !is_lint_enabled(LintId::of(&MISSING_DIRECT_DEPENDENCY))
+        {
+            return None;
+        }
         let mut diagnostic = Diagnostic::new(
             DiagnosticId::UvMetadata,
             Severity::Warning,
@@ -336,7 +355,7 @@ impl DependencyMetadataError {
             }
             _ => {}
         }
-        diagnostic
+        Some(diagnostic)
     }
 }
 

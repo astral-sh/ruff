@@ -20,7 +20,7 @@ pub(crate) struct UvMetadata {
     workspace_root: SystemPathBuf,
     members: Box<[WorkspaceMember]>,
     environment: Option<SystemPathBuf>,
-    installed_packages: BTreeMap<CharStr, InstalledPackage>,
+    installed_packages: Option<BTreeMap<CharStr, InstalledPackage>>,
     schema: Schema,
     workspace: Option<NodeReference>,
     script: Option<PathNodeReference>,
@@ -61,12 +61,10 @@ impl UvMetadata {
                     "environment root",
                     system,
                 )?),
-                environment
-                    .packages
-                    .ok_or(UvMetadataError::MissingPackageInventory)?
-                    .0,
+                environment.packages.map(|packages| packages.0),
             ),
-            None => (None, BTreeMap::new()),
+            // With no environment there are no installed packages to attribute.
+            None => (None, Some(BTreeMap::new())),
         };
 
         let mut module_owners = metadata.module_owners;
@@ -121,9 +119,6 @@ pub(crate) enum UvMetadataError {
 
     #[error("invalid `uv workspace metadata` JSON: {0}")]
     InvalidMetadata(serde_json::Error),
-
-    #[error("uv metadata is missing the installed package inventory; upgrade to uv {minimum_version} or newer", minimum_version = Version::new(MINIMUM_UV_VERSION))]
-    MissingPackageInventory,
 
     #[error("non-Unicode {description} returned by `uv workspace metadata`: `{path}`", path = path.display())]
     NonUnicodePath {
@@ -212,7 +207,7 @@ struct ModuleMetadata {
 #[derive(Deserialize)]
 struct WorkspaceEnvironment {
     root: PathBuf,
-    // An optional field lets us provide an upgrade message for older uv versions.
+    // uv versions before 0.13.2 supply an environment root without a package inventory.
     packages: Option<InstalledPackages>,
 }
 
@@ -304,7 +299,7 @@ mod tests {
     use ruff_db::system::TestSystem;
     use serde_json::json;
 
-    use super::{UvMetadata, UvMetadataError};
+    use super::{DependencyMetadataError, UvMetadata, UvMetadataError};
 
     #[test]
     fn rejects_invalid_metadata() {
@@ -337,7 +332,7 @@ mod tests {
     }
 
     #[test]
-    fn environment_requires_package_inventory() -> anyhow::Result<()> {
+    fn only_dependency_checks_require_the_package_inventory() -> anyhow::Result<()> {
         let system = TestSystem::default();
         system.memory_file_system().create_directory_all("/app")?;
 
@@ -350,9 +345,14 @@ mod tests {
                 "workspace_root": "/app",
                 "environment": environment,
             });
+            let metadata = UvMetadata::from_metadata(&serde_json::to_vec(&metadata)?, &system)?;
+            assert_eq!(
+                metadata.environment().map(|root| root.as_str()),
+                Some("/app")
+            );
             assert_matches!(
-                UvMetadata::from_metadata(&serde_json::to_vec(&metadata)?, &system),
-                Err(UvMetadataError::MissingPackageInventory)
+                metadata.dependency_metadata(),
+                Err(DependencyMetadataError::MissingPackageInventory)
             );
         }
 
@@ -405,6 +405,8 @@ mod tests {
             .context("expected module ownership")?;
         let (installed_id, package) = metadata
             .installed_packages
+            .as_ref()
+            .context("expected an installed package inventory")?
             .get_key_value(dependency_id)
             .context("expected an installed dependency")?;
 

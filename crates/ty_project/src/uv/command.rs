@@ -8,7 +8,7 @@ use ty_static::EnvVars;
 
 use super::{UvMetadata, UvMetadataError};
 
-pub(super) const MINIMUM_UV_VERSION: [u64; 3] = [0, 13, 2];
+pub(super) const MINIMUM_UV_VERSION: [u64; 3] = [0, 12, 3];
 
 #[derive(Clone)]
 pub(crate) struct Uv {

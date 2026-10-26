@@ -797,6 +797,7 @@ fn script_python(db: &dyn Db) -> Option<SystemPathBuf> {
 mod tests {
     use anyhow::Context;
     use ruff_db::Db as _;
+    use ruff_db::diagnostic::DiagnosticId;
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath};
     use salsa::Setter;
@@ -837,29 +838,18 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn dependency_metadata_changes_recheck_unchanged_imports() -> anyhow::Result<()> {
+    fn script_test_environment() -> anyhow::Result<(TestDb, &'static SystemPath)> {
         let root = SystemPath::new(if cfg!(windows) {
             "C:/project"
         } else {
             "/project"
         });
-        let path = root.join("script.py");
         let environment = root.join(".venv");
         let site_packages = environment.join(if cfg!(windows) {
             "Lib/site-packages"
         } else {
             "lib/python3.13/site-packages"
         });
-        let indirect = r#"
-            # /// script
-            # dependencies = ['parent']
-            # [tool.ty.rules]
-            # missing-direct-dependency = 'error'
-            # ///
-            import leaf
-            "#;
-        let declared = indirect.replace("['parent']", "['parent', 'leaf']");
         let metadata = ProjectMetadata::new("test", root.to_path_buf()).with_use_uv(UseUv::Scripts);
         let mut db = TestDb::new(metadata);
         db.write_dedented(
@@ -873,6 +863,66 @@ mod tests {
             ),
         )?;
         db.write_file(site_packages.join("leaf.py"), "")?;
+        Ok((db, root))
+    }
+
+    #[test]
+    fn older_uv_still_type_checks_scripts() -> anyhow::Result<()> {
+        let (mut db, root) = script_test_environment()?;
+        let path = root.join("script.py");
+        let metadata = json!({
+            "schema": {"version": "preview"},
+            "workspace_root": root.as_str(),
+            "environment": {"root": root.join(".venv")}
+        });
+        for rule in ["", "missing-direct-dependency = 'error'"] {
+            db.write_dedented(
+                path.as_str(),
+                &format!(
+                    r#"
+                # /// script
+                # dependencies = []
+                # [tool.ty.rules]
+                # {rule}
+                # ///
+                import leaf
+                x: int = "wrong"
+            "#
+                ),
+            )?;
+            let file = system_path_to_file(&db, &path)?;
+            apply_dependency_metadata(&mut db, file, &metadata)?;
+            let diagnostics = db.check_file(file);
+            assert!(diagnostics[0].id().is_lint_named("invalid-assignment"));
+            if rule.is_empty() {
+                assert_eq!(diagnostics.len(), 1);
+            } else {
+                assert_eq!(diagnostics.len(), 2);
+                assert_eq!(diagnostics[1].id(), DiagnosticId::UvMetadata);
+                assert!(
+                    diagnostics[1]
+                        .concise_message()
+                        .to_string()
+                        .contains("uv 0.13.2")
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn dependency_metadata_changes_recheck_unchanged_imports() -> anyhow::Result<()> {
+        let (mut db, root) = script_test_environment()?;
+        let path = root.join("script.py");
+        let indirect = r#"
+            # /// script
+            # dependencies = ['parent']
+            # [tool.ty.rules]
+            # missing-direct-dependency = 'error'
+            # ///
+            import leaf
+            "#;
+        let declared = indirect.replace("['parent']", "['parent', 'leaf']");
         db.write_dedented(path.as_str(), indirect)?;
         let file = system_path_to_file(&db, &path)?;
 

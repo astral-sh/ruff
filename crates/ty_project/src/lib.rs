@@ -852,7 +852,9 @@ impl Project {
         let uv_diagnostic = metadata.uv_diagnostic(db).or_else(|| {
             let workspace = metadata.uv_workspace_metadata()?;
             let error = self.dependency_metadata(db).as_ref().err()?;
-            let mut diagnostic = error.to_diagnostic(DependencyProjectKind::Project);
+            let mut diagnostic = error.to_diagnostic(DependencyProjectKind::Project, |lint| {
+                self.settings(db).enables_lint(lint)
+            })?;
             if let Ok(file) =
                 system_path_to_file(db, workspace.workspace_root().join("pyproject.toml"))
             {
@@ -1028,13 +1030,20 @@ pub(crate) fn check_file_impl(
 
             let settings_diagnostics = script.settings_diagnostics(*db);
             let dependency_diagnostic =
-                script.dependency_metadata(*db).as_ref().err().map(|error| {
-                    let mut diagnostic = error.to_diagnostic(DependencyProjectKind::Script);
-                    let mut annotation = Annotation::primary(Span::from(source_file));
-                    annotation.hide_snippet(true);
-                    diagnostic.annotate(annotation);
-                    diagnostic
-                });
+                script
+                    .dependency_metadata(*db)
+                    .as_ref()
+                    .err()
+                    .and_then(|error| {
+                        let mut diagnostic = error
+                            .to_diagnostic(DependencyProjectKind::Script, |lint| {
+                                db.rule_selection(source_file).is_enabled(lint)
+                            })?;
+                        let mut annotation = Annotation::primary(Span::from(source_file));
+                        annotation.hide_snippet(true);
+                        diagnostic.annotate(annotation);
+                        Some(diagnostic)
+                    });
             if settings_diagnostics.is_empty() && dependency_diagnostic.is_none() {
                 return Ok(diagnostics);
             }
