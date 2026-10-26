@@ -72,9 +72,9 @@ use anyhow::Context;
 use compact_str::CompactString;
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span};
 use ruff_db::files::{File, FilePath, system_path_to_file};
-use ruff_db::source::{line_index, source_text};
+use ruff_db::source::source_text;
 use ruff_db::system::{SystemPath, SystemPathBuf};
-use ruff_source_file::{PositionEncoding, SourceCode};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -104,9 +104,7 @@ pub(crate) fn demote_diagnostics(db: &dyn Db, file: File, diagnostics: &mut [Dia
         .collect();
     current.sort_by_key(|(location, _)| location.sort_key());
 
-    let text = source_text(db, file);
-    let index = line_index(db, file);
-    let source = SourceCode::new(&text, &index);
+    let source = source_text(db, file);
     let entries: Vec<_> = current
         .iter()
         .map(|(location, _)| location.entry(&source))
@@ -262,9 +260,7 @@ impl BaselineFile {
         )]
         for (file, (path, mut diagnostics)) in by_file {
             diagnostics.sort_by_key(BaselineDiagnostic::sort_key);
-            let text = source_text(db, file);
-            let index = line_index(db, file);
-            let source = SourceCode::new(&text, &index);
+            let source = source_text(db, file);
             let entries = diagnostics
                 .iter()
                 .map(|diagnostic| diagnostic.entry(&source))
@@ -312,7 +308,7 @@ impl BaselineFile {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct BaselineEntry {
     rule: CompactString,
-    /// Zero-based UTF-16 columns. The end is exclusive.
+    /// Zero-based columns counted in Unicode scalar values. The end is exclusive.
     start_column: usize,
     end_column: usize,
     /// Includes both the start and end lines.
@@ -394,14 +390,18 @@ impl BaselineDiagnostic {
         (self.range.start(), self.range.end(), self.rule)
     }
 
-    fn entry(&self, source: &SourceCode<'_, '_>) -> BaselineEntry {
-        let start = source.source_location(self.range.start(), PositionEncoding::Utf16);
-        let end = source.source_location(self.range.end(), PositionEncoding::Utf16);
+    fn entry(&self, source: &str) -> BaselineEntry {
+        let through_end = &source[TextRange::up_to(self.range.end())];
+        let column = |offset| {
+            let before = &through_end[TextRange::up_to(offset)];
+            let line_start = before.line_start(offset).to_usize();
+            before[line_start..].chars().count()
+        };
         BaselineEntry {
             rule: CompactString::const_new(self.rule.as_str()),
-            start_column: start.character_offset.to_zero_indexed(),
-            end_column: end.character_offset.to_zero_indexed(),
-            line_count: end.line.get() - start.line.get() + 1,
+            start_column: column(self.range.start()),
+            end_column: column(self.range.end()),
+            line_count: 1 + through_end.count_lines(self.range) as usize,
         }
     }
 }

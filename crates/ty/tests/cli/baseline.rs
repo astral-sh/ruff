@@ -138,8 +138,8 @@ x: int = 1.5
         "test.py": [
           {
             "rule": "invalid-assignment",
-            "startColumn": 10,
-            "endColumn": 5,
+            "startColumn": 9,
+            "endColumn": 4,
             "lineCount": 2
           },
           {
