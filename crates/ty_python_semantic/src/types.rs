@@ -5401,6 +5401,17 @@ impl<'db> Type<'db> {
         (member, kind, error)
     }
 
+    /// Looks for a concrete `__set__` or `__delete__` method. A type such as `type[Any]`
+    /// can hold a data descriptor without declaring either method.
+    fn has_data_descriptor_method(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        matches!(self, Type::PropertyInstance(_) | Type::SlotDescriptor(_))
+            || ["__set__", "__delete__"].into_iter().any(|name| {
+                !self
+                    .class_member_with_policy(db, env, name, MemberLookupPolicy::REQUIRE_CONCRETE)
+                    .is_undefined()
+            })
+    }
+
     /// Returns whether this type is a data descriptor, i.e. defines `__set__` or `__delete__`.
     /// If this type is a union, requires all elements of union to be data descriptors.
     /// A directly dynamic type is treated as a data descriptor because it could inhabit one.
@@ -5483,7 +5494,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Dynamic(_) => !any_of_union,
             Type::SubclassOf(_) if self.dynamic_descriptor_type().is_some() => true,
-            Type::Never | Type::PropertyInstance(_) | Type::SlotDescriptor(_) => true,
+            Type::Never => true,
             Type::Union(union) if any_of_union => union
                 .elements(db)
                 .iter()
@@ -5504,26 +5515,7 @@ impl<'db> Type<'db> {
                 .unfold(db, env)
                 .map(|unfolded| unfolded.is_data_descriptor_impl(db, program, any_of_union))
                 .unwrap_or(!any_of_union),
-            _ => {
-                !self
-                    .class_member_with_policy(
-                        db,
-                        env,
-                        "__set__",
-                        MemberLookupPolicy::REQUIRE_CONCRETE,
-                    )
-                    .place
-                    .is_undefined()
-                    || !self
-                        .class_member_with_policy(
-                            db,
-                            env,
-                            "__delete__",
-                            MemberLookupPolicy::REQUIRE_CONCRETE,
-                        )
-                        .place
-                        .is_undefined()
-            }
+            _ => self.has_data_descriptor_method(db, env),
         }
     }
 

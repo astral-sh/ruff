@@ -160,12 +160,15 @@ fn unbound_member_contract<'db>(
     {
         return None;
     }
-    let mut class_member = owner.own_class_member(db, env, None, name).inner;
-    let instance_member = if kind != AttributeContractKind::Receiver
-        && matches!(
-            class_member.place.ignore_possibly_undefined(),
-            Some(Type::SlotDescriptor(_))
-        ) {
+    let mut class_member = if kind == AttributeContractKind::Receiver {
+        PlaceAndQualifiers::unbound()
+    } else {
+        owner.own_class_member(db, env, None, name).inner
+    };
+    let instance_member = if matches!(
+        class_member.ignore_possibly_undefined(),
+        Some(Type::SlotDescriptor(_))
+    ) {
         // A slot provides storage without replacing an inherited annotation:
         //
         // ```python
@@ -193,25 +196,18 @@ fn unbound_member_contract<'db>(
         Place::Defined(DefinedPlace { origin: TypeOrigin::Declared, provenance, .. })
             if provenance.definition().is_some_and(|definition| definition.place(db).is_member())
     );
-    if kind == AttributeContractKind::Receiver
-        || kind == AttributeContractKind::Inherited
-            && has_receiver_declaration
-            && !class_member.qualifiers.contains(TypeQualifiers::CLASS_VAR)
-            && class_member
-                .place
-                .ignore_possibly_undefined()
-                .is_none_or(|ty| {
-                    !ty.may_be_data_descriptor(db, env)
-                        && ty
-                            .class_member_with_policy(
-                                db,
-                                env,
-                                "__get__",
-                                MemberLookupPolicy::REQUIRE_CONCRETE,
-                            )
-                            .place
-                            .is_undefined()
-                })
+    // An annotation such as `type[Any]` permits values that act as descriptors, but it
+    // still declares a writable attribute unless its type supplies a descriptor method.
+    let has_descriptor_method = !class_member.is_class_var()
+        && class_member.ignore_possibly_undefined().is_some_and(|ty| {
+            !ty.class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
+                .is_undefined()
+                || ty.has_data_descriptor_method(db, env)
+        });
+    if kind == AttributeContractKind::Inherited
+        && has_receiver_declaration
+        && !class_member.is_class_var()
+        && !has_descriptor_method
     {
         // An unannotated default may inherit an ancestor's type. It must not hide the
         // receiver declaration when this class is compared with its own subclasses.
@@ -225,17 +221,7 @@ fn unbound_member_contract<'db>(
         return None;
     }
     let qualifiers = class_member.qualifiers | instance_member.qualifiers;
-    let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
-    // A descriptor can define a write contract without defining `__get__`.
-    let is_descriptor = !is_class_var
-        && !class_member.place.is_undefined()
-        && (own_place.ty.may_be_data_descriptor(db, env)
-            || own_place
-                .ty
-                .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
-                .place
-                .ignore_possibly_undefined()
-                .is_some());
+    let is_descriptor = has_descriptor_method && !qualifiers.contains(TypeQualifiers::CLASS_VAR);
     // Unannotated defaults with an inherited annotation already have a declared type.
     // Other inferred bindings do not define an independent write contract: their raw
     // types can retain literals that ordinary attribute access widens.
@@ -380,12 +366,7 @@ fn descriptor_write_domain<'db>(
     match descriptor_setter_domain(db, env, descriptor, receiver) {
         DescriptorSetterDomain::Known(ty) => Some(ty),
         DescriptorSetterDomain::Deferred => Some(Type::unknown()),
-        DescriptorSetterDomain::Missing
-            if descriptor.as_property_instance().is_some()
-                || descriptor.is_data_descriptor(db, env) =>
-        {
-            None
-        }
+        DescriptorSetterDomain::Missing if descriptor.has_data_descriptor_method(db, env) => None,
         DescriptorSetterDomain::Missing => Some(storage_type),
     }
 }

@@ -3231,6 +3231,29 @@ class Same(Base):
     shared: ClassVar[int]
 ```
 
+A subclass can redeclare an `Any` attribute as `type[Any]` and still assign class objects to it.
+
+```py
+class DataType:
+    kind: Any
+
+class ConcreteDataType(DataType):
+    kind: type[Any]  # no diagnostic
+
+def set_kind(obj: ConcreteDataType):
+    obj.kind = int  # no diagnostic
+```
+
+The attribute remains writable when its type also permits a descriptor with only a getter.
+
+```py
+class Getter:
+    def __get__(self, instance: object, owner: type) -> Any: ...
+
+class WithGetter(DataType):
+    kind: Getter | type[Any]  # no diagnostic
+```
+
 ## Property value types
 
 Read-only properties may narrow their result types. They cannot return an unrelated type, even when
@@ -3290,7 +3313,7 @@ contract of an inherited attribute or property. The same check applies when an a
 method.
 
 ```py
-from typing import Callable
+from typing import Any, Callable
 
 class PropertyBase:
     @property
@@ -3331,6 +3354,20 @@ class CallablePropertyBase:
 class CompatibleMethod(CallablePropertyBase):
     def value(self) -> int:  # no diagnostic
         return 1
+```
+
+A method cannot replace a writable attribute that accepts both class objects and other callables.
+
+```py
+class Domain:
+    dtype: type[Any] | Callable[..., Any]
+
+def replace(domain: Domain):
+    domain.dtype = object  # no diagnostic
+
+class Field(Domain):
+    def dtype(self, value: int) -> int:  # error: [invalid-mutable-override]
+        return value
 ```
 
 ## Decorators preserving method binding
