@@ -2209,7 +2209,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         predicate_node: &'ast ast::Expr,
     ) -> (PredicateOrLiteral<'db>, ScopedPredicateId) {
-        let predicate = self.build_predicate(predicate_node, ExpressionContext::Condition);
+        let predicate = self.build_predicate(predicate_node, ExpressionContext::Condition, None);
         let predicate_id = self.record_narrowing_constraint(predicate);
         (predicate, predicate_id)
     }
@@ -2218,6 +2218,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         predicate_node: &'ast ast::Expr,
         context: ExpressionContext,
+        registered: Option<Expression<'db>>,
     ) -> PredicateOrLiteral<'db> {
         // Some commonly used test expressions are eagerly evaluated as `true`
         // or `false` here for performance reasons. This list does not need to
@@ -2246,11 +2247,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.register_narrowing_alias_predicates(predicate_node);
 
         if let Some(literal) = resolve_to_literal(predicate_node) {
-            self.add_standalone_expression(predicate_node);
+            if registered.is_none() {
+                self.add_standalone_expression(predicate_node);
+            }
             return PredicateOrLiteral::Literal(literal);
         }
 
-        let expression = self.add_predicate_expression(predicate_node, context);
+        let expression =
+            registered.unwrap_or_else(|| self.add_predicate_expression(predicate_node, context));
         PredicateOrLiteral::Predicate(Predicate {
             node: PredicateNode::Expression(expression),
             is_positive: true,
@@ -3752,7 +3756,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     value,
                 ));
                 let condition_flow_snapshots = self.take_condition_flow_snapshots(value);
-                let predicate = self.build_predicate(value, context);
+                let predicate = self.build_predicate(value, context, None);
                 let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
                 let predicate_id = match op {
                     ast::BoolOp::And => self.add_predicate(predicate),
@@ -4294,7 +4298,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 self.visit_condition(test);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
-                let predicate = self.build_predicate(test, ExpressionContext::Condition);
+                let predicate = self.build_predicate(test, ExpressionContext::Condition, None);
 
                 if msg.is_some()
                     || self
@@ -5000,8 +5004,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             self.flow_snapshot()
                         };
 
-                        let (guard_predicate, guard_predicate_id) =
-                            self.record_expression_narrowing_constraint(guard);
+                        let guard_predicate = self.build_predicate(
+                            guard,
+                            ExpressionContext::Condition,
+                            match_pattern_predicate.guard(self.db),
+                        );
+                        let guard_predicate_id = self.record_narrowing_constraint(guard_predicate);
                         let guard_reachability_constraint =
                             self.record_reachability_constraint_id(guard_predicate_id);
                         let guard_success = self.flow_snapshot();
