@@ -1,15 +1,16 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::{Expr, ExprCall};
+use ruff_python_ast::{Expr, ExprAttribute, ExprCall, Stmt};
 use ruff_python_semantic::analyze::typing;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 
 /// ## What it does
-/// Checks for mocks of shared clock and sleep functions in `time` and `asyncio`.
+/// Checks for patches, assignments, and deletions of shared clock and sleep
+/// functions in `time` and `asyncio`.
 ///
 /// ## Why is this bad?
 /// Python modules are shared within a process. Patching `time.sleep` also affects
@@ -48,13 +49,16 @@ use crate::codes::Category;
 ///
 /// ## Known problems
 /// This rule recognizes `unittest.mock.patch`, `patch.object`, pytest-mock's
-/// conventional fixture names, and `monkeypatch.setattr`. It also recognizes
-/// locally constructed `pytest.MonkeyPatch` instances.
+/// conventional fixture names, and pytest's `monkeypatch.setattr` and
+/// `monkeypatch.delattr`, including locally constructed `pytest.MonkeyPatch`
+/// instances.
 ///
 /// Targets ending in `.time` or `.asyncio` are assumed to refer to the corresponding
-/// standard-library module. This can produce false positives when an attribute
-/// already holds a private clock. Dynamic string targets and aliases of these
-/// attributes may not be recognized. Direct assignments are not checked.
+/// standard-library module, except for attributes directly on `self` or `cls`.
+/// This can produce false positives when an attribute
+/// already holds a private clock, for example when a pytest fixture replaced
+/// the consuming module's binding before the test ran. Dynamic string targets
+/// and aliases of these attributes may not be recognized.
 ///
 /// ## References
 /// - [Python documentation: Where to patch](https://docs.python.org/3/library/unittest.mock.html#where-to-patch)
@@ -69,7 +73,7 @@ impl Violation for SharedClockMock {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { function } = self;
-        format!("Mocking `{function}` may affect unrelated threads or tasks")
+        format!("Changing `{function}` may affect unrelated threads or tasks")
     }
 }
 
@@ -93,15 +97,20 @@ impl PatchApi {
                 ["unittest", "mock", "patch", "object"] | ["mock", "patch", "object"] => {
                     Some(Self::Object)
                 }
-                ["pytest", "MonkeyPatch", "setattr"]
-                | ["_pytest", "monkeypatch", "MonkeyPatch", "setattr"] => Some(Self::MonkeyPatch),
+                ["pytest", "MonkeyPatch", "setattr" | "delattr"]
+                | [
+                    "_pytest",
+                    "monkeypatch",
+                    "MonkeyPatch",
+                    "setattr" | "delattr",
+                ] => Some(Self::MonkeyPatch),
                 _ => None,
             };
         }
 
         let name = UnqualifiedName::from_expr(&call.func)?;
         match name.segments() {
-            ["monkeypatch", "setattr"] => Some(Self::MonkeyPatch),
+            ["monkeypatch", "setattr" | "delattr"] => Some(Self::MonkeyPatch),
             [
                 "mocker" | "class_mocker" | "module_mocker" | "package_mocker" | "session_mocker",
                 "patch",
@@ -125,14 +134,14 @@ pub(crate) fn shared_clock_mock(checker: &Checker, call: &ExprCall) {
         return;
     };
 
-    let (module, member) = match api {
+    let (module, member, range) = match api {
         PatchApi::String | PatchApi::MonkeyPatch
             if let Some(target) = target.as_string_literal_expr() =>
         {
             let Some((module, member)) = target.value.to_str().rsplit_once('.') else {
                 return;
             };
-            (module.rsplit('.').next(), member)
+            (module.rsplit('.').next(), member, target.range())
         }
         PatchApi::Object | PatchApi::MonkeyPatch => {
             let attribute = match api {
@@ -146,11 +155,36 @@ pub(crate) fn shared_clock_mock(checker: &Checker, call: &ExprCall) {
             else {
                 return;
             };
-            (clock_module(checker, target), member.value.to_str())
+            (
+                clock_module(checker, target),
+                member.value.to_str(),
+                target.range().cover(member.range()),
+            )
         }
         PatchApi::String => return,
     };
 
+    report_shared_clock(checker, module, member, range);
+}
+
+/// `shared-clock-mock`
+pub(crate) fn shared_clock_attribute(checker: &Checker, attribute: &ExprAttribute) {
+    // An annotation without a value does not write to the attribute.
+    if let Stmt::AnnAssign(assignment) = checker.semantic().current_statement()
+        && assignment.value.is_none()
+        && assignment.target.range() == attribute.range()
+    {
+        return;
+    }
+    report_shared_clock(
+        checker,
+        clock_module(checker, &attribute.value),
+        attribute.attr.as_str(),
+        attribute.range(),
+    );
+}
+
+fn report_shared_clock(checker: &Checker, module: Option<&str>, member: &str, range: TextRange) {
     if let Some(module) = module
         && matches!(
             (module, member),
@@ -166,12 +200,13 @@ pub(crate) fn shared_clock_mock(checker: &Checker, call: &ExprCall) {
             ) | ("asyncio", "sleep")
         )
     {
-        checker.report_diagnostic(
+        let mut diagnostic = checker.report_diagnostic(
             SharedClockMock {
                 function: format!("{module}.{member}"),
             },
-            target.range(),
+            range,
         );
+        diagnostic.help("Replace the binding in the consuming module with a private clock");
     }
 }
 
@@ -185,7 +220,15 @@ fn clock_module<'a>(checker: &Checker, target: &'a Expr) -> Option<&'a str> {
         }
     }
 
-    target
-        .as_attribute_expr()
-        .map(|target| target.attr.as_str())
+    let attribute = target.as_attribute_expr()?;
+    if let Some(receiver) = attribute.value.as_name_expr()
+        && matches!(receiver.id.as_str(), "self" | "cls")
+        && checker
+            .semantic()
+            .resolve_name(receiver)
+            .is_some_and(|id| checker.semantic().binding(id).kind.is_argument())
+    {
+        return None;
+    }
+    Some(attribute.attr.as_str())
 }

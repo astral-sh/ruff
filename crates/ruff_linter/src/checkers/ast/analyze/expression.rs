@@ -399,6 +399,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
         }
         Expr::Attribute(attribute) => {
+            if checker.is_rule_enabled(Rule::SharedClockMock)
+                && matches!(attribute.ctx, ExprContext::Store | ExprContext::Del)
+            {
+                ruff::rules::shared_clock_attribute(checker, attribute);
+            }
             if attribute.ctx == ExprContext::Load {
                 if checker.any_rule_enabled(&[
                     Rule::SuspiciousPickleUsage,
