@@ -52,6 +52,7 @@ use std::borrow::Cow;
 use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextSize};
 
+use super::{MarkdownFence, rest_literal_marker};
 use crate::docstring::document::syntax::BacktickScanner;
 
 /// Exposes an interface for rendering a line of prose that may contain a hyperlink.
@@ -728,11 +729,86 @@ fn consume_tag_prefix<'a>(cursor: &mut Cursor<'a>) -> Option<&'a str> {
 
     // Require a boundary after the name so `<p=placeholder>` is not treated
     // as an HTML tag named `p`.
-    if !matches!(cursor.first(), '>' | '/' | ' ' | '\t') {
+    if !matches!(cursor.first(), '>' | '/' | ' ' | '\t' | '\n') {
         return None;
     }
 
     Some(&remaining[..remaining.len() - cursor.as_str().len()])
+}
+
+/// Finds the last line needed to render wrapped tags on the first line.
+pub(super) fn wrapped_html_line_end(
+    source: &str,
+    first_line_end: usize,
+    allowed_html_tags: &[String],
+) -> WrappedHtmlLineEnd {
+    if allowed_html_tags.is_empty() {
+        return WrappedHtmlLineEnd::None;
+    }
+
+    let mut cursor = Cursor::new(source);
+    let mut line_end = first_line_end;
+    while cursor.offset().to_usize() < line_end {
+        // Do not treat tag-shaped text inside inline code or a reST hyperlink
+        // as a wrapped tag. An unmatched backtick may begin a wrapped link.
+        if cursor.first() == '`' {
+            let mut scanner = BacktickScanner::new(&source[cursor.offset().to_usize()..line_end]);
+            let Some(opening) = scanner.next() else {
+                break;
+            };
+            let Some(span) = scanner.eat_span(opening) else {
+                // A wrapped link beginning on a continuation line needs that
+                // line's indentation, not the first line's indentation.
+                return WrappedHtmlLineEnd::UnmatchedBacktick(line_end);
+            };
+            cursor.skip_bytes(span.end().to_usize());
+            continue;
+        }
+        if cursor.first() == '<' {
+            let mut lookahead = cursor.clone();
+            if let Some(tag) = consume_supported_html_tag(&mut lookahead, allowed_html_tags) {
+                let tag_end = lookahead.offset().to_usize();
+                if tag_end > line_end {
+                    let end = source[tag_end..]
+                        .find('\n')
+                        .map(|offset| tag_end + offset)
+                        .unwrap_or(source.len());
+                    let crosses_block_boundary = source[cursor.offset().to_usize()..end]
+                        .lines()
+                        .skip(1)
+                        .any(|line| {
+                            let line = line.trim_start();
+                            line.is_empty()
+                                || line.starts_with(">>>")
+                                || MarkdownFence::find(line).is_some()
+                                || rest_literal_marker(line).is_some()
+                        });
+                    if tag.contains('`') || crosses_block_boundary {
+                        break;
+                    }
+                    line_end = end;
+                }
+                cursor = lookahead;
+                continue;
+            }
+        }
+        cursor.bump();
+    }
+    if line_end > first_line_end {
+        WrappedHtmlLineEnd::End(line_end)
+    } else {
+        WrappedHtmlLineEnd::None
+    }
+}
+
+/// The result of scanning for wrapped HTML tags on a prose line.
+pub(super) enum WrappedHtmlLineEnd {
+    /// No wrapped tag needs to be rendered.
+    None,
+    /// The end of the last line needed to render the wrapped tags.
+    End(usize),
+    /// The end of the line containing an unmatched backtick.
+    UnmatchedBacktick(usize),
 }
 
 /// Consumes the rest of a tag through `>`, ignoring `>` inside quotes.
