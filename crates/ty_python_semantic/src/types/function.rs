@@ -2018,6 +2018,40 @@ impl<'db> FunctionType<'db> {
         }
     }
 
+    /// Represent a function's signature as the type arguments of `types.FunctionType`.
+    ///
+    /// A single return type cannot preserve the correlations between overload parameters and
+    /// return types. Overloaded functions and descriptor wrappers retain their callable representation.
+    pub(crate) fn try_to_function_type_instance(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        if self.runtime_class(db) != KnownClass::FunctionType {
+            return None;
+        }
+        let signatures = self.signature(db);
+        let [signature] = signatures.overloads.as_slice() else {
+            return None;
+        };
+        // Retain the generic context so that specializing `FunctionType.__call__` restores the
+        // binders shared by the parameters and return type.
+        let parameters = Type::Callable(CallableType::paramspec_value_from_signatures(
+            db,
+            signatures.clone(),
+        ));
+        KnownClass::FunctionType
+            .to_specialized_class_type(db, env, &[parameters, signature.return_ty])
+            .map(|class| Type::instance(db, env, class))
+    }
+
+    /// Return the runtime instance type, retaining the signature when it can be expressed by
+    /// `types.FunctionType`'s type parameters.
+    pub(crate) fn to_instance(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        self.try_to_function_type_instance(db, env)
+            .unwrap_or_else(|| self.runtime_class(db).to_instance(db, env))
+    }
+
     /// Convert the `FunctionType` into a [`CallableType`].
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         CallableType::new(db, self.signature(db), self.callable_type_kind(db))

@@ -2819,3 +2819,172 @@ def concrete(a: Box[str], b: Box[int], cond: bool):
     # error: [missing-argument]
     box.invoke(callback, 1)
 ```
+
+## Function types
+
+A generic `FunctionType` annotation preserves parameter names, defaults, and parameter kinds when
+inferring a signature from a function definition.
+
+```py
+from types import FunctionType
+
+def identity[**P, R](function: FunctionType[P, R]) -> FunctionType[P, R]:
+    return function
+
+def stringify(value: int, /, label: str = "value", *, uppercase: bool = False) -> str:
+    return str(value)
+
+function = identity(stringify)
+reveal_type(function(1))  # revealed: str
+reveal_type(function(1, label="item", uppercase=True))  # revealed: str
+function("one")  # error: [invalid-argument-type]
+function()  # error: [missing-argument]
+function(1, "item", True)  # error: [too-many-positional-arguments]
+function(1, value=2)  # error: [positional-only-parameter-as-kwarg]
+```
+
+The same signature is preserved when the generic function is used as a decorator.
+
+```py
+@identity
+def decorated(value: int, *, label: str = "value") -> str:
+    return label
+
+reveal_type(decorated(value=1))  # revealed: str
+reveal_type(decorated(1, label="item"))  # revealed: str
+decorated(1, label=False)  # error: [invalid-argument-type]
+```
+
+## Callable decorators and method binding
+
+Decorators annotated with `Callable` continue to bind the instance when their result is accessed as
+a method.
+
+```py
+from collections.abc import Callable
+
+def identity[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class C:
+    @identity
+    def stringify(self, value: int, *, label: str = "value") -> str:
+        return label
+
+reveal_type(C().stringify(1))  # revealed: str
+reveal_type(C().stringify(value=1, label="item"))  # revealed: str
+reveal_type(C.stringify(C(), 1))  # revealed: str
+C().stringify("one")  # error: [invalid-argument-type]
+C().stringify()  # error: [missing-argument]
+```
+
+## Generic functions as function types
+
+A generic function can be assigned to a `FunctionType` specialization when its signature supports
+that parameter list and return type.
+
+```py
+from types import FunctionType
+
+def identity[T](value: T) -> T:
+    return value
+
+integer: FunctionType[[int], int] = identity  # no diagnostic
+string: FunctionType[[str], str] = identity  # no diagnostic
+wrong_arity: FunctionType[[], int] = identity  # error: [invalid-assignment]
+
+def returns_int[T](value: T) -> int:
+    return 0
+
+wrong_return: FunctionType[[int], str] = returns_int  # error: [invalid-assignment]
+```
+
+Collection inference preserves a generic signature in `FunctionType`, including the type variables
+needed by its `__call__` method.
+
+```py
+from collections.abc import Callable
+from ty_extensions._internal import generic_context
+
+functions = [identity]
+reveal_type(functions)  # revealed: list[FunctionType[(value: T@identity), T@identity]]
+# revealed: ty_extensions._internal.GenericContext[T@identity]
+reveal_type(generic_context(functions[0].__call__))
+
+promoted_integer: FunctionType[[int], int] = functions[0]  # no diagnostic
+promoted_string: FunctionType[[str], str] = functions[0]  # no diagnostic
+integer_callback: Callable[[int], int] = functions[0]  # no diagnostic
+string_callback: Callable[[str], str] = functions[0]  # no diagnostic
+
+def check(value: int, label: str) -> None:
+    reveal_type(functions[0](value))  # revealed: int
+    reveal_type(functions[0](label))  # revealed: str
+```
+
+## Bounded generic functions as function types
+
+Promoting a generic function also preserves bounds and the independent inference of multiple type
+variables on each call.
+
+```py
+from ty_extensions._internal import generic_context
+
+def pair[Number: int, Item](number: Number, item: Item) -> tuple[Number, Item]:
+    return number, item
+
+pairs = [pair]
+# revealed: ty_extensions._internal.GenericContext[Number@pair, Item@pair]
+reveal_type(generic_context(pairs[0].__call__))
+
+def check(number: int, flag: bool, label: str, data: bytes) -> None:
+    reveal_type(pairs[0](number, label))  # revealed: tuple[int, str]
+    reveal_type(pairs[0](flag, data))  # revealed: tuple[bool, bytes]
+    pairs[0](label, data)  # error: [invalid-argument-type]
+```
+
+## Function type methods with `Self`
+
+A method returned by a `FunctionType` decorator binds `Self` to the receiver passed to the call,
+including when a subclass instance is passed through the base class's attribute.
+
+```py
+from types import FunctionType
+from typing import Self
+
+def identity[**P, R](function: FunctionType[P, R]) -> FunctionType[P, R]:
+    return function
+
+class Base:
+    @identity
+    def clone(self: Self) -> Self:
+        return self
+
+class Derived(Base): ...
+
+reveal_type(Base.clone(Derived()))  # revealed: Derived
+reveal_type(Derived().clone())  # revealed: Derived
+reveal_type(Base.clone(Base()))  # revealed: Base
+```
+
+## Bound method types
+
+A generic `MethodType` annotation captures the bound signature, including keyword-only parameters
+and defaults.
+
+```py
+from types import MethodType
+
+def identity[**P, R](method: MethodType[P, R]) -> MethodType[P, R]:
+    return method
+
+class C:
+    def method(self, value: int, *, label: str = "value") -> str:
+        return label
+
+method = identity(C().method)
+reveal_type(method(1))  # revealed: str
+reveal_type(method(value=1, label="item"))  # revealed: str
+method("one")  # error: [invalid-argument-type]
+method(1, label=False)  # error: [invalid-argument-type]
+method(1, "item")  # error: [too-many-positional-arguments]
+```

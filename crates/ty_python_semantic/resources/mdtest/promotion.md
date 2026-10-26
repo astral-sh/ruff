@@ -72,14 +72,14 @@ def _(source: Literal["foo", "bar"]):
     reveal_type(promote(x8))  # revealed: list[str]
 ```
 
-Function types are also promoted to their `Callable` form:
+Function literals are promoted to `FunctionType` with their parameter and return types:
 
 ```py
 def f(_: int) -> int:
     return 0
 
 reveal_type(f)  # revealed: def f(_: int) -> int
-reveal_type(promote(f))  # revealed: list[(_: int) -> int]
+reveal_type(promote(f))  # revealed: list[FunctionType[(_: int), int]]
 ```
 
 ## Invariant collection literals are promoted
@@ -626,7 +626,7 @@ type NarrowA = Intersection[A, Not[AlwaysFalsy]]
 def transform(value: NarrowA) -> NarrowA:
     return value
 
-reveal_type([transform])  # revealed: list[(value: NarrowA) -> A]
+reveal_type([transform])  # revealed: list[FunctionType[(value: NarrowA), A]]
 ```
 
 ## Literal annotations are respected

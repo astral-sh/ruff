@@ -83,7 +83,7 @@ class SomeTypedDict(TypedDict):
 
 N = NewType("N", int)
 
-# revealed: <super: <class 'object'>, FunctionType>
+# revealed: <super: <class 'object'>, FunctionType[(...), Any]>
 reveal_type(super(object, f))
 # revealed: <super: <class 'object'>, WrapperDescriptorType>
 reveal_type(super(object, types.FunctionType.__get__))
@@ -93,7 +93,7 @@ reveal_type(super(object, Foo[int]))
 reveal_type(super(object, Literal))
 # revealed: <super: <class 'object'>, TypeAliasType>
 reveal_type(super(object, Alias))
-# revealed: <super: <class 'object'>, MethodType>
+# revealed: <super: <class 'object'>, MethodType[(...), Any]>
 reveal_type(super(object, Foo().method))
 # revealed: <super: <class 'object'>, property>
 reveal_type(super(object, Foo.some_property))

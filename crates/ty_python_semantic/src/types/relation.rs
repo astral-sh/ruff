@@ -2573,6 +2573,35 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     self.check_callable_pair(db, source_callable, target_callable)
                 }),
 
+            // Compare complete function and bound-method signatures so generic binders can
+            // relate their parameters and return types, including across nominal type arguments.
+            // The signature alone is not enough: the runtime classes must also match.
+            (
+                Type::FunctionLiteral(_)
+                | Type::Callable(_)
+                | Type::BoundMethod(_)
+                | Type::NominalInstance(_),
+                Type::NominalInstance(instance),
+            ) if (instance.has_known_class(db, KnownClass::FunctionType)
+                && source.function_like_kind(db) == Some(CallableTypeKind::FunctionLike))
+                || (instance.has_known_class(db, KnownClass::MethodType)
+                    && (matches!(source, Type::BoundMethod(_))
+                        || matches!(source, Type::NominalInstance(source)
+                            if source.has_known_class(db, KnownClass::MethodType)))) =>
+            {
+                self.with_recursion_guard(db, source, target, || {
+                    let Some(source) = source.try_upcast_to_callable(db, env) else {
+                        return self.never();
+                    };
+                    let Some(target) = target.try_upcast_to_callable(db, env) else {
+                        return self.never();
+                    };
+                    target.iter().when_all(db, self.constraints, |target| {
+                        self.check_callables_vs_callable(db, &source, *target)
+                    })
+                })
+            }
+
             (
                 Type::Callable(source_callable),
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(target_partial)),
@@ -4266,11 +4295,22 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::FunctionLiteral(function), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::FunctionLiteral(function)) => {
                 // Function literals and their descriptor wrappers have an exact runtime class.
+                // Compare class origins because different signature specializations can describe
+                // the same runtime function object.
                 nontrivial_check(self, || {
-                    function
-                        .runtime_class(db)
-                        .when_subclass_of(db, env, instance.class(db, env), self.constraints)
-                        .negate(db, self.constraints)
+                    ConstraintSet::from_bool(
+                        self.constraints,
+                        function
+                            .runtime_class(db)
+                            .to_class_literal(db, env)
+                            .to_class_type(db)
+                            .is_some_and(|runtime_class| {
+                                !runtime_class.is_subtype_of_class_literal(
+                                    db,
+                                    instance.class_literal(db, env),
+                                )
+                            }),
+                    )
                 })
             }
 

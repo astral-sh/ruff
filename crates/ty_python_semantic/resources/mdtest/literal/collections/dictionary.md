@@ -59,7 +59,7 @@ def b(_: int) -> int:
     return 1
 
 x = {1: a, 2: b}
-reveal_type(x)  # revealed: dict[int, (_: int) -> int]
+reveal_type(x)  # revealed: dict[int, FunctionType[(_: int), int]]
 ```
 
 ## Mixed dict

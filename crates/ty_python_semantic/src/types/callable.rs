@@ -26,6 +26,11 @@ impl<'db> Type<'db> {
         match self {
             Type::FunctionLiteral(function) => Some(function.callable_type_kind(db)),
             Type::Callable(callable) if callable.is_method_like(db) => Some(callable.kind(db)),
+            Type::NominalInstance(instance)
+                if instance.has_known_class(db, KnownClass::FunctionType) =>
+            {
+                Some(CallableTypeKind::FunctionLike)
+            }
             Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
                 Some(match wrapper.kind(db) {
                     MethodWrapperKind::Staticmethod => CallableTypeKind::StaticMethodLike,
@@ -263,9 +268,46 @@ impl<'db> Type<'db> {
                         .try_upcast_to_callable_with_policy_and_context(
                             db, env, policy, context, None,
                         )
-                        // The callable instance itself doesn't inherit the descriptor behavior of
-                        // its `__call__` method.
-                        .map(|callables| callables.map(|callable| callable.into_regular(db)))
+                        .map(|callables| {
+                            callables.map(|mut callable| {
+                                // FunctionType instances are descriptors in their own right.
+                                // Other callable instances do not inherit the descriptor behavior
+                                // of their `__call__` method.
+                                if let Type::NominalInstance(instance) = self
+                                    && instance.has_known_class(db, KnownClass::FunctionType)
+                                {
+                                    // The bound `__call__` signature describes the function itself.
+                                    // Restore its definition for `Self` binding and its receiver
+                                    // constraints: the stub's `__call__` receiver does not constrain
+                                    // the represented function.
+                                    if let ClassType::Generic(alias) = instance.class(db, env)
+                                        && let [Type::Callable(parameters), _] =
+                                            alias.specialization(db).types(db)
+                                        && let [source_signature] =
+                                            parameters.signatures(db).overloads.as_slice()
+                                    {
+                                        callable = callable.with_signatures(
+                                            db,
+                                            CallableSignature::from_overloads(
+                                                callable.signatures(db).iter().map(|signature| {
+                                                    signature
+                                                        .clone()
+                                                        .with_definition(
+                                                            source_signature.definition(),
+                                                        )
+                                                        .with_receiver_constraints_from(
+                                                            source_signature,
+                                                        )
+                                                }),
+                                            ),
+                                        );
+                                    }
+                                    callable.into_function_like(db)
+                                } else {
+                                    callable.into_regular(db)
+                                }
+                            })
+                        })
                 } else {
                     None
                 }
@@ -550,7 +592,7 @@ pub enum CallableTypeKind {
     ///   `__qualname__`, `__module__`, `__code__`, `__defaults__`, and `__annotations__`.
     ///   `__call__` retains the callable's precise signatures.
     /// - Their metatype is the `types.FunctionType` class literal.
-    /// - They are subtypes of `types.FunctionType`. They can also satisfy a
+    /// - They satisfy `types.FunctionType` annotations with compatible signatures, as well as a
     ///   [`Self::Regular`] callable type with a compatible signature, but a regular callable
     ///   cannot satisfy a function-like callable type merely by having a compatible signature.
     /// - They use `types.FunctionType` as their owner type when constructing `super()`.
@@ -584,7 +626,8 @@ pub enum CallableTypeKind {
     /// ```
     ///
     /// When inferring a mutable collection's element type, we generalize function literals to
-    /// function-like callables. This allows the list below to contain other functions with
+    /// specialized `FunctionType` instances, retaining function-like callables for overloaded
+    /// signatures. This allows the list below to contain other functions with
     /// compatible signatures, rather than restricting it to the single function `first`:
     ///
     /// ```python

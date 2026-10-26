@@ -64,7 +64,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
  49 | 
  50 | N = NewType("N", int)
  51 | 
- 52 | # revealed: <super: <class 'object'>, FunctionType>
+ 52 | # revealed: <super: <class 'object'>, FunctionType[(...), Any]>
  53 | reveal_type(super(object, f))
  54 | # revealed: <super: <class 'object'>, WrapperDescriptorType>
  55 | reveal_type(super(object, types.FunctionType.__get__))
@@ -74,7 +74,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
  59 | reveal_type(super(object, Literal))
  60 | # revealed: <super: <class 'object'>, TypeAliasType>
  61 | reveal_type(super(object, Alias))
- 62 | # revealed: <super: <class 'object'>, MethodType>
+ 62 | # revealed: <super: <class 'object'>, MethodType[(...), Any]>
  63 | reveal_type(super(object, Foo().method))
  64 | # revealed: <super: <class 'object'>, property>
  65 | reveal_type(super(object, Foo.some_property))
