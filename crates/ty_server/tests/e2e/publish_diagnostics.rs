@@ -8,7 +8,7 @@ use lsp_types::{
     TextDocumentContentChangePartial, TextDocumentContentChangeWholeDocument, TextDocumentItem,
     Uri,
 };
-use ruff_db::system::{SystemPath, SystemVirtualPath};
+use ruff_db::system::{SystemPath, SystemPathBuf, SystemVirtualPath};
 use ty_server::ClientOptions;
 
 use crate::notebook::NotebookBuilder;
@@ -34,6 +34,28 @@ def foo() -> str:
     let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
 
     insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn deferred_opens_complete_with_one_worker() -> Result<()> {
+    let mut builder = TestServerBuilder::new()?.with_workspace(SystemPath::new("src"), None)?;
+    let paths = (0..80)
+        .map(|index| SystemPathBuf::from(format!("src/file_{index}.py")))
+        .collect::<Vec<_>>();
+    for path in &paths {
+        builder = builder.with_file(path, "value = 1\n")?;
+    }
+    let mut server = builder.build();
+
+    // Editors can open many documents before workspace settings arrive. With a single worker,
+    // processing those deferred notifications must still leave later requests able to run.
+    for path in &paths {
+        server.open_text_document(path, "value = 1\n", 1);
+    }
+    let mut server = server.wait_until_workspaces_are_initialized();
+    server.document_diagnostic_request(&paths[0], None);
 
     Ok(())
 }
@@ -1024,9 +1046,9 @@ mod uv_metadata {
     use std::process::Command;
 
     use anyhow::Result;
-    #[cfg(feature = "test-uv")]
-    use lsp_types::Message;
     use lsp_types::{Code, PublishDiagnosticsNotification};
+    #[cfg(feature = "test-uv")]
+    use lsp_types::{Message, TextDocumentContentChangeWholeDocument};
     use ruff_db::system::SystemPath;
     #[cfg(feature = "test-uv")]
     use ruff_python_trivia::textwrap::dedent;
@@ -1134,12 +1156,76 @@ package = "invalid"
 
         server.assert_work_done_progress("Refreshing example metadata")?;
 
-        // The existing warning is republished while the refresh is pending, then cleared.
-        assert_eq!(
-            server.collect_publish_diagnostic_notifications(1),
-            diagnostics
-        );
+        // The unchanged warning stays visible until the completed refresh clears it.
         assert!(server.collect_publish_diagnostic_notifications(1)[&event.uri].is_empty());
+        Ok(())
+    }
+
+    #[cfg(feature = "test-uv")]
+    #[test]
+    fn unused_dependency_updates_closed_manifest_after_python_edits() -> Result<()> {
+        let main = SystemPath::new("src/main.py");
+        let manifest = SystemPath::new("src/pyproject.toml");
+        let builder = TestServerBuilder::new()?
+            .with_workspace(SystemPath::new("src"), None)?
+            .with_file(
+                manifest,
+                r#"
+[project]
+name = "example"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["attrs==25.4.0"]
+
+[tool.ty.rules]
+unused-dependency = "warn"
+"#,
+            )?
+            .with_file(main, "pass\n")?
+            .with_real_uv(UseUv::On)?;
+
+        let output = Command::new("uv")
+            .env_clear()
+            .envs(uv_test_env_vars())
+            .current_dir(builder.file_path("src"))
+            .args(["sync"])
+            .output()?;
+        anyhow::ensure!(
+            output.status.success(),
+            "uv sync failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let mut server = builder.build().wait_until_workspaces_are_initialized();
+        let diagnostic = server.await_notification::<PublishDiagnosticsNotification>();
+        assert_eq!(diagnostic.uri, server.file_uri(manifest));
+        assert_eq!(diagnostic.diagnostics.len(), 1);
+        assert_eq!(
+            diagnostic.diagnostics[0].code,
+            Some(Code::String("unused-dependency".into()))
+        );
+
+        // The manifest stays closed, but an unsaved import in the Python file still clears its
+        // dependency diagnostic.
+        server.open_text_document(main, "import attrs\n", 1);
+        let cleared = server.await_notification::<PublishDiagnosticsNotification>();
+        assert_eq!(cleared.uri, server.file_uri(manifest));
+        assert!(cleared.diagnostics.is_empty());
+
+        server.change_text_document(
+            main,
+            vec![
+                TextDocumentContentChangeWholeDocument {
+                    text: "pass\n".to_string(),
+                }
+                .into(),
+            ],
+            2,
+        );
+        let restored = server.await_notification::<PublishDiagnosticsNotification>();
+        assert_eq!(restored.uri, diagnostic.uri);
+        assert_eq!(restored.diagnostics, diagnostic.diagnostics);
+
         Ok(())
     }
 
