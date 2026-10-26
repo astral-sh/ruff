@@ -296,7 +296,7 @@ mod tests {
 
     use anyhow::Context;
     use char_str::CharStr;
-    use ruff_db::system::TestSystem;
+    use ruff_db::system::{SystemPath, TestSystem};
     use serde_json::json;
 
     use super::{DependencyMetadataError, UvMetadata, UvMetadataError};
@@ -346,10 +346,7 @@ mod tests {
                 "environment": environment,
             });
             let metadata = UvMetadata::from_metadata(&serde_json::to_vec(&metadata)?, &system)?;
-            assert_eq!(
-                metadata.environment().map(|root| root.as_str()),
-                Some("/app")
-            );
+            assert_eq!(metadata.environment(), Some(SystemPath::new("/app")));
             assert_matches!(
                 metadata.dependency_metadata(),
                 Err(DependencyMetadataError::MissingPackageInventory)
