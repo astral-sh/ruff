@@ -86,7 +86,9 @@ pub fn semantic_index<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> SemanticI
 /// Whether this file contains an augmented assignment with an attribute target.
 #[salsa::tracked(returns(copy))]
 pub fn has_augmented_attribute_assignment<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> bool {
-    semantic_index(db, file).has_augmented_attribute_assignment
+    semantic_index(db, file)
+        .features
+        .augmented_attribute_assignment
 }
 
 /// Returns the place table for a specific `scope`.
@@ -289,6 +291,12 @@ impl<'db> DefinitionsByNode<'db> {
     }
 }
 
+#[derive(Debug, Default, get_size2::GetSize)]
+struct FileFeatures {
+    future_annotations: bool,
+    augmented_attribute_assignment: bool,
+}
+
 /// The place tables and use-def maps for all scopes in a file.
 #[derive(Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct SemanticIndex<'db> {
@@ -340,10 +348,7 @@ pub struct SemanticIndex<'db> {
     /// The set of modules that are imported anywhere within this file.
     imported_modules: FrozenSet<ModuleName>,
 
-    /// Flags about the global scope (code usage impacting inference)
-    has_future_annotations: bool,
-
-    has_augmented_attribute_assignment: bool,
+    features: FileFeatures,
 
     /// Map of all of the enclosing snapshots that appear in this file.
     enclosing_snapshots: FrozenMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
@@ -791,7 +796,7 @@ impl<'db> SemanticIndex<'db> {
     /// Checks if there is an import of `__future__.annotations` in the global scope, which affects
     /// the logic for type inference.
     pub fn has_future_annotations(&self) -> bool {
-        self.has_future_annotations
+        self.features.future_annotations
     }
 
     /// Returns
