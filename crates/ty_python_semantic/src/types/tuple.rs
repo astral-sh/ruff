@@ -1065,12 +1065,15 @@ impl<'db> FixedLengthTuple<Type<'db>> {
             ),
         };
 
-        Self::from_elements(
-            self.0
-                .iter()
-                .zip(tcx_elements)
-                .map(|(ty, tcx)| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
-        )
+        let elements = self.0.iter().copied().zip(tcx_elements);
+        if let Some(map_element) = type_mapping.map_arguments_without_variance(db, visitor) {
+            Self::from_elements(elements.map(map_element))
+        } else {
+            Self::from_elements(
+                elements
+                    .map(|(ty, tcx)| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+            )
+        }
     }
 
     fn find_legacy_typevars_impl(

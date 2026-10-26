@@ -38,11 +38,11 @@ use crate::types::visitor::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, DivergentProjection, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType,
-    KnownClass, KnownInstanceType, MaterializationKind, RecursiveType, SelfTypeVarOrigin,
-    SubclassOfInner, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type,
-    infer_definition_types, inferred_declaration,
+    ClassLiteral, DivergentProjection, DivergentType, ErrorContext, FindLegacyTypeVarsVisitor,
+    IntersectionType, KnownClass, KnownInstanceType, MaterializationKind, RecursiveType,
+    SelfTypeVarOrigin, SubclassOfInner, Type, TypeAliasType, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType,
+    binding_type, infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -1469,10 +1469,13 @@ impl<'db> Specialization<'db> {
         }
 
         let mut new_materialization_kind = self.materialization_kind(db);
+        let mut map_argument = type_mapping.map_arguments_without_variance(db, visitor);
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::declared(tcx.get(i).copied());
-            if type_mapping.is_structural() {
-                return ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+            if let Some(map_argument) = &mut map_argument {
+                // Replacing markers in stored alias arguments must not evaluate the alias body
+                // to infer the variance of a parameter.
+                return map_argument((ty, tcx));
             }
             match (typevar.variance(db), type_mapping) {
                 (
@@ -1543,6 +1546,44 @@ impl<'db> Specialization<'db> {
         } else {
             self
         }
+    }
+
+    /// Normalize only alternatives that carry provisional evidence. An independent argument can
+    /// be a large shared type graph, even when a sibling contains a single cycle marker.
+    pub(super) fn normalized_alias_arguments(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        div: Type<'db>,
+    ) -> Self {
+        let carries_marker = |ty| {
+            any_over_type_including_alias_arguments(db, env, ty, |ty| {
+                ty.same_divergent_marker(db, div) || ty.is_pending_narrowing()
+            })
+        };
+        let types = self.map_types(db, |_, _, argument| {
+            if !carries_marker(argument) {
+                return argument;
+            }
+            argument.map_cycle_recovery_alternatives(db, env, |alternative| {
+                if alternative != argument && !carries_marker(alternative) {
+                    return alternative;
+                }
+                alternative
+                    .recursive_type_normalized_impl(db, env, div, true)
+                    .unwrap_or(div)
+            })
+        });
+        if matches!(types, Cow::Borrowed(_)) {
+            return self;
+        }
+        Self::new(
+            db,
+            self.generic_context(db),
+            types,
+            self.materialization_kind(db),
+            self.tuple_inner(db),
+        )
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -2533,7 +2574,7 @@ pub(super) fn resolve_divergent_projection<'db>(
     env: &ProgramEnvironment<'db>,
     actual: Type<'db>,
     projection: DivergentProjection<'db>,
-    marker: Type<'db>,
+    marker: DivergentType<'db>,
 ) -> Option<Type<'db>> {
     let projections: Vec<_> =
         std::iter::successors(Some(projection), |projection| projection.parent(db)).collect();
@@ -2579,6 +2620,7 @@ pub(super) fn resolve_divergent_projection<'db>(
         }
         inferred = inference.merged_types(db).first().copied().flatten()?;
     }
+    let marker = Type::Divergent(marker);
     let resolved = inferred
         .recursive_type_normalized_impl(db, env, marker, false)
         .unwrap_or(marker);
@@ -4238,9 +4280,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 );
             }
 
-            (formal, actual @ Type::Divergent(_))
-                if actual.is_dynamic() && !formal.is_type_var() =>
-            {
+            (formal, actual) if actual.is_unmaterialized_divergent() && !formal.is_type_var() => {
                 let when = self.constraint_for_relation(formal, actual, polarity);
                 return self.infer_from_constraint_set(when);
             }
@@ -4591,7 +4631,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     && actual_union
                         .elements(db)
                         .iter()
-                        .any(|ty| ty.is_divergent() && ty.is_dynamic()) =>
+                        .any(Type::is_unmaterialized_divergent) =>
             {
                 let when = self.constraint_for_relation(formal, actual, polarity);
                 return self.infer_from_constraint_set(when);

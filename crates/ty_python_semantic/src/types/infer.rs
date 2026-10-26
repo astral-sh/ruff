@@ -60,8 +60,8 @@ use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, KnownClass, RecursiveType, StaticClassLiteral, Type, TypeAndQualifiers,
-    TypeQualifiers,
+    ClassLiteral, DivergentType, KnownClass, RecursiveType, StaticClassLiteral, Type,
+    TypeAndQualifiers, TypeQualifiers,
 };
 use crate::{Db, FxIndexSet};
 
@@ -256,7 +256,8 @@ fn normalize_collection_use_constraints<'db>(
         DefinitionInference::cycle_initial(
             db,
             definition,
-            Type::divergent(id).binding_cycle_marker(db, definition),
+            id,
+            Some(Type::divergent_for_binding(db, id, definition)),
         )
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
@@ -413,7 +414,7 @@ impl<'db> FunctionDecoratorInference<'db> {
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+        DefinitionInference::cycle_initial(db, definition, id, None)
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
         inference.cycle_normalized(db, previous, cycle, definition)
@@ -459,7 +460,7 @@ pub(crate) fn infer_deferred_types<'db>(
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+        DefinitionInference::cycle_initial(db, definition, id, None)
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
         inference.cycle_normalized(db, previous, cycle, definition)
@@ -1297,7 +1298,7 @@ impl<'db> DefinitionTypes<'db> {
         mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        replacements: &[(Type<'db>, Type<'db>)],
+        replacements: &[(DivergentType<'db>, Type<'db>)],
     ) -> Self {
         let replace = |ty: Type<'db>| ty.replace_divergent_projections(db, env, replacements);
         match &mut self {
@@ -1654,12 +1655,13 @@ impl<'db> DefinitionInference<'db> {
     fn cycle_initial(
         db: &'db dyn Db,
         definition: Definition<'db>,
-        cycle_recovery: Type<'db>,
+        id: salsa::Id,
+        binding: Option<Type<'db>>,
     ) -> Self {
         let env = ProgramEnvironment::from_definition(definition);
-        // Other missing fields use the generic fallback below. Only the owner binding can be
-        // used to resolve projections of this marker.
-        let mut types = DefinitionTypes::Binding(cycle_recovery);
+        let cycle_recovery = Type::divergent(id);
+        // Only the owner binding can supply a defining equation for a projected marker.
+        let mut types = DefinitionTypes::Binding(binding.unwrap_or(cycle_recovery));
 
         // Eagerly store more precise types for collection literals to avoid an extra
         // cycle iteration, i.e., by inferring `list[Divergent]` instead of `Divergent`.
@@ -1674,19 +1676,15 @@ impl<'db> DefinitionInference<'db> {
                 _ => None,
             };
 
-            if let Some(known_collection) = known_collection {
-                if let Some(collection_class) = known_collection.try_to_class_literal(db, &env) {
-                    let divergent_collection =
-                        collection_class.apply_specialization(db, |generic_context| {
-                            generic_context.repeat_specialization(
-                                db,
-                                cycle_recovery.without_binding_cycle_origin(db),
-                            )
-                        });
+            if let Some(known_collection) = known_collection
+                && let Some(collection_class) = known_collection.try_to_class_literal(db, &env)
+            {
+                let divergent_collection = collection_class
+                    .apply_specialization(db, |generic_context| {
+                        generic_context.repeat_specialization(db, cycle_recovery)
+                    });
 
-                    types =
-                        DefinitionTypes::Binding(Type::instance(db, &env, divergent_collection));
-                }
+                types = DefinitionTypes::Binding(Type::instance(db, &env, divergent_collection));
             }
         } else if let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) {
             let program_file = definition.program_file(db);
@@ -1718,7 +1716,7 @@ impl<'db> DefinitionInference<'db> {
                 .infer_annotated_assignment_cycle_initial(
                     definition,
                     assignment,
-                    cycle_recovery.without_binding_cycle_origin(db),
+                    cycle_recovery,
                 );
             }
         }
@@ -1730,7 +1728,7 @@ impl<'db> DefinitionInference<'db> {
             scope: definition.scope(db),
             extra: Some(Box::new(DefinitionInferenceExtra::Other(Box::new(
                 OtherDefinitionInferenceExtra {
-                    cycle_recovery: Some(cycle_recovery.without_binding_cycle_origin(db)),
+                    cycle_recovery: Some(cycle_recovery),
                     ..OtherDefinitionInferenceExtra::default()
                 },
             )))),

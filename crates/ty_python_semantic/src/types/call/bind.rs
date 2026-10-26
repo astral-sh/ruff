@@ -3934,25 +3934,7 @@ impl<'db> CallableBinding<'db> {
         // `*arg` where `arg` is a union of a 2-tuple and a 3-tuple, we shouldn't eliminate any
         // overload for arity reasons before trying argument expansion.
         let argument_expansions = call_arguments.expansions(db, env);
-        let divergent_expansions = call_arguments
-            .expansions(db, env)
-            .with_divergent_partitions();
-        // Partitioning refines the return type of an already successful generic call. It must
-        // not change overload selection. Constructors derive their result from the inferred
-        // specialization instead of the expanded return types, so they cannot use this refinement.
-        let has_divergent_partitions = matches!(self.overloads.as_slice(), [overload]
-            if overload.signature.generic_context.is_some() && overload.constructor_context.is_none())
-            && !call_arguments.iter().any(|argument| {
-                matches!(
-                    argument,
-                    CallArgument::Variadic(_) | CallArgument::Keywords(_)
-                )
-            })
-            && call_arguments.iter().enumerate().any(|(index, argument)| {
-                matches!(argument.source_type(), Some(Type::Union(union))
-                    if union.elements(db).iter().any(|ty| ty.is_divergent() && ty.is_dynamic()))
-                    && divergent_expansions.argument_alternatives(index).is_some()
-            });
+        let mut divergent_expansions = None;
         let (should_retry_after_provisional_arity, overloads_for_expansion) = if self
             .should_retry_after_provisional_arity(&argument_expansions)
         {
@@ -3973,15 +3955,43 @@ impl<'db> CallableBinding<'db> {
                     // If only one candidate overload remains, it is the winning match. Evaluate
                     // it as a regular (non-overloaded) call.
                     self.matching_overload_before_type_checking = Some(index);
-                    if !has_divergent_partitions {
-                        self.overloads[index].check_types(
-                            db,
-                            env,
-                            call_arguments.as_ref(),
-                            call_expression_tcx,
-                        );
+                    self.overloads[index].check_types(
+                        db,
+                        env,
+                        call_arguments.as_ref(),
+                        call_expression_tcx,
+                    );
+
+                    // Partition only after a single generic signature has matched so this cannot
+                    // change overload selection. Constructors derive their result from the
+                    // inferred specialization instead of the expanded return types.
+                    let [overload] = self.overloads.as_slice() else {
+                        return;
+                    };
+                    if overload.has_errors_affecting_overload_resolution()
+                        || overload.signature.generic_context.is_none()
+                        || overload.constructor_context.is_some()
+                        || call_arguments.iter().any(|argument| {
+                            matches!(
+                                argument,
+                                CallArgument::Variadic(_) | CallArgument::Keywords(_)
+                            )
+                        })
+                    {
                         return;
                     }
+
+                    let partitions = call_arguments
+                        .expansions(db, env)
+                        .with_divergent_partitions();
+                    if !call_arguments.iter().enumerate().any(|(index, argument)| {
+                        matches!(argument.source_type(), Some(Type::Union(union))
+                            if union.elements(db).iter().any(Type::is_unmaterialized_divergent))
+                            && partitions.argument_alternatives(index).is_some()
+                    }) {
+                        return;
+                    }
+                    divergent_expansions = Some(partitions);
                     (false, vec![index])
                 }
                 MatchingOverloadIndex::Multiple(indexes) => (false, indexes),
@@ -3989,9 +3999,13 @@ impl<'db> CallableBinding<'db> {
         };
 
         // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
-        // whether it is compatible with the supplied argument list.
-        for (_, overload) in self.matching_overloads_mut() {
-            overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
+        // whether it is compatible with the supplied argument list. A single signature already
+        // matched above and needs only the return type refinement.
+        let partition_divergent = divergent_expansions.is_some();
+        if !partition_divergent {
+            for (_, overload) in self.matching_overloads_mut() {
+                overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
+            }
         }
 
         tracing::trace!(
@@ -4000,24 +4014,16 @@ impl<'db> CallableBinding<'db> {
             "after step 2",
         );
 
-        let partition_divergent = has_divergent_partitions
-            && !matches!(self.matching_overload_index(), MatchingOverloadIndex::None);
-        if !partition_divergent && overloads_for_expansion.len() == 1 {
-            return;
-        }
-
         // If we are in the "retry for provisional arity" case, we have to try argument expansion
         // before deciding we are done or moving on to step 4+.
-        if !should_retry_after_provisional_arity {
+        if !should_retry_after_provisional_arity && !partition_divergent {
             match self.matching_overload_index() {
                 MatchingOverloadIndex::None => {
                     // If all overloads result in errors, proceed to step 3.
                 }
                 MatchingOverloadIndex::Single(_) => {
                     // If only one overload evaluates without error, it is the winning match.
-                    if !partition_divergent {
-                        return;
-                    }
+                    return;
                 }
                 MatchingOverloadIndex::Multiple(indexes) => {
                     // If two or more candidate overloads remain, proceed to step 4.
@@ -4066,11 +4072,7 @@ impl<'db> CallableBinding<'db> {
 
         // Step 3: Perform "argument type expansion". Reference:
         // https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion
-        let argument_expansions = if partition_divergent {
-            divergent_expansions
-        } else {
-            argument_expansions
-        };
+        let argument_expansions = divergent_expansions.unwrap_or(argument_expansions);
         // Recovery partitions every selected argument before evaluating any cases. Its residual
         // unions stay intact, so unrelated alternatives do not multiply across cycle iterations.
         let mut expansions = if partition_divergent {

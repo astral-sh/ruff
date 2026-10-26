@@ -85,10 +85,12 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
     /// their identities so cycle recovery can resolve them, without lifting nested markers out of
     /// their enclosing constructors. Materialized markers represent `object` or `Never` instead.
     fn merge_divergent(&self, types: &[Type<'db>]) -> Option<Type<'db>> {
-        let is_marker = |ty: Type<'db>| matches!(ty, Type::Divergent(divergent) if divergent.materialization_kind().is_none());
         if !types.iter().any(|&ty| match ty {
-            Type::Union(union) => union.elements(self.db).iter().copied().any(is_marker),
-            _ => is_marker(ty),
+            Type::Union(union) => union
+                .elements(self.db)
+                .iter()
+                .any(Type::is_unmaterialized_divergent),
+            _ => ty.is_unmaterialized_divergent(),
         }) {
             return None;
         }
@@ -96,7 +98,7 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
         let mut builder = UnionBuilder::new(self.db, self.env).unpack_aliases(false);
         let mut residuals = Vec::with_capacity(types.len());
         for &ty in types {
-            if is_marker(ty) {
+            if ty.is_unmaterialized_divergent() {
                 builder.add_in_place(ty);
             } else if let Type::Union(union) = ty {
                 let mut residual = UnionBuilder::new(self.db, self.env)
@@ -104,7 +106,7 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
                     .or_recursively_defined(union.recursively_defined(self.db));
                 builder = builder.or_recursively_defined(union.recursively_defined(self.db));
                 for &element in union.elements(self.db) {
-                    if is_marker(element) {
+                    if element.is_unmaterialized_divergent() {
                         builder.add_in_place(element);
                     } else {
                         residual.add_in_place(element);

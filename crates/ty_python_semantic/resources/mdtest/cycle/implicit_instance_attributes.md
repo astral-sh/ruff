@@ -94,6 +94,36 @@ class C:
 reveal_type(C().value)  # revealed: list[int] | list[list[int] | Divergent]
 ```
 
+## An attribute referenced by a generic return type
+
+Inferring the alias in `expand`'s return type requires reading the attribute that the call updates.
+The initializer and the update produce tuples of different lengths. Both shapes survive when
+inference widens their recursive elements.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Iterable
+from ty_extensions._internal import TypeOf
+
+type Item[T] = T | TypeOf[Tree().items]
+
+class Tree:
+    def __init__(self):
+        self.items = (1,)
+
+    def update(self):
+        self.items = expand(self.items)
+
+def expand[T](items: Iterable[T]) -> tuple[list[T], Item[T]]:
+    raise NotImplementedError
+
+reveal_type(Tree().items)  # revealed: tuple[int] | tuple[Divergent, Divergent]
+```
+
 ## Concatenating recursively growing tuples
 
 Repeatedly appending or prepending elements to an inferred attribute can produce tuples of arbitrary

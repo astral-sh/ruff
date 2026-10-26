@@ -716,6 +716,10 @@ impl<'db> TypeAliasType<'db> {
             TypeMapping::ApplyRecursiveSubstitution(_) => {
                 Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
             }
+            TypeMapping::ReplaceDivergent { .. } => visitor
+                .visit_stored_alias_arguments(ty, || {
+                    Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
+                }),
             TypeMapping::Materialize(_) if self.materialization_kind(db).is_some() => ty,
             TypeMapping::EagerExpansion if self.materialization_kind(db).is_some() => self
                 .value_type_with_recursion(db, visitor.recursion_context)
@@ -793,12 +797,20 @@ impl<'db> TypeAliasType<'db> {
         if mapped == specialization {
             return self;
         }
+        self.with_specialization(db, mapped)
+    }
+
+    pub(super) fn with_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Self {
         match self {
             Self::PEP695(alias) => Self::PEP695(PEP695TypeAliasType::new(
                 db,
                 alias.name(db),
                 alias.rhs_scope(db),
-                Some(mapped),
+                Some(specialization),
                 alias.materialization_kind(db),
             )),
             Self::ManualPEP695(alias) => Self::ManualPEP695(ManualPEP695TypeAliasType::new(
@@ -806,7 +818,7 @@ impl<'db> TypeAliasType<'db> {
                 alias.name(db),
                 alias.definition(db),
                 alias.typing_module(db),
-                Some(mapped),
+                Some(specialization),
                 alias.materialization_kind(db),
             )),
         }

@@ -4384,6 +4384,29 @@ def probe(value: Levels[int, str, bytes]):
     reveal_type(grandchild_value(value))  # revealed: bytes
 ```
 
+## Recursive aliases returned by generic calls in loops
+
+Each iteration wraps the previous items in a tree. Inference widens the recursive element while
+preserving the list returned by the function and the initial tuple from the zero-iteration path.
+
+```py
+from collections.abc import Iterable
+from typing import TypeVar
+
+T = TypeVar("T")
+Tree = T | tuple["Tree[T]", ...]
+Forest = list[Tree[T]]
+
+def nest(items: Iterable[T]) -> Forest[T]:
+    return [tuple(items)]
+
+def nest_repeatedly(running: bool):
+    items = (1,)
+    while running:
+        items = nest(items)
+    reveal_type(items)  # revealed: tuple[Literal[1]] | list[Divergent]
+```
+
 ## Recursive class objects passed to generic functions
 
 Inference converges when a loop repeatedly wraps a class's instance type in `list`.
@@ -4486,16 +4509,10 @@ unsound-return-statement = "error"
 ```
 
 ```py
-from typing import Protocol, TypeVar
+from collections.abc import Iterable, Iterator
+from typing import TypeVar
 
-T_co = TypeVar("T_co", covariant=True)
 T = TypeVar("T")
-
-class Iterable(Protocol[T_co]):
-    def __iter__(self) -> "Iterator[T_co]": ...
-
-class Iterator(Iterable[T_co], Protocol[T_co]):
-    def __next__(self) -> T_co: ...
 
 class Filter:
     def filter(self, items: Iterable[T]) -> Iterator[T]:
@@ -4514,24 +4531,18 @@ Updating a collection while iterating through a generic wrapper preserves its el
 invalid attribute access is still rejected.
 
 ```py
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
 class Indexed(Generic[T]):
     def __init__(self, items: Iterable[T]) -> None: ...
-    def __iter__(self) -> "Indexed[T]":
+    def __iter__(self) -> Iterator[tuple[int, T]]:
         raise NotImplementedError
-
-    def __next__(self) -> tuple[int, T]:
-        raise NotImplementedError
-
-class Item:
-    pass
 
 class Container:
-    items: list[Item]
+    items: list[int]
 
 def visit_constructor(container: Container):
     while True:
@@ -4544,8 +4555,6 @@ The same check applies when a generic function combines two collections into an 
 Both arguments contribute to the item type, which is preserved through both return-type layers.
 
 ```py
-from collections.abc import Iterator
-
 def paired(left: Iterable[T], right: Iterable[T]) -> Iterator[tuple[T, T]]:
     raise NotImplementedError
 

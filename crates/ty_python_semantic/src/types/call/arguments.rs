@@ -191,7 +191,7 @@ impl<'a, 'db> CallArgument<'a, 'db> {
         if !union
             .elements(db)
             .iter()
-            .any(|ty| ty.is_divergent() && ty.is_dynamic())
+            .any(Type::is_unmaterialized_divergent)
         {
             return None;
         }
@@ -202,7 +202,7 @@ impl<'a, 'db> CallArgument<'a, 'db> {
         };
         let (mut residual, mut markers) = (builder(), builder());
         for &element in union.elements(db) {
-            if element.is_divergent() && element.is_dynamic() {
+            if element.is_unmaterialized_divergent() {
                 markers.add_in_place(element);
             } else {
                 residual.add_in_place(element);

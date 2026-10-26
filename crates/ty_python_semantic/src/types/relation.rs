@@ -15,7 +15,7 @@ use crate::types::constraints::{
 use crate::types::cyclic::{ActiveRecursionDetector, HasIdentity, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
-use crate::types::generics::walk_specialization_types;
+use crate::types::generics::{Specialization, walk_specialization_types};
 use crate::types::protocol_class::walk_protocol_instance_interface;
 use crate::types::relation_error::ErrorRelation;
 use crate::types::set_theoretic::RecursivelyDefined;
@@ -1816,6 +1816,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             env: &'a ProgramEnvironment<'db>,
             typevars: RefCell<FxOrderSet<BoundTypeVarInstance<'db>>>,
             visited: TypeCollector<'db>,
+            visited_arguments: RefCell<FxHashSet<Specialization<'db>>>,
             active: ActiveRecursionDetector<TypeIdentity<'db>>,
             active_protocols: ActiveRecursionDetector<Definition<'db>>,
         }
@@ -1882,18 +1883,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         .and_then(|(_, specialization)| specialization),
                     _ => None,
                 };
-                if let Some(arguments) = arguments {
+                if let Some(arguments) = arguments
+                    && self.visited_arguments.borrow_mut().insert(arguments)
+                {
                     walk_specialization_types(db, arguments, self);
                 }
-                if matches!(ty, Type::ProtocolInstance(_)) {
+                let walk_body = || {
+                    // Inside a different active body, a recursive edge can stop at a different
+                    // definition. Only reuse argument walks that ran under the same active bodies.
+                    let outer_arguments = self.visited_arguments.take();
                     walk_type_with_recursion_guard(db, ty, self, &self.visited);
+                    self.visited_arguments.replace(outer_arguments);
+                };
+                if matches!(ty, Type::ProtocolInstance(_)) {
+                    walk_body();
                     return;
                 }
-                self.active.visit(
-                    &ty.to_type_identity(db),
-                    || {},
-                    || walk_type_with_recursion_guard(db, ty, self, &self.visited),
-                );
+                self.active
+                    .visit(&ty.to_type_identity(db), || {}, walk_body);
             }
         }
 
@@ -1906,6 +1913,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             env: self.env,
             typevars: RefCell::default(),
             visited: TypeCollector::default(),
+            visited_arguments: RefCell::default(),
             active: ActiveRecursionDetector::default(),
             active_protocols: ActiveRecursionDetector::default(),
         };
