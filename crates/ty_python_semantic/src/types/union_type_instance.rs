@@ -282,11 +282,19 @@ impl<'db> UnionTypeInstance<'db> {
         program: Program<'db>,
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         let env = ProgramEnvironment::from_program(program);
+        self.build_union_type(db, &env, UnionBuilder::new(db, &env))
+    }
+
+    fn build_union_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mut builder: UnionBuilder<'db>,
+    ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         match self.kind(db) {
             RuntimeUnion::Pep604(operands) => {
-                let mut builder = UnionBuilder::new(db, &env);
                 for operand in Self::leaves(db, operands) {
-                    builder.add_in_place(operand.denoted(db, &env)?);
+                    builder.add_in_place(operand.denoted(db, env)?);
                 }
                 Ok(builder.build())
             }
@@ -482,8 +490,10 @@ impl<'db> UnionTypeInstance<'db> {
                 let canonical =
                     Self::new_internal(db, RuntimeUnion::Pep604(leaves.into_iter().collect()));
                 // A denoted union can drop a divergent member even if normalizing the raw
-                // operands left that marker in place.
-                if let Ok(ty) = self.union_type(db, env)
+                // operands left that marker in place. Use the recovery builder here because
+                // ordinary union simplification can introduce new query cycles.
+                if let Ok(ty) =
+                    self.build_union_type(db, env, UnionBuilder::new(db, env).cycle_recovery(true))
                     && let normalized = normalize(ty)?
                     && normalized != ty
                 {

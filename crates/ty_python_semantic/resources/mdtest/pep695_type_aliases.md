@@ -398,6 +398,18 @@ def f(condition: bool):
         reveal_type(x)  # revealed: int | str
 ```
 
+An alias can refer to the same union that the loop extends. Adding the alias preserves the type the
+union denotes.
+
+```py
+type Alias = union
+union = int
+for _ in range(2):
+    union |= Alias
+
+reveal_type(union)  # revealed: <types.UnionType special-form 'int'>
+```
+
 ## Multiple layers of union aliases
 
 ```py
