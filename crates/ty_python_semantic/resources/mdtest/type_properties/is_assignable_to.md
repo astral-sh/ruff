@@ -893,6 +893,28 @@ static_assert(is_assignable_to(LiteralString, Literal[""] | AlwaysTruthy))
 static_assert(not is_assignable_to(Literal[True] | AlwaysFalsy, Literal[False] | AlwaysTruthy))
 ```
 
+## Gradual unions with complementary arms
+
+Separate arms of a gradual union can collectively cover the source. The top materialization of
+`Not[Top[list[Any]]] | list[Any]` is `object`, so every object is assignable to this union. This
+does not make `object` a subtype of the union.
+
+```py
+from typing import Any
+from ty_extensions import Intersection, Not, Top, static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+static_assert(is_assignable_to(object, Not[Top[list[Any]]] | list[Any]))
+static_assert(not is_subtype_of(object, Not[Top[list[Any]]] | list[Any]))
+```
+
+A type variable in the remaining arm still restricts which values the union accepts.
+
+```py
+def restricted[T]() -> None:
+    static_assert(not is_assignable_to(object, Intersection[T, Not[Top[list[Any]]]] | list[Any]))
+```
+
 ## Intersection types
 
 ```pyi

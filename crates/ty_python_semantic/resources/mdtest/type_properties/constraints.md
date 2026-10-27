@@ -1579,6 +1579,70 @@ def upper_bounded_noninferable[I, N]() -> None:
     reveal_type(constraints.solutions(inferable=tuple[I]))
 ```
 
+### Type variables in union upper bounds
+
+An upper bound on a caller-fixed variable can provide evidence for an inferable variable inside the
+bound. From `U ≤ T | int`, we infer `U & ~int ≤ T`: `T` only needs to accept the portion of `U` that
+the concrete `int` arm does not cover. The solution preserves `U` symbolically without binding it.
+
+```py
+from typing import Any
+from ty_extensions._internal import ConstraintSet
+
+def union_upper[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(U, T | int) & ConstraintSet.lower_bound(str, T)
+    # revealed: tuple[Solution[T=(U@union_upper & ~int) | str]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
+Every other union arm contributes to the residual, even when there is no separate lower-bound
+evidence for `T`.
+
+```py
+def several_arms[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(U, T | int | bytes)
+    # revealed: tuple[Solution[T=U@several_arms & ~int & ~bytes]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
+We reject the constraint when the remaining portion of `U` cannot satisfy `T`'s declared bound.
+
+```py
+def uncovered[T: str, U: int | bytes]() -> None:
+    constraints = ConstraintSet.upper_bound(U, T | int)
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
+```
+
+For a gradual arm, we subtract its top materialization: `U & ~Top[A] ≤ T`. This preserves the
+portion of `U` that the gradual arm cannot accept.
+
+```py
+def nested_gradual[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(U, T | list[Any]) & ConstraintSet.lower_bound(str, T)
+    # revealed: tuple[Solution[T=(U@nested_gradual & ~Top[list[Any]]) | str]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
+Propagating the residual through `T = U` can produce `T & ~str ≤ T`. This tautology contributes no
+inference evidence: the solution remains `U`, rather than the self-referential `U | (T & ~str)`.
+
+```py
+def propagated_residual[T, U]() -> None:
+    constraints = ConstraintSet.range(U, T, U) & ConstraintSet.upper_bound(T, U | str)
+    # revealed: tuple[Solution[T=U@propagated_residual]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
+```
+
+The dual tautology, `T ≤ T | V`, also contributes no evidence. Here, `T = U` satisfies both upper
+bounds without leaving a reference to `T` in its own solution.
+
+```py
+def propagated_union[T, U, V]() -> None:
+    constraints = ConstraintSet.upper_bound(T, U) & ConstraintSet.upper_bound(U, T | V)
+    # revealed: tuple[Solution[T=U@propagated_union]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
+```
+
 ### Substitution exceeding the derivation budget
 
 If substituting an exact type into a deeply nested bound exceeds the derivation budget, the original
