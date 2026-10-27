@@ -173,6 +173,7 @@ impl<'src> Parser<'src> {
                 );
             } else if self.at_compound_stmt() && !self.at(TokenKind::Match) {
                 // `match` can also be an identifier. Check its separator when parsing the keyword.
+
                 // test_err simple_and_compound_stmt_on_same_line
                 // a; if b: pass; b
                 self.add_error(
