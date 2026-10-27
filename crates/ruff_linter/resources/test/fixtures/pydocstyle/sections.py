@@ -190,8 +190,8 @@ def ignore_non_actual_section():  # noqa: D416
 @expect("D400: First line should end with a period (not 's')")
 @expect("D415: First line should end with a period, question "
         "mark, or exclamation point (not 's')")
-@expect("D205: 1 blank line required between summary line and description "
-        "(found 0)")
+@expect('D205: Multi-line docstrings should be a one-line summary, a blank line, and a detailed description. '
+        '(found 0 blank lines)')
 def section_name_in_first_line():  # noqa: D416
     """Returns
     -------

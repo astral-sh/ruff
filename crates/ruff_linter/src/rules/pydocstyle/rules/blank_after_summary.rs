@@ -58,16 +58,16 @@ impl Violation for MissingBlankLineAfterSummary {
     fn message(&self) -> String {
         let MissingBlankLineAfterSummary { num_lines } = self;
         if *num_lines == 0 {
-            "1 blank line required between summary line and description".to_string()
+            "Multi-line docstrings should be a one-line summary, a blank line, and a detailed description.".to_string()
         } else {
             format!(
-                "1 blank line required between summary line and description (found {num_lines})"
+                "Multi-line docstrings should be a one-line summary, a blank line, and a detailed description. (found {num_lines} blank lines)"
             )
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Insert single blank line".to_string())
+        Some("Insert single blank line between the summary and the description".to_string())
     }
 }
 

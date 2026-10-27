@@ -193,8 +193,8 @@ class LeadingAndTrailingSpaceMissing:
     pass
 
 
-@expect('D205: 1 blank line required between summary line and description '
-        '(found 0)')
+@expect('D205: Multi-line docstrings should be a one-line summary, a blank line, and a detailed description. '
+        '(found 0 blank lines)')
 @expect('D213: Multi-line docstring summary should start at the second line')
 def multi_line_zero_separating_blanks():
     """Summary.
@@ -203,8 +203,8 @@ def multi_line_zero_separating_blanks():
     """
 
 
-@expect('D205: 1 blank line required between summary line and description '
-        '(found 2)')
+@expect('D205: Multi-line docstrings should be a one-line summary, a blank line, and a detailed description. '
+        '(found 2 blank lines)')
 @expect('D213: Multi-line docstring summary should start at the second line')
 def multi_line_two_separating_blanks():
     """Summary.

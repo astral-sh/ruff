@@ -50,8 +50,8 @@ expect = expectation.expect
 # module docstring expected violations:
 expectation.expected.add((
     os.path.normcase(__file__),
-    "D205: 1 blank line required between summary line and description "
-    "(found 0)"))
+    "Multi-line docstrings should be a one-line summary, a blank line, and a detailed description. "
+    "(found 0 blank lines)"))
 expectation.expected.add((
     os.path.normcase(__file__),
     "D213: Multi-line docstring summary should start at the second line"))
