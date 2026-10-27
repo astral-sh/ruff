@@ -425,6 +425,34 @@ def _(abstract: AbstractBook, ebook: Ebook, book: Book):
     reveal_type(book.isbn)  # revealed: str
 ```
 
+### Annotated abstract setting
+
+A bare annotation for `Meta.abstract` does not make a model abstract.
+
+```py
+from django.db import models
+
+class Book(models.Model):
+    class Meta:
+        abstract: bool
+
+def _(book: Book):
+    reveal_type(book.id)  # revealed: int
+    reveal_type(book.pk)  # revealed: int
+```
+
+When an assignment follows the annotation, its value determines whether the model is abstract.
+
+```py
+class AbstractBook(models.Model):
+    class Meta:
+        abstract: bool
+        abstract = True
+
+def _(abstract: AbstractBook):
+    abstract.id  # error: [unresolved-attribute]
+```
+
 ### Multiple inheritance
 
 An abstract base without a primary key does not shadow an inherited `id`, regardless of the base

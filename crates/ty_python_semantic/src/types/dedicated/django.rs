@@ -6,7 +6,7 @@ use ty_python_core::{
     place_table, use_def_map,
 };
 
-use crate::place::{Place, Provenance, known_module_symbol};
+use crate::place::{Place, Provenance, known_module_symbol, place_from_bindings};
 use crate::types::member::class_member;
 use crate::types::{
     BindingContext, BoundTypeVarInstance, ClassBase, GenericContext, KnownClass,
@@ -261,7 +261,14 @@ fn is_abstract_model<'db>(
     let Provenance::SingleDefinition(definition) = abstract_flag.provenance else {
         return false;
     };
-    binding_type(db, definition) == Type::bool_literal(true)
+    place_from_bindings(
+        db,
+        env,
+        use_def_map(db, definition.scope(db)).end_of_scope_bindings(definition.place(db)),
+    )
+    .place
+    .ignore_possibly_undefined()
+        == Some(Type::bool_literal(true))
 }
 
 /// Find a field constructed with `primary_key=True` in this class body.
