@@ -138,6 +138,59 @@ def check(value: WithLiteral):
     isinstance(value, WithLiteral)  # error: [invalid-argument-type]
 ```
 
+## Runtime operators in eager annotations
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+### Nested union objects
+
+`bool | int` denotes `int`, but evaluates to a union object that accepts `None` on either side.
+
+```py
+def f(left: bool | int | None | bytes, right: bytes | (None | (bool | int))):
+    reveal_type(left)  # revealed: int | None | bytes
+    reveal_type(right)  # revealed: bytes | None | int
+```
+
+### Custom metaclass operators
+
+A metaclass can give `|` a different result. Here `C | "int"` evaluates to a string, so applying
+`| None` to that result fails.
+
+```py
+class Meta(type):
+    def __or__(self, other: str) -> str:
+        return other
+
+class C(metaclass=Meta): ...
+
+# error: 29 [unsupported-operator] "Operator `|` is unsupported between objects of type `str` and `None`"
+def invalid(value: bytes | (C | "int" | None)):
+    reveal_type(value)  # revealed: bytes | C | int | None
+```
+
+### Dictionary merges
+
+Even in an invalid annotation, merging a dictionary literal with a `TypedDict` instance produces
+that `TypedDict`. The next `|` reports its runtime type.
+
+```py
+from typing import TypedDict
+
+class Row(TypedDict):
+    key: int
+
+row: Row = {"key": 1}
+
+# error: [invalid-type-form] "Dict literals"
+# error: [invalid-type-form] "Variable of type `Row`"
+# error: [unsupported-operator] "Operator `|` is unsupported between objects of type `Row` and `None`"
+def invalid(value: {} | row | None | bytes): ...
+```
+
 ## Recursive assignments to invalid union operands
 
 An invalid operation still produces a diagnostic when its operand is inferred recursively:
