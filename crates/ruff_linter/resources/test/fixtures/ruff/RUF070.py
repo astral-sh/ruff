@@ -56,16 +56,23 @@ def foo():
     x = yield 1
     yield x  # RUF070 (yield as assigned value, fix adds parentheses)
 
-# Assignment inside `with`, yield outside
-def foo():
-    with open("foo.txt") as f:
-        x = f.read()
-    yield x  # RUF070
-
 
 ###
 # Non-errors
 ###
+
+# Assignment inside `with`, yield outside. Inlining would move the `yield` into
+# the `with`, so the generator would pause with the file still open (#25653)
+def foo():
+    with open("foo.txt") as f:
+        x = f.read()
+    yield x
+
+# Same with `async with` in an async generator (inlining would trigger ASYNC119)
+async def foo():
+    async with connect() as conn:
+        x = await conn.fetch()
+    yield x
 
 # Variable used after yield
 def foo():

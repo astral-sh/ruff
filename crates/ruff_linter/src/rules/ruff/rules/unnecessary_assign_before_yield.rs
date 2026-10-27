@@ -4,14 +4,12 @@ use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Identifier, Stmt};
-use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits;
-use crate::rules::flake8_return::has_conditional_body;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -77,7 +75,7 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
     };
 
     let visitor = {
-        let mut visitor = YieldVisitor::new(checker.semantic());
+        let mut visitor = YieldVisitor::new();
         visitor.visit_body(&function_def.body);
         visitor
     };
@@ -157,9 +155,7 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
     }
 }
 
-struct YieldVisitor<'semantic, 'a> {
-    /// The semantic model of the current file.
-    semantic: &'semantic SemanticModel<'a>,
+struct YieldVisitor<'a> {
     /// The non-local variables in the current function.
     non_locals: FxHashSet<&'a str>,
     /// The annotated variables in the current function.
@@ -170,10 +166,9 @@ struct YieldVisitor<'semantic, 'a> {
     sibling: Option<&'a Stmt>,
 }
 
-impl<'semantic, 'a> YieldVisitor<'semantic, 'a> {
-    fn new(semantic: &'semantic SemanticModel<'a>) -> Self {
+impl YieldVisitor<'_> {
+    fn new() -> Self {
         Self {
-            semantic,
             non_locals: FxHashSet::default(),
             annotations: FxHashSet::default(),
             assignment_yield: Vec::new(),
@@ -182,7 +177,7 @@ impl<'semantic, 'a> YieldVisitor<'semantic, 'a> {
     }
 }
 
-impl<'a> Visitor<'a> for YieldVisitor<'_, 'a> {
+impl<'a> Visitor<'a> for YieldVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::ClassDef(_) | Stmt::FunctionDef(_) => {
@@ -203,23 +198,15 @@ impl<'a> Visitor<'a> for YieldVisitor<'_, 'a> {
                 }
             }
             Stmt::Expr(ast::StmtExpr { value, .. }) => {
-                if matches!(value.as_ref(), Expr::Yield(_) | Expr::YieldFrom(_)) {
-                    match self.sibling {
-                        Some(Stmt::Assign(stmt_assign)) => {
-                            self.assignment_yield
-                                .push((stmt_assign, value.as_ref(), stmt));
-                        }
-                        Some(Stmt::With(with)) => {
-                            if let Some(stmt_assign) =
-                                with.body.last().and_then(Stmt::as_assign_stmt)
-                                && !has_conditional_body(with, self.semantic)
-                            {
-                                self.assignment_yield
-                                    .push((stmt_assign, value.as_ref(), stmt));
-                            }
-                        }
-                        _ => {}
-                    }
+                // Unlike `RET504`, we don't look inside a preceding `with` block here. Inlining
+                // an assignment from the end of a `with` body into a `yield` after it would move
+                // the `yield` inside the `with`, so the generator would suspend while the context
+                // manager is still open.
+                if matches!(value.as_ref(), Expr::Yield(_) | Expr::YieldFrom(_))
+                    && let Some(Stmt::Assign(stmt_assign)) = self.sibling
+                {
+                    self.assignment_yield
+                        .push((stmt_assign, value.as_ref(), stmt));
                 }
             }
             _ => {}
