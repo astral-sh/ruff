@@ -17,7 +17,7 @@ use crate::types::type_expansion::expand_elements;
 use crate::types::typed_dict::{
     TypedDictOpenness, UnpackedTypedDictKey, extract_unpacked_typed_dict_from_value_type,
 };
-use crate::types::{Parameters, Type, TypeContext, UnionType, expand_type};
+use crate::types::{Parameters, Type, TypeContext, UnionBuilder, UnionType, expand_type};
 
 /// Maximum total number of expanded argument type combinations across all arguments
 /// in [`CallArgumentExpansions::iter`].
@@ -166,6 +166,57 @@ impl<'a, 'db> CallArgument<'a, 'db> {
                     .collect()
             }
         })
+    }
+
+    /// Split off direct cycle markers while keeping the remaining union alternatives together.
+    /// Expanding those alternatives individually could keep producing new concrete nested types
+    /// across iterations even while an unrelated cycle marker propagates through the call.
+    fn partition_divergent(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> ArgumentExpansion<'a, 'db> {
+        if matches!(self, Self::Variadic(_) | Self::Keywords(_)) {
+            return None;
+        }
+        let ty = self
+            .source_types()
+            .iter()
+            .map(|(_, ty)| ty)
+            .all_equal_value()
+            .ok()?;
+        let Type::Union(union) = ty else {
+            return None;
+        };
+        if !union
+            .elements(db)
+            .iter()
+            .any(Type::is_unmaterialized_divergent)
+        {
+            return None;
+        }
+        let builder = || {
+            UnionBuilder::new(db, env)
+                .unpack_aliases(false)
+                .or_recursively_defined(union.recursively_defined(db))
+        };
+        let (mut residual, mut markers) = (builder(), builder());
+        for &element in union.elements(db) {
+            if element.is_unmaterialized_divergent() {
+                markers.add_in_place(element);
+            } else {
+                residual.add_in_place(element);
+            }
+        }
+        if residual.is_empty() {
+            return None;
+        }
+        Some(
+            [residual.build(), markers.build()]
+                .into_iter()
+                .map(|ty| Self::new(self.kind(), Some(ty)))
+                .collect(),
+        )
     }
 }
 
@@ -846,6 +897,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             db,
             env,
             types: OnceCell::new(),
+            partition_divergent: false,
         }
     }
 
@@ -915,9 +967,15 @@ pub(super) struct CallArgumentExpansions<'s, 'a, 'db> {
     db: &'db dyn Db,
     env: &'s ProgramEnvironment<'db>,
     types: OnceCell<Box<[OnceCell<ArgumentExpansion<'a, 'db>>]>>,
+    partition_divergent: bool,
 }
 
 impl<'a, 'db> CallArgumentExpansions<'_, 'a, 'db> {
+    pub(super) fn with_divergent_partitions(mut self) -> Self {
+        self.partition_divergent = true;
+        self
+    }
+
     /// Returns the expanded alternatives of an argument, computing them at most once.
     pub(super) fn argument_alternatives(&self, index: usize) -> Option<&[CallArgument<'a, 'db>]> {
         // TODO: For types inferred multiple times with distinct type context, we currently only
@@ -935,7 +993,13 @@ impl<'a, 'db> CallArgumentExpansions<'_, 'a, 'db> {
                 .collect()
         });
         types[index]
-            .get_or_init(|| argument.expand(self.db, self.env))
+            .get_or_init(|| {
+                if self.partition_divergent {
+                    argument.partition_divergent(self.db, self.env)
+                } else {
+                    argument.expand(self.db, self.env)
+                }
+            })
             .as_deref()
     }
 
@@ -991,7 +1055,7 @@ impl<'a, 'db> CallArgumentExpansions<'_, 'a, 'db> {
             Some(State::Expanding(ExpandingState::Initial)),
             move |previous| {
                 let state = match previous {
-                    State::LimitReached(index) => return Some(State::LimitReached(*index)),
+                    State::LimitReached(_) => return None,
                     State::Expanding(expanding_state) => expanding_state,
                 };
 
@@ -1070,5 +1134,29 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
         }
 
         Self { items }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Argument, CallArguments, Expansion, MAX_TOTAL_EXPANSION};
+    use crate::db::tests::setup_db;
+    use crate::types::{Type, UnionType};
+
+    #[test]
+    fn argument_expansion_terminates_at_limit() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let ty = UnionType::from_elements(&db, &env, [Type::int_literal(0), Type::int_literal(1)]);
+        let limit_index = MAX_TOTAL_EXPANSION.ilog2() as usize;
+        let arguments: CallArguments =
+            std::iter::repeat_n((Argument::Positional, Some(ty)), limit_index + 1).collect();
+        let expansions = arguments.expansions(&db, &env);
+        let mut iter = expansions.iter();
+
+        assert!(
+            matches!(iter.nth(limit_index), Some(Expansion::LimitReached(index)) if index == limit_index)
+        );
+        assert!(iter.next().is_none());
     }
 }

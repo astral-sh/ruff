@@ -6,7 +6,7 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
         ClassType, GenericContext, KnownClass, PromotionKind, PromotionMode, StringLiteralType,
-        Type, TypeAliasType, TypeContext, TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
+        Type, TypeAliasType, TypeContext, TypeMapping, TypeVarNonce, VarianceTerm,
         callable::{CallableTypeKind, CallableTypes},
         class::NamedTupleSpec,
         constraints::{OwnedConstraintSet, TypeVarSolution},
@@ -613,6 +613,7 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::GeneralizeLocalTypes(_)
+                | TypeMapping::ReplaceDivergent { .. }
                 | TypeMapping::RescopeReturnCallables(_)
                 | TypeMapping::ApplyRecursiveSubstitution(_) => Type::KnownInstance(self),
             },
@@ -847,29 +848,13 @@ impl<'db> FunctoolsPartialInstance<'db> {
         // Repeated `f = partial(f)` assignments add a new layer to the wrapped callable.
         // Treat it as nested so that cycle recovery can collapse these layers while
         // preserving the reduced signature of the outer partial.
-        let wrapped = match self.wrapped(db).inner(db) {
-            Type::Union(union) if !nested => {
-                // Keep known callable alternatives in `func`, even if another alternative
-                // diverges. For example, `p = partial(p.func)` does not add wrapped layers.
-                let mut builder = UnionBuilder::new(db, env)
-                    .cycle_recovery(true)
-                    .or_recursively_defined(union.recursively_defined(db));
-                for ty in union.elements(db) {
-                    builder.add_in_place(
-                        ty.recursive_type_normalized_impl(db, env, div, true)
-                            .unwrap_or(div),
-                    );
-                }
-                builder.build()
-            }
-            wrapped => {
-                let wrapped = wrapped.recursive_type_normalized_impl(db, env, div, true);
-                if nested {
-                    wrapped?
-                } else {
-                    wrapped.unwrap_or(div)
-                }
-            }
+        let wrapped = self.wrapped(db).inner(db);
+        let wrapped = if nested {
+            wrapped.recursive_type_normalized_impl(db, env, div, true)?
+        } else {
+            // Keep known callable alternatives in `func`, even if another alternative diverges.
+            // For example, `p = partial(p.func)` does not add wrapped layers.
+            wrapped.recursive_type_normalized_component(db, env, div)
         };
         Some(Self::new(
             db,

@@ -1809,6 +1809,31 @@ x8: EitherList = list(("1", "2", "3"))
 reveal_type(x8)  # revealed: list[int | str]
 ```
 
+## Converting elements of an inferred list
+
+A conversion can return a base class that lacks the conversion method. When its result goes back
+into the same list, indexing that list can produce the base class too.
+
+```py
+class Array[T]:
+    value: T
+
+class Row[T](Array[T]):
+    def cast[U](self, dtype: type[U]) -> Array[U]:
+        raise NotImplementedError
+
+class Column[T](Array[T]):
+    def cast[U](self, dtype: type[U]) -> "Column[U]":
+        raise NotImplementedError
+
+def convert(row: Row[str], column: Column[bytes]):
+    arrays = []
+    arrays.extend([row, column])
+    # error: [unresolved-attribute] "Attribute `cast` is not defined on `Array[int]`"
+    arrays.extend([arrays[0].cast(int)])
+    reveal_type(arrays)  # revealed: list[Row[str] | Column[bytes] | Array[int] | Divergent]
+```
+
 ## Literal union context for generic calls
 
 Narrowing a small literal union preserves the precise result of a nested generic call, including

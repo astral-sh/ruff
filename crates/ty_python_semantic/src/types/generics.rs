@@ -34,15 +34,15 @@ use crate::types::typevar::{
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
-    walk_type_with_recursion_guard,
+    any_over_type_including_alias_arguments, walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
-    KnownInstanceType, MaterializationKind, RecursiveType, SelfTypeVarOrigin, SubclassOfInner,
-    Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind,
-    TypeVarVariance, UnionAccumulator, UnionType, binding_type, infer_definition_types,
-    inferred_declaration,
+    ClassLiteral, DivergentProjection, DivergentType, ErrorContext, FindLegacyTypeVarsVisitor,
+    IntersectionType, KnownClass, KnownInstanceType, MaterializationKind, RecursiveType,
+    SelfTypeVarOrigin, SubclassOfInner, Type, TypeAliasType, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType,
+    binding_type, infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -1210,6 +1210,32 @@ pub(super) fn walk_specialization_types<'db, V: TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> Specialization<'db> {
+    /// Compare stored arguments without type relations, ignoring only flat union member order.
+    pub(super) fn is_same_ignoring_union_order(self, db: &'db dyn Db, other: Self) -> bool {
+        self.generic_context(db) == other.generic_context(db)
+            && self.materialization_kind(db) == other.materialization_kind(db)
+            && self.tuple_inner(db) == other.tuple_inner(db)
+            && self.types(db).len() == other.types(db).len()
+            && self
+                .types(db)
+                .iter()
+                .zip(other.types(db))
+                .all(|(left, right)| {
+                    left == right
+                        || match (left, right) {
+                            (Type::Union(left), Type::Union(right)) => {
+                                left.recursively_defined(db) == right.recursively_defined(db)
+                                    && left.elements(db).len() == right.elements(db).len()
+                                    && left
+                                        .elements(db)
+                                        .iter()
+                                        .all(|element| right.elements(db).contains(element))
+                            }
+                            _ => false,
+                        }
+                })
+    }
+
     /// Merge cycle iterations that differ only by gradual `Unknown` type arguments.
     ///
     /// Known argument mismatches are not merged because doing so would be unsound for invariant
@@ -1447,10 +1473,13 @@ impl<'db> Specialization<'db> {
         }
 
         let mut new_materialization_kind = self.materialization_kind(db);
+        let mut map_argument = type_mapping.map_arguments_without_variance(db, visitor);
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::declared(tcx.get(i).copied());
-            if type_mapping.is_structural() {
-                return ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+            if let Some(map_argument) = &mut map_argument {
+                // Replacing markers in stored alias arguments must not evaluate the alias body
+                // to infer the variance of a parameter.
+                return map_argument((ty, tcx));
             }
             match (typevar.variance(db), type_mapping) {
                 (
@@ -1523,6 +1552,44 @@ impl<'db> Specialization<'db> {
         }
     }
 
+    /// Normalize only alternatives that carry provisional evidence. An independent argument can
+    /// be a large shared type graph, even when a sibling contains a single cycle marker.
+    pub(super) fn normalized_alias_arguments(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        div: Type<'db>,
+    ) -> Self {
+        let carries_marker = |ty| {
+            any_over_type_including_alias_arguments(db, env, ty, |ty| {
+                ty.same_divergent_marker(db, div) || ty.is_pending_narrowing()
+            })
+        };
+        let types = self.map_types(db, |_, _, argument| {
+            if !carries_marker(argument) {
+                return argument;
+            }
+            argument.map_cycle_recovery_alternatives(db, env, |alternative| {
+                if alternative != argument && !carries_marker(alternative) {
+                    return alternative;
+                }
+                alternative
+                    .recursive_type_normalized_impl(db, env, div, true)
+                    .unwrap_or(div)
+            })
+        });
+        if matches!(types, Cow::Borrowed(_)) {
+            return self;
+        }
+        Self::new(
+            db,
+            self.generic_context(db),
+            types,
+            self.materialization_kind(db),
+            self.tuple_inner(db),
+        )
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -1538,10 +1605,7 @@ impl<'db> Specialization<'db> {
         } else {
             self.types(db)
                 .iter()
-                .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, env, div, true)
-                        .unwrap_or(div)
-                })
+                .map(|ty| ty.recursive_type_normalized_component(db, env, div))
                 .collect::<Box<[_]>>()
         };
         let tuple_inner = match self.tuple_inner(db) {
@@ -2505,6 +2569,90 @@ impl<'db> HasIdentity<'db> for InferSpecialization<'db> {
             self.type_identity(db, self.actual),
         )
     }
+}
+
+/// Resolve a projected cycle marker when its inferred type has no remaining provisional dependency.
+/// Apply chained projections before normalization so intermediate structure remains available.
+pub(super) fn resolve_divergent_projection<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    actual: Type<'db>,
+    projection: DivergentProjection<'db>,
+    marker: DivergentType<'db>,
+) -> Option<Type<'db>> {
+    let projections: Vec<_> =
+        std::iter::successors(Some(projection), |projection| projection.parent(db)).collect();
+    // A bare cycle marker supplies only marker bounds for a protocol's type variables, and
+    // `Unknown` supplies no bounds. Projecting a union of these through more protocols cannot
+    // yield an independent type unless a declared bound or constraint supplies one.
+    if let Type::Union(union) = actual
+        && union
+            .elements(db)
+            .iter()
+            .all(|ty| ty.is_unmaterialized_divergent() || *ty == Type::unknown())
+        && projections.iter().all(|projection| {
+            projection.polarity(db) == TypeVarVariance::Covariant
+                && matches!(projection.formal(db), Type::ProtocolInstance(_))
+                && !projection
+                    .typevar(db)
+                    .typevar(db)
+                    .has_bound_or_constraints(db)
+        })
+    {
+        return None;
+    }
+    let mut inferred = actual;
+    for projection in projections.into_iter().rev() {
+        // Only covariant extraction preserves unions, allowing a direct self-reference to be
+        // removed from its defining equation. Invariant or contravariant inference can choose
+        // a concrete bound while other alternatives still depend on the recursive value.
+        if !projection
+            .polarity(db)
+            .compose(
+                projection
+                    .formal(db)
+                    .variance_of(db, env, projection.typevar(db).identity(db))
+                    .evaluate(db),
+            )
+            .is_covariant()
+        {
+            return None;
+        }
+        let context = GenericContext::from_typevar_instances(db, env, [projection.typevar(db)]);
+        let constraints = ConstraintSetBuilder::new();
+        let mut builder = SpecializationBuilder::new(db, env, &constraints, context);
+        builder
+            .infer_map_impl(
+                projection.formal(db),
+                inferred,
+                projection.polarity(db),
+                &InferSpecializationVisitor::new(Ok(())),
+            )
+            .ok()?;
+        let inference = builder.build_inference_with(|_, _| None).ok()?;
+        // A compatibility mapping or an unresolved alternative is not evidence that the
+        // recursive dependency has disappeared.
+        match inference.solutions(db) {
+            TypeVarInferenceSolutions::Single => {}
+            TypeVarInferenceSolutions::Alternatives(alternatives)
+                if !alternatives.is_empty()
+                    && alternatives.iter().all(|solution| {
+                        matches!(solution.as_ref(), [Some(SolutionType::Resolved(_))])
+                    }) => {}
+            _ => return None,
+        }
+        inferred = inference.merged_types(db).first().copied().flatten()?;
+    }
+    let marker = Type::Divergent(marker);
+    let resolved = inferred
+        .recursive_type_normalized_impl(db, env, marker, false)
+        .unwrap_or(marker);
+    // An explicit `Any` supplies independent evidence, just like a static type. Inference
+    // fallbacks such as `Unknown` cannot establish that the recursive dependency is gone.
+    (!any_over_type_including_alias_arguments(db, env, resolved, |ty| {
+        (ty.is_dynamic() && ty != Type::any()) || ty.is_divergent()
+    }))
+    .then_some(resolved)
 }
 
 /// Performs type inference between parameter annotations and argument types, producing a
@@ -4155,6 +4303,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 );
             }
 
+            (formal, actual) if actual.is_unmaterialized_divergent() && !formal.is_type_var() => {
+                let when = self.constraint_for_relation(formal, actual, polarity);
+                return self.infer_from_constraint_set(when);
+            }
+
             (Type::TypeForm(formal_typeform), Type::TypeForm(actual_typeform)) => {
                 let variance = TypeVarVariance::Covariant.compose(polarity);
                 return self.infer_map_impl(
@@ -4492,6 +4645,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     }
                     _ => self.add_type_mapping(bound_typevar, ty, polarity),
                 }
+            }
+
+            // TODO: Remove this special case once actual unions use constraint-set inference
+            // regardless of the formal type.
+            (formal, Type::Union(actual_union))
+                if polarity.is_covariant()
+                    && actual_union
+                        .elements(db)
+                        .iter()
+                        .any(Type::is_unmaterialized_divergent) =>
+            {
+                let when = self.constraint_for_relation(formal, actual, polarity);
+                return self.infer_from_constraint_set(when);
             }
 
             (Type::NominalInstance(_), Type::TypeVar(actual_typevar))

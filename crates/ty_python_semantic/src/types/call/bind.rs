@@ -80,9 +80,9 @@ use crate::types::{
     BindingContext, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
     DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, TypeContext, TypeIdentity,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
-    UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
+    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, TypeContext, TypeFormType,
+    TypeIdentity, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator,
+    UnionBuilder, UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -1125,6 +1125,89 @@ impl<'db> Bindings<'db> {
         });
     }
 
+    /// Can an overload give the single positional argument a `TypeForm` context?
+    /// In that context, even a bare class name can be reinterpreted as a type expression.
+    pub(crate) fn may_reinterpret_class_argument(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        candidates: &OverloadSet,
+    ) -> bool {
+        let type_form = TypeFormType::from_type_expression(db, Type::Never);
+        let mut may_reinterpret = false;
+        self.visit_overload_set(candidates, &mut |overload, binding| {
+            if may_reinterpret {
+                return;
+            }
+            let Some(matched) = overload.matched_argument_for_call_argument(binding, 0) else {
+                return;
+            };
+            let [matched] = matched.parameters.as_slice() else {
+                return;
+            };
+            let raw = overload.signature.parameters()[matched.index].annotated_type();
+            let expected = matched.expected_type.unwrap_or(raw);
+            // A parameter pack can forward a context from the wrapped callable or its return type.
+            if matches!(raw, Type::TypeVar(_)) {
+                may_reinterpret = true;
+            } else if !expected.is_dynamic() {
+                let inferable = overload
+                    .signature
+                    .generic_context
+                    .map_or(TypeVarSet::None, |context| context.inferable_typevars(db));
+                // Every specialization with a `TypeForm[T]` union member accepts `TypeForm[Never]`.
+                may_reinterpret = !type_form
+                    .when_assignable_to(db, env, expected, &ConstraintSetBuilder::new(), inferable)
+                    .is_never_satisfied(db, env, inferable);
+            }
+        });
+        may_reinterpret
+    }
+
+    /// If one receiver returns an instance outside the target's class hierarchy, the union
+    /// cannot match the target either. Resolve overloads normally, since ambiguous overloads
+    /// can return `Unknown` even when their individual return annotations look incompatible.
+    pub(crate) fn has_incompatible_receiver_result(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        argument: Type<'db>,
+        tcx: TypeContext<'db>,
+        dataclass_field_specifiers: &[Type<'db>],
+    ) -> bool {
+        let Some(Type::NominalInstance(target)) = tcx.annotation else {
+            return false;
+        };
+        let arguments = CallArguments::positional([argument]);
+        self.elements.iter().any(|element| {
+            let [CallableItem::Regular(binding)] = element.items.as_slice() else {
+                return false;
+            };
+            if !matches!(binding.callable_type, Type::BoundMethod(_)) {
+                return false;
+            }
+            let Ok(checked) = Self::from(binding.clone()).check_types(
+                db,
+                env,
+                &ConstraintSetBuilder::new(),
+                &arguments,
+                tcx,
+                dataclass_field_specifiers,
+            ) else {
+                return false;
+            };
+            let ret = checked.return_type(db, env);
+            ret.as_nominal_instance().is_some_and(|instance| {
+                // Literal results can satisfy the complete declared union across several targets.
+                !instance
+                    .class(db, env)
+                    .is_subtype_of_class_literal(db, target.class_literal(db, env))
+                    && !ret.is_literal_or_union_of_literals(db, env)
+                    && !ret.is_assignable_to(db, env, Type::NominalInstance(target))
+            })
+        })
+    }
+
     /// Returns `true` if every element of the union contains an intersection element with a matching
     /// overload that satisfies the provided closure, or `false` otherwise.
     pub(crate) fn satisfies(&self, f: impl Fn(&Binding<'db>) -> bool) -> bool {
@@ -1700,6 +1783,10 @@ impl<'db> Bindings<'db> {
         // Each special case listed here should have a corresponding clause in `Type::bindings`.
         for binding in self.iter_flat_mut() {
             let binding_type = binding.callable_type;
+            let single_return_type = match binding.overloads.as_slice() {
+                [overload] => Some(overload.return_type()),
+                _ => None,
+            };
             for (overload_index, overload) in binding.matching_overloads_mut() {
                 match binding_type {
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
@@ -3405,6 +3492,17 @@ impl<'db> Bindings<'db> {
                 }
             }
 
+            // A known-call override replaces the signature's return type, including any
+            // refinement inferred by partitioning a single generic signature's arguments.
+            if matches!(
+                binding.overload_call_result,
+                Some(OverloadCallResult::ArgumentTypeExpansion(_))
+            ) && single_return_type
+                .is_some_and(|previous| previous != binding.overloads[0].return_type())
+            {
+                binding.overload_call_result = None;
+            }
+
             // Known method overrides can resolve ambiguity or change the shared return structure.
             if matches!(
                 binding.overload_call_result,
@@ -3919,6 +4017,7 @@ impl<'db> CallableBinding<'db> {
         // `*arg` where `arg` is a union of a 2-tuple and a 3-tuple, we shouldn't eliminate any
         // overload for arity reasons before trying argument expansion.
         let argument_expansions = call_arguments.expansions(db, env);
+        let mut divergent_expansions = None;
         let (should_retry_after_provisional_arity, overloads_for_expansion) = if self
             .should_retry_after_provisional_arity(&argument_expansions)
         {
@@ -3945,16 +4044,51 @@ impl<'db> CallableBinding<'db> {
                         call_arguments.as_ref(),
                         call_expression_tcx,
                     );
-                    return;
+
+                    // Partition only after a single generic signature has matched so this cannot
+                    // change overload selection. Constructors derive their result from the
+                    // inferred specialization instead of the expanded return types.
+                    let [overload] = self.overloads.as_slice() else {
+                        return;
+                    };
+                    if overload.has_errors_affecting_overload_resolution()
+                        || overload.signature.generic_context.is_none()
+                        || overload.constructor_context.is_some()
+                        || call_arguments.iter().any(|argument| {
+                            matches!(
+                                argument,
+                                CallArgument::Variadic(_) | CallArgument::Keywords(_)
+                            )
+                        })
+                    {
+                        return;
+                    }
+
+                    let partitions = call_arguments
+                        .expansions(db, env)
+                        .with_divergent_partitions();
+                    if !call_arguments.iter().enumerate().any(|(index, argument)| {
+                        matches!(argument.source_type(), Some(Type::Union(union))
+                            if union.elements(db).iter().any(Type::is_unmaterialized_divergent))
+                            && partitions.argument_alternatives(index).is_some()
+                    }) {
+                        return;
+                    }
+                    divergent_expansions = Some(partitions);
+                    (false, vec![index])
                 }
                 MatchingOverloadIndex::Multiple(indexes) => (false, indexes),
             }
         };
 
         // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
-        // whether it is compatible with the supplied argument list.
-        for (_, overload) in self.matching_overloads_mut() {
-            overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
+        // whether it is compatible with the supplied argument list. A single signature already
+        // matched above and needs only the return type refinement.
+        let partition_divergent = divergent_expansions.is_some();
+        if !partition_divergent {
+            for (_, overload) in self.matching_overloads_mut() {
+                overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
+            }
         }
 
         tracing::trace!(
@@ -3965,7 +4099,7 @@ impl<'db> CallableBinding<'db> {
 
         // If we are in the "retry for provisional arity" case, we have to try argument expansion
         // before deciding we are done or moving on to step 4+.
-        if !should_retry_after_provisional_arity {
+        if !should_retry_after_provisional_arity && !partition_divergent {
             match self.matching_overload_index() {
                 MatchingOverloadIndex::None => {
                     // If all overloads result in errors, proceed to step 3.
@@ -4021,7 +4155,15 @@ impl<'db> CallableBinding<'db> {
 
         // Step 3: Perform "argument type expansion". Reference:
         // https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion
-        let mut expansions = argument_expansions.iter().peekable();
+        let argument_expansions = divergent_expansions.unwrap_or(argument_expansions);
+        // Recovery partitions every selected argument before evaluating any cases. Its residual
+        // unions stay intact, so unrelated alternatives do not multiply across cycle iterations.
+        let mut expansions = if partition_divergent {
+            Either::Left(argument_expansions.iter().last().into_iter())
+        } else {
+            Either::Right(argument_expansions.iter())
+        }
+        .peekable();
 
         // Return early if there are no argument types to expand.
         if expansions.peek().is_none() {
@@ -4105,14 +4247,17 @@ impl<'db> CallableBinding<'db> {
             let expanded_argument_lists = match expansion {
                 Expansion::LimitReached(index) => {
                     snapshotter.restore(self, post_evaluation_snapshot);
-                    self.overload_call_result =
-                        Some(OverloadCallResult::ArgumentTypeExpansionLimitReached(index));
+                    if !partition_divergent {
+                        self.overload_call_result =
+                            Some(OverloadCallResult::ArgumentTypeExpansionLimitReached(index));
+                    }
                     return;
                 }
                 Expansion::Expanded(argument_lists) => argument_lists,
             };
 
             let mut cases = Vec::with_capacity(expanded_argument_lists.len());
+            let mut merged_evaluation_state: Option<CallableBindingSnapshot<'db>> = None;
 
             for expanded_arguments in &expanded_argument_lists {
                 // Ambiguity belongs to one expanded argument list. In particular, an earlier
@@ -4192,13 +4337,19 @@ impl<'db> CallableBinding<'db> {
                 };
 
                 if let Some(return_type) = return_type {
+                    if !partition_divergent {
+                        let snapshot = snapshotter.take(self);
+                        match &mut merged_evaluation_state {
+                            Some(merged) => merged.update(&snapshot),
+                            state @ None => *state = Some(snapshot),
+                        }
+                    }
                     cases.push(ExpandedCallEvaluation {
                         return_type,
                         selected_overloads: self
                             .selected_overloads()
                             .map(|(index, _)| index)
                             .collect(),
-                        snapshot: snapshotter.take(self),
                     });
                 } else {
                     // No need to check the remaining argument lists if the current argument list
@@ -4207,27 +4358,35 @@ impl<'db> CallableBinding<'db> {
                 }
             }
 
-            if cases.len() == expanded_argument_lists.len()
-                && let Some((first, rest)) = cases.split_first()
-            {
+            if cases.len() == expanded_argument_lists.len() && !cases.is_empty() {
                 // The merged view supports consumers that need one binding per overload. Keep
                 // the individual evaluations as well: the same generic overload can infer a
                 // different specialization for each expanded argument list.
-                let mut merged_evaluation_state = first.snapshot.clone();
-                for case in rest {
-                    merged_evaluation_state.update(&case.snapshot);
-                }
-                snapshotter.restore(self, merged_evaluation_state);
+                // Recovery partitions refine only the return type. Argument contexts, partial
+                // application, and collection specialization still need the inference from the
+                // complete arguments, so restore their original bindings instead.
+                snapshotter.restore(
+                    self,
+                    merged_evaluation_state.unwrap_or(post_evaluation_snapshot),
+                );
 
                 // Every expanded argument list must succeed. Alternative matches within a case
                 // cannot compensate for a different argument list with no matches.
+                // During recovery, keep the concrete case even if a mixed case such as
+                // `Iterator[tuple[T | Divergent]]` would normally subsume it: normalization
+                // subsequently collapses that mixed case at the nested constructor boundary.
+                let return_type = if partition_divergent {
+                    UnionType::from_elements_cycle_recovery(
+                        db,
+                        env,
+                        cases.iter().map(|case| case.return_type),
+                    )
+                } else {
+                    UnionType::from_elements(db, env, cases.iter().map(|case| case.return_type))
+                };
                 self.overload_call_result = Some(OverloadCallResult::ArgumentTypeExpansion(
                     Box::new(ExpandedOverloadCall {
-                        return_type: UnionType::from_elements(
-                            db,
-                            env,
-                            cases.iter().map(|case| case.return_type),
-                        ),
+                        return_type,
                         cases: cases.into_boxed_slice(),
                     }),
                 ));
@@ -4983,14 +5142,12 @@ struct ExpandedOverloadCall<'db> {
     cases: Box<[ExpandedCallEvaluation<'db>]>,
 }
 
-/// One successful expanded argument list, before its bindings are merged with other cases.
-/// The snapshot retains matching candidates; selection records the overloads that determine
-/// this case's result after resolving equivalent return types or ambiguity.
+/// The return type and selected overloads of one successful expanded argument list, after
+/// resolving equivalent return types or ambiguity.
 #[derive(Debug, Clone)]
 struct ExpandedCallEvaluation<'db> {
     return_type: Type<'db>,
     selected_overloads: SmallVec<[usize; 2]>,
-    snapshot: CallableBindingSnapshot<'db>,
 }
 
 #[derive(Debug)]
@@ -9227,7 +9384,7 @@ struct CallableBindingSnapshotter(Vec<usize>);
 impl CallableBindingSnapshotter {
     /// Creates a new snapshotter for the given indexes of the matched overloads.
     fn new(indexes: Vec<usize>) -> Self {
-        debug_assert!(indexes.len() > 1);
+        debug_assert!(!indexes.is_empty());
         CallableBindingSnapshotter(indexes)
     }
 

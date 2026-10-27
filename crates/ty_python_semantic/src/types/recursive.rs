@@ -270,7 +270,11 @@ impl<'db> RecursiveType<'db> {
         }
     }
 
-    fn with_arguments(self, db: &'db dyn Db, arguments: Option<Specialization<'db>>) -> Self {
+    pub(super) fn with_arguments(
+        self,
+        db: &'db dyn Db,
+        arguments: Option<Specialization<'db>>,
+    ) -> Self {
         Self::new_internal(
             db,
             self.definition(db),
@@ -402,6 +406,12 @@ impl<'db> RecursiveType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        let with_mapped_arguments = || {
+            let arguments = self
+                .arguments(db)
+                .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
+            self.with_arguments(db, arguments)
+        };
         match mapping {
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
                 RecursiveSubstitution::Bind(cycle),
@@ -439,11 +449,12 @@ impl<'db> RecursiveType<'db> {
             | TypeMapping::ReplaceSelf { .. } => {
                 // These mappings substitute free variables, which are captured by the alias's
                 // arguments. Its formal body must remain independent of the calling context.
-                let arguments = self
-                    .arguments(db)
-                    .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
-                Type::Recursive(self.with_arguments(db, arguments))
+                Type::Recursive(with_mapped_arguments())
             }
+            TypeMapping::ReplaceDivergent { .. } => visitor
+                .visit_stored_alias_arguments(Type::Recursive(self), || {
+                    Type::Recursive(with_mapped_arguments())
+                }),
             TypeMapping::Materialize(_) if self.materialization_kind(db).is_some() => {
                 Type::Recursive(self)
             }
@@ -484,10 +495,7 @@ impl<'db> RecursiveType<'db> {
             _ => visitor.visit(db, Type::Recursive(self), mapping, || {
                 // Map arguments before unfolding so recursive backedges retain their mapped
                 // arguments. Keep the application's materialization throughout the traversal.
-                let arguments = self
-                    .arguments(db)
-                    .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
-                let recursive = self.with_arguments(db, arguments);
+                let recursive = with_mapped_arguments();
                 recursive
                     .unfold(db, visitor.env)
                     .map(|unfolded| {

@@ -1084,6 +1084,31 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
+            if self.cycle_recovery
+                && let (Some(new_tuple), Some(existing_tuple)) = (
+                    ty.exact_tuple_instance_spec(db),
+                    element_type.exact_tuple_instance_spec(db),
+                )
+            {
+                if new_tuple.is_contained_by_homogeneous(db, &self.env, &existing_tuple) {
+                    return;
+                }
+                if existing_tuple.is_contained_by_homogeneous(db, &self.env, &new_tuple) {
+                    to_remove.push(i);
+                    continue;
+                }
+            }
+
+            // Preserve the first representation when cycle iterations reorder argument unions.
+            // Structural comparison retains exact marker identities without inference queries.
+            if self.cycle_recovery
+                && let (Type::NominalInstance(left), Type::NominalInstance(right)) =
+                    (ty, element_type)
+                && left.is_same_ignoring_union_order(db, right)
+            {
+                return;
+            }
+
             // `object` already contains every possible union element.
             if !self.cycle_recovery && element_type == Type::object() {
                 return;
@@ -2625,6 +2650,71 @@ mod tests {
         assert_eq!(
             UnionType::widen_growing_tuples(&db, &env, first, second),
             None
+        );
+    }
+
+    #[test]
+    fn cycle_recovery_reduces_unions_without_relation_queries() {
+        let db = setup_db();
+        let mut events_db = db.clone();
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(&db, &env);
+        let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+        let other_div = Type::divergent(salsa::plumbing::Id::from_bits(2));
+        let list_of = |elements| {
+            let argument = UnionType::from_elements_cycle_recovery(&db, &env, elements);
+            KnownClass::List.to_specialized_instance(&db, &env, &[argument])
+        };
+        let first = list_of([int, div]);
+        let reordered = list_of([div, int]);
+        let distinct_marker = list_of([int, other_div]);
+        assert_ne!(first, reordered);
+        let narrow_tuple = Type::homogeneous_tuple(&db, &env, div);
+        let broad_tuple = Type::homogeneous_tuple(
+            &db,
+            &env,
+            UnionType::from_elements_cycle_recovery(&db, &env, [int, div]),
+        );
+        let concrete_tuple = Type::homogeneous_tuple(&db, &env, int);
+        let nested_marker_tuple = Type::homogeneous_tuple(
+            &db,
+            &env,
+            UnionType::from_elements_cycle_recovery(&db, &env, [div, distinct_marker]),
+        );
+        events_db.clear_salsa_events();
+
+        for (left, right) in [(first, reordered), (reordered, first)] {
+            assert_eq!(
+                UnionType::from_elements_cycle_recovery(&db, &env, [left, right]),
+                left,
+            );
+        }
+        let union =
+            UnionType::from_elements_cycle_recovery(&db, &env, [first, reordered, distinct_marker]);
+        assert_eq!(
+            union.expect_union().elements(&db),
+            &[first, distinct_marker]
+        );
+        for pair in [[narrow_tuple, broad_tuple], [broad_tuple, narrow_tuple]] {
+            assert_eq!(
+                UnionType::from_elements_cycle_recovery(&db, &env, pair),
+                broad_tuple,
+            );
+        }
+        // These alternatives survive a cutoff that collapses the broader tuple, including when
+        // the extra marker is nested inside a generic argument.
+        for pair in [
+            [concrete_tuple, broad_tuple],
+            [narrow_tuple, nested_marker_tuple],
+        ] {
+            let independent = UnionType::from_elements_cycle_recovery(&db, &env, pair);
+            assert_eq!(independent.expect_union().elements(&db), &pair);
+        }
+        assert!(
+            events_db
+                .take_salsa_events()
+                .iter()
+                .all(|event| !matches!(event.kind, salsa::EventKind::WillExecute { .. }))
         );
     }
 

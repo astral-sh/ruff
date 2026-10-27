@@ -417,6 +417,29 @@ def _(xs: Unknown):
     reveal_type("".join(map("{}".format, xs)))  # revealed: str
 ```
 
+## Calls to `divmod` in a loop
+
+Feeding the remainder into the next call preserves the narrower quotient type inferred from the
+overloaded `__divmod__` method.
+
+```py
+from typing import overload
+
+class Number:
+    @overload
+    def __divmod__(self, other: int) -> tuple[int, "Number"]: ...
+    @overload
+    def __divmod__(self, other: float) -> tuple[float, "Number"]: ...
+    def __divmod__(self, other):
+        raise NotImplementedError
+
+def divide_repeatedly(repeat: bool):
+    remainder = Number()
+    while repeat:
+        quotient, remainder = divmod(remainder, 1)
+        reveal_type(quotient)  # revealed: int
+```
+
 ## Mapping methods accept arbitrary object types
 
 ```toml

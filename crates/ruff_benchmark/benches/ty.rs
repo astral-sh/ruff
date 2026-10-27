@@ -334,6 +334,63 @@ fn benchmark_recursive_collection_use_constraints(criterion: &mut Criterion) {
     );
 }
 
+/// The multiplication overloads project the loop-carried result, while the
+/// unannotated alternative contributes `Unknown` on every iteration.
+fn benchmark_recursive_multiplication(criterion: &mut Criterion) {
+    let code = "
+        from operator import mul
+
+        def multiply(value, alternative, flags: list[bool]):
+            operation = mul if alternative is None else alternative
+            result = value
+            for flag in flags:
+                result = operation(result, result)
+                if flag:
+                    result = operation(result, value)
+            return result
+    ";
+
+    benchmark_micro_case(criterion, "ty_micro[recursive_multiplication]", code);
+}
+
+/// Conversions in `scipy.sparse` overload on the receiver and preserve its matrix kind. Extending
+/// the same list with converted matrices makes every kind part of the expected element type.
+fn benchmark_sparse_conversions(criterion: &mut Criterion) {
+    const KINDS: usize = 8;
+    let mut code = String::from(
+        "from __future__ import annotations
+from typing import Any, Self, overload
+
+class Sparse[T]:
+    @overload
+    def cast(self, dtype: type[T]) -> Self: ...
+",
+    );
+    for i in 0..KINDS {
+        writeln!(
+            code,
+            "    @overload\n    def cast[U](self: S{i}[Any], dtype: type[U]) -> S{i}[U]: ..."
+        )
+        .ok();
+    }
+    code.push_str(
+        "    def cast(self, dtype: type[Any]) -> Sparse[Any]: raise NotImplementedError\n",
+    );
+    for i in 0..KINDS {
+        writeln!(code, "class S{i}[T](Sparse[T]): ...").ok();
+    }
+    let kinds = (0..KINDS).map(|i| format!("S{i}[int]")).join(" | ");
+    writeln!(
+        code,
+        "def convert(value: {kinds}):
+    values = []
+    values.extend([value])
+    values.extend([values[0].cast(int), values[0].cast(str)])"
+    )
+    .ok();
+    benchmark_micro_case(criterion, "ty_micro[sparse_conversions]", &code);
+}
+
 fn benchmark_complex_constrained_attributes_1(criterion: &mut Criterion) {
     setup_rayon();
 
@@ -1484,6 +1541,14 @@ fn benchmark_union_construction(criterion: &mut Criterion) {
         writeln!(split, "U{i} = U{} | Literal[{i}]", i - 1).ok();
     }
     benchmark_micro_case(criterion, "ty_micro[split_literal_union_1024]", &split);
+
+    // Extending a union stored in a tuple should still reuse the prefix, even when the prefix
+    // contains a generic type.
+    let mut stored = String::from("from typing import Literal\nU1 = (list[int] | Literal[1],)\n");
+    for i in 2..=1024 {
+        writeln!(stored, "U{i} = (U{}[0] | Literal[{i}],)", i - 1).ok();
+    }
+    benchmark_micro_case(criterion, "ty_micro[split_stored_union_1024]", &stored);
 }
 
 /// Benchmark for narrowing a large union type through multiple match statements.
@@ -2677,6 +2742,8 @@ criterion_group!(
     benchmark_many_tuple_assignments,
     benchmark_tuple_implicit_instance_attributes,
     benchmark_recursive_collection_use_constraints,
+    benchmark_recursive_multiplication,
+    benchmark_sparse_conversions,
     benchmark_complex_constrained_attributes_1,
     benchmark_complex_constrained_attributes_2,
     benchmark_complex_constrained_attributes_3,

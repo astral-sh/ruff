@@ -1821,6 +1821,58 @@ def _(value: Any):
     reveal_type(optional(value))  # revealed: Unknown
 ```
 
+### Equivalent overload returns during loop inference
+
+`divide` can infer its result from either argument. Both paths return `tuple[int, int]` throughout
+the loop, so updating the accumulator preserves `int`.
+
+```py
+from typing import Protocol, TypeVar, overload
+
+T = TypeVar("T", covariant=True)
+
+class SupportsDivMod(Protocol[T]):
+    def __divmod__(self, other: int, /) -> T: ...
+
+class SupportsRDivMod(Protocol[T]):
+    def __rdivmod__(self, other: int, /) -> T: ...
+
+@overload
+def divide(x: SupportsDivMod[T], y: int) -> T: ...
+@overload
+def divide(x: int, y: SupportsRDivMod[T]) -> T: ...
+def divide(x, y): ...
+def accumulate(a: int, b: int) -> int:
+    value = 0
+    while b:
+        quotient, remainder = divide(a, b)
+        a, b, value = b, remainder, quotient * value
+    reveal_type(value)  # revealed: int
+    return value  # no diagnostic
+```
+
+### Differing overload returns during loop inference
+
+A loop can feed an ambiguous result back into the generic argument of a later call. Differing
+concrete return types remain ambiguous through that feedback.
+
+```py
+from typing import Any, TypeVar, overload
+
+T = TypeVar("T")
+
+@overload
+def choose(value: T, selector: int) -> T | str: ...
+@overload
+def choose(value: T, selector: str) -> T | bytes: ...
+def choose(value, selector): ...
+def feedback(selector: Any):
+    value = 0
+    while True:
+        value = choose(value, selector)
+        reveal_type(value)  # revealed: Unknown
+```
+
 ### Argument expansion with shared return structure
 
 Ambiguity is resolved separately for each expanded argument list. The final result is a union of

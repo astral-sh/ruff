@@ -279,7 +279,7 @@ type Container = list[A | ~A]
 type A = Container | list[~A]
 
 def _(value: A):
-    reveal_type(value)  # revealed: list[Divergent]
+    reveal_type(value)  # revealed: list[A | ~A] | list[~A]
 ```
 
 ## Intersections inside `type[...]`

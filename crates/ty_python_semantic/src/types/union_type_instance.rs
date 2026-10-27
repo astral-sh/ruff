@@ -1,20 +1,27 @@
+use std::cell::RefCell;
+
 use itertools::{Either, EitherOrBoth, Itertools};
 use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::{definition::Definition, scope::ScopeId};
 
 use super::{
     ApplyTypeMappingVisitor, GenericAlias, InferenceFlags, InvalidTypeExpressionError, KnownClass,
-    KnownInstanceType, Type, TypeContext, TypeMapping, UnionBuilder, visitor::TypeVisitor,
+    KnownInstanceType, Type, TypeContext, TypeMapping, UnionBuilder,
+    visitor::{self, TypeKind, TypeVisitor},
 };
 use crate::{Db, FxOrderSet, Program, ProgramEnvironment};
 
 /// The type of a single Python union object, which can be used as a value or as an annotation.
 /// For example, `bool | int` retains both classes as runtime operands and denotes `int` as an
 /// annotation.
-#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, constructor=intern, heap_size=ruff_memory_usage::heap_size)]
 pub struct UnionTypeInstance<'db> {
     #[returns(ref)]
     kind: RuntimeUnion<'db>,
+    /// True when all denoted operands are marker-free atomic types, including those in nested
+    /// unions. Extending such a union with another literal can reuse this fact without a query.
+    #[returns(copy)]
+    projection_free: bool,
 }
 
 impl get_size2::GetSize for UnionTypeInstance<'_> {}
@@ -35,6 +42,17 @@ pub enum RuntimeUnion<'db> {
     },
 }
 
+impl<'db> RuntimeUnion<'db> {
+    fn types_to_visit(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+        match self {
+            Self::Evaluated { ty, .. } => Either::Left(std::iter::once(*ty)),
+            Self::Pep604(operands) => {
+                Either::Right(operands.iter().filter_map(UnionOperand::type_to_visit))
+            }
+        }
+    }
+}
+
 /// An operand of a runtime `|` union.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum UnionOperand<'db> {
@@ -50,6 +68,13 @@ pub enum UnionOperand<'db> {
 }
 
 impl<'db> UnionOperand<'db> {
+    fn type_to_visit(&self) -> Option<Type<'db>> {
+        match self {
+            Self::Nested(union) => Some(union.into_type()),
+            Self::Leaf { ty, .. } => ty.as_ref().ok().copied(),
+        }
+    }
+
     fn value(&self) -> Type<'db> {
         match self {
             Self::Nested(union) => union.into_type(),
@@ -97,6 +122,57 @@ fn same_generic_operand<'db>(
 
 #[salsa::tracked]
 impl<'db> UnionTypeInstance<'db> {
+    fn new_internal(db: &'db dyn Db, kind: RuntimeUnion<'db>) -> Self {
+        let projection_free = kind.types_to_visit().all(|ty| match ty {
+            Type::KnownInstance(KnownInstanceType::UnionType(union)) => union.projection_free(db),
+            Type::Divergent(_) | Type::RecursiveVar(_) => false,
+            ty => matches!(TypeKind::from(ty), TypeKind::Atomic),
+        });
+        Self::intern(db, kind, projection_free)
+    }
+
+    pub(super) fn may_contain_binding_projection(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        !self.projection_free(db) && self.has_binding_projection(db, env.program(db))
+    }
+
+    /// Bindings that extend the same union can reuse the result of searching its compound
+    /// operands. A provisional result keeps the normal marker walk enabled.
+    #[salsa::tracked(returns(copy), cycle_result=|_, _, _, _| true)]
+    fn has_binding_projection(self, db: &'db dyn Db, program: Program<'db>) -> bool {
+        thread_local! {
+            static SEARCHING: RefCell<()> = const { RefCell::new(()) };
+        }
+        let env = ProgramEnvironment::from_program(program);
+        let projected = |ty| {
+            let Type::Divergent(marker) = ty else {
+                return false;
+            };
+            marker.binding(db).is_some() && marker.projection(db).is_some()
+        };
+        SEARCHING.with(|active| {
+            // A single expression can have a deep prefix that no binding has queried yet.
+            // Flatten it iteratively instead of nesting a Salsa query for every `|`.
+            let Ok(_guard) = active.try_borrow_mut() else {
+                return visitor::any_over_type_including_alias_arguments(
+                    db,
+                    &env,
+                    self.into_type(),
+                    projected,
+                );
+            };
+            visitor::any_over_types_for_binding_projections(
+                db,
+                &env,
+                self.kind(db).types_to_visit(),
+                projected,
+            )
+        })
+    }
+
     fn into_type(self) -> Type<'db> {
         Type::KnownInstance(KnownInstanceType::UnionType(self))
     }
@@ -520,12 +596,10 @@ pub(super) fn walk_union_type_instance<'db, V: TypeVisitor<'db> + ?Sized>(
     match instance.kind(db) {
         RuntimeUnion::Evaluated { ty, .. } => visitor.visit_type(db, *ty),
         RuntimeUnion::Pep604(operands) => {
-            for operand in UnionTypeInstance::leaves(db, operands) {
-                match operand {
-                    UnionOperand::Leaf { ty: Ok(ty), .. } => visitor.visit_type(db, *ty),
-                    UnionOperand::Nested(union) => visitor.visit_type(db, union.into_type()),
-                    UnionOperand::Leaf { ty: Err(_), .. } => {}
-                }
+            for ty in
+                UnionTypeInstance::leaves(db, operands).filter_map(UnionOperand::type_to_visit)
+            {
+                visitor.visit_type(db, ty);
             }
         }
     }

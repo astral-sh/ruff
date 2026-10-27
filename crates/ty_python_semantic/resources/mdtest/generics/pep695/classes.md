@@ -2156,6 +2156,28 @@ def _(series: Series[Any]):
     result.missing()  # error: [unresolved-attribute]
 ```
 
+## Recursive shapes returned by overloads
+
+An array constructor accepts either a scalar length or a tuple of axis lengths. Updating an array
+with a tuple of at least two axes does not produce a one-dimensional shape.
+
+```py
+from typing import overload
+
+class Array[Shape: tuple[int, ...]]:
+    shape: Shape
+
+@overload
+def zeros(shape: int) -> Array[tuple[int]]: ...
+@overload
+def zeros[Shape: tuple[int, ...]](shape: Shape) -> Array[Shape]: ...
+def zeros(shape): ...
+
+class Polynomial:
+    def extend(self):
+        self.c = zeros((0, self.c.shape[1]) + self.c.shape[2:])  # no diagnostic
+```
+
 ## Ambiguous overloads returning generic protocols
 
 Specializations of a single protocol preserve the protocol while differing type arguments become

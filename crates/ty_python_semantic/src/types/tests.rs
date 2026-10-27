@@ -373,12 +373,28 @@ fn divergent_type() {
     let db = setup_db();
     let db = &db;
     let env = db.program_environment();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let id = salsa::plumbing::Id::from_bits(1);
+    let marker = DivergentType::new(id);
+    let div = Type::Divergent(marker);
     assert!(div.is_dynamic());
     assert!(div.has_dynamic(db, &env));
     let visitor = ApplyTypeMappingVisitor::new(&env);
     let top_div = div.materialize(db, MaterializationKind::Top, &visitor);
     let bottom_div = div.materialize(db, MaterializationKind::Bottom, &visitor);
+
+    // Freezing the first occurrence must preserve the second occurrence's own materialization.
+    let pair = |a, b| Type::heterogeneous_tuple(db, &env, [Type::Divergent(a), Type::Divergent(b)]);
+    let top = marker.materialized(MaterializationKind::Top);
+    for (first, second) in [(top, marker), (marker, top)] {
+        let mapping = TypeMapping::freeze_projection(first, id);
+        assert_eq!(
+            pair(first, second).apply_type_mapping(db, &env, &mapping, TypeContext::default()),
+            pair(
+                first.with_flags(DivergentFlags::FROZEN),
+                second.with_flags(DivergentFlags::FROZEN)
+            )
+        );
+    }
 
     assert!(top_div.is_divergent());
     assert!(bottom_div.is_divergent());
@@ -534,7 +550,7 @@ fn divergent_type() {
         normalized
             .display(db, &db.program_environment())
             .to_string(),
-        "list[Divergent]"
+        "list[Divergent | None]"
     );
 
     let recursive_tuple = Type::heterogeneous_tuple(
@@ -570,7 +586,7 @@ fn divergent_type() {
         normalized
             .display(db, &db.program_environment())
             .to_string(),
-        "tuple[Divergent, str]"
+        "tuple[int | Divergent, str]"
     );
 
     let recursive_dict = KnownClass::Dict.to_specialized_instance(
@@ -606,7 +622,7 @@ fn divergent_type() {
         normalized
             .display(db, &db.program_environment())
             .to_string(),
-        "dict[str, Divergent]"
+        "dict[str, int | Divergent]"
     );
 
     let union = UnionType::from_elements(db, &env, [div, KnownClass::Int.to_instance(db, &env)]);
@@ -738,7 +754,7 @@ fn pending_narrowing_cycle_recovery_preserves_guarded_contributions() {
     let recursive = Type::divergent(salsa::plumbing::Id::from_bits(1));
     let int = KnownClass::Int.to_instance(&db, &env);
     let foreign = Type::divergent(salsa::plumbing::Id::from_bits(2));
-    let is_cycle_marker = |ty: Type<'_>| ty.same_divergent_marker(recursive);
+    let is_cycle_marker = |ty: Type<'_>| ty.same_divergent_marker(&db, recursive);
     let normalize =
         |ty| Type::pending_narrowing_normalized(ty, &db, &env, recursive, &is_cycle_marker);
     let list_of = |element| KnownClass::List.to_specialized_instance(&db, &env, &[element]);
@@ -799,7 +815,7 @@ fn pending_narrowing_cycle_recovery_checks_alias_arguments() -> anyhow::Result<(
     let file = ProgramFile::new(&db, file, env.program(&db));
     let pending = Type::pending_narrowing();
     let recursive = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let is_cycle_marker = |ty: Type<'_>| ty.same_divergent_marker(recursive);
+    let is_cycle_marker = |ty: Type<'_>| ty.same_divergent_marker(&db, recursive);
     let normalize =
         |ty| Type::pending_narrowing_normalized(ty, &db, &env, recursive, &is_cycle_marker);
     let list_of = |element| KnownClass::List.to_specialized_instance(&db, &env, &[element]);
@@ -815,6 +831,67 @@ fn pending_narrowing_cycle_recovery_checks_alias_arguments() -> anyhow::Result<(
     );
     assert_eq!(normalize(alias), pending);
     assert_eq!(normalize(list_of(alias)), list_of(recursive));
+    Ok(())
+}
+
+#[test]
+fn freezes_projections_in_stored_alias_arguments() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/aliases.py",
+        "type Tree[T, Unused] = tuple[T, Tree[list[T], int]]",
+    )?;
+    let db = &db;
+    let env = db.program_environment();
+    let file = ProgramFile::new(
+        db,
+        system_path_to_file(db, "/src/aliases.py")?,
+        env.program(db),
+    );
+    let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) =
+        global_symbol(db, file, "Tree").place.expect_type()
+    else {
+        anyhow::bail!("expected `Tree` to be a type alias");
+    };
+    let Some(context) = alias.generic_context(db) else {
+        anyhow::bail!("expected `Tree` to be generic");
+    };
+    let Some(typevar) = context.variables(db).next() else {
+        anyhow::bail!("expected `Tree` to have a type parameter");
+    };
+    let id = salsa::Id::from_bits(1);
+    let marker = DivergentType::new(id);
+    let projection = DivergentProjection::new(
+        db,
+        None,
+        Type::TypeVar(typevar),
+        typevar,
+        TypeVarVariance::Covariant,
+    );
+    let projected = marker.with_projection(db, projection);
+    let mapping = TypeMapping::freeze_projection(projected, id);
+    let freeze = |ty| Type::apply_type_mapping(ty, db, &env, &mapping, TypeContext::default());
+    let projected = Type::Divergent(projected);
+    let frozen = Type::Divergent(marker.with_flags(DivergentFlags::FROZEN));
+    let tree = |left, right| {
+        Type::TypeAlias(alias.apply_specialization(db, |context| {
+            Specialization::new(db, context, [left, right].as_slice(), None, None)
+        }))
+    };
+    // Only the unused parameter holds the projection. Repeated arguments share a finite graph.
+    let nested = |marker| (0..32).fold(tree(Type::Never, marker), |ty, _| tree(ty, ty));
+    assert_eq!(freeze(nested(projected)), nested(frozen));
+
+    // A recursive binder's formal body may contain the very same marker independently of
+    // its stored argument. Freezing the argument preserves the original binder and body.
+    let definition = alias.definition(db);
+    let cycle = salsa::Id::from_bits(2);
+    let seed = RecursiveType::initial(db, definition, cycle, Some(context));
+    let body = Type::heterogeneous_tuple(db, &env, [Type::Recursive(seed), projected]);
+    let recursive = RecursiveType::recover(db, definition, cycle, Some(context), body);
+    let application =
+        |argument| recursive.apply_specialization(db, context.repeat_specialization(db, argument));
+    assert_eq!(freeze(application(projected)), application(frozen));
     Ok(())
 }
 
@@ -1138,16 +1215,17 @@ type H[T] = G[T]
             .expand_eagerly(&db, &db.program_environment())
             .display(&db, &db.program_environment())
             .to_string(),
-        "list[Divergent]",
+        "list[T@RecursiveList | Divergent]",
     );
 
     let rec_int_list = get_type_alias(&db, "RecursiveIntList");
+    // Eager expansion follows raw alias values for cycle detection, without specialization.
     assert_eq!(
         rec_int_list
             .expand_eagerly(&db, &db.program_environment())
             .display(&db, &db.program_environment())
             .to_string(),
-        "list[Divergent]",
+        "list[T@RecursiveList | Divergent]",
     );
 
     let itself = get_type_alias(&db, "Itself");

@@ -951,6 +951,8 @@ enum TypeSearchMode {
     IncludeLazyAttributes,
     /// Visit alias arguments without evaluating alias bodies or other lazy attributes.
     IncludeAliasArguments,
+    /// Also skip runtime unions known to contain no projected binding marker.
+    BindingProjections,
 }
 
 impl TypeSearchMode {
@@ -959,15 +961,15 @@ impl TypeSearchMode {
     }
 
     const fn should_visit_alias_arguments(self) -> bool {
-        matches!(self, Self::IncludeAliasArguments)
+        matches!(self, Self::IncludeAliasArguments | Self::BindingProjections)
     }
 }
 
 /// Shared implementation for type searches.
-fn any_over_type_impl<'db, F, T>(
+fn any_over_types_impl<'db, F, T>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    ty: Type<'db>,
+    roots: impl IntoIterator<Item = Type<'db>>,
     mode: TypeSearchMode,
     query: F,
 ) -> T
@@ -993,6 +995,16 @@ where
 
         fn should_visit_lazy_type_attributes(&self) -> bool {
             self.mode.should_visit_lazy_type_attributes()
+        }
+
+        fn visit_known_instance_type(&self, db: &'db dyn Db, known: KnownInstanceType<'db>) {
+            if matches!(self.mode, TypeSearchMode::BindingProjections)
+                && let KnownInstanceType::UnionType(union) = known
+                && !union.may_contain_binding_projection(db, self.env)
+            {
+                return;
+            }
+            walk_known_instance_type(db, known, self);
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -1032,7 +1044,12 @@ where
         found_matching_type: Cell::default(),
         mode,
     };
-    visitor.visit_type(db, ty);
+    for ty in roots {
+        visitor.visit_type(db, ty);
+        if visitor.found_matching_type.get() != T::default() {
+            break;
+        }
+    }
     visitor.found_matching_type.get()
 }
 
@@ -1056,7 +1073,7 @@ pub(super) fn any_over_type<'db>(
     } else {
         TypeSearchMode::SkipLazyAttributes
     };
-    any_over_type_impl(db, env, ty, mode, query)
+    any_over_types_impl(db, env, [ty], mode, query)
 }
 
 /// Searches through the arguments of [`Type::TypeAlias`] without evaluating alias bodies or other
@@ -1069,7 +1086,16 @@ pub(super) fn any_over_type_including_alias_arguments<'db>(
     ty: Type<'db>,
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
-    any_over_type_impl(db, env, ty, TypeSearchMode::IncludeAliasArguments, query)
+    any_over_types_impl(db, env, [ty], TypeSearchMode::IncludeAliasArguments, query)
+}
+
+pub(super) fn any_over_types_for_binding_projections<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    roots: impl IntoIterator<Item = Type<'db>>,
+    query: impl Fn(Type<'db>) -> bool,
+) -> bool {
+    any_over_types_impl(db, env, roots, TypeSearchMode::BindingProjections, query)
 }
 
 /// Searches through type aliases without forcing other lazily inferred type attributes.
@@ -1147,7 +1173,7 @@ where
     } else {
         TypeSearchMode::SkipLazyAttributes
     };
-    any_over_type_impl(db, env, ty, mode, query)
+    any_over_types_impl(db, env, [ty], mode, query)
 }
 
 #[cfg(test)]

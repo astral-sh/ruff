@@ -1045,6 +1045,19 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
 }
 
 impl<'db, Tag> TypeTransformer<'db, Tag> {
+    /// Transforms a type without treating other applications of its constructor as recursive.
+    pub(super) fn visit_exact_type(
+        &self,
+        ty: Type<'db>,
+        compute: impl FnOnce() -> Type<'db>,
+    ) -> Type<'db> {
+        match self.begin_visit(ty, || TypeIdentity::Other(ty)) {
+            TypeTransformerVisit::Ready(result) => result,
+            TypeTransformerVisit::Cycle(_) => ty,
+            TypeTransformerVisit::Pending(ty) => self.finish_visit(ty, compute(), true),
+        }
+    }
+
     #[inline]
     pub(crate) fn visit_type(
         &self,
@@ -1069,7 +1082,7 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         cycle_fallback: impl FnOnce(Type<'db>) -> Option<Type<'db>>,
         cache_result: impl FnOnce(Type<'db>) -> bool,
     ) -> Type<'db> {
-        match self.begin_visit(db, ty) {
+        match self.begin_visit(ty, || ty.to_type_identity(db)) {
             TypeTransformerVisit::Ready(result) => result,
             TypeTransformerVisit::Cycle(active) => cycle_fallback(active).unwrap_or_else(compute),
             TypeTransformerVisit::Pending(ty) => {
@@ -1079,12 +1092,16 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         }
     }
 
-    fn begin_visit(&self, db: &'db dyn Db, ty: Type<'db>) -> TypeTransformerVisit<'db> {
+    fn begin_visit(
+        &self,
+        ty: Type<'db>,
+        identity: impl FnOnce() -> TypeIdentity<'db>,
+    ) -> TypeTransformerVisit<'db> {
         if let Some(result) = self.cache.borrow().get(&ty) {
             return TypeTransformerVisit::Ready(*result);
         }
 
-        let identity = ty.to_type_identity(db);
+        let identity = identity();
         let seen = self.seen.borrow();
         if let Some(active) = seen
             .iter()

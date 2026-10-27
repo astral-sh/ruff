@@ -4384,6 +4384,220 @@ def probe(value: Levels[int, str, bytes]):
     reveal_type(grandchild_value(value))  # revealed: bytes
 ```
 
+## Recursive aliases returned by generic calls in loops
+
+Each iteration wraps the previous items in a tree. Inference widens the recursive element while
+preserving the list returned by the function and the initial tuple from the zero-iteration path.
+
+```py
+from collections.abc import Iterable
+from typing import TypeVar
+
+T = TypeVar("T")
+Tree = T | tuple["Tree[T]", ...]
+Forest = list[Tree[T]]
+
+def nest(items: Iterable[T]) -> Forest[T]:
+    return [tuple(items)]
+
+def nest_repeatedly(running: bool):
+    items = (1,)
+    while running:
+        items = nest(items)
+    reveal_type(items)  # revealed: tuple[Literal[1]] | list[Divergent]
+```
+
+## Recursive class objects passed to generic functions
+
+Inference converges when a loop repeatedly wraps a class's instance type in `list`.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def nest(cls: type[T]) -> type[list[T]]:
+    raise NotImplementedError
+
+def wrap(paths: list[int]):
+    cls = int
+    for _ in paths:
+        cls = nest(cls)
+    reveal_type(cls)  # revealed: <class 'int'> | type[list[int | Divergent]]
+```
+
+## Unpacking generic return types in loops
+
+A loop that unpacks a generic helper's return value preserves the list's element type. The second
+argument also supplies that element type independently of the loop.
+
+```toml
+[rules]
+unsound-assignment = "error"
+```
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def rebuild(items: list[T], item: T) -> tuple[list[T]]:
+    raise NotImplementedError
+
+def update(items: list[T], item: T):
+    for _ in range(3):
+        (items,) = rebuild(items, item)  # no diagnostic
+    reveal_type(items)  # revealed: list[T@update]
+```
+
+## Reconstructing generic tuples in loops
+
+Rebuilding a tuple and passing it through a generic helper preserves the nested list's element type.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def combine(left: tuple[list[T], int | None], right: tuple[list[T], int | None]) -> tuple[list[T], int | None]:
+    raise NotImplementedError
+
+def update(initial: tuple[list[T], int | None]) -> tuple[list[T], int | None]:
+    result = (initial[0], 0)
+    for index in range(3):
+        result = (result[0], index)
+        result = combine(result, initial)
+    reveal_type(result)  # revealed: tuple[list[T@update], int | None]
+    return result  # no diagnostic
+```
+
+## Intermediate tuple expressions in loops
+
+The string occupies a different position in an intermediate tuple than in the loop variable. Both
+tuples retain their respective element types.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def second(value: tuple[object, T]) -> T:
+    return value[1]
+
+def update(initial: tuple[int, str]):
+    value = initial
+    for _ in range(3):
+        # revealed: tuple[str, Literal[1]]
+        value = (0, reveal_type((second(value), 1))[0])
+    reveal_type(value)  # revealed: tuple[Literal[0], str]
+```
+
+## Filtering generic iterables in loops
+
+Repeatedly filtering an iterable preserves its element type when each filter returns an iterator
+over the same type.
+
+```toml
+[rules]
+unsound-assignment = "error"
+unsound-return-statement = "error"
+```
+
+```py
+from collections.abc import Iterable, Iterator
+from typing import TypeVar
+
+T = TypeVar("T")
+
+class Filter:
+    def filter(self, items: Iterable[T]) -> Iterator[T]:
+        return iter(items)
+
+def filter_all(filters: list[Filter], items: Iterable[T]) -> Iterator[T]:
+    for step in filters:
+        items = step.filter(items)  # no diagnostic
+    reveal_type(iter(items))  # revealed: Iterator[T@filter_all]
+    return iter(items)  # no diagnostic
+```
+
+## Element types across generic calls in loops
+
+Updating a collection while iterating through a generic wrapper preserves its element type, so
+invalid attribute access is still rejected.
+
+```py
+from collections.abc import Iterable, Iterator
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Indexed(Generic[T]):
+    def __init__(self, items: Iterable[T]) -> None: ...
+    def __iter__(self) -> Iterator[tuple[int, T]]:
+        raise NotImplementedError
+
+class Container:
+    items: list[int]
+
+def visit_constructor(container: Container):
+    while True:
+        for _, item in Indexed(container.items):
+            container.items = item.items  # error: [unresolved-attribute]
+            break
+```
+
+The same check applies when a generic function combines two collections into an iterator of pairs.
+Both arguments contribute to the item type, which is preserved through both return-type layers.
+
+```py
+def paired(left: Iterable[T], right: Iterable[T]) -> Iterator[tuple[T, T]]:
+    raise NotImplementedError
+
+def visit_function(container: Container):
+    while True:
+        for item, _ in paired(container.items, container.items):
+            container.items = item.items  # error: [unresolved-attribute]
+            break
+```
+
+## String comparisons across generic calls in loops
+
+Updating the dictionary feeds the loop's inferred types back into iteration. The accumulated string
+can be empty or nonempty, so both branches remain reachable.
+
+```toml
+[analysis]
+strict-equality-semantics = true
+```
+
+```py
+from collections.abc import Iterable
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def first(value: Iterable[T]) -> T:
+    raise NotImplementedError
+
+def update():
+    values = {"a": ""}
+    for key in values:
+        value = key
+        result = ""
+        while value:
+            if result == "":  # no diagnostic
+                result = value
+            else:
+                result = value + result
+            value = first(value)
+        values[key] = result
+```
+
 ## Generic property setters implementing protocols
 
 These deliberately contrived setters could use `object` and `int` directly instead of method-scoped

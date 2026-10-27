@@ -6,6 +6,7 @@ use crate::types::tuple::{TupleSpec, TupleType, VariableSegment};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     ClassType, DynamicType, GenericAlias, KnownClass, SubclassOfInner, SubclassOfType, Type,
+    UnionBuilder,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -57,6 +58,10 @@ struct AmbiguousReturnMerger<'env, 'db> {
 
 impl<'db> AmbiguousReturnMerger<'_, 'db> {
     fn merge(&self, types: &[Type<'db>]) -> Type<'db> {
+        if let Some(merged) = self.merge_divergent(types) {
+            return merged;
+        }
+
         // Differing leaves retain this marker so cycle recovery can recognize when overload
         // ambiguity caused a loss of precision.
         let unknown = Type::Dynamic(DynamicType::AmbiguousOverload);
@@ -74,6 +79,63 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
         self.visitor.visit(self.db, ReturnTypes(types.into()), || {
             self.merge_structure(types).unwrap_or(unknown)
         })
+    }
+
+    /// Different cycle dependencies do not make otherwise equivalent returns ambiguous. Retain
+    /// their identities so cycle recovery can resolve them, without lifting nested markers out of
+    /// their enclosing constructors. Materialized markers represent `object` or `Never` instead.
+    fn merge_divergent(&self, types: &[Type<'db>]) -> Option<Type<'db>> {
+        if !types.iter().any(|&ty| match ty {
+            Type::Union(union) => union
+                .elements(self.db)
+                .iter()
+                .any(Type::is_unmaterialized_divergent),
+            _ => ty.is_unmaterialized_divergent(),
+        }) {
+            return None;
+        }
+
+        let mut builder = UnionBuilder::new(self.db, self.env).unpack_aliases(false);
+        let mut residuals = Vec::with_capacity(types.len());
+        for &ty in types {
+            if ty.is_unmaterialized_divergent() {
+                builder.add_in_place(ty);
+            } else if let Type::Union(union) = ty {
+                let mut residual = UnionBuilder::new(self.db, self.env)
+                    .unpack_aliases(false)
+                    .or_recursively_defined(union.recursively_defined(self.db));
+                builder = builder.or_recursively_defined(union.recursively_defined(self.db));
+                for &element in union.elements(self.db) {
+                    if element.is_unmaterialized_divergent() {
+                        builder.add_in_place(element);
+                    } else {
+                        residual.add_in_place(element);
+                    }
+                }
+                if !residual.is_empty() {
+                    residuals.push(residual.build());
+                }
+            } else {
+                residuals.push(ty);
+            }
+        }
+
+        if !residuals.is_empty() {
+            // Keep each overload's remaining union intact. Differing concrete returns still
+            // require ordinary ambiguity handling, even when a cycle marker is also present.
+            let equivalent = self.equivalent_representative(&residuals)?;
+            // A marker-only return has no concrete evidence to agree with the other overloads.
+            // Independent dynamic returns still contribute uncertainty needed for convergence;
+            // unlike concrete types, they do not introduce a speculative return shape.
+            if residuals.len() == types.len()
+                || equivalent
+                    .resolve_type_alias(self.db)
+                    .is_non_divergent_dynamic()
+            {
+                builder.add_in_place(equivalent);
+            }
+        }
+        Some(builder.build())
     }
 
     fn equivalent_representative(&self, types: &[Type<'db>]) -> Option<Type<'db>> {

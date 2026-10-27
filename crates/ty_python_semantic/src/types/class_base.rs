@@ -30,7 +30,7 @@ pub enum ClassBase<'db> {
     /// is `Any` does not give the class the same gradual assignability as an explicit `Any` base.
     Any,
     Dynamic(DynamicType<'db>),
-    Divergent(DivergentType),
+    Divergent(DivergentType<'db>),
     Class(ClassType<'db>),
     /// Although `Protocol` is not a class in typeshed's stubs, it is at runtime,
     /// and can appear in the MRO of a class.
