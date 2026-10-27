@@ -1268,18 +1268,24 @@ impl<'db> UnionBuilder<'db> {
                             )
                     })
                 };
-                let without_covered_exclusions = remove_covered_by(ty, element_type)
-                    .map(|widened| (element_type, widened))
-                    .or_else(|| remove_covered_by(element_type, ty).map(|widened| (widened, ty)));
-                if let Some((existing, incoming)) = without_covered_exclusions {
+                if let Some(widened) = remove_covered_by(ty, element_type) {
+                    for index in to_remove.into_iter().rev() {
+                        self.elements.swap_remove(index);
+                    }
+                    // The covering element is unchanged. Recheck only the widened incoming
+                    // type against earlier elements that it might now subsume.
+                    self.add_in_place_impl(widened, seen_aliases);
+                    return;
+                }
+                if let Some(widened) = remove_covered_by(element_type, ty) {
                     to_remove.push(i);
                     for index in to_remove.into_iter().rev() {
                         self.elements.swap_remove(index);
                     }
-                    // Keep the covering element, and recheck the widened intersection against
-                    // earlier elements that it might now subsume.
-                    self.add_in_place_impl(existing, seen_aliases);
-                    self.add_in_place_impl(incoming, seen_aliases);
+                    // The existing element changed, so recheck it against the whole union
+                    // before adding the incoming covering type.
+                    self.add_in_place_impl(widened, seen_aliases);
+                    self.add_in_place_impl(ty, seen_aliases);
                     return;
                 }
                 if ty.is_redundant_with(db, &self.env, element_type) {
