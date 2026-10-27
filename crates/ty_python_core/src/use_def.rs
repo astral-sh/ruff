@@ -1850,19 +1850,23 @@ impl PendingReachability {
         target: PendingReachabilityId,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) -> ScopedReachabilityConstraintId {
-        let mut constraint = ScopedReachabilityConstraintId::ALWAYS_TRUE;
+        let mut unapplied = SmallVec::<[ScopedReachabilityConstraintId; 4]>::new();
         let mut current = target;
         while current != ancestor {
             let event = &self.constraints[current];
-            constraint = reachability_constraints
-                .add_and_constraint(constraint, event.reachability_constraint);
+            unapplied.push(event.reachability_constraint);
             assert_ne!(
                 current, event.parent,
                 "pending reachability must be an ancestor"
             );
             current = event.parent;
         }
-        constraint
+        // Later predicates are higher in the decision diagram. Adding constraints in source
+        // order reuses the previous diagram instead of rebuilding it for each earlier predicate.
+        unapplied.into_iter().rev().fold(
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            |constraint, next| reachability_constraints.add_and_constraint(constraint, next),
+        )
     }
 
     /// Combines the narrowing gates after `ancestor` through `target` into one constraint.
