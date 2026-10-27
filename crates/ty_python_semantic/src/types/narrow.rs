@@ -2880,7 +2880,7 @@ impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
         else {
             return Some(Type::unknown());
         };
-        let default_ty = if self.mapping_pattern_uses_standard_get(subject_ty) {
+        let default_ty = if self.is_standard_mapping_get(get_method) {
             mapping_value_ty
         } else {
             Type::object()
@@ -2897,40 +2897,21 @@ impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
         )
     }
 
-    fn mapping_pattern_uses_standard_get(&self, subject_ty: Type<'db>) -> bool {
+    /// Identify `dict.get` and `Mapping.get` by their definitions, even when the receiver
+    /// has been narrowed to an intersection and no longer has a single nominal class.
+    fn is_standard_mapping_get(&self, get_method: Type<'db>) -> bool {
         let db = self.db;
-        let Some(class) = subject_ty.nominal_class(db, &self.env) else {
+        let Type::BoundMethod(method) = get_method else {
             return false;
         };
-        for base in class.iter_mro(db) {
-            let class = match base {
-                ClassBase::Class(class) => class,
-                ClassBase::Generic | ClassBase::Protocol => continue,
-                ClassBase::Any
-                | ClassBase::Dynamic(_)
-                | ClassBase::Divergent(_)
-                | ClassBase::TypedDict(_) => {
-                    return false;
-                }
-            };
-            if !class
-                .own_instance_member(db, &self.env, "get")
-                .is_undefined()
-            {
-                return false;
-            }
-            if class
-                .own_class_member(db, &self.env, None, "get")
-                .is_undefined()
-            {
-                continue;
-            }
-            return matches!(
-                class.known(db),
-                Some(KnownClass::Dict | KnownClass::Mapping)
-            );
-        }
-        false
+        let Some(function) = method.function(db) else {
+            return false;
+        };
+        function.name(db) == "get"
+            && [KnownClass::Dict, KnownClass::Mapping]
+                .into_iter()
+                .filter_map(|class| class.try_to_class_literal(db, &self.env))
+                .any(|class| class.body_scope(db) == function.definition(db).scope(db))
     }
 
     fn mapping_pattern_key_types(&self, kind: &MappingPatternPredicateKind<'db>) -> Vec<Type<'db>> {

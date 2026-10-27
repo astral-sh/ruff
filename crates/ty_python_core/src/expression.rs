@@ -91,7 +91,7 @@ pub enum ExpressionContext {
 pub enum ExpressionKind {
     /// An ordinary value expression, such as `1` in `self.x: int = 1`.
     Normal,
-    /// A predicate whose truthiness is recorded in its evaluation context.
+    /// A predicate evaluated in value or condition context.
     Predicate {
         context: ExpressionContext,
         in_loop: bool,

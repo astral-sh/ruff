@@ -54,7 +54,7 @@ use crate::codes::Category;
 /// - [Python documentation: Where to patch](https://docs.python.org/3/library/unittest.mock.html#where-to-patch)
 /// - [pytest documentation: Monkeypatching](https://docs.pytest.org/en/stable/how-to/monkeypatch.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Suspicious)]
+#[violation_metadata(preview_since = "0.17.3", category = Category::Suspicious)]
 pub(crate) struct SharedClockMock {
     function: String,
 }

@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 
 use itertools::Itertools;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::definition::Definition;
 
 use crate::place::{DefinedPlace, Place};
@@ -35,7 +35,7 @@ use crate::types::{
     TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
-    Db, FxOrderSet,
+    Db, FxOrderSet, Program,
     types::{
         ErrorContext, ErrorContextTree, Type, TypePair, constraints::ConstraintSet,
         typevar::TypeVarSet,
@@ -252,6 +252,71 @@ fn has_missing_generic_nominal_bound<'db>(
                     .is_some_and(|source| source != target && !source.has_explicit_bases(db))
             })
         })
+}
+
+/// Return the class of a nominal instance with no generic specialization or tuple
+/// specification of its own, provided the class is defined by a `class` statement.
+fn non_generic_nominal_class<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> Option<ClassLiteral<'db>> {
+    let Type::NominalInstance(instance) = ty else {
+        return None;
+    };
+    if instance.own_tuple_spec(db).is_some() {
+        return None;
+    }
+    let ClassType::NonGeneric(class @ ClassLiteral::Static(_)) = instance.class(db, env) else {
+        return None;
+    };
+    Some(class)
+}
+
+/// Recognize a single nominal positive and nominal exclusions, without alias, type-variable, or
+/// enum-literal operands. These classes can still inherit specialized or recursive generic bases.
+fn nominal_intersection_bound<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> Option<ClassLiteral<'db>> {
+    let positive = if let Type::Intersection(intersection) = ty {
+        if intersection.positive(db).len() != 1
+            || intersection
+                .negative(db)
+                .iter()
+                .any(|&negative| non_generic_nominal_class(db, env, negative).is_none())
+        {
+            return None;
+        }
+        *intersection.positive(db).iter().next()?
+    } else {
+        ty
+    };
+    non_generic_nominal_class(db, env, positive)
+}
+
+/// Index union alternatives by their required nominal class before checking their exclusions.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn nominal_union_index<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    union: UnionType<'db>,
+) -> Option<FxHashMap<ClassLiteral<'db>, Box<[Type<'db>]>>> {
+    let env = ProgramEnvironment::from_program(program);
+    let mut index: FxHashMap<_, Vec<_>> = FxHashMap::default();
+    for &element in union.elements(db) {
+        index
+            .entry(nominal_intersection_bound(db, &env, element)?)
+            .or_default()
+            .push(element);
+    }
+    let mut index: FxHashMap<_, _> = index
+        .into_iter()
+        .map(|(class, elements)| (class, elements.into_boxed_slice()))
+        .collect();
+    index.shrink_to_fit();
+    Some(index)
 }
 
 #[salsa::tracked]
@@ -1398,6 +1463,43 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             && let Some(alternatives) = intersection.finite_alternative_union(db, self.env)
         {
             return self.check_type_pair(db, alternatives, target);
+        }
+
+        // Fast path for pattern narrowing, which can compare many intersections against the
+        // same wide union. If the source intersection and every arm require a single nominal
+        // class and have only nominal exclusions, the cached index lets us skip arms the
+        // source cannot match. Keep the full traversal when collecting error context for each arm.
+        if source.is_intersection()
+            && !self.is_context_collection_enabled()
+            && let Some(source_class) = nominal_intersection_bound(db, self.env, source)
+            && let Some(index) = nominal_union_index(db, self.env.program(db), union)
+            // A gradual base can make the source assignable to a class outside its known MRO.
+            && !(self.relation.is_assignability()
+                && source_class.iter_mro(db).any(|base| {
+                    matches!(base, ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_))
+                }))
+        {
+            // A successful alternative needs the same nominal class or one of its bases.
+            // Check class identity separately: an unspecialized generic class acquires default
+            // arguments in its MRO. The full relation still checks each alternative's exclusions.
+            let mut matching = std::iter::once(source_class)
+                .chain(source_class.iter_mro(db).filter_map(|base| match base {
+                    ClassBase::Class(ClassType::NonGeneric(class)) if class != source_class => {
+                        Some(class)
+                    }
+                    _ => None,
+                }))
+                .filter_map(|class| index.get(&class));
+            let Some(elements) = matching.next() else {
+                return self.never();
+            };
+            // One group preserves the target union's comparison order. If several bounds match,
+            // use the original traversal so recursive inherited specializations keep that order.
+            if matching.next().is_none() {
+                return elements.iter().when_any(db, self.constraints, |&element| {
+                    self.check_type_pair(db, source, element)
+                });
+            }
         }
 
         let check_expanded_source = || {
