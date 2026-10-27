@@ -179,12 +179,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 BinaryExpressionOperandTypes::Inferred(left_ty, right_ty) => (left_ty, right_ty),
             };
 
+        self.infer_binary_expression_from_types(binary, left_ty, right_ty)
+    }
+
+    /// Evaluate a binary operator whose operands have already been inferred in their type contexts.
+    pub(super) fn infer_binary_expression_from_types(
+        &mut self,
+        binary: &ast::ExprBinOp,
+        left_ty: Type<'db>,
+        right_ty: Type<'db>,
+    ) -> Type<'db> {
+        let op = binary.op;
         let mut state = BinaryInferenceState::default();
         let return_type =
-            self.infer_binary_expression_type(binary.into(), left_ty, right_ty, *op, &mut state);
+            self.infer_binary_expression_type(binary.into(), left_ty, right_ty, op, &mut state);
         self.report_deprecated_functions(binary, state.deprecated_functions);
         return_type.unwrap_or_else(|| {
-            report_unsupported_binary_operation(&self.context, binary, left_ty, right_ty, *op);
+            report_unsupported_binary_operation(&self.context, binary, left_ty, right_ty, op);
             Type::unknown()
         })
     }

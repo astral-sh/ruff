@@ -497,6 +497,13 @@ reveal_type(foo(str))  # revealed: str
 foo(float)  # error: [no-matching-overload]
 ```
 
+An invalid union operator still produces a diagnostic when the argument matches an overload.
+
+```py
+# error: [unsupported-operator]
+reveal_type(foo("bool" | "int" | bool))  # revealed: int
+```
+
 ## Narrowing to runtime classes
 
 A `TypeForm[T]` value may or may not be a runtime class object. An `isinstance(..., type)` check can
