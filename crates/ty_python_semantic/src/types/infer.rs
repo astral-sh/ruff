@@ -45,7 +45,7 @@
 
 use crate::ProgramEnvironment;
 use itertools::Either;
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
@@ -578,24 +578,8 @@ pub(crate) fn infer_expression_types<'db>(
     infer_expression_types_impl(db, InferExpression::new(db, expression, tcx))
 }
 
-/// A loop predicate can depend on bindings it guards in the previous iteration.
-/// Reading a recorded outcome directly keeps the extra truthiness query out of that cycle.
-pub(crate) fn infer_predicate_truthiness<'db>(
-    db: &'db dyn Db,
-    expression: Expression<'db>,
-) -> Truthiness {
-    if matches!(
-        expression.kind(db),
-        ExpressionKind::Predicate { in_loop: true, .. }
-    ) && let Some(truthiness) =
-        infer_expression_types_impl(db, InferExpression::Bare(expression)).predicate_truthiness
-    {
-        return truthiness;
-    }
-    cached_predicate_truthiness(db, expression)
-}
-
-/// Keep reachability queries cached when an operand's type changes but its truthiness stays the same.
+/// Evaluate a predicate from its inferred operand types. Truthiness can depend on other
+/// definitions, such as a class's metaclass, so it needs its own query to recover those cycles.
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _| Truthiness::Ambiguous,
@@ -608,15 +592,23 @@ pub(crate) fn infer_predicate_truthiness<'db>(
     },
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn cached_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
-    let inference = infer_expression_types_impl(db, InferExpression::Bare(expression));
-    if let Some(truthiness) = inference.predicate_truthiness {
-        return truthiness;
-    }
+pub(crate) fn infer_predicate_truthiness<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+) -> Truthiness {
+    let ExpressionKind::Predicate(context) = expression.kind(db) else {
+        return Truthiness::Ambiguous;
+    };
+    let inference = infer_expression_types(db, expression, TypeContext::default());
     let env = ProgramEnvironment::from_scope(expression.scope(db));
-    inference
-        .compute_predicate_truthiness(db, &env, expression, None)
-        .unwrap_or(Truthiness::Ambiguous)
+    let module = parsed_module(db, expression.python_file(db)).load(db);
+    TruthinessAnalyzer::new(
+        db,
+        &env,
+        |node| inference.expression_type(node),
+        |node| inference.comparison_truthiness(node),
+    )
+    .truthiness(expression.node_ref(db).node(&module), context)
 }
 
 #[salsa::tracked(
@@ -650,7 +642,7 @@ pub(super) fn infer_expression_types_impl<'db>(
 
     let env = ProgramEnvironment::from_file(program_file);
 
-    let mut inference = TypeInferenceBuilder::new(
+    TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Expression(expression, tcx),
@@ -659,13 +651,7 @@ pub(super) fn infer_expression_types_impl<'db>(
         index,
         &module,
     )
-    .finish_expression();
-    // Reachability only requests truthiness for predicates without an expected type.
-    if let InferExpression::Bare(expression) = input {
-        inference.predicate_truthiness =
-            inference.compute_predicate_truthiness(db, &env, expression, Some(module));
-    }
-    inference
+    .finish_expression()
 }
 
 fn expression_cycle_initial<'db>(
@@ -2042,10 +2028,6 @@ pub(crate) struct ExpressionInference<'db> {
     /// The types of every expression in this region.
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
-    /// The predicate's possible outcomes in its evaluation context. When cycle recovery widens
-    /// an operand, the recorded outcome may be stale. Reachability then computes it on demand.
-    predicate_truthiness: Option<Truthiness>,
-
     extra: Option<Box<ExpressionInferenceExtra<'db>>>,
 
     /// The scope this region is part of.
@@ -2114,29 +2096,6 @@ struct ExpressionInferenceExtra<'db> {
 }
 
 impl<'db> ExpressionInference<'db> {
-    fn compute_predicate_truthiness(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        expression: Expression<'db>,
-        module: Option<ParsedModuleRef>,
-    ) -> Option<Truthiness> {
-        let ExpressionKind::Predicate { context, .. } = expression.kind(db) else {
-            return None;
-        };
-        let module =
-            module.unwrap_or_else(|| parsed_module(db, expression.python_file(db)).load(db));
-        Some(
-            TruthinessAnalyzer::new(
-                db,
-                env,
-                |node| self.expression_type(node),
-                |node| self.comparison_truthiness(node),
-            )
-            .truthiness(expression.node_ref(db).node(&module), context),
-        )
-    }
-
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
         Self {
@@ -2144,7 +2103,6 @@ impl<'db> ExpressionInference<'db> {
                 cycle_recovery: Some(cycle_recovery),
                 ..ExpressionInferenceExtra::default()
             })),
-            predicate_truthiness: Some(Truthiness::Ambiguous),
             expressions: FrozenMap::default(),
             #[cfg(debug_assertions)]
             scope,
@@ -2179,20 +2137,7 @@ impl<'db> ExpressionInference<'db> {
 
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous.expression_type(*expr);
-            let normalized = ty.cycle_normalized(db, env, previous_ty, cycle);
-            if normalized != *ty {
-                // Testing the widened type here can introduce a new Salsa cycle, for example
-                // when truthiness depends on the metaclass of a newly added union member.
-                self.predicate_truthiness = None;
-            }
-            *ty = normalized;
-        }
-
-        if cycle.iteration() > crate::TAINTED_CYCLES {
-            self.predicate_truthiness = previous
-                .predicate_truthiness
-                .zip(self.predicate_truthiness)
-                .map(|(previous, current)| previous.union(current));
+            *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -2235,13 +2180,7 @@ impl<'db> ExpressionInference<'db> {
             |expression| self.expression_type(expression).bool(db, env),
             |expression| previous.expression_type(expression).bool(db, env),
         );
-        if comparison_truthiness.iter().next().is_some()
-            && self
-                .extra
-                .as_deref()
-                .is_none_or(|extra| extra.comparison_truthiness != comparison_truthiness)
-        {
-            self.predicate_truthiness = None;
+        if comparison_truthiness.iter().next().is_some() {
             self.extra.get_or_insert_default().comparison_truthiness = comparison_truthiness;
         }
     }
