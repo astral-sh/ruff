@@ -56,7 +56,10 @@ jobs:
           checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@09a77e55b9cacee25c4170194cb529300c015991
+        with:
+          # Keep a smaller dependency cache; build savings add little fuzzing time within the fixed budget.
+          cache-workspace-crates: "false"
       - name: Build ruff
         # A debug build means the script runs slower once it gets started,
         # but this is outweighed by the fact that a release build takes *much* longer to compile in CI
