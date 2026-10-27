@@ -698,27 +698,21 @@ impl Configuration {
     #[must_use]
     pub(crate) fn apply_fallbacks(
         mut self,
-        origin: ConfigurationOrigin,
+        origin: ConfigurationOrigin<'_>,
         initial_config_path: &Path,
     ) -> Self {
-        if matches!(origin, ConfigurationOrigin::Ancestor) {
-            self.target_version = self.target_version.or_else(|| {
-                let dir = initial_config_path.parent()?;
-                let fallback = pyproject::find_fallback_target_version(dir)?;
-                debug!("Derived `target-version` from `requires-python`: {fallback:?}");
-                Some(fallback.into())
-            });
+        let directory = match origin {
+            ConfigurationOrigin::Ancestor if self.target_version.is_none() => {
+                initial_config_path.parent()
+            }
+            // A project's Python requirement takes precedence over the user-level target version.
+            ConfigurationOrigin::UserSettings { fallback_directory } => Some(fallback_directory),
+            _ => None,
+        };
+        if let Some(version) = directory.and_then(pyproject::find_fallback_target_version) {
+            debug!("Derived `target-version` from `requires-python`: {version:?}");
+            self.target_version = Some(version.into());
         }
-        // If the origin is UserSettings, we need more information
-        // to determine where to search for a fallback target version.
-        // - If Ruff is being invoked via the CLI, then we search in
-        // the cwd.
-        // - If Ruff is being invoked via the server, then we search
-        // in the editor's workspace root.
-        //
-        // This logic is implemented manually, at the time of this
-        // writing 2026-01-30, in `ruff::resolve::resolve` and
-        // `ruff_server::session::index::ruff_settings::RuffSettings::fallback`, respectively.
         self
     }
 }

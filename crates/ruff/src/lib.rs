@@ -285,7 +285,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         output_format,
         show_fixes,
         ..
-    } = pyproject_config.settings;
+    } = pyproject_config.base.settings;
 
     // Fix rules are as follows:
     // - By default, generate all fixes, but don't apply them to the filesystem.
@@ -374,8 +374,8 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     // the settings should already be combined with the CLI overrides at this point
     // TODO: this should reference the global preview mode once https://github.com/astral-sh/ruff/issues/8232
     //   is resolved.
-    let preview = pyproject_config.settings.linter.preview;
-    let prefer_rule_codes = pyproject_config.settings.output_prefer_rule_codes;
+    let preview = pyproject_config.base.settings.linter.preview;
+    let prefer_rule_codes = pyproject_config.base.settings.output_prefer_rule_codes;
 
     if cli.watch {
         // Configure the file watcher.
@@ -384,7 +384,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         for file in &files {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
-        if let Some(file) = pyproject_config.path.as_ref() {
+        if let Some(file) = pyproject_config.base.config_path.as_ref() {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
 

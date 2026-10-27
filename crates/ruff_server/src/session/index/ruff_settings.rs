@@ -11,7 +11,7 @@ use ruff_linter::settings::types::GlobPath;
 use ruff_linter::{settings::types::FilePattern, settings::types::PreviewMode};
 use ruff_workspace::Settings;
 use ruff_workspace::pyproject::find_fallback_target_version;
-use ruff_workspace::resolver::match_exclusion;
+use ruff_workspace::resolver::{ConfigurationOrigin, ResolvedSettings, match_exclusion};
 use ruff_workspace::{
     configuration::{Configuration, FormatConfiguration, LintConfiguration, RuleSelection},
     pyproject::{find_user_settings_toml, settings_toml},
@@ -23,17 +23,11 @@ use crate::session::options::ConfigurationPreference;
 use crate::session::settings::{EditorSettings, ResolvedConfiguration};
 
 #[derive(Debug)]
-pub(crate) struct RuffSettings {
-    /// The path to this configuration file, used for debugging.
-    /// The default fallback configuration does not have a file path.
-    path: Option<PathBuf>,
-    /// The resolved settings.
-    settings: Settings,
-}
+pub(crate) struct RuffSettings(ResolvedSettings);
 
 impl RuffSettings {
     pub(crate) fn path(&self) -> Option<&Path> {
-        self.path.as_deref()
+        self.0.config_path.as_deref()
     }
 }
 
@@ -41,7 +35,7 @@ impl Deref for RuffSettings {
     type Target = Settings;
 
     fn deref(&self) -> &Settings {
-        &self.settings
+        &self.0.settings
     }
 }
 
@@ -53,7 +47,7 @@ pub(super) struct RuffSettingsIndex {
 
 impl std::fmt::Display for RuffSettings {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(&self.settings, f)
+        std::fmt::Display::fmt(&self.0.settings, f)
     }
 }
 
@@ -68,24 +62,6 @@ impl RuffSettings {
     /// If there is an error in the editor-only settings, it finally falls back to the default
     /// settings.
     pub(crate) fn fallback(editor_settings: &EditorSettings, root: &Path) -> RuffSettings {
-        struct FallbackTransformer<'a> {
-            inner: EditorConfigurationTransformer<'a>,
-        }
-
-        impl ConfigurationTransformer for FallbackTransformer<'_> {
-            fn transform(&self, mut configuration: Configuration) -> Configuration {
-                let fallback = find_fallback_target_version(self.inner.1);
-                if let Some(fallback) = fallback {
-                    tracing::debug!(
-                        "Derived `target-version` from found `requires-python`: {fallback:?}"
-                    );
-                    configuration.target_version = Some(fallback.into());
-                }
-
-                self.inner.transform(configuration)
-            }
-        }
-
         find_user_settings_toml()
             .and_then(|user_settings| {
                 tracing::debug!(
@@ -94,16 +70,11 @@ impl RuffSettings {
                 );
                 ruff_workspace::resolver::resolve_root_settings(
                     &user_settings,
-                    &FallbackTransformer {
-                        inner: EditorConfigurationTransformer(editor_settings, root),
-                    },
-                    ruff_workspace::resolver::ConfigurationOrigin::UserSettings,
+                    &EditorConfigurationTransformer(editor_settings, root),
+                    ConfigurationOrigin::UserSettings { fallback_directory: root },
                 )
                 .ok()
-                .map(|settings| RuffSettings {
-                    path: Some(user_settings),
-                    settings,
-                })
+                .map(RuffSettings)
             })
             .unwrap_or_else(|| {
                 let fallback = find_fallback_target_version(root);
@@ -139,16 +110,20 @@ impl RuffSettings {
             .into_settings(root)
             .unwrap_or_else(|error| {
                 tracing::error!("Failed to resolve editor settings: {error}");
-                configuration.into_settings(root).unwrap_or_else(|error| {
-                    tracing::error!("Failed to resolve default settings: {error}");
-                    Settings::default()
-                })
+                configuration
+                    .clone()
+                    .into_settings(root)
+                    .unwrap_or_else(|error| {
+                        tracing::error!("Failed to resolve default settings: {error}");
+                        Settings::default()
+                    })
             });
 
-        RuffSettings {
-            path: None,
+        RuffSettings(ResolvedSettings {
+            configuration,
             settings,
-        }
+            config_path: None,
+        })
     }
 }
 
@@ -199,19 +174,13 @@ impl RuffSettingsIndex {
                     match ruff_workspace::resolver::resolve_root_settings(
                         &pyproject,
                         &EditorConfigurationTransformer(editor_settings, root),
-                        ruff_workspace::resolver::ConfigurationOrigin::Ancestor,
+                        ConfigurationOrigin::Ancestor,
                     ) {
-                        Ok(settings) => {
+                        Ok(resolved) => {
                             tracing::debug!("Loaded settings from: `{}`", pyproject.display());
-                            respect_gitignore = Some(settings.file_resolver.respect_gitignore);
-
-                            index.insert(
-                                directory.to_path_buf(),
-                                Arc::new(RuffSettings {
-                                    path: Some(pyproject),
-                                    settings,
-                                }),
-                            );
+                            respect_gitignore =
+                                Some(resolved.settings.file_resolver.respect_gitignore);
+                            index.insert(directory.to_path_buf(), Arc::new(RuffSettings(resolved)));
                             break;
                         }
                         error => {
@@ -332,7 +301,7 @@ impl RuffSettingsIndex {
                         match ruff_workspace::resolver::resolve_root_settings(
                             &pyproject,
                             &EditorConfigurationTransformer(editor_settings, root),
-                            ruff_workspace::resolver::ConfigurationOrigin::Ancestor,
+                            ConfigurationOrigin::Ancestor,
                         ) {
                             Ok(settings) => {
                                 tracing::debug!(
@@ -340,13 +309,10 @@ impl RuffSettingsIndex {
                                     pyproject.display(),
                                     directory.display()
                                 );
-                                index.write().unwrap().insert(
-                                    directory,
-                                    Arc::new(RuffSettings {
-                                        path: Some(pyproject),
-                                        settings,
-                                    }),
-                                );
+                                index
+                                    .write()
+                                    .unwrap()
+                                    .insert(directory, Arc::new(RuffSettings(settings)));
                             }
                             error => {
                                 tracing::error!(
@@ -403,9 +369,7 @@ impl RuffSettingsIndex {
 
     /// Returns an iterator over the paths to the configuration files in the index.
     pub(crate) fn config_file_paths(&self) -> impl Iterator<Item = &Path> {
-        self.index
-            .values()
-            .filter_map(|settings| settings.path.as_deref())
+        self.index.values().filter_map(|settings| settings.path())
     }
 }
 
@@ -508,19 +472,7 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
 }
 
 fn open_configuration_file(config_path: &Path) -> crate::Result<Configuration> {
-    ruff_workspace::resolver::resolve_configuration(
-        config_path,
-        &IdentityTransformer,
-        ruff_workspace::resolver::ConfigurationOrigin::UserSpecified,
-    )
-}
-
-struct IdentityTransformer;
-
-impl ConfigurationTransformer for IdentityTransformer {
-    fn transform(&self, config: Configuration) -> Configuration {
-        config
-    }
+    ruff_workspace::resolver::resolve_configuration(config_path, ConfigurationOrigin::UserSpecified)
 }
 
 #[cfg(test)]

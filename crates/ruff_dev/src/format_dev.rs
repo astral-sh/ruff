@@ -53,7 +53,7 @@ fn find_pyproject_config(
 ) -> anyhow::Result<PyprojectConfig> {
     let mut pyproject_config = resolve(config_arguments, cli.stdin_filename.as_deref())?;
     // We don't want to format pyproject.toml
-    pyproject_config.settings.file_resolver.include = FilePatternSet::try_from_iter([
+    pyproject_config.base.settings.file_resolver.include = FilePatternSet::try_from_iter([
         FilePattern::Builtin("*.py"),
         FilePattern::Builtin("*.pyi"),
     ])
