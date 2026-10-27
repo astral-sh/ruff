@@ -1943,6 +1943,21 @@ for _ in range(1_000_000):
         x = 2
 ```
 
+The condition can depend on an earlier iteration. Here `y` starts at `2` and only ever receives `1`
+or `2` from `x`, so the loop never decrements `x`.
+
+```py
+def f(n: int):
+    x = 1
+    y = 2
+    for _ in range(n):
+        if not y:
+            x, y = x - 1, x
+        else:
+            x, y = 2, x
+    reveal_type(x)  # revealed: Literal[1, 2]
+```
+
 ### Large reachability constraint graphs fall back to `Unknown`
 
 ```py

@@ -12949,7 +12949,6 @@ impl<'db> FullExpressionCacheEntry<'db> {
         });
 
         ExpressionInference {
-            predicate_truthiness: Truthiness::Ambiguous,
             expressions: FrozenMap::from(self.expressions),
             extra,
             #[cfg(debug_assertions)]
