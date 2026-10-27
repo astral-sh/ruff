@@ -4,19 +4,19 @@ use std::path::PathBuf;
 use anyhow::{Result, bail};
 use itertools::Itertools;
 
-use ruff_workspace::resolver::{PyprojectConfig, ResolvedFile, project_files_in_path};
+use ruff_workspace::resolver::{PyprojectDiscovery, ResolvedFile, project_files_in_path};
 
 use crate::args::ConfigArguments;
 
 /// Print the user-facing configuration settings.
 pub(crate) fn show_settings(
     files: &[PathBuf],
-    pyproject_config: &PyprojectConfig,
+    project_config: &PyprojectDiscovery,
     config_arguments: &ConfigArguments,
     writer: &mut impl Write,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (paths, resolver) = project_files_in_path(files, pyproject_config, config_arguments)?;
+    let (paths, resolver) = project_files_in_path(files, project_config, config_arguments)?;
 
     // Print the list of files.
     let Some(path) = paths

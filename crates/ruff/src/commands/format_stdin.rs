@@ -7,7 +7,9 @@ use log::error;
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_python_ast::SourceType;
 use ruff_workspace::FormatterSettings;
-use ruff_workspace::resolver::{PyprojectConfig, Resolver, match_exclusion, project_file_at_path};
+use ruff_workspace::resolver::{
+    PyprojectDiscovery, Resolver, match_exclusion, project_file_at_path,
+};
 
 use crate::ExitStatus;
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
@@ -21,9 +23,9 @@ use crate::stdin::{parrot_stdin, read_from_stdin};
 pub(crate) fn format_stdin(
     cli: &FormatArguments,
     config_arguments: &ConfigArguments,
-    pyproject_config: &PyprojectConfig,
+    project_config: &PyprojectDiscovery,
 ) -> Result<ExitStatus> {
-    let mut resolver = Resolver::new(pyproject_config);
+    let mut resolver = Resolver::new(project_config);
     warn_incompatible_formatter_settings(&resolver);
 
     let mode = FormatMode::from_cli(cli);
@@ -38,7 +40,7 @@ pub(crate) fn format_stdin(
             }
 
             if filename.file_name().is_some_and(|name| {
-                match_exclusion(filename, name, &resolver.base_settings().formatter.exclude)
+                match_exclusion(filename, name, &resolver.root_settings().formatter.exclude)
             }) {
                 if mode.is_write() {
                     parrot_stdin()?;
@@ -49,7 +51,7 @@ pub(crate) fn format_stdin(
     }
 
     let path = cli.stdin_filename.as_deref();
-    let settings = &resolver.base_settings().formatter;
+    let settings = &resolver.root_settings().formatter;
 
     let source_type = path
         .map(|path| settings.extension.get_source_type(path))

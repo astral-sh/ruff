@@ -26,8 +26,8 @@ pub(crate) fn analyze_graph(
 ) -> Result<ExitStatus> {
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside the hierarchy.
-    let pyproject_config = resolve(config_arguments, None)?;
-    if pyproject_config.base.settings.analyze.preview.is_disabled() {
+    let project_config = resolve(config_arguments, None)?;
+    if project_config.root.settings.analyze.preview.is_disabled() {
         warn_user!("`ruff analyze graph` is experimental and may change without warning");
     }
 
@@ -37,7 +37,7 @@ pub(crate) fn analyze_graph(
 
     // Find all Python files.
     let files = resolve_default_files(args.files, false);
-    let (mut paths, resolver) = project_files_in_path(&files, &pyproject_config, config_arguments)?;
+    let (mut paths, resolver) = project_files_in_path(&files, &project_config, config_arguments)?;
 
     // Filter to only Python files
     paths.retain(|path| {
@@ -79,8 +79,8 @@ pub(crate) fn analyze_graph(
     // Add configured `src` paths first (for precedence), filtering to only include existing
     // directories.
     src_roots.extend(
-        pyproject_config
-            .base
+        project_config
+            .root
             .settings
             .linter
             .src

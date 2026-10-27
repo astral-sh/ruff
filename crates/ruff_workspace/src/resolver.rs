@@ -27,25 +27,28 @@ use crate::pyproject::settings_toml;
 use crate::settings::Settings;
 use crate::{FileResolverSettings, pyproject};
 
-/// The configuration information from a `pyproject.toml` file.
+/// The root configuration for a Ruff invocation and how Ruff selects settings for each input file.
+///
+/// For example, running `ruff check .` in a directory with a `ruff.toml` starts
+/// with that file's settings. If `tests/ruff.toml` also exists, its settings
+/// apply to files under `tests/`. Running `ruff check --config ruff.toml .`
+/// instead uses the specified configuration for every file.
 #[derive(Debug)]
-pub struct PyprojectConfig {
-    /// The strategy used to discover the relevant `pyproject.toml` file for
-    /// each Python file.
+pub struct PyprojectDiscovery {
+    /// Whether to look for a closer configuration file for each input.
     pub strategy: PyprojectDiscoveryStrategy,
-    /// Settings used when no closer configuration file applies.
-    pub base: ResolvedSettings,
+    /// The configuration selected for this invocation (from a file or Ruff's defaults)
+    /// and the settings built from it.
+    pub root: ConfigurationAndSettings,
 }
 
-/// The strategy used to discover the relevant `pyproject.toml` file for each
-/// Python file.
+/// How the resolver chooses a configuration for each input file.
 #[derive(Debug, Copy, Clone)]
 pub enum PyprojectDiscoveryStrategy {
-    /// Use a fixed `pyproject.toml` file for all Python files (i.e., one
-    /// provided on the command-line).
+    /// Use the root settings for every file, as with `--config <path>` or `--isolated`.
     Fixed,
-    /// Use the closest `pyproject.toml` file in the filesystem hierarchy, or
-    /// the default settings.
+    /// Use the closest configuration in the file's directory or its ancestors,
+    /// falling back to the root settings.
     Hierarchical,
 }
 
@@ -79,49 +82,49 @@ impl Relativity {
 
 #[derive(Debug)]
 pub struct Resolver<'a> {
-    pyproject_config: &'a PyprojectConfig,
+    project_config: &'a PyprojectDiscovery,
     /// All [`Settings`] that have been added to the resolver, along with their config file paths.
-    settings: Vec<ResolvedSettings>,
+    settings: Vec<ConfigurationAndSettings>,
     /// A router from path to index into the `settings` vector.
     router: Router<usize>,
 }
 
 impl<'a> Resolver<'a> {
-    /// Create a new [`Resolver`] for the given [`PyprojectConfig`].
-    pub fn new(pyproject_config: &'a PyprojectConfig) -> Self {
+    /// Create a new [`Resolver`] for the given [`PyprojectDiscovery`].
+    pub fn new(project_config: &'a PyprojectDiscovery) -> Self {
         Self {
-            pyproject_config,
+            project_config,
             settings: Vec::new(),
             router: Router::new(),
         }
     }
 
-    /// Return the [`Settings`] from the [`PyprojectConfig`].
+    /// Return the settings from the root configuration.
     #[inline]
-    pub fn base_settings(&self) -> &Settings {
-        &self.pyproject_config.base.settings
+    pub fn root_settings(&self) -> &Settings {
+        &self.project_config.root.settings
     }
 
     /// Return `true` if the [`Resolver`] is using a hierarchical discovery strategy.
     #[inline]
     fn is_hierarchical(&self) -> bool {
-        self.pyproject_config.strategy.is_hierarchical()
+        self.project_config.strategy.is_hierarchical()
     }
 
     /// Return `true` if the [`Resolver`] should force-exclude files passed directly to the CLI.
     #[inline]
     pub fn force_exclude(&self) -> bool {
-        self.base_settings().file_resolver.force_exclude
+        self.root_settings().file_resolver.force_exclude
     }
 
     /// Return `true` if the [`Resolver`] should respect `.gitignore` files.
     #[inline]
     fn respect_gitignore(&self) -> bool {
-        self.base_settings().file_resolver.respect_gitignore
+        self.root_settings().file_resolver.respect_gitignore
     }
 
     /// Use these settings for files under the given directory.
-    fn add(&mut self, path: &Path, settings: ResolvedSettings) {
+    fn add(&mut self, path: &Path, settings: ConfigurationAndSettings) {
         self.settings.push(settings);
 
         // Normalize the path to use `/` separators and escape the '{' and '}' characters,
@@ -151,14 +154,14 @@ impl<'a> Resolver<'a> {
     }
 
     /// Return the settings and their source configuration for a given [`Path`].
-    pub fn resolve_with_path(&self, path: &Path) -> &ResolvedSettings {
-        match self.pyproject_config.strategy {
-            PyprojectDiscoveryStrategy::Fixed => &self.pyproject_config.base,
+    pub fn resolve_with_path(&self, path: &Path) -> &ConfigurationAndSettings {
+        match self.project_config.strategy {
+            PyprojectDiscoveryStrategy::Fixed => &self.project_config.root,
             PyprojectDiscoveryStrategy::Hierarchical => self
                 .router
                 .at(path.to_slash_lossy().as_ref())
                 .map(|Match { value, .. }| &self.settings[*value])
-                .unwrap_or(&self.pyproject_config.base),
+                .unwrap_or(&self.project_config.root),
         }
     }
 
@@ -233,21 +236,23 @@ impl<'a> Resolver<'a> {
 
     /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
     pub fn settings(&self) -> impl Iterator<Item = &Settings> {
-        std::iter::once(self.base_settings())
+        std::iter::once(self.root_settings())
             .chain(self.settings.iter().map(|entry| &entry.settings))
     }
 }
 
+/// A Ruff configuration and the settings built from it.
 #[derive(Debug, Default)]
-pub struct ResolvedSettings {
+pub struct ConfigurationAndSettings {
     /// The merged configuration, including filesystem fallbacks, before CLI or editor overrides.
     pub configuration: Configuration,
+    /// The settings after applying CLI or editor overrides.
     pub settings: Settings,
     /// Absolute path to the Ruff configuration file, if one was loaded.
     pub config_path: Option<PathBuf>,
 }
 
-impl ResolvedSettings {
+impl ConfigurationAndSettings {
     pub fn new(
         configuration: Configuration,
         transformer: &dyn ConfigurationTransformer,
@@ -422,9 +427,9 @@ fn resolve_scoped_settings(
     transformer: &dyn ConfigurationTransformer,
     origin: ConfigurationOrigin<'_>,
     configuration_cache: Option<&ConfigurationCache>,
-) -> Result<ResolvedSettings> {
+) -> Result<ConfigurationAndSettings> {
     let configuration = resolve_configuration_with_cache(pyproject, origin, configuration_cache)?;
-    ResolvedSettings::new(
+    ConfigurationAndSettings::new(
         configuration,
         transformer,
         Relativity::from(origin).resolve(pyproject),
@@ -438,7 +443,7 @@ pub fn resolve_root_settings(
     pyproject: &Path,
     transformer: &dyn ConfigurationTransformer,
     origin: ConfigurationOrigin<'_>,
-) -> Result<ResolvedSettings> {
+) -> Result<ConfigurationAndSettings> {
     resolve_scoped_settings(pyproject, transformer, origin, None)
 }
 
@@ -469,19 +474,19 @@ impl From<ConfigurationOrigin<'_>> for Relativity {
 /// Find all project files in a set of paths, following configured include/exclude settings.
 pub fn project_files_in_path<'a>(
     paths: &[PathBuf],
-    pyproject_config: &'a PyprojectConfig,
+    project_config: &'a PyprojectDiscovery,
     transformer: &(dyn ConfigurationTransformer + Sync),
 ) -> Result<(Vec<Result<ResolvedFile, ignore::Error>>, Resolver<'a>)> {
     // Normalize every path (e.g., convert from relative to absolute).
     let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).unique().collect();
 
     // Search for `pyproject.toml` files in all parent directories.
-    let mut resolver = Resolver::new(pyproject_config);
+    let mut resolver = Resolver::new(project_config);
     let mut seen = FxHashSet::default();
     let configuration_cache = ConfigurationCache::default();
 
-    // Insert the path to the root configuration to avoid parsing the configuration a second time.
-    if let Some(config_path) = &pyproject_config.base.config_path {
+    // Skip the root configuration file, which has already been loaded.
+    if let Some(config_path) = &project_config.root.config_path {
         seen.insert(config_path.parent().unwrap());
     }
 
@@ -1004,9 +1009,9 @@ mod tests {
     use crate::configuration::Configuration;
     use crate::pyproject::find_settings_toml;
     use crate::resolver::{
-        ConfigurationOrigin, ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy,
-        ResolvedFile, ResolvedSettings, Resolver, is_file_excluded, match_exclusion,
-        project_files_in_path, resolve_root_settings,
+        ConfigurationAndSettings, ConfigurationOrigin, ConfigurationTransformer,
+        PyprojectDiscovery, PyprojectDiscoveryStrategy, ResolvedFile, Resolver, is_file_excluded,
+        match_exclusion, project_files_in_path, resolve_root_settings,
     };
     use crate::tests::test_resource_path;
 
@@ -1021,15 +1026,15 @@ mod tests {
     #[test]
     fn rooted_exclusion() -> Result<()> {
         let package_root = test_resource_path("package");
-        let pyproject_config = PyprojectConfig {
+        let project_config = PyprojectDiscovery {
             strategy: PyprojectDiscoveryStrategy::Hierarchical,
-            base: resolve_root_settings(
+            root: resolve_root_settings(
                 &find_settings_toml(&package_root)?.unwrap(),
                 &NoOpTransformer,
                 ConfigurationOrigin::Ancestor,
             )?,
         };
-        let resolver = Resolver::new(&pyproject_config);
+        let resolver = Resolver::new(&project_config);
         // src/app.py should not be excluded even if it lives in a hierarchy that should
         // be excluded by virtue of the pyproject.toml having `resources/*` in
         // it.
@@ -1067,9 +1072,9 @@ mod tests {
 
         let (paths, _) = project_files_in_path(
             &[root.to_path_buf()],
-            &PyprojectConfig {
+            &PyprojectDiscovery {
                 strategy: PyprojectDiscoveryStrategy::Fixed,
-                base: ResolvedSettings::default(),
+                root: ConfigurationAndSettings::default(),
             },
             &NoOpTransformer,
         )?;

@@ -11,7 +11,7 @@ use ruff_linter::settings::types::GlobPath;
 use ruff_linter::{settings::types::FilePattern, settings::types::PreviewMode};
 use ruff_workspace::Settings;
 use ruff_workspace::pyproject::find_fallback_target_version;
-use ruff_workspace::resolver::{ConfigurationOrigin, ResolvedSettings, match_exclusion};
+use ruff_workspace::resolver::{ConfigurationAndSettings, ConfigurationOrigin, match_exclusion};
 use ruff_workspace::{
     configuration::{Configuration, FormatConfiguration, LintConfiguration, RuleSelection},
     pyproject::{find_user_settings_toml, settings_toml},
@@ -23,7 +23,7 @@ use crate::session::options::ConfigurationPreference;
 use crate::session::settings::{EditorSettings, ResolvedConfiguration};
 
 #[derive(Debug)]
-pub(crate) struct RuffSettings(ResolvedSettings);
+pub(crate) struct RuffSettings(ConfigurationAndSettings);
 
 impl RuffSettings {
     pub(crate) fn path(&self) -> Option<&Path> {
@@ -119,7 +119,7 @@ impl RuffSettings {
                     })
             });
 
-        RuffSettings(ResolvedSettings {
+        RuffSettings(ConfigurationAndSettings {
             configuration,
             settings,
             config_path: None,

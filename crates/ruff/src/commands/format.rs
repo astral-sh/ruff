@@ -38,7 +38,7 @@ use ruff_source_file::{LineIndex, LineRanges, OneIndexed, SourceFile, SourceFile
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::FormatterSettings;
 use ruff_workspace::resolver::{
-    PyprojectConfig, ResolvedFile, Resolver, match_exclusion, project_files_in_path,
+    PyprojectDiscovery, ResolvedFile, Resolver, match_exclusion, project_files_in_path,
 };
 
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
@@ -71,13 +71,13 @@ impl FormatMode {
 pub(crate) fn format(
     cli: FormatArguments,
     config_arguments: &ConfigArguments,
-    pyproject_config: &PyprojectConfig,
+    project_config: &PyprojectDiscovery,
 ) -> Result<ExitStatus> {
     let mode = FormatMode::from_cli(&cli);
     let files = resolve_default_files(cli.files, false);
-    let (paths, resolver) = project_files_in_path(&files, pyproject_config, config_arguments)?;
+    let (paths, resolver) = project_files_in_path(&files, project_config, config_arguments)?;
 
-    let output_format = pyproject_config.base.settings.output_format;
+    let output_format = project_config.root.settings.output_format;
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");

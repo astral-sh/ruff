@@ -6,7 +6,7 @@ use log::debug;
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::pyproject::{self, find_fallback_target_version};
 use ruff_workspace::resolver::{
-    ConfigurationOrigin, PyprojectConfig, PyprojectDiscoveryStrategy, ResolvedSettings,
+    ConfigurationAndSettings, ConfigurationOrigin, PyprojectDiscovery, PyprojectDiscoveryStrategy,
     resolve_root_settings,
 };
 
@@ -14,12 +14,11 @@ use ruff_python_ast as ast;
 
 use crate::args::ConfigArguments;
 
-/// Resolve the relevant settings strategy and defaults for the current
-/// invocation.
+/// Select the root settings and discovery strategy for this invocation.
 pub fn resolve(
     config_arguments: &ConfigArguments,
     stdin_filename: Option<&Path>,
-) -> Result<PyprojectConfig> {
+) -> Result<PyprojectDiscovery> {
     let Ok(cwd) = std::env::current_dir() else {
         bail!("Working directory does not exist")
     };
@@ -27,9 +26,14 @@ pub fn resolve(
     // First priority: if we're running in isolated mode, use the default settings.
     if config_arguments.isolated {
         debug!("Isolated mode, not reading any pyproject.toml");
-        return Ok(PyprojectConfig {
+        return Ok(PyprojectDiscovery {
             strategy: PyprojectDiscoveryStrategy::Fixed,
-            base: ResolvedSettings::new(Configuration::default(), config_arguments, &cwd, None)?,
+            root: ConfigurationAndSettings::new(
+                Configuration::default(),
+                config_arguments,
+                &cwd,
+                None,
+            )?,
         });
     }
 
@@ -37,7 +41,7 @@ pub fn resolve(
     // `pyproject.toml` for _all_ configuration, and resolve paths relative to the
     // current working directory. (This matches ESLint's behavior.)
     if let Some(pyproject) = config_arguments.config_file() {
-        let settings = resolve_root_settings(
+        let root = resolve_root_settings(
             pyproject,
             config_arguments,
             ConfigurationOrigin::UserSpecified,
@@ -46,56 +50,48 @@ pub fn resolve(
             "Using user-specified configuration file at: {}",
             pyproject.display()
         );
-        return Ok(PyprojectConfig {
+        return Ok(PyprojectDiscovery {
             strategy: PyprojectDiscoveryStrategy::Fixed,
-            base: settings,
+            root,
         });
     }
 
-    // Third priority: find a `pyproject.toml` file in either an ancestor of
-    // `stdin_filename` (if set) or the current working path all paths relative to
-    // that directory. (With `Strategy::Hierarchical`, we'll end up finding
-    // the "closest" `pyproject.toml` file for every Python file later on,
-    // so these act as the "default" settings.)
+    // Third priority: search from the stdin filename or the current working directory.
+    // Resolve paths in the configuration relative to the directory containing it.
     if let Some(pyproject) = pyproject::find_settings_toml(stdin_filename.unwrap_or(&cwd))? {
         debug!(
             "Using configuration file (via parent) at: {}",
             pyproject.display()
         );
-        let settings =
+        let root =
             resolve_root_settings(&pyproject, config_arguments, ConfigurationOrigin::Ancestor)?;
-        return Ok(PyprojectConfig {
+        return Ok(PyprojectDiscovery {
             strategy: PyprojectDiscoveryStrategy::Hierarchical,
-            base: settings,
+            root,
         });
     }
 
-    // Fourth priority: find a user-specific `pyproject.toml`, but resolve all paths
-    // relative the current working directory. (With `Strategy::Hierarchical`, we'll
-    // end up the "closest" `pyproject.toml` file for every Python file later on, so
-    // these act as the "default" settings.)
+    // Fourth priority: use the user-level configuration and resolve paths relative
+    // to the current working directory.
     if let Some(pyproject) = pyproject::find_user_settings_toml() {
         debug!(
             "Using configuration file (via cwd) at: {}",
             pyproject.display()
         );
-        let settings = resolve_root_settings(
+        let root = resolve_root_settings(
             &pyproject,
             config_arguments,
             ConfigurationOrigin::UserSettings {
                 fallback_directory: &cwd,
             },
         )?;
-        return Ok(PyprojectConfig {
+        return Ok(PyprojectDiscovery {
             strategy: PyprojectDiscoveryStrategy::Hierarchical,
-            base: settings,
+            root,
         });
     }
 
-    // Fallback: load Ruff's default settings, and resolve all paths relative to the
-    // current working directory. (With `Strategy::Hierarchical`, we'll end up the
-    // "closest" `pyproject.toml` file for every Python file later on, so these act
-    // as the "default" settings.)
+    // Fall back to Ruff's defaults, resolving paths relative to the current working directory.
     debug!("Using Ruff default settings");
     // A `pyproject.toml` without a `[tool.ruff]` section can still specify `requires-python`.
     let fallback = find_fallback_target_version(stdin_filename.unwrap_or(&cwd));
@@ -106,9 +102,9 @@ pub fn resolve(
         target_version: fallback.map(ast::PythonVersion::from),
         ..Configuration::default()
     };
-    Ok(PyprojectConfig {
+    Ok(PyprojectDiscovery {
         strategy: PyprojectDiscoveryStrategy::Hierarchical,
-        base: ResolvedSettings::new(configuration, config_arguments, &cwd, None)?,
+        root: ConfigurationAndSettings::new(configuration, config_arguments, &cwd, None)?,
     })
 }
 
@@ -140,9 +136,9 @@ mod tests {
 
         let (_, arguments) = CheckCommand::try_parse_from(["check", "--target-version", "py312"])?
             .partition(GlobalConfigArgs::default())?;
-        let config = resolve(&arguments, Some(root))?;
+        let project_config = resolve(&arguments, Some(root))?;
         let (_, resolver) =
-            project_files_in_path(std::slice::from_ref(&nested), &config, &arguments)?;
+            project_files_in_path(std::slice::from_ref(&nested), &project_config, &arguments)?;
 
         for (directory, base_version) in [
             (root, PythonVersion::PY310),

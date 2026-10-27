@@ -34,7 +34,7 @@ use ruff_python_formatter::{
     FormatModuleError, MagicTrailingComma, PreviewMode, PyFormatOptions, format_module_source,
 };
 use ruff_python_parser::ParseError;
-use ruff_workspace::resolver::{PyprojectConfig, ResolvedFile, Resolver, project_files_in_path};
+use ruff_workspace::resolver::{PyprojectDiscovery, ResolvedFile, Resolver, project_files_in_path};
 
 fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, ConfigArguments)> {
     let args_matches = FormatCommand::command()
@@ -46,28 +46,28 @@ fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, ConfigArgumen
     Ok((cli, config_arguments))
 }
 
-/// Find the [`PyprojectConfig`] to use for formatting.
-fn find_pyproject_config(
+/// Configure discovery for the Python files used in the formatter comparison.
+fn project_config_for_formatting(
     cli: &FormatArguments,
     config_arguments: &ConfigArguments,
-) -> anyhow::Result<PyprojectConfig> {
-    let mut pyproject_config = resolve(config_arguments, cli.stdin_filename.as_deref())?;
+) -> anyhow::Result<PyprojectDiscovery> {
+    let mut project_config = resolve(config_arguments, cli.stdin_filename.as_deref())?;
     // We don't want to format pyproject.toml
-    pyproject_config.base.settings.file_resolver.include = FilePatternSet::try_from_iter([
+    project_config.root.settings.file_resolver.include = FilePatternSet::try_from_iter([
         FilePattern::Builtin("*.py"),
         FilePattern::Builtin("*.pyi"),
     ])
     .unwrap();
-    Ok(pyproject_config)
+    Ok(project_config)
 }
 
 /// Find files that ruff would check so we can format them. Adapted from `ruff`.
 fn ruff_check_paths<'a>(
-    pyproject_config: &'a PyprojectConfig,
+    project_config: &'a PyprojectDiscovery,
     cli: &FormatArguments,
     config_arguments: &ConfigArguments,
 ) -> anyhow::Result<(Vec<Result<ResolvedFile, ignore::Error>>, Resolver<'a>)> {
-    let (paths, resolver) = project_files_in_path(&cli.files, pyproject_config, config_arguments)?;
+    let (paths, resolver) = project_files_in_path(&cli.files, project_config, config_arguments)?;
     Ok((paths, resolver))
 }
 
@@ -469,8 +469,8 @@ fn format_dev_project(
     // Find files to check (or in this case, format twice). Adapted from ruff
     // First argument is ignored
     let (cli, overrides) = parse_cli(files)?;
-    let pyproject_config = find_pyproject_config(&cli, &overrides)?;
-    let (paths, resolver) = ruff_check_paths(&pyproject_config, &cli, &overrides)?;
+    let project_config = project_config_for_formatting(&cli, &overrides)?;
+    let (paths, resolver) = ruff_check_paths(&project_config, &cli, &overrides)?;
 
     if paths.is_empty() {
         bail!("No Python files found under the given path(s)");
