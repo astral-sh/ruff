@@ -2935,7 +2935,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         node: &ast::Expr,
         context: ExpressionContext,
     ) -> Expression<'db> {
-        self.add_standalone_expression_impl(node, ExpressionKind::Predicate(context), None)
+        self.add_standalone_expression_impl(
+            node,
+            ExpressionKind::Predicate {
+                context,
+                in_loop: self.in_loop_context(),
+            },
+            None,
+        )
     }
 
     /// Record an expression that is immediately assigned to a target, and that needs to be a Salsa

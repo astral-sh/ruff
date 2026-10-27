@@ -578,13 +578,36 @@ pub(crate) fn infer_expression_types<'db>(
     infer_expression_types_impl(db, InferExpression::new(db, expression, tcx))
 }
 
-/// Evaluate truthiness from the inferred operand types. A widened operand can require a new
-/// metaclass lookup, so evaluate it in the caller's query, after expression cycle recovery.
+/// A loop predicate can depend on bindings it guards in the previous iteration.
+/// Evaluate it in the caller's query to keep an extra query out of that cycle.
 pub(crate) fn infer_predicate_truthiness<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> Truthiness {
-    let ExpressionKind::Predicate(context) = expression.kind(db) else {
+    if matches!(
+        expression.kind(db),
+        ExpressionKind::Predicate { in_loop: true, .. }
+    ) {
+        evaluate_predicate_truthiness(db, expression)
+    } else {
+        cached_predicate_truthiness(db, expression)
+    }
+}
+
+/// Reachability walks can revisit the same predicate for many different bindings.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _| Truthiness::Ambiguous,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn cached_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+    evaluate_predicate_truthiness(db, expression)
+}
+
+/// A widened operand can require a new metaclass lookup, so evaluate truthiness after
+/// expression inference has normalized the operand types.
+fn evaluate_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+    let ExpressionKind::Predicate { context, .. } = expression.kind(db) else {
         return Truthiness::Ambiguous;
     };
     let inference = infer_expression_types(db, expression, TypeContext::default());
