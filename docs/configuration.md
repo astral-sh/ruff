@@ -317,8 +317,9 @@ Note that in these last two cases, the behavior of Ruff may differ depending on 
 
 ### Inline script metadata
 
-A Python script without a `[tool.ruff]` table uses the project's lint and format settings.
-It can still declare its own minimum Python version.
+Ruff uses its default lint and format settings for any Python file with a PEP 723
+`script` block, even one that declares only dependencies. Files without a `script`
+block use the project's settings. A script can declare its minimum Python version.
 
 ```python
 # /// script
@@ -328,11 +329,11 @@ It can still declare its own minimum Python version.
 
 When linting or formatting this file, Ruff targets Python 3.12 even if the project specifies
 a different `target-version` or a matching `per-file-target-version`. Ruff chooses the lowest supported Python minor version that satisfies the script's constraint.
-If the script omits `requires-python`, the project's target version applies.
+If the script omits `requires-python`, Ruff uses its default target version unless the
+script or a CLI override supplies one.
 
-Adding a `[tool.ruff]` table gives the script its own configuration. An empty table selects
-Ruff's defaults. For example, this script enables only `F401`, regardless of the project's
-rule selection.
+Use `[tool.ruff]` to configure linting and formatting for the script. For example, this
+script enables only `F401`, regardless of the project's rule selection.
 
 ```python
 # /// script

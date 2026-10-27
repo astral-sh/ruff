@@ -2463,9 +2463,10 @@ fn range_formatting_notebook() -> Result<()> {
 #[test]
 fn inline_script_formatter() -> Result<()> {
     let test = CliTest::with_file("ruff.toml", "format.quote-style = 'single'")?;
+    test.write_file("scripts/ordinary.py", "x = 'hello'\n")?;
     test.write_file("shared.toml", "format.quote-style = 'single'")?;
     for (name, metadata) in [
-        ("inherited.py", "dependencies = []"),
+        ("dependencies.py", "dependencies = []"),
         ("defaults.py", "[tool.ruff]"),
         ("extended.py", "tool.ruff.extend = '../shared.toml'"),
     ] {
@@ -2482,8 +2483,12 @@ fn inline_script_formatter() -> Result<()> {
             .success()
     );
     assert!(
-        test.read_file("scripts/inherited.py")?
+        test.read_file("scripts/ordinary.py")?
             .ends_with("x = 'hello'\n")
+    );
+    assert!(
+        test.read_file("scripts/dependencies.py")?
+            .ends_with("x = \"hello\"\n")
     );
     assert!(
         test.read_file("scripts/defaults.py")?

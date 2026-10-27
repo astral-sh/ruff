@@ -89,6 +89,7 @@ fn script_requires_python_show_settings() -> anyhow::Result<()> {
 fn inline_script_target_version() -> anyhow::Result<()> {
     let test = CliTest::with_file("ruff.toml", "target-version = 'py39'")?;
     for (metadata, expected) in [
+        ("dependencies = []", "3.11"),
         ("[tool.ruff]", "3.11"),
         ("requires-python = '>=3.12'\n# [tool.ruff]", "3.12"),
         (

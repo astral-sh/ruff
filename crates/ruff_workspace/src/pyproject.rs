@@ -238,7 +238,7 @@ fn get_fallback_target_version(dir: &Path) -> Option<PythonVersion> {
 }
 
 pub(super) struct ScriptMetadata {
-    pub options: Option<Options>,
+    pub options: Options,
     pub target_version: Option<PythonVersion>,
 }
 
@@ -264,9 +264,13 @@ impl ScriptMetadata {
             .and_then(|tool| tool.get_ref().as_table())
             .and_then(|tool| tool.get("ruff"));
         let Some(ruff) = ruff.filter(|_| use_inline_config) else {
-            return Ok(errors.is_empty().then_some(Self {
-                options: None,
-                target_version,
+            return Ok(Some(Self {
+                options: Options::default(),
+                target_version: if errors.is_empty() {
+                    target_version
+                } else {
+                    None
+                },
             }));
         };
         if let Some(error) = errors.into_iter().next() {
@@ -286,7 +290,7 @@ impl ScriptMetadata {
             })
             .context("Invalid Ruff configuration in inline script metadata")?;
         Ok(Some(Self {
-            options: Some(options),
+            options,
             target_version,
         }))
     }
