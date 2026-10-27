@@ -2183,6 +2183,32 @@ def test_match_mapping_uses_get(value: CustomGet) -> None:
             reveal_type(item)  # revealed: object
 ```
 
+Narrowing a mapping preserves the type of its entries when it still uses the standard `get` method.
+A truthiness check can exclude empty dictionaries, and an `isinstance` check can add another class
+to the subject's type.
+
+```py
+def match_nonempty_dict(value: dict[str, int]) -> None:
+    if value:
+        match value:
+            case {"item": item}:
+                reveal_type(item)  # revealed: int
+
+class Tagged: ...
+
+def match_tagged_mapping(value: Mapping[str, bytes]) -> None:
+    if isinstance(value, Tagged):
+        match value:
+            case {"item": item}:
+                reveal_type(item)  # revealed: bytes
+
+def match_nonempty_custom_get(value: CustomGet) -> None:
+    if value:
+        match value:
+            case {"item": item}:
+                reveal_type(item)  # revealed: object
+```
+
 A callable stored on the instance can also provide `get`. The captured value still has type
 `object`.
 
