@@ -1,20 +1,22 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::Scope;
-use ruff_python_semantic::analyze::function_type::{self, FunctionType};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 
 /// ## What it does
-/// Checks for methods that have no parameter to receive their implicit argument.
+/// Checks for methods that have no parameters.
+///
+/// Methods with decorators are ignored because decorators can change how a method
+/// is called.
 ///
 /// ## Why is this bad?
 /// Calling a method through an instance passes the instance as an implicit
-/// positional argument. Class methods receive the class instead. A method without a
-/// positional parameter or `*args` cannot accept this argument and raises a
-/// `TypeError` when called this way.
+/// positional argument. Some special methods, such as `__init_subclass__`, receive
+/// the class instead. A method without any parameters cannot accept this argument
+/// and raises a `TypeError` when called this way.
 ///
 /// Add an instance or class parameter, conventionally named `self` or `cls`.
 /// If the function does not need either, use `@staticmethod` instead.
@@ -35,21 +37,10 @@ use crate::codes::Category;
 ///
 /// ## Known problems
 /// An ordinary function defined in a class can be called directly through the
-/// class, without passing an instance: `Example.method()` works in the example
-/// above, while `Example().method()` raises a `TypeError`. This rule flags the
+/// class, without passing an instance: `Example.method()` works in the first
+/// example, while `Example().method()` raises a `TypeError`. This rule flags the
 /// definition regardless of how it is called. Use `@staticmethod`, or suppress
 /// the diagnostic if class-only access is intentional.
-///
-/// Custom decorators can change whether a method receives an implicit argument.
-/// Decorators that make a method static can be configured using
-/// [`lint.pep8-naming.staticmethod-decorators`].
-///
-/// For compatibility with Pylint's E0211, methods accepting `**kwargs` are
-/// exempt, even though `**kwargs` cannot receive a positional argument.
-///
-/// ## Options
-/// - `lint.pep8-naming.classmethod-decorators`
-/// - `lint.pep8-naming.staticmethod-decorators`
 ///
 /// ## References
 /// - [Python documentation: Instance methods](https://docs.python.org/3/reference/datamodel.html#instance-methods)
@@ -73,12 +64,7 @@ pub(crate) fn no_method_argument(checker: &Checker, scope: &Scope) {
         return;
     };
 
-    let parameters = &function.parameters;
-    if !parameters.posonlyargs.is_empty()
-        || !parameters.args.is_empty()
-        || parameters.vararg.is_some()
-        || parameters.kwarg.is_some()
-    {
+    if !function.parameters.is_empty() || !function.decorator_list.is_empty() {
         return;
     }
 
@@ -86,18 +72,8 @@ pub(crate) fn no_method_argument(checker: &Checker, scope: &Scope) {
         return;
     };
 
-    match function_type::classify(
-        &function.name,
-        &function.decorator_list,
-        parent,
-        checker.semantic(),
-        &checker.settings().pep8_naming.classmethod_decorators,
-        &checker.settings().pep8_naming.staticmethod_decorators,
-    ) {
-        FunctionType::Function => return,
-        // Python passes the class to `__new__` even when it is explicitly static.
-        FunctionType::StaticMethod if function.name.as_str() != "__new__" => return,
-        _ => {}
+    if !parent.kind.is_class() {
+        return;
     }
 
     checker.report_diagnostic(
