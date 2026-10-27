@@ -58,7 +58,7 @@ use crate::types::function::{
 };
 use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
-    TypeVarInferenceSolutions, walk_specialization_types,
+    TypeVarInferenceSolutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::known_instance::{
@@ -70,7 +70,7 @@ use crate::types::signatures::{
     PartialApplication, PartialSignatureApplication,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableSegment};
-use crate::types::type_alias::{TypeAliasType, walk_type_alias_arguments};
+use crate::types::type_alias::TypeAliasType;
 use crate::types::typed_dict::TypedDictOpenness;
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarKind, TypeVarNonceGenerator, TypeVarSet};
 use crate::types::variance::VarianceInferable;
@@ -7994,8 +7994,9 @@ struct ParamSpecArgumentContext<'a, 'call, 'db> {
 
 /// Returns the number of occurrences of inferable type variables in the provided type.
 ///
-/// Counting the `T` in `Alias[T]` keeps the argument in the convergence check when a sibling
-/// constrains `T`. This only requires visiting the supplied arguments, even for recursive aliases.
+/// An alias argument contributes only if its parameter affects the alias's value. For example,
+/// `Items[T]` contributes one occurrence for `type Items[T] = list[T]`, while `type Ignore[T] = None`
+/// contributes none.
 fn inferable_typevar_occurrences<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -8007,6 +8008,29 @@ fn inferable_typevar_occurrences<'db>(
         inferable: TypeVarSet<'db>,
         count: Cell<usize>,
         stack: RefCell<SmallVec<[Type<'db>; 8]>>,
+    }
+
+    impl<'db> InferableTypeVarVisitor<'_, 'db> {
+        fn visit_alias_arguments(
+            &self,
+            db: &'db dyn Db,
+            constructor: Type<'db>,
+            arguments: Specialization<'db>,
+        ) {
+            for (parameter, &argument) in arguments
+                .generic_context(db)
+                .variables(db)
+                .zip(arguments.types(db))
+            {
+                if constructor
+                    .variance_of(db, self.env, parameter.identity(db))
+                    .evaluate(db)
+                    != TypeVarVariance::Bivariant
+                {
+                    self.visit_type(db, argument);
+                }
+            }
+        }
     }
 
     impl<'db> TypeVisitor<'db> for InferableTypeVarVisitor<'_, 'db> {
@@ -8044,12 +8068,18 @@ fn inferable_typevar_occurrences<'db>(
         }
 
         fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-            walk_type_alias_arguments(db, alias, self);
+            if let Some(arguments) = alias.specialization(db) {
+                self.visit_alias_arguments(db, Type::TypeAlias(alias.unspecialized(db)), arguments);
+            }
         }
 
         fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
             if let Some(arguments) = recursive.arguments(db) {
-                walk_specialization_types(db, arguments, self);
+                self.visit_alias_arguments(
+                    db,
+                    Type::Recursive(recursive.constructor(db)),
+                    arguments,
+                );
             }
         }
     }

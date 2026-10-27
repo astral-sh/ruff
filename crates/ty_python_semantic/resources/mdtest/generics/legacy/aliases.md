@@ -29,6 +29,41 @@ def _(n: int, value: int | str):
     accept_nested([n], value)  # no diagnostic
 ```
 
+## Unused alias parameters in call inference
+
+An argument of type `Ignore[T]` supplies no information about `T`. Passing `None` explicitly
+therefore has the same effect on inference for the callback as omitting the argument.
+
+```py
+from collections.abc import Callable, Sequence
+from typing import Generic, TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+Ignore = TypeAliasType("Ignore", None, type_params=(T,))
+
+class First(Generic[T]):
+    def __call__(self, items: Sequence[T]) -> T:
+        return items[0]
+
+def apply(fn: Callable[[T], T], x: T, y: T, unused: Ignore[T] = None) -> None: ...
+
+values = [["text"]]
+apply(First(), values, values)  # no diagnostic
+apply(First(), values, values, None)  # no diagnostic
+```
+
+A recursive alias can pass `T` to itself without ever using it as an element type. Its argument
+supplies no information about `T` either.
+
+```py
+RecursiveIgnore = None | tuple["RecursiveIgnore[list[T]]"]
+
+def apply_recursive(fn: Callable[[T], T], x: T, y: T, unused: RecursiveIgnore[T] = None) -> None: ...
+
+apply_recursive(First(), values, values, None)  # no diagnostic
+```
+
 ## Ambiguous overload returns through generic aliases
 
 Aliases are expanded when comparing the structure of ambiguous return types. Recursive aliases

@@ -509,6 +509,26 @@ impl<'db> RecursiveType<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         let env = self.environment(db);
+        if let Some(arguments) = self.arguments(db) {
+            let parameters = arguments.generic_context(db);
+            let constructor = self.with_arguments(db, Some(parameters.identity_specialization(db)));
+            if self != constructor && self.may_have_unbounded_specialization(db) {
+                // Unfolding R[list[T]] can produce R[list[list[T]]] and so on. Express the
+                // variance through the constructor's formal parameters so the equations repeat.
+                let argument_variances = parameters.variables(db).zip(arguments.types(db)).map(
+                    |(parameter, argument)| {
+                        argument
+                            .variance_of(db, &env, typevar)
+                            .compose_thunk(db, || {
+                                constructor.variance_of(db, &env, parameter.identity(db))
+                            })
+                    },
+                );
+                let captured_variance = (!parameters.contains(db, typevar))
+                    .then(|| constructor.variance_of(db, &env, typevar));
+                return VarianceTerm::join(db, argument_variances.chain(captured_variance));
+            }
+        }
         self.unfold(db, &env)
             .map(|unfolded| unfolded.variance_of(db, &env, typevar))
             .unwrap_or(VarianceTerm::BIVARIANT)

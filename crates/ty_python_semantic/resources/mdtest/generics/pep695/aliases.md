@@ -658,6 +658,27 @@ def _(n: int, value: int | str):
     append([n], value)  # no diagnostic
 ```
 
+## Unused alias parameters in call inference
+
+An argument of type `Ignore[T]` supplies no information about `T`. Passing `None` explicitly
+therefore has the same effect on inference for the callback as omitting the argument.
+
+```py
+from collections.abc import Callable, Sequence
+
+type Ignore[T] = None
+
+class First[T]:
+    def __call__(self, items: Sequence[T]) -> T:
+        return items[0]
+
+def apply[T](fn: Callable[[T], T], x: T, y: T, unused: Ignore[T] = None) -> None: ...
+
+values = [["text"]]
+apply(First(), values, values)  # no diagnostic
+apply(First(), values, values, None)  # no diagnostic
+```
+
 ## Bidirectional type inference with union type aliases
 
 When a PEP 695 type alias expands to a union, bidirectional type inference should still work
