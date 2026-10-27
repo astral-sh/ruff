@@ -3771,7 +3771,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn visit_bool_expression(&mut self, node: &'ast ast::ExprBoolOp, context: ExpressionContext) {
         let ast::ExprBoolOp { values, op, .. } = node;
         let mut snapshots = vec![];
-        let mut reachability_constraints = vec![];
+        let has_named_expression = values
+            .iter()
+            .any(|value| any_over_expr(value, &ast::Expr::is_named_expr));
+        let mut reachability_constraints = SmallVec::<[ScopedReachabilityConstraintId; 1]>::new();
         let mut last_condition_flow_snapshots = None;
 
         for (index, value) in values.iter().enumerate() {
@@ -3812,19 +3815,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.flow_snapshot()
                 };
 
-                // We first model the short-circuiting behavior. We take the short-circuit
-                // path here if all of the previous short-circuit paths were not taken, so
-                // we record all previously existing reachability constraints, and negate the
-                // one for the current expression.
-
+                // This path reaches the current operand and then short-circuits.
                 self.record_negated_reachability_constraint(reachability_constraint);
                 snapshots.push(self.flow_snapshot());
 
-                // Then we model the non-short-circuiting behavior. Here, we need to delay
-                // the application of the reachability constraint until after the expression
-                // has been evaluated, so we only push it onto the stack here.
                 self.flow_restore(continuation);
                 self.record_narrowing_constraint_id_for_places(predicate_id, &possibly_narrowed);
+                // The continuation carries the conditions that led to this operand. Named
+                // expressions can introduce new bindings that still need the earlier gates.
+                if !has_named_expression {
+                    reachability_constraints.clear();
+                }
                 reachability_constraints.push(reachability_constraint);
             } else {
                 last_condition_flow_snapshots = self.take_condition_flow_snapshots(value);
@@ -3838,13 +3839,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     condition_flow_snapshots.into_short_circuit_and_continuation(*op);
                 (Some(short_circuit), Some(no_short_circuit))
             } else {
-                (
-                    None,
-                    values
-                        .iter()
-                        .any(|value| any_over_expr(value, &ast::Expr::is_named_expr))
-                        .then(|| self.flow_snapshot()),
-                )
+                (None, has_named_expression.then(|| self.flow_snapshot()))
             };
 
         if let Some(last_short_circuit) = last_short_circuit {
