@@ -172,7 +172,7 @@ impl<'src> Parser<'src> {
                     self.current_token_range(),
                 );
             } else if self.at_compound_stmt() && !self.at(TokenKind::Match) {
-                // `match` can also be an identifier. Check its separator when parsing the keyword.
+                // `match` can also be an identifier. Report this error when parsing it as a keyword.
 
                 // test_err simple_and_compound_stmt_on_same_line
                 // a; if b: pass; b
@@ -2530,8 +2530,8 @@ impl<'src> Parser<'src> {
         target
     }
 
-    /// Consume `match` as a compound statement keyword. Speculative parsing rewinds
-    /// the separator error if `match` turns out to be an identifier.
+    /// Consume `match` as a keyword and report an error if the compound statement follows
+    /// a semicolon. If `match` turns out to be an identifier, rewinding discards the error.
     fn bump_match_statement_keyword(&mut self) {
         // test_ok semicolon_before_match_identifier
         // first(); match = value
