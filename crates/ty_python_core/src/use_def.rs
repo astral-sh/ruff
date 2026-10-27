@@ -1659,7 +1659,7 @@ pub(super) struct FlowSnapshot {
     checkpoint_flow: ScopedReachabilityConstraintId,
     checkpoint_state: ExceptionCheckpointSnapshot,
     pending_reachability: PendingReachabilityId,
-    last_join: PendingReachabilityId,
+    last_join: FlowJoin,
 }
 
 impl FlowSnapshot {
@@ -1679,6 +1679,14 @@ struct PendingReachabilityConstraint {
     narrowing_constraint: ScopedNarrowingConstraint,
 }
 
+/// A control-flow join and the pending constraints visible at that join.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct FlowJoin {
+    node: PendingReachabilityId,
+    /// Distinct joins can reuse the same node when their branch constraints cancel.
+    revision: u64,
+}
+
 /// An append-only tree of scope-wide reachability constraints and narrowing gates.
 ///
 /// Each [`PendingPlaceState`] remembers the last node applied for each constraint kind, so
@@ -1688,7 +1696,8 @@ struct PendingReachability {
     constraints: IndexVec<PendingReachabilityId, PendingReachabilityConstraint>,
     current: PendingReachabilityId,
     /// Narrowing gates through this join are visible when a place is read.
-    last_join: PendingReachabilityId,
+    last_join: FlowJoin,
+    join_count: u64,
 }
 
 impl Default for PendingReachability {
@@ -1703,7 +1712,11 @@ impl Default for PendingReachability {
         Self {
             constraints,
             current: root,
-            last_join: root,
+            last_join: FlowJoin {
+                node: root,
+                revision: 0,
+            },
+            join_count: 0,
         }
     }
 }
@@ -1829,14 +1842,14 @@ impl PendingReachability {
         &self,
         pending: &'a mut PendingPlaceState,
         target: PendingReachabilityId,
-        last_join: PendingReachabilityId,
+        last_join: FlowJoin,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) -> &'a PlaceState {
         self.materialize_reachability(pending, target, reachability_constraints);
         // Both positions lie on the path to `target`. Nodes are numbered after their parents.
-        if pending.narrowing.index() < last_join.index() {
-            self.materialize_narrowing(pending, last_join, narrowing_constraints);
+        if pending.narrowing.index() < last_join.node.index() {
+            self.materialize_narrowing(pending, last_join.node, narrowing_constraints);
         }
         &pending.state
     }
@@ -1995,6 +2008,7 @@ impl PendingReachability {
         branch_states: IndexVec<I, PendingPlaceState>,
         branch: PendingReachabilityId,
         joined: PendingReachabilityId,
+        can_defer: bool,
         branch_reachability: ScopedReachabilityConstraintId,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
@@ -2003,6 +2017,7 @@ impl PendingReachability {
         for current in current_states {
             let branch_state = branch_states.next();
             if let Some(branch_state) = &branch_state
+                && can_defer
                 && current.reachability == branch_state.reachability
                 && current.narrowing == branch_state.narrowing
                 && Rc::ptr_eq(&current.state, &branch_state.state)
@@ -3124,11 +3139,18 @@ impl<'db> UseDefMapBuilder<'db> {
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
         );
+        // A nested join can make narrowing visible on one arm even when both arms still
+        // share the same place state. Apply each arm's gates before merging its bindings,
+        // unless one incoming path already includes the other.
+        let can_defer = self.pending_reachability.last_join == snapshot.last_join
+            || joined == self.pending_reachability.current
+            || joined == branch;
         self.pending_reachability.merge_place_states(
             &mut self.symbol_states,
             snapshot.symbol_states,
             branch,
             joined,
+            can_defer,
             snapshot.reachability,
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
@@ -3139,6 +3161,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 snapshot.member_states,
                 branch,
                 joined,
+                can_defer,
                 snapshot.reachability,
                 &mut self.narrowing_constraints,
                 &mut self.reachability_constraints,
@@ -3146,7 +3169,11 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         self.pending_reachability.current = joined;
-        self.pending_reachability.last_join = joined;
+        self.pending_reachability.join_count += 1;
+        self.pending_reachability.last_join = FlowJoin {
+            node: joined,
+            revision: self.pending_reachability.join_count,
+        };
 
         self.reachability = self
             .reachability_constraints

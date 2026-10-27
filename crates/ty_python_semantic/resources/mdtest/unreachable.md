@@ -113,6 +113,30 @@ def after_nested_branch(message: str | None, verbose: bool):
         print(message)
 ```
 
+Only the path where `message` is a string reaches the return, even when the non-returning condition
+has a nested branch.
+
+```py
+def normalize(message: str | None, verbose: bool) -> str:
+    print("starting")
+    if message is None:
+        if always_raises():
+            if verbose:
+                print("verbose")
+    return message.upper()
+```
+
+Short-circuiting also preserves the effect of a non-returning condition. Here either the first call
+raises or `message` is `None` and the second call raises.
+
+```py
+def short_circuit(message: str | None, verbose: bool):
+    if message is not None:
+        always_raises()
+    should_log = ((current := message) is None and always_raises()) or verbose
+    reveal_type(message)  # revealed: Never
+```
+
 ### Calls to unions of functions returning `Never`
 
 In the example below, either function raises an exception, so calling the selected function makes
@@ -268,6 +292,19 @@ def f():
     print("unreachable")
 
     print(x)
+```
+
+Further branches inside an unreachable block keep uses of other variables unreachable.
+
+```py
+def check(value: str | None, trace: bool, validate: bool):
+    marker = "ready"
+    if isinstance(marker, int):
+        if marker is value:
+            if trace:
+                print("tracing")
+        if validate:
+            reveal_type(value)  # revealed: Never
 ```
 
 ### Use of variable in nested function
