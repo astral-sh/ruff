@@ -353,7 +353,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           profile: |
             debug
@@ -382,7 +382,7 @@ jobs:
           persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup toolchain install 1.99.0
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           target-directory: target/hawk
           # Cache dependencies without enabling unstable Cargo freshness for Hawk.
@@ -405,7 +405,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           # Cargo verifies each package from an extracted archive, so cache dependencies only.
           cache-workspace-crates: "false"
@@ -428,10 +428,8 @@ jobs:
           persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
-          # After source changes, extra workspace cache restore time can outweigh rebuild savings.
-          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install uv"
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
@@ -512,7 +510,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           profile: profiling
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -550,7 +548,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           # After source changes, extra workspace cache restore time can outweigh rebuild savings.
           cache-workspace-crates: "false"
@@ -594,7 +592,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           profile: |
             debug
@@ -643,7 +641,7 @@ jobs:
         run: |
           rustup toolchain install "${MSRV}" --profile minimal
           echo "RUSTUP_TOOLCHAIN=${MSRV}" >> "$GITHUB_ENV"
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           # Test the MSRV without enabling unstable Cargo features.
           cache-workspace-crates: "false"
@@ -666,7 +664,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           profile: |
             release
@@ -703,7 +701,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - id: rust-cache
-        uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+        uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           key: ruff-binary-debug
           add-job-id-key: "false"
@@ -738,7 +736,7 @@ jobs:
           checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           key: ruff-binary-debug
           add-job-id-key: "false"
@@ -773,7 +771,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
@@ -839,7 +837,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
 
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           key: ruff-binary-debug
           add-job-id-key: "false"
@@ -976,7 +974,7 @@ jobs:
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.13.5"
           checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           # Base and PR builds use different revisions; keep a smaller dependency cache.
           cache-workspace-crates: "false"
@@ -1077,7 +1075,7 @@ jobs:
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.13.5"
           checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           profile: profiling
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -1105,7 +1103,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Prep README.md"
@@ -1136,7 +1134,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           # Keep a smaller cache for the separate instrumented and profile-guided builds.
           cache-workspace-crates: "false"
@@ -1191,7 +1189,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
@@ -1226,7 +1224,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
@@ -1254,7 +1252,7 @@ jobs:
           persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           profile: |
             debug
@@ -1317,7 +1315,7 @@ jobs:
 
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           profile: profiling
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -1365,7 +1363,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           # Full workspace caches can be much larger for little rebuild savings after source changes.
           cache-workspace-crates: "false"
@@ -1514,7 +1512,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
 
-      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
+      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
         with:
           profile: profiling
           save-if: ${{ github.ref == 'refs/heads/main' }}
