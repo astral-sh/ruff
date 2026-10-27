@@ -578,20 +578,8 @@ pub(crate) fn infer_expression_types<'db>(
     infer_expression_types_impl(db, InferExpression::new(db, expression, tcx))
 }
 
-/// Evaluate a predicate from its inferred operand types. Truthiness can depend on other
-/// definitions, such as a class's metaclass, so it needs its own query to recover those cycles.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial = |_, _, _| Truthiness::Ambiguous,
-    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, current: Truthiness, _| {
-        if cycle.iteration() > crate::TAINTED_CYCLES {
-            previous.union(current)
-        } else {
-            current
-        }
-    },
-    heap_size = get_size2::GetSize::get_heap_size
-)]
+/// Evaluate truthiness from the inferred operand types. A widened operand can require a new
+/// metaclass lookup, so evaluate it in the caller's query, after expression cycle recovery.
 pub(crate) fn infer_predicate_truthiness<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
