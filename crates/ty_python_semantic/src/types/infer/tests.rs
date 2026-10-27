@@ -306,6 +306,28 @@ fn not_literal_string() -> anyhow::Result<()> {
 }
 
 #[test]
+fn typed_dict_get_with_a_widened_string_key() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "src/a.py",
+        &format!(
+            r#"
+            from typing import TypedDict, reveal_type
+
+            class Record(TypedDict):
+                {key}: int
+
+            def read(record: Record):
+                reveal_type(record.get("{key}"))
+            "#,
+            key = "x".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1),
+        ),
+    )?;
+    assert_revealed_type(&db, "src/a.py", "Unknown | None");
+    Ok(())
+}
+
+#[test]
 fn multiplied_string() -> anyhow::Result<()> {
     let mut db = setup_db();
     let content = format!(

@@ -413,11 +413,7 @@ fn synthesize_typed_dict_get<'db>(
             ];
             let get_sig = Signature::new(
                 Parameters::standard(get_sig_params),
-                if field.is_required() {
-                    field.declared_ty
-                } else {
-                    UnionType::from_two_elements(db, env, field.declared_ty, Type::none(db, env))
-                },
+                field.get_type_without_default(db, env),
             );
 
             let t_default = BoundTypeVarInstance::synthetic(

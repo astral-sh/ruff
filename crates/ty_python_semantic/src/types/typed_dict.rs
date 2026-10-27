@@ -19,8 +19,8 @@ use super::diagnostic::{
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, ErrorContext, IntersectionType, Type,
-    TypeMapping, TypeQualifiers, TypeVarVariance, UnionBuilder, VarianceInferable, VarianceTerm,
-    definition_expression_annotation, definition_expression_type, visitor,
+    TypeMapping, TypeQualifiers, TypeVarVariance, UnionBuilder, UnionType, VarianceInferable,
+    VarianceTerm, definition_expression_annotation, definition_expression_type, visitor,
 };
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
@@ -3249,6 +3249,19 @@ pub struct TypedDictField<'db> {
 impl<'db> TypedDictField<'db> {
     pub(crate) const fn is_required(&self) -> bool {
         self.flags.contains(TypedDictFieldFlags::REQUIRED)
+    }
+
+    /// Returns the type of `TypedDict.get` for this field when no default is passed.
+    pub(super) fn get_type_without_default(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        if self.is_required() {
+            self.declared_ty
+        } else {
+            UnionType::from_two_elements(db, env, self.declared_ty, Type::none(db, env))
+        }
     }
 
     pub(crate) const fn is_read_only(&self) -> bool {

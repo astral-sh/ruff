@@ -9547,6 +9547,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
         let mut call_arguments = self.prepare_call_arguments(arguments);
+        let mut callable_to_bind = callable_type;
 
         // Special handling for `TypedDict` method calls
         if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
@@ -9584,6 +9585,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             key,
                         );
                         return Type::unknown();
+                    }
+
+                    // A key inferred as a string literal can only select this field's
+                    // overloads or a string fallback. Open files keep all overload
+                    // contexts for key completions.
+                    if is_declared
+                        && method_name == "get"
+                        && arguments.keywords.is_empty()
+                        && first_arg.is_string_literal_expr()
+                        && key.len() <= Self::MAX_STRING_LITERAL_SIZE
+                        && !self.collects_expected_types()
+                    {
+                        if arguments.args.len() == 1 {
+                            self.get_or_infer_expression(
+                                first_arg,
+                                TypeContext::declared(Some(Type::string_literal(db, key))),
+                            );
+                            return field.get_type_without_default(db, env);
+                        }
+                        if let [_, default] = arguments.args.as_ref()
+                            && items.len() > 1
+                            && !default.is_starred_expr()
+                            && let Type::BoundMethod(method) = callable_type
+                            && let Type::Callable(callable) = method.func(db)
+                        {
+                            let key_ty = Type::string_literal(db, key);
+                            let overloads = callable.signatures(db).iter().filter(|overload| {
+                                let param_ty = overload.parameters()[1].annotated_type();
+                                param_ty == key_ty || param_ty.as_string_literal().is_none()
+                            });
+                            let signatures = CallableSignature::from_overloads(overloads.cloned());
+                            let function = Type::Callable(callable.with_signatures(db, signatures));
+                            callable_to_bind = Type::BoundMethod(method.with_func(db, function));
+                        }
                     }
 
                     if !is_declared
@@ -9860,7 +9895,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
         let mut bindings =
-            self.bindings_for_call(callable_type)
+            self.bindings_for_call(callable_to_bind)
                 .match_parameters(db, env, &call_arguments);
 
         report_missing_implicit_constructor_call(
