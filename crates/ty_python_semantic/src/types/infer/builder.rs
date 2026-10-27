@@ -5966,6 +5966,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .filter(|_| has_generic_context)
             .unwrap_or_default();
 
+        // In `xs.extend([xs[0].astype(dtype)])`, each sparse matrix kind in `xs` is also an
+        // expected result of `astype`. If the argument has the same type in every parameter
+        // context, checking one receiver can rule out a target for the whole union.
+        let class_argument = if narrow_targets.iter().any(Type::is_unmaterialized_divergent)
+            && matches!(bindings.callable_type(), Type::Union(_))
+            && let Ok(ArgOrKeyword::Arg(arg)) = ast_arguments.clone().exactly_one()
+            && matches!(arg, ast::Expr::Name(_) | ast::Expr::Attribute(_))
+        {
+            let mut probe = self.speculate();
+            let ty = infer_argument_ty(&mut probe, (0, arg, TypeContext::default()));
+            match ty {
+                Type::GenericAlias(_) => Some(ty),
+                Type::ClassLiteral(class) if class.generic_context(db).is_none() => Some(ty),
+                _ => None,
+            }
+        } else {
+            None
+        }
+        .filter(|_| !bindings.may_reinterpret_class_argument(db, env, &overload_candidates));
+
         let mut try_narrow = |narrowed_ty: Type<'db>| {
             // Short-circuit if there is no overload with a matching return type.
             if !bindings.satisfies(|overload| {
@@ -5984,6 +6004,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let narrowed_tcx = call_expression_tcx.with_annotation(Some(narrowed_ty));
+
+            if let Some(argument) = class_argument
+                && bindings.has_incompatible_receiver_result(
+                    db,
+                    env,
+                    argument,
+                    narrowed_tcx,
+                    &self.dataclass_field_specifiers,
+                )
+            {
+                return None;
+            }
 
             let mut speculative_bindings = bindings.clone();
             let mut speculative_builder = self.speculate();

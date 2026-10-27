@@ -2582,6 +2582,25 @@ pub(super) fn resolve_divergent_projection<'db>(
 ) -> Option<Type<'db>> {
     let projections: Vec<_> =
         std::iter::successors(Some(projection), |projection| projection.parent(db)).collect();
+    // A bare cycle marker supplies only marker bounds for a protocol's type variables, and
+    // `Unknown` supplies no bounds. Projecting a union of these through more protocols cannot
+    // yield an independent type unless a declared bound or constraint supplies one.
+    if let Type::Union(union) = actual
+        && union
+            .elements(db)
+            .iter()
+            .all(|ty| ty.is_unmaterialized_divergent() || *ty == Type::unknown())
+        && projections.iter().all(|projection| {
+            projection.polarity(db) == TypeVarVariance::Covariant
+                && matches!(projection.formal(db), Type::ProtocolInstance(_))
+                && !projection
+                    .typevar(db)
+                    .typevar(db)
+                    .has_bound_or_constraints(db)
+        })
+    {
+        return None;
+    }
     let mut inferred = actual;
     for projection in projections.into_iter().rev() {
         // Only covariant extraction preserves unions, allowing a direct self-reference to be

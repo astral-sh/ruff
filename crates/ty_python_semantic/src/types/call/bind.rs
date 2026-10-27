@@ -80,9 +80,9 @@ use crate::types::{
     BindingContext, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
     DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, TypeContext, TypeIdentity,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
-    UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
+    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, TypeContext, TypeFormType,
+    TypeIdentity, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator,
+    UnionBuilder, UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -1123,6 +1123,89 @@ impl<'db> Bindings<'db> {
                 }
             }
         });
+    }
+
+    /// Can an overload give the single positional argument a `TypeForm` context?
+    /// In that context, even a bare class name can be reinterpreted as a type expression.
+    pub(crate) fn may_reinterpret_class_argument(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        candidates: &OverloadSet,
+    ) -> bool {
+        let type_form = TypeFormType::from_type_expression(db, Type::Never);
+        let mut may_reinterpret = false;
+        self.visit_overload_set(candidates, &mut |overload, binding| {
+            if may_reinterpret {
+                return;
+            }
+            let Some(matched) = overload.matched_argument_for_call_argument(binding, 0) else {
+                return;
+            };
+            let [matched] = matched.parameters.as_slice() else {
+                return;
+            };
+            let raw = overload.signature.parameters()[matched.index].annotated_type();
+            let expected = matched.expected_type.unwrap_or(raw);
+            // A parameter pack can forward a context from the wrapped callable or its return type.
+            if matches!(raw, Type::TypeVar(_)) {
+                may_reinterpret = true;
+            } else if !expected.is_dynamic() {
+                let inferable = overload
+                    .signature
+                    .generic_context
+                    .map_or(TypeVarSet::None, |context| context.inferable_typevars(db));
+                // Every specialization with a `TypeForm[T]` union member accepts `TypeForm[Never]`.
+                may_reinterpret = !type_form
+                    .when_assignable_to(db, env, expected, &ConstraintSetBuilder::new(), inferable)
+                    .is_never_satisfied(db, env, inferable);
+            }
+        });
+        may_reinterpret
+    }
+
+    /// If one receiver returns an instance outside the target's class hierarchy, the union
+    /// cannot match the target either. Resolve overloads normally, since ambiguous overloads
+    /// can return `Unknown` even when their individual return annotations look incompatible.
+    pub(crate) fn has_incompatible_receiver_result(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        argument: Type<'db>,
+        tcx: TypeContext<'db>,
+        dataclass_field_specifiers: &[Type<'db>],
+    ) -> bool {
+        let Some(Type::NominalInstance(target)) = tcx.annotation else {
+            return false;
+        };
+        let arguments = CallArguments::positional([argument]);
+        self.elements.iter().any(|element| {
+            let [CallableItem::Regular(binding)] = element.items.as_slice() else {
+                return false;
+            };
+            if !matches!(binding.callable_type, Type::BoundMethod(_)) {
+                return false;
+            }
+            let Ok(checked) = Self::from(binding.clone()).check_types(
+                db,
+                env,
+                &ConstraintSetBuilder::new(),
+                &arguments,
+                tcx,
+                dataclass_field_specifiers,
+            ) else {
+                return false;
+            };
+            let ret = checked.return_type(db, env);
+            ret.as_nominal_instance().is_some_and(|instance| {
+                // Literal results can satisfy the complete declared union across several targets.
+                !instance
+                    .class(db, env)
+                    .is_subtype_of_class_literal(db, target.class_literal(db, env))
+                    && !ret.is_literal_or_union_of_literals(db, env)
+                    && !ret.is_assignable_to(db, env, Type::NominalInstance(target))
+            })
+        })
     }
 
     /// Returns `true` if every element of the union contains an intersection element with a matching
