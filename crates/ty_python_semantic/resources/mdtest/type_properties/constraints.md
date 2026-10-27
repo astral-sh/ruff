@@ -2101,7 +2101,7 @@ def defaults[**P]() -> None:
     static_assert(reverse == ConstraintSet.never())
 ```
 
-Variadic positional parameters accept fixed positional lists, but not the reverse.
+A variadic positional parameter can match a fixed positional parameter list, but not the reverse.
 
 ```pyi
 def args(*args: int) -> None: ...

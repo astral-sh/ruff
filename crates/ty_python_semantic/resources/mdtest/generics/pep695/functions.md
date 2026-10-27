@@ -4106,15 +4106,13 @@ class ClassWithNewAndInit:
 
     def __init__(self, x: int) -> None: ...
 
-# TODO: We do not currently solve a common behavioral supertype for the two solutions of P.
 # revealed: ((...) -> ClassWithNewAndInit) | ((x: int) -> ClassWithNewAndInit)
 reveal_type(into_regular_callable(ClassWithNewAndInit))
-# TODO: revealed: ((...) -> ClassWithNewAndInit) | ((x: int) -> ClassWithNewAndInit)
 # revealed: (...) -> ClassWithNewAndInit
 reveal_type(accepts_callable(ClassWithNewAndInit))
 # revealed: ClassWithNewAndInit
 reveal_type(accepts_callable(ClassWithNewAndInit)(1))
-# TODO: Combine both constructor parameter lists and report [missing-argument].
+# TODO: error: [missing-argument]
 # revealed: ClassWithNewAndInit
 reveal_type(accepts_callable(ClassWithNewAndInit)())
 
