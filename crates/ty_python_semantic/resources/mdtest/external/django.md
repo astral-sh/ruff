@@ -453,6 +453,50 @@ def _(abstract: AbstractBook):
     abstract.id  # error: [unresolved-attribute]
 ```
 
+### Inherited Meta configuration
+
+Django resets an abstract model's `Meta.abstract` to `False`. A child that subclasses this `Meta` is
+concrete unless it explicitly sets `abstract = True` again.
+
+```py
+from django.db import models
+
+class AbstractBook(models.Model):
+    class Meta:
+        abstract = True
+
+class NotAbstract(AbstractBook):
+    # error: [invalid-attribute-override] "Meta"
+    class Meta(AbstractBook.Meta):
+        ordering = ["id"]
+
+class Abstract(AbstractBook):
+    # error: [invalid-attribute-override] "Meta"
+    class Meta(AbstractBook.Meta):
+        abstract = True
+
+def _(not_abstract: NotAbstract, abstract: Abstract):
+    # concrete models have an automatic primary key
+    not_abstract.id
+
+    # abstract models do not:
+    abstract.id  # error: [unresolved-attribute]
+```
+
+Configuration inherited from an ordinary class retains its `abstract` setting.
+
+```py
+class Options:
+    abstract = True
+
+class InheritedAbstract(models.Model):
+    class Meta(Options):
+        pass
+
+def _(abstract: InheritedAbstract):
+    abstract.id  # error: [unresolved-attribute]
+```
+
 ### Multiple inheritance
 
 An abstract base without a primary key does not shadow an inherited `id`, regardless of the base

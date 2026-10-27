@@ -3,15 +3,16 @@ use ruff_python_ast::name::Name;
 use ty_module_resolver::KnownModule;
 use ty_python_core::{
     definition::{Definition, DefinitionKind},
-    place_table, use_def_map,
+    place_table, semantic_index, use_def_map,
 };
 
-use crate::place::{Place, Provenance, known_module_symbol, place_from_bindings};
+use crate::place::{known_module_symbol, place_from_bindings};
+use crate::types::infer::nearest_enclosing_class;
 use crate::types::member::class_member;
 use crate::types::{
-    BindingContext, BoundTypeVarInstance, ClassBase, GenericContext, KnownClass,
-    MemberLookupPolicy, Parameter, Parameters, SelfTypeVarOrigin, Signature, Specialization,
-    StaticClassLiteral, Type, UnionType, binding_type, definition_expression_type,
+    BindingContext, BoundTypeVarInstance, ClassBase, GenericContext, KnownClass, Parameter,
+    Parameters, SelfTypeVarOrigin, Signature, Specialization, StaticClassLiteral, Type, UnionType,
+    binding_type, definition_expression_type,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -149,6 +150,71 @@ fn own_model_fields<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> Box
         .collect()
 }
 
+/// Metadata extracted from a Django model's `Meta` configuration.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct ModelMetadata {
+    is_abstract: bool,
+}
+
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn model_metadata<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelMetadata {
+    let env = ProgramEnvironment::from_scope(class.body_scope(db));
+    // Subclasses do not inherit `abstract = True`, so only inspect this model's own Meta.
+    let Some(meta) = own_meta(db, class) else {
+        return ModelMetadata::default();
+    };
+
+    for meta_base in meta.iter_mro(db, None).filter_map(ClassBase::into_class) {
+        let Some((meta_base, _)) = meta_base.static_class_literal(db) else {
+            return ModelMetadata::default();
+        };
+        // Django resets an abstract model's Meta.abstract to False during model creation.
+        // A child can inherit other options from that Meta, but must set abstract=True itself.
+        let enclosing_scope = meta_base.definition(db).scope(db);
+        if let Some(owner) = nearest_enclosing_class(
+            db,
+            semantic_index(db, enclosing_scope.program_file(db)),
+            enclosing_scope,
+        ) && owner != class
+            && is_model(db, owner)
+            && own_meta(db, owner) == Some(meta_base)
+        {
+            return ModelMetadata::default();
+        }
+
+        let scope = meta_base.body_scope(db);
+        let Some(symbol) = place_table(db, scope).symbol_id("abstract") else {
+            continue;
+        };
+        // The public type is widened to `bool`, so read the bindings' literal values instead.
+        let Some(abstract_flag) = place_from_bindings(
+            db,
+            &env,
+            use_def_map(db, scope).end_of_scope_symbol_bindings(symbol),
+        )
+        .place
+        .ignore_possibly_undefined() else {
+            continue;
+        };
+        return ModelMetadata {
+            is_abstract: abstract_flag == Type::bool_literal(true),
+        };
+    }
+    ModelMetadata::default()
+}
+
+fn own_meta<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<StaticClassLiteral<'db>> {
+    let meta = class_member(db, class.body_scope(db), "Meta")
+        .ignore_possibly_undefined()?
+        .as_class_literal()?
+        .as_static()?;
+    (meta.name(db).as_str() == "Meta" && meta.definition(db).scope(db) == class.body_scope(db))
+        .then_some(meta)
+}
+
 /// Provides synthesized attributes and methods for Django models.
 pub(in crate::types) fn synthesized_member<'db>(
     db: &'db dyn Db,
@@ -227,7 +293,7 @@ fn primary_key_member<'db>(
     }
 
     // Abstract models do not have an automatic primary key.
-    if is_abstract_model(db, env, class) {
+    if model_metadata(db, class).is_abstract {
         return None;
     }
 
@@ -235,40 +301,6 @@ fn primary_key_member<'db>(
         .place
         .ignore_possibly_undefined()?
         .to_instance_approximation(db, env)
-}
-
-fn is_abstract_model<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    class: StaticClassLiteral<'db>,
-) -> bool {
-    // Subclasses do not inherit `abstract = True`, so only inspect this model's own Meta.
-    let Some(meta) = class_member(db, class.body_scope(db), "Meta")
-        .ignore_possibly_undefined()
-        .and_then(Type::as_class_literal)
-    else {
-        return false;
-    };
-
-    let Place::Defined(abstract_flag) = meta
-        .class_member(db, env, "abstract", MemberLookupPolicy::default())
-        .place
-    else {
-        return false;
-    };
-    // The public type of a mutable boolean attribute is widened to `bool`.
-    // Its binding retains the literal value that Django reads during model construction.
-    let Provenance::SingleDefinition(definition) = abstract_flag.provenance else {
-        return false;
-    };
-    place_from_bindings(
-        db,
-        env,
-        use_def_map(db, definition.scope(db)).end_of_scope_bindings(definition.place(db)),
-    )
-    .place
-    .ignore_possibly_undefined()
-        == Some(Type::bool_literal(true))
 }
 
 /// Find a field constructed with `primary_key=True` in this class body.
