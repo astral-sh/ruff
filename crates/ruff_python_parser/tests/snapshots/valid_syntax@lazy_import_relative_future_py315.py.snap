@@ -1,0 +1,71 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+assertion_line: 152
+input_file: crates/ruff_python_parser/resources/inline/ok/lazy_import_relative_future_py315.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..131,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 44..84,
+                    module: Some(
+                        Identifier {
+                            id: Name("__future__"),
+                            range: 55..65,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 73..84,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("annotations"),
+                                range: 73..84,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 1,
+                    is_lazy: true,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 85..130,
+                    module: Some(
+                        Identifier {
+                            id: Name("__future__"),
+                            range: 97..107,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 115..130,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("invalid_feature"),
+                                range: 115..130,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 2,
+                    is_lazy: true,
+                },
+            ),
+        ],
+    },
+)
+```

@@ -1,0 +1,150 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+assertion_line: 152
+input_file: crates/ruff_python_parser/resources/inline/ok/relative_future_import.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..148,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 0..39,
+                    module: Some(
+                        Identifier {
+                            id: Name("__future__"),
+                            range: 6..16,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 24..39,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("invalid_feature"),
+                                range: 24..39,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 1,
+                    is_lazy: false,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 40..76,
+                    module: Some(
+                        Identifier {
+                            id: Name("__future__"),
+                            range: 47..57,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 65..76,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("annotations"),
+                                range: 65..76,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 2,
+                    is_lazy: false,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 77..104,
+                    module: Some(
+                        Identifier {
+                            id: Name("__future__"),
+                            range: 85..95,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 103..104,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("*"),
+                                range: 103..104,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 3,
+                    is_lazy: false,
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    node_index: NodeIndex(None),
+                    range: 106..111,
+                    targets: [
+                        Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 106..107,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            node_index: NodeIndex(None),
+                            range: 110..111,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 112..147,
+                    module: Some(
+                        Identifier {
+                            id: Name("__future__"),
+                            range: 118..128,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 136..147,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("annotations"),
+                                range: 136..147,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 1,
+                    is_lazy: false,
+                },
+            ),
+        ],
+    },
+)
+```

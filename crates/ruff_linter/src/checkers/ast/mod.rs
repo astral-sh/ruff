@@ -1079,13 +1079,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 module,
                 names,
                 is_lazy,
+                level,
                 ..
             }) => {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
 
                 // Allow eager `__future__` imports until we see any other import. Lazy imports,
                 // including `lazy from __future__ import ...`, don't enable future annotations.
-                if !*is_lazy && matches!(module.as_deref(), Some("__future__")) {
+                // Neither do relative imports of a module named `__future__`.
+                if !*is_lazy && *level == 0 && matches!(module.as_deref(), Some("__future__")) {
                     if names
                         .iter()
                         .any(|alias| alias.name.as_str() == "annotations")
