@@ -381,6 +381,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pylint, "E0116") => rules::pylint::rules::ContinueInFinally,
         (Pylint, "E0117") => rules::pylint::rules::NonlocalWithoutBinding,
         (Pylint, "E0118") => rules::pylint::rules::LoadBeforeGlobalDeclaration,
+        (Pylint, "E0211") => rules::pylint::rules::NoMethodArgument,
         (Pylint, "E0237") => rules::pylint::rules::NonSlotAssignment,
         (Pylint, "E0241") => rules::pylint::rules::DuplicateBases,
         (Pylint, "E0302") => rules::pylint::rules::UnexpectedSpecialMethodSignature,
