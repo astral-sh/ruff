@@ -544,8 +544,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::BinOp(binary) => {
                 match binary.op {
                     // PEP-604 unions are okay, e.g., `int | str`
+                    ast::Operator::BitOr if self.should_check_runtime_errors(binary) => {
+                        self.infer_eager_union_type_expression(binary, false)
+                            .annotation
+                    }
                     ast::Operator::BitOr => {
-                        self.infer_union_type_expression(binary, false).annotation
+                        let left = self.infer_type_expression(&binary.left);
+                        let right = self.infer_type_expression(&binary.right);
+                        UnionType::from_elements_leave_aliases(db, env, [left, right])
                     }
                     ast::Operator::BitAnd => {
                         if let Some(builder) =
@@ -1249,13 +1255,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
-    fn infer_union_operand(
-        &mut self,
-        expr: &ast::Expr,
-        check_runtime: bool,
-    ) -> InferredUnionOperand<'db> {
+    fn infer_eager_union_operand(&mut self, expr: &ast::Expr) -> InferredUnionOperand<'db> {
         // Overload resolution can share expression inference that also needs diagnostics.
-        if !check_runtime || self.expression_cache.is_some() || self.cycle_recovery.is_some() {
+        if self.expression_cache.is_some() || self.cycle_recovery.is_some() {
             return InferredUnionOperand {
                 annotation: self.infer_type_expression(expr),
                 runtime_value: None,
@@ -1266,8 +1268,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let operand = self.with_type_expression_context(|builder| match expr {
             ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
                 // Entering a nested type expression can change how type arguments are interpreted.
-                builder
-                    .infer_union_type_expression(binary, builder.inference_flags() == parent_flags)
+                builder.infer_eager_union_type_expression(
+                    binary,
+                    builder.inference_flags() == parent_flags,
+                )
             }
             ast::Expr::Name(name) if name.ctx.is_load() => {
                 // A bare name has the same runtime value under either set of flags.
@@ -1290,42 +1294,38 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         operand
     }
 
-    fn infer_union_type_expression(
+    fn infer_eager_union_type_expression(
         &mut self,
         binary: &ast::ExprBinOp,
         need_runtime_value: bool,
     ) -> InferredUnionOperand<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let check_runtime = self.should_check_runtime_errors(binary);
-        let left = self.infer_union_operand(&binary.left, check_runtime);
-        let right = self.infer_union_operand(&binary.right, check_runtime);
-        let mut runtime_value = None;
-        if check_runtime {
-            let mut speculative = self.speculate_without_diagnostics();
-            let mut operand_value = |expr: &ast::Expr, value: Option<Type<'db>>| {
-                value
-                    .filter(|_| speculative.cycle_recovery.is_none())
-                    .unwrap_or_else(|| speculative.infer_expression(expr, TypeContext::default()))
-            };
-            let left_value = operand_value(&binary.left, left.runtime_value);
-            let right_value = operand_value(&binary.right, right.runtime_value);
-            self.check_union_operator(binary, left_value, right_value);
+        let left = self.infer_eager_union_operand(&binary.left);
+        let right = self.infer_eager_union_operand(&binary.right);
+        let mut speculative = self.speculate_without_diagnostics();
+        let mut operand_value = |expr: &ast::Expr, value: Option<Type<'db>>| {
+            value
+                .filter(|_| speculative.cycle_recovery.is_none())
+                .unwrap_or_else(|| speculative.infer_expression(expr, TypeContext::default()))
+        };
+        let left_value = operand_value(&binary.left, left.runtime_value);
+        let right_value = operand_value(&binary.right, right.runtime_value);
+        self.check_union_operator(binary, left_value, right_value);
 
-            // Ordinary value inference can use the TypedDict on one side of `|` to infer
-            // a dictionary literal on the other, even when the annotation is invalid.
-            if need_runtime_value
-                && speculative.cycle_recovery.is_none()
-                && !binary.left.is_dict_expr()
-                && !binary.right.is_dict_expr()
-            {
-                let result =
-                    speculative.infer_binary_expression_from_types(binary, left_value, right_value);
-                if speculative.cycle_recovery.is_none() {
-                    runtime_value = Some(result);
-                }
-            }
-        }
+        // Ordinary value inference can use the TypedDict on one side of `|` to infer
+        // a dictionary literal on the other, even when the annotation is invalid.
+        let runtime_value = if need_runtime_value
+            && speculative.cycle_recovery.is_none()
+            && !binary.left.is_dict_expr()
+            && !binary.right.is_dict_expr()
+        {
+            let value =
+                speculative.infer_binary_expression_from_types(binary, left_value, right_value);
+            speculative.cycle_recovery.is_none().then_some(value)
+        } else {
+            None
+        };
         InferredUnionOperand {
             annotation: UnionType::from_elements_leave_aliases(
                 db,
