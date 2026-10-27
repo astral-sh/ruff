@@ -16,12 +16,6 @@ use crate::package::PackageRoot;
 
 /// ## What it does
 /// Checks for packages that are missing an `__init__.py` file.
-/// In preview mode, INP001 can also report a missing `__init__.py` in a
-/// namespace-package directory that contains a nested regular package. For
-/// example, if `a/` has no `__init__.py` but `a/b/` does, Ruff can report `a/`,
-/// even if `a/` contains no Python files of its own. Since the rule runs on
-/// files, it cannot report a completely empty directory or a directory
-/// hierarchy with no Python files.
 ///
 /// ## Why is this bad?
 /// Python packages are directories that contain a file named `__init__.py`.
@@ -35,6 +29,19 @@ use crate::package::PackageRoot;
 /// Namespace packages are less widely used, so a package that lacks an
 /// `__init__.py` file is typically meant to be a regular package, and
 /// the absence of the `__init__.py` file is probably an oversight.
+///
+/// ## Preview
+///
+/// In preview, the rule also checks for packages without `__init__.py` files between two regular
+/// packages, such as `bar` in the project structure below.
+///
+/// ```text
+/// foo/
+/// ├── __init__.py
+/// └── bar/
+///     └── baz/
+///         └── __init__.py
+/// ```
 ///
 /// ## Options
 /// - `namespace-packages`
