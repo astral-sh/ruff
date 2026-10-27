@@ -447,12 +447,12 @@ class AbstractHasId(models.Model):
         abstract = True
 
 # Django allows separate `Meta` configurations, but ty currently reports a conflict between them.
-# error: [invalid-attribute-override]
+# error: [invalid-attribute-override] "Incompatible inherited attribute `Meta`"
 class Book1(AbstractHasTitle, AbstractHasId):
     pass
 
 # (see above)
-# error: [invalid-attribute-override]
+# error: [invalid-attribute-override] "Incompatible inherited attribute `Meta`"
 class Book2(AbstractHasId, AbstractHasTitle):
     pass
 
