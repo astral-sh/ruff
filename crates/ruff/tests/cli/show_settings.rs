@@ -84,3 +84,37 @@ fn script_requires_python_show_settings() -> anyhow::Result<()> {
     assert!(settings.contains("formatter.unresolved_target_version = 3.12"));
     Ok(())
 }
+
+#[test]
+fn inline_script_target_version() -> anyhow::Result<()> {
+    let test = CliTest::with_file("ruff.toml", "target-version = 'py39'")?;
+    for (metadata, expected) in [
+        ("[tool.ruff]", "3.11"),
+        ("requires-python = '>=3.12'\n# [tool.ruff]", "3.12"),
+        (
+            "requires-python = '>=3.12'\n# tool.ruff.target-version = 'py310'",
+            "3.10",
+        ),
+        (
+            "requires-python = '>=3.12'\n# tool.ruff.extend = 'ruff.toml'",
+            "3.12",
+        ),
+    ] {
+        test.write_file("script.py", &format!("# /// script\n# {metadata}\n# ///\n"))?;
+        let output = test
+            .command()
+            .args(["check", "--show-settings", "script.py"])
+            .output()?;
+        assert!(output.status.success());
+        let settings = String::from_utf8(output.stdout)?;
+        assert!(settings.contains(&format!(
+            "Settings path: \"{}\"",
+            test.root().join("script.py").display()
+        )));
+        assert!(
+            settings.contains(&format!("formatter.unresolved_target_version = {expected}")),
+            "{metadata}"
+        );
+    }
+    Ok(())
+}

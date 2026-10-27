@@ -315,7 +315,10 @@ The rules for this behavior are as follows:
 
 Note that in these last two cases, the behavior of Ruff may differ depending on the working directory from which it is invoked.
 
-A Python script can declare its own minimum version with inline script metadata.
+### Inline script metadata
+
+A Python script without a `[tool.ruff]` table uses the project's lint and format settings.
+It can still declare its own minimum Python version.
 
 ```python
 # /// script
@@ -325,8 +328,26 @@ A Python script can declare its own minimum version with inline script metadata.
 
 When linting or formatting this file, Ruff targets Python 3.12 even if the project specifies
 a different `target-version` or a matching `per-file-target-version`. Ruff chooses the lowest supported Python minor version that satisfies the script's constraint.
-If the script omits `requires-python`, the usual project settings apply. An explicit `--target-version` or
-inline `--config` version override takes precedence over the script's requirement.
+If the script omits `requires-python`, the project's target version applies.
+
+Adding a `[tool.ruff]` table gives the script its own configuration. An empty table selects
+Ruff's defaults. For example, this script enables only `F401`, regardless of the project's
+rule selection.
+
+```python
+# /// script
+# requires-python = ">=3.12"
+# [tool.ruff.lint]
+# select = ["F401"]
+# ///
+```
+
+To inherit from a particular configuration file, set `extend` in `[tool.ruff]`, for example
+`extend = "../pyproject.toml"`. Relative paths in inline settings are resolved from the script's
+directory. A target version set in the inline table takes precedence over the script's
+`requires-python`. Dedicated CLI flags and `--config "key=value"` overrides still apply.
+`--isolated` ignores inline Ruff settings as well as project configuration files.
+The project configuration still controls file discovery and invocation-wide options such as `fix`.
 
 ## Python file discovery
 

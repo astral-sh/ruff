@@ -74,11 +74,7 @@ pub(crate) fn check(
 
     // Load the caches.
     let caches = if cache.is_enabled() {
-        Some(PackageCacheMap::init(
-            &package_roots,
-            &resolver,
-            config_arguments,
-        ))
+        Some(PackageCacheMap::init(&package_roots, &resolver))
     } else {
         None
     };
@@ -113,7 +109,7 @@ pub(crate) fn check(
                 lint_path(
                     path,
                     package,
-                    project.with_overrides(config_arguments),
+                    &project.with_overrides(config_arguments),
                     cache,
                     noqa,
                     fix_mode,
@@ -199,7 +195,7 @@ pub(crate) fn check(
 fn lint_path(
     path: &Path,
     package: Option<PackageRoot<'_>>,
-    settings: SettingsForSource<'_, ConfigArguments>,
+    settings: &SettingsForSource<'_, ConfigArguments>,
     cache: Option<&Cache>,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,

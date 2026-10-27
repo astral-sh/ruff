@@ -4067,6 +4067,112 @@ fn a005_module_shadowing_strict_default() -> Result<()> {
 }
 
 #[test]
+fn inline_script_configuration() -> Result<()> {
+    let test = CliTest::with_file("ruff.toml", "lint.select = ['T201']")?;
+    for (filename, metadata) in [
+        ("inherited.py", "[tool.other]"),
+        ("defaults.py", "[tool.ruff]"),
+        ("configured.py", "[tool.ruff.lint]\n# select = ['F821']"),
+    ] {
+        test.write_file(
+            filename,
+            &format!("# /// script\n# {metadata}\n# ///\nimport os\nprint(missing)\n"),
+        )?;
+    }
+    assert_cmd_snapshot!(test.check_command().arg("."), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    configured.py:6:7: F821 Undefined name `missing`
+    defaults.py:4:1: I001 [*] Import block is un-sorted or un-formatted
+    defaults.py:4:8: F401 [*] `os` imported but unused
+    defaults.py:5:7: F821 Undefined name `missing`
+    inherited.py:5:1: T201 `print` found
+    Found 5 errors.
+    [*] 2 fixable with `--fix` (1 unsafe fix available with `--fix --unsafe-fixes`).
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn inline_script_namespace_packages() -> Result<()> {
+    let test = CliTest::with_file(
+        "ruff.toml",
+        "namespace-packages = ['pkg']\nlint.select = ['N999']",
+    )?;
+    let check = || test.check_command().arg("pkg/Invalid-Name.py").output();
+    test.write_file(
+        "pkg/Invalid-Name.py",
+        "# /// script\n# tool.ruff.lint.select = ['N999']\n# ///\n",
+    )?;
+    assert!(check()?.status.success());
+
+    test.write_file("pkg/Invalid-Name.py", "# /// script\n# tool.ruff.lint.select = ['N999']\n# tool.ruff.namespace-packages = ['.']\n# ///\n")?;
+    assert!(str::from_utf8(&check()?.stdout)?.contains("N999"));
+    Ok(())
+}
+
+#[test]
+fn invalid_inline_script_configuration() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        "# /// script\n# tool.ruff.lint.select = ['UNKNOWN']\n# ///\n",
+    )?;
+    let output = test.check_command().arg("script.py").output()?;
+    assert_eq!(output.status.code(), Some(1));
+    let diagnostics = str::from_utf8(&output.stdout)?;
+    assert!(
+        diagnostics.contains("invalid-script-metadata"),
+        "{diagnostics}"
+    );
+    assert!(
+        diagnostics.contains("Unknown rule selector `UNKNOWN`"),
+        "{diagnostics}"
+    );
+    assert!(
+        test.check_command()
+            .args(["--isolated", "script.py"])
+            .output()?
+            .status
+            .success()
+    );
+    Ok(())
+}
+
+#[test]
+fn inline_script_extend_and_cache() -> Result<()> {
+    let test = CliTest::with_files([
+        ("ruff.toml", "lint.select = ['F401']"),
+        ("shared.toml", "lint.select = ['T201']"),
+        (
+            "scripts/example.py",
+            "# /// script\n# [tool.ruff]\n# extend = '../shared.toml'\n# ///\nimport os\n",
+        ),
+    ])?;
+    let check = |args: &[&str]| {
+        test.command()
+            .args(["check", "--output-format=concise", "scripts/example.py"])
+            .args(args)
+            .output()
+    };
+    assert!(check(&[])?.status.success());
+
+    // This explicit override matches the project and changes the script's rule selection.
+    let output = check(&["--select=F401"])?;
+    assert_eq!(output.status.code(), Some(1));
+    assert!(str::from_utf8(&output.stdout)?.contains("F401"));
+
+    assert!(check(&[])?.status.success());
+    test.write_file("shared.toml", "lint.select = ['F401']")?;
+    let output = check(&[])?;
+    assert_eq!(output.status.code(), Some(1));
+    assert!(str::from_utf8(&output.stdout)?.contains("F401"));
+    Ok(())
+}
+
+#[test]
 fn script_requires_python() -> Result<()> {
     let test = CliTest::with_file(
         "pyproject.toml",

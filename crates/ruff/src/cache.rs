@@ -23,8 +23,6 @@ use ruff_macros::CacheKey;
 use ruff_workspace::Settings;
 use ruff_workspace::resolver::Resolver;
 
-use crate::args::ConfigArguments;
-
 /// [`Path`] that is relative to the package root in [`PackageCache`].
 pub(crate) type RelativePath = Path;
 /// [`PathBuf`] that is relative to the package root in [`PackageCache`].
@@ -36,6 +34,9 @@ pub(crate) struct FileCacheKey {
     file_last_modified: FileTime,
     /// Permissions of the file before the (cached) check.
     file_permissions_mode: u32,
+    /// The project cache key alone cannot account for a script's `extend` or for CLI
+    /// overrides that match the project but change the script's settings.
+    script_settings: Option<u64>,
 }
 
 impl FileCacheKey {
@@ -54,6 +55,20 @@ impl FileCacheKey {
         Ok(FileCacheKey {
             file_last_modified: FileTime::from_last_modification_time(&metadata),
             file_permissions_mode: permissions,
+            script_settings: None,
+        })
+    }
+
+    pub(crate) fn set_script_settings(&mut self, settings: &Settings) {
+        let mut hasher = CacheKeyHasher::new();
+        settings.cache_key(&mut hasher);
+        self.script_settings = Some(hasher.finish());
+    }
+
+    pub(crate) fn after_write(self, path: &Path) -> io::Result<Self> {
+        Ok(Self {
+            script_settings: self.script_settings,
+            ..Self::from_path(path)?
         })
     }
 }
@@ -93,10 +108,10 @@ impl Cache {
     ///
     /// Finally `settings` is used to ensure we don't open a cache for different
     /// settings. It also defines the directory where to store the cache.
-    fn open(package_root: PathBuf, settings: &Settings, overrides: &ConfigArguments) -> Self {
+    fn open(package_root: PathBuf, settings: &Settings) -> Self {
         debug_assert!(package_root.is_absolute(), "package root not canonicalized");
 
-        let key = format!("{}", cache_key(&package_root, settings, overrides));
+        let key = format!("{}", cache_key(&package_root, settings));
         let path = PathBuf::from_iter([&settings.cache_dir, Path::new(VERSION), Path::new(&key)]);
 
         let serialized = match fs::read(&path) {
@@ -364,11 +379,10 @@ struct FileCacheData {
 
 /// Returns a hash key based on the `package_root`, `settings` and the crate
 /// version.
-fn cache_key(package_root: &Path, settings: &Settings, overrides: &ConfigArguments) -> u64 {
+fn cache_key(package_root: &Path, settings: &Settings) -> u64 {
     let mut hasher = CacheKeyHasher::new();
     package_root.cache_key(&mut hasher);
     settings.cache_key(&mut hasher);
-    overrides.cache_key_for_scripts(&mut hasher);
 
     hasher.finish()
 }
@@ -426,7 +440,6 @@ impl<'a> PackageCacheMap<'a> {
     pub(crate) fn init(
         package_roots: &FxHashMap<&'a Path, Option<PackageRoot<'a>>>,
         resolver: &Resolver,
-        overrides: &ConfigArguments,
     ) -> Self {
         fn init_cache(path: &Path) {
             if let Err(e) = init(path) {
@@ -448,7 +461,7 @@ impl<'a> PackageCacheMap<'a> {
                 .par_bridge()
                 .map(|cache_root| {
                     let settings = resolver.resolve(cache_root);
-                    let cache = Cache::open(cache_root.to_path_buf(), settings, overrides);
+                    let cache = Cache::open(cache_root.to_path_buf(), settings);
                     (cache_root, cache)
                 })
                 .collect(),
@@ -553,7 +566,7 @@ mod tests {
         };
         let overrides = ConfigArguments::default();
         let package_root = fs::canonicalize(package_root).unwrap();
-        let cache = Cache::open(package_root.clone(), &project.settings, &overrides);
+        let cache = Cache::open(package_root.clone(), &project.settings);
         assert_eq!(cache.changes.lock().unwrap().len(), 0);
 
         let mut paths = Vec::new();
@@ -584,7 +597,7 @@ mod tests {
                 let mut diagnostics = lint_path(
                     &path,
                     Some(PackageRoot::root(&package_root)),
-                    project.with_overrides(&overrides),
+                    &project.with_overrides(&overrides),
                     Some(&cache),
                     flags::Noqa::Enabled,
                     flags::FixMode::Generate,
@@ -609,7 +622,7 @@ mod tests {
 
         cache.persist().unwrap();
 
-        let cache = Cache::open(package_root.clone(), &project.settings, &overrides);
+        let cache = Cache::open(package_root.clone(), &project.settings);
         assert_ne!(cache.package.files.len(), 0);
 
         paths_with_diagnostics.sort();
@@ -633,7 +646,7 @@ mod tests {
             got_diagnostics += lint_path(
                 &path,
                 Some(PackageRoot::root(&package_root)),
-                project.with_overrides(&overrides),
+                &project.with_overrides(&overrides),
                 Some(&cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
@@ -1068,11 +1081,7 @@ mod tests {
         }
 
         fn open(&self) -> Cache {
-            Cache::open(
-                self.package_root.clone(),
-                &self.project.settings,
-                &ConfigArguments::default(),
-            )
+            Cache::open(self.package_root.clone(), &self.project.settings)
         }
 
         fn lint_file_with_cache(
@@ -1083,7 +1092,7 @@ mod tests {
             lint_path(
                 &self.package_root.join(path),
                 Some(PackageRoot::root(&self.package_root)),
-                self.project.with_overrides(&ConfigArguments::default()),
+                &self.project.with_overrides(&ConfigArguments::default()),
                 Some(cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
@@ -1099,7 +1108,7 @@ mod tests {
             let file_path = self.package_root.join(path);
             format_path(
                 &file_path,
-                self.project.with_overrides(&ConfigArguments::default()),
+                &self.project.with_overrides(&ConfigArguments::default()),
                 SourceType::Python(PySourceType::Python),
                 FormatMode::Write,
                 None,

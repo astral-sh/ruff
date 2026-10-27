@@ -88,9 +88,9 @@ pub(crate) fn add_noqa(
                     return Ok(0);
                 }
             };
-            let linter = project
-                .with_overrides(config_arguments)
-                .linter(source_type, source_kind.source_code())?;
+            let project = project.with_overrides(config_arguments);
+            let linter = project.linter(Some(path), source_type, source_kind.source_code())?;
+            let package = project.package_root(path, package, &linter);
             match add_suppressions_to_path(
                 path,
                 package,

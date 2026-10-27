@@ -2,8 +2,6 @@ use std::path::Path;
 
 use anyhow::Result;
 use ruff_db::diagnostic::Diagnostic;
-use ruff_linter::package::PackageRoot;
-use ruff_linter::packaging;
 use ruff_linter::settings::flags;
 use ruff_workspace::resolver::{
     PyprojectDiscovery, Resolver, match_exclusion, project_file_at_path,
@@ -43,21 +41,18 @@ pub(crate) fn check_stdin(
         }
     }
     let stdin = read_from_stdin()?;
-    let package_root = filename.and_then(Path::parent).and_then(|path| {
-        packaging::detect_package_root(path, &resolver.root_settings().linter.namespace_packages)
-            .map(PackageRoot::root)
-    });
     let settings = &project_config.root.settings;
     let source_type = filename
         .map(|path| settings.linter.extension.get_source_type(path))
         .unwrap_or_default();
-    let linter = project_config
-        .root
-        .with_overrides(overrides)
-        .linter(source_type, &stdin)?;
+    let linter =
+        project_config
+            .root
+            .with_overrides(overrides)
+            .linter(filename, source_type, &stdin)?;
     let mut diagnostics = lint_stdin(
         filename,
-        package_root,
+        source_type,
         stdin,
         &linter,
         settings.unsafe_fixes,

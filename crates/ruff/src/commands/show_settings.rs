@@ -6,9 +6,7 @@ use anyhow::{Result, bail};
 use itertools::Itertools;
 
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_workspace::resolver::{
-    ConfigurationTransformer, PyprojectDiscovery, ResolvedFile, project_files_in_path,
-};
+use ruff_workspace::resolver::{PyprojectDiscovery, ResolvedFile, project_files_in_path};
 
 use crate::args::ConfigArguments;
 
@@ -35,28 +33,24 @@ pub(crate) fn show_settings(
 
     let resolved = resolver.resolve_with_path(&path);
 
+    let source_type = resolved.settings.linter.extension.get_source_type(&path);
+    let script = if source_type == SourceType::Python(PySourceType::Python)
+        && let Ok(source) = fs::read_to_string(&path)
+    {
+        resolved.with_overrides(config_arguments).resolve_script(
+            Some(&path),
+            source_type,
+            &source,
+        )?
+    } else {
+        None
+    };
+    let resolved = script.as_ref().unwrap_or(resolved);
     writeln!(writer, "Resolved settings for: \"{}\"", path.display())?;
     if let Some(settings_path) = &resolved.config_path {
         writeln!(writer, "Settings path: \"{}\"", settings_path.display())?;
     }
-    let source_type = resolved.settings.linter.extension.get_source_type(&path);
-    let script_settings = if source_type == SourceType::Python(PySourceType::Python)
-        && let Ok(source) = fs::read_to_string(&path)
-        && let Some(configuration) = resolved.script_configuration(source_type, &source)
-    {
-        Some(
-            config_arguments
-                .transform(configuration)
-                .into_settings(&resolved.settings.file_resolver.project_root)?,
-        )
-    } else {
-        None
-    };
-    write!(
-        writer,
-        "{}",
-        script_settings.as_ref().unwrap_or(&resolved.settings)
-    )?;
+    write!(writer, "{}", resolved.settings)?;
 
     Ok(())
 }

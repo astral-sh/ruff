@@ -134,18 +134,29 @@ impl RuffSettings {
         document: Option<&TextDocument>,
         overrides: &EditorConfigurationTransformer,
     ) -> Arc<Self> {
-        let Some(config) = document.and_then(|document| {
-            self.0.script_configuration(
-                self.linter.extension.get_source_type(path),
-                document.contents(),
-            )
-        }) else {
+        let Some(document) = document else {
             return self;
         };
-        let root = &self.file_resolver.project_root;
-        let mut resolved = Self::with_editor_settings(overrides, root, config);
-        resolved.0.config_path.clone_from(&self.0.config_path);
-        Arc::new(resolved)
+        match self.0.with_overrides(overrides).resolve_script(
+            Some(path),
+            self.linter.extension.get_source_type(path),
+            document.contents(),
+        ) {
+            Ok(Some(script)) => Arc::new(Self(script)),
+            Ok(None) => self,
+            Err(error) => {
+                tracing::error!(
+                    "Failed to resolve settings for `{}`: {error:#}",
+                    path.display()
+                );
+                let root = path.parent().unwrap_or(path);
+                Arc::new(Self::with_editor_settings(
+                    overrides,
+                    root,
+                    Configuration::default(),
+                ))
+            }
+        }
     }
 }
 
@@ -504,8 +515,7 @@ impl ConfigurationTransformer for EditorConfigurationTransformer {
     fn transform(&self, filesystem_configuration: Configuration) -> Configuration {
         let editor_configuration = self.configuration.clone();
         match self.preference {
-            // In editor-only mode we skip project discovery. The configuration can still
-            // contain the Python requirement from the current document.
+            // In editor-only mode the current document can still supply a Python requirement.
             ConfigurationPreference::EditorFirst | ConfigurationPreference::EditorOnly => {
                 editor_configuration.combine(filesystem_configuration)
             }
@@ -513,6 +523,10 @@ impl ConfigurationTransformer for EditorConfigurationTransformer {
                 filesystem_configuration.combine(editor_configuration)
             }
         }
+    }
+
+    fn use_inline_config(&self) -> bool {
+        self.preference != ConfigurationPreference::EditorOnly
     }
 }
 

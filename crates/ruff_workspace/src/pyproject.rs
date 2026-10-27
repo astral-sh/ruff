@@ -237,28 +237,72 @@ fn get_fallback_target_version(dir: &Path) -> Option<PythonVersion> {
     None
 }
 
-/// Infer the target version from a Python script's inline metadata.
-pub(crate) fn script_target_version(source: &str) -> Option<ruff_python_ast::PythonVersion> {
-    #[derive(Deserialize)]
-    #[serde(rename_all = "kebab-case")]
-    struct ScriptMetadata {
-        requires_python: VersionSpecifiers,
-    }
+pub(super) struct ScriptMetadata {
+    pub options: Option<Options>,
+    pub target_version: Option<PythonVersion>,
+}
 
-    let tag = ScriptTag::parse(source.as_bytes())?;
-    let metadata: ScriptMetadata = toml::from_str(tag.metadata()).ok()?;
-    if metadata.requires_python.is_empty() {
+impl ScriptMetadata {
+    pub(super) fn parse(
+        source: &str,
+        path: Option<&Path>,
+        use_inline_config: bool,
+    ) -> Result<Option<Self>> {
+        let Some(tag) = ScriptTag::parse(source.as_bytes()) else {
+            return Ok(None);
+        };
+        let (root, errors) = toml::de::DeTable::parse_recoverable(tag.metadata());
+        let table = root.get_ref();
+        let target_version = table
+            .get("requires-python")
+            .and_then(|value| value.get_ref().as_str())
+            .and_then(|requirement| requirement.parse().ok())
+            .and_then(script_target_version);
+
+        let ruff = table
+            .get("tool")
+            .and_then(|tool| tool.get_ref().as_table())
+            .and_then(|tool| tool.get("ruff"));
+        let Some(ruff) = ruff.filter(|_| use_inline_config) else {
+            return Ok(errors.is_empty().then_some(Self {
+                options: None,
+                target_version,
+            }));
+        };
+        if let Some(error) = errors.into_iter().next() {
+            return Err(error).context("Invalid TOML in inline script metadata");
+        }
+        check_required_version(table, &["tool", "ruff"])?;
+        let source = path.map_or(ValueSource::Cli, |path| {
+            ValueSource::File(Arc::new(SystemPathBuf::from_path_buf_lossy(
+                path.to_owned(),
+            )))
+        });
+        let _guard = ValueSourceGuard::with_source_map(source, tag.source_map().clone());
+        let options = Options::deserialize(toml::de::ValueDeserializer::from(ruff.clone()))
+            .map_err(|mut err| {
+                err.set_input(Some(tag.metadata()));
+                err
+            })
+            .context("Invalid Ruff configuration in inline script metadata")?;
+        Ok(Some(Self {
+            options: Some(options),
+            target_version,
+        }))
+    }
+}
+
+fn script_target_version(requires_python: VersionSpecifiers) -> Option<PythonVersion> {
+    if requires_python.is_empty() {
         return None;
     }
-    let supported = release_specifiers_to_ranges(metadata.requires_python);
+    let supported = release_specifiers_to_ranges(requires_python);
     // Ruff targets minor versions. A requirement such as `>=3.10.2` includes part of 3.10.
-    PythonVersion::iter()
-        .find(|&version| {
-            let minor =
-                release_specifier_to_range(VersionSpecifier::equals_star_version(version.into()));
-            !minor.is_disjoint(&supported)
-        })
-        .map(Into::into)
+    PythonVersion::iter().find(|&version| {
+        let minor =
+            release_specifier_to_range(VersionSpecifier::equals_star_version(version.into()));
+        !minor.is_disjoint(&supported)
+    })
 }
 
 /// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
@@ -313,7 +357,7 @@ mod tests {
     use crate::pyproject::{Pyproject, Tools, find_settings_toml, parse_pyproject_toml};
 
     #[test]
-    fn script_requires_python_ranges() {
+    fn script_requires_python_ranges() -> Result<()> {
         for (constraint, expected) in [
             (">=3.10.2,<3.12", Some(PythonVersion::Py310)),
             (">=3.9,!=3.9.*,>=3.10,!=3.10.*", Some(PythonVersion::Py311)),
@@ -324,11 +368,13 @@ mod tests {
         ] {
             let script = format!("# /// script\n# requires-python = '{constraint}'\n# ///\n");
             assert_eq!(
-                super::script_target_version(&script),
-                expected.map(Into::into),
+                super::ScriptMetadata::parse(&script, None, true)?
+                    .and_then(|metadata| metadata.target_version),
+                expected,
                 "{constraint}"
             );
         }
+        Ok(())
     }
 
     #[test]

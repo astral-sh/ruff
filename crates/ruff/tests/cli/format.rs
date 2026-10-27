@@ -2461,6 +2461,65 @@ fn range_formatting_notebook() -> Result<()> {
 }
 
 #[test]
+fn inline_script_formatter() -> Result<()> {
+    let test = CliTest::with_file("ruff.toml", "format.quote-style = 'single'")?;
+    test.write_file("shared.toml", "format.quote-style = 'single'")?;
+    for (name, metadata) in [
+        ("inherited.py", "dependencies = []"),
+        ("defaults.py", "[tool.ruff]"),
+        ("extended.py", "tool.ruff.extend = '../shared.toml'"),
+    ] {
+        test.write_file(
+            format!("scripts/{name}"),
+            &format!("# /// script\n# {metadata}\n# ///\nx = 'hello'\n"),
+        )?;
+    }
+    assert!(
+        test.command()
+            .args(["format", "scripts"])
+            .output()?
+            .status
+            .success()
+    );
+    assert!(
+        test.read_file("scripts/inherited.py")?
+            .ends_with("x = 'hello'\n")
+    );
+    assert!(
+        test.read_file("scripts/defaults.py")?
+            .ends_with("x = \"hello\"\n")
+    );
+    assert!(
+        test.read_file("scripts/extended.py")?
+            .ends_with("x = 'hello'\n")
+    );
+    test.write_file("shared.toml", "format.quote-style = 'double'")?;
+    assert_eq!(
+        test.command()
+            .args(["format", "--check", "scripts/extended.py"])
+            .output()?
+            .status
+            .code(),
+        Some(1)
+    );
+
+    assert_cmd_snapshot!(test.format_command().args(["--stdin-filename=scripts/extended.py", "-"]).pass_stdin(
+        "# /// script\n# tool.ruff.extend = '../ruff.toml'\n# ///\nx = \"hello\"\n"
+    ), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    # /// script
+    # tool.ruff.extend = '../ruff.toml'
+    # ///
+    x = 'hello'
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
 fn script_requires_python_formatter() -> Result<()> {
     let test = CliTest::with_file(
         "ruff.toml",

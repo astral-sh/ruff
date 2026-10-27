@@ -8,6 +8,44 @@ use lsp_types::{
 use crate::TestServerBuilder;
 
 #[test]
+fn inline_script_configuration_in_open_document() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file("ruff.toml", "lint.ignore = ['F401']")?
+        .build();
+    server.open_text_document(
+        "script.py",
+        "# /// script\n# [tool.ruff]\n# ///\nimport os\n",
+        1,
+    );
+    let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) =
+        server.document_diagnostic_request("script.py", None)
+    else {
+        anyhow::bail!("expected a full report");
+    };
+    assert_eq!(report.full_document_diagnostic_report.items.len(), 1);
+
+    server.change_text_document(
+        "script.py",
+        vec![
+            TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: "import os\n".into(),
+                },
+            ),
+        ],
+        2,
+    );
+    let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) =
+        server.document_diagnostic_request("script.py", None)
+    else {
+        anyhow::bail!("expected a full report after removing the inline table");
+    };
+    assert!(report.full_document_diagnostic_report.items.is_empty());
+    Ok(())
+}
+
+#[test]
 fn script_requires_python_in_open_document() -> Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_workspace(".")?

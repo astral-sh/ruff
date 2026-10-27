@@ -21,10 +21,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_linter::fs;
 use ruff_linter::package::PackageRoot;
-use ruff_linter::packaging::is_package;
+use ruff_linter::packaging::{detect_package_root, is_package};
 use ruff_linter::settings::LinterSettings;
-use ruff_linter::settings::types::CompiledPerFileTargetVersionList;
-use ruff_python_ast::{PySourceType, PythonVersion, SourceType};
+use ruff_python_ast::{PySourceType, SourceType};
 
 use crate::configuration::Configuration;
 use crate::pyproject::settings_toml;
@@ -282,25 +281,6 @@ impl ConfigurationAndSettings {
             overrides,
         }
     }
-
-    /// The inherited configuration for a script with its own Python requirement.
-    pub fn script_configuration(
-        &self,
-        source_type: SourceType,
-        source: &str,
-    ) -> Option<Configuration> {
-        if source_type != SourceType::Python(PySourceType::Python) {
-            return None;
-        }
-        let version = pyproject::script_target_version(source)?;
-        Some(Configuration {
-            target_version: Some(version),
-            // A project glob can match the script even when it targets a different Python version.
-            // CLI or editor overrides are applied to this configuration afterwards.
-            per_file_target_version: Some(Vec::new()),
-            ..self.configuration.clone()
-        })
-    }
 }
 
 /// Project settings with the CLI or editor overrides to apply after reading script metadata.
@@ -314,53 +294,99 @@ impl<'a, T: ConfigurationTransformer> SettingsForSource<'a, T> {
         &self.project.settings
     }
 
-    pub fn linter(self, source_type: SourceType, source: &str) -> Result<Cow<'a, LinterSettings>> {
-        let settings = &self.project.settings.linter;
-        let Some((target_version, per_file_target_version)) =
-            self.target_versions(source_type, source)?
+    /// Resolve settings that depend on the contents of a Python script. An inline
+    /// `[tool.ruff]` is a configuration file in its own right, even when empty.
+    pub fn resolve_script(
+        &self,
+        path: Option<&Path>,
+        source_type: SourceType,
+        source: &str,
+    ) -> Result<Option<ConfigurationAndSettings>> {
+        if source_type != SourceType::Python(PySourceType::Python) {
+            return Ok(None);
+        }
+        let Some(metadata) =
+            pyproject::ScriptMetadata::parse(source, path, self.overrides.use_inline_config())?
         else {
-            return Ok(Cow::Borrowed(settings));
+            return Ok(None);
         };
-        Ok(Cow::Owned(LinterSettings {
-            unresolved_target_version: target_version.into(),
-            per_file_target_version,
-            ..settings.clone()
-        }))
+
+        if let Some(options) = metadata.options {
+            let root = fs::normalize_path(path.and_then(Path::parent).unwrap_or(Path::new(".")));
+            let mut configuration = Configuration::from_options(options, path, &root)?;
+            if let Some(version) = metadata.target_version {
+                configuration.target_version.get_or_insert(version.into());
+                // Only the script's own per-file targets can override its requirement.
+                configuration
+                    .per_file_target_version
+                    .get_or_insert_default();
+            }
+            if let Some(extend) = &configuration.extend {
+                let base = resolve_configuration(&root.join(extend), ConfigurationOrigin::Unknown)?;
+                configuration = configuration.combine(base);
+            }
+            return ConfigurationAndSettings::new(configuration, self.overrides, &root, path)
+                .map(Some);
+        }
+
+        let Some(version) = metadata.target_version else {
+            return Ok(None);
+        };
+        let configuration = Configuration {
+            target_version: Some(version.into()),
+            per_file_target_version: Some(Vec::new()),
+            ..self.project.configuration.clone()
+        };
+        ConfigurationAndSettings::new(
+            configuration,
+            self.overrides,
+            &self.project.settings.file_resolver.project_root,
+            self.project.config_path.as_deref(),
+        )
+        .map(Some)
+    }
+
+    pub fn linter(
+        &self,
+        path: Option<&Path>,
+        source_type: SourceType,
+        source: &str,
+    ) -> Result<Cow<'a, LinterSettings>> {
+        Ok(match self.resolve_script(path, source_type, source)? {
+            Some(script) => Cow::Owned(script.settings.linter),
+            None => Cow::Borrowed(&self.project.settings.linter),
+        })
     }
 
     pub fn formatter(
-        self,
+        &self,
+        path: Option<&Path>,
         source_type: SourceType,
         source: &str,
     ) -> Result<Cow<'a, FormatterSettings>> {
-        let settings = &self.project.settings.formatter;
-        let Some((target_version, per_file_target_version)) =
-            self.target_versions(source_type, source)?
-        else {
-            return Ok(Cow::Borrowed(settings));
-        };
-        Ok(Cow::Owned(FormatterSettings {
-            unresolved_target_version: target_version,
-            per_file_target_version,
-            ..settings.clone()
-        }))
+        Ok(match self.resolve_script(path, source_type, source)? {
+            Some(script) => Cow::Owned(script.settings.formatter),
+            None => Cow::Borrowed(&self.project.settings.formatter),
+        })
     }
 
-    fn target_versions(
-        self,
-        source_type: SourceType,
-        source: &str,
-    ) -> Result<Option<(PythonVersion, CompiledPerFileTargetVersionList)>> {
-        let Some(config) = self.project.script_configuration(source_type, source) else {
-            return Ok(None);
-        };
-        let config = self.overrides.transform(config);
-        Ok(Some((
-            config.target_version.unwrap_or_default(),
-            CompiledPerFileTargetVersionList::resolve(
-                config.per_file_target_version.unwrap_or_default(),
-            )?,
-        )))
+    /// Reuse the package root from file discovery unless the script changes which
+    /// directories count as namespace packages.
+    pub fn package_root<'p>(
+        &self,
+        path: &'p Path,
+        package: Option<PackageRoot<'p>>,
+        linter: &LinterSettings,
+    ) -> Option<PackageRoot<'p>> {
+        if linter.namespace_packages == self.project.settings.linter.namespace_packages {
+            return package;
+        }
+        let root = detect_package_root(path.parent()?, &linter.namespace_packages)?;
+        Some(
+            package
+                .filter(|package| package.path() == root)
+                .unwrap_or_else(|| PackageRoot::root(root)),
+        )
     }
 }
 
@@ -396,6 +422,11 @@ fn is_package_with_cache<'a>(
 /// Used to override options with the values provided by the CLI.
 pub trait ConfigurationTransformer {
     fn transform(&self, config: Configuration) -> Configuration;
+
+    /// Whether to load Ruff configuration embedded in a script, including files it extends.
+    fn use_inline_config(&self) -> bool {
+        true
+    }
 }
 
 /// Configurations shared during one traversal, before inheritance and overrides.

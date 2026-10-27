@@ -67,7 +67,7 @@ pub(crate) fn format_stdin(
     let settings = project_config
         .root
         .with_overrides(config_arguments)
-        .formatter(source_type, &source_code)?;
+        .formatter(path, source_type, &source_code)?;
     // Format the file.
     match format_source_code(path, cli.range, &settings, source_type, source_code, mode) {
         Ok(result) => match mode {
