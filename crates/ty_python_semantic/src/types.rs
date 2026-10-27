@@ -2174,9 +2174,9 @@ pub enum Type<'db> {
 /// A captured parameter list, another `ParamSpec`, or an intersection of those values.
 ///
 /// An intersection of callables describes a callable supporting every constituent signature, so it
-/// accurately represents a conjunction of upper bounds on a ParamSpec. A union of callables
+/// accurately represents a conjunction of upper bounds on a `ParamSpec`. A union of callables
 /// describes alternative callable types rather than their shared calling interface, so it's not an
-/// accurate representation of a conjunction of lower bounds on a ParamSpec.
+/// accurate representation of a conjunction of lower bounds on a `ParamSpec`.
 ///
 /// For example, callbacks accepting `(int, object)` and `(object, int)` share the calling interface
 /// `(int, int)`. A callable accepting only two integers satisfies that shared interface but
