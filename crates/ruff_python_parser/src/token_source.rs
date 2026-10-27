@@ -42,9 +42,13 @@ impl<'src> TokenSource<'src> {
         self.lexer.current_kind()
     }
 
-    /// Returns the kind of the previous non-trivia token.
-    pub(crate) const fn previous_kind(&self) -> Option<TokenKind> {
-        self.lexer.previous_kind()
+    /// Returns the last consumed non-trivia token kind.
+    pub(crate) fn previous_kind(&self) -> Option<TokenKind> {
+        self.tokens
+            .iter()
+            .rev()
+            .map(Token::kind)
+            .find(|kind| !kind.is_trivia())
     }
 
     /// Returns the range of the current token.

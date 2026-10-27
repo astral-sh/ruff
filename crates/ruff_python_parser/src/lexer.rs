@@ -45,9 +45,6 @@ pub struct Lexer<'src> {
     /// The kind of the current token.
     current_kind: TokenKind,
 
-    /// The kind of the previous non-trivia token.
-    previous_kind: Option<TokenKind>,
-
     /// The range of the current token.
     current_range: TextRange,
 
@@ -98,7 +95,6 @@ impl<'src> Lexer<'src> {
             cursor: Cursor::new(source),
             state,
             current_kind: TokenKind::EndOfFile,
-            previous_kind: None,
             current_range: TextRange::empty(start_offset),
             current_flags: TokenFlags::empty(),
             nesting,
@@ -124,11 +120,6 @@ impl<'src> Lexer<'src> {
         self.current_kind
     }
 
-    /// Returns the kind of the previous non-trivia token.
-    pub(crate) const fn previous_kind(&self) -> Option<TokenKind> {
-        self.previous_kind
-    }
-
     /// Returns the range of the current token.
     #[doc(hidden)]
     pub const fn current_range(&self) -> TextRange {
@@ -151,13 +142,6 @@ impl<'src> Lexer<'src> {
 
     /// Lex the next token.
     pub fn next_token(&mut self) -> TokenKind {
-        if !self.current_kind.is_trivia() && self.current_kind != TokenKind::EndOfFile {
-            self.previous_kind = Some(self.current_kind);
-        }
-        self.lex_current_token()
-    }
-
-    fn lex_current_token(&mut self) -> TokenKind {
         // `lex_token` marks the start on the path that lexes each token.
         self.current_flags = TokenFlags::empty();
         self.current_kind = self.lex_token();
@@ -1288,7 +1272,7 @@ impl<'src> Lexer<'src> {
         self.cursor = Cursor::new(self.source);
         self.cursor.skip_bytes(new_position.to_usize());
         self.state = State::Other;
-        self.lex_current_token();
+        self.next_token();
         true
     }
 
@@ -1411,7 +1395,6 @@ impl<'src> Lexer<'src> {
     pub(crate) fn checkpoint(&self) -> LexerCheckpoint {
         LexerCheckpoint {
             current_kind: self.current_kind,
-            previous_kind: self.previous_kind,
             current_range: self.current_range,
             current_flags: self.current_flags,
             cursor_offset: self.offset(),
@@ -1428,7 +1411,6 @@ impl<'src> Lexer<'src> {
     pub(crate) fn rewind(&mut self, checkpoint: LexerCheckpoint) {
         let LexerCheckpoint {
             current_kind,
-            previous_kind,
             current_range,
             current_flags,
             cursor_offset,
@@ -1445,7 +1427,6 @@ impl<'src> Lexer<'src> {
         cursor.skip_bytes(cursor_offset.to_usize());
 
         self.current_kind = current_kind;
-        self.previous_kind = previous_kind;
         self.current_range = current_range;
         self.current_flags = current_flags;
         self.cursor = cursor;
@@ -1465,7 +1446,6 @@ impl<'src> Lexer<'src> {
 
 pub(crate) struct LexerCheckpoint {
     current_kind: TokenKind,
-    previous_kind: Option<TokenKind>,
     current_range: TextRange,
     current_flags: TokenFlags,
     cursor_offset: TextSize,
