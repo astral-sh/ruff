@@ -68,6 +68,7 @@ use super::generics::{ApplySpecialization, Specialization};
 use super::relation::{TypeRelation, TypeRelationChecker};
 use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
+use super::visitor::contains_growing_type;
 use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, MaterializationKind, Type,
     TypeContext, TypeMapping, VarianceTerm,
@@ -509,29 +510,46 @@ impl<'db> RecursiveType<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         let env = self.environment(db);
-        if let Some(arguments) = self.arguments(db) {
-            let parameters = arguments.generic_context(db);
-            let constructor = self.with_arguments(db, Some(parameters.identity_specialization(db)));
-            if self != constructor && self.may_have_unbounded_specialization(db) {
-                // Unfolding R[list[T]] can produce R[list[list[T]]] and so on. Express the
-                // variance through the constructor's formal parameters so the equations repeat.
-                let argument_variances = parameters.variables(db).zip(arguments.types(db)).map(
-                    |(parameter, argument)| {
-                        argument
-                            .variance_of(db, &env, typevar)
-                            .compose_thunk(db, || {
-                                constructor.variance_of(db, &env, parameter.identity(db))
-                            })
-                    },
-                );
-                let captured_variance = (!parameters.contains(db, typevar))
-                    .then(|| constructor.variance_of(db, &env, typevar));
-                return VarianceTerm::join(db, argument_variances.chain(captured_variance));
-            }
-        }
         self.unfold(db, &env)
             .map(|unfolded| unfolded.variance_of(db, &env, typevar))
             .unwrap_or(VarianceTerm::BIVARIANT)
+    }
+
+    /// Estimate parameter use through a growing recursive reference. Unfolding `R[list[T]]`
+    /// can produce `R[list[list[T]]]` and so on. References to the formal parameters instead
+    /// give call inference a finite set of variance equations.
+    pub(in crate::types) fn growing_parameter_variance(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> Option<VarianceTerm<'db>> {
+        let arguments = self.arguments(db)?;
+        let parameters = arguments.generic_context(db);
+        let constructor = self.with_arguments(db, Some(parameters.identity_specialization(db)));
+        if self == constructor || !self.may_have_unbounded_specialization(db) {
+            return None;
+        }
+
+        let env = self.environment(db);
+        // Specialization can erase the recursion altogether, for example when a union
+        // contains `object`. In that case its ordinary variance equation is already finite.
+        if !contains_growing_type(db, &env, self.unfold(db, &env).into_type()) {
+            return None;
+        }
+        let arguments =
+            parameters
+                .variables(db)
+                .zip(arguments.types(db))
+                .map(|(parameter, argument)| {
+                    argument
+                        .variance_of(db, &env, typevar)
+                        .compose_thunk(db, || {
+                            constructor.variance_of(db, &env, parameter.identity(db))
+                        })
+                });
+        let captured =
+            (!parameters.contains(db, typevar)).then(|| constructor.variance_of(db, &env, typevar));
+        Some(VarianceTerm::join(db, arguments.chain(captured)))
     }
 }
 

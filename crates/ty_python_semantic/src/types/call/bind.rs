@@ -8024,8 +8024,7 @@ fn inferable_typevar_occurrences<'db>(
             {
                 if constructor
                     .variance_of(db, self.env, parameter.identity(db))
-                    .evaluate(db)
-                    != TypeVarVariance::Bivariant
+                    .is_used_in_alias(db)
                 {
                     self.visit_type(db, argument);
                 }

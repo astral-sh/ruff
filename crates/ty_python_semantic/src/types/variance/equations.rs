@@ -30,6 +30,12 @@ pub(crate) enum VarianceTerm<'db> {
     Compose(VarianceProduct<'db>),
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum VariancePurpose {
+    Type,
+    AliasParameter,
+}
+
 impl<'db> VarianceTerm<'db> {
     pub(crate) const BIVARIANT: Self = Self::Constant(TypeVarVariance::Bivariant);
 
@@ -79,7 +85,17 @@ impl<'db> VarianceTerm<'db> {
 
     /// Evaluate an expression using declared variance at protocol-parameter references.
     pub(crate) fn evaluate(self, db: &'db dyn Db) -> TypeVarVariance {
-        self.evaluate_with(db, &|variable| variable.effective_variance(db))
+        self.evaluate_with(db, &|variable| {
+            variable.effective_variance(db, VariancePurpose::Type)
+        })
+    }
+
+    /// Whether an alias parameter contributes to call inference. For growing recursive aliases,
+    /// following the parameter through the constructor keeps this check finite.
+    pub(in crate::types) fn is_used_in_alias(self, db: &'db dyn Db) -> bool {
+        self.evaluate_with(db, &|variable| {
+            variable.effective_variance(db, VariancePurpose::AliasParameter)
+        }) != TypeVarVariance::Bivariant
     }
 
     /// Substitute the supplied variable values; the component solver supplies its current
@@ -176,13 +192,22 @@ impl get_size2::GetSize for VarianceVariable<'_> {}
 impl<'db> VarianceVariable<'db> {
     /// Honor the protocol declaration attached to this reference even when its equation infers
     /// a different variance. References without a declaration are evaluated from their equations.
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
-    fn effective_variance(self, db: &'db dyn Db) -> TypeVarVariance {
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
+    fn effective_variance(self, db: &'db dyn Db, purpose: VariancePurpose) -> TypeVarVariance {
         if let VarianceOrigin::ProtocolParameter(_, declared) = self.origin(db) {
-            declared
-        } else {
-            self.equation(db).evaluate(db)
+            return declared;
         }
+
+        let mut equation = self.equation(db);
+        if purpose == VariancePurpose::AliasParameter
+            && !matches!(equation, VarianceTerm::Constant(_))
+            && let VarianceOrigin::Recursive(recursive) = self.origin(db)
+            && let Some(parameter_variance) =
+                recursive.growing_parameter_variance(db, self.typevar(db))
+        {
+            equation = parameter_variance;
+        }
+        equation.evaluate_with(db, &|variable| variable.effective_variance(db, purpose))
     }
 
     /// Return the defining expression, or declared variance for an unsupported protocol.
@@ -271,7 +296,7 @@ impl<'db> VarianceComponent<'db> {
             queued[index] = false;
             let variance = equations[index].evaluate_with(db, &|dependency| {
                 indices.get(&dependency).map_or_else(
-                    || dependency.effective_variance(db),
+                    || dependency.effective_variance(db, VariancePurpose::Type),
                     |&dependency_index| values[dependency_index],
                 )
             });

@@ -64,6 +64,20 @@ def apply_recursive(fn: Callable[[T], T], x: T, y: T, unused: RecursiveIgnore[T]
 apply_recursive(First(), values, values, None)  # no diagnostic
 ```
 
+Specializing an alias can also erase a parameter. Here `object` absorbs every other member of the
+union, so `Wrapped[T]` cannot constrain the callback.
+
+```py
+U = TypeVar("U")
+V = TypeVar("V")
+Growing = T | U | tuple["Growing[T, U, list[V]]"]
+Wrapped = TypeAliasType("Wrapped", Growing[T, object, int], type_params=(T,))
+
+def apply_wrapped(fn: Callable[[T], T], x: T, y: T, unused: Wrapped[T] = None) -> None: ...
+
+apply_wrapped(First(), values, values, None)  # no diagnostic
+```
+
 ## Ambiguous overload returns through generic aliases
 
 Aliases are expanded when comparing the structure of ambiguous return types. Recursive aliases
