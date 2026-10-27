@@ -532,7 +532,10 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Raise);
 
         let exc = match self.current_token_kind() {
-            TokenKind::Newline => None,
+            // test_ok bare_raise_before_semicolon
+            // try: work()
+            // except ValueError: raise; report()
+            TokenKind::Newline | TokenKind::Semi => None,
             TokenKind::From => {
                 // test_err raise_stmt_from_without_exc
                 // raise from exc
