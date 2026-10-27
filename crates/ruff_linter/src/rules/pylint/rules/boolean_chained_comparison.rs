@@ -7,6 +7,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -35,7 +36,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     pass
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.9.0")]
+#[violation_metadata(stable_since = "0.9.0", category = Category::Style)]
 pub(crate) struct BooleanChainedComparison;
 
 impl AlwaysFixableViolation for BooleanChainedComparison {
@@ -77,11 +78,11 @@ pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprB
                 are_compare_expr_simplifiable(left_compare, right_compare)
             })
     {
-        let Some(Expr::Name(left_compare_right)) = left_compare.comparators.last() else {
+        let Some(Expr::Name(left_compare_right)) = left_compare.operands.last() else {
             continue;
         };
 
-        let Expr::Name(right_compare_left) = &*right_compare.left else {
+        let Expr::Name(right_compare_left) = right_compare.first_operand() else {
             continue;
         };
 

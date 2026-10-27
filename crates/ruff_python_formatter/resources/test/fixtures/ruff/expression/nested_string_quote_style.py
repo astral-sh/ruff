@@ -79,3 +79,12 @@ t'{ ("implicit " "concatenation", ["more", "strings"]) }'
 # Inner implicit concatenation with escaped quotes.
 f'{ ("implicit " "concatenation", ["'single'", "\"double\""]) }'
 t'{ ("implicit " "concatenation", ["'single'", "\"double\""]) }'
+
+# A field in a format spec belongs to the same string as its enclosing field,
+# so its string literals follow the same rules as an ordinary interpolation.
+# Regression test for https://github.com/astral-sh/ruff/issues/28218
+f'{v:{d["n"]}}'
+t'{v:{d["n"]}}'
+
+# A nested f-string inside a format spec adds another level of nesting.
+f'''{v:{f"{d['n']}"}}'''

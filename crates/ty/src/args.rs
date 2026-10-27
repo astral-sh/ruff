@@ -35,7 +35,7 @@ pub(crate) enum Command {
     Check(CheckCommand),
 
     /// Start the language server
-    Server,
+    Server(ServerCommand),
 
     /// Display ty's version
     Version {
@@ -76,6 +76,14 @@ pub(crate) struct CheckCommand {
     /// Adds `ty: ignore` comments to suppress all rule diagnostics.
     #[arg(long, conflicts_with("fix"))]
     pub(crate) add_ignore: bool,
+
+    /// Path to a JSON diagnostic baseline (preview).
+    #[arg(long, value_name = "PATH")]
+    baseline: Option<SystemPathBuf>,
+
+    /// Create or update the configured diagnostic baseline (preview).
+    #[arg(long, conflicts_with_all = ["watch", "fix", "add_ignore"])]
+    pub(crate) update_baseline: bool,
 
     /// Run the command within the given project directory.
     ///
@@ -273,6 +281,7 @@ impl CheckCommand {
             .then_some(false)
             .or(self.error_on_warning);
         let options = Options {
+            baseline: self.baseline.map(RelativePathBuf::cli),
             environment: Some(EnvironmentOptions {
                 python_version: self.python_version.map(Into::into).map(RangedValue::cli),
                 python_platform: self
@@ -308,6 +317,19 @@ impl CheckCommand {
         // Merge with options passed in via --config
         options.combine(self.config.into_options().unwrap_or_default())
     }
+}
+
+#[derive(Debug, Parser)]
+pub(crate) struct ServerCommand {
+    /// Print the absolute path to the ty executable to use for the current folder.
+    ///
+    /// Discover the project from the current working directory. Use `environment.python` if it
+    /// is configured; otherwise, discover the Python environment in the normal order.
+    /// Print the path to ty if it is installed there.
+    /// If project discovery fails, use the current working directory as the discovery root.
+    /// Exit with status 0 if ty is found, 1 if discovery fails, or 2 on an unexpected error.
+    #[arg(long, hide = true)]
+    pub(crate) find_executable: bool,
 }
 
 /// A list of rules to enable or disable with a given severity.
@@ -370,7 +392,11 @@ impl clap::Args for RulesArg {
             clap::Arg::new("error")
                 .long("error")
                 .action(ArgAction::Append)
-                .help("Treat the given rule as having severity 'error'. Can be specified multiple times. Use 'all' to apply to all rules.")
+                .help(
+                    "Treat the given rule as having severity 'error'. \
+                    Can be specified multiple times. \
+                    Use 'all' to apply to all rules.",
+                )
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -378,7 +404,11 @@ impl clap::Args for RulesArg {
             clap::Arg::new("warn")
                 .long("warn")
                 .action(ArgAction::Append)
-                .help("Treat the given rule as having severity 'warn'. Can be specified multiple times. Use 'all' to apply to all rules.")
+                .help(
+                    "Treat the given rule as having severity 'warn'. \
+                    Can be specified multiple times. \
+                    Use 'all' to apply to all rules.",
+                )
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -386,7 +416,11 @@ impl clap::Args for RulesArg {
             clap::Arg::new("ignore")
                 .long("ignore")
                 .action(ArgAction::Append)
-                .help("Disables the rule. Can be specified multiple times. Use 'all' to apply to all rules.")
+                .help(
+                    "Disables the rule. \
+                    Can be specified multiple times. \
+                    Use 'all' to apply to all rules.",
+                )
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -424,6 +458,9 @@ pub enum OutputFormat {
     /// Print diagnostics as a JUnit-style XML report.
     #[value(name = "junit")]
     Junit,
+    /// Print diagnostics as a SARIF report.
+    #[value(name = "sarif")]
+    Sarif,
 }
 
 impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
@@ -434,6 +471,7 @@ impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
             OutputFormat::Gitlab => Self::Gitlab,
             OutputFormat::Github => Self::Github,
             OutputFormat::Junit => Self::Junit,
+            OutputFormat::Sarif => Self::Sarif,
         }
     }
 }

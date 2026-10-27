@@ -28,7 +28,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .iter()
                     .any(|element| matches!(element.resolve_type_alias(db), Type::TypeForm(_))) =>
             {
-                Some(target.filter_union(db, |element| {
+                Some(target.filter_union(db, env, |element| {
                     !matches!(element.resolve_type_alias(db), Type::TypeForm(_))
                 }))
             }
@@ -58,7 +58,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             let contextual_ty = self
                 .speculate_without_diagnostics()
-                .infer_value_expression_impl(expression, TypeContext::new(Some(target)));
+                .infer_value_expression_impl(expression, TypeContext::declared(Some(target)));
             if contextual_ty.is_assignable_to(db, env, target) {
                 return None;
             }
@@ -104,8 +104,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::Intersection(intersection) => intersection
                     .iter_positive(builder.db())
                     .any(|element| imp(builder, expression, element, visitor)),
-                Type::TypeAlias(alias) => visitor.visit(db, ty, || {
-                    imp(builder, expression, alias.value_type(db), visitor)
+                Type::TypeAlias(_) | Type::Recursive(_) => visitor.visit(db, ty, || {
+                    imp(builder, expression, ty.resolve_type_alias(db), visitor)
                 }),
                 Type::TypeVar(typevar) => visitor.visit(db, ty, || {
                     typevar

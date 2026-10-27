@@ -1,5 +1,6 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::ExceptHandler;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{Arguments, Expr, Stmt, visitor};
 use ruff_python_semantic::analyze::function_type;
@@ -7,6 +8,12 @@ use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_text_size::TextRange;
 
 use crate::settings::LinterSettings;
+
+/// Returns `true` if a module member is public despite having an
+/// underscore-prefixed name.
+pub(crate) fn is_underscore_prefixed_public_member(qualified_name: &QualifiedName) -> bool {
+    matches!(qualified_name.segments(), ["os", "_exit"])
+}
 
 /// Returns the value of the `name` parameter to, e.g., a `TypeVar` constructor.
 pub(super) fn type_param_name(arguments: &Arguments) -> Option<&str> {
@@ -222,99 +229,104 @@ pub(crate) fn is_dunder_operator_method(method: &str) -> bool {
 
 /// Returns `true` if a method is a known dunder method.
 pub(super) fn is_known_dunder_method(method: &str) -> bool {
-    is_dunder_operator_method(method)
-        || matches!(
-            method,
-            "__abs__"
-            | "__aenter__"
-            | "__aexit__"
-            | "__aiter__"
-            | "__anext__"
-            | "__attrs_init__"
-            | "__attrs_post_init__"
-            | "__attrs_pre_init__"
-            | "__await__"
-            | "__bool__"
-            | "__buffer__"
-            | "__bytes__"
-            | "__call__"
-            | "__ceil__"
-            | "__class__"
-            | "__class_getitem__"
-            | "__complex__"
-            | "__contains__"
-            | "__copy__"
-            | "__deepcopy__"
-            | "__del__"
-            | "__delattr__"
-            | "__delete__"
-            | "__delitem__"
-            | "__dict__"
-            | "__dir__"
-            | "__doc__"
-            | "__enter__"
-            | "__exit__"
-            | "__float__"
-            | "__floor__"
-            | "__format__"
-            | "__fspath__"
-            | "__get__"
-            | "__getattr__"
-            | "__getattribute__"
-            | "__getitem__"
-            | "__getnewargs__"
-            | "__getnewargs_ex__"
-            | "__getstate__"
-            | "__hash__"
-            | "__html__"
-            | "__index__"
-            | "__init__"
-            | "__init_subclass__"
-            | "__instancecheck__"
-            | "__int__"
-            | "__invert__"
-            | "__iter__"
-            | "__len__"
-            | "__length_hint__"
-            | "__missing__"
-            | "__module__"
-            | "__mro_entries__"
-            | "__neg__"
-            | "__new__"
-            | "__next__"
-            | "__pos__"
-            | "__post_init__"
-            | "__prepare__"
-            | "__reduce__"
-            | "__reduce_ex__"
-            | "__release_buffer__"
-            | "__replace__"
-            | "__repr__"
-            | "__reversed__"
-            | "__round__"
-            | "__set__"
-            | "__set_name__"
-            | "__setattr__"
-            | "__setitem__"
-            | "__setstate__"
-            | "__sizeof__"
-            | "__str__"
-            | "__subclasscheck__"
-            | "__subclasses__"
-            | "__subclasshook__"
-            | "__trunc__"
-            | "__weakref__"
-            // Overridable sunder names from the `Enum` class.
-            // See: https://docs.python.org/3/library/enum.html#supported-sunder-names
-            | "_add_alias_"
-            | "_add_value_alias_"
-            | "_name_"
-            | "_value_"
-            | "_missing_"
-            | "_ignore_"
-            | "_order_"
-            | "_generate_next_value_"
-        )
+    if is_dunder_operator_method(method) {
+        return true;
+    }
+
+    match method {
+        "__abs__"
+        | "__aenter__"
+        | "__aexit__"
+        | "__aiter__"
+        | "__anext__"
+        | "__attrs_init__"
+        | "__attrs_post_init__"
+        | "__attrs_pre_init__"
+        | "__await__"
+        | "__bool__"
+        | "__buffer__"
+        | "__bytes__"
+        | "__call__"
+        | "__ceil__"
+        | "__class__"
+        | "__class_getitem__"
+        | "__complex__"
+        | "__contains__"
+        | "__copy__"
+        | "__deepcopy__"
+        | "__del__"
+        | "__delattr__"
+        | "__delete__"
+        | "__delitem__"
+        | "__dict__"
+        | "__dir__"
+        | "__doc__"
+        | "__enter__"
+        | "__exit__"
+        | "__float__"
+        | "__floor__"
+        | "__format__"
+        | "__fspath__"
+        | "__get__"
+        | "__getattr__"
+        | "__getattribute__"
+        | "__getitem__"
+        | "__getnewargs__"
+        | "__getnewargs_ex__"
+        | "__getstate__"
+        | "__hash__"
+        | "__html__"
+        | "__index__"
+        | "__init__"
+        | "__init_subclass__"
+        | "__instancecheck__"
+        | "__int__"
+        | "__invert__"
+        | "__iter__"
+        | "__len__"
+        | "__length_hint__"
+        | "__missing__"
+        | "__module__"
+        | "__mro_entries__"
+        | "__neg__"
+        | "__new__"
+        | "__next__"
+        | "__pos__"
+        | "__post_init__"
+        | "__prepare__"
+        | "__reduce__"
+        | "__reduce_ex__"
+        | "__release_buffer__"
+        | "__replace__"
+        | "__repr__"
+        | "__reversed__"
+        | "__round__"
+        | "__set__"
+        | "__set_name__"
+        | "__setattr__"
+        | "__setitem__"
+        | "__setstate__"
+        | "__sizeof__"
+        | "__str__"
+        | "__subclasscheck__"
+        | "__subclasses__"
+        | "__subclasshook__"
+        | "__trunc__"
+        | "__weakref__" => true,
+
+        // Overridable sunder names from the `Enum` class.
+        // See: https://docs.python.org/3/library/enum.html#supported-sunder-names
+        "_add_alias_"
+        | "_add_value_alias_"
+        | "_name_"
+        | "_value_"
+        | "_missing_"
+        | "_ignore_"
+        | "_order_"
+        | "_generate_next_value_" => true,
+
+        _ => false,
+    }
 }
 
 pub(super) fn num_statements(stmts: &[Stmt]) -> usize {

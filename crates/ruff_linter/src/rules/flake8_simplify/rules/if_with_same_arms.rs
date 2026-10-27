@@ -13,6 +13,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -36,7 +37,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     print("Hello")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.246")]
+#[violation_metadata(stable_since = "v0.0.246", category = Category::Suspicious)]
 pub(crate) struct IfWithSameArms;
 
 impl Violation for IfWithSameArms {

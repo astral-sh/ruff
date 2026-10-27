@@ -1,4 +1,5 @@
 mod analysis_options;
+mod baseline;
 mod config_option;
 mod exit_code;
 mod file_selection;
@@ -7,18 +8,17 @@ mod python_environment;
 mod rule;
 mod rule_selection;
 mod scripts;
+mod server;
 mod uv_workspace;
 
-use anyhow::Context as _;
-use insta::Settings;
-use insta::internals::SettingsBindDropGuard;
-use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
-use std::{
-    fmt::Write,
-    path::{Path, PathBuf},
-    process::Command,
-};
-use tempfile::TempDir;
+#[path = "../common/mod.rs"]
+pub mod common;
+
+use std::fmt::Write;
+
+use insta_cmd::assert_cmd_snapshot;
+
+use common::{CliTest, user_config_directory_env_var};
 
 #[test]
 fn test_quiet_output() -> anyhow::Result<()> {
@@ -768,6 +768,248 @@ fn github_diagnostics() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn sarif_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            division-by-zero = "warn"
+            unused-ignore-comment = "error"
+
+            [[overrides]]
+            include = ["a.py"]
+
+            [overrides.rules]
+            unresolved-reference = "warn"
+            "#,
+        ),
+        ("a.py", "print(x)"),
+        (
+            "b.py",
+            r#"
+            print(x)
+            1 / 0  # ty: ignore[unresolved-reference]
+            "#,
+        ),
+    ])?
+    .with_filter(
+        r#"("fullDescription": \{\s*"text": ")[^\n]*(")"#,
+        "$1[DESCRIPTION]$2",
+    )
+    .with_filter(r#"(?m)^(\s{10}"version": ")[^"]+"#, "$1[VERSION]")
+    .with_filter(r#"file://[^"]*/project/"#, "file://<temp_dir>/");
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=sarif"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    {
+      "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+      "runs": [
+        {
+          "results": [
+            {
+              "level": "warning",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/a.py"
+                    },
+                    "region": {
+                      "endColumn": 8,
+                      "endLine": 1,
+                      "startColumn": 7,
+                      "startLine": 1
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Name `x` used when not defined"
+              },
+              "ruleId": "unresolved-reference"
+            },
+            {
+              "level": "error",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/b.py"
+                    },
+                    "region": {
+                      "endColumn": 8,
+                      "endLine": 2,
+                      "startColumn": 7,
+                      "startLine": 2
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Name `x` used when not defined"
+              },
+              "ruleId": "unresolved-reference"
+            },
+            {
+              "level": "warning",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/b.py"
+                    },
+                    "region": {
+                      "endColumn": 6,
+                      "endLine": 3,
+                      "startColumn": 1,
+                      "startLine": 3
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Cannot divide object of type `Literal[1]` by zero"
+              },
+              "ruleId": "division-by-zero"
+            },
+            {
+              "fixes": [
+                {
+                  "artifactChanges": [
+                    {
+                      "artifactLocation": {
+                        "uri": "file://<temp_dir>/b.py"
+                      },
+                      "replacements": [
+                        {
+                          "deletedRegion": {
+                            "endColumn": 42,
+                            "endLine": 3,
+                            "startColumn": 6,
+                            "startLine": 3
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "description": {
+                    "text": "Remove the unused suppression comment"
+                  }
+                }
+              ],
+              "level": "error",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/b.py"
+                    },
+                    "region": {
+                      "endColumn": 42,
+                      "endLine": 3,
+                      "startColumn": 8,
+                      "startLine": 3
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Unused `ty: ignore` directive"
+              },
+              "ruleId": "unused-ignore-comment"
+            }
+          ],
+          "tool": {
+            "driver": {
+              "informationUri": "https://github.com/astral-sh/ty",
+              "name": "ty",
+              "rules": [
+                {
+                  "defaultConfiguration": {
+                    "enabled": false
+                  },
+                  "fullDescription": {
+                    "text": "[DESCRIPTION]"
+                  },
+                  "help": {
+                    "text": "detects division by zero"
+                  },
+                  "helpUri": "https://ty.dev/rules#division-by-zero",
+                  "id": "division-by-zero",
+                  "properties": {
+                    "id": "division-by-zero",
+                    "kind": null,
+                    "name": "division-by-zero",
+                    "problem.severity": "warning"
+                  },
+                  "shortDescription": {
+                    "text": "detects division by zero"
+                  }
+                },
+                {
+                  "defaultConfiguration": {
+                    "enabled": true,
+                    "level": "error"
+                  },
+                  "fullDescription": {
+                    "text": "[DESCRIPTION]"
+                  },
+                  "help": {
+                    "text": "detects references to names that are not defined"
+                  },
+                  "helpUri": "https://ty.dev/rules#unresolved-reference",
+                  "id": "unresolved-reference",
+                  "properties": {
+                    "id": "unresolved-reference",
+                    "kind": null,
+                    "name": "unresolved-reference",
+                    "problem.severity": "error"
+                  },
+                  "shortDescription": {
+                    "text": "detects references to names that are not defined"
+                  }
+                },
+                {
+                  "defaultConfiguration": {
+                    "enabled": true,
+                    "level": "warning"
+                  },
+                  "fullDescription": {
+                    "text": "[DESCRIPTION]"
+                  },
+                  "help": {
+                    "text": "detects unused `ty: ignore` comments"
+                  },
+                  "helpUri": "https://ty.dev/rules#unused-ignore-comment",
+                  "id": "unused-ignore-comment",
+                  "properties": {
+                    "id": "unused-ignore-comment",
+                    "kind": null,
+                    "name": "unused-ignore-comment",
+                    "problem.severity": "error"
+                  },
+                  "shortDescription": {
+                    "text": "detects unused `ty: ignore` comments"
+                  }
+                }
+              ],
+              "version": "[VERSION]"
+            }
+          }
+        }
+      ],
+      "version": "2.1.0"
+    }
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
 /// This tests the diagnostic format for revealed type.
 ///
 /// This test was introduced because changes were made to
@@ -832,194 +1074,4 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
     ");
 
     Ok(())
-}
-
-pub(crate) struct CliTest {
-    _temp_dir: TempDir,
-    settings: Settings,
-    settings_scope: Option<SettingsBindDropGuard>,
-    project_dir: PathBuf,
-    ty_binary_path: PathBuf,
-}
-
-impl CliTest {
-    pub(crate) fn new() -> anyhow::Result<Self> {
-        let temp_dir = TempDir::new()?;
-
-        // Canonicalize the tempdir path because macos uses symlinks for tempdirs
-        // and that doesn't play well with our snapshot filtering.
-        // Simplify with dunce because otherwise we get UNC paths on Windows.
-        let temp_dir_path = dunce::simplified(
-            &temp_dir
-                .path()
-                .canonicalize()
-                .context("Failed to canonicalize temporary directory path")?,
-        )
-        .to_path_buf();
-        let project_dir = temp_dir_path.join("project");
-        std::fs::create_dir_all(&project_dir)
-            .with_context(|| format!("Failed to create directory `{}`", project_dir.display()))?;
-
-        let mut settings = insta::Settings::clone_current();
-        settings.add_filter(&tempdir_filter(&project_dir), "<temp_dir>/");
-        settings.add_filter(r"\bty\.exe\b", "ty");
-        settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
-        // 0.003s
-        settings.add_filter(r"\d.\d\d\ds", "0.000s");
-        settings.add_filter(
-            "INFO Checking file `[^`]+` took more than 100ms \\([^)]+\\)\n",
-            "",
-        );
-        settings.add_filter("INFO Defaulting to python-platform `[^`]+`\n", "");
-        settings.add_filter("INFO Python version: [^,]+, platform: [a-z0-9_]+\n", "");
-        settings.add_filter(
-            r#"The system cannot find the file specified."#,
-            "No such file or directory",
-        );
-
-        let settings_scope = settings.bind_to_scope();
-
-        Ok(Self {
-            project_dir,
-            _temp_dir: temp_dir,
-            settings,
-            settings_scope: Some(settings_scope),
-            ty_binary_path: get_cargo_bin("ty"),
-        })
-    }
-
-    pub(crate) fn with_files<'a>(
-        files: impl IntoIterator<Item = (&'a str, &'a str)>,
-    ) -> anyhow::Result<Self> {
-        let case = Self::new()?;
-        case.write_files(files)?;
-        Ok(case)
-    }
-
-    pub(crate) fn with_file(path: impl AsRef<Path>, content: &str) -> anyhow::Result<Self> {
-        let case = Self::new()?;
-        case.write_file(path, content)?;
-        Ok(case)
-    }
-
-    pub(crate) fn write_files<'a>(
-        &self,
-        files: impl IntoIterator<Item = (&'a str, &'a str)>,
-    ) -> anyhow::Result<()> {
-        for (path, content) in files {
-            self.write_file(path, content)?;
-        }
-
-        Ok(())
-    }
-
-    /// Return [`Self`] with the ty binary copied to the specified path instead.
-    pub(crate) fn with_ty_at(mut self, dest_path: impl AsRef<Path>) -> anyhow::Result<Self> {
-        let dest_path = dest_path.as_ref();
-        let dest_path = self.project_dir.join(dest_path);
-
-        Self::ensure_parent_directory(&dest_path)?;
-        std::fs::copy(&self.ty_binary_path, &dest_path)
-            .with_context(|| format!("Failed to copy ty binary to `{}`", dest_path.display()))?;
-
-        self.ty_binary_path = dest_path;
-        Ok(self)
-    }
-
-    /// Add a filter to the settings and rebind them.
-    pub(crate) fn with_filter(mut self, pattern: &str, replacement: &str) -> Self {
-        self.settings.add_filter(pattern, replacement);
-        // Drop the old scope before binding a new one, otherwise the old scope is dropped _after_
-        // binding and assigning the new one, restoring the settings to their state before the old
-        // scope was bound.
-        drop(self.settings_scope.take());
-        self.settings_scope = Some(self.settings.bind_to_scope());
-        self
-    }
-
-    fn ensure_parent_directory(path: &Path) -> anyhow::Result<()> {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create directory `{}`", parent.display()))?;
-        }
-        Ok(())
-    }
-
-    pub(crate) fn write_file(&self, path: impl AsRef<Path>, content: &str) -> anyhow::Result<()> {
-        let path = path.as_ref();
-        let path = self.project_dir.join(path);
-
-        Self::ensure_parent_directory(&path)?;
-
-        std::fs::write(&path, &*ruff_python_trivia::textwrap::dedent(content))
-            .with_context(|| format!("Failed to write file `{path}`", path = path.display()))?;
-
-        Ok(())
-    }
-
-    #[cfg(unix)]
-    pub(crate) fn write_symlink(
-        &self,
-        original: impl AsRef<Path>,
-        link: impl AsRef<Path>,
-    ) -> anyhow::Result<()> {
-        let link = link.as_ref();
-        let link = self.project_dir.join(link);
-
-        let original = original.as_ref();
-        let original = self.project_dir.join(original);
-
-        Self::ensure_parent_directory(&link)?;
-
-        std::os::unix::fs::symlink(original, &link)
-            .with_context(|| format!("Failed to write symlink `{link}`", link = link.display()))?;
-
-        Ok(())
-    }
-
-    pub(crate) fn root(&self) -> &Path {
-        &self.project_dir
-    }
-
-    pub(crate) fn command(&self) -> Command {
-        let mut command = Command::new(&self.ty_binary_path);
-        command.current_dir(&self.project_dir).arg("check");
-
-        // Unset all environment variables because they can affect test behavior.
-        command.env_clear();
-        // Point user config discovery at a test-local directory to avoid picking up host config.
-        command.env(
-            user_config_directory_env_var(),
-            self.user_config_directory(),
-        );
-
-        command
-    }
-
-    fn user_config_directory(&self) -> PathBuf {
-        self.project_dir
-            .parent()
-            .expect("project directory always has a parent")
-            .join("home/.config")
-    }
-}
-
-fn tempdir_filter(path: &Path) -> String {
-    format!(r"{}\\?/?", regex::escape(path.to_str().unwrap()))
-}
-
-fn site_packages_filter(python_version: &str) -> String {
-    if cfg!(windows) {
-        "Lib/site-packages".to_string()
-    } else {
-        format!("lib/python{}/site-packages", regex::escape(python_version))
-    }
-}
-
-fn user_config_directory_env_var() -> &'static str {
-    if cfg!(windows) {
-        "APPDATA"
-    } else {
-        "XDG_CONFIG_HOME"
-    }
 }

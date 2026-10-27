@@ -45,7 +45,7 @@
 
 use crate::ProgramEnvironment;
 use itertools::Either;
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
@@ -54,28 +54,132 @@ use salsa::plumbing::AsId;
 use std::borrow::Cow;
 pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 
+use crate::types::context::InferContextResult;
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
+    ClassLiteral, KnownClass, RecursiveType, StaticClassLiteral, Type, TypeAndQualifiers,
+    TypeQualifiers,
 };
 use crate::{Db, FxIndexSet};
 
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_core::expression::Expression;
+use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::statement::StatementInner;
 use ty_python_core::unpack::Unpack;
-use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, semantic_index};
+use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, semantic_index};
 
 mod builder;
+mod legacy_type_alias;
+use legacy_type_alias::legacy_type_alias_definition;
+pub(super) use legacy_type_alias::legacy_type_alias_parameters;
 mod comparisons;
+mod expression_truthiness;
+pub(crate) use expression_truthiness::TruthinessAnalyzer;
 #[cfg(test)]
 mod tests;
+
+/// The inferred alias type, or a cycle error retaining a type for recovery.
+pub(super) type LegacyTypeAliasResult<'db> = Result<Type<'db>, CyclicTypeAliasError<'db>>;
+
+/// An alias that reaches itself through aliases and unions without a containing type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct CyclicTypeAliasError<'db> {
+    /// The type available for recovery. Normalizing this type does not make the alias valid.
+    fallback_type: Type<'db>,
+}
+
+/// Infer the type denoted by a legacy type alias independently of its runtime value.
+///
+/// The generic parameters are part of the query key and are used by Salsa's cycle callbacks.
+/// `cycle_initial` uses them to construct `μa. a` with an identity specialization (for example,
+/// `T -> T`) on both the recursive type and its self-reference. This lets recursive uses such as
+/// `Alias[int]` or `Alias[list[T]]` specialize
+/// the provisional type before inference of the alias's body is complete. `cycle_fn` then binds
+/// self-references in the inferred result through [`RecursiveType::recover`].
+///
+/// For generic aliases, the caller applies explicit type arguments or the default specialization.
+/// If inference does not encounter a cycle, the result need not contain a structural recursive type.
+/// Validation examines the inferred constructor before recovery, so diagnostics do not depend on
+/// which recursive references remain in the recovered type.
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|db, id, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
+        LegacyTypeAliasInference {
+            ty: Ok(Type::Recursive(RecursiveType::initial(db, definition, id, parameters))),
+            context: InferContextResult::default(),
+            legacy_aliases: Box::default(),
+        }
+    },
+    cycle_fn=|db, cycle: &salsa::Cycle, _: &LegacyTypeAliasInference<'db>, mut result: LegacyTypeAliasInference<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
+        let recover = |ty| RecursiveType::recover(db, definition, cycle.id(), parameters, ty);
+        result.ty = result.ty.map(recover).map_err(|error| CyclicTypeAliasError {
+            fallback_type: recover(error.fallback_type),
+        });
+        result
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(super) fn infer_legacy_type_alias<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    _parameters: Option<crate::types::GenericContext<'db>>,
+) -> LegacyTypeAliasInference<'db> {
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let Some(value) = definition.kind(db).value(&module) else {
+        return LegacyTypeAliasInference {
+            ty: Ok(Type::unknown()),
+            context: InferContextResult::default(),
+            legacy_aliases: Box::default(),
+        };
+    };
+    let env = ProgramEnvironment::from_file(program_file);
+    TypeInferenceBuilder::for_definition(db, &env, definition, &module)
+        .finish_legacy_type_alias(definition, value)
+}
+
+/// The type and diagnostics inferred from an alias's right-hand side.
+///
+/// An alias's own diagnostics are kept separate from those of aliases it references. File
+/// checking collects each referenced alias once, so recursive aliases cannot accumulate each
+/// other's diagnostics during fixed-point iteration.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct LegacyTypeAliasInference<'db> {
+    pub(super) ty: LegacyTypeAliasResult<'db>,
+    pub(super) context: InferContextResult,
+    pub(super) legacy_aliases: Box<[Definition<'db>]>,
+}
+
+/// Explain why an ordinary assignment's right-hand side is not a valid type expression.
+///
+/// These diagnostics are attached to errors at references to the value. They are inferred
+/// separately so unchecked dependencies and local suppressions do not hide the explanation.
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|_, _, _| TypeCheckDiagnostics::default(),
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(super) fn non_alias_type_expression_diagnostics<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> TypeCheckDiagnostics {
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let Some(value) = definition.kind(db).value(&module) else {
+        return TypeCheckDiagnostics::default();
+    };
+    let env = ProgramEnvironment::from_file(program_file);
+    TypeInferenceBuilder::for_definition(db, &env, definition, &module)
+        .finish_non_alias_type_expression_diagnostics(definition, value)
+}
 
 bitflags::bitflags! {
     /// Metadata for expressions inferred as type expressions.
@@ -86,6 +190,9 @@ bitflags::bitflags! {
 
         /// The operand of an `Unpack[...]` expression is neither a tuple nor a `TypeVarTuple`.
         const INVALID_UNPACK = 1 << 1;
+
+        /// The expression refers to a `TypeVarTuple` without unpacking it.
+        const INVALID_BARE_TYPE_VAR_TUPLE = 1 << 2;
     }
 }
 
@@ -119,6 +226,28 @@ fn extend_collection_use_constraints<'db>(
     }
 }
 
+/// Normalizes recursive collection constraints so that each cycle iteration cannot add another
+/// layer of nesting. These constraints feed back into the collection's initializer, so they need
+/// the same normalization as expression and binding types before the next iteration uses them.
+fn normalize_collection_use_constraints<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    constraints: &mut CollectionUseConstraints<'db>,
+    cycle: &salsa::Cycle,
+) {
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "constraints for distinct collection definitions are normalized independently"
+    )]
+    for types in constraints.values_mut() {
+        *types = std::mem::take(types)
+            .into_iter()
+            .map(|ty| ty.recursive_type_normalized(db, env, cycle))
+            .collect();
+        types.shrink_to_fit();
+    }
+}
+
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a place use or public type of a place.
 #[salsa::tracked(
@@ -145,20 +274,9 @@ pub(crate) fn infer_definition_types<'db>(
     )
     .entered();
 
-    let index = semantic_index(db, program_file);
-
     let env = ProgramEnvironment::from_file(program_file);
-
-    TypeInferenceBuilder::new(
-        db,
-        &env,
-        InferenceRegion::Definition(definition),
-        python_file.file(db),
-        program_file,
-        index,
-        &module,
-    )
-    .finish_definition(definition)
+    TypeInferenceBuilder::for_definition(db, &env, definition, &module)
+        .finish_definition(definition)
 }
 
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.
@@ -190,7 +308,10 @@ pub(crate) fn is_discarded_dict_key_assignment<'db>(
 /// `@staticmethod`).
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, _, _| FunctionDecoratorInference::default(),
+    cycle_initial=|_, _, _| FunctionDecoratorInference {
+        may_produce_abstract_method: true,
+        ..FunctionDecoratorInference::default()
+    },
     heap_size=ruff_memory_usage::heap_size
 )]
 pub(crate) fn function_known_decorators<'db>(
@@ -233,8 +354,12 @@ pub(crate) struct FunctionDecoratorInference<'db> {
     expression_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
     called_functions: Box<[FunctionType<'db>]>,
+    legacy_aliases: Box<[Definition<'db>]>,
     known_decorators: FunctionDecorators,
-    diagnostics: TypeCheckDiagnostics,
+    /// Whether a decorator could produce an explicitly abstract method, or decorator
+    /// inference is incomplete.
+    may_produce_abstract_method: bool,
+    context: InferContextResult,
 }
 
 impl<'db> FunctionDecoratorInference<'db> {
@@ -259,12 +384,20 @@ impl<'db> FunctionDecoratorInference<'db> {
         &self.called_functions
     }
 
+    fn legacy_aliases(&self) -> &[Definition<'db>] {
+        &self.legacy_aliases
+    }
+
     fn known_decorators(&self) -> FunctionDecorators {
         self.known_decorators
     }
 
-    fn diagnostics(&self) -> &TypeCheckDiagnostics {
-        &self.diagnostics
+    pub(super) fn may_produce_abstract_method(&self) -> bool {
+        self.may_produce_abstract_method
+    }
+
+    fn context_result(&self) -> &InferContextResult {
+        &self.context
     }
 }
 
@@ -272,6 +405,7 @@ impl<'db> FunctionDecoratorInference<'db> {
 ///
 /// Deferred expressions are type expressions (annotations, base classes, aliases...) in a stub
 /// file, or in a file with `from __future__ import annotations`, or stringified annotations.
+/// Function parameter defaults are inferred separately by [`infer_function_default_types`].
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
@@ -305,6 +439,43 @@ pub(crate) fn infer_deferred_types<'db>(
         db,
         &env,
         InferenceRegion::Deferred(definition),
+        python_file.file(db),
+        program_file,
+        index,
+        &module,
+    )
+    .finish_definition(definition)
+}
+
+/// Infer a function's parameter defaults without retaining its annotation types.
+///
+/// Callable signature checking only needs to know which parameters are optional. Inferring their
+/// default values while inferring annotations can re-enter the decorated function's own signature.
+/// Keeping the results separate also avoids caching annotation expressions twice.
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|db, id, definition: Definition<'db>| {
+        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+    },
+    cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
+        inference.cycle_normalized(db, previous, cycle, definition)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(crate) fn infer_function_default_types<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> DefinitionInference<'db> {
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let index = semantic_index(db, program_file);
+    let env = ProgramEnvironment::from_file(program_file);
+
+    TypeInferenceBuilder::new(
+        db,
+        &env,
+        InferenceRegion::FunctionDefaults(definition),
         python_file.file(db),
         program_file,
         index,
@@ -407,13 +578,43 @@ pub(crate) fn infer_expression_types<'db>(
     infer_expression_types_impl(db, InferExpression::new(db, expression, tcx))
 }
 
+/// A loop predicate can depend on bindings it guards in the previous iteration.
+/// Reading inference directly keeps the extra truthiness query out of that cycle.
+pub(crate) fn infer_predicate_truthiness<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+) -> Truthiness {
+    if matches!(
+        expression.kind(db),
+        ExpressionKind::Predicate { in_loop: true, .. }
+    ) {
+        recorded_predicate_truthiness(db, expression)
+    } else {
+        cached_predicate_truthiness(db, expression)
+    }
+}
+
+/// Keep reachability queries cached when an operand's type changes but its truthiness stays the same.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _| Truthiness::Ambiguous,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn cached_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+    recorded_predicate_truthiness(db, expression)
+}
+
+fn recorded_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+    infer_expression_types_impl(db, InferExpression::Bare(expression)).predicate_truthiness
+}
+
 #[salsa::tracked(
     returns(ref),
     cycle_initial=expression_cycle_initial,
     cycle_fn=|db, cycle, previous: &ExpressionInference<'db>, inference: ExpressionInference<'db>, input: InferExpression<'db>| {
         let (expression, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(expression.scope(db));
-        inference.cycle_normalized(db, &env, previous, cycle)
+        inference.cycle_normalized(db, &env, previous, cycle, input)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -438,7 +639,7 @@ pub(super) fn infer_expression_types_impl<'db>(
 
     let env = ProgramEnvironment::from_file(program_file);
 
-    TypeInferenceBuilder::new(
+    let mut inference = TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Expression(expression, tcx),
@@ -447,7 +648,9 @@ pub(super) fn infer_expression_types_impl<'db>(
         index,
         &module,
     )
-    .finish_expression()
+    .finish_expression();
+    inference.record_predicate_truthiness(db, &env, input, Some(module));
+    inference
 }
 
 fn expression_cycle_initial<'db>(
@@ -647,7 +850,23 @@ impl<'db> InferScope<'db> {
     }
 }
 
-/// The type context for a given expression, namely the type annotation
+/// The kind of type context constraint being provided.
+#[derive(
+    Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue,
+)]
+enum TypeContextKind {
+    /// A direct declared type annotation.
+    #[default]
+    Declared,
+
+    /// The declared upper bound of a type variable.
+    ///
+    /// Note that unlike a declared type, the upper bound of a type variable acts only as a validity
+    /// constraint, and does not provide a preferred specialization during generic call inference.
+    Validity,
+}
+
+/// The type context for a given expression, e.g., the type annotation
 /// in an annotated assignment.
 ///
 /// Knowing the outer type context when inferring an expression can enable
@@ -657,11 +876,26 @@ impl<'db> InferScope<'db> {
 )]
 pub(crate) struct TypeContext<'db> {
     pub(crate) annotation: Option<Type<'db>>,
+    kind: TypeContextKind,
 }
 
 impl<'db> TypeContext<'db> {
-    pub(crate) fn new(annotation: Option<Type<'db>>) -> Self {
-        Self { annotation }
+    pub(crate) fn declared(annotation: Option<Type<'db>>) -> Self {
+        Self {
+            annotation,
+            kind: TypeContextKind::Declared,
+        }
+    }
+
+    pub(crate) fn validity(annotation: Type<'db>) -> Self {
+        Self {
+            annotation: Some(annotation),
+            kind: TypeContextKind::Validity,
+        }
+    }
+
+    pub(crate) fn is_declared(self) -> bool {
+        matches!(self.kind, TypeContextKind::Declared)
     }
 
     /// If the type annotation is a specialized instance of the given `KnownClass`, returns the
@@ -677,9 +911,11 @@ impl<'db> TypeContext<'db> {
     }
 
     fn map(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
-        Self {
-            annotation: self.annotation.map(f),
-        }
+        self.with_annotation(self.annotation.map(f))
+    }
+
+    pub(crate) fn with_annotation(self, annotation: Option<Type<'db>>) -> Self {
+        Self { annotation, ..self }
     }
 
     fn is_typealias(&self) -> bool {
@@ -715,7 +951,7 @@ impl<'db> TypeContext<'db> {
 
 impl<'db> From<Type<'db>> for TypeContext<'db> {
     fn from(annotation: Type<'db>) -> Self {
-        Self::new(Some(annotation))
+        Self::declared(Some(annotation))
     }
 }
 
@@ -832,6 +1068,8 @@ pub(crate) enum InferenceRegion<'db> {
     Definition(Definition<'db>),
     /// infer types for the decorators on a function [`Definition`]
     FunctionDecorators(Definition<'db>),
+    /// Infer a function's parameter default values, but not its annotations.
+    FunctionDefaults(Definition<'db>),
     /// infer deferred types for a [`Definition`]
     Deferred(Definition<'db>),
     /// infer types for an entire [`ScopeId`]
@@ -845,6 +1083,7 @@ impl<'db> InferenceRegion<'db> {
             InferenceRegion::Expression(expression, _) => expression.scope(db),
             InferenceRegion::Definition(definition)
             | InferenceRegion::FunctionDecorators(definition)
+            | InferenceRegion::FunctionDefaults(definition)
             | InferenceRegion::Deferred(definition) => definition.scope(db),
             InferenceRegion::Scope(scope, _) => scope,
         }
@@ -863,6 +1102,9 @@ pub(crate) struct ScopeInference<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ScopeInferenceExtra<'db> {
+    /// Aliases whose type-expression diagnostics are needed by this region.
+    legacy_aliases: Box<[Definition<'db>]>,
+
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -881,8 +1123,13 @@ struct ScopeInferenceExtra<'db> {
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
-    /// The diagnostics for this region.
-    diagnostics: TypeCheckDiagnostics,
+    /// Diagnostics and semantic validity for this region.
+    context: InferContextResult,
+
+    /// For function bodies, this type represents the inferred return type, a union of all types inferred
+    /// for the expressions in reachable `return` statements, and possibly `None` if control flow can
+    /// reach the end of the function. This type is `Never` if the function cannot return.
+    return_type: Option<Type<'db>>,
 }
 
 impl<'db> ScopeInference<'db> {
@@ -890,6 +1137,7 @@ impl<'db> ScopeInference<'db> {
         Self {
             extra: Some(Box::new(ScopeInferenceExtra {
                 cycle_recovery: Some(cycle_recovery),
+                return_type: Some(cycle_recovery),
                 ..ScopeInferenceExtra::default()
             })),
             expressions: FrozenValueMap::default(),
@@ -918,11 +1166,39 @@ impl<'db> ScopeInference<'db> {
             );
         }
 
+        if let Some(extra) = self.extra.as_deref_mut() {
+            if let Some(return_type) = &mut extra.return_type {
+                *return_type =
+                    return_type.cycle_normalized(db, env, previous_inference.return_type(), cycle);
+            }
+            normalize_collection_use_constraints(
+                db,
+                env,
+                &mut extra.collection_use_constraints,
+                cycle,
+            );
+        }
+
         self
     }
 
+    pub(super) fn return_type(&self) -> Type<'db> {
+        self.extra
+            .as_deref()
+            .and_then(|extra| extra.return_type)
+            .unwrap_or_else(Type::unknown)
+    }
+
     pub(crate) fn diagnostics(&self) -> Option<&TypeCheckDiagnostics> {
-        self.extra.as_deref().map(|extra| &extra.diagnostics)
+        self.extra
+            .as_deref()
+            .map(|extra| &extra.context.diagnostics)
+    }
+
+    pub(crate) fn legacy_aliases(&self) -> &[Definition<'db>] {
+        self.extra
+            .as_deref()
+            .map_or(&[], |extra| &extra.legacy_aliases)
     }
 
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
@@ -1220,18 +1496,6 @@ impl<'db> DefinitionTypes<'db> {
             Self::Empty | Self::Binding(..) => Either::Right([].iter().copied()),
         }
     }
-
-    fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> + '_ {
-        match self {
-            Self::Declaration(declaration) | Self::BindingAndDeclaration(declaration) => {
-                Either::Left(Either::Left(std::iter::once(*declaration)))
-            }
-            Self::Other(other) => {
-                Either::Left(Either::Right(other.declarations.iter().map(|(_, ty)| *ty)))
-            }
-            Self::Empty | Self::Binding(..) => Either::Right(std::iter::empty()),
-        }
-    }
 }
 
 /// Compact representations for common combinations of extra definition inference data.
@@ -1244,7 +1508,10 @@ enum DefinitionInferenceExtra<'db> {
     /// Deferred definitions are the only extra data for most definitions with annotations.
     Deferred(Box<[Definition<'db>]>),
 
-    Diagnostics(Box<TypeCheckDiagnostics>),
+    Context(Box<InferContextResult>),
+
+    /// Invalid type form with no emitted diagnostics or used suppressions.
+    InvalidTypeForm,
 
     Undecorated(Box<Type<'db>>),
 
@@ -1270,6 +1537,13 @@ struct DeferredAndUndecorated<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct OtherDefinitionInferenceExtra<'db> {
+    /// Aliases whose type-expression diagnostics are needed by this region.
+    legacy_aliases: Box<[Definition<'db>]>,
+
+    /// Condition truthiness retained for checks of enclosing conditions containing walrus expressions.
+    /// See [`ExpressionInferenceExtra::comparison_truthiness`] for the distinction from value types.
+    comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
+
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -1291,11 +1565,14 @@ struct OtherDefinitionInferenceExtra<'db> {
     /// The definitions that have some deferred parts.
     deferred: Box<[Definition<'db>]>,
 
-    /// The diagnostics for this region.
-    diagnostics: TypeCheckDiagnostics,
+    /// Diagnostics and semantic validity for this region.
+    context: InferContextResult,
 
     /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
+
+    /// Input types for decorator applications that need validation after inference.
+    deferred_decorator_calls: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// Whether synthesized dictionary-key assignments derived from the right-hand side should be
     /// discarded.
@@ -1317,8 +1594,15 @@ impl<'db> DefinitionInferenceExtra<'db> {
                 deferred,
                 ..OtherDefinitionInferenceExtra::default()
             },
-            Self::Diagnostics(diagnostics) => OtherDefinitionInferenceExtra {
-                diagnostics: *diagnostics,
+            Self::Context(context) => OtherDefinitionInferenceExtra {
+                context: *context,
+                ..OtherDefinitionInferenceExtra::default()
+            },
+            Self::InvalidTypeForm => OtherDefinitionInferenceExtra {
+                context: InferContextResult {
+                    has_invalid_type_form: true,
+                    ..InferContextResult::default()
+                },
                 ..OtherDefinitionInferenceExtra::default()
             },
             Self::Undecorated(undecorated_type) => OtherDefinitionInferenceExtra {
@@ -1362,6 +1646,13 @@ impl<'db> DefinitionInferenceExtra<'db> {
             _ => None,
         }
     }
+
+    fn comparison_truthiness(&self) -> Option<&FrozenMap<ExpressionNodeKey, Truthiness>> {
+        match self {
+            Self::Other(extra) => Some(&extra.comparison_truthiness),
+            _ => None,
+        }
+    }
 }
 
 impl<'db> DefinitionInference<'db> {
@@ -1397,6 +1688,39 @@ impl<'db> DefinitionInference<'db> {
                         DefinitionTypes::Binding(Type::instance(db, &env, divergent_collection));
                 }
             }
+        } else if let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) {
+            let program_file = definition.program_file(db);
+            let python_file = program_file.python_file(db);
+            let module = parsed_module(db, python_file).load(db);
+            let index = semantic_index(db, program_file);
+
+            if assignment.value(&module).is_none()
+                && index
+                    .use_def_map(definition.file_scope(db))
+                    .bindings_at_definition(definition)
+                    .any(|binding| {
+                        binding
+                            .binding
+                            .is_defined_and(|binding| binding.kind(db).is_loop_header())
+                    })
+            {
+                // Loop-carried assignments need this annotation as context before validating
+                // the declaration can infer their binding types.
+                return TypeInferenceBuilder::new(
+                    db,
+                    &env,
+                    InferenceRegion::Definition(definition),
+                    python_file.file(db),
+                    program_file,
+                    index,
+                    &module,
+                )
+                .infer_annotated_assignment_cycle_initial(
+                    definition,
+                    assignment,
+                    cycle_recovery,
+                );
+            }
         }
 
         Self {
@@ -1421,6 +1745,10 @@ impl<'db> DefinitionInference<'db> {
         definition: Definition<'db>,
     ) -> DefinitionInference<'db> {
         let env = ProgramEnvironment::from_definition(definition);
+        if cycle.iteration() > crate::TAINTED_CYCLES {
+            self.widen_comparison_truthiness(db, &env, previous_inference);
+        }
+
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, &env, previous_ty, cycle);
@@ -1432,6 +1760,18 @@ impl<'db> DefinitionInference<'db> {
             cycle,
             definition,
         );
+
+        if let Some(DefinitionInferenceExtra::Other(extra)) = self.extra.as_deref_mut() {
+            for (expression, ty) in &mut extra.deferred_decorator_calls {
+                *ty = if let Some(previous_ty) =
+                    previous_inference.deferred_decorator_input_type(*expression)
+                {
+                    ty.cycle_normalized(db, &env, previous_ty, cycle)
+                } else {
+                    ty.recursive_type_normalized(db, &env, cycle)
+                };
+            }
+        }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
             && let Some(previous_constraints) = previous_inference
@@ -1453,7 +1793,45 @@ impl<'db> DefinitionInference<'db> {
             self.extra = Some(Box::new(DefinitionInferenceExtra::Other(Box::new(extra))));
         }
 
+        if let Some(DefinitionInferenceExtra::Other(extra)) = self.extra.as_deref_mut() {
+            normalize_collection_use_constraints(
+                db,
+                &env,
+                &mut extra.collection_use_constraints,
+                cycle,
+            );
+        }
+
         self
+    }
+
+    fn widen_comparison_truthiness(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: &Self,
+    ) {
+        let comparison_truthiness = widen_comparison_truthiness(
+            self.extra
+                .as_deref()
+                .and_then(DefinitionInferenceExtra::comparison_truthiness),
+            previous
+                .extra
+                .as_deref()
+                .and_then(DefinitionInferenceExtra::comparison_truthiness),
+            |expression| self.expression_type(expression).bool(db, env),
+            |expression| previous.expression_type(expression).bool(db, env),
+        );
+        if comparison_truthiness.iter().next().is_some() {
+            let mut extra = self
+                .extra
+                .take()
+                .map_or_else(OtherDefinitionInferenceExtra::default, |extra| {
+                    extra.into_other()
+                });
+            extra.comparison_truthiness = comparison_truthiness;
+            self.extra = Some(Box::new(DefinitionInferenceExtra::Other(Box::new(extra))));
+        }
     }
 
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
@@ -1559,10 +1937,6 @@ impl<'db> DefinitionInference<'db> {
         self.types.declarations(owner)
     }
 
-    fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> {
-        self.types.declaration_types()
-    }
-
     fn fallback_type(&self) -> Option<Type<'db>> {
         match self.extra.as_deref() {
             Some(DefinitionInferenceExtra::Other(extra)) => extra.cycle_recovery,
@@ -1570,7 +1944,7 @@ impl<'db> DefinitionInference<'db> {
         }
     }
 
-    fn discards_dict_key_assignments(&self) -> bool {
+    pub(crate) fn discards_dict_key_assignments(&self) -> bool {
         match self.extra.as_deref() {
             Some(DefinitionInferenceExtra::DiscardsDictKeyAssignments) => true,
             Some(DefinitionInferenceExtra::Other(extra)) => extra.discards_dict_key_assignments,
@@ -1591,6 +1965,19 @@ impl<'db> DefinitionInference<'db> {
         }
     }
 
+    fn deferred_decorator_input_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
+        match self.extra.as_deref() {
+            Some(DefinitionInferenceExtra::Other(extra)) => extra
+                .deferred_decorator_calls
+                .get(&expression.into())
+                .copied(),
+            Some(_) | None => None,
+        }
+    }
+
     pub(crate) fn function_type(&self, definition: Definition<'db>) -> Option<FunctionType<'db>> {
         let ty = if let Some(undecorated) = self.undecorated_type() {
             undecorated
@@ -1604,11 +1991,44 @@ impl<'db> DefinitionInference<'db> {
     }
 }
 
+/// Widen comparison truthiness for expression, statement, and definition regions using the same rules.
+///
+/// Sparse overrides can appear or disappear as operand types change. Compare the effective
+/// truthiness in both iterations, including previous-only overrides, so widening cannot make
+/// a condition alternate between definite outcomes. The fallbacks use each iteration's value
+/// types before those types are themselves widened.
+fn widen_comparison_truthiness(
+    current: Option<&FrozenMap<ExpressionNodeKey, Truthiness>>,
+    previous: Option<&FrozenMap<ExpressionNodeKey, Truthiness>>,
+    current_fallback: impl Fn(ExpressionNodeKey) -> Truthiness,
+    previous_fallback: impl Fn(ExpressionNodeKey) -> Truthiness,
+) -> FrozenMap<ExpressionNodeKey, Truthiness> {
+    current
+        .into_iter()
+        .chain(previous)
+        .flatten()
+        .map(|(expression, _)| {
+            let truthiness = current
+                .and_then(|overrides| overrides.get(expression))
+                .copied()
+                .unwrap_or_else(|| current_fallback(*expression));
+            let previous_truthiness = previous
+                .and_then(|overrides| overrides.get(expression))
+                .copied()
+                .unwrap_or_else(|| previous_fallback(*expression));
+            (*expression, truthiness.union(previous_truthiness))
+        })
+        .collect()
+}
+
 /// The inferred types for an expression region.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ExpressionInference<'db> {
     /// The types of every expression in this region.
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
+
+    /// The predicate's possible outcomes in its evaluation context.
+    predicate_truthiness: Truthiness,
 
     extra: Option<Box<ExpressionInferenceExtra<'db>>>,
 
@@ -1620,6 +2040,9 @@ pub(crate) struct ExpressionInference<'db> {
 /// Extra data that only exists for few inferred expression regions.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ExpressionInferenceExtra<'db> {
+    /// Aliases whose type-expression diagnostics are needed by this region.
+    legacy_aliases: Box<[Definition<'db>]>,
+
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -1629,6 +2052,33 @@ struct ExpressionInferenceExtra<'db> {
     /// Metadata for type expressions in this region.
     type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
+    /// A comparison chain's truthiness when evaluated directly as a condition.
+    ///
+    /// Expression types describe the objects produced by evaluation, which is not always enough
+    /// to determine a condition's outcome. If `x < 1` returns an object with mutable truthiness,
+    /// `saved = x < 1 < 0` can store that object after it tests falsy; `if saved:` can then test it
+    /// again and get `True`. In contrast, `if x < 1 < 0:` cannot enter its body: either the first
+    /// comparison tests falsy or the final comparison `1 < 0` does. Its condition truthiness is
+    /// `AlwaysFalse`, but its value type must still include objects returned by the first comparison.
+    ///
+    /// The same distinction matters for `and`/`or`, but their operands have separate expression
+    /// nodes with inferred types. [`TruthinessAnalyzer`] can reconstruct their condition
+    /// truthiness by recursively visiting those operands, without relying on the compound
+    /// expression's value type.
+    ///
+    /// A comparison chain instead has one `ExprCompare` node with the operands and operators.
+    /// In `x < 1 < 0`, neither `x < 1` nor `1 < 0` has its own expression node, so their result
+    /// types are not recorded in [`ExpressionInference::expressions`]. We retain their combined
+    /// condition truthiness here while those types are available during comparison inference.
+    /// A single comparison needs no override: there is no intermediate truthiness check.
+    ///
+    /// When an `and`/`or` condition has a comparison chain as an operand, the recursive condition
+    /// analysis uses this map for that operand.
+    ///
+    /// Inference normally stores only differences from the truthiness of the chain's value type.
+    /// Cycle recovery also retains earlier overrides to keep widening monotonic.
+    comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
+
     /// The constraints on any collection initializers that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,
 
@@ -1637,8 +2087,8 @@ struct ExpressionInferenceExtra<'db> {
     /// Only very few expression regions have bindings (around 0.1%).
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
 
-    /// The diagnostics for this region.
-    diagnostics: TypeCheckDiagnostics,
+    /// Diagnostics and semantic validity for this region.
+    context: InferContextResult,
 
     /// Functions called while inferring this expression.
     called_functions: Box<[FunctionType<'db>]>,
@@ -1648,6 +2098,31 @@ struct ExpressionInferenceExtra<'db> {
 }
 
 impl<'db> ExpressionInference<'db> {
+    /// Reachability always asks for a predicate's truthiness without an expected type.
+    fn record_predicate_truthiness(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        input: InferExpression<'db>,
+        module: Option<ParsedModuleRef>,
+    ) {
+        let InferExpression::Bare(expression) = input else {
+            return;
+        };
+        let ExpressionKind::Predicate { context, .. } = expression.kind(db) else {
+            return;
+        };
+        let module =
+            module.unwrap_or_else(|| parsed_module(db, expression.python_file(db)).load(db));
+        self.predicate_truthiness = TruthinessAnalyzer::new(
+            db,
+            env,
+            |node| self.expression_type(node),
+            |node| self.comparison_truthiness(node),
+        )
+        .truthiness(expression.node_ref(db).node(&module), context);
+    }
+
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
         Self {
@@ -1655,6 +2130,7 @@ impl<'db> ExpressionInference<'db> {
                 cycle_recovery: Some(cycle_recovery),
                 ..ExpressionInferenceExtra::default()
             })),
+            predicate_truthiness: Truthiness::Ambiguous,
             expressions: FrozenMap::default(),
             #[cfg(debug_assertions)]
             scope,
@@ -1667,6 +2143,7 @@ impl<'db> ExpressionInference<'db> {
         env: &ProgramEnvironment<'db>,
         previous: &ExpressionInference<'db>,
         cycle: &salsa::Cycle,
+        input: InferExpression<'db>,
     ) -> ExpressionInference<'db> {
         if let Some(extra) = self.extra.as_mut() {
             for (binding, binding_ty) in &mut extra.bindings {
@@ -1683,9 +2160,22 @@ impl<'db> ExpressionInference<'db> {
             }
         }
 
+        if cycle.iteration() > crate::TAINTED_CYCLES {
+            self.widen_comparison_truthiness(db, env, previous);
+        }
+
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous.expression_type(*expr);
             *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
+        }
+
+        // Normalizing the operands can change whether the predicate completes. Once the first
+        // provisional results have cleared, retain earlier outcomes so the predicate converges.
+        self.record_predicate_truthiness(db, env, input, None);
+        if cycle.iteration() > crate::TAINTED_CYCLES {
+            self.predicate_truthiness = previous
+                .predicate_truthiness
+                .union(self.predicate_truthiness);
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -1699,7 +2189,38 @@ impl<'db> ExpressionInference<'db> {
             );
         }
 
+        if let Some(extra) = self.extra.as_deref_mut() {
+            normalize_collection_use_constraints(
+                db,
+                env,
+                &mut extra.collection_use_constraints,
+                cycle,
+            );
+        }
+
         self
+    }
+
+    fn widen_comparison_truthiness(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: &Self,
+    ) {
+        let comparison_truthiness = widen_comparison_truthiness(
+            self.extra
+                .as_deref()
+                .map(|extra| &extra.comparison_truthiness),
+            previous
+                .extra
+                .as_deref()
+                .map(|extra| &extra.comparison_truthiness),
+            |expression| self.expression_type(expression).bool(db, env),
+            |expression| previous.expression_type(expression).bool(db, env),
+        );
+        if comparison_truthiness.iter().next().is_some() {
+            self.extra.get_or_insert_default().comparison_truthiness = comparison_truthiness;
+        }
     }
 
     fn try_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
@@ -1714,6 +2235,17 @@ impl<'db> ExpressionInference<'db> {
             .unwrap_or_else(Type::unknown)
     }
 
+    fn comparison_truthiness(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Truthiness> {
+        self.extra
+            .as_deref()?
+            .comparison_truthiness
+            .get(&expression.into())
+            .copied()
+    }
+
     fn collection_use_constraints(
         &self,
         collection_def: Definition<'db>,
@@ -1722,6 +2254,11 @@ impl<'db> ExpressionInference<'db> {
             .as_ref()?
             .collection_use_constraints
             .get(&collection_def)
+    }
+
+    /// Whether this result depends on provisional types from cycle recovery.
+    pub(super) fn is_provisional(&self) -> bool {
+        self.fallback_type().is_some()
     }
 
     fn fallback_type(&self) -> Option<Type<'db>> {
@@ -1789,6 +2326,13 @@ pub(crate) struct StatementInferenceInner<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct StatementInferenceInnerExtra<'db> {
+    /// Aliases whose type-expression diagnostics are needed by this region.
+    legacy_aliases: Box<[Definition<'db>]>,
+
+    /// Condition truthiness retained for checks performed by the enclosing suite.
+    /// See [`ExpressionInferenceExtra::comparison_truthiness`] for the distinction from value types.
+    comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
+
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -1813,8 +2357,8 @@ struct StatementInferenceInnerExtra<'db> {
     /// The definitions that have some deferred parts.
     deferred: Box<[Definition<'db>]>,
 
-    /// The diagnostics for this region.
-    diagnostics: TypeCheckDiagnostics,
+    /// Diagnostics and semantic validity for this region.
+    context: InferContextResult,
 
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
     /// Only populated for expressions that have non-empty qualifiers.
@@ -1845,6 +2389,10 @@ impl<'db> StatementInferenceInner<'db> {
         previous_inference: &StatementInferenceInner<'db>,
         cycle: &salsa::Cycle,
     ) -> StatementInferenceInner<'db> {
+        if cycle.iteration() > crate::TAINTED_CYCLES {
+            self.widen_comparison_truthiness(db, env, previous_inference);
+        }
+
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
@@ -1886,7 +2434,38 @@ impl<'db> StatementInferenceInner<'db> {
             );
         }
 
+        if let Some(extra) = self.extra.as_deref_mut() {
+            normalize_collection_use_constraints(
+                db,
+                env,
+                &mut extra.collection_use_constraints,
+                cycle,
+            );
+        }
+
         self
+    }
+
+    fn widen_comparison_truthiness(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: &Self,
+    ) {
+        let comparison_truthiness = widen_comparison_truthiness(
+            self.extra
+                .as_deref()
+                .map(|extra| &extra.comparison_truthiness),
+            previous
+                .extra
+                .as_deref()
+                .map(|extra| &extra.comparison_truthiness),
+            |expression| self.expression_type(expression).bool(db, env),
+            |expression| previous.expression_type(expression).bool(db, env),
+        );
+        if comparison_truthiness.iter().next().is_some() {
+            self.extra.get_or_insert_default().comparison_truthiness = comparison_truthiness;
+        }
     }
 
     fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
@@ -1958,34 +2537,31 @@ bitflags::bitflags! {
         /// Whether we are currently in a context where `Concatenate` can be legal
         const IN_VALID_CONCATENATE_CONTEXT = 1 << 6;
 
-        /// Whether we're in the first pass of inferring a PEP-613 type alias.
-        ///
-        /// During this pass, `invalid-type-form` diagnostics are suppressed;
-        /// these are emitted during the second, post-inference, pass.
-        const IN_PEP_613_ALIAS_FIRST_PASS = 1 << 7;
-
-        const IN_NO_TYPE_CHECK = 1 << 8;
+        const IN_NO_TYPE_CHECK = 1 << 7;
 
         /// Whether the visitor is currently visiting a `**kwargs` annotation.
-        const IN_KWARG_ANNOTATION = 1 << 9;
+        const IN_KWARG_ANNOTATION = 1 << 8;
 
         /// Whether we're in a context where `Unpack` can be legal.
-        const IN_VALID_UNPACK_CONTEXT = 1 << 10;
+        const IN_VALID_UNPACK_CONTEXT = 1 << 9;
 
         /// Whether to disable the `int`/`float` special case in a type expression.
-        const DISABLE_INT_FLOAT_SPECIAL_CASE = 1 << 11;
+        const DISABLE_INT_FLOAT_SPECIAL_CASE = 1 << 10;
 
         /// Whether the visitor is currently visiting a type expression.
-        const IN_TYPE_EXPRESSION = 1 << 12;
+        const IN_TYPE_EXPRESSION = 1 << 11;
 
         /// Whether the visitor is currently visiting a nested position in a type expression.
-        const IN_NESTED_TYPE_EXPRESSION = 1 << 13;
+        const IN_NESTED_TYPE_EXPRESSION = 1 << 12;
 
         /// Whether the visitor is currently visiting the argument to `Unpack[...]` or `*`.
-        const IN_UNPACK_TYPE_ARGUMENT = 1 << 14;
+        const IN_UNPACK_TYPE_ARGUMENT = 1 << 13;
 
         /// Whether the current method's explicit receiver annotation is incompatible with `Self`.
-        const HAS_INCOMPATIBLE_SELF_RECEIVER = 1 << 15;
+        const HAS_INCOMPATIBLE_SELF_RECEIVER = 1 << 14;
+
+        /// Whether the visitor is currently visiting an explicit `__init__` receiver annotation.
+        const IN_INIT_RECEIVER_ANNOTATION = 1 << 15;
     }
 }
 
@@ -2005,7 +2581,7 @@ impl InferenceFlags {
         } else if self.contains(InferenceFlags::IN_PARAMETER_ANNOTATION) {
             "parameter annotation"
         } else if self.contains(InferenceFlags::IN_TYPE_ALIAS) {
-            "type alias value"
+            "type alias definition"
         } else {
             "type expression"
         }

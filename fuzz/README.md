@@ -24,7 +24,7 @@ without it (very unlikely for the fuzzer to generate valid python code from "thi
 Once you have initialised the fuzzers, you can then execute any fuzzer with:
 
 ```bash
-cargo fuzz run -s none name_of_fuzzer -- -timeout=1
+uv run --only-dev cargo fuzz run -s none name_of_fuzzer -- -timeout=1
 ```
 
 > [!NOTE]
@@ -33,10 +33,10 @@ cargo fuzz run -s none name_of_fuzzer -- -timeout=1
 > command, as this architecture does not support fuzzing without a sanitizer.
 >
 > ```shell
-> cargo +nightly fuzz run name_of_fuzzer -- -timeout=1
+> uv run --only-dev cargo +nightly fuzz run name_of_fuzzer -- -timeout=1
 > ```
 
-You can view the names of the available fuzzers with `cargo fuzz list`.
+You can view the names of the available fuzzers with `uv run --only-dev cargo fuzz list`.
 For specific details about how each fuzzer works, please read this document in its entirety.
 
 > [!NOTE]
@@ -53,7 +53,7 @@ triggered with a smaller input.
 `cargo-fuzz` supports this out of the box with:
 
 ```bash
-cargo fuzz tmin -s none name_of_fuzzer artifacts/name_of_fuzzer/crash-...
+uv run --only-dev cargo fuzz tmin -s none name_of_fuzzer artifacts/name_of_fuzzer/crash-...
 ```
 
 From here, you will need to analyse the input and potentially the behaviour of the program.

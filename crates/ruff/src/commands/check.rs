@@ -224,8 +224,9 @@ mod test {
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
-    use ruff_db::diagnostic::{DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics};
-    use ruff_linter::message::EmitterContext;
+    use ruff_db::diagnostic::DisplayDiagnosticConfig;
+    use ruff_db::diagnostic::render::{ConciseRenderer, Renderer};
+    use ruff_linter::message::RenderContext;
     use ruff_linter::registry::Rule;
     use ruff_linter::settings::types::UnsafeFixes;
     use ruff_linter::settings::{LinterSettings, flags};
@@ -258,7 +259,7 @@ mod test {
         }
 
         // Configure
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path);
+        let snapshot = format!("{}_{}", rule_code.name(), path);
         // invalid pyproject.toml is not active by default
         let settings = Settings {
             linter: LinterSettings::for_rules(vec![rule_code, Rule::InvalidPyprojectToml]),
@@ -279,15 +280,10 @@ mod test {
         )
         .unwrap();
 
-        let config = DisplayDiagnosticConfig::new("ruff")
-            .format(DiagnosticFormat::Concise)
-            .hide_severity(true);
-        let messages = DisplayDiagnostics::new(
-            &EmitterContext::new(&FxHashMap::default()),
-            &config,
-            &diagnostics.inner,
-        )
-        .to_string();
+        let config = DisplayDiagnosticConfig::new("ruff").hide_severity(true);
+        let messages = ConciseRenderer::new(&RenderContext::new(&FxHashMap::default()), &config)
+            .display(&diagnostics.inner)
+            .to_string();
 
         insta::with_settings!({
             omit_expression => true,

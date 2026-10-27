@@ -20,7 +20,7 @@ re.match('', '')
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default())
+        .with_initialization_options(&ClientOptions::default())
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()

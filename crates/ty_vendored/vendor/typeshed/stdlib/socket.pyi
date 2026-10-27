@@ -1082,9 +1082,10 @@ if sys.platform != "win32" and sys.platform != "darwin":
 if sys.platform != "win32" and sys.platform != "darwin" and sys.platform != "linux":
     __all__ += ["BTPROTO_HCI", "BTPROTO_L2CAP", "BTPROTO_SCO"]
 
-if sys.platform != "win32" and sys.platform != "darwin" and sys.platform != "linux":
+if sys.platform != "win32" and sys.platform != "darwin":
     from _socket import HCI_DATA_DIR as HCI_DATA_DIR, HCI_FILTER as HCI_FILTER, HCI_TIME_STAMP as HCI_TIME_STAMP
 
+if sys.platform != "win32" and sys.platform != "darwin" and sys.platform != "linux":
     __all__ += ["HCI_FILTER", "HCI_TIME_STAMP", "HCI_DATA_DIR"]
 
 if sys.version_info >= (3, 11) and sys.platform != "linux" and sys.platform != "win32" and sys.platform != "darwin":

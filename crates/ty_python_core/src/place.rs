@@ -10,7 +10,7 @@ use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use smallvec::SmallVec;
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 use std::iter::FusedIterator;
 
 /// Return the expressions whose existing bindings a match pattern can narrow.
@@ -189,6 +189,30 @@ pub struct PlaceTable {
     members: MemberTable,
 }
 
+impl Hash for PlaceTable {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // The reverse-lookup indexes are also ignored by equality.
+        self.symbols.iter().len().hash(state);
+        for symbol in self.symbols.iter() {
+            symbol.name().hash(state);
+            symbol.is_used().hash(state);
+            symbol.is_bound().hash(state);
+            symbol.is_declared().hash(state);
+            symbol.is_global().hash(state);
+            symbol.is_nonlocal().hash(state);
+            symbol.is_reassigned().hash(state);
+            symbol.is_parameter().hash(state);
+        }
+        self.members.iter().len().hash(state);
+        for member in self.members.iter() {
+            member.expression().as_ref().hash(state);
+            member.is_bound().hash(state);
+            member.is_declared().hash(state);
+            member.is_instance_attribute().hash(state);
+        }
+    }
+}
+
 impl PlaceTable {
     /// Iterate over the "root" expressions of the place (e.g. `x.y.z`, `x.y`, `x` for `x.y.z[0]`).
     ///
@@ -210,6 +234,28 @@ impl PlaceTable {
     /// Iterator over all members in this scope.
     pub fn members(&self) -> std::slice::Iter<'_, Member> {
         self.members.iter()
+    }
+
+    /// Receiver attributes that this scope can define. A read of `self.value` alone
+    /// does not establish `value` as an implicit attribute.
+    pub fn defined_instance_attribute_names(&self) -> impl Iterator<Item = &str> {
+        self.members
+            .iter()
+            .filter(|member| member.is_bound() || member.is_declared())
+            .filter_map(Member::as_instance_attribute)
+    }
+
+    /// Receiver attributes declared in this scope, such as `self.value: int`.
+    pub fn declared_instance_attributes(&self) -> impl Iterator<Item = (ScopedMemberId, &str)> {
+        self.members.iter().enumerate().filter_map(|(id, member)| {
+            if !member.is_declared() {
+                return None;
+            }
+            Some((
+                ScopedMemberId::from_usize(id),
+                member.as_instance_attribute()?,
+            ))
+        })
     }
 
     /// Looks up a symbol by its ID and returns a reference to it.
@@ -603,7 +649,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                 places.extend(self.simple_expr(&attribute.value));
                 places
             }
-            // Subscript truthiness can also narrow its base (`TypedDict` tagged unions).
+            // Subscript truthiness can also narrow its base (`TypedDict` and tuple unions).
             ast::Expr::Subscript(subscript) => {
                 let mut places = self.simple_expr(expr);
                 places.extend(self.simple_expr(&subscript.value));
@@ -647,12 +693,8 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
     fn expr_compare(&self, expr_compare: &ast::ExprCompare) -> PossiblyNarrowedPlaces {
         let mut places = PossiblyNarrowedPlaces::default();
 
-        // The left side can be narrowed
-        self.add_narrowing_target(&expr_compare.left, &mut places);
-
-        // Each comparator can also be narrowed
-        for comparator in &expr_compare.comparators {
-            self.add_narrowing_target(comparator, &mut places);
+        for operand in &expr_compare.operands {
+            self.add_narrowing_target(operand, &mut places);
         }
 
         let can_narrow_tagged_union_base = matches!(
@@ -661,7 +703,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         );
 
         // Tagged-union checks can also narrow the base of a subscript or attribute on either side.
-        for expr in std::iter::once(&*expr_compare.left).chain(&expr_compare.comparators) {
+        for expr in &expr_compare.operands {
             if can_narrow_tagged_union_base
                 && let ast::Expr::Subscript(subscript) = expr.expression_value()
                 && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
@@ -700,10 +742,17 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                 .filter(|keyword| keyword.arg.is_some())
                 .map(|keyword| &keyword.value),
         ) {
-            if let Some(place_expr) = PlaceExpr::try_from_expr(argument) {
-                if let Some(place) = self.places.place_id((&place_expr).into()) {
-                    places.insert(place);
-                }
+            if let Some(place_expr) = PlaceExpr::try_from_expr(argument)
+                && let Some(place) = self.places.place_id((&place_expr).into())
+            {
+                places.insert(place);
+            }
+            // Checking a tuple element can also eliminate alternatives of its tuple union.
+            if let ast::Expr::Subscript(subscript) = argument.expression_value()
+                && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
+                && let Some(place) = self.places.place_id((&place_expr).into())
+            {
+                places.insert(place);
             }
         }
 

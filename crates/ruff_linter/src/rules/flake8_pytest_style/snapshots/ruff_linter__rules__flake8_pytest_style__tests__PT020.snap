@@ -9,6 +9,7 @@ PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
 15 | def error_without_parens():
 16 |     return 0
    |
+help: Replace with `pytest.fixture`
 
 PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
   --> PT020.py:19:1
@@ -18,3 +19,49 @@ PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
 20 | def error_with_parens():
 21 |     return 0
    |
+help: Replace with `pytest.fixture`
+
+PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+  --> PT020.py:24:1
+   |
+24 | @pytest.yield_fixture(scope="module", name="my_fixture")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+25 | def error_with_arguments():
+26 |     return 0
+   |
+help: Replace with `pytest.fixture`
+
+PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+  --> PT020.py:29:1
+   |
+29 | @pytest.yield_fixture()  # comment
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+30 | def error_with_comment():
+31 |     return 0
+   |
+help: Replace with `pytest.fixture`
+
+PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+  --> PT020.py:35:5
+   |
+34 | class TestClass:
+35 |     @pytest.yield_fixture()
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+36 |     def error_in_class(self):
+37 |         return 0
+   |
+help: Replace with `pytest.fixture`
+
+PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+  --> PT020.py:40:1
+   |
+40 | / @(
+41 | |     pytest
+42 | |     # comment
+43 | |     .yield_fixture
+44 | | )
+   | |_^
+45 |   def error_with_comment_in_reference():
+46 |       return 0
+   |
+help: Replace with `pytest.fixture`

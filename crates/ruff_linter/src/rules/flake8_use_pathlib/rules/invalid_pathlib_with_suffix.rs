@@ -1,4 +1,5 @@
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, PythonVersion, StringFlags};
@@ -57,7 +58,7 @@ use ruff_text_size::Ranged;
 ///
 /// No fix is offered if the suffix `"."` is given, since the intent is unclear.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", category = Category::Correctness)]
 pub(crate) struct InvalidPathlibWithSuffix {
     single_dot: bool,
 }
@@ -123,7 +124,7 @@ pub(crate) fn invalid_pathlib_with_suffix(checker: &Checker, call: &ast::ExprCal
     }
 
     let mut diagnostic =
-        checker.report_diagnostic(InvalidPathlibWithSuffix { single_dot }, call.range);
+        checker.report_diagnostic(InvalidPathlibWithSuffix { single_dot }, call.range());
     if !single_dot {
         let after_leading_quote = string.start() + first_part.flags.opener_len();
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(

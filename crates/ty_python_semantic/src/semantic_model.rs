@@ -9,25 +9,37 @@ use ruff_python_ast::{Expr, ExprRef, name::Name};
 use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
 use ruff_text_size::Ranged;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use ty_module_resolver::{
     ImportingFile, KnownModule, Module, ModuleName, list_modules, resolve_module,
+    resolve_module_for_import_from,
 };
 
 use crate::Db;
+use crate::place::definitions::DefinitionResolution;
 use crate::place::implicit_globals::all_implicit_module_globals;
+use crate::place::{
+    builtins_module_scope, class_body_implicit_symbol, implicit_builtins_symbol_scope,
+    loop_header_reachability, place_from_bindings,
+};
+use crate::place_load::{
+    ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolutionStep, PlaceLoadSourceKind,
+    resolve_place_load,
+};
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
     CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
-    infer_complete_scope_types, inferred_declaration,
+    infer_complete_scope_types, infer_definition_types, inferred_declaration,
+    is_discarded_dict_key_assignment,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::place::PlaceExpr;
 use ty_python_core::place_table;
 use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
 use ty_python_core::symbol::Symbol;
-use ty_python_core::{Program, ProgramFile};
+use ty_python_core::{BindingWithConstraintsIterator, Program, ProgramFile};
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
@@ -89,12 +101,45 @@ impl<'db> SemanticModel<'db> {
         line_index(self.db, self.file())
     }
 
+    /// Returns whether `name` refers to a standard builtin in the scope containing `node`.
+    ///
+    /// This method uses a simplified implementation of name resolution: any binding or declaration
+    /// in a visible scope shadows the builtin, even if it does not reach `node`. As a result, it
+    /// can return `false` when the builtin is actually available. That is acceptable when deciding
+    /// whether to offer an autofix: we can safely omit the fix in edge cases where resolving the
+    /// name precisely would require more complex analysis.
+    ///
+    /// Definitions in a project-level `__builtins__.pyi` also shadow standard builtins.
+    pub(crate) fn definitely_has_builtin_binding(
+        &self,
+        name: &str,
+        node: ast::AnyNodeRef<'_>,
+    ) -> bool {
+        let index = semantic_index(self.db, self.program_file());
+        let Some(scope) = self.scope(node) else {
+            return false;
+        };
+
+        if index.visible_ancestor_scopes(scope).any(|(scope, _)| {
+            index
+                .place_table(scope)
+                .symbol_by_name(name)
+                .is_some_and(|symbol| symbol.is_bound() || symbol.is_declared())
+        }) {
+            return false;
+        }
+
+        let env = self.program_environment();
+        implicit_builtins_symbol_scope(self.db, &env, name)
+            .is_some_and(|scope| Some(scope) == builtins_module_scope(self.db, &env))
+    }
+
     /// Returns a map from symbol name to that symbol's
     /// type and definition site (if available).
     ///
     /// The symbols are the symbols in scope at the given
     /// AST node.
-    pub fn members_in_scope_at(
+    pub(crate) fn members_in_scope_at(
         &self,
         node: ast::AnyNodeRef<'_>,
     ) -> FxHashMap<Name, MemberDefinition<'db>> {
@@ -595,10 +640,15 @@ impl<'db> SemanticModel<'db> {
         }
     }
 
-    /// Returns completion candidates for a string-literal expression based on its expected type.
+    /// Returns completion candidates from a string's expected type and dictionary initializer.
+    ///
+    /// If provided, `subscript` must have `string_expr` as its complete slice.
+    /// Initializer keys are suggestions, not a guarantee that a mutable dictionary still contains
+    /// them or that it contains no other keys.
     pub fn expected_string_literal_completions(
         &self,
         string_expr: &ast::ExprStringLiteral,
+        subscript: Option<&ast::ExprSubscript>,
     ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
         struct StringLiteralCandidates;
         type StringLiteralCandidatesVisitor<'db> = CycleDetector<
@@ -638,19 +688,238 @@ impl<'db> SemanticModel<'db> {
                 Type::TypeAlias(alias) => {
                     visitor.visit(db, ty, || collect(db, alias.value_type(db), visitor))
                 }
+                Type::Recursive(recursive) => visitor.visit(db, ty, || {
+                    recursive
+                        .unfold(db, &recursive.environment(db))
+                        .map(|unfolded| collect(db, unfolded, visitor))
+                        .unwrap_or_else(Vec::new)
+                }),
                 _ => Vec::new(),
             }
         }
         let db = self.db;
 
-        let Some(expected_ty) = self.string_literal_completion_expected_type(string_expr) else {
-            return Vec::new();
-        };
-
-        let mut candidates = collect(db, expected_ty, &StringLiteralCandidatesVisitor::default());
+        let expected_ty = self.string_literal_completion_expected_type(string_expr);
+        let mut candidates = expected_ty
+            .map(|expected_ty| collect(db, expected_ty, &StringLiteralCandidatesVisitor::default()))
+            .unwrap_or_default();
+        // Finite choices from the expected type take precedence. A string used as the complete
+        // subscript key can fall back to initializer keys that fit any known expected type.
+        if candidates.is_empty()
+            && self.in_string_annotation_expr.is_none()
+            && let Some(subscript) = subscript
+        {
+            self.dictionary_initializer_keys(
+                &subscript.value,
+                &mut FxHashSet::default(),
+                &mut candidates,
+            );
+            if let Some(expected_ty) = expected_ty {
+                candidates.retain(|candidate| {
+                    candidate
+                        .ty
+                        .is_assignable_to(db, &self.program_environment(), expected_ty)
+                });
+            }
+        }
         candidates.sort_unstable_by(|left, right| left.value.cmp(&right.value));
         candidates.dedup_by(|left, right| left.value == right.value);
         candidates
+    }
+
+    /// Appends literal string keys from dictionary initializers that can reach `receiver`.
+    ///
+    /// Follows reaching definitions, aliases, `from` imports, and nested dictionary lookups,
+    /// ignoring unreachable or discarded assignments. The caller's `visited` set breaks
+    /// definition cycles. The caller filters candidates against the expected type, sorts them,
+    /// and removes duplicates.
+    fn dictionary_initializer_keys(
+        &self,
+        receiver: &ast::Expr,
+        visited: &mut FxHashSet<Definition<'db>>,
+        candidates: &mut Vec<ExpectedStringLiteralCompletion<'db>>,
+    ) {
+        if let ast::Expr::Dict(dict) = receiver {
+            candidates.extend(dict.items.iter().filter_map(|item| {
+                let ast::Expr::StringLiteral(key) = item.key.as_ref()? else {
+                    return None;
+                };
+                let value = key.value.to_string();
+                Some(ExpectedStringLiteralCompletion {
+                    ty: Type::string_literal(self.db, value.as_str()),
+                    value,
+                })
+            }));
+            return;
+        }
+
+        let mut definitions = self.reaching_definitions_at(receiver);
+        while let Some(definition) = definitions.pop() {
+            if !visited.insert(definition) {
+                continue;
+            }
+            let kind = definition.kind(self.db);
+            if kind.is_loop_header() {
+                definitions.extend(
+                    loop_header_reachability(self.db, definition)
+                        .reachable_bindings
+                        .iter()
+                        .map(|binding| binding.definition),
+                );
+                continue;
+            }
+            if kind.is_import() {
+                self.extend_imported_definitions(definition, &mut definitions);
+                continue;
+            }
+            let file = definition.program_file(self.db);
+            let module = parsed_module(self.db, file.python_file(self.db)).load(self.db);
+            let value = match kind {
+                DefinitionKind::Assignment(assignment) => assignment
+                    .unpack()
+                    .is_none()
+                    .then(|| assignment.value(&module)),
+                DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(&module),
+                DefinitionKind::DictKeyAssignment(assignment) => Some(assignment.value(&module)),
+                _ => None,
+            };
+            if let Some(value) = value
+                && !infer_definition_types(self.db, definition).discards_dict_key_assignments()
+                && !is_discarded_dict_key_assignment(self.db, definition)
+            {
+                Self::new(self.db, file).dictionary_initializer_keys(value, visited, candidates);
+            }
+        }
+    }
+
+    /// Returns definitions that can reach this expression's load.
+    ///
+    /// Names follow Python's scope lookup rules, stopping at a definitely bound source.
+    /// Other tracked places use the bindings recorded at their use site.
+    fn reaching_definitions_at(&self, receiver: &ast::Expr) -> Vec<Definition<'db>> {
+        let index = semantic_index(self.db, self.file);
+        let Some(scope) = index.try_expression_scope_id(receiver) else {
+            return Vec::new();
+        };
+        let Some(use_id) = index.try_expression_use_id(receiver.into()) else {
+            return Vec::new();
+        };
+        let mut definitions = Vec::new();
+        let mut add_bindings = |bindings: BindingWithConstraintsIterator<'db, 'db>| {
+            let resolution = DefinitionResolution::from_bindings(self.db, bindings);
+            definitions.extend_from_slice(resolution.definitions());
+        };
+        if let ast::Expr::Name(name) = receiver {
+            let mut resolution = resolve_place_load(
+                self.db,
+                index,
+                scope.to_scope_id(self.db, self.file),
+                PlaceExpr::from_expr_name(name),
+                PlaceLoadMode::AtExpression(name.into()),
+            );
+            while let Some(PlaceLoadResolutionStep::Source(source)) = resolution.next() {
+                match source.kind {
+                    PlaceLoadSourceKind::Bindings(bindings) => {
+                        let bound = place_from_bindings(
+                            self.db,
+                            &self.program_environment(),
+                            bindings.clone(),
+                        )
+                        .place
+                        .is_definitely_bound();
+                        add_bindings(bindings);
+                        if bound {
+                            break;
+                        }
+                    }
+                    PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => {
+                        let index = semantic_index(self.db, scope.program_file(self.db));
+                        add_bindings(
+                            index
+                                .use_def_map(scope.file_scope_id(self.db))
+                                .reachable_bindings(id),
+                        );
+                        break;
+                    }
+                    PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ClassBodySymbol(name)) => {
+                        if class_body_implicit_symbol(self.db, &self.program_environment(), &name)
+                            .place
+                            .is_definitely_bound()
+                        {
+                            break;
+                        }
+                    }
+                    PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ExplicitGlobalSymbol {
+                        file,
+                        name,
+                    }) => {
+                        let index = semantic_index(self.db, file);
+                        if let Some(id) = index.place_table(FileScopeId::global()).symbol_id(&name)
+                        {
+                            add_bindings(
+                                index
+                                    .use_def_map(FileScopeId::global())
+                                    .reachable_symbol_bindings(id),
+                            );
+                        }
+                        break;
+                    }
+                    PlaceLoadSourceKind::Implicit(_) => break,
+                }
+            }
+        } else {
+            add_bindings(index.use_def_map(scope).bindings_at_use(use_id));
+        }
+        definitions
+    }
+
+    /// Appends the reachable bindings of a `from` import's symbol in its target module.
+    ///
+    /// Follows one import at a time so an overwritten re-export cannot contribute keys.
+    fn extend_imported_definitions(
+        &self,
+        definition: Definition<'db>,
+        definitions: &mut Vec<Definition<'db>>,
+    ) {
+        let file = definition.program_file(self.db);
+        let kind = definition.kind(self.db);
+        let module = parsed_module(self.db, file.python_file(self.db)).load(self.db);
+        let (import, name) = match &kind {
+            DefinitionKind::ImportFrom(import) => {
+                (import.import(&module), import.alias(&module).name.as_str())
+            }
+            DefinitionKind::StarImport(import) => {
+                let Some(symbol) = semantic_index(self.db, file)
+                    .place_table(definition.file_scope(self.db))
+                    .place(definition.place(self.db))
+                    .as_symbol()
+                else {
+                    return;
+                };
+                (import.import(&module), symbol.name().as_str())
+            }
+            _ => return,
+        };
+        let env = ProgramEnvironment::from_file(file);
+        let importing_file =
+            ImportingFile::File(file.file(self.db), env.resolver_environment(self.db));
+        let Some(target_file) = resolve_module_for_import_from(self.db, importing_file, import)
+            .and_then(|module| module.file(self.db))
+        else {
+            return;
+        };
+        let target_file = ProgramFile::new(self.db, target_file, env.program(self.db));
+        let index = semantic_index(self.db, target_file);
+        let Some(id) = index.place_table(FileScopeId::global()).symbol_id(name) else {
+            return;
+        };
+        let resolution = DefinitionResolution::from_bindings(
+            self.db,
+            index
+                .use_def_map(FileScopeId::global())
+                .end_of_scope_symbol_bindings(id),
+        );
+        definitions.extend_from_slice(resolution.definitions());
     }
 
     fn string_literal_completion_expected_type(
@@ -668,9 +937,9 @@ impl<'db> SemanticModel<'db> {
 
 /// The type and definition of a symbol.
 #[derive(Clone, Debug)]
-pub struct MemberDefinition<'db> {
-    pub ty: Type<'db>,
-    pub first_reachable_definition: Definition<'db>,
+pub(crate) struct MemberDefinition<'db> {
+    pub(crate) ty: Type<'db>,
+    pub(crate) first_reachable_definition: Definition<'db>,
 }
 
 /// A classification of symbol names.
@@ -752,7 +1021,7 @@ pub trait HasDefinition {
     fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db>;
 }
 
-pub(crate) trait HasOptionalDefinition {
+trait HasOptionalDefinition {
     /// Returns the definition of `self`, if it has one.
     ///
     /// ## Panics

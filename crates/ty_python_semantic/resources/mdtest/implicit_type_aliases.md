@@ -1,12 +1,12 @@
 # Implicit type aliases
 
 Implicit type aliases are the earliest form of type alias, introduced in PEP 484. They have no
-special marker, just an ordinary assignment statement.
+special marker, just an ordinary assignment statement. Implicit aliases and PEP 613 aliases declared
+with `typing.TypeAlias` are collectively called legacy type aliases.
 
 ## Basic
 
-We support simple type aliases with no extra effort, when the "value type" of the RHS is still a
-valid type for use in a type expression:
+An implicit alias denotes the type described by its right-hand side:
 
 ```py
 MyInt = int
@@ -26,6 +26,17 @@ def g(x: MyNone):
     reveal_type(x)  # revealed: None
 
 g(None)
+```
+
+## Any
+
+```py
+from typing import Any
+
+MyAny = Any
+
+def inspect(value: MyAny):
+    reveal_type(value)  # revealed: Any
 ```
 
 ## Unions
@@ -343,9 +354,7 @@ class Bar(metaclass=Meta): ...
 
 X = Foo | Bar
 
-# In an ideal world, perhaps we would respect `Meta.__or__` here and reveal `str`?
-# But we still need to record what the elements are, since (according to the typing spec)
-# `X` is still a valid type alias
+# TODO: Respect `Meta.__or__` here and reveal `str`.
 reveal_type(X)  # revealed: <types.UnionType special-form 'Foo | Bar'>
 
 def f(obj: X):
@@ -560,6 +569,15 @@ def _(
     reveal_type(type_or_list)  # revealed: type[Any] | list[Any]
 ```
 
+A runtime union of two generic alias values preserves the distinct bindings of their type variables:
+
+```py
+First = T | int
+Second = T | str
+Both = First | Second
+reveal_type(Both)  # revealed: <types.UnionType special-form 'T@First | int | T@Second | str'>
+```
+
 If a generic implicit type alias is used unspecialized in a type expression, we use the default
 specialization. For type variables without defaults, this is `Unknown`:
 
@@ -632,6 +650,262 @@ class Derived2(GenericBaseAlias[int]):
     pass
 ```
 
+### Forwarding aliases
+
+Forwarding a generic alias with an unannotated assignment preserves its type parameters and
+defaults. A forwarded class or special form still accepts the same type arguments.
+
+```py
+from typing_extensions import Annotated, TypeVar, Union
+
+T = TypeVar("T", default=str)
+
+Items = list[T]
+Forwarded = Items
+ForwardedAgain = Forwarded
+List = list
+ForwardedList = List
+UnionAlias = Union
+ForwardedUnion = UnionAlias
+
+def inspect(
+    default: Forwarded,
+    specialized: ForwardedAgain[int],
+    class_alias: ForwardedList[int],
+    special_form: ForwardedUnion[int, str],
+):
+    reveal_type(default)  # revealed: list[str]
+    reveal_type(specialized)  # revealed: list[int]
+    reveal_type(class_alias)  # revealed: list[int]
+    reveal_type(special_form)  # revealed: int | str
+```
+
+Renaming a type variable preserves its identity; it does not create an alias that accepts type
+arguments. An alias containing that variable, even a transparent `Annotated` wrapper, can be
+specialized:
+
+```py
+Renamed = T
+ForwardedTypeVar = Renamed
+Identity = Annotated[T, "identity"]
+ForwardedIdentity = Identity
+
+def inspect(
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    type_var: ForwardedTypeVar[int],
+    identity: ForwardedIdentity[int],
+):
+    reveal_type(type_var)  # revealed: Unknown
+    reveal_type(identity)  # revealed: int
+```
+
+The parameters are preserved only when the right-hand side is a name or attribute. A reference
+nested inside another type expression uses the alias's default specialization:
+
+```py
+OptionalItems = Items | None
+AnnotatedItems = Annotated[Items, "metadata"]
+
+def inspect(optional: OptionalItems, annotated: AnnotatedItems):
+    reveal_type(optional)  # revealed: list[str] | None
+    reveal_type(annotated)  # revealed: list[str]
+
+def invalid(
+    optional: OptionalItems[int],  # error: [not-subscriptable]
+    annotated: AnnotatedItems[int],  # error: [not-subscriptable]
+): ...
+```
+
+### Forwarding conditionally defined aliases
+
+A possibly missing name or attribute still preserves an alias's parameters when it has only one
+definition. The forwarding assignment reports that the reference might not exist:
+
+```toml
+[rules]
+possibly-unresolved-reference = "error"
+possibly-missing-attribute = "error"
+```
+
+```py
+from typing_extensions import TypeVar
+
+def condition() -> bool:
+    return True
+
+T = TypeVar("T", default=str)
+if condition():
+    Items = list[T]
+Forwarded = Items  # error: [possibly-unresolved-reference]
+
+class Holder:
+    if condition():
+        Items = list[T]
+
+ForwardedAttribute = Holder.Items  # error: [possibly-missing-attribute]
+
+def inspect(direct: Forwarded[int], attribute: ForwardedAttribute[bytes]):
+    reveal_type(direct)  # revealed: list[int]
+    reveal_type(attribute)  # revealed: list[bytes]
+```
+
+A conditional class binding can fall back to a builtin. With two possible values, the forwarded type
+uses their default specializations:
+
+```py
+class Scope:
+    if condition():
+        list = set[T]
+    ForwardedList = list
+
+    def inspect(self, default: ForwardedList):
+        reveal_type(default)  # revealed: set[str] | list[Unknown]
+
+    def invalid(self, specialized: ForwardedList[int]): ...  # error: [not-subscriptable]
+```
+
+### Forwarding separately annotated bindings
+
+Name lookup preserves an assignment's narrowed value even when it has a separate annotation:
+
+```py
+from typing_extensions import TypeVar
+
+T = TypeVar("T", default=str)
+Items: object
+Items = list[T]
+Forwarded = Items
+
+def inspect(value: Forwarded[int]):
+    reveal_type(value)  # revealed: list[int]
+```
+
+Reading an attribute assigned in the class body instead uses the declared type, which does not
+describe a type alias:
+
+```py
+class Holder:
+    Items: object
+    Items = list[T]
+
+ForwardedAttribute = Holder.Items
+
+def inspect(value: ForwardedAttribute):  # error: [invalid-type-form]
+    reveal_type(value)  # revealed: Unknown
+```
+
+An assignment to the attribute in the current scope narrows the value used for forwarding:
+
+```py
+class LocallyAssigned:
+    Items: object
+
+LocallyAssigned.Items = list[T]
+ForwardedLocalAttribute = LocallyAssigned.Items
+
+def inspect(specialized: ForwardedLocalAttribute[int], default: ForwardedLocalAttribute):
+    reveal_type(specialized)  # revealed: list[int]
+    reveal_type(default)  # revealed: list[str]
+```
+
+### Forwarding PEP 695 aliases
+
+Assigning a PEP 695 alias to another name preserves its type parameters and defaults, including when
+the right-hand side is a module attribute:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+`aliases.py`:
+
+```py
+type Modern[V = str] = list[V]
+```
+
+`main.py`:
+
+```py
+from aliases import Modern
+import aliases
+
+Forwarded = Modern
+ForwardedAttribute = aliases.Modern
+
+def inspect(specialized: Forwarded[int], attribute: ForwardedAttribute[bytes], default: ForwardedAttribute):
+    reveal_type(specialized)  # revealed: list[int]
+    reveal_type(attribute)  # revealed: list[bytes]
+    reveal_type(default)  # revealed: list[str]
+```
+
+### Generic typed dictionaries in aliases
+
+First, define a generic typed dictionary whose field uses a legacy type variable:
+
+```py
+from typing import Generic, TypeVar, TypedDict
+
+T = TypeVar("T")
+
+class Item(TypedDict, Generic[T]):
+    value: T
+```
+
+An implicit union alias remains generic when its only type variable appears in the typed dictionary,
+and specialization preserves the dictionary's field type:
+
+```py
+OptionalItem = Item[T] | None
+
+def _(item: OptionalItem[int]):
+    reveal_type(item)  # revealed: Item[int] | None
+
+    if item is not None:
+        reveal_type(item["value"])  # revealed: int
+```
+
+Without an explicit type argument, the alias uses the type variable's default specialization:
+
+```py
+def _(item: OptionalItem):
+    reveal_type(item)  # revealed: Item[Unknown] | None
+```
+
+The type variable is also discovered when the typed dictionary is nested inside a container:
+
+```py
+Items = list[Item[T]]
+
+def _(items: Items[str]):
+    reveal_type(items)  # revealed: list[Item[str]]
+    reveal_type(items[0]["value"])  # revealed: str
+```
+
+### Type-variable order in generic typed-dictionary aliases
+
+Type variables that appear inside a typed dictionary are collected in the same order as variables in
+other union members:
+
+```py
+from typing import Generic, TypeVar, TypedDict
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Item(TypedDict, Generic[T]):
+    value: T
+
+TypedDictFirst = Item[T] | list[U]
+TypedDictLast = list[U] | Item[T]
+Repeated = Item[T] | list[T]
+
+def _(first: TypedDictFirst[int, str], last: TypedDictLast[str, int], repeated: Repeated[int]):
+    reveal_type(first)  # revealed: Item[int] | list[str]
+    reveal_type(last)  # revealed: list[str] | Item[int]
+    reveal_type(repeated)  # revealed: Item[int] | list[int]
+```
+
 ### Imported aliases
 
 Generic implicit type aliases can be imported from other modules and specialized:
@@ -652,16 +926,91 @@ MyList = list[T]
 from my_types import MyList
 import my_types as mt
 
+Forwarded = MyList
+ForwardedAttribute = mt.MyList
+
 def _(
     list_of_ints1: MyList[int],
     list_of_ints2: mt.MyList[int],
     list_of_str: mt.MyList,
     list_of_str_or_none: mt.MyList | None,
+    forwarded: Forwarded[int],
+    forwarded_attribute: ForwardedAttribute[int],
+    forwarded_default: ForwardedAttribute,
 ):
     reveal_type(list_of_ints1)  # revealed: list[int]
     reveal_type(list_of_ints2)  # revealed: list[int]
     reveal_type(list_of_str)  # revealed: list[str]
     reveal_type(list_of_str_or_none)  # revealed: list[str] | None
+    reveal_type(forwarded)  # revealed: list[int]
+    reveal_type(forwarded_attribute)  # revealed: list[int]
+    reveal_type(forwarded_default)  # revealed: list[str]
+```
+
+### Type variables through module aliases
+
+Assigning a module to another name preserves access to its type variables, including in string
+annotations. Aliases using those variables remain generic:
+
+`variables.py`:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+```
+
+`main.py`:
+
+```py
+import variables
+
+renamed = variables
+Pair = tuple[renamed.T, "renamed.U"]
+
+def inspect(specialized: Pair[int, str], default: Pair):
+    reveal_type(specialized)  # revealed: tuple[int, str]
+    reveal_type(default)  # revealed: tuple[Unknown, Unknown]
+```
+
+### Imported tagged typed-dictionary aliases
+
+A stub can define a generic tagged union containing a typed dictionary and expose a concrete
+specialization through a function signature:
+
+`events.pyi`:
+
+```pyi
+from typing import Generic, Literal, TypeVar, TypedDict, Union
+
+T = TypeVar("T")
+
+class ObjectEvent(TypedDict, Generic[T]):
+    type: Literal["ADDED"]
+    object: T
+
+class BookmarkEvent(TypedDict):
+    type: Literal["BOOKMARK"]
+    object: object
+
+DecodedEvent = Union[ObjectEvent[T], BookmarkEvent, None]
+
+def get_event() -> DecodedEvent[int]: ...
+```
+
+After excluding the other union members, Python code sees the concrete typed-dictionary field type:
+
+`main.py`:
+
+```py
+from events import get_event
+
+event = get_event()
+if event is not None and event["type"] != "BOOKMARK":
+    reveal_type(event)  # revealed: ObjectEvent[int]
+    reveal_type(event["object"])  # revealed: int
+    event["object"].bit_length()
 ```
 
 ### In stringified annotations
@@ -716,7 +1065,7 @@ from typing import Protocol, TypeVar, TypedDict
 
 ListOfInts = list[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[int]'>`"
+# error: [not-subscriptable] "Cannot subscript non-generic type `list[int]`"
 def _(doubly_specialized: ListOfInts[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
@@ -739,18 +1088,19 @@ def _(doubly_specialized: List, doubly_specialized_2: WorseList):
 
 Tuple = tuple[int, str]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'tuple[int, str]'>`"
+# error: [not-subscriptable] "Cannot subscript non-generic type `tuple[int, str]`"
 def _(doubly_specialized: Tuple[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
 T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 
-class LegacyProto(Protocol[T]):
+class LegacyProto(Protocol[T_co]):
     pass
 
 LegacyProtoInt = LegacyProto[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'LegacyProto[int]'>`"
+# error: [not-subscriptable] "Cannot subscript non-generic type `LegacyProto[int]`"
 def _(doubly_specialized: LegacyProtoInt[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
@@ -759,7 +1109,7 @@ class Proto[T](Protocol):
 
 ProtoInt = Proto[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Proto[int]'>`"
+# error: [not-subscriptable] "Cannot subscript non-generic type `Proto[int]`"
 def _(doubly_specialized: ProtoInt[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
@@ -781,20 +1131,20 @@ class Dict[T](TypedDict):
 
 DictInt = Dict[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Dict[int]'>`"
+# error: [not-subscriptable] "Cannot subscript non-generic type `Dict[int]`"
 def _(doubly_specialized: DictInt[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
 Union = list[str] | list[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<types.UnionType special-form 'list[str] | list[int]'>`"
+# error: [not-subscriptable] "Cannot subscript non-generic type `list[str] | list[int]`"
 def _(doubly_specialized: Union[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
 type MyListAlias[T] = list[T]
 MyListOfInts = MyListAlias[int]
 
-# error: [not-subscriptable] "Cannot specialize non-generic type alias: Double specialization is not allowed"
+# error: [not-subscriptable] "Cannot subscript non-generic type `MyListAlias[int]`"
 def _(doubly_specialized: MyListOfInts[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 ```
@@ -891,7 +1241,7 @@ three_ints: ThreeInts[int]
 ```
 
 ```snapshot
-error[not-subscriptable]: Cannot subscript non-generic type `<class 'tuple[int, int, int]'>`
+error[not-subscriptable]: Cannot subscript non-generic type `tuple[int, int, int]`
  --> src/mdtest_snippet.py:8:13
   |
 8 | three_ints: ThreeInts[int]
@@ -910,7 +1260,7 @@ alias_for_a: AliasForA[int]
 ```
 
 ```snapshot
-error[not-subscriptable]: Cannot subscript non-generic type `<class 'A[int]'>`
+error[not-subscriptable]: Cannot subscript non-generic type `A[int]`
   --> src/mdtest_snippet.py:14:14
    |
 14 | alias_for_a: AliasForA[int]
@@ -962,6 +1312,27 @@ def _(
 ):
     reveal_type(x1)  # revealed: list[int]
     reveal_type(x2)  # revealed: set[int]
+```
+
+#### Conditionally defined type variables
+
+A generic alias uses the reachable definition of a type variable, including when the variable is
+quoted on the right-hand side.
+
+```py
+from typing import TypeVar
+
+if 1 == 1:
+    T = TypeVar("T", bound=int)
+else:
+    T = TypeVar("T", bound=str)
+
+Direct = list[T]
+Quoted = list["T"]
+
+def inspect(direct: Direct[int], quoted: Quoted[int]):
+    reveal_type(direct)  # revealed: list[int]
+    reveal_type(quoted)  # revealed: list[int]
 ```
 
 #### Statically unknown conditions
@@ -1046,7 +1417,7 @@ reveal_type(LiteralInt)  # revealed: Unknown
 def _(weird: LiteralInt):
     reveal_type(weird)  # revealed: Unknown
 
-# error: [invalid-type-form] "`Literal[26]` is not a generic class"
+# error: [not-subscriptable] "Cannot subscript non-generic type `Literal[26]`"
 def _(weird: IntLiteral1[int]):
     reveal_type(weird)  # revealed: Unknown
 ```
@@ -1352,6 +1723,220 @@ def _(
     reveal_type(invalid_subclass_of_1)  # revealed: type[Unknown]
     # TODO: this should be `type[Unknown]` or `Unknown`
     reveal_type(invalid_subclass_of_literal)  # revealed: <class 'int'>
+```
+
+### Subscripted generic alias inside `type[…]`
+
+A generic alias can also be specialized inside a `type[…]` annotation.
+
+#### Valid specializations
+
+The PEP 613 spelling and `typing.Type[…]` take the same path:
+
+```py
+from typing import Generic, Type, TypeAlias, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Pair(Generic[T, U]): ...
+
+PairAlias = Pair[T, U]
+Pep613Pair: TypeAlias = Pair[T, U]
+
+def implicit(x: type[PairAlias[int, str]]):
+    reveal_type(x)  # revealed: type[Pair[int, str]]
+
+def pep_613(x: type[Pep613Pair[int, str]]):
+    reveal_type(x)  # revealed: type[Pair[int, str]]
+
+def uppercase_type(x: Type[PairAlias[int, str]]):
+    reveal_type(x)  # revealed: type[Pair[int, str]]
+
+def partially_specialized(x: type[PairAlias[int, T]]):
+    reveal_type(x)  # revealed: type[Pair[int, T@partially_specialized]]
+```
+
+#### Incorrect type-argument counts
+
+A generic alias specialized inside `type[…]` must receive the correct number of type arguments:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Pair(Generic[T, U]): ...
+
+PairAlias = Pair[T, U]
+
+def _(
+    # error: [invalid-type-arguments] "No type argument provided for required type variable `U`"
+    too_few: type[PairAlias[int]],
+    # error: [invalid-type-arguments] "Too many type arguments: expected 2, got 3"
+    too_many: type[PairAlias[int, str, bool]],
+):
+    reveal_type(too_few)  # revealed: type[Pair[Unknown, Unknown]]
+    reveal_type(too_many)  # revealed: type[Pair[Unknown, Unknown]]
+```
+
+#### Type-variable bounds
+
+Specializing an alias inside `type[…]` enforces the upper bound of its type variable:
+
+```py
+from typing import Generic, TypeVar
+
+Bounded = TypeVar("Bounded", bound=int)
+
+class BoundedBox(Generic[Bounded]): ...
+
+BoundedAlias = BoundedBox[Bounded]
+
+def _(
+    # error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `Bounded@BoundedAlias`"
+    violated_bound: type[BoundedAlias[str]],
+):
+    reveal_type(violated_bound)  # revealed: type[BoundedBox[Unknown]]
+```
+
+#### Type-variable constraints
+
+Specializing an alias inside `type[…]` also enforces constraints on its type variable:
+
+```py
+from typing import Generic, TypeVar
+
+Constrained = TypeVar("Constrained", int, str)
+
+class ConstrainedBox(Generic[Constrained]): ...
+
+ConstrainedAlias = ConstrainedBox[Constrained]
+
+def _(
+    # error: [invalid-type-arguments] "Type `bytes` does not satisfy constraints `int`, `str` of type variable `Constrained@ConstrainedAlias`"
+    violated_constraint: type[ConstrainedAlias[bytes]],
+):
+    reveal_type(violated_constraint)  # revealed: type[ConstrainedBox[Unknown]]
+```
+
+#### Bounds on union-valued aliases
+
+The upper bound of a type variable is enforced even when its alias resolves to a union:
+
+```py
+from typing import TypeVar
+
+Bounded = TypeVar("Bounded", bound=int)
+BoundedUnionAlias = list[Bounded] | set[Bounded]
+
+def _(
+    # error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `Bounded@BoundedUnionAlias`"
+    union_violated_bound: type[BoundedUnionAlias[str]],
+):
+    reveal_type(union_violated_bound)  # revealed: type[list[Unknown] | set[Unknown]]
+```
+
+#### Invalid nested subscripts
+
+Subscripting an already-subscripted alias inside `type[…]` is invalid, just as it is outside it:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Pair(Generic[T, U]): ...
+
+PairAlias = Pair[T, U]
+
+def _(
+    # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in parameter annotations"
+    double_subscript: type[PairAlias[T, U][int, str]],
+):
+    reveal_type(double_subscript)  # revealed: type[Unknown]
+```
+
+#### Assignments to class-backed aliases
+
+An object assigned to a specialized alias inside `type[…]` must match the class it represents:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Pair(Generic[T, U]): ...
+
+PairAlias = Pair[T, U]
+
+# error: [invalid-assignment] "Object of type `<class 'int'>` is not assignable to `type[Pair[int, str]]`"
+assigned: type[PairAlias[int, str]] = int
+```
+
+#### Assignments to union-valued aliases
+
+An object assigned to a union-valued alias inside `type[…]` must match one of the union elements:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+UnionAlias = list[T] | set[T]
+
+# error: [invalid-assignment] "Object of type `<class 'str'>` is not assignable to `type[list[int] | set[int]]`"
+assigned_union: type[UnionAlias[int]] = str
+```
+
+#### Other alias representations
+
+An alias does not have to be backed by a class. Stringified, transparent, `Annotated` and
+union-valued aliases all specialize inside `type[…]` the same way they do outside it:
+
+```py
+from __future__ import annotations
+
+from typing import Annotated, TypeAlias, TypeVar
+
+T = TypeVar("T")
+
+StringAlias: TypeAlias = "list[T]"
+TransparentAlias: TypeAlias = T
+AnnotatedAlias = Annotated[list[T], "metadata"]
+UnionAlias = list[T] | set[T]
+
+def _(
+    string: type[StringAlias[int]],
+    transparent: type[TransparentAlias[int]],
+    annotated: type[AnnotatedAlias[int]],
+    union: type[UnionAlias[int]],
+):
+    reveal_type(string)  # revealed: type[list[int]]
+    reveal_type(transparent)  # revealed: type[int]
+    reveal_type(annotated)  # revealed: type[list[int]]
+    reveal_type(union)  # revealed: type[list[int] | set[int]]
+```
+
+#### Callable aliases
+
+A callable is not a class object, so specializing a `Callable` alias inside `type[…]` is rejected,
+just as a directly spelled callable is:
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+
+CallableAlias = Callable[[T], T]
+
+def _(
+    # error: [invalid-type-form] "The argument to `type[]` must be a class object type"
+    callable_: type[CallableAlias[int]],
+):
+    reveal_type(callable_)  # revealed: type[Unknown]
 ```
 
 ### `Type[…]`
@@ -1661,9 +2246,7 @@ From the [typing spec on type aliases](https://typing.python.org/en/latest/spec/
 > Type aliases may be as complex as type hints in annotations – anything that is acceptable as a
 > type hint is acceptable in a type alias
 
-However, no other type checker seems to support stringified annotations in implicit type aliases. We
-currently also do not support them, and we detect places where these attempted unions cause runtime
-errors:
+An assignment of a string literal creates a string variable, rather than an implicit type alias:
 
 ```py
 AliasForStr = "str"
@@ -1671,13 +2254,26 @@ AliasForStr = "str"
 # error: [invalid-type-form] "Variable of type `Literal["str"]` is not allowed in a parameter annotation"
 def _(s: AliasForStr):
     reveal_type(s)  # revealed: Unknown
+```
 
+A union with a string operand is invalid at runtime. We report that error, but still interpret the
+original union expression when the alias is used as a type:
+
+```py
 IntOrStr = int | "str"  # error: [unsupported-operator]
 
 reveal_type(IntOrStr)  # revealed: Unknown
 
 def _(int_or_str: IntOrStr):
-    reveal_type(int_or_str)  # revealed: Unknown
+    reveal_type(int_or_str)  # revealed: int | str
+```
+
+This alias has no type parameters and is thus not subscriptable, even though its runtime value is
+`Unknown`:
+
+```py
+def invalid(value: IntOrStr[int]):  # error: [not-subscriptable]
+    reveal_type(value)  # revealed: Unknown
 ```
 
 We *do* support stringified annotations if they appear in a position where a type expression is
@@ -1714,9 +2310,329 @@ def _(
     reveal_type(callable_style_to_style)  # revealed: (Style, /) -> Style
 ```
 
+## Ordinary assignments remain values
+
+An assignment that is never used in a type expression is not checked as a type alias. In particular,
+`Self` can be stored as a value, and a list of classes is an ordinary list.
+
+```py
+from typing_extensions import Self
+
+class Node:
+    marker = Self
+    classes = [int, str]
+```
+
+## Invalid implicit aliases
+
+A valid runtime expression can still be invalid as a type expression. We reject using such a value
+as an annotation, rather than reporting an error on its ordinary assignment:
+
+```py
+Number = 1 + 2
+one = 1
+ForwardedNumber = one
+
+def inspect(
+    expression: Number,  # snapshot: invalid-type-form
+    forwarded: ForwardedNumber,  # error: [invalid-type-form]
+    specialized: Number[int],  # error: [invalid-type-form]
+    quoted: "Number",  # error: [invalid-type-form]
+):
+    reveal_type(expression)  # revealed: Unknown
+    reveal_type(forwarded)  # revealed: Unknown
+    reveal_type(specialized)  # revealed: Unknown
+    reveal_type(quoted)  # revealed: Unknown
+```
+
+```snapshot
+error[invalid-type-form]: Variable `Number` cannot be used as a type
+ --> src/mdtest_snippet.py:6:17
+  |
+6 |     expression: Number,  # snapshot: invalid-type-form
+  |                 ^^^^^^
+info: `Number` is not a valid type alias
+info: Invalid binary operator `+` in a type alias definition
+ --> src/mdtest_snippet.py:1:10
+  |
+1 | Number = 1 + 2
+  |          ^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+An expression that evaluates to a class does not automatically define a type alias. The diagnostic
+explains why its original definition is invalid as a type expression:
+
+```py
+Called = type(1)
+
+# snapshot: invalid-type-form
+def inspect(called: Called):
+    reveal_type(called)  # revealed: Unknown
+```
+
+```snapshot
+error[invalid-type-form]: Variable `Called` cannot be used as a type
+  --> src/mdtest_snippet.py:18:21
+   |
+18 | def inspect(called: Called):
+   |                     ^^^^^^
+info: `Called` is not a valid type alias
+info: Function calls are not allowed in type alias definitions
+  --> src/mdtest_snippet.py:15:10
+   |
+15 | Called = type(1)
+   |          ^^^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+Other calls, indexing into a list or dictionary, conditional expressions, and boolean operations
+also remain ordinary values, even if they evaluate to a class or `Any`. Assigning such a value to
+another name does not make it a type alias:
+
+```py
+Evaluated = eval("int")
+CalledGeneric = (lambda: list)()
+Indexed = [int][0]
+Classes = [int]
+IndexedName = Classes[0]
+Mixed = [int, 1]
+IndexedMixed = Mixed[0]
+Mapping = {"type": int}
+IndexedMapping = Mapping["type"]
+Conditional = int if 1 < 3 else str
+Boolean = list or set
+ForwardedCalled = Called
+
+def inspect(
+    evaluated: Evaluated,  # error: [invalid-type-form]
+    specialized: CalledGeneric[int],  # error: [invalid-type-form]
+    indexed: Indexed,  # error: [invalid-type-form]
+    indexed_name: IndexedName,  # error: [invalid-type-form]
+    indexed_mixed: IndexedMixed,  # error: [invalid-type-form]
+    indexed_mapping: IndexedMapping,  # error: [invalid-type-form]
+    conditional: Conditional,  # error: [invalid-type-form]
+    boolean: Boolean,  # error: [invalid-type-form]
+    forwarded: ForwardedCalled,  # error: [invalid-type-form]
+):
+    reveal_type(evaluated)  # revealed: Unknown
+    reveal_type(specialized)  # revealed: Unknown
+    reveal_type(indexed_mixed)  # revealed: Unknown
+```
+
+Errors in type arguments remain visible even when the alias itself is invalid:
+
+```py
+def invalid_arguments(
+    # error: [invalid-type-form]
+    # error: [unresolved-reference]
+    single: CalledGeneric[Missing],
+    # error: [invalid-type-form]
+    # error: [unresolved-reference]
+    multiple: CalledGeneric[int, Missing],
+    # error: [invalid-type-form]
+    # error: [unsupported-operator]
+    computed: CalledGeneric[1 + "bad"],
+): ...
+```
+
+Invalid aliases in string annotations also recover without evaluating nested runtime expressions:
+
+```py
+def invalid_string(value: "CalledGeneric[lambda: int]"): ...  # error: [invalid-type-form]
+```
+
+## Invalid expressions with nested scopes
+
+Lambdas and comprehensions are invalid type arguments, even when they refer to type variables:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+LambdaAlias = list[lambda: T]  # error: [invalid-type-form]
+ComprehensionAlias = list[[T for _ in []]]  # error: [invalid-type-form]
+
+def inspect(lambda_alias: LambdaAlias, comprehension_alias: ComprehensionAlias):
+    reveal_type(lambda_alias)  # revealed: list[Unknown]
+    reveal_type(comprehension_alias)  # revealed: list[Unknown]
+```
+
+## Imported invalid implicit aliases
+
+Importing a value, accessing it through its module, or assigning it to another name does not make it
+a valid type alias, even when the value is a class. This also holds when the defining module is a
+dependency that is not checked:
+
+```toml
+[environment]
+extra-paths = ["/dependencies"]
+```
+
+`/dependencies/values.py`:
+
+```py
+Number = 1 + 2
+Forwarded = Number
+ComputedClass = (lambda: int)()
+ForwardedClass = ComputedClass
+```
+
+`main.py`:
+
+```py
+from values import ForwardedClass
+
+# snapshot: invalid-type-form
+def inspect_forwarded(forwarded: ForwardedClass):
+    reveal_type(forwarded)  # revealed: Unknown
+```
+
+```snapshot
+error[invalid-type-form]: Variable `ForwardedClass` cannot be used as a type
+ --> src/main.py:4:34
+  |
+4 | def inspect_forwarded(forwarded: ForwardedClass):
+  |                                  ^^^^^^^^^^^^^^
+info: `ForwardedClass` is not a valid type alias
+info: Function calls are not allowed in type alias definitions
+ --> dependencies/values.py:3:17
+  |
+3 | ComputedClass = (lambda: int)()
+  |                 ^^^^^^^^^^^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+Quoted attribute references name the attribute used in the annotation, while the explanation points
+to its original definition:
+
+`quoted.py`:
+
+```py
+import values
+
+# snapshot: invalid-type-form
+def inspect_quoted(attribute: "values.Number"): ...
+```
+
+```snapshot
+error[invalid-type-form]: Variable `values.Number` cannot be used as a type
+ --> src/quoted.py:4:32
+  |
+4 | def inspect_quoted(attribute: "values.Number"): ...
+  |                                ^^^^^^^^^^^^^
+info: `values.Number` is not a valid type alias
+info: Invalid binary operator `+` in a type alias definition
+ --> dependencies/values.py:1:10
+  |
+1 | Number = 1 + 2
+  |          ^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+The same restriction applies to direct imports, module attributes, and local assignments:
+
+```py
+import values
+from values import Number, Forwarded, ComputedClass
+
+Local = Number
+LocalClass = ComputedClass
+AttributeClass = values.ComputedClass
+
+def inspect(
+    imported: Number,  # error: [invalid-type-form]
+    attribute: values.Number,  # error: [invalid-type-form]
+    forwarded: Forwarded,  # error: [invalid-type-form]
+    local: Local,  # error: [invalid-type-form]
+):
+    reveal_type(local)  # revealed: Unknown
+
+def inspect_classes(
+    imported: ComputedClass,  # error: [invalid-type-form]
+    attribute: values.ComputedClass,  # error: [invalid-type-form]
+    local: LocalClass,  # error: [invalid-type-form]
+    local_attribute: AttributeClass,  # error: [invalid-type-form]
+):
+    reveal_type(local_attribute)  # revealed: Unknown
+```
+
+## Suppressions on alias definitions
+
+The assignment below is valid runtime code; the error belongs to the use of `Number` as a type.
+
+We explain the error by inferring the assignment's right-hand side as a type expression at its
+original source location. The resulting diagnostics are attached as notes on the error at the use,
+not reported as separate errors on the assignment. This inference must bypass the assignment's
+suppression: the test checks that the ignore remains unused and that the explanation is still shown.
+
+```py
+# error: [unused-ignore-comment]
+Number = 1 + 2  # ty: ignore[invalid-type-form]
+
+# snapshot: invalid-type-form
+def inspect(value: Number): ...
+```
+
+```snapshot
+error[invalid-type-form]: Variable `Number` cannot be used as a type
+ --> src/mdtest_snippet.py:5:20
+  |
+5 | def inspect(value: Number): ...
+  |                    ^^^^^^
+info: `Number` is not a valid type alias
+info: Invalid binary operator `+` in a type alias definition
+ --> src/mdtest_snippet.py:2:10
+  |
+2 | Number = 1 + 2  # ty: ignore[invalid-type-form]
+  |          ^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+## Disabled invalid implicit alias diagnostics
+
+Disabling `invalid-type-form` does not make invalid aliases valid:
+
+```toml
+[rules]
+invalid-type-form = "ignore"
+```
+
+```py
+Number = 1 + 2
+
+def inspect(number: Number, specialized: Number[int]):
+    reveal_type(number)  # revealed: Unknown
+    reveal_type(specialized)  # revealed: Unknown
+```
+
+An invalid union member cannot be hidden by simplification, and forwarding or nesting the alias
+preserves its `Unknown` fallback:
+
+```py
+from typing_extensions import Self
+
+class Node:
+    Simplified = object | Self
+    Forwarded = Simplified
+    Nested = tuple[Forwarded, int]
+
+    def inspect(self, simplified: Simplified, forwarded: Forwarded, nested: Nested):
+        reveal_type(simplified)  # revealed: Unknown
+        reveal_type(forwarded)  # revealed: Unknown
+        reveal_type(nested)  # revealed: tuple[Unknown, int]
+```
+
 ## Recursive
 
 ### Old union syntax
+
+Recursive aliases are displayed using their declared names.
 
 ```py
 from typing import Union
@@ -1724,7 +2640,7 @@ from typing import Union
 Recursive = list[Union["Recursive", None]]
 
 def _(r: Recursive):
-    reveal_type(r)  # revealed: list[Divergent]
+    reveal_type(r)  # revealed: Recursive
 ```
 
 ### New union syntax
@@ -1752,12 +2668,1156 @@ def _(
     recursive_dict3: RecursiveDict3,
     recursive_dict4: RecursiveDict4,
 ):
-    reveal_type(recursive_list1)  # revealed: list[Divergent]
-    reveal_type(recursive_list2)  # revealed: list[Divergent]
-    reveal_type(recursive_dict1)  # revealed: dict[str, Divergent]
-    reveal_type(recursive_dict2)  # revealed: dict[str, Divergent]
-    reveal_type(recursive_dict3)  # revealed: dict[Divergent, int]
-    reveal_type(recursive_dict4)  # revealed: dict[Divergent, int]
+    reveal_type(recursive_list1)  # revealed: RecursiveList1
+    reveal_type(recursive_list2)  # revealed: RecursiveList2
+    reveal_type(recursive_dict1)  # revealed: RecursiveDict1
+    reveal_type(recursive_dict2)  # revealed: RecursiveDict2
+    reveal_type(recursive_dict3)  # revealed: RecursiveDict3
+    reveal_type(recursive_dict4)  # revealed: RecursiveDict4
+```
+
+Truthiness operations inspect the closed unfolding of a recursive alias:
+
+```py
+def is_empty(value: RecursiveList1) -> bool:
+    return not value
+```
+
+### Nested values
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+An implicit recursive alias checks the leaves of nested values, just like an alias declared with
+`type`.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+Tree = int | tuple["Tree"]
+type NamedTree = int | tuple[NamedTree]
+
+static_assert(is_assignable_to(Tree, NamedTree))
+static_assert(is_assignable_to(NamedTree, Tree))
+static_assert(not is_assignable_to(tuple[tuple[str]], Tree))
+
+def valid_tree() -> Tree:
+    return (((1,),),)
+
+def invalid_tree() -> Tree:
+    return ((("leaf",),),)  # error: [invalid-return-type]
+```
+
+### Displaying aliases with the same name
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Recursive aliases retain their declared names when imported under another name. When different
+aliases or classes share a name, the display includes their modules to distinguish them, including
+inside type arguments.
+
+`left.py`:
+
+```py
+Tree = list["Tree | None"]
+
+class Item: ...
+```
+
+`right.py`:
+
+```py
+Tree = dict[str, "Tree | None"]
+
+class Item: ...
+```
+
+`classes.py`:
+
+```py
+class Tree: ...
+```
+
+`modern.py`:
+
+```py
+type Tree = tuple[Tree, ...]
+```
+
+`main.py`:
+
+```py
+from typing import TypeVar
+from left import Tree as Left
+from right import Tree as Right
+from classes import Tree as Class
+from modern import Tree as Modern
+from left import Item as LeftItem
+from right import Item as RightItem
+
+def inspect(value: tuple[Left, Right, Class, Modern]):
+    # revealed: tuple[left.Tree, right.Tree, classes.Tree, modern.Tree]
+    reveal_type(value)
+
+T = TypeVar("T")
+Container = list["Container[T] | T"]
+
+def inspect_arguments(value: tuple[Container[LeftItem], Container[RightItem]]):
+    reveal_type(value)  # revealed: tuple[Container[left.Item], Container[right.Item]]
+```
+
+### Recursive aliases across annotation contexts
+
+A recursive alias keeps its identity through imports, re-exports, and attribute access, in both
+function signatures and variable annotations.
+
+`aliases.py`:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Tree = T | list["Tree[T]"]
+Plain = list["Plain | None"]
+```
+
+`forward.py`:
+
+```py
+from aliases import Tree, Plain
+```
+
+`main.py`:
+
+```py
+from forward import Tree, Plain
+import aliases
+
+def inspect(a: Plain, b: Tree[int], c: aliases.Plain, d: aliases.Tree[int]):
+    reveal_type(a)  # revealed: Plain
+    reveal_type(b)  # revealed: Tree[int]
+    reveal_type(c)  # revealed: Plain
+    reveal_type(d)  # revealed: Tree[int]
+    reveal_type(c[0])  # revealed: Plain | None
+
+def assign():
+    value: Tree[int]
+    # error: [invalid-assignment] "is not assignable to `Tree[int]`"
+    value = "bad"
+    other: aliases.Plain
+    # error: [invalid-assignment] "is not assignable to `Plain`"
+    other = 1
+
+valid: Tree[int] = [1, [2]]
+```
+
+### Recursive aliases provide tuple element contexts
+
+A recursive tuple alias supplies the expected types for its elements, including the parameters of a
+lambda expression.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+
+Implicit = tuple[Callable[[int], int], "Implicit | None"]
+type Pep695 = tuple[Callable[[int], int], Pep695 | None]
+
+implicit: Implicit = (lambda value: reveal_type(value) or value, None)  # revealed: int
+pep695: Pep695 = (lambda value: reveal_type(value) or value, None)  # revealed: int
+```
+
+### Recursive aliases in union contexts
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+#### Nested dictionary literals
+
+An outer `None` alternative does not prevent a recursive alias from supplying the expected type for
+a nested dictionary. Implicit aliases and PEP 695 aliases accept the same values.
+
+```py
+Value = str | dict[str, "Value | None"]
+type Pep695Value = str | dict[str, Pep695Value | None]
+
+implicit: dict[str, Value | None] = {"input": {"location": "file"}}
+pep695: dict[str, Pep695Value | None] = {"input": {"location": "file"}}
+
+invalid: dict[str, Value | None] = {"input": {"location": 1}}  # error: [invalid-assignment]
+```
+
+#### Subscript assignments
+
+The expected value type of a dictionary supplies the list element type for both literals and
+comprehensions, even when that value type includes a recursive alias and `None`.
+
+```py
+Value = str | list["Value | None"]
+type Pep695Value = str | list[Pep695Value | None]
+
+def implicit(data: dict[str, Value | None], values: list[Value | None]):
+    data["fields"] = ["name"]
+    data["filtered"] = [value for value in values if value is not None]
+
+def pep695(data: dict[str, Pep695Value | None], values: list[Pep695Value | None]):
+    data["fields"] = ["name"]
+    data["filtered"] = [value for value in values if value is not None]
+```
+
+#### Return after narrowing
+
+A value remains compatible with the recursive alias after excluding one of its alternatives. It can
+be placed in a dictionary whose values have that alias type.
+
+```py
+Value = str | list["Value | None"] | dict[str, "Value | None"]
+type Pep695Value = str | list[Pep695Value | None] | dict[str, Pep695Value | None]
+
+def implicit(value: Value | None) -> Value | None:
+    if isinstance(value, list):
+        return None
+    return {"items": value}
+
+def pep695(value: Pep695Value | None) -> Pep695Value | None:
+    if isinstance(value, list):
+        return None
+    return {"items": value}
+```
+
+### String variables are not recursive aliases
+
+A string assignment remains a runtime value even when its contents describe a recursive type. A PEP
+613 alias can use a quoted type expression as its right-hand side.
+
+```py
+from typing import TypeAlias
+
+PlainString = "list[int]"
+RecursiveString = "list[RecursiveString]"
+QuotedList: TypeAlias = "list[QuotedList]"
+
+def inspect(
+    plain: PlainString,  # error: [invalid-type-form]
+    recursive: RecursiveString,  # error: [invalid-type-form]
+    alias: QuotedList,
+):
+    reveal_type(plain)  # revealed: Unknown
+    reveal_type(recursive)  # revealed: Unknown
+    reveal_type(alias)  # revealed: QuotedList
+```
+
+### Invalid cycles
+
+An implicit alias cannot include itself as a union member without a containing type. The error is
+reported once at the definition, even when the alias is used in multiple annotations.
+
+```py
+from typing import Union
+
+# snapshot: cyclic-type-alias-definition
+IntOr = Union[int, "IntOr"]
+
+def first(value: IntOr): ...
+def second(value: IntOr): ...
+```
+
+```snapshot
+error[cyclic-type-alias-definition]: Type alias `IntOr` has a circular definition
+ --> src/mdtest_snippet.py:4:9
+  |
+4 | IntOr = Union[int, "IntOr"]
+  |         ^^^^^^^^^^^^^^^^^^^
+```
+
+The same restriction applies to mutually recursive aliases.
+
+```py
+First = Union[int, "Second"]  # error: [cyclic-type-alias-definition] "Type alias `First` has a circular definition"
+Second = Union[str, "First"]  # error: [cyclic-type-alias-definition] "Type alias `Second` has a circular definition"
+
+def inspect(first: First, second: Second): ...
+```
+
+### Invalid generic cycles
+
+Specializing a recursive reference does not guard its cycle. A generic implicit alias cannot include
+a specialization of itself as a union member.
+
+```py
+from typing import TypeVar, Union
+
+T = TypeVar("T")
+Alias = Union[T, "Alias[T]"]  # error: [cyclic-type-alias-definition]
+Growing = Union[T, "Growing[list[T]]"]  # error: [cyclic-type-alias-definition]
+
+def inspect(bare: Alias, specialized: Alias[int], growing: Growing[int]): ...
+```
+
+### Invalid recursive alias bodies
+
+`Self` cannot appear in a type alias. Repeated uses of a recursive alias report the error once, at
+its definition.
+
+```py
+from typing_extensions import Self
+
+class Node:
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    Tree = tuple[Self, "Node.Tree"]
+
+def first(value: Node.Tree): ...
+def second(value: Node.Tree): ...
+```
+
+Errors that are also detected while inferring the assignment's runtime value are reported once.
+
+```py
+Tree = tuple["Tree", 1]  # error: [invalid-type-form]
+
+def first(value: Tree): ...
+def second(value: Tree): ...
+```
+
+### Suppressing invalid recursive alias bodies
+
+A suppression on an alias definition applies to errors in its type expression. The suppression is
+used even when the assignment is valid as a runtime expression.
+
+```toml
+[rules]
+unused-ignore-comment = "error"
+```
+
+```py
+from typing_extensions import Self
+
+class Node:
+    Tree = tuple[Self, "Node.Tree"]  # ty: ignore[invalid-type-form]
+
+def inspect(value: Node.Tree): ...
+```
+
+### Invalid bodies in mutually recursive aliases
+
+Using an alias also checks the bodies of aliases it references. An error in a mutually recursive
+alias is reported once at its definition.
+
+```py
+from typing_extensions import Self
+
+class Node:
+    First = tuple["Node.Second"]
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    Second = tuple[Self, "Node.First"]
+
+def inspect(value: Node.First): ...
+```
+
+### Recursive aliases inside unchecked functions
+
+`no_type_check` suppresses errors in nested class bodies, including errors in recursive aliases used
+by a nested function.
+
+```py
+from typing import no_type_check
+from typing_extensions import Self
+
+@no_type_check
+def unchecked():
+    class Node:
+        Tree = tuple[Self, "Node.Tree"]
+
+    def inspect(value: Node.Tree): ...
+```
+
+### Mutually recursive aliases
+
+The two aliases alternate the type allowed at each depth. A tuple does not hide an invalid leaf.
+
+```py
+Even = int | tuple["Odd"]
+Odd = str | tuple["Even"]
+
+def valid_even() -> Even:
+    return ((1,),)
+
+def valid_odd() -> Odd:
+    return (("leaf",),)
+
+def invalid_even() -> Even:
+    return (("leaf",),)  # error: [invalid-return-type]
+
+def invalid_odd() -> Odd:
+    return ((1,),)  # error: [invalid-return-type]
+```
+
+### Self-recursion within mutually recursive aliases
+
+An inner tuple can refer both to itself and to the outer tuple. Indexing preserves their distinct
+element types, and both references enforce those types on returned values.
+
+```py
+Outer = tuple[int, "Inner | None"]
+Inner = tuple[str, "Outer | None", "Inner | None"]
+
+def inspect(outer: Outer):
+    inner = outer[1]
+    if inner is not None:
+        reveal_type(inner[0])  # revealed: str
+        reveal_type(inner[1])  # revealed: Outer | None
+        reveal_type(inner[2])  # revealed: Inner | None
+        next_outer = inner[1]
+        if next_outer is not None:
+            reveal_type(next_outer[0])  # revealed: int
+        next_inner = inner[2]
+        if next_inner is not None:
+            reveal_type(next_inner[0])  # revealed: str
+
+def valid() -> Outer:
+    return (1, ("inner", (2, None), ("inner", None, None)))
+
+def invalid_outer() -> Outer:
+    return (1, ("inner", ("bad", None), None))  # error: [invalid-return-type]
+
+def invalid_inner() -> Outer:
+    return (1, ("inner", None, (2, None, None)))  # error: [invalid-return-type]
+```
+
+### A recursive union with a self-recursive tuple member
+
+A union can refer to a tuple that recurses both through the union and through itself. These
+references preserve their type arguments when the union is specialized.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeVar, Union
+
+T = TypeVar("T")
+Tree = Union[int, "Node[T]"]
+Node = tuple[T, "Tree[T]", "Node[T] | None"]
+type Pep695Tree[T] = int | Pep695Node[T]
+type Pep695Node[T] = tuple[T, Pep695Tree[T], Pep695Node[T] | None]
+
+def inspect(value: Tree[int], pep695: Pep695Tree[int]):
+    reveal_type(value)  # revealed: Tree[int]
+    reveal_type(pep695)  # revealed: int | tuple[int, Pep695Tree[int], Pep695Node[int] | None]
+
+valid: Tree[str] = ("leaf", 1, None)
+invalid: Tree[str] = (1, 1, None)  # error: [invalid-assignment]
+pep695_valid: Pep695Tree[str] = ("leaf", 1, None)
+pep695_invalid: Pep695Tree[str] = (1, 1, None)  # error: [invalid-assignment]
+```
+
+### Three mutually recursive generic aliases
+
+The three aliases alternate containers while preserving the leaf type. Currently, only the alias at
+the start of the cycle retains its name; the others appear as unfoldings that refer back to it.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+A = T | list["B[T]"]
+B = T | tuple["C[T]"]
+C = T | dict[str, "A[T]"]
+
+def inspect(a: A[int], b: B[int], c: C[int]):
+    reveal_type(a)  # revealed: A[int]
+    reveal_type(b)  # revealed: int | tuple[int | dict[str, A[int]]]
+    reveal_type(c)  # revealed: int | dict[str, A[int]]
+
+def valid() -> A[int]:
+    return [({"leaf": [({"leaf": 1},)]},)]
+
+def invalid() -> A[int]:
+    return [({"leaf": "bad"},)]  # error: [invalid-return-type]
+```
+
+### Self-recursion within three mutually recursive generic aliases
+
+Each alias preserves its own element type and the shared type argument when a tuple refers back to
+itself or either of the other aliases.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Outer = tuple[T, "Middle[T] | None"]
+Middle = tuple[list[T], "Inner[T] | None", "Middle[T] | None"]
+Inner = tuple[set[T], "Outer[T] | None", "Middle[T] | None", "Inner[T] | None"]
+
+def inspect(outer: Outer[int]):
+    reveal_type(outer[0])  # revealed: int
+    middle = outer[1]
+    if middle is None:
+        return
+    reveal_type(middle[0])  # revealed: list[int]
+    reveal_type(middle[2])  # revealed: Middle[int] | None
+    inner = middle[1]
+    if inner is None:
+        return
+    reveal_type(inner[0])  # revealed: set[int]
+    reveal_type(inner[1])  # revealed: Outer[int] | None
+    reveal_type(inner[2])  # revealed: Middle[int] | None
+    reveal_type(inner[3])  # revealed: Inner[int] | None
+```
+
+### Shared references in mutually recursive aliases
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A tuple can reach the same alias both directly and through another alias. Both paths preserve the
+leaf type, including when they return to the outer tuple. The implicit aliases describe the same
+types as their PEP 695 counterparts.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+Root = tuple[int, "Branch | None", "Shared | None"]
+Branch = tuple["Shared | None"]
+Shared = tuple["Root | None", "Branch | None"]
+
+type Pep695Root = tuple[int, Pep695Branch | None, Pep695Shared | None]
+type Pep695Branch = tuple[Pep695Shared | None]
+type Pep695Shared = tuple[Pep695Root | None, Pep695Branch | None]
+
+static_assert(is_equivalent_to(Root, Pep695Root))
+static_assert(is_equivalent_to(Branch, Pep695Branch))
+static_assert(is_equivalent_to(Shared, Pep695Shared))
+
+def inspect(root: Root):
+    reveal_type(root[0])  # revealed: int
+    branch = root[1]
+    if branch is not None:
+        shared = branch[0]
+        if shared is not None:
+            next_root = shared[0]
+            if next_root is not None:
+                reveal_type(next_root[0])  # revealed: int
+    shared = root[2]
+    if shared is not None:
+        branch = shared[1]
+        if branch is not None:
+            next_shared = branch[0]
+            if next_shared is not None:
+                next_root = next_shared[0]
+                if next_root is not None:
+                    reveal_type(next_root[0])  # revealed: int
+
+def valid() -> Root:
+    return (1, None, (None, (((2, None, None), None),)))
+
+def invalid() -> Root:
+    return (1, None, (None, ((("bad", None, None), None),)))  # error: [invalid-return-type]
+```
+
+### Shared references with changing type arguments
+
+Each alias binds its own type parameter. Traversing a branch wraps that parameter in a list, whether
+the branch is reached directly or through the shared alias.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+Root = tuple[T, "Branch[T] | None", "Shared[T] | None"]
+Branch = tuple["Shared[list[U]] | None"]
+Shared = tuple["Root[V] | None", "Branch[V] | None"]
+
+def inspect(root: Root[int]):
+    reveal_type(root[0])  # revealed: int
+    branch = root[1]
+    if branch is not None:
+        shared = branch[0]
+        if shared is not None:
+            next_root = shared[0]
+            if next_root is not None:
+                reveal_type(next_root[0])  # revealed: list[int]
+    shared = root[2]
+    if shared is not None:
+        branch = shared[1]
+        if branch is not None:
+            next_shared = branch[0]
+            if next_shared is not None:
+                next_root = next_shared[0]
+                if next_root is not None:
+                    reveal_type(next_root[0])  # revealed: list[int]
+
+def valid() -> Root[int]:
+    return (1, None, (None, ((([2], None, None), None),)))
+
+def invalid() -> Root[int]:
+    return (1, None, (None, (((["bad"], None, None), None),)))  # error: [invalid-return-type]
+```
+
+### Generic recursion through different paths
+
+Returning to the outer alias directly preserves its type argument. Returning through another alias
+can change that argument without changing the type of the other path.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+Root = tuple[T, "Direct[T] | None", "Via[T] | None"]
+Direct = tuple[U, "Root[U] | None"]
+Via = tuple[V, "Direct[list[V]] | None"]
+
+def inspect(root: Root[int]):
+    reveal_type(root[0])  # revealed: int
+    direct = root[1]
+    if direct is not None:
+        reveal_type(direct[0])  # revealed: int
+        next_root = direct[1]
+        if next_root is not None:
+            reveal_type(next_root[0])  # revealed: int
+    via = root[2]
+    if via is not None:
+        reveal_type(via[0])  # revealed: int
+        direct = via[1]
+        if direct is not None:
+            reveal_type(direct[0])  # revealed: list[int]
+            next_root = direct[1]
+            if next_root is not None:
+                reveal_type(next_root[0])  # revealed: list[int]
+
+def valid() -> Root[int]:
+    return (1, (2, None), (3, ([4], None)))
+
+def invalid() -> Root[int]:
+    return (1, None, (2, ("bad", None)))  # error: [invalid-return-type]
+```
+
+### Recursive callable parameters
+
+A recursive callable accepts another callable with the same signature. Its recursive parameter
+retains this requirement when the callable is invoked.
+
+```py
+from typing import Callable
+
+Callback = Callable[["Callback"], int]
+
+def invoke(callback: Callback):
+    reveal_type(callback(callback))  # revealed: int
+    callback(1)  # error: [invalid-argument-type]
+```
+
+### Copying dictionaries with recursive callable values
+
+Copying a dictionary preserves its recursive callable value type, including callables with gradual
+parameter lists.
+
+```py
+from typing import Callable
+
+Callback = Callable[..., "Callback"]
+
+def copy_callbacks(value: dict[str, Callback]):
+    copied: dict[str, Callback] = dict(value)  # no diagnostic
+```
+
+This also applies when the callable is one alternative of a recursive union.
+
+```py
+Value = float | None | Callable[..., "Value"]
+
+def copy_values(value: dict[str, Value]):
+    copied: dict[str, Value] = dict(value)  # no diagnostic
+```
+
+### Recursion through generic alias arguments
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A helper alias can carry a recursive reference in its type arguments, including when the helper
+returns its argument unchanged.
+
+```py
+type Identity[T] = T
+type Container[T] = tuple[T]
+
+First = int | tuple["Identity[First]"]
+Second = int | Container["Second"]
+
+def valid_first() -> First:
+    return (((1,),),)
+
+def invalid_first() -> First:
+    return ((("leaf",),),)  # error: [invalid-return-type]
+
+def valid_second() -> Second:
+    return (((1,),),)
+
+def invalid_second() -> Second:
+    return ((("leaf",),),)  # error: [invalid-return-type]
+```
+
+### Unguarded recursion through generic aliases
+
+An alias that returns its argument unchanged does not make a recursive definition valid, even when
+the helper is applied more than once. We recover from these cycles before using the alias.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Identity[T] = T
+
+Direct = Identity["Direct"]  # error: [cyclic-type-alias-definition]
+Repeated = Identity[Identity["Repeated"]]  # error: [cyclic-type-alias-definition]
+
+def inspect(direct: Direct, repeated: Repeated):
+    reveal_type(direct)  # revealed: Divergent
+    reveal_type(repeated)  # revealed: Divergent
+    direct[0]
+    repeated[0]
+```
+
+A union member does not make an unguarded cycle valid.
+
+```py
+WithLeaf = int | Identity["WithLeaf"]  # error: [cyclic-type-alias-definition]
+
+def inspect_union(value: WithLeaf):
+    reveal_type(value)  # revealed: Divergent
+    value[0]
+```
+
+### Generic recursive aliases
+
+Type arguments are preserved at every recursive occurrence. A nested value with a different leaf
+type is rejected.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+T = TypeVar("T")
+Tree = T | tuple["Tree[T]"]
+type NamedTree[T] = T | tuple[NamedTree[T]]
+
+static_assert(is_assignable_to(Tree[int], NamedTree[int]))
+static_assert(is_assignable_to(NamedTree[int], Tree[int]))
+static_assert(not is_assignable_to(Tree[str], Tree[int]))
+
+def valid() -> Tree[int]:
+    return (((1,),),)
+
+def invalid() -> Tree[int]:
+    return ((("bad",),),)  # error: [invalid-return-type]
+```
+
+Type arguments can themselves be recursive aliases; their display preserves each application.
+
+```py
+def inspect(value: Tree[Tree[int]]):
+    reveal_type(value)  # revealed: Tree[Tree[int]]
+```
+
+### Recursive alias contexts in generic calls
+
+A recursive alias can appear inside a generic function's list parameter. Both legacy and PEP 695
+functions infer result types from the elements of the argument list.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+W = TypeVar("W")
+Tree = T | tuple["Tree[T]"]
+
+def first_list(value: list[Tree[W]]) -> W:
+    raise NotImplementedError
+
+def modern_first_list[W](value: list[Tree[W]]) -> W:
+    raise NotImplementedError
+
+# TODO: should be `int`
+reveal_type(first_list([1]))  # revealed: int | tuple[Tree[int]]
+# TODO: should be `int`
+reveal_type(modern_first_list([1]))  # revealed: int | tuple[Tree[int]]
+
+# TODO: should be `int`
+# revealed: tuple[Tree[tuple[tuple[int]] | tuple[int] | int]] | int
+reveal_type(first_list([((1,),)]))
+# TODO: should be `int`
+# revealed: tuple[Tree[tuple[tuple[int]] | tuple[int] | int]] | int
+reveal_type(modern_first_list([((1,),)]))
+```
+
+### Recursive aliases returned by generic functions
+
+A recursive return type retains the inferred argument after narrowing, indexing, and insertion into
+a collection. Both forms of generic function bind their own parameters independently of the alias's
+parameters.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Tree = T | tuple["Tree[T]"]
+
+def legacy(value: T) -> Tree[T]:
+    raise NotImplementedError
+
+def modern[S](value: S) -> Tree[S]:
+    raise NotImplementedError
+
+def take(values: list[Tree[int]]) -> None: ...
+
+for tree in (legacy(1), modern(1)):
+    reveal_type(tree)  # revealed: Tree[Literal[1]]
+    if isinstance(tree, tuple):
+        reveal_type(tree[0])  # revealed: Tree[Literal[1]]
+
+reveal_type([legacy(1)])  # revealed: list[int | tuple[int | tuple[Tree[int]]]]
+reveal_type([modern(1)])  # revealed: list[int | tuple[int | tuple[Tree[int]]]]
+take([legacy(1)])
+take([modern(1)])
+annotated: list[Tree[int]] = [legacy(1), modern(1)]
+```
+
+### Growing aliases in generic signatures
+
+Calling a generic function or binding a method's `Self` does not change the type arguments at
+successive depths of an unrelated recursive alias. Promoting collection elements preserves the same
+progression.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, Self, TypeVar
+
+T = TypeVar("T")
+Growing = T | list["Growing[list[T]]"]
+
+def fixed(value: T) -> Growing[int]:
+    raise NotImplementedError
+
+def legacy(value: T) -> Growing[T]:
+    raise NotImplementedError
+
+def modern[S](value: S) -> Growing[S]:
+    raise NotImplementedError
+
+class Container:
+    def get(self) -> tuple[Self, Growing[int]]:
+        raise NotImplementedError
+
+class Box(Generic[T]):
+    def __init__(self, value: Growing[T]) -> None:
+        self.value = value
+
+def inspect(container: Container):
+    for tree in (fixed(1), container.get()[1]):
+        if isinstance(tree, list):
+            reveal_type(tree[0])  # revealed: Growing[list[int]]
+            reveal_type(tree[0][0])  # revealed: int | Growing[list[list[int]]]
+
+    values = [legacy(1), modern(1)]
+    reveal_type(values)  # revealed: list[int | list[Growing[list[int]]]]
+    tree = values[0]
+    if isinstance(tree, list):
+        reveal_type(tree[0])  # revealed: Growing[list[int]]
+        reveal_type(tree[0][0])  # revealed: int | Growing[list[list[int]]]
+```
+
+### Type parameters used only in recursive references
+
+A type variable used only as an argument to a recursive reference still makes the alias generic.
+Variable annotations accept its specialization and check nested values against the recursive type.
+
+```py
+from typing import Final, TypeVar
+
+T = TypeVar("T")
+NestedDict = dict[str, "NestedDict[T]"]
+
+valid: NestedDict[int] = {"nested": {}}
+invalid: NestedDict[int] = {"nested": b"wrong"}  # error: [invalid-assignment]
+constant: Final[NestedDict[int]] = {"nested": {}}
+quoted: "NestedDict[int]" = {"nested": b"wrong"}  # error: [invalid-assignment]
+
+def inspect(value: NestedDict[int]):
+    local: NestedDict[int] = value
+    reveal_type(local["nested"])  # revealed: NestedDict[int]
+    invalid_local: NestedDict[int] = {"nested": {"leaf": 1}}  # error: [invalid-assignment]
+
+class Holder:
+    valid: NestedDict[int] = {"nested": {}}
+    invalid: NestedDict[int] = {"nested": 1}  # error: [invalid-assignment]
+```
+
+### Forwarding generic recursive aliases
+
+A forwarded alias preserves type arguments even when the recursive definition refers back to the
+forwarded name:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Node = tuple[T, "Forwarded[T] | None"]
+Forwarded = Node
+
+def inspect(forwarded: Forwarded[int], original: Node[str]):
+    reveal_type(forwarded[0])  # revealed: int
+    reveal_type(original[0])  # revealed: str
+    forwarded_tail = forwarded[1]
+    if forwarded_tail is not None:
+        reveal_type(forwarded_tail[0])  # revealed: int
+    original_tail = original[1]
+    if original_tail is not None:
+        reveal_type(original_tail[0])  # revealed: str
+
+def valid() -> Forwarded[int]:
+    return (1, (2, None))
+
+def invalid() -> Forwarded[int]:
+    return (1, ("bad", None))  # error: [invalid-return-type]
+```
+
+### Generic mutually recursive aliases
+
+Specializing either alias applies the same argument through the other alias before returning to the
+first one. An invalid leaf is rejected after crossing both aliases.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Even = T | list["Odd[T]"]
+Odd = T | tuple["Even[T]"]
+
+def valid() -> Even[int]:
+    return [(1,)]
+
+def invalid_even() -> Even[int]:
+    return [("bad",)]  # error: [invalid-return-type]
+
+def invalid_odd() -> Odd[int]:
+    return ([("bad",)],)  # error: [invalid-return-type]
+```
+
+### Changing recursive type arguments
+
+Each recursive occurrence can apply a different argument. Here, entering the recursive list also
+wraps the parameter in `list`. Narrowing and indexing preserve those applications.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Growing = T | list["Growing[list[T]]"]
+
+def valid() -> Growing[int]:
+    return [[1]]
+
+def invalid() -> Growing[int]:
+    return [["bad"]]  # error: [invalid-return-type]
+
+def inspect(value: Growing[int]):
+    if isinstance(value, list):
+        reveal_type(value)  # revealed: list[Growing[list[int]]]
+        reveal_type(value[0])  # revealed: Growing[list[int]]
+        reveal_type(value[0][0])  # revealed: int | Growing[list[list[int]]]
+```
+
+### Projection through a recursive alias argument
+
+Projecting a generic member through a recursive alias keeps the recursive result closed:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Protocol, Type, Union
+
+class Properties[T](Protocol):
+    def __getitem__(self, key: str) -> T: ...
+
+ByModuleProperties = Properties[Union["ByModuleProperties", Type[Any]]]
+
+def _(properties: ByModuleProperties):
+    reveal_type(properties["name"])  # revealed: ByModuleProperties | type[Any]
+```
+
+### Recursive aliases with variadic parameters
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+A recursive tuple preserves its specialized elements at each level:
+
+```py
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+TupleTree = tuple[*Ts, "TupleTree[*Ts] | None"]
+
+def _(tree: TupleTree[int, str]):
+    tail = tree[2]
+    if tail is not None:
+        reveal_type(tail[0])  # revealed: int
+        reveal_type(tail[1])  # revealed: str
+```
+
+A recursive callable preserves its parameter specification in the callbacks it returns:
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+Callback = Callable[P, "T | Callback[P, T]"]
+
+def _(callback: Callback[[int], str]):
+    result = callback(1)
+    if not isinstance(result, str):
+        # error: [invalid-argument-type] "Expected `int`"
+        result("bad")
+```
+
+### Imported generic recursive aliases
+
+Both import forms preserve the parameters and recursive structure of an implicit alias.
+
+`tree.py`:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Tree = T | list["Tree[T]"]
+```
+
+`main.py`:
+
+```py
+from tree import Tree
+import tree
+
+def valid() -> Tree[int]:
+    return [[1]]
+
+def invalid() -> tree.Tree[int]:
+    return [["bad"]]  # error: [invalid-return-type]
+
+def inspect(value: Tree[int]):
+    if isinstance(value, list):
+        reveal_type(value[0])  # revealed: Tree[int]
+```
+
+### Parameters and metadata in recursive aliases
+
+String literals in `Literal` and values in `Annotated` metadata do not declare type parameters.
+Parameters occurring only in a forward reference still belong to the alias.
+
+```py
+from typing import Annotated, Literal, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+Tree = Annotated[U, T] | Literal["T"] | tuple["Tree[U]"]
+
+def valid() -> Tree[int]:
+    return (("T",),)
+
+def invalid() -> Tree[int]:
+    return (("bad",),)  # error: [invalid-return-type]
+```
+
+### Specialized aliases do not introduce type parameters
+
+A specialized generic alias does not make an enclosing recursive alias generic. Here `Identity`
+contributes `int` as a leaf type, so `Tree` takes no type arguments.
+
+```py
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+Identity: TypeAlias = T
+Tree = list["Identity[int] | Tree"]
+
+def inspect(value: Tree):
+    reveal_type(value)  # revealed: Tree
+    reveal_type(value[0])  # revealed: int | Tree
+
+def invalid(value: Tree[str]): ...  # error: [not-subscriptable]
+```
+
+### Recursive typed-dictionary fields in generic aliases
+
+A recursive field on a non-generic typed dictionary does not make an unrelated enclosing generic
+alias recursive:
+
+```py
+from typing import TypeVar, TypedDict
+
+T = TypeVar("T")
+RecursiveList = list["RecursiveList | None"]
+
+class Payload(TypedDict):
+    value: RecursiveList
+
+ListOrPayload = list[T] | Payload
+
+def _(value: ListOrPayload[int]):
+    reveal_type(value)  # revealed: list[int] | Payload
 ```
 
 ### Self-referential generic implicit type aliases
@@ -1774,8 +3834,8 @@ def _(
     nested_dict_int: NestedDict[int],
     nested_list_str: NestedList[str],
 ):
-    reveal_type(nested_dict_int)  # revealed: dict[str, Divergent]
-    reveal_type(nested_list_str)  # revealed: list[Divergent]
+    reveal_type(nested_dict_int)  # revealed: NestedDict[int]
+    reveal_type(nested_list_str)  # revealed: NestedList[str]
 ```
 
 ### Materialization of self-referential generic implicit type aliases
@@ -1794,4 +3854,76 @@ NestedDict = dict[K, Union[V, "NestedDict[K, V]"]]
 
 static_assert(is_subtype_of(Bottom[NestedList[str]], Top[NestedList[str]]))
 static_assert(is_subtype_of(Bottom[NestedDict[str, int]], Top[NestedDict[str, int]]))
+```
+
+Materialization preserves aliases whose type arguments and recursive bodies are fully static.
+
+```py
+def inspect(top: Top[NestedDict[str, int]], bottom: Bottom[NestedDict[str, int]]):
+    reveal_type(top)  # revealed: NestedDict[str, int]
+    reveal_type(bottom)  # revealed: NestedDict[str, int]
+```
+
+### Mutually recursive aliases with growing specializations
+
+The type arguments grow when these aliases refer back to each other. Inferring a list containing one
+of these values preserves the alias without expanding the recursive references indefinitely.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+GrowingA = tuple[T, "GrowingB[T] | None"]
+GrowingB = tuple[T, "GrowingA[list[T]] | None", "GrowingB[T] | None"]
+
+def f(a: GrowingA[int]):
+    reveal_type([a])  # revealed: list[GrowingA[int]]
+```
+
+These aliases contain no dynamic types when specialized with `int`, so both materializations are
+equivalent to the original type.
+
+```py
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+static_assert(is_equivalent_to(GrowingA[int], Top[GrowingA[int]]))
+static_assert(is_equivalent_to(GrowingA[int], Bottom[GrowingA[int]]))
+```
+
+### Materialized recursive aliases in collections
+
+Literal promotion preserves a recursive alias's materialization, including when its type arguments
+change at each level. In particular, inserting a top-materialized value into a list must not restore
+`Any` as an unconstrained leaf type.
+
+```py
+from typing import Any, TypeVar
+from ty_extensions import Bottom, Top
+
+T = TypeVar("T")
+Tree = T | tuple["Tree[T]"]
+Growing = T | list["Growing[list[T]]"]
+
+def inspect(
+    top: Top[Tree[Any]],
+    bottom: Bottom[Tree[Any]],
+    top_growing: Top[Growing[Any]],
+    bottom_growing: Bottom[Growing[Any]],
+):
+    reveal_type([top])  # revealed: list[Top[Tree[Any]]]
+    reveal_type([bottom])  # revealed: list[Bottom[Tree[Any]]]
+    reveal_type([top_growing])  # revealed: list[Top[Growing[Any]]]
+    reveal_type([bottom_growing])  # revealed: list[Bottom[Growing[Any]]]
+```
+
+### Recursive aliases and their complements
+
+```py
+from ty_extensions import Not
+
+A = list["A | Not[A]"]
+
+def f(x: A):
+    reveal_type(x[0])  # revealed: object
 ```

@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of `tarfile.extractall`.
@@ -38,7 +39,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [PEP 706]: https://peps.python.org/pep-0706/#backporting-forward-compatibility
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Security)]
 pub(crate) struct TarfileUnsafeMembers;
 
 impl Violation for TarfileUnsafeMembers {

@@ -492,3 +492,9 @@ def buffer_info(o: _CData | _CDataType | type[_CData | _CDataType], /) -> tuple[
 
 def call_cdeclfunction(address: int, arguments: tuple[Any, ...], /) -> Any: ...
 def call_function(address: int, arguments: tuple[Any, ...], /) -> Any: ...
+
+# dllist() is available on Linux and other platforms like NetBSD
+if sys.version_info >= (3, 14) and sys.platform != "win32" and sys.platform != "darwin":
+    # Added in Python 3.14.7
+    def dllist() -> list[str]:
+        """dllist() return a list of loaded shared libraries"""

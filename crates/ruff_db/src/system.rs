@@ -1,3 +1,4 @@
+pub use command::{Command, CommandExecutor};
 pub use memory_fs::MemoryFileSystem;
 
 #[cfg(all(feature = "testing", feature = "os"))]
@@ -21,7 +22,9 @@ pub use self::path::{
     SystemVirtualPathBuf, deduplicate_nested_paths,
 };
 use crate::file_revision::FileRevision;
+use crate::files::FilePath;
 
+mod command;
 mod memory_fs;
 #[cfg(feature = "os")]
 mod os;
@@ -69,6 +72,11 @@ pub trait System: Debug + Sync + Send {
     /// Returns `true` if both paths refer to the same file.
     fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool>;
 
+    /// Returns `true` if `path` is known to be open in an editor.
+    fn is_file_open(&self, _path: &FilePath) -> bool {
+        false
+    }
+
     /// Returns the source type for `path` if known or `None`.
     ///
     /// The default is to always return `None`, assuming the system
@@ -101,18 +109,21 @@ pub trait System: Debug + Sync + Send {
     /// Find an executable binary's path by name.
     fn which(&self, binary_name: &str) -> WhichResult;
 
-    /// Runs a command in the given working directory, returning its output.
-    fn run_command(
-        &self,
-        program: &str,
-        args: &[&str],
-        current_directory: &SystemPath,
-    ) -> Result<Output> {
-        let _ = (program, args, current_directory);
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "running commands is not supported by this system",
-        ))
+    /// Runs `command` and captures its standard output and standard error.
+    fn run_command(&self, command: Command) -> Result<Output> {
+        let Some(executor) = self.command_executor() else {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "running commands is not supported by this system",
+            ));
+        };
+
+        executor.execute(command)
+    }
+
+    /// Returns the system's command executor, if it supports running commands.
+    fn command_executor(&self) -> Option<&dyn CommandExecutor> {
+        None
     }
 
     /// Reads the content of the file at `path` into a [`String`].
@@ -237,6 +248,9 @@ pub trait WritableSystem: System {
 
     /// Writes the given content to the file at the given path.
     fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()>;
+
+    /// Removes the file at the given path.
+    fn remove_file(&self, path: &SystemPath) -> Result<()>;
 
     /// Creates a directory at `path` as well as any intermediate directories.
     fn create_directory_all(&self, path: &SystemPath) -> Result<()>;

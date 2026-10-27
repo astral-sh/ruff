@@ -76,7 +76,7 @@ impl TypeDefinition<'_> {
 }
 
 impl<'db> TypeDefinition<'db> {
-    pub fn definition<'a>(&'a self) -> Option<&'a Definition<'db>> {
+    pub fn definition(&self) -> Option<Definition<'db>> {
         match self {
             Self::Module(_) => None,
             Self::StaticClass(definition)
@@ -86,7 +86,7 @@ impl<'db> TypeDefinition<'db> {
             | Self::TypeAlias(definition)
             | Self::SpecialForm(definition)
             | Self::NewType(definition)
-            | Self::EnumMember(definition) => Some(definition),
+            | Self::EnumMember(definition) => Some(*definition),
         }
     }
 }

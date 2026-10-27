@@ -1,0 +1,87 @@
+name: Select pull request reviewers
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Pull request number
+        required: true
+        type: string
+      head_sha:
+        description: Pull request head commit
+        required: true
+        type: string
+
+permissions: {}
+
+env:
+  UV_LOCKED: 1
+
+jobs:
+  assign:
+    if: >-
+      github.repository == 'astral-sh/ruff' &&
+      github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: github-ubuntu-24.04-x86_64-2
+    timeout-minutes: 10
+    environment:
+      name: automations
+      deployment: false
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: pull-request-reviewer-round-robin
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout: |
+            /pyproject.toml
+            scripts
+            .github/pr-reviewer-pools.toml
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.13.5"
+          checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
+          python-version: "3.13"
+          enable-cache: false
+      - name: Read reviewer credits
+        uses: astral-sh/github-actions/key-value-store/get@9ece8e1afa7e9485a0bc35c40e34e1fa495ae454
+        with:
+          service-url: ${{ secrets.KV_API_URL }}
+          scope: workflow
+          key: reviewer-round-robin-v1
+          path: ${{ runner.temp }}/reviewer-state-${{ github.run_id }}-${{ github.run_attempt }}.json
+      - name: Get a reviewer token
+        id: token
+        uses: astral-sh/github-actions/simple-token-service@eb81cf4d13127c3f9539f621c17e4c65327636c8
+        with:
+          exchange-url: ${{ secrets.STS_API_URL }}/exchange
+          audience: ${{ secrets.STS_API_URL }}
+          repository: astral-sh/ruff
+          permissions: |
+            pull_requests: write
+      - name: Request a reviewer
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          PULL_REQUEST: ${{ inputs.pull_request }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+          REVIEWER_STATE: ${{ runner.temp }}/reviewer-state-${{ github.run_id }}-${{ github.run_attempt }}.json
+          NEXT_REVIEWER_STATE: ${{ runner.temp }}/reviewer-state-next-${{ github.run_id }}-${{ github.run_attempt }}.json
+        run: >-
+          uv run --script scripts/pull_request_reviewers.py
+          --pull-request "$PULL_REQUEST" --head-sha "$HEAD_SHA" --state "$REVIEWER_STATE"
+          --output "$NEXT_REVIEWER_STATE"
+      - name: Store reviewer credits
+        uses: astral-sh/github-actions/key-value-store/put@9ece8e1afa7e9485a0bc35c40e34e1fa495ae454
+        with:
+          service-url: ${{ secrets.KV_API_URL }}
+          scope: workflow
+          key: reviewer-round-robin-v1
+          path: ${{ runner.temp }}/reviewer-state-next-${{ github.run_id }}-${{ github.run_attempt }}.json

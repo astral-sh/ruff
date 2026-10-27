@@ -33,7 +33,7 @@ pub(crate) enum ConfigurationPreference {
     EditorOnly,
 }
 
-/// A direct representation of of `configuration` schema within the client settings.
+/// A direct representation of the `configuration` schema within the client settings.
 #[derive(Clone, Debug, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(untagged)]
@@ -350,8 +350,14 @@ impl AllOptions {
         Self::from_init_options(
             serde_json::from_value(options)
                 .map_err(|err| {
-                    tracing::error!("Failed to deserialize initialization options: {err}. Falling back to default client settings...");
-                    client.show_error_message("Ruff received invalid client settings - falling back to default client settings.");
+                    tracing::error!(
+                        "Failed to deserialize initialization options: {err}. \
+                        Falling back to default client settings..."
+                    );
+                    client.show_error_message(
+                        "Ruff received invalid client settings - \
+                        falling back to default client settings.",
+                    );
                 })
                 .unwrap_or_default(),
         )
@@ -485,8 +491,6 @@ impl_noop_combine!(LineLength);
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use insta::assert_debug_snapshot;
     use ruff_linter::settings::types::PreviewMode;
     use ruff_python_formatter::QuoteStyle;
@@ -740,6 +744,8 @@ mod tests {
     #[cfg(not(windows))]
     #[test]
     fn test_vs_code_workspace_settings_resolve() {
+        use std::str::FromStr;
+
         let options = deserialize_fixture(VS_CODE_INIT_OPTIONS_FIXTURE);
         let AllOptions {
             global,

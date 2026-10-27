@@ -21,13 +21,13 @@ fn rule_default_output() {
 
     Detects returned values that can't be assigned to the function's annotated return type.
 
-    Note that the special case of a function with a non-`None` return type and an empty body
-    is handled by the separate `empty-body` error code.
+    Note that the special case of a function with a non-`None` return type and an empty body is handled
+    by the separate `empty-body` error code.
 
     ## Why is this bad?
 
-    Returning an object of a type incompatible with the annotated return type
-    is unsound, and will lead to ty inferring incorrect types elsewhere.
+    Returning an object of a type incompatible with the annotated return type is unsound, and will lead
+    to ty inferring incorrect types elsewhere.
 
     ## Examples
 
@@ -49,7 +49,7 @@ fn rule_json_output() {
     {
       "name": "invalid-return-type",
       "summary": "detects returned values that can't be assigned to the function's annotated return type",
-      "documentation": "## What it does\n\nDetects returned values that can't be assigned to the function's annotated return type.\n\nNote that the special case of a function with a non-`None` return type and an empty body\nis handled by the separate `empty-body` error code.\n\n## Why is this bad?\n\nReturning an object of a type incompatible with the annotated return type\nis unsound, and will lead to ty inferring incorrect types elsewhere.\n\n## Examples\n\n```python\ndef func() -> int:\n    return \"a\"  # error: [invalid-return-type]\n```",
+      "documentation": "## What it does\n\nDetects returned values that can't be assigned to the function's annotated return type.\n\nNote that the special case of a function with a non-`None` return type and an empty body is handled\nby the separate `empty-body` error code.\n\n## Why is this bad?\n\nReturning an object of a type incompatible with the annotated return type is unsound, and will lead\nto ty inferring incorrect types elsewhere.\n\n## Examples\n\n```python\ndef func() -> int:\n    return \"a\"  # error: [invalid-return-type]\n```",
       "default_level": "error",
       "status": {
         "type": "stable",
@@ -58,6 +58,37 @@ fn rule_json_output() {
     }
     ----- stderr -----
     "###);
+}
+
+#[test]
+fn preview_rule_status() -> anyhow::Result<()> {
+    let output = ty_cmd()
+        .args(["explain", "rule", "missing-direct-dependency"])
+        .output()?;
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(
+        stdout.contains("Default level: ignore | Preview (since 0.0.76)"),
+        "{stdout}"
+    );
+
+    let output = ty_cmd()
+        .args([
+            "explain",
+            "rule",
+            "missing-direct-dependency",
+            "--output-format",
+            "json",
+        ])
+        .output()?;
+    assert!(output.status.success());
+    let rule: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    assert_eq!(
+        rule["status"],
+        serde_json::json!({"type": "preview", "since": "0.0.76"})
+    );
+
+    Ok(())
 }
 
 #[test]

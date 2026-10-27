@@ -203,6 +203,17 @@ def _(
     reveal_type(i2)  # revealed: P & Q
 ```
 
+Recombining the truthy and falsy parts of `int` also subsumes the earlier `bool` operand.
+
+```py
+from typing import Union
+from ty_extensions import AlwaysFalsy, AlwaysTruthy
+
+TruthyInt = Intersection[int, Not[AlwaysFalsy]]
+FalsyInt = Intersection[int, Not[AlwaysTruthy]]
+reveal_type(Union[bool, TruthyInt, FalsyInt])  # revealed: <types.UnionType special-form 'int'>
+```
+
 ## Unions of literals with `AlwaysTruthy` and `AlwaysFalsy`
 
 ```toml
@@ -338,6 +349,124 @@ def f(
     reveal_type(h)  # revealed: tuple[Any | str, ...]
 ```
 
+## Tuple unions with narrowed built-in elements
+
+A tuple alternative is redundant when its element type is covered by another alternative, including
+when that element is a built-in type narrowed by an exclusion. The `float` annotation includes
+`int`, so it also covers `int & ~bool`:
+
+```py
+from ty_extensions import Intersection, Not
+
+def numeric(value: tuple[Intersection[int, Not[bool]]] | tuple[float]):
+    reveal_type(value)  # revealed: tuple[float]
+```
+
+## Tuple unions with built-in exclusions
+
+Matching the positive class is not enough to establish redundancy: its exclusions also matter. For
+example, a subclass of both `Marker` and `str` can inhabit the first tuple alternative below, but
+neither branch of the second:
+
+```py
+from ty_extensions import Intersection, Not
+
+class Marker: ...
+
+def different_exclusions(
+    value: tuple[Intersection[Marker, Not[int]]] | tuple[Intersection[Marker, Not[str]] | bytes],
+):
+    reveal_type(value)  # revealed: tuple[Marker & ~int] | tuple[(Marker & ~str) | bytes]
+```
+
+## Tuple unions with different exclusions on the same base
+
+`Base & ~Y` covers `Child & ~Y`, so adding the child's tuple leaves the union unchanged. Excluding a
+third class, or starting from an unrelated class, leaves an additional tuple in the union.
+
+```py
+from ty_extensions import Intersection, Not
+
+class Base: ...
+class Child(Base): ...
+class X: ...
+class Y: ...
+class Z: ...
+
+def compare(
+    flag: bool,
+    target: tuple[Intersection[Base, Not[X]] | Intersection[Base, Not[Y]]],
+    covered: tuple[Intersection[Child, Not[Y]]],
+    different_exclusion: tuple[Intersection[Child, Not[Z]]],
+    unrelated: tuple[Intersection[Z, Not[X]]],
+):
+    reveal_type(covered if flag else target)  # revealed: tuple[(Base & ~X) | (Base & ~Y)]
+    reveal_type(different_exclusion if flag else target)  # revealed: tuple[Child & ~Z] | tuple[(Base & ~X) | (Base & ~Y)]
+    reveal_type(unrelated if flag else target)  # revealed: tuple[Z & ~X] | tuple[(Base & ~X) | (Base & ~Y)]
+```
+
+## Tuple unions with multiple inheritance
+
+Either base of `Both` can cover the narrower tuple, depending on which type its element excludes. A
+`Left` that excludes `str` can still be an `int` outside `Right`, so its tuple stays in the union.
+
+```py
+from ty_extensions import Intersection, Not
+
+class Left: ...
+class Right: ...
+class Both(Left, Right): ...
+
+def compare(
+    flag: bool,
+    target: tuple[Intersection[Left, Not[int]] | Intersection[Right, Not[str]]],
+    via_left: tuple[Intersection[Both, Not[int]]],
+    via_right: tuple[Intersection[Both, Not[str]]],
+    left_excluding_str: tuple[Intersection[Left, Not[str]]],
+):
+    reveal_type(via_left if flag else target)  # revealed: tuple[(Left & ~int) | (Right & ~str)]
+    reveal_type(via_right if flag else target)  # revealed: tuple[(Left & ~int) | (Right & ~str)]
+    reveal_type(left_excluding_str if flag else target)  # revealed: tuple[Left & ~str] | tuple[(Left & ~int) | (Right & ~str)]
+```
+
+## Tuple unions with a base of `Any`
+
+Inheriting from `Any` preserves the distinction between a known subclass and an unrelated class when
+simplifying tuple unions.
+
+```py
+from typing import Any
+from ty_extensions import Intersection, Not
+
+class Base(Any): ...
+class Child(Base): ...
+
+def compare(
+    unrelated: tuple[Intersection[Base, Not[int]]] | tuple[str | bytes],
+    inherited: tuple[Intersection[Child, Not[int]]] | tuple[Intersection[Base, Not[int]] | bytes],
+):
+    reveal_type(unrelated)  # revealed: tuple[Base & ~int] | tuple[str | bytes]
+    reveal_type(inherited)  # revealed: tuple[(Base & ~int) | bytes]
+```
+
+## Tuple unions with a recursive generic base
+
+`Node & ~Excluded` covers `Child & ~Excluded` even when `Node` appears in its own base class
+specialization.
+
+```py
+from ty_extensions import Intersection, Not
+
+class Node(list["Node"]): ...
+class Child(Node): ...
+class Excluded: ...
+
+def recursive(
+    value: tuple[Intersection[Child, Not[Excluded]]] | tuple[Intersection[Node, Not[Excluded]] | str],
+):
+    reveal_type(value)  # revealed: tuple[(Node & ~Excluded) | str]
+```
+
 ## Unions of other generic containers
 
 ```toml
@@ -393,8 +522,9 @@ def gradual_aliases(
     reveal_type(nested_last)  # revealed: Covariant[NestedGradualAlias]
 ```
 
-Matching materialization endpoints do not establish that gradual tuple arguments have the same
-shape. A bounded generic must preserve which tuple position contains the gradual element.
+Matching top materializations do not establish that gradual tuple arguments have the same shape. A
+bounded generic must preserve which tuple position contains the gradual element, including in its
+bottom materialization.
 
 ```py
 from ty_extensions import Bottom, Top, static_assert
@@ -408,7 +538,7 @@ class C[T: tuple[int, int]]:
         raise NotImplementedError
 
 static_assert(is_equivalent_to(Top[C[L]], Top[C[R]]))
-static_assert(is_equivalent_to(Bottom[C[L]], Bottom[C[R]]))
+static_assert(not is_equivalent_to(Bottom[C[L]], Bottom[C[R]]))
 static_assert(not is_equivalent_to(C[L], C[R]))
 static_assert(not is_equivalent_to(C[L] | C[R], C[L]))
 static_assert(not is_equivalent_to(C[R] | C[L], C[R]))

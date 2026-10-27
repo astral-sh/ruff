@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for long exception messages that are not defined in the exception
@@ -44,7 +45,7 @@ use crate::checkers::ast::Checker;
 ///         raise CantBeNegative(x)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.236")]
+#[violation_metadata(stable_since = "v0.0.236", category = Category::Pedantic)]
 pub(crate) struct RaiseVanillaArgs;
 
 impl Violation for RaiseVanillaArgs {
@@ -90,12 +91,12 @@ fn contains_message(expr: &Expr) -> bool {
         Expr::FString(ast::ExprFString { value, .. }) => {
             for f_string_part in value {
                 match f_string_part {
-                    ast::FStringPart::Literal(literal) => {
+                    ast::FStringPartRef::Literal(literal) => {
                         if literal.chars().any(char::is_whitespace) {
                             return true;
                         }
                     }
-                    ast::FStringPart::FString(f_string) => {
+                    ast::FStringPartRef::FString(f_string) => {
                         for literal in f_string.elements.literals() {
                             if literal.chars().any(char::is_whitespace) {
                                 return true;

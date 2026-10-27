@@ -1,6 +1,7 @@
 use ruff_macros::ViolationMetadata;
 
 use crate::Violation;
+use crate::codes::Category;
 
 /// ## Removed
 /// There's no [evidence](https://github.com/astral-sh/ruff/issues/12754) that generators are
@@ -28,7 +29,7 @@ use crate::Violation;
 /// - [Python documentation: Generator expressions](https://docs.python.org/3/reference/expressions.html#generator-expressions)
 /// - [Python documentation: List comprehensions](https://docs.python.org/3/tutorial/datastructures.html#list-comprehensions)
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "0.8.0")]
+#[violation_metadata(removed_since = "0.8.0", category = Category::Pedantic)]
 pub(crate) struct UnpackedListComprehension;
 
 impl Violation for UnpackedListComprehension {

@@ -119,6 +119,7 @@ excepthook: Callable[[type[BaseException], BaseException, TracebackType | None],
 exec_prefix: str
 executable: str
 float_repr_style: Literal["short", "legacy"]
+_framework: str  # empty string on non-macOS platforms
 hexversion: int
 last_type: type[BaseException] | None
 last_value: BaseException | None

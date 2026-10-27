@@ -168,6 +168,18 @@ class SupportsTrunc(Protocol):
 
 # Mapping-like protocols
 
+# The second and third overload could technically be combined, but splitting
+# them works better with some type checkers.
+class SupportsGet(Protocol[_KT_contra, _VT_co]):  # type: ignore[misc]  # ty:ignore[invalid-protocol]  # Covariant type as parameter
+    @overload
+    def get(self, key: _KT_contra, /) -> _VT_co | None: ...
+    @overload
+    def get(  # pyrefly: ignore[invalid-variance]
+        self, key: _KT_contra, default: _VT_co, /  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
+    ) -> _VT_co: ...
+    @overload
+    def get(self, key: _KT_contra, default: _T, /) -> _VT_co | _T: ...
+
 # stable
 class SupportsItems(Protocol[_KT_co, _VT_co]):
     def items(self) -> AbstractSet[tuple[_KT_co, _VT_co]]: ...
@@ -176,6 +188,18 @@ class SupportsItems(Protocol[_KT_co, _VT_co]):
 class SupportsKeysAndGetItem(Protocol[_KT, _VT_co]):
     def keys(self) -> Iterable[_KT]: ...
     def __getitem__(self, key: _KT, /) -> _VT_co: ...
+
+class SupportsKeysAndGet(Protocol[_KT, _VT_co]):  # type: ignore[misc]  # ty:ignore[invalid-protocol]  # Covariant type as parameter
+    def keys(self) -> Iterable[_KT]: ...
+
+    @overload
+    def get(self, key: _KT, /) -> _VT_co | None: ...
+    @overload
+    def get(  # pyrefly: ignore[invalid-variance]
+        self, key: _KT, default: _VT_co, /  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
+    ) -> _VT_co: ...
+    @overload
+    def get(self, key: _KT, default: _T, /) -> _VT_co | _T: ...
 
 # stable
 class SupportsGetItem(Protocol[_KT_contra, _VT_co]):
@@ -192,6 +216,8 @@ class SupportsItemAccess(Protocol[_KT_contra, _VT]):
     def __getitem__(self, key: _KT_contra, /) -> _VT: ...
     def __setitem__(self, key: _KT_contra, value: _VT, /) -> None: ...
     def __delitem__(self, key: _KT_contra, /) -> None: ...
+
+# Path and file handling
 
 StrPath: TypeAlias = str | PathLike[str]  # stable
 BytesPath: TypeAlias = bytes | PathLike[bytes]  # stable

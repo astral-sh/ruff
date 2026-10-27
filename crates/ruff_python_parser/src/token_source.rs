@@ -47,12 +47,6 @@ impl<'src> TokenSource<'src> {
         self.lexer.current_range()
     }
 
-    /// Returns the current parenthesis, bracket, and brace nesting level.
-    #[inline]
-    pub(crate) const fn nesting(&self) -> u32 {
-        self.lexer.nesting()
-    }
-
     /// Returns the flags for the current token.
     pub(crate) const fn current_flags(&self) -> TokenFlags {
         self.lexer.current_flags()
@@ -266,5 +260,5 @@ fn allocate_tokens_vec(contents: &str) -> Vec<Token> {
 
     // Stay on a power-of-two bucket so that later geometric growth does not preserve an
     // arbitrary capacity offset.
-    Vec::with_capacity(1 << capacity_hint.ilog2())
+    Vec::with_capacity(capacity_hint.isolate_highest_one())
 }

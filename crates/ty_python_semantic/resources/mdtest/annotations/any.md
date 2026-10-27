@@ -141,7 +141,7 @@ class SubclassOfGenericAlias(GenericSubclass[int]): ...
 @final
 class FinalClass: ...
 
-final: FinalClass = SubclassOfGenericAlias()
+final_value: FinalClass = SubclassOfGenericAlias()
 literal: Literal[1] = SubclassOfGenericAlias()
 ```
 

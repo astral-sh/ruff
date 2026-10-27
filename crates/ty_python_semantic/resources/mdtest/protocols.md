@@ -289,6 +289,65 @@ static_assert(is_subtype_of(TypeOf[Protocol], typing._ProtocolMeta))
 reveal_type(issubclass(MyProtocol, Protocol))  # revealed: bool
 ```
 
+## Protocol metaclasses
+
+By default, a protocol declared outside typeshed uses `typing._ProtocolMeta`. Nominal subclasses
+inherit this metaclass and the abstract base class methods it provides through `ABCMeta`.
+
+```py
+from typing import Protocol, _ProtocolMeta
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Parent(Protocol): ...
+class Child(Parent, Protocol): ...
+class Concrete(Child): ...
+
+reveal_type(type(Parent))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(Child))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(Concrete))  # revealed: <class '_ProtocolMeta'>
+static_assert(is_subtype_of(type[Concrete], _ProtocolMeta))
+```
+
+The same applies to generic protocols and the `typing_extensions` backport.
+
+```py
+from typing import TypeVar
+from typing_extensions import Protocol as ExtensionsProtocol
+
+T = TypeVar("T", covariant=True)
+
+class GenericProtocol(Protocol[T]): ...
+class BackportedProtocol(ExtensionsProtocol): ...
+
+reveal_type(type(GenericProtocol))  # revealed: <class '_ProtocolMeta'>
+reveal_type(type(BackportedProtocol))  # revealed: <class '_ProtocolMeta'>
+```
+
+## Virtual subclass registration
+
+Protocol classes inherit `ABCMeta.register`, which returns the registered class with its type
+intact.
+
+```py
+from typing import Protocol
+
+class P(Protocol): ...
+class Concrete: ...
+
+reveal_type(P.register(Concrete))  # revealed: type[Concrete]
+```
+
+The method is also available on collection ABCs that typeshed models using protocols. This is a
+regression test for <https://github.com/astral-sh/ty/issues/1204>.
+
+```py
+from collections.abc import Container, Mapping
+
+reveal_type(Container.register(Concrete))  # revealed: type[Concrete]
+reveal_type(Mapping.register(Concrete))  # revealed: type[Concrete]
+```
+
 ## Diagnostics and autofixes for `Protocol` classes defined in invalid ways
 
 <!-- snapshot-diagnostics -->
@@ -384,6 +443,135 @@ incorrect:
 ```py
 reveal_type(typing.Protocol is typing_extensions.Protocol)  # revealed: bool
 reveal_type(typing.Protocol is not typing_extensions.Protocol)  # revealed: bool
+```
+
+## Applying `runtime_checkable`
+
+The `runtime_checkable` decorator can only be applied to protocol classes. Applying it to an
+ordinary class raises `TypeError` at runtime:
+
+```py
+from typing import Protocol, runtime_checkable
+
+# snapshot: invalid-argument-type
+@runtime_checkable
+class NotAProtocol: ...
+```
+
+```snapshot
+error[invalid-argument-type]: `runtime_checkable` can only be applied to protocol classes
+ --> src/mdtest_snippet.py:4:1
+  |
+4 | @runtime_checkable
+  | ^^^^^^^^^^^^^^^^^^
+5 | class NotAProtocol: ...
+  |       ------------ `NotAProtocol` is not a protocol class
+info: A class is only a protocol if it directly inherits from `typing.Protocol` or `typing_extensions.Protocol`
+```
+
+The same restriction applies to `typing_extensions.runtime_checkable`:
+
+```py
+from typing_extensions import runtime_checkable as runtime_checkable_extensions
+
+# error: [invalid-argument-type]
+@runtime_checkable_extensions
+class AlsoNotAProtocol: ...
+```
+
+A subclass of a protocol is not itself a protocol unless it explicitly inherits from `Protocol`:
+
+```py
+class Base(Protocol): ...
+
+# error: [invalid-argument-type]
+@runtime_checkable
+class Concrete(Base): ...
+
+@runtime_checkable  # no diagnostic
+class Subprotocol(Base, Protocol): ...
+```
+
+## Calling `runtime_checkable` directly
+
+Direct calls enforce the same restriction, whether the class is passed by position or by name:
+
+```py
+from typing import Protocol, runtime_checkable
+from typing_extensions import runtime_checkable as runtime_checkable_extensions
+
+class NotAProtocol: ...
+class P(Protocol): ...
+
+runtime_checkable(NotAProtocol)  # error: [invalid-argument-type] "`runtime_checkable` can only be applied to protocol classes"
+runtime_checkable_extensions(cls=NotAProtocol)  # error: [invalid-argument-type]
+runtime_checkable(P)  # no diagnostic
+```
+
+## `runtime_checkable` in stub files
+
+In a stub file, a class can inherit from `Protocol` through an alias defined later in the file:
+
+```pyi
+from typing import runtime_checkable
+
+@runtime_checkable  # no diagnostic
+class P(ProtocolAlias): ...
+
+from typing import Protocol as ProtocolAlias
+```
+
+As in Python files, a subclass must explicitly inherit from `Protocol` to be a protocol:
+
+```pyi
+# error: [invalid-argument-type]
+@runtime_checkable
+class Concrete(P): ...
+```
+
+## `runtime_checkable` and decorator order
+
+Decorators are applied from bottom to top. An inner decorator can replace an ordinary class with a
+protocol before `runtime_checkable` receives it:
+
+```py
+from typing import Protocol, runtime_checkable
+
+class P(Protocol): ...
+
+@runtime_checkable  # no diagnostic
+@lambda cls: P
+class Replaced: ...
+```
+
+Reversing the order applies `runtime_checkable` to the ordinary class before it can be replaced:
+
+```py
+@lambda cls: P
+# error: [invalid-argument-type]
+@runtime_checkable
+class NotAProtocol: ...
+```
+
+An inner decorator can also replace a protocol with an ordinary class. `runtime_checkable` rejects
+the replacement:
+
+```py
+class Ordinary: ...
+
+# error: [invalid-argument-type]
+@runtime_checkable
+@lambda cls: Ordinary
+class ReplacedWithClass(Protocol): ...
+```
+
+If the inner decorator returns an integer, `runtime_checkable` rejects it because it is not a class:
+
+```py
+# error: [invalid-argument-type]
+@runtime_checkable
+@lambda cls: 1
+class ReplacedWithInstance(Protocol): ...
 ```
 
 ## Calls to protocol classes
@@ -708,7 +896,7 @@ static_assert(not is_assignable_to(FooSubclassOfAny, HasX))
 class FooWithY(Foo):
     y: int
 
-assert is_subtype_of(FooWithY, HasXY)
+static_assert(is_subtype_of(FooWithY, HasXY))
 static_assert(is_assignable_to(FooWithY, HasXY))
 
 class Bar:
@@ -1046,7 +1234,8 @@ class AnySelf(Protocol):
 ```
 
 Assignments in a comprehension and augmented assignments are also writes to the instance.
-`__getattr__` provides the read side of `+=` below, so that case tests only the write:
+`__getattr__` provides the read side of `+=` below, although the write is not yet recognized as
+establishing an instance attribute:
 
 ```py
 class AssignmentForms(Protocol):
@@ -1057,14 +1246,15 @@ class AssignmentForms(Protocol):
         [None for self.from_comprehension in [1]]  # error: [ambiguous-protocol-member]
 
     def augmented_assignment(self) -> None:
+        # error: [unresolved-attribute]
         self.augmented += 1  # snapshot: ambiguous-protocol-member
 ```
 
 ```snapshot
 warning[ambiguous-protocol-member]: Cannot assign to an undeclared attribute in a protocol method
-   --> src/mdtest_snippet.py:326:9
+   --> src/mdtest_snippet.py:327:9
     |
-326 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
+327 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
     |         ^^^^^^^^^^^^^^ `augmented` is not declared as a protocol member
 info: Assigning to an undeclared attribute in a protocol method leads to an ambiguous interface
    --> src/mdtest_snippet.py:318:7
@@ -1375,6 +1565,33 @@ def needs_something_hashable(x: Hashable):
 needs_something_hashable([])  # error: [invalid-argument-type]
 ```
 
+## Unannotated protocol defaults retain inherited declarations
+
+A default in a protocol subclass preserves the inherited member type. Both protocol writes and
+structural implementations use the annotation, so a narrower default does not narrow the interface.
+
+```py
+from typing import ClassVar, Protocol
+
+class Base(Protocol):
+    value: int | str
+    shared: ClassVar[int | str]
+
+class WithDefaults(Base, Protocol):
+    value = "default"
+    shared = "default"
+
+class Implementation:
+    value: int | str = 1
+    shared: ClassVar[int | str] = 1
+
+def check(protocol: WithDefaults, implementation: Implementation) -> None:
+    reveal_type(protocol.value)  # revealed: int | str
+    protocol.value = 1
+    protocol.shared = 1  # error: [invalid-attribute-access]
+    result: WithDefaults = implementation
+```
+
 ## Diagnostics for protocols with invalid attribute members
 
 This is a short appendix to the previous section with the `snapshot-diagnostics` directive enabled
@@ -1434,6 +1651,35 @@ from typing import Protocol
 
 class C(A, Protocol):
     x = 42  # fine, due to declaration in the base class
+```
+
+## Imported `Final` values do not declare protocol members
+
+An imported `Final` qualifier does not turn an import into an explicit protocol-member declaration.
+If a real declaration exists, the imported qualifier still makes that protocol member read-only.
+
+`constants.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`main.py`:
+
+```py
+from typing import Protocol
+
+class ImportOnly(Protocol):
+    from constants import VALUE  # error: [ambiguous-protocol-member]
+
+class ExplicitlyDeclared(Protocol):
+    VALUE: int
+    from constants import VALUE
+
+def mutate(value: ExplicitlyDeclared) -> None:
+    value.VALUE = 2  # error: [invalid-assignment]
 ```
 
 ## Hashable protocol assignability
@@ -2848,8 +3094,6 @@ class WritableSelfAttr:
 class RecursiveWritableSelfAttr(Protocol):
     x: Self
 
-# TODO: Add an equivalent property protocol and an `is_equivalent_to` assertion once `Self` types
-# are supported in protocol member comparisons.
 class HasWritableSelfAttr(Protocol):
     @property
     def x(self) -> WritableSelfAttr: ...
@@ -2916,6 +3160,209 @@ class HasConcretePropertySetter(Protocol):
 
 static_assert(is_subtype_of(PropertyWithSelfSetter, HasConcretePropertySetter))
 static_assert(is_assignable_to(PropertyWithSelfSetter, HasConcretePropertySetter))
+```
+
+## `Self` in protocol attributes
+
+Attribute and property annotations bind `Self` to the implementation type. An inherited attribute
+keeps that meaning when a subclass supplies an unannotated default:
+
+```py
+from typing import Protocol
+from typing_extensions import Self
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class Attribute(Protocol):
+    value: Self | None
+
+class WithDefault(Attribute, Protocol):
+    value = None
+
+class Property(Protocol):
+    @property
+    def value(self) -> Self | None: ...
+    @value.setter
+    def value(self, value: Self | None) -> None: ...
+
+static_assert(is_equivalent_to(Attribute, Property))
+static_assert(is_equivalent_to(WithDefault, Property))
+```
+
+## `Self` in conditional protocol members
+
+`Self` still binds to the implementation type when an attribute has multiple definitions. The
+identical branches below give the inherited attribute multiple default assignments without changing
+its type:
+
+```py
+from typing import Protocol
+from typing_extensions import Self
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class Attribute(Protocol):
+    value: Self | None
+
+class Property(Protocol):
+    @property
+    def value(self) -> Self | None: ...
+    @value.setter
+    def value(self, value: Self | None) -> None: ...
+
+def condition() -> bool:
+    return True
+
+class WithDefault(Attribute, Protocol):
+    if condition():
+        value = None
+    else:
+        value = None
+
+static_assert(is_equivalent_to(WithDefault, Property))
+```
+
+The inherited annotation can also have multiple definitions. Both branches declare the same type, so
+`Self` binding still has the same result:
+
+```py
+class ConditionalAttribute(Protocol):
+    if condition():
+        value: Self | None
+    else:
+        value: Self | None
+
+class InheritedConditionalAttribute(ConditionalAttribute, Protocol):
+    value = None
+
+static_assert(is_equivalent_to(InheritedConditionalAttribute, Property))
+```
+
+## Writable `__class__` members
+
+A writable `__class__: type[object]` excludes proper subclasses of `object`: their inherited setter
+accepts only `type[Self]`.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class JustObject(Protocol):
+    __class__: type[object]
+
+class C: ...
+
+def takes_instance(value: JustObject) -> None: ...
+def takes_class(value: type[JustObject]) -> None: ...
+
+takes_instance(object())  # no diagnostic
+takes_class(object)  # no diagnostic
+
+takes_instance(C())  # error: [invalid-argument-type]
+takes_class(C)  # error: [invalid-argument-type]
+takes_instance(C)  # error: [invalid-argument-type]
+
+static_assert(not is_equivalent_to(JustObject, object))
+```
+
+Inherited declarations impose the same requirement:
+
+```py
+class InheritedJustObject(JustObject, Protocol): ...
+
+inherited: InheritedJustObject = C()  # error: [invalid-assignment]
+```
+
+Writable contracts that accept only `type[Self]` or `Never` do not require accepting another
+object's class. These protocols remain equivalent to `object`:
+
+```py
+from typing_extensions import Never, Self
+
+class SelfClass(Protocol):
+    @property
+    def __class__(self) -> type[Self]: ...
+    @__class__.setter
+    def __class__(self, value: type[Self]) -> None: ...
+
+class NeverClass(Protocol):
+    @property
+    def __class__(self) -> type[object]: ...
+    @__class__.setter
+    def __class__(self, value: Never) -> None: ...
+
+static_assert(is_equivalent_to(SelfClass, object))
+static_assert(is_equivalent_to(NeverClass, object))
+```
+
+An attribute annotation expresses the same `Self` requirement, including when inherited:
+
+```py
+class SelfClassAttribute(Protocol):
+    __class__: type[Self]
+
+class InheritedSelfClassAttribute(SelfClassAttribute, Protocol): ...
+
+static_assert(is_equivalent_to(SelfClassAttribute, object))
+static_assert(is_equivalent_to(InheritedSelfClassAttribute, object))
+```
+
+## `Self` in universal protocol methods
+
+Returning a subtype of `object` does not guarantee returning `Self` for every receiver. Although
+`object.__eq__` returns `bool`, it does not satisfy a universal requirement to return `Self`:
+
+```py
+from typing import Protocol
+from typing_extensions import Self
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class ReturnsSelf(Protocol):
+    # error: [invalid-method-override]
+    def __eq__(self, other: object) -> Self: ...
+
+static_assert(not is_equivalent_to(ReturnsSelf, object))
+```
+
+## Enum members and writable protocol members
+
+An enum class can satisfy a read-only property protocol through one of its members. It cannot
+satisfy a writable attribute or property protocol because enum members cannot be reassigned on the
+class.
+
+```py
+from enum import Enum
+from typing import Any, Protocol
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+class ReadOnly(Protocol):
+    @property
+    def NO(self) -> Answer: ...
+
+class Writable(Protocol):
+    @property
+    def NO(self) -> Answer: ...
+    @NO.setter
+    def NO(self, value: int) -> None: ...
+
+class Attribute(Protocol):
+    NO: Any
+
+read_only: ReadOnly = Answer
+writable: Writable = Answer  # error: [invalid-assignment]
+attribute: Attribute = Answer  # error: [invalid-assignment]
+```
+
+An enum instance can shadow the class attribute, so it can satisfy the writable protocols:
+
+```py
+writable_instance: Writable = Answer.YES
+attribute_instance: Attribute = Answer.YES
 ```
 
 ## Protocol members defined using descriptor decorators
@@ -3386,6 +3833,359 @@ def update_bounded_value(value: HasBoundedValue) -> None:
     value.bounded_value = "bad"  # error: [invalid-assignment]
 ```
 
+### Specialized protocol setter value types
+
+`P[int]` does not depend on the setter's unused `U`. A property setter accepting `P[int]` therefore
+satisfies the same writable member, including for strict subtyping:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class P[T](Protocol):
+    def method(self) -> T: ...
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> object:
+        return object()
+
+    def __set__[U](self, instance: object, value: P[int]) -> None: ...
+
+class HasValue(Protocol):
+    @Descriptor
+    def value(self) -> object: ...
+
+class Implementation:
+    @property
+    def value(self) -> object:
+        return object()
+
+    @value.setter
+    def value(self, value: P[int]) -> None: ...
+
+static_assert(is_subtype_of(Implementation, HasValue))
+```
+
+A setter accepting only `P[Literal[1]]` is too narrow:
+
+```py
+from typing import Literal
+
+class Narrowed:
+    @property
+    def value(self) -> object:
+        return object()
+
+    @value.setter
+    def value(self, value: P[Literal[1]]) -> None: ...
+
+x: HasValue = Narrowed()  # error: [invalid-assignment]
+```
+
+### Local protocol setter types
+
+A setter's unused type parameter does not affect the accepted value type, even when that type is a
+local protocol. A property setter accepting the same protocol satisfies the writable member:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+def _() -> None:
+    class Local(Protocol):
+        member: int
+
+    class Descriptor:
+        def __init__(self, getter: object) -> None: ...
+        def __get__(self, instance: object, owner: type | None = None) -> int:
+            return 1
+
+        def __set__[U](self, instance: object, value: Local) -> None: ...
+
+    class HasValue(Protocol):
+        @Descriptor
+        def value(self) -> int: ...
+
+    class Implementation:
+        @property
+        def value(self) -> int:
+            return 1
+
+        @value.setter
+        def value(self, value: Local) -> None: ...
+
+    static_assert(is_subtype_of(Implementation, HasValue))
+```
+
+### Recursive protocol setter value types
+
+`P[int]` does not depend on the setter's `U`, so a matching property setter satisfies the writable
+member even though `P`'s method returns another instance of the protocol:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class P[T](Protocol):
+    def method(self) -> P[int]: ...
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> object:
+        return object()
+
+    def __set__[U](self, instance: object, value: P[int]) -> None: ...
+
+class HasValue(Protocol):
+    @Descriptor
+    def value(self) -> object: ...
+
+class Implementation:
+    @property
+    def value(self) -> object:
+        return object()
+
+    @value.setter
+    def value(self, value: P[int]) -> None: ...
+
+static_assert(is_subtype_of(Implementation, HasValue))
+```
+
+### Setter value types with permuted protocol arguments
+
+Recursion through different specializations remains independent of the setter's type parameter.
+`Swapped[int, str]` alternates with `Swapped[str, int]`, and a setter accepting that type satisfies
+the writable member:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Swapped[A, B](Protocol):
+    def value(self) -> A: ...
+    def next(self) -> Swapped[B, A]: ...
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> object:
+        return object()
+
+    def __set__[U](self, instance: object, value: Swapped[int, str]) -> None: ...
+
+class HasValue(Protocol):
+    @Descriptor
+    def value(self) -> object: ...
+
+class Implementation:
+    @property
+    def value(self) -> object:
+        return object()
+
+    @value.setter
+    def value(self, value: Swapped[int, str]) -> None: ...
+
+static_assert(is_subtype_of(Implementation, HasValue))
+```
+
+The second argument is used after following the recursive reference. The setter's `U: int` bound
+therefore restricts that argument:
+
+```py
+class GenericDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> object:
+        return object()
+
+    def __set__[U: int](self, instance: object, value: Swapped[str, U]) -> None: ...
+
+class HasGenericValue(Protocol):
+    @GenericDescriptor
+    def value(self) -> object: ...
+
+def update(value: HasGenericValue, accepted: Swapped[str, int], rejected: Swapped[str, str]) -> None:
+    value.value = accepted  # no diagnostic
+    value.value = rejected  # error: [invalid-assignment]
+```
+
+### Setter value types with nested recursive arguments
+
+Each `next` member nests another `list` in the protocol's type argument. This recursion does not
+depend on `__set__`'s type parameter, so assignments are checked against `Recursive[int]`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Recursive[T](Protocol):
+    next: Recursive[list[T]]
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[U](self, instance: object, value: Recursive[int]) -> None: ...
+
+class HasValue(Protocol):
+    @Descriptor
+    def value(self) -> int: ...
+
+def _(x: HasValue, value: Recursive[int]) -> None:
+    x.value = value  # no diagnostic
+    x.value = 1  # error: [invalid-assignment]
+```
+
+The same property setter satisfies the protocol, while an `int` attribute cannot accept
+`Recursive[int]` values:
+
+```py
+class Implementation:
+    @property
+    def value(self) -> int:
+        return 1
+
+    @value.setter
+    def value(self, value: Recursive[int]) -> None: ...
+
+static_assert(is_subtype_of(Implementation, HasValue))
+
+class IntAttribute:
+    value: int
+
+x: HasValue = IntAttribute()  # error: [invalid-assignment]
+```
+
+### Recursive `TypedDict` setter value types
+
+A recursive `TypedDict` can also be independent of the setter's type parameter. Assignments are
+checked against `Payload[int]`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, TypedDict
+
+class Payload[T](TypedDict):
+    child: Payload[list[T]]
+
+class PayloadDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[U](self, instance: object, value: Payload[int]) -> None: ...
+
+class HasPayload(Protocol):
+    @PayloadDescriptor
+    def value(self) -> int: ...
+
+def _(x: HasPayload, value: Payload[int]) -> None:
+    x.value = value  # no diagnostic
+    x.value = 1  # error: [invalid-assignment]
+```
+
+### Recursive alias setter value types
+
+A recursive alias independent of the setter's type parameter behaves the same way:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+type RecursiveAlias[T] = list[RecursiveAlias[list[T]]]
+
+class AliasDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[U](self, instance: object, value: RecursiveAlias[int]) -> None: ...
+
+class HasAlias(Protocol):
+    @AliasDescriptor
+    def value(self) -> int: ...
+
+def _(x: HasAlias, value: RecursiveAlias[int]) -> None:
+    x.value = value  # no diagnostic
+    x.value = 1  # error: [invalid-assignment]
+```
+
+### Recursive aliases in generic setters
+
+A generic setter still rejects values incompatible with the outer type of a recursive alias.
+`Recursive[T]` always denotes a `list`, so an `int` assignment is invalid:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+type Recursive[T] = list[Recursive[list[T]]]
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[T](self, instance: object, value: Recursive[T]) -> None: ...
+
+class HasValue(Protocol):
+    @Descriptor
+    def value(self) -> int: ...
+
+def _(x: HasValue) -> None:
+    x.value = 1  # error: [invalid-assignment]
+```
+
 ### Type variables from the surrounding function
 
 A type variable supplied by the surrounding function is still the descriptor's value type. Assigning
@@ -3461,6 +4261,37 @@ Assignments through the protocol accept `int` but reject `str`:
 def update_aliased_receiver(value: HasAliasedReceiver) -> None:
     value.value = 1
     value.value = "bad"  # error: [invalid-assignment]
+```
+
+### Unused alias arguments do not constrain setters
+
+`Ignored[T]` always denotes `int`, so the setter accepts `int` independently of its type parameter
+and rejects `str`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+type Ignored[T] = int
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[T](self, instance: object, value: Ignored[T]) -> None: ...
+
+class HasValue(Protocol):
+    @Descriptor
+    def value(self) -> int: ...
+
+def _(x: HasValue) -> None:
+    x.value = 1  # no diagnostic
+    x.value = "bad"  # error: [invalid-assignment]
 ```
 
 ### Constrained generic setters
@@ -3923,8 +4754,8 @@ reveal_type(abs(5))  # revealed: int
 def f(x: Literal[5]) -> None:
     reveal_type(abs(x))  # revealed: int
 
-InT = TypeVar("InT")
-OutT = TypeVar("OutT")
+InT = TypeVar("InT", contravariant=True)
+OutT = TypeVar("OutT", covariant=True)
 
 class CanMul(Protocol[InT, OutT]):
     def __mul__(self, x: InT, /) -> OutT: ...
@@ -3983,6 +4814,27 @@ static_assert(is_subtype_of(Text, ConsoleRenderable))
 static_assert(is_assignable_to(Text, ConsoleRenderable))
 ```
 
+## Receiver parameter names
+
+Receiver parameter names do not affect method compatibility, including methods with explicit
+protocol receiver restrictions.
+
+```py
+from typing import Protocol
+
+class Receiver(Protocol):
+    value: int
+
+class Required(Protocol):
+    def method(self: Receiver) -> None: ...
+
+class Implementation:
+    def method(receiver: Receiver) -> None: ...
+
+def check(value: Implementation) -> Required:
+    return value  # no diagnostic
+```
+
 ## Recursive protocol receiver binding
 
 A classmethod on a generic protocol can cause receiver binding for another method to depend on
@@ -4011,6 +4863,149 @@ class DateTime(Protocol[T]):
         return datetime.now(tz)  # error: [invalid-return-type]
 ```
 
+## Recursive protocol receiver binding with an incompatible override
+
+An incompatible override of a covariant generic protocol method can recursively compare the
+protocol's explicitly annotated receiver with the implementing class. The receiver-binding and
+assignability queries must converge and report the incompatible override instead of panicking.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+
+class Result(Generic[T_co]): ...
+
+class SupportsMethod(Protocol[T_co]):
+    def method(self: "SupportsMethod[T]") -> Result[T]: ...
+
+class Compatible(SupportsMethod[T_co]):
+    def method(self: "Compatible[T]") -> Result[T]:
+        raise NotImplementedError
+
+class Incompatible(SupportsMethod[T_co]):
+    def method(self: "Incompatible[T]", value: int) -> Result[T]:  # error: [invalid-method-override]
+        raise NotImplementedError
+```
+
+## Recursive protocol receiver binding during constructor inference
+
+Inferring a constructor's type argument from a protocol can recursively compare an explicitly typed
+receiver with the same protocol. Constraints from another generic method must not make this cycle
+alternate between equivalent representations.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class Container[T](Protocol):
+    value: T
+
+    def replace[U](self, value: U) -> None:
+        return
+
+    def flatten[U](self: "Container[Container[U]]") -> None:
+        return
+
+class Implementation[T](Container[T]):
+    pass
+
+value: Container[int] = Implementation()
+reveal_type(value)  # revealed: Implementation[int]
+```
+
+## Recursive protocol receiver binding with an overloaded class method
+
+Accessing an overloaded class method on a generic protocol can recursively bind the protocol's
+receiver. The receiver-binding query must converge and preserve both overload signatures.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, overload
+
+class Container[T](Protocol):
+    def value(self) -> T: ...
+    @overload
+    @classmethod
+    def from_value[Self, S](cls: type[Self], value: S) -> object: ...
+    @overload
+    @classmethod
+    def from_value[Self, S](cls: type[Self], value: S, flag: bool) -> object: ...
+
+reveal_type(Container.from_value)  # revealed: Overload[[S](value: S) -> object, [S](value: S, flag: bool) -> object]
+```
+
+## Recursive protocol receiver binding with a bounded type variable
+
+A class method can recursively bind a protocol receiver through a type variable with a declared
+upper bound. Its declared bound is metadata, not another part of the receiver constraint.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S", bound=object)
+
+class Box(Protocol[T]):
+    value: T
+
+    @classmethod
+    def first(cls: type[S]) -> S:
+        return cls()
+
+    def second(self) -> S: ...
+    @classmethod
+    def last(cls: type[S]) -> object: ...
+
+reveal_type(Box.first())  # revealed: Box[Unknown]
+```
+
+## Recursive protocol receiver binding with a defaulted type variable
+
+A method type variable with a declared default can also appear while recursively binding a protocol
+receiver. Its default is declaration metadata, not a type-variable occurrence in the constraint.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Protocol
+
+class Box[T](Protocol):
+    value: T
+
+    @classmethod
+    def first[S = int](cls: type[S]) -> S:
+        return cls()
+
+    def second[S = int](self) -> S: ...
+    @classmethod
+    def last[S = int](cls: type[S]) -> object: ...
+
+reveal_type(Box.first())  # revealed: Box[Unknown]
+```
+
 ## Subtyping of protocols with generic method members
 
 Protocol method members can be generic. They can have generic contexts scoped to the class:
@@ -4029,7 +5024,7 @@ from ty_extensions._internal import is_equivalent_to, is_assignable_to, is_subty
 class NewStyleClassScoped[T](Protocol):
     def method(self, input: T) -> None: ...
 
-S = TypeVar("S")
+S = TypeVar("S", contravariant=True)
 
 class LegacyClassScoped(Protocol[S]):
     def method(self, input: S) -> None: ...
@@ -4204,10 +5199,10 @@ static_assert(not is_assignable_to(NominalReturningOtherClass, UsesSelf))
 static_assert(not is_assignable_to(GenericReceiver, ConcreteMethod))
 static_assert(not is_subtype_of(GenericReceiver, ConcreteMethod))
 
-# Specializing the receiver constraint to `GradualReceiverImplementation` must preserve the
-# assignability relation that produced it; `list[int]` is assignable to, but not a subtype of,
-# `list[Any]`.
+# The explicit receiver permits assignability, but does not establish strict subtyping:
+# `list[int]` is assignable to, but not a subtype of, `list[Any]`.
 static_assert(is_assignable_to(GradualReceiverImplementation, GradualReceiverProtocol))
+static_assert(not is_subtype_of(GradualReceiverImplementation, GradualReceiverProtocol))
 
 # Checking the receiver constraint requires the same protocol relation that is already in
 # progress. The recursive check should terminate and establish the structural relation.
@@ -4248,6 +5243,140 @@ static_assert(not is_assignable_to(BadReturnType, ShapeProtocolImplicitSelf))
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
 ```
 
+## Gradual explicit receivers
+
+A gradual receiver is assignable to a concrete explicit `self` annotation, but is not its subtype.
+Protocol matching preserves that distinction instead of treating a possibly available method as
+unconditionally available:
+
+```py
+from typing import Any, Generic, Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, is_subtype_of
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Source(Generic[T_co]):
+    def get(self: "Source[int]") -> int:
+        return 0
+
+class IntSource(Protocol):
+    def get(self) -> int: ...
+
+static_assert(is_assignable_to(Source[Any], IntSource))
+static_assert(is_assignable_to(Source[Unknown], IntSource))
+static_assert(not is_subtype_of(Source[Any], IntSource))
+static_assert(not is_subtype_of(Source[Unknown], IntSource))
+
+static_assert(is_subtype_of(Source[int], IntSource))
+static_assert(not is_assignable_to(Source[str], IntSource))
+static_assert(not is_subtype_of(Source[str], IntSource))
+```
+
+## `Self` in generic type aliases during protocol matching
+
+`Self` in a protocol method's return type refers to the structural implementation, even when it is
+wrapped in a generic type alias. The implementation can return plain `Self`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, Self
+
+type Identity[T] = T
+
+class Cloneable(Protocol):
+    def clone(self) -> Identity[Self]: ...
+
+class DirectClone:
+    def clone(self) -> Self:
+        return self
+
+direct: Cloneable = DirectClone()
+```
+
+The same binding applies to a property return type:
+
+```py
+class Current(Protocol):
+    @property
+    def current(self) -> Identity[Self]: ...
+
+class CurrentImpl:
+    @property
+    def current(self) -> Self:
+        return self
+
+current: Current = CurrentImpl()
+```
+
+## `Self`-returning instance methods in `ParamSpec` protocols
+
+Specializing a protocol's `ParamSpec` preserves the meaning of `Self`: the return type names the
+structural implementation, even when the specialized parameter list is empty.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, Self
+
+class Copier[**P](Protocol):
+    def copy(self, *args: P.args, **kwargs: P.kwargs) -> Self: ...
+
+class Copyable:
+    def copy(self) -> Self:
+        return self
+
+copier: Copier[[]] = Copyable()
+copier_class: type[Copier[[]]] = Copyable
+```
+
+## `Self`-returning class methods in `ParamSpec` protocols
+
+A class method returning `Self` also satisfies a specialized protocol, whether the implementation is
+assigned as an instance or as a class object. The implementation does not need to inherit from the
+protocol.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, Self
+
+class FactoryP[**P](Protocol):
+    @classmethod
+    def bind(cls, *args: P.args, **kwargs: P.kwargs) -> Self: ...
+
+class Factory:
+    @classmethod
+    def bind(cls, value: int) -> Self:
+        return cls()
+
+factory: FactoryP[[int]] = Factory()
+factory_class: type[FactoryP[[int]]] = Factory
+```
+
+A matching parameter list is not enough: returning an unrelated type does not satisfy the protocol's
+`Self` return type.
+
+```py
+class BadFactory:
+    @classmethod
+    def bind(cls, value: int) -> int:
+        return value
+
+bad_factory: FactoryP[[int]] = BadFactory()  # error: [invalid-assignment]
+bad_factory_class: type[FactoryP[[int]]] = BadFactory  # error: [invalid-assignment]
+```
+
 ## Module objects with static-method protocol members
 
 Module objects implement protocols through their public interface. A module-level function can
@@ -4283,6 +5412,86 @@ factory_object: FactoryObject = factory
 factory_module: FactoryModule = factory
 ```
 
+## Generic protocol inference from module objects
+
+A module attribute can determine a protocol's type argument when the module itself is passed to a
+generic function.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`values.py`:
+
+```py
+value: int = 1
+```
+
+`main.py`:
+
+```py
+from typing import Protocol
+
+import values
+
+class HasValue[T](Protocol):
+    value: T
+
+def get_value[T](obj: HasValue[T]) -> T:
+    return obj.value
+
+reveal_type(get_value(values))  # revealed: int
+```
+
+## Generic protocol inference through type aliases
+
+An alias for an instance type does not obscure the members that determine a protocol's type
+arguments. Inference sees through these aliases and checks the bounds of these arguments.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class HasValue[T](Protocol):
+    def get(self) -> T: ...
+
+class Box[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+type Alias[T] = Box[T]
+
+def get_value[T](value: HasValue[T]) -> T:
+    return value.get()
+
+def require_str[T: str](value: HasValue[T]) -> T:
+    return value.get()
+
+def check_alias(value: Alias[int]):
+    reveal_type(get_value(value))  # revealed: int
+    # error: [invalid-argument-type] "Argument type `int` does not satisfy upper bound `str` of type variable `T`"
+    require_str(value)
+```
+
+An equivalent generic alias constructed with `TypeAliasType` preserves the same information.
+
+```py
+from typing import TypeAliasType, TypeVar
+
+U = TypeVar("U")
+ConstructedAlias = TypeAliasType("ConstructedAlias", Box[U], type_params=(U,))
+
+def check_constructed_alias(value: ConstructedAlias[int]):
+    reveal_type(get_value(value))  # revealed: int
+    # error: [invalid-argument-type] "Argument type `int` does not satisfy upper bound `str` of type variable `T`"
+    require_str(value)
+```
+
 ## Class objects with class-method protocol members
 
 A class object implements a protocol when its directly accessible members have compatible types. The
@@ -4301,6 +5510,116 @@ class IntParser:
         return int(value)
 
 parser: Parser = IntParser
+```
+
+## Generic protocol inference from class attributes
+
+A class object can supply the type argument of a protocol through an ordinary attribute. Passing the
+class itself should infer the same type as passing an instance.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class HasValue[T](Protocol):
+    value: T
+
+class IntValue:
+    value: int = 1
+
+def get_value[T](obj: HasValue[T]) -> T:
+    return obj.value
+
+reveal_type(get_value(IntValue))  # revealed: int
+reveal_type(get_value(IntValue()))  # revealed: int
+
+def _(cls: type[IntValue]) -> None:
+    reveal_type(get_value(cls))  # revealed: int
+```
+
+## Generic protocol inference from class methods
+
+The return type of a class method can determine a protocol's type argument, including when the
+argument is the class object itself.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class Factory[T](Protocol):
+    @classmethod
+    def make(cls) -> T: ...
+
+class Concrete:
+    @classmethod
+    def make(cls) -> "Concrete":
+        return cls()
+
+def from_protocol[T](factory: Factory[T]) -> T:
+    return factory.make()
+
+reveal_type(from_protocol(Concrete))  # revealed: Concrete
+reveal_type(from_protocol(Concrete()))  # revealed: Concrete
+
+bad: Factory[str] = Concrete  # error: [invalid-assignment]
+```
+
+Specialized generic class objects and unions of class objects also contribute their method return
+types to inference.
+
+```py
+class GenericFactory[T]:
+    @classmethod
+    def make(cls) -> T:
+        raise NotImplementedError
+
+reveal_type(from_protocol(GenericFactory[int]))  # revealed: int
+
+def _(cls: type[GenericFactory[int]] | type[GenericFactory[str]]) -> None:
+    reveal_type(from_protocol(cls))  # revealed: int | str
+```
+
+## Generic protocol inference from static methods
+
+A static method on a class object can satisfy either a static-method or an instance-method protocol
+member. Both forms should contribute the method's return type to inference.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class StaticFactory[T](Protocol):
+    @staticmethod
+    def make() -> T: ...
+
+class InstanceFactory[T](Protocol):
+    def make(self) -> T: ...
+
+class IntFactory:
+    @staticmethod
+    def make() -> int:
+        return 1
+
+def from_static[T](factory: StaticFactory[T]) -> T:
+    return factory.make()
+
+def from_instance[T](factory: InstanceFactory[T]) -> T:
+    return factory.make()
+
+reveal_type(from_static(IntFactory))  # revealed: int
+reveal_type(from_instance(IntFactory))  # revealed: int
 ```
 
 ## Class objects and `Self`-returning class-method protocol members
@@ -4545,7 +5864,8 @@ class ClassCollection(metaclass=CollectionMeta):
 static_assert(is_assignable_to(TypeOf[ClassCollection], Membership))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Container[int]))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Container[str]))
-static_assert(is_subtype_of(TypeOf[ClassCollection], Container[int]))
+# The class object is assignable to the gradual receiver `type[Any]`, but is not its subtype.
+static_assert(not is_subtype_of(TypeOf[ClassCollection], Container[int]))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Iterable[int]))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Reversible[int]))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Collection[int]))
@@ -4570,6 +5890,44 @@ class NonBooleanMembership(metaclass=NonBooleanMembershipMeta):
 
 static_assert(not is_assignable_to(TypeOf[StringMembership], Container[int]))
 static_assert(not is_assignable_to(TypeOf[NonBooleanMembership], Container[int]))
+```
+
+## Class objects with bounded type-variable receivers
+
+An iterable class combined with an empty fallback must contribute its member type to generic call
+inference. A classmethod can therefore collect its own instances without losing `Self`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Iterator
+from typing import Self
+
+class IterableMeta(type):
+    def __iter__[T](self: type[T]) -> Iterator[T]:
+        raise NotImplementedError
+
+class Item(metaclass=IterableMeta):
+    @classmethod
+    def all(cls, enabled: bool) -> frozenset[Self]:
+        items = frozenset(cls if enabled else ())
+        reveal_type(items)  # revealed: frozenset[Self@all]
+        return items
+```
+
+## Generic inference from gradual class objects
+
+`type[Any]` can be assigned to an iterable protocol. A concrete fallback must still contribute its
+element type to generic inference.
+
+```py
+from typing import Any
+
+def collect(cls: type[Any], enabled: bool) -> None:
+    reveal_type(list(cls if enabled else (1,)))  # revealed: list[int]
 ```
 
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members
@@ -4639,7 +5997,7 @@ class NObject:
 
 class NStaticMethodShadowed(NStaticMethodGood):
     def __init__(self) -> None:
-        self.x: int = 1
+        self.x: int = 1  # error: [invalid-attribute-override]
 
 class PFactory(Protocol):
     @classmethod
@@ -5425,6 +6783,83 @@ class Constructor(Protocol):
 constructor: Constructor = Product
 ```
 
+## Generic constructor callback inference
+
+Passing `type[T]` to a generic callback protocol must preserve the type variable returned by the
+class's constructor.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class Callback[T](Protocol):
+    def __call__(self) -> T: ...
+
+def invoke[T](callback: Callback[T]) -> T:
+    return callback()
+
+def create[T](cls: type[T]) -> T:
+    reveal_type(invoke(cls))  # revealed: T@create
+    return invoke(cls)
+```
+
+## Generic callback inference from other members
+
+A callable protocol can infer a type argument from another member. Comparing only its `__call__`
+signature would miss the class attribute that determines `T` here.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class ConstructorWithValue[T](Protocol):
+    value: T
+
+    def __call__(self) -> object: ...
+
+class Product:
+    value: int = 1
+
+def get_value[T](factory: ConstructorWithValue[T]) -> T:
+    return factory.value
+
+reveal_type(get_value(Product))  # revealed: int
+```
+
+## Generic callback inference from function attributes
+
+A function object's attributes also contribute to protocol inference. Here, the type argument comes
+from `__name__`, not the callback's return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class NamedCallback[T](Protocol):
+    __name__: T
+
+    def __call__(self) -> object: ...
+
+def get_name[T](callback: NamedCallback[T]) -> T:
+    return callback.__name__
+
+def callback() -> None: ...
+
+reveal_type(get_name(callback))  # revealed: str
+```
+
 ## Generic protocols and union arguments
 
 When a union is passed to a parameter annotated as a generic protocol, each union element can
@@ -5435,7 +6870,7 @@ Other type variables in the same call are still inferred from their correspondin
 ```py
 from typing import Protocol, TypeVar
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
 U = TypeVar("U")
 
 class Box(Protocol[T]):
@@ -5472,11 +6907,11 @@ class X(Protocol):
     x: int
 
 class YProto(X, Protocol):
-    x: None = None  # TODO: we should emit an error here due to the Liskov violation
+    x: None = None  # error: [invalid-attribute-override]
 
 @final
 class YNominal(X):
-    x: None = None  # TODO: we should emit an error here due to the Liskov violation
+    x: None = None  # error: [invalid-attribute-override]
 
 static_assert(is_subtype_of(YProto, X))
 static_assert(is_subtype_of(YNominal, X))
@@ -5737,6 +7172,55 @@ static_assert(not is_subtype_of(LeftProtocol[int], RightProtocol[int]))
 static_assert(not is_subtype_of(LeftAlias[int], RightAlias[int]))
 # A conservative cycle fallback must not accept structurally different recursive protocols.
 static_assert(not is_subtype_of(LeftProtocol[int], DifferentProtocol[int]))
+
+class ShiftingLeftProtocol[A, B, C](Protocol):
+    @property
+    def value(self) -> A: ...
+    @property
+    def child(self) -> ShiftingLeftProtocol[B, C, None]: ...
+
+class ShiftingRightProtocol[A, B, C](Protocol):
+    @property
+    def value(self) -> A: ...
+    @property
+    def child(self) -> ShiftingRightProtocol[B, C, None]: ...
+
+# These recursive specializations reach an exact repetition after shifting out every initial
+# argument.
+static_assert(
+    is_subtype_of(
+        ShiftingLeftProtocol[int, str, bytes],
+        ShiftingRightProtocol[int, str, bytes],
+    )
+)
+
+class SaturatingLeftProtocol[T](Protocol):
+    @property
+    def value(self) -> T: ...
+    @property
+    def child(self) -> SaturatingLeftProtocol[T | int]: ...
+
+class SaturatingRightProtocol[T](Protocol):
+    @property
+    def value(self) -> T: ...
+    @property
+    def child(self) -> SaturatingRightProtocol[T | int]: ...
+
+# Repeatedly adding the same union element also reaches an exact repetition.
+static_assert(is_subtype_of(SaturatingLeftProtocol[str], SaturatingRightProtocol[str]))
+
+# A nested alias can capture the protocol argument while the recursive reference resets that
+# argument to a constant.
+class CapturedResetLeftProtocol[T](Protocol):
+    type Inner = tuple[T, CapturedResetLeftProtocol[int]]
+    value: Inner
+
+class CapturedResetRightProtocol[T](Protocol):
+    type Inner = tuple[T, CapturedResetRightProtocol[int]]
+    value: Inner
+
+# TODO: These structurally equivalent protocols should be recognized as subtypes.
+static_assert(not is_subtype_of(CapturedResetLeftProtocol[str], CapturedResetRightProtocol[str]))
 
 class FiniteLeft[T](Protocol):
     value: T
@@ -6086,7 +7570,7 @@ y: A | Foo[A]
 
 # The same thing, but using the legacy syntax:
 
-S = TypeVar("S")
+S = TypeVar("S", covariant=True)
 
 class Bar(Protocol[S]):
     def x(self) -> "S | Bar[S]": ...
@@ -6148,6 +7632,451 @@ def check(value: Left[int]) -> None:
     expect_right1(value)  # error: [invalid-argument-type]
     # This should be an error
     expect_right2(value)  # error: [invalid-argument-type]
+```
+
+Generic-call inference must also avoid expanding recursive protocol members when checking whether
+its argument constraints are independent:
+
+```py
+def accept[U, V](outer: U, recursive: V) -> None: ...
+def infer[T](outer: T, recursive: C[int]) -> None:
+    accept(outer, recursive)
+```
+
+### Recursive protocol requirements after matching finite members
+
+Matching a finite member does not prove that the whole protocol is compatible. The recursive `split`
+requirement also carries `T` in a tuple element, so these specializations are incompatible even
+though their `marker` methods match.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+class Node[T](Protocol):
+    def marker(self) -> int: ...
+    def split(self) -> tuple[T, Node[T]]: ...
+
+static_assert(not is_assignable_to(Node[str], Node[int]))
+```
+
+### Nested protocol source members with finite targets
+
+A source specialization can contain its own protocol even when the target has no recursive
+requirements. This must not activate a recursive matching shortcut or discard the source member.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_constraint_set_assignable_to
+
+class Consumer[T](Protocol):
+    def consume(self, value: T | int) -> None: ...
+
+static_assert(is_constraint_set_assignable_to(Consumer[Consumer[int]], Consumer[int]))
+```
+
+### Recursive members in the source specialization
+
+A protocol member can contain the same protocol in the source specialization but remain finite in
+the target specialization. Its structural requirements still contribute to inference, and each
+retained specialization must accept the original argument. Here, `extract` infers `Consumer[int]`
+for `T`. The same members also establish assignability when no type variables need to be inferred.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+class Consumer[T](Protocol):
+    def consume(self, value: T | int) -> None: ...
+    @property
+    def child(self) -> Consumer[T]: ...
+
+static_assert(is_assignable_to(Consumer[Consumer[int]], Consumer[int]))
+
+def extract[T](consumer: Consumer[T]) -> T:
+    raise NotImplementedError
+
+def check(value: Consumer[Consumer[int]]) -> None:
+    reveal_type(extract(value))  # revealed: Consumer[int]
+```
+
+An explicit receiver annotation introduces constraints when comparing a bound method with a
+callable. The return types still match structurally, so union simplification retains only the
+callable.
+
+```py
+class Receiver:
+    def method[S](self: S, value: S, /) -> Consumer[Consumer[int]]:
+        raise NotImplementedError
+
+def check_union(receiver: Receiver, callback: Callable[[object], Consumer[int]], flag: bool) -> None:
+    reveal_type(receiver.method if flag else callback)  # revealed: (object, /) -> Consumer[int]
+```
+
+### Repeated applications of a nonrecursive alias
+
+Nested applications of the same finite alias do not create an alias cycle. Their protocol
+requirement must still contribute its type-variable constraints.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions._internal import is_constraint_set_assignable_to
+
+type Identity[T] = T
+
+class Recursive[T](Protocol):
+    @property
+    def value(self) -> Identity[Identity[T]]: ...
+    @property
+    def child(self) -> Recursive[T]: ...
+
+def inspect[T]() -> None:
+    constraints = is_constraint_set_assignable_to(Recursive[int], Recursive[T])
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=int]]
+```
+
+### Growing aliases in recursive protocol requirements
+
+A recursive alias can change its specialization every time its definition is expanded. Finite
+protocol matching must detect the repeated alias definition instead of following the growing
+specializations indefinitely.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+type GrowingAlias[T] = T | GrowingAlias[list[T]]  # error: [cyclic-type-alias-definition]
+
+class Recursive[T](Protocol):
+    def consume(self, value: T) -> None: ...
+    def growing(self) -> GrowingAlias[T]: ...
+    def child(self) -> Recursive[T]: ...
+
+def check(value: Recursive[int]) -> None:
+    rejected: Recursive[str] = value  # error: [invalid-assignment]
+```
+
+### Generic constructors inheriting recursive protocols
+
+A generic constructor can infer its specialization from an expected recursive protocol even when the
+protocol includes a concrete method with an explicitly constrained receiver. Invalid constructor
+arguments are rejected. Without an expected type, the empty tuple is an `Iterable[Never]`, so the
+constructor infers `T = Never` regardless of the protocol's variance.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Iterable
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def value(self) -> T:
+        raise RuntimeError
+    def combine[S](self: Chain[S], pair: tuple[S, T]) -> Chain[T]:
+        raise RuntimeError
+
+class Concrete[T](Chain[T]):
+    def __init__(self, values: Iterable[T]) -> None: ...
+
+contextual: Chain[int] = Concrete(())
+reveal_type(contextual)  # revealed: Concrete[int]
+wrong: Chain[int] = Concrete(("wrong",))  # error: [invalid-assignment]
+reveal_type(Concrete(()))  # revealed: Concrete[Never]
+
+def make() -> Chain[int]:
+    return Concrete(())
+```
+
+### Specialized sources with constrained protocol receivers
+
+A concrete class can inherit implemented recursive methods with explicitly constrained receivers.
+Concrete, symbolic, and unknown specializations bind those receivers and preserve the corresponding
+return types.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def value(self) -> T:
+        raise RuntimeError
+    def accumulate[S](self: Chain[S]) -> Chain[S]:
+        return self
+
+class Concrete[T](Chain[T]): ...
+
+def check[T](concrete: Concrete[int], symbolic: Concrete[T]) -> None:
+    reveal_type(concrete.accumulate())  # revealed: Chain[int]
+    reveal_type(symbolic.accumulate())  # revealed: Chain[T@check]
+    reveal_type(Concrete().accumulate())  # revealed: Chain[Unknown]
+```
+
+### Nested symbolic sources with constrained protocol receivers
+
+Type variables nested inside a concrete class's specialization still contribute constraints when
+binding an inherited recursive protocol method. Tuple, union, and aliased specializations preserve
+their element types in the result.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+    def accumulate[S](self: Chain[S]) -> Chain[S]: ...
+
+class Concrete[T](Chain[T]): ...
+
+type Wrapped[T] = tuple[T]
+
+def check[T](nested: Concrete[tuple[T]], union: Concrete[T | list[T]], aliased: Concrete[Wrapped[T]]) -> None:
+    reveal_type(nested.accumulate())  # revealed: Chain[tuple[T@check]]
+    reveal_type(union.accumulate())  # revealed: Chain[T@check | list[T@check]]
+    reveal_type(aliased.accumulate())  # revealed: Chain[Wrapped[T@check]]
+```
+
+### Incompatible explicit receivers on recursive protocols
+
+The `value` and `write` methods make `Chain` invariant. Calling `flatten` on `Chain[list[int]]` is
+therefore invalid, even though `list[int]` is assignable to `Iterable[int]`. The incompatible
+`write` requirement rejects the receiver without expanding the recursive specializations in
+`combinations` and `product`. A receiver specialized with `Iterable[int]` remains valid and
+preserves the element type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Iterable
+from typing import Literal, Protocol, overload
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+    @overload
+    def combinations(self, length: Literal[2]) -> Chain[tuple[T, T]]: ...
+    @overload
+    def combinations(self, length: Literal[3]) -> Chain[tuple[T, T, T]]: ...
+    @overload
+    def combinations(self, length: int) -> Chain[tuple[T, ...]]: ...
+    def product(self) -> Chain[tuple[T]]: ...
+    def flatten[U](self: Chain[Iterable[U]]) -> Chain[U]: ...
+    def write(self, items: Iterable[T]) -> None: ...
+
+def invalid(value: Chain[list[int]]) -> None:
+    value.flatten()  # error: [invalid-argument-type]
+
+def valid(value: Chain[Iterable[int]]) -> None:
+    reveal_type(value.flatten())  # revealed: Chain[int]
+```
+
+### Structurally equivalent recursive protocol specializations as receivers
+
+Comparing the `child` return types of `Node[str]` and `Node[int]` leads back to the same comparison.
+No other member uses `T`, so their structures match at every depth. Thus `Node[str]` satisfies the
+`Node[int]` receiver of `read`, even though `str` is not a subtype of `int`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Node[T](Protocol):
+    def child(self) -> Node[T]: ...
+    def read(self: Node[int]) -> int: ...
+
+class Readable(Protocol):
+    def read(self) -> int: ...
+
+static_assert(is_subtype_of(Node[str], Node[int]))
+
+def check(node: Node[str]) -> Readable:
+    return node  # no diagnostic
+
+T = TypeVar("T", covariant=True)
+
+class LegacyNode(Protocol[T]):
+    def child(self) -> LegacyNode[T]: ...
+    def read(self: LegacyNode[int]) -> int: ...
+
+static_assert(is_subtype_of(LegacyNode[str], LegacyNode[int]))
+
+def check_legacy(node: LegacyNode[str]) -> Readable:
+    return node  # no diagnostic
+```
+
+### Explicit receivers on overloaded recursive protocol methods
+
+An overloaded method can constrain its receiver to a tuple specialization of the same recursive
+protocol. Comparing the fixed-length overload with the gradual fallback terminates without
+repeatedly expanding the recursive requirement, and the call preserves the callback's return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any, Protocol, overload
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+    def child(self) -> Chain[tuple[T]]: ...
+    @overload
+    def map_star[A, B, R](self: Chain[tuple[A, B]], callback: Callable[[A, B], R]) -> Chain[R]: ...
+    @overload
+    def map_star[R](self: Chain[tuple[Any, ...]], callback: Callable[..., R]) -> Chain[R]: ...
+
+def check(value: Chain[tuple[int, str]]) -> None:
+    reveal_type(value.map_star(lambda first, second: 1))  # revealed: Chain[Literal[1]]
+```
+
+### Structural inference from recursive protocol requirements
+
+An inherited protocol specialization can erase a class type parameter. A recursive member can still
+recover that parameter structurally, so satisfying the nominal relation is not enough to stop
+collecting protocol constraints.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any, Protocol
+
+class Recursive[A, B](Protocol):
+    first: A
+    def value(self, child: Recursive[Any, Any]) -> B: ...
+
+class Erased[T, U](Recursive[T, Any]):
+    def value(self, child: Recursive[Any, Any]) -> U:
+        raise NotImplementedError
+
+    def __init__(self, callback: Callable[[U], object]) -> None: ...
+
+pair: Recursive[int, str] = Erased(lambda value: reveal_type(value))  # revealed: str
+```
+
+The same inference is needed when an erased source argument contains a nested type variable. The
+nominal relation constrains `T`, but only the recursive `value` member can infer `U` through the
+tuple.
+
+```py
+def make[T, U](callback: Callable[[U], object]) -> Erased[T, tuple[U]]:
+    raise NotImplementedError
+
+nested: Recursive[int, tuple[str]] = make(lambda value: reveal_type(value))  # revealed: str
+```
+
+### Overridden recursive protocol requirements
+
+Recursive requirements remain significant when a concrete class overrides them. Their constraints
+reject incompatible assignments and preserve generic inference.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Node[T](Protocol):
+    @property
+    def value(self) -> T: ...
+    @property
+    def child(self) -> Node[T]: ...
+
+class Mismatched[T](Node[object]):
+    def __init__(self, value: T) -> None: ...
+    @property
+    def value(self) -> T:
+        raise NotImplementedError
+
+    @property
+    def child(self) -> Node[str]:
+        raise NotImplementedError
+
+bad_assignment: Node[int] = Mismatched(1)  # error: [invalid-assignment]
+
+def extract[U](node: Node[U]) -> U:
+    raise NotImplementedError
+
+# The structural solution includes both `value`'s `Literal[1]` and `child`'s `str`.
+# Intersecting it with the inherited `Node[object]` solution preserves that precision.
+reveal_type(extract(Mismatched(1)))  # revealed: Literal[1] | str
 ```
 
 ### Recursive legacy generic protocol
@@ -6706,6 +8635,163 @@ def _(flag: bool) -> None:
     reveal_type(infer_producer(cls))  # revealed: int | str
 ```
 
+## Default specialization of generic meta-protocol constructors
+
+Checking a bare generic class against `type[Protocol]` does not provide constructor arguments from
+which to infer a specialization. Its constructed instance therefore uses the class's default type
+arguments, or `Unknown` for parameters without defaults.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Protocol
+
+class HasValue[T](Protocol):
+    @property
+    def value(self) -> T: ...
+
+class Defaulted[T = int]:
+    value: T
+
+class NoDefault[T]:
+    value: T
+
+defaulted: type[HasValue[int]] = Defaulted
+wrong_default: type[HasValue[str]] = Defaulted  # error: [invalid-assignment]
+unspecified: type[HasValue[str]] = NoDefault
+```
+
+Generic inference exposes these type arguments: `int` for `Defaulted` and `Unknown` for `NoDefault`.
+Explicit class arguments take precedence over defaults.
+
+```py
+def infer[T](cls: type[HasValue[T]]) -> T:
+    return cls().value
+
+reveal_type(infer(Defaulted))  # revealed: int
+reveal_type(infer(NoDefault))  # revealed: Unknown
+reveal_type(infer(Defaulted[str]))  # revealed: str
+
+explicit: type[HasValue[str]] = Defaulted[str]
+wrong: type[HasValue[int]] = Defaulted[str]  # error: [invalid-assignment]
+```
+
+Inference from a union of bare classes combines their default arguments.
+
+```py
+class StringDefaulted[T = str]:
+    value: T
+
+def infer_union(flag: bool) -> None:
+    cls = Defaulted if flag else StringDefaulted
+    reveal_type(infer(cls))  # revealed: int | str
+```
+
+A parameter already annotated with a specialization retains that specialization, including type
+variables supplied by its caller.
+
+```py
+def preserve[T](cls: type[Defaulted[T]]) -> T:
+    reveal_type(infer(cls))  # revealed: T@preserve
+    return infer(cls)
+```
+
+An ordinary method is checked on both the constructed instance and the class object. Default
+specialization also preserves the method's unbound signature.
+
+```py
+class Getter[T](Protocol):
+    def get(self) -> T: ...
+
+class DefaultedGetter[T = int]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def infer_getter[T](cls: type[Getter[T]]) -> T:
+    return cls().get()
+
+reveal_type(infer_getter(DefaultedGetter))  # revealed: int
+reveal_type(infer_getter(DefaultedGetter[str]))  # revealed: str
+wrong_getter: type[Getter[str]] = DefaultedGetter  # error: [invalid-assignment]
+```
+
+`functools.partial` has special constructor handling. Its omitted type argument also becomes
+`Unknown`, while an explicit argument is preserved.
+
+```py
+from functools import partial
+from typing import Any
+
+class CallableInstance[T](Protocol):
+    def __call__(self, *args: Any, **kwargs: Any) -> T: ...
+
+def infer_return[T](cls: type[CallableInstance[T]]) -> T:
+    raise NotImplementedError
+
+reveal_type(infer_return(partial[str]))  # revealed: str
+reveal_type(infer_return(partial))  # revealed: Unknown
+
+bad_partial: type[CallableInstance[int]] = partial[str]  # error: [invalid-assignment]
+```
+
+## Generic meta-protocol constructors with a custom return type
+
+Default specialization still uses the effective constructor return. `Factory` does not have the
+required instance attribute itself, but its `__new__` returns a `Product` that does.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Protocol
+
+class HasValue[T](Protocol):
+    @property
+    def value(self) -> T: ...
+
+class Product[T]:
+    value: T
+
+class Factory[T = int]:
+    def __new__(cls) -> Product[T]:
+        raise NotImplementedError
+
+defaulted: type[HasValue[int]] = Factory
+explicit: type[HasValue[str]] = Factory[str]
+wrong: type[HasValue[str]] = Factory  # error: [invalid-assignment]
+```
+
+A constructor can return a type unrelated to its class's default arguments. Those arguments do not
+replace an explicitly declared return type.
+
+```py
+class StringFactory[T = int]:
+    def __new__(cls) -> Product[str]:
+        raise NotImplementedError
+
+strings: type[HasValue[str]] = StringFactory
+integers: type[HasValue[int]] = StringFactory  # error: [invalid-assignment]
+```
+
+A metaclass can override construction independently of the generic class's default arguments. Its
+`__call__` return still determines which instance protocol the class satisfies.
+
+```py
+class StringFactoryMeta(type):
+    def __call__(self) -> Product[str]:
+        raise NotImplementedError
+
+class MetaFactory[T = int](metaclass=StringFactoryMeta): ...
+
+meta_strings: type[HasValue[str]] = MetaFactory
+meta_integers: type[HasValue[int]] = MetaFactory  # error: [invalid-assignment]
+```
+
 ## Generic substitution of `type[Protocol]`
 
 Passing `type[P]` through a generic identity function preserves its structural meaning, including
@@ -6807,8 +8893,8 @@ Protocols can have TypeVars with forward reference bounds that form cycles.
 ```py
 from typing import Any, Protocol, TypeVar
 
-T1 = TypeVar("T1", bound="A2[Any]")
-T2 = TypeVar("T2", bound="A1[Any]")
+T1 = TypeVar("T1", bound="A2[Any]", covariant=True)
+T2 = TypeVar("T2", bound="A1[Any]", covariant=True)
 T3 = TypeVar("T3", bound="B2[Any]")
 T4 = TypeVar("T4", bound="B1[Any]")
 
@@ -6871,6 +8957,10 @@ visible. As of Python 3.13, it is necessary because structurally inferring throu
 `close() -> _ReturnT_co | None` can spuriously infer `None`. The latter workaround can be removed
 once [ty#3596](https://github.com/astral-sh/ty/issues/3596) is fixed.
 
+The custom protocol below is invariant because its mutable list contains a generator with a
+covariant return parameter. Variance validation respects that declaration even when the parameter is
+not structurally visible.
+
 ```toml
 [environment]
 python-version = "3.12"
@@ -6881,7 +8971,7 @@ from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to, is_subtype_of, is_assignable_to
 from typing import Generator, Awaitable, Protocol, TypeVar, Any, Protocol
 
-T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
 
 class A: ...
 class B: ...
@@ -6901,19 +8991,20 @@ static_assert(not is_equivalent_to(Awaitable[A], Awaitable[Any]))
 static_assert(not is_subtype_of(Awaitable[A], Awaitable[B]))
 static_assert(not is_assignable_to(Awaitable[A], Awaitable[B]))
 
-class CustomCovariantProtocol(Protocol[T_co]):
-    def foo(self) -> tuple[list[Generator[None, None, T_co]]]: ...
+class CustomInvariantProtocol(Protocol[T]):
+    def foo(self) -> tuple[list[Generator[None, None, T]]]: ...
 
-static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
-static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[Any]))
-static_assert(not is_subtype_of(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
-static_assert(not is_assignable_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+static_assert(not is_equivalent_to(CustomInvariantProtocol[A], CustomInvariantProtocol[B]))
+static_assert(not is_equivalent_to(CustomInvariantProtocol[A], CustomInvariantProtocol[Any]))
+static_assert(not is_subtype_of(CustomInvariantProtocol[A], CustomInvariantProtocol[B]))
+static_assert(not is_assignable_to(CustomInvariantProtocol[A], CustomInvariantProtocol[B]))
 ```
 
 ## The `Generator` protocol's `_ReturnT_co` appears in `close` as of Python 3.13
 
 The same test cases as above, but for Python 3.13 instead of 3.12. In this version `_ReturnT_co`
-appears in `Generator`'s `close` method.
+appears in `Generator`'s `close` method. The custom protocol is invariant because this return type
+is exposed inside a mutable list.
 
 ```toml
 [environment]
@@ -6925,7 +9016,7 @@ from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to, is_subtype_of, is_assignable_to
 from typing import Generator, Awaitable, TypeVar, Protocol, Any
 
-T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
 
 class A: ...
 class B: ...
@@ -6943,13 +9034,13 @@ static_assert(not is_equivalent_to(Awaitable[A], Awaitable[Any]))
 static_assert(not is_subtype_of(Awaitable[A], Awaitable[B]))
 static_assert(not is_assignable_to(Awaitable[A], Awaitable[B]))
 
-class CustomCovariantProtocol(Protocol[T_co]):
-    def foo(self) -> tuple[list[Generator[None, None, T_co]]]: ...
+class CustomInvariantProtocol(Protocol[T]):
+    def foo(self) -> tuple[list[Generator[None, None, T]]]: ...
 
-static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
-static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[Any]))
-static_assert(not is_subtype_of(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
-static_assert(not is_assignable_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+static_assert(not is_equivalent_to(CustomInvariantProtocol[A], CustomInvariantProtocol[B]))
+static_assert(not is_equivalent_to(CustomInvariantProtocol[A], CustomInvariantProtocol[Any]))
+static_assert(not is_subtype_of(CustomInvariantProtocol[A], CustomInvariantProtocol[B]))
+static_assert(not is_assignable_to(CustomInvariantProtocol[A], CustomInvariantProtocol[B]))
 ```
 
 ## Inferring async return contexts on Python 3.13 or newer
