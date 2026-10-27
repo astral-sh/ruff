@@ -291,6 +291,7 @@ impl Rule {
             | Rule::MissingTodoDescription
             | Rule::MissingTodoLink
             | Rule::MissingTrailingComma
+            | Rule::MissingTrailingCommaInMultilineList
             | Rule::MultiLineImplicitStringConcatenation
             | Rule::MultipleStatementsOnOneLineColon
             | Rule::MultipleStatementsOnOneLineSemicolon
