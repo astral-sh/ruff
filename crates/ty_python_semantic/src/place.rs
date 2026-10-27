@@ -1830,6 +1830,7 @@ fn place_from_bindings_impl<'db>(
     let predicates = bindings_with_constraints.predicates();
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
     let boundness_analysis = bindings_with_constraints.boundness_analysis();
+    let single_binding = bindings_with_constraints.has_single_live_binding();
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
 
     let is_non_exported = |binding: Definition<'db>| {
@@ -2006,7 +2007,7 @@ fn place_from_bindings_impl<'db>(
                             binding_ty,
                         )
                     })
-                    .narrow(constraint, binding_ty),
+                    .narrow(constraint, binding_ty, single_binding),
             };
             Some((narrowed, static_reachability))
         },

@@ -1447,6 +1447,11 @@ pub struct BindingWithConstraintsIterator<'map, 'db> {
 }
 
 impl<'map, 'db> BindingWithConstraintsIterator<'map, 'db> {
+    /// Whether only one live binding remains, apart from an initial unbound sentinel.
+    pub fn has_single_live_binding(&self) -> bool {
+        self.inner.len() == 1
+    }
+
     pub const fn predicates(&self) -> &'map Predicates<'db> {
         &self.constraint_tables.predicates
     }

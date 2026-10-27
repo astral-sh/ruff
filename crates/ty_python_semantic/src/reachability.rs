@@ -592,6 +592,13 @@ const NON_TERMINAL_CALL_CHUNK_SIZE: usize = 16;
 const REACHABILITY_EVALUATION_CHUNK_SIZE: usize = 256;
 const CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL: usize = 16;
 const NARROWING_EVALUATION_CHECKPOINT_INTERVAL: usize = 8;
+
+fn is_narrowing_checkpoint_position(predicate: ScopedPredicateId) -> bool {
+    let index = predicate.index();
+    let position = index ^ (index / NARROWING_EVALUATION_CHECKPOINT_INTERVAL);
+    (position + 1).is_multiple_of(NARROWING_EVALUATION_CHECKPOINT_INTERVAL)
+}
+
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
         PredicateNode::Expression(expression)
@@ -978,7 +985,7 @@ pub(crate) fn narrow_type_by_constraint<'db>(
         place,
         base_ty,
     )
-    .narrow(id, base_ty)
+    .narrow(id, base_ty, true)
 }
 
 fn apply_accumulated_narrowing<'db>(
@@ -1173,6 +1180,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         &mut self,
         constraint: ScopedNarrowingConstraint,
         base_ty: Type<'db>,
+        single_binding: bool,
     ) -> Type<'db> {
         self.base_ty = base_ty;
         match constraint {
@@ -1187,8 +1195,53 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             return base_ty;
         }
 
+        // With multiple bindings, registering each root can turn a suffix of another
+        // binding's graph into a join. Replacement narrowing depends on those boundaries.
+        if single_binding && let Some(ty) = self.narrow_single_predicate(constraint) {
+            return ty;
+        }
+
         let root = self.project(constraint, true);
         self.narrow_projected(root, base_ty)
+    }
+
+    /// Evaluates a single positive or negative expression predicate without projecting a graph.
+    fn narrow_single_predicate(&self, root: ScopedNarrowingConstraint) -> Option<Type<'db>> {
+        type Id = ScopedNarrowingConstraint;
+
+        let node = self.constraints.get_interior_node(root);
+        let positive = match (node.if_true, node.if_uncertain, node.if_false) {
+            (Id::ALWAYS_TRUE, Id::ALWAYS_FALSE, Id::ALWAYS_FALSE) => true,
+            (Id::ALWAYS_FALSE, Id::ALWAYS_FALSE, Id::ALWAYS_TRUE) => false,
+            _ => return None,
+        };
+        let predicate = self.predicates[node.atom];
+        if !matches!(predicate.node, PredicateNode::Expression(_)) {
+            return None;
+        }
+
+        if self
+            .predicate_narrowing_targets
+            .contains(node.atom, self.place)
+        {
+            if is_narrowing_checkpoint_position(node.atom) {
+                return None;
+            }
+            let (pos, neg) = infer_narrowing_constraints(self.db, predicate, self.place);
+            if pos.is_some() || neg.is_some() {
+                return Some(apply_accumulated_narrowing(
+                    self.db,
+                    self.env,
+                    self.base_ty,
+                    if positive { pos } else { neg },
+                ));
+            }
+        }
+
+        let reachable = analyze_single(self.db, self.env, &predicate)
+            .negate_if(!positive)
+            .may_be_true();
+        Some(if reachable { self.base_ty } else { Type::Never })
     }
 
     /// Narrows a projected constraint while reusing suffix results for its original binding type.
@@ -1437,12 +1490,8 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
 
                     let node = self.constraints.get_interior_node(id);
                     let predicate = self.predicates[node.atom];
-                    let index = node.atom.index();
-                    let checkpoint_position =
-                        index ^ (index / NARROWING_EVALUATION_CHECKPOINT_INTERVAL);
                     if (id != root || use_root_checkpoint)
-                        && (checkpoint_position + 1)
-                            .is_multiple_of(NARROWING_EVALUATION_CHECKPOINT_INTERVAL)
+                        && is_narrowing_checkpoint_position(node.atom)
                         && (self
                             .predicate_narrowing_targets
                             .contains(node.atom, self.place)
