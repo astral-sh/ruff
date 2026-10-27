@@ -1932,115 +1932,94 @@ fn pending_place_state_mut<'a>(
 }
 
 impl PendingReachability {
-    /// Merges an alternative branch's place states into the current control-flow path.
+    /// Joins the current and alternative paths at their common ancestor.
     ///
-    /// States shared by both branches only need their path constraints merged. States that differ
-    /// are materialized before their bindings and declarations are merged, while places absent
-    /// from the alternative branch are treated as undefined on that path.
+    /// An untouched place can apply the joined constraints on demand, just like any other
+    /// pending node. If both paths' constraints cancel out, the ancestor already represents
+    /// the joined path.
+    fn join_paths(
+        &mut self,
+        branch: PendingReachabilityId,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    ) -> PendingReachabilityId {
+        if self.current == branch {
+            return branch;
+        }
+        let ancestor = self.common_ancestor(self.current, branch);
+        let current_reachability =
+            self.constraint_between(ancestor, self.current, reachability_constraints);
+        let branch_reachability =
+            self.constraint_between(ancestor, branch, reachability_constraints);
+        let reachability =
+            reachability_constraints.add_or_constraint(current_reachability, branch_reachability);
+        let current_narrowing =
+            self.narrowing_constraint_between(ancestor, self.current, narrowing_constraints);
+        let branch_narrowing =
+            self.narrowing_constraint_between(ancestor, branch, narrowing_constraints);
+        let narrowing =
+            narrowing_constraints.add_or_constraint(current_narrowing, branch_narrowing);
+        if reachability == ScopedReachabilityConstraintId::ALWAYS_TRUE
+            && narrowing == ScopedNarrowingConstraint::ALWAYS_TRUE
+        {
+            ancestor
+        } else {
+            self.constraints.push(PendingReachabilityConstraint {
+                parent: ancestor,
+                reachability_constraint: reachability,
+                narrowing_constraint: narrowing,
+            })
+        }
+    }
+
+    /// Merges the alternative branch's place states, materializing states that differ
+    /// before combining their bindings and declarations. A place absent from the
+    /// alternative branch is undefined on that path.
+    #[expect(clippy::too_many_arguments)]
     fn merge_place_states<I: Idx>(
         &self,
         current_states: &mut IndexVec<I, PendingPlaceState>,
         branch_states: IndexVec<I, PendingPlaceState>,
         branch: PendingReachabilityId,
+        joined: PendingReachabilityId,
         branch_reachability: ScopedReachabilityConstraintId,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
-        let branch_ancestor = self.common_ancestor(self.current, branch);
-        let current_narrowing =
-            self.narrowing_constraint_between(branch_ancestor, self.current, narrowing_constraints);
-        let branch_narrowing =
-            self.narrowing_constraint_between(branch_ancestor, branch, narrowing_constraints);
-        let merged_narrowing =
-            narrowing_constraints.add_or_constraint(current_narrowing, branch_narrowing);
-        // Consecutive places often share their last applied reachability node, so their
-        // merged path constraint can be reused even when they have distinct place states.
-        let mut last_merged_reachability = None;
         let mut branch_states = branch_states.into_iter();
         for current in current_states {
-            let Some(mut branch_state) = branch_states.next() else {
-                let current = self.materialize(
-                    current,
-                    self.current,
-                    narrowing_constraints,
-                    reachability_constraints,
-                );
-                current.merge(
-                    PlaceState::undefined(branch_reachability),
-                    narrowing_constraints,
-                    reachability_constraints,
-                );
-                continue;
-            };
-
-            // If neither branch changed the place itself, merge just the path constraints. The
-            // common case is a truthy/falsy pair whose constraints cancel to `ALWAYS_TRUE`, leaving
-            // the shared state untouched.
-            if current.reachability == branch_state.reachability
+            let branch_state = branch_states.next();
+            if let Some(branch_state) = &branch_state
+                && current.reachability == branch_state.reachability
                 && current.narrowing == branch_state.narrowing
                 && Rc::ptr_eq(&current.state, &branch_state.state)
             {
-                if self.current == branch {
-                    continue;
-                }
-
-                // Preserve gates that precede the branch, then merge gates introduced on the
-                // individual branch paths. If either path has no gate, the merged gate simplifies
-                // to `ALWAYS_TRUE` and can be discarded.
-                self.materialize_narrowing(current, branch_ancestor, narrowing_constraints);
-                if merged_narrowing != ScopedNarrowingConstraint::ALWAYS_TRUE {
-                    Rc::make_mut(&mut current.state)
-                        .record_narrowing_constraint(narrowing_constraints, merged_narrowing);
-                }
-
-                let merged_constraint = match last_merged_reachability {
-                    Some((ancestor, constraint)) if ancestor == current.reachability => constraint,
-                    _ => {
-                        let current_constraint = self.constraint_between(
-                            current.reachability,
-                            self.current,
-                            reachability_constraints,
-                        );
-                        let branch_constraint = self.constraint_between(
-                            current.reachability,
-                            branch,
-                            reachability_constraints,
-                        );
-                        let merged_constraint = reachability_constraints
-                            .add_or_constraint(current_constraint, branch_constraint);
-                        last_merged_reachability = Some((current.reachability, merged_constraint));
-                        merged_constraint
-                    }
-                };
-                if merged_constraint != ScopedReachabilityConstraintId::ALWAYS_TRUE {
-                    Rc::make_mut(&mut current.state).record_reachability_constraint(
-                        reachability_constraints,
-                        merged_constraint,
-                    );
-                }
-                current.reachability = self.current;
-                current.narrowing = self.current;
+                // The shared cursors precede the fork, so the joined node already accounts
+                // for both paths the next time this place is accessed.
                 continue;
             }
 
+            let other = if let Some(mut branch_state) = branch_state {
+                self.materialize(
+                    &mut branch_state,
+                    branch,
+                    narrowing_constraints,
+                    reachability_constraints,
+                );
+                Rc::unwrap_or_clone(branch_state.state)
+            } else {
+                PlaceState::undefined(branch_reachability)
+            };
+
             self.materialize(
-                &mut branch_state,
-                branch,
-                narrowing_constraints,
-                reachability_constraints,
-            );
-            let branch_state = Rc::unwrap_or_clone(branch_state.state);
-            let current = self.materialize(
                 current,
                 self.current,
                 narrowing_constraints,
                 reachability_constraints,
-            );
-            current.merge(
-                branch_state,
-                narrowing_constraints,
-                reachability_constraints,
-            );
+            )
+            .merge(other, narrowing_constraints, reachability_constraints);
+            current.reachability = joined;
+            current.narrowing = joined;
         }
     }
 }
@@ -3119,10 +3098,16 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert!(self.member_states.len() >= snapshot.member_states.len());
 
         let branch = snapshot.pending_reachability;
+        let joined = self.pending_reachability.join_paths(
+            branch,
+            &mut self.narrowing_constraints,
+            &mut self.reachability_constraints,
+        );
         self.pending_reachability.merge_place_states(
             &mut self.symbol_states,
             snapshot.symbol_states,
             branch,
+            joined,
             snapshot.reachability,
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
@@ -3132,11 +3117,14 @@ impl<'db> UseDefMapBuilder<'db> {
                 &mut self.member_states,
                 snapshot.member_states,
                 branch,
+                joined,
                 snapshot.reachability,
                 &mut self.narrowing_constraints,
                 &mut self.reachability_constraints,
             );
         }
+
+        self.pending_reachability.current = joined;
 
         self.reachability = self
             .reachability_constraints
