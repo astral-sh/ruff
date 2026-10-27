@@ -12,8 +12,8 @@ use crate::types::call::bind::CallableDescription;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY,
-    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
-    TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
+    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_DEFAULT, NOT_SUBSCRIPTABLE,
+    POSSIBLY_MISSING_IMPLICIT_CALL, TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
     report_invalid_arguments_to_annotated, report_not_subscriptable,
 };
 use crate::types::dict::dict_literal_key_value_types;
@@ -27,7 +27,7 @@ use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::typed_dict::{
     TypedDictAssignmentKind, TypedDictExtraItems, TypedDictKeyAssignment,
 };
-use crate::types::typevar::{BindingContext, TypeVarSet};
+use crate::types::typevar::{BindingContext, TypeVarKind, TypeVarSet};
 use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, ClassType,
     CycleDetector, DisplaySettings, DynamicType, InternedType, KnownClass, KnownInstanceType,
@@ -1582,6 +1582,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => value_ty.subscript(db, env, slice_ty, expr_context),
         };
+
+        if let Ok(Type::KnownInstance(
+            KnownInstanceType::SubscriptedGeneric(Some(context))
+            | KnownInstanceType::SubscriptedProtocol(Some(context)),
+        )) = subscript_result
+            && let Some(arguments) = subscript.slice.as_tuple_expr()
+            && self.context.is_lint_enabled(&INVALID_TYPE_VARIABLE_DEFAULT)
+        {
+            for ((pack, parameter), argument) in context
+                .variables(db)
+                .tuple_windows()
+                .zip(arguments.elts.iter().skip(1))
+            {
+                if pack.is_typevartuple(db)
+                    && parameter.kind(db) == TypeVarKind::LegacyTypeVar
+                    && parameter.typevar(db).default_type(db, env).is_some()
+                    && let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, argument)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Type parameter `{}` with a default follows TypeVarTuple `{}`",
+                        parameter.name(db),
+                        pack.name(db),
+                    ));
+                }
+            }
+        }
 
         subscript_result.map_err(|error| {
             error.report_diagnostics(&self.context, subscript);
