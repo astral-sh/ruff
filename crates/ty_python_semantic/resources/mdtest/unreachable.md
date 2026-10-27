@@ -101,6 +101,16 @@ def f():
 
     # TODO: we should mark this as unreachable
     print("unreachable")
+
+def after_nested_branch(message: str | None, verbose: bool):
+    if always_raises():
+        print("starting")
+        if verbose:
+            print("verbose")
+
+    reveal_type(message)  # revealed: Never
+    if message:
+        print(message)
 ```
 
 ### Calls to unions of functions returning `Never`

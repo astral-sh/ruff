@@ -1659,6 +1659,7 @@ pub(super) struct FlowSnapshot {
     checkpoint_flow: ScopedReachabilityConstraintId,
     checkpoint_state: ExceptionCheckpointSnapshot,
     pending_reachability: PendingReachabilityId,
+    last_join: PendingReachabilityId,
 }
 
 impl FlowSnapshot {
@@ -1686,6 +1687,8 @@ struct PendingReachabilityConstraint {
 struct PendingReachability {
     constraints: IndexVec<PendingReachabilityId, PendingReachabilityConstraint>,
     current: PendingReachabilityId,
+    /// Narrowing gates through this join are visible when a place is read.
+    last_join: PendingReachabilityId,
 }
 
 impl Default for PendingReachability {
@@ -1700,6 +1703,7 @@ impl Default for PendingReachability {
         Self {
             constraints,
             current: root,
+            last_join: root,
         }
     }
 }
@@ -1819,15 +1823,21 @@ impl PendingReachability {
 
     /// Returns the place state needed to resolve a use.
     ///
-    /// Pending narrowing gates are only needed to preserve path correlations across a later place
-    /// change or merge, so they are not materialized here.
+    /// Narrowing gates after the last join only preserve correlations for a later change or merge.
+    /// Earlier gates are part of the merged bindings and can make them unreachable at this use.
     fn materialize_ref_at_use<'a>(
         &self,
         pending: &'a mut PendingPlaceState,
         target: PendingReachabilityId,
+        last_join: PendingReachabilityId,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) -> &'a PlaceState {
         self.materialize_reachability(pending, target, reachability_constraints);
+        // Both positions lie on the path to `target`. Nodes are numbered after their parents.
+        if pending.narrowing.index() < last_join.index() {
+            self.materialize_narrowing(pending, last_join, narrowing_constraints);
+        }
         &pending.state
     }
 
@@ -1934,9 +1944,8 @@ fn pending_place_state_mut<'a>(
 impl PendingReachability {
     /// Joins the current and alternative paths at their common ancestor.
     ///
-    /// An untouched place can apply the joined constraints on demand, just like any other
-    /// pending node. If both paths' constraints cancel out, the ancestor already represents
-    /// the joined path.
+    /// Untouched places can apply the joined constraints on demand. If both paths' constraints
+    /// cancel out, the ancestor already represents the joined path.
     fn join_paths(
         &mut self,
         branch: PendingReachabilityId,
@@ -2766,6 +2775,8 @@ impl<'db> UseDefMapBuilder<'db> {
                         .materialize_ref_at_use(
                             state,
                             snapshot.pending_reachability,
+                            snapshot.last_join,
+                            &mut self.narrowing_constraints,
                             &mut self.reachability_constraints,
                         )
                         .bindings()
@@ -2781,6 +2792,8 @@ impl<'db> UseDefMapBuilder<'db> {
         let place_state = self.pending_reachability.materialize_ref_at_use(
             place_state,
             pending,
+            self.pending_reachability.last_join,
+            &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
         );
         let bindings = place_state.bindings().clone();
@@ -2804,6 +2817,8 @@ impl<'db> UseDefMapBuilder<'db> {
             let place_state = self.pending_reachability.materialize_ref_at_use(
                 place_state,
                 pending,
+                self.pending_reachability.last_join,
+                &mut self.narrowing_constraints,
                 &mut self.reachability_constraints,
             );
             let bindings = place_state.bindings().clone();
@@ -3018,6 +3033,7 @@ impl<'db> UseDefMapBuilder<'db> {
             checkpoint_flow: self.checkpoint_flow,
             checkpoint_state: self.checkpoint_state.snapshot(),
             pending_reachability: self.pending_reachability.current,
+            last_join: self.pending_reachability.last_join,
         }
     }
 
@@ -3058,6 +3074,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.reachability = snapshot.reachability;
         self.checkpoint_flow = snapshot.checkpoint_flow;
         self.pending_reachability.current = snapshot.pending_reachability;
+        self.pending_reachability.last_join = snapshot.last_join;
 
         // If the snapshot we are restoring is missing some places we've recorded since, we need
         // to fill them in so the place IDs continue to line up. Since they don't exist in the
@@ -3125,6 +3142,7 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         self.pending_reachability.current = joined;
+        self.pending_reachability.last_join = joined;
 
         self.reachability = self
             .reachability_constraints
@@ -3141,11 +3159,11 @@ impl<'db> UseDefMapBuilder<'db> {
             .iter_mut()
             .chain(self.member_states.iter_mut())
         {
-            // No later place change or merge can require the path correlation represented by
-            // pending narrowing gates, so only reachability needs to be finalized here.
-            self.pending_reachability.materialize_reachability(
+            self.pending_reachability.materialize_ref_at_use(
                 state,
                 pending,
+                self.pending_reachability.last_join,
+                &mut self.narrowing_constraints,
                 &mut self.reachability_constraints,
             );
         }
