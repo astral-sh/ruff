@@ -98,7 +98,7 @@ impl Relativity {
 pub struct Resolver<'a> {
     pyproject_config: &'a PyprojectConfig,
     /// All [`Settings`] that have been added to the resolver, along with their config file paths.
-    settings: Vec<(Settings, PathBuf)>,
+    settings: Vec<ResolvedSettings>,
     /// A router from path to index into the `settings` vector.
     router: Router<usize>,
 }
@@ -142,7 +142,10 @@ impl<'a> Resolver<'a> {
 
     /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
     fn add(&mut self, path: &Path, settings: Settings, config_path: PathBuf) {
-        self.settings.push((settings, config_path));
+        self.settings.push(ResolvedSettings {
+            settings,
+            config_path,
+        });
 
         // Normalize the path to use `/` separators and escape the '{' and '}' characters,
         // which matchit uses for routing parameters.
@@ -181,8 +184,8 @@ impl<'a> Resolver<'a> {
                 .router
                 .at(path.to_slash_lossy().as_ref())
                 .map(|Match { value, .. }| {
-                    let (settings, config_path) = &self.settings[*value];
-                    (settings, Some(config_path.as_path()))
+                    let entry = &self.settings[*value];
+                    (&entry.settings, Some(entry.config_path.as_path()))
                 })
                 .unwrap_or((
                     &self.pyproject_config.settings,
@@ -263,8 +266,14 @@ impl<'a> Resolver<'a> {
     /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
     pub fn settings(&self) -> impl Iterator<Item = &Settings> {
         std::iter::once(&self.pyproject_config.settings)
-            .chain(self.settings.iter().map(|(settings, _)| settings))
+            .chain(self.settings.iter().map(|entry| &entry.settings))
     }
+}
+
+#[derive(Debug)]
+struct ResolvedSettings {
+    settings: Settings,
+    config_path: PathBuf,
 }
 
 /// A wrapper around `detect_package_root` to cache filesystem lookups.
