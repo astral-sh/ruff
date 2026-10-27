@@ -15,6 +15,7 @@ use colored::Colorize;
 use itertools::Itertools;
 use path_absolutize::path_dedot;
 use regex::Regex;
+use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_graph::Direction;
 use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
@@ -729,6 +730,18 @@ pub struct ConfigArguments {
 }
 
 impl ConfigArguments {
+    /// A CLI override can equal the project value but still change a script's target version.
+    /// The values themselves are already part of the settings cache key.
+    pub(crate) fn cache_key_for_scripts(&self, hasher: &mut CacheKeyHasher) {
+        (self.per_flag_overrides.target_version.is_some()
+            || self.overrides.target_version.is_some())
+        .cache_key(hasher);
+        self.overrides
+            .per_file_target_version
+            .is_some()
+            .cache_key(hasher);
+    }
+
     pub(crate) fn config_file(&self) -> Option<&Path> {
         self.config_file.as_deref()
     }

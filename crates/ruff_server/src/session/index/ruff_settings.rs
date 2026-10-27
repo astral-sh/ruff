@@ -18,6 +18,7 @@ use ruff_workspace::{
     resolver::ConfigurationTransformer,
 };
 
+use crate::TextDocument;
 use crate::session::Client;
 use crate::session::options::ConfigurationPreference;
 use crate::session::settings::{EditorSettings, ResolvedConfiguration};
@@ -43,6 +44,7 @@ pub(super) struct RuffSettingsIndex {
     /// Index from folder to the resolved ruff settings.
     index: BTreeMap<PathBuf, Arc<RuffSettings>>,
     fallback: Arc<RuffSettings>,
+    pub(super) overrides: EditorConfigurationTransformer,
 }
 
 impl std::fmt::Display for RuffSettings {
@@ -61,7 +63,13 @@ impl RuffSettings {
     ///
     /// If there is an error in the editor-only settings, it finally falls back to the default
     /// settings.
-    pub(crate) fn fallback(editor_settings: &EditorSettings, root: &Path) -> RuffSettings {
+    pub(super) fn fallback(
+        overrides: &EditorConfigurationTransformer,
+        root: &Path,
+    ) -> RuffSettings {
+        if overrides.preference == ConfigurationPreference::EditorOnly {
+            return Self::with_editor_settings(overrides, root, Configuration::default());
+        }
         find_user_settings_toml()
             .and_then(|user_settings| {
                 tracing::debug!(
@@ -70,7 +78,7 @@ impl RuffSettings {
                 );
                 ruff_workspace::resolver::resolve_root_settings(
                     &user_settings,
-                    &EditorConfigurationTransformer(editor_settings, root),
+                    overrides,
                     ConfigurationOrigin::UserSettings { fallback_directory: root },
                 )
                 .ok()
@@ -88,24 +96,18 @@ impl RuffSettings {
                     target_version: fallback.map(Into::into),
                     ..Configuration::default()
                 };
-                Self::with_editor_settings(editor_settings, root, configuration)
+                Self::with_editor_settings(overrides, root, configuration)
             })
-    }
-
-    /// Constructs [`RuffSettings`] by merging the editor-defined settings with the
-    /// default configuration.
-    fn editor_only(editor_settings: &EditorSettings, root: &Path) -> RuffSettings {
-        Self::with_editor_settings(editor_settings, root, Configuration::default())
     }
 
     /// Merges the `configuration` with the editor-defined settings, falling back to the
     /// unmodified configuration if the editor settings are invalid.
     fn with_editor_settings(
-        editor_settings: &EditorSettings,
+        overrides: &EditorConfigurationTransformer,
         root: &Path,
         configuration: Configuration,
     ) -> RuffSettings {
-        let settings = EditorConfigurationTransformer(editor_settings, root)
+        let settings = overrides
             .transform(configuration.clone())
             .into_settings(root)
             .unwrap_or_else(|error| {
@@ -124,6 +126,26 @@ impl RuffSettings {
             settings,
             config_path: None,
         })
+    }
+
+    pub(super) fn for_document(
+        self: Arc<Self>,
+        path: &Path,
+        document: Option<&TextDocument>,
+        overrides: &EditorConfigurationTransformer,
+    ) -> Arc<Self> {
+        let Some(config) = document.and_then(|document| {
+            self.0.script_configuration(
+                self.linter.extension.get_source_type(path),
+                document.contents(),
+            )
+        }) else {
+            return self;
+        };
+        let root = &self.file_resolver.project_root;
+        let mut resolved = Self::with_editor_settings(overrides, root, config);
+        resolved.0.config_path.clone_from(&self.0.config_path);
+        Arc::new(resolved)
     }
 }
 
@@ -144,14 +166,20 @@ impl RuffSettingsIndex {
         editor_settings: &EditorSettings,
         is_default_workspace: bool,
     ) -> Self {
-        if editor_settings.configuration_preference == ConfigurationPreference::EditorOnly {
+        let overrides = EditorConfigurationTransformer::new(editor_settings, root);
+        if overrides.preference == ConfigurationPreference::EditorOnly {
             tracing::debug!(
                 "Using editor-only settings for workspace: {} (skipped indexing)",
                 root.display()
             );
             return RuffSettingsIndex {
                 index: BTreeMap::default(),
-                fallback: Arc::new(RuffSettings::editor_only(editor_settings, root)),
+                fallback: Arc::new(RuffSettings::with_editor_settings(
+                    &overrides,
+                    root,
+                    Configuration::default(),
+                )),
+                overrides,
             };
         }
 
@@ -173,7 +201,7 @@ impl RuffSettingsIndex {
                 Ok(Some(pyproject)) => {
                     match ruff_workspace::resolver::resolve_root_settings(
                         &pyproject,
-                        &EditorConfigurationTransformer(editor_settings, root),
+                        &overrides,
                         ConfigurationOrigin::Ancestor,
                     ) {
                         Ok(resolved) => {
@@ -209,7 +237,7 @@ impl RuffSettingsIndex {
             }
         }
 
-        let fallback = Arc::new(RuffSettings::fallback(editor_settings, root));
+        let fallback = Arc::new(RuffSettings::fallback(&overrides, root));
 
         // If this is the default workspace, the server is running in single-file mode. What this
         // means is that the user opened a file directly (not the folder) in the editor and the
@@ -227,7 +255,11 @@ impl RuffSettingsIndex {
                 ));
             }
 
-            return RuffSettingsIndex { index, fallback };
+            return RuffSettingsIndex {
+                index,
+                fallback,
+                overrides,
+            };
         }
 
         // Add any settings within the workspace itself
@@ -300,7 +332,7 @@ impl RuffSettingsIndex {
                     Ok(Some(pyproject)) => {
                         match ruff_workspace::resolver::resolve_root_settings(
                             &pyproject,
-                            &EditorConfigurationTransformer(editor_settings, root),
+                            &overrides,
                             ConfigurationOrigin::Ancestor,
                         ) {
                             Ok(settings) => {
@@ -351,6 +383,7 @@ impl RuffSettingsIndex {
         RuffSettingsIndex {
             index: index.into_inner().unwrap(),
             fallback,
+            overrides,
         }
     }
 
@@ -373,10 +406,13 @@ impl RuffSettingsIndex {
     }
 }
 
-struct EditorConfigurationTransformer<'a>(&'a EditorSettings, &'a Path);
+pub(super) struct EditorConfigurationTransformer {
+    configuration: Configuration,
+    preference: ConfigurationPreference,
+}
 
-impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
-    fn transform(&self, filesystem_configuration: Configuration) -> Configuration {
+impl EditorConfigurationTransformer {
+    pub(super) fn new(settings: &EditorSettings, project_root: &Path) -> Self {
         let EditorSettings {
             configuration,
             format_preview,
@@ -388,9 +424,7 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
             exclude,
             line_length,
             configuration_preference,
-        } = self.0.clone();
-
-        let project_root = self.1;
+        } = settings.clone();
 
         let editor_configuration = Configuration {
             lint: LintConfiguration {
@@ -459,14 +493,25 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
             editor_configuration
         };
 
-        match configuration_preference {
-            ConfigurationPreference::EditorFirst => {
+        Self {
+            configuration: editor_configuration,
+            preference: configuration_preference,
+        }
+    }
+}
+
+impl ConfigurationTransformer for EditorConfigurationTransformer {
+    fn transform(&self, filesystem_configuration: Configuration) -> Configuration {
+        let editor_configuration = self.configuration.clone();
+        match self.preference {
+            // In editor-only mode we skip project discovery. The configuration can still
+            // contain the Python requirement from the current document.
+            ConfigurationPreference::EditorFirst | ConfigurationPreference::EditorOnly => {
                 editor_configuration.combine(filesystem_configuration)
             }
             ConfigurationPreference::FilesystemFirst => {
                 filesystem_configuration.combine(editor_configuration)
             }
-            ConfigurationPreference::EditorOnly => editor_configuration,
         }
     }
 }
@@ -498,8 +543,9 @@ mod tests {
             ..Default::default()
         };
 
-        let config = EditorConfigurationTransformer(&editor_settings, Path::new("/src/project"))
-            .transform(Configuration::default());
+        let config =
+            EditorConfigurationTransformer::new(&editor_settings, Path::new("/src/project"))
+                .transform(Configuration::default());
 
         assert_eq!(config.line_length.unwrap().value(), 120);
     }
@@ -517,8 +563,9 @@ mod tests {
             ..Default::default()
         };
 
-        let config = EditorConfigurationTransformer(&editor_settings, Path::new("/src/project"))
-            .transform(Configuration::default());
+        let config =
+            EditorConfigurationTransformer::new(&editor_settings, Path::new("/src/project"))
+                .transform(Configuration::default());
 
         assert_eq!(config.line_length.unwrap().value(), 100);
     }
@@ -535,7 +582,7 @@ mod tests {
         };
 
         let settings = RuffSettings::with_editor_settings(
-            &editor_settings,
+            &EditorConfigurationTransformer::new(&editor_settings, root),
             root,
             Configuration {
                 target_version: Some(PythonVersion::PY313),
@@ -560,7 +607,10 @@ mod tests {
             ..Default::default()
         };
 
-        let settings = RuffSettings::editor_only(&editor_settings, root);
+        let settings = RuffSettings::fallback(
+            &EditorConfigurationTransformer::new(&editor_settings, root),
+            root,
+        );
 
         assert_eq!(settings.path(), None);
         assert_eq!(settings.linter.project_root, root);
@@ -585,7 +635,11 @@ mod tests {
             ..Default::default()
         };
 
-        let settings = RuffSettings::editor_only(&editor_settings, root);
+        let settings = RuffSettings::with_editor_settings(
+            &EditorConfigurationTransformer::new(&editor_settings, root),
+            root,
+            Configuration::default(),
+        );
 
         assert_eq!(settings.path(), None);
         assert!(

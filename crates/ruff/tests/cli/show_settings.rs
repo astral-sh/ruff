@@ -64,3 +64,23 @@ fn display_settings_from_nested_directory() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn script_requires_python_show_settings() -> anyhow::Result<()> {
+    let test = CliTest::with_files([
+        ("ruff.toml", "target-version = 'py39'"),
+        (
+            "script.py",
+            "# /// script\n# requires-python = '>=3.12'\n# ///\n",
+        ),
+    ])?;
+    let output = test
+        .command()
+        .args(["check", "--show-settings", "script.py"])
+        .output()?;
+    assert!(output.status.success());
+    let settings = String::from_utf8(output.stdout)?;
+    assert!(settings.contains("linter.unresolved_target_version = 3.12"));
+    assert!(settings.contains("formatter.unresolved_target_version = 3.12"));
+    Ok(())
+}

@@ -716,7 +716,6 @@ impl TestServer {
     }
 
     /// Send a `textDocument/didChange` notification with the given content changes
-    #[expect(dead_code)]
     pub(crate) fn change_text_document(
         &mut self,
         path: impl AsRef<Path>,

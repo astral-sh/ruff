@@ -315,6 +315,19 @@ The rules for this behavior are as follows:
 
 Note that in these last two cases, the behavior of Ruff may differ depending on the working directory from which it is invoked.
 
+A Python script can declare its own minimum version with inline script metadata.
+
+```python
+# /// script
+# requires-python = ">=3.12"
+# ///
+```
+
+When linting or formatting this file, Ruff targets Python 3.12 even if the project specifies
+a different `target-version` or a matching `per-file-target-version`. Ruff chooses the lowest supported Python minor version that satisfies the script's constraint.
+If the script omits `requires-python`, the usual project settings apply. An explicit `--target-version` or
+inline `--config` version override takes precedence over the script's requirement.
+
 ## Python file discovery
 
 When passed a path on the command-line, Ruff will automatically discover all Python files in that

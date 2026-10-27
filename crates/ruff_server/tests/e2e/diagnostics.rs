@@ -1,7 +1,50 @@
 use anyhow::Result;
 use insta::assert_json_snapshot;
+use lsp_types::{
+    DocumentDiagnosticReport, TextDocumentContentChangeEvent,
+    TextDocumentContentChangeWholeDocument,
+};
 
 use crate::TestServerBuilder;
+
+#[test]
+fn script_requires_python_in_open_document() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file(
+            "ruff.toml",
+            "per-file-target-version = { 'script.py' = 'py39' }\nlint.select = ['UP045']",
+        )?
+        .build();
+    let code = "from typing import Optional\nx: Optional[int]\n";
+    server.open_text_document(
+        "script.py",
+        format!("# /// script\n# requires-python = '>=3.10'\n# ///\n{code}"),
+        1,
+    );
+    let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) =
+        server.document_diagnostic_request("script.py", None)
+    else {
+        anyhow::bail!("expected a full report");
+    };
+    assert_eq!(report.full_document_diagnostic_report.items.len(), 1);
+    server.change_text_document(
+        "script.py",
+        vec![
+            TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument { text: code.into() },
+            ),
+        ],
+        2,
+    );
+    let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) =
+        server.document_diagnostic_request("script.py", None)
+    else {
+        anyhow::bail!("expected a full report after editing the script");
+    };
+    assert!(report.full_document_diagnostic_report.items.is_empty());
+    Ok(())
+}
 
 #[test]
 fn uses_human_readable_names_in_preview() -> Result<()> {

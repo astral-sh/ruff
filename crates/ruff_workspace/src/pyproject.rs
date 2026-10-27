@@ -5,7 +5,10 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use log::debug;
-use pep440_rs::{Operator, Version, VersionSpecifiers};
+use pep440_rs::{
+    Operator, Version, VersionSpecifier, VersionSpecifiers, release_specifier_to_range,
+    release_specifiers_to_ranges,
+};
 use ruff_db::system::SystemPathBuf;
 use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use serde::de::DeserializeOwned;
@@ -13,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
 use ruff_linter::settings::types::{PythonVersion, RequiredVersion};
+use ruff_python_ast::script::ScriptTag;
 
 use crate::options::{Options, validate_required_version};
 
@@ -233,6 +237,30 @@ fn get_fallback_target_version(dir: &Path) -> Option<PythonVersion> {
     None
 }
 
+/// Infer the target version from a Python script's inline metadata.
+pub(crate) fn script_target_version(source: &str) -> Option<ruff_python_ast::PythonVersion> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "kebab-case")]
+    struct ScriptMetadata {
+        requires_python: VersionSpecifiers,
+    }
+
+    let tag = ScriptTag::parse(source.as_bytes())?;
+    let metadata: ScriptMetadata = toml::from_str(tag.metadata()).ok()?;
+    if metadata.requires_python.is_empty() {
+        return None;
+    }
+    let supported = release_specifiers_to_ranges(metadata.requires_python);
+    // Ruff targets minor versions. A requirement such as `>=3.10.2` includes part of 3.10.
+    PythonVersion::iter()
+        .find(|&version| {
+            let minor =
+                release_specifier_to_range(VersionSpecifier::equals_star_version(version.into()));
+            !minor.is_disjoint(&supported)
+        })
+        .map(Into::into)
+}
+
 /// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
 fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<PythonVersion> {
     /// Truncate a version to its major and minor components.
@@ -278,11 +306,30 @@ mod tests {
     use ruff_db::system::SystemPathBuf;
     use ruff_linter::UnresolvedRuleSelector;
     use ruff_linter::line_width::LineLength;
-    use ruff_linter::settings::types::PatternPrefixPair;
+    use ruff_linter::settings::types::{PatternPrefixPair, PythonVersion};
     use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 
     use crate::options::{Flake8BuiltinsOptions, LintCommonOptions, LintOptions, Options};
     use crate::pyproject::{Pyproject, Tools, find_settings_toml, parse_pyproject_toml};
+
+    #[test]
+    fn script_requires_python_ranges() {
+        for (constraint, expected) in [
+            (">=3.10.2,<3.12", Some(PythonVersion::Py310)),
+            (">=3.9,!=3.9.*,>=3.10,!=3.10.*", Some(PythonVersion::Py311)),
+            ("<3.10", Some(PythonVersion::Py37)),
+            (">=3.20", None),
+            ("", None),
+            ("invalid", None),
+        ] {
+            let script = format!("# /// script\n# requires-python = '{constraint}'\n# ///\n");
+            assert_eq!(
+                super::script_target_version(&script),
+                expected.map(Into::into),
+                "{constraint}"
+            );
+        }
+    }
 
     #[test]
     fn deserialize() -> Result<()> {

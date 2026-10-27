@@ -1,6 +1,7 @@
 //! Discover Python files, and their corresponding [`Settings`], from the
 //! filesystem.
 
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
@@ -21,11 +22,14 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ruff_linter::fs;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging::is_package;
+use ruff_linter::settings::LinterSettings;
+use ruff_linter::settings::types::CompiledPerFileTargetVersionList;
+use ruff_python_ast::{PySourceType, PythonVersion, SourceType};
 
 use crate::configuration::Configuration;
 use crate::pyproject::settings_toml;
 use crate::settings::Settings;
-use crate::{FileResolverSettings, pyproject};
+use crate::{FileResolverSettings, FormatterSettings, pyproject};
 
 /// The root configuration for a Ruff invocation and how Ruff selects settings for each input file.
 ///
@@ -267,6 +271,96 @@ impl ConfigurationAndSettings {
             settings,
             config_path: config_path.map(fs::normalize_path),
         })
+    }
+
+    pub fn with_overrides<'a, T: ConfigurationTransformer>(
+        &'a self,
+        overrides: &'a T,
+    ) -> SettingsForSource<'a, T> {
+        SettingsForSource {
+            project: self,
+            overrides,
+        }
+    }
+
+    /// The inherited configuration for a script with its own Python requirement.
+    pub fn script_configuration(
+        &self,
+        source_type: SourceType,
+        source: &str,
+    ) -> Option<Configuration> {
+        if source_type != SourceType::Python(PySourceType::Python) {
+            return None;
+        }
+        let version = pyproject::script_target_version(source)?;
+        Some(Configuration {
+            target_version: Some(version),
+            // A project glob can match the script even when it targets a different Python version.
+            // CLI or editor overrides are applied to this configuration afterwards.
+            per_file_target_version: Some(Vec::new()),
+            ..self.configuration.clone()
+        })
+    }
+}
+
+/// Project settings with the CLI or editor overrides to apply after reading script metadata.
+pub struct SettingsForSource<'a, T> {
+    project: &'a ConfigurationAndSettings,
+    overrides: &'a T,
+}
+
+impl<'a, T: ConfigurationTransformer> SettingsForSource<'a, T> {
+    pub fn project_settings(&self) -> &'a Settings {
+        &self.project.settings
+    }
+
+    pub fn linter(self, source_type: SourceType, source: &str) -> Result<Cow<'a, LinterSettings>> {
+        let settings = &self.project.settings.linter;
+        let Some((target_version, per_file_target_version)) =
+            self.target_versions(source_type, source)?
+        else {
+            return Ok(Cow::Borrowed(settings));
+        };
+        Ok(Cow::Owned(LinterSettings {
+            unresolved_target_version: target_version.into(),
+            per_file_target_version,
+            ..settings.clone()
+        }))
+    }
+
+    pub fn formatter(
+        self,
+        source_type: SourceType,
+        source: &str,
+    ) -> Result<Cow<'a, FormatterSettings>> {
+        let settings = &self.project.settings.formatter;
+        let Some((target_version, per_file_target_version)) =
+            self.target_versions(source_type, source)?
+        else {
+            return Ok(Cow::Borrowed(settings));
+        };
+        Ok(Cow::Owned(FormatterSettings {
+            unresolved_target_version: target_version,
+            per_file_target_version,
+            ..settings.clone()
+        }))
+    }
+
+    fn target_versions(
+        self,
+        source_type: SourceType,
+        source: &str,
+    ) -> Result<Option<(PythonVersion, CompiledPerFileTargetVersionList)>> {
+        let Some(config) = self.project.script_configuration(source_type, source) else {
+            return Ok(None);
+        };
+        let config = self.overrides.transform(config);
+        Ok(Some((
+            config.target_version.unwrap_or_default(),
+            CompiledPerFileTargetVersionList::resolve(
+                config.per_file_target_version.unwrap_or_default(),
+            )?,
+        )))
     }
 }
 

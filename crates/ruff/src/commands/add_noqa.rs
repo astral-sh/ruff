@@ -69,7 +69,8 @@ pub(crate) fn add_noqa(
                 .parent()
                 .and_then(|parent| package_roots.get(parent))
                 .and_then(|package| *package);
-            let settings = resolver.resolve(path);
+            let project = resolver.resolve_with_path(path);
+            let settings = &project.settings;
             if (settings.file_resolver.force_exclude || !resolved_file.is_root())
                 && match_exclusion(
                     resolved_file.path(),
@@ -87,12 +88,15 @@ pub(crate) fn add_noqa(
                     return Ok(0);
                 }
             };
+            let linter = project
+                .with_overrides(config_arguments)
+                .linter(source_type, source_kind.source_code())?;
             match add_suppressions_to_path(
                 path,
                 package,
                 &source_kind,
                 source_type.expect_python(),
-                &settings.linter,
+                &linter,
                 reason,
                 suppression_kind,
             ) {

@@ -47,11 +47,20 @@ pub(crate) fn check_stdin(
         packaging::detect_package_root(path, &resolver.root_settings().linter.namespace_packages)
             .map(PackageRoot::root)
     });
+    let settings = &project_config.root.settings;
+    let source_type = filename
+        .map(|path| settings.linter.extension.get_source_type(path))
+        .unwrap_or_default();
+    let linter = project_config
+        .root
+        .with_overrides(overrides)
+        .linter(source_type, &stdin)?;
     let mut diagnostics = lint_stdin(
         filename,
         package_root,
         stdin,
-        resolver.root_settings(),
+        &linter,
+        settings.unsafe_fixes,
         noqa,
         fix_mode,
     )?;

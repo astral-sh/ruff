@@ -63,8 +63,13 @@ pub(crate) fn format_stdin(
         return Ok(ExitStatus::Success);
     }
 
+    let source_code = read_from_stdin()?;
+    let settings = project_config
+        .root
+        .with_overrides(config_arguments)
+        .formatter(source_type, &source_code)?;
     // Format the file.
-    match format_source_code(path, cli.range, settings, source_type, mode) {
+    match format_source_code(path, cli.range, &settings, source_type, source_code, mode) {
         Ok(result) => match mode {
             FormatMode::Write => Ok(ExitStatus::Success),
             FormatMode::Check | FormatMode::Diff => {
@@ -88,12 +93,9 @@ fn format_source_code(
     range: Option<FormatRange>,
     settings: &FormatterSettings,
     source_type: SourceType,
+    source_code: String,
     mode: FormatMode,
 ) -> Result<FormatResult, FormatCommandError> {
-    // Read the source from stdin.
-    let source_code = read_from_stdin()
-        .map_err(|err| FormatCommandError::Read(path.map(Path::to_path_buf), err.into()))?;
-
     let source_kind = match SourceKind::from_source_code(source_code, source_type) {
         Ok(Some(source_kind)) => source_kind,
         Ok(None) => return Ok(FormatResult::Unchanged),

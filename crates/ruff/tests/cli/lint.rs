@@ -4066,6 +4066,105 @@ fn a005_module_shadowing_strict_default() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn script_requires_python() -> Result<()> {
+    let test = CliTest::with_file(
+        "pyproject.toml",
+        r#"
+[project]
+requires-python = ">=3.10"
+[tool.ruff]
+per-file-target-version = { "old_*.py" = "py39" }
+[tool.ruff.lint]
+select = ["UP045"]
+"#,
+    )?;
+    let code = "from typing import Optional\nx: Optional[int]\n";
+    for (name, metadata) in [
+        ("old_script.py", "requires-python = '>=3.10'"),
+        ("script.py", "requires-python = '>=3.9'"),
+        ("old_fallback.py", "dependencies = []"),
+        ("fallback.py", "dependencies = []"),
+    ] {
+        test.write_file(name, &format!("# /// script\n# {metadata}\n# ///\n{code}"))?;
+    }
+    assert_cmd_snapshot!(test.check_command().arg("."), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    fallback.py:5:4: UP045 [*] Use `X | None` for type annotations
+    old_script.py:5:4: UP045 [*] Use `X | None` for type annotations
+    Found 2 errors.
+    [*] 2 fixable with `--fix`.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn script_requires_python_cli_override_and_cache() -> Result<()> {
+    let test = CliTest::with_files([
+        (
+            "ruff.toml",
+            "target-version = 'py310'\nper-file-target-version = { 'script.py' = 'py310' }\nlint.select = ['UP045']",
+        ),
+        (
+            "script.py",
+            "# /// script\n# requires-python = '>=3.9'\n# ///\nfrom typing import Optional\nx: Optional[int]\n",
+        ),
+    ])?;
+    let check = |args: &[&str]| {
+        test.command()
+            .args(["check", "--output-format=concise", "script.py"])
+            .args(args)
+            .output()
+    };
+
+    // Warm the cache with a clean result for the script's own Python version.
+    assert!(check(&[])?.status.success());
+    for args in [
+        &["--target-version=py310"][..],
+        &["--config", "target-version = 'py310'"],
+        &[
+            "--config",
+            "per-file-target-version = { 'script.py' = 'py310' }",
+        ],
+    ] {
+        let output = check(args)?;
+        assert_eq!(output.status.code(), Some(1), "{args:?}");
+        assert!(
+            str::from_utf8(&output.stdout)?.contains("UP045"),
+            "{args:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn script_requires_python_stdin() -> Result<()> {
+    let test = CliTest::with_file(
+        "ruff.toml",
+        "target-version = 'py39'\nlint.select = ['UP045']",
+    )?;
+    assert_cmd_snapshot!(test.check_command().args(["--fix", "-"]).pass_stdin(
+        "# /// script\n# requires-python = '>=3.10'\n# ///\nfrom typing import Optional\nx: Optional[int]\n"
+    ), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    # /// script
+    # requires-python = '>=3.10'
+    # ///
+    from typing import Optional
+    x: int | None
+
+    ----- stderr -----
+    Found 1 error (1 fixed, 0 remaining).
+    ");
+    Ok(())
+}
+
 /// Test that the linter respects per-file-target-version.
 #[test]
 fn per_file_target_version_linter() {
