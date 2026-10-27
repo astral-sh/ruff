@@ -22,7 +22,6 @@ help: Replace with explicit concatenation
 6 +     "def")
 7 |
   |
-note: This is an unsafe fix and may change runtime behavior
 
 ISC002 [*] Implicitly concatenated string literals over multiple lines
   --> ISC.py:74:10
@@ -45,7 +44,6 @@ help: Replace with explicit concatenation
 75 +     f"def")} g"
 76 |
    |
-note: This is an unsafe fix and may change runtime behavior
 
 ISC002 [*] Implicitly concatenated string literals over multiple lines
    --> ISC.py:196:1
@@ -66,7 +64,6 @@ help: Replace with explicit concatenation
 197 + t"dog.")
 198 |
     |
-note: This is an unsafe fix and may change runtime behavior
 
 ISC002 [*] Implicitly concatenated string literals over multiple lines
    --> ISC.py:208:10
@@ -86,4 +83,57 @@ help: Replace with explicit concatenation
 209 +     t"def")} g"
 210 |
     |
-note: This is an unsafe fix and may change runtime behavior
+
+ISC002 Implicitly concatenated string literals over multiple lines
+   --> ISC.py:241:5
+    |
+240 |   # No fix: wrapping one pair of a longer backslash chain would be a syntax error
+241 |   x = "abc" \
+    |  _____^
+242 | |     "def" \
+    | |_________^
+243 |       "ghi"
+    |
+help: Replace with explicit concatenation
+
+ISC002 Implicitly concatenated string literals over multiple lines
+   --> ISC.py:242:5
+    |
+240 |   # No fix: wrapping one pair of a longer backslash chain would be a syntax error
+241 |   x = "abc" \
+242 | /     "def" \
+243 | |     "ghi"
+    | |_________^
+244 |
+245 |   # No fix: the pair continues a parenthesized concatenation
+    |
+help: Replace with explicit concatenation
+
+ISC002 Implicitly concatenated string literals over multiple lines
+   --> ISC.py:248:5
+    |
+246 |   x = (
+247 |       "abc"
+248 | /     "def" \
+249 | |     "ghi"
+    | |_________^
+250 |   )
+    |
+help: Replace with explicit concatenation
+
+ISC002 [*] Implicitly concatenated string literals over multiple lines
+   --> ISC.py:253:5
+    |
+252 |   # Safe fix: the pair is the whole concatenation
+253 |   x = "abc" \
+    |  _____^
+254 | |     "{}".format(1)
+    | |________^
+help: Replace with explicit concatenation
+    |
+252 | # Safe fix: the pair is the whole concatenation
+    - x = "abc" \
+    -     "{}".format(1)
+253 + x = ("abc"
+254 +     "{}").format(1)
+    |

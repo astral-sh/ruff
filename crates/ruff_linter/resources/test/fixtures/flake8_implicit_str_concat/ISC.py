@@ -236,3 +236,19 @@ x = (
     "abc"  # not a continuation \
     "def"
 )
+
+# No fix: wrapping one pair of a longer backslash chain would be a syntax error
+x = "abc" \
+    "def" \
+    "ghi"
+
+# No fix: the pair continues a parenthesized concatenation
+x = (
+    "abc"
+    "def" \
+    "ghi"
+)
+
+# Safe fix: the pair is the whole concatenation
+x = "abc" \
+    "{}".format(1)
