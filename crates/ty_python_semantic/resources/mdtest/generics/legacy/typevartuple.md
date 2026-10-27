@@ -703,6 +703,14 @@ reveal_type(WithDefault().attr)  # revealed: tuple[int, str]
 reveal_type(WithDefault[bool, bytes]().attr)  # revealed: tuple[bool, bytes]
 ```
 
+A legacy pack can also use another unpacked pack as its default. Neither pack has to be bound to a
+class or function when it is declared.
+
+```py
+OtherTs = TypeVarTuple("OtherTs")
+CopiedTs = TypeVarTuple("CopiedTs", default=Unpack[OtherTs])  # no diagnostic
+```
+
 ### Backported default type arguments
 
 `typing_extensions.TypeVarTuple` backports the `default` parameter to older Python versions.
