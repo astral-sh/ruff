@@ -702,25 +702,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .iter()
             .position(|typevar| typevar.is_typevartuple(db));
 
+        // A trailing ParamSpec can be distinguished from the types in a pack. For
+        // G[*Ts, **P = [bool]], G[int, str] supplies two types for Ts, whereas
+        // G[int, [str]] supplies one type for Ts and an explicit parameter list for P.
+        let supplied_typevars = if typevartuple_index.is_some()
+            && let Some((last, rest)) = typevars.split_last()
+            && last.is_paramspec(db)
+            && last.default_type(db).is_some()
+            && let Some(argument) = type_arguments.last()
+            && !self.is_explicit_paramspec_argument(argument)
+        {
+            rest
+        } else {
+            typevars.as_slice()
+        };
+
         let mut expanded_type_arguments = Vec::with_capacity(type_arguments.len());
 
         for (source_index, expr) in type_arguments.iter().enumerate() {
             let typevar = if let Some(typevartuple_index) = typevartuple_index {
-                let suffix_len = typevars_len - typevartuple_index - 1;
+                let suffix_len = supplied_typevars.len() - typevartuple_index - 1;
                 let suffix_source_start = type_arguments.len().saturating_sub(suffix_len);
                 if suffix_len > 0
                     && type_arguments.len() >= typevartuple_index + suffix_len
                     && source_index >= suffix_source_start
                 {
                     let suffix_index = source_index - suffix_source_start;
-                    typevars
-                        .get(typevars_len - suffix_len + suffix_index)
+                    supplied_typevars
+                        .get(typevartuple_index + 1 + suffix_index)
                         .copied()
                 } else {
-                    typevars.get(expanded_type_arguments.len()).copied()
+                    supplied_typevars
+                        .get(expanded_type_arguments.len())
+                        .copied()
                 }
             } else {
-                typevars.get(expanded_type_arguments.len()).copied()
+                supplied_typevars
+                    .get(expanded_type_arguments.len())
+                    .copied()
             };
             if exactly_one_paramspec || typevar.is_some_and(|typevar| typevar.is_paramspec(db)) {
                 expanded_type_arguments.push(TypeArgument {
@@ -757,11 +776,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if is_unpack
                 && let Some(tuple) = provided_type.exact_tuple_instance_spec(db)
                 && let Tuple::Fixed(tuple) = tuple.as_ref()
-                && expanded_type_arguments.len() <= typevars_len
-                && typevars[expanded_type_arguments.len()
+                && expanded_type_arguments.len() <= supplied_typevars.len()
+                && supplied_typevars[expanded_type_arguments.len()
                     ..usize::min(
                         expanded_type_arguments.len() + tuple.elements_slice().len(),
-                        typevars_len,
+                        supplied_typevars.len(),
                     )]
                     .iter()
                     .all(|typevar| !typevar.is_paramspec(db))
@@ -796,7 +815,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let expanded_type_arguments = if let Some(typevartuple_index) = typevartuple_index {
-            let suffix_len = typevars_len - typevartuple_index - 1;
+            let suffix_len = supplied_typevars.len() - typevartuple_index - 1;
             let typevartuple_end = expanded_type_arguments
                 .len()
                 .saturating_sub(suffix_len)
@@ -1251,6 +1270,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn is_explicit_paramspec_argument(&self, expr: &ast::Expr) -> bool {
+        let target = match expr {
+            ast::Expr::List(_) | ast::Expr::EllipsisLiteral(_) => return true,
+            ast::Expr::Subscript(subscript) => &subscript.value,
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) => expr,
+            _ => return false,
+        };
+        // The argument will be inferred in its own context once we know which parameter it fills.
+        let ty = self
+            .speculate_without_diagnostics()
+            .infer_expression(target, TypeContext::default());
+        if expr.is_subscript_expr() {
+            return ty == Type::SpecialForm(SpecialFormType::Concatenate);
+        }
+        match ty {
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
+                typevar.is_paramspec(self.db())
+            }
+            Type::TypeVar(typevar) => typevar.is_paramspec(self.db()),
+            _ => false,
+        }
+    }
+
     /// Infer the type of the expression that represents an explicit specialization of a
     /// `ParamSpec` type variable.
     fn infer_paramspec_explicit_specialization_value(
@@ -1328,11 +1370,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return Ok(Type::paramspec_value_callable(db, Parameters::todo()));
             }
 
-            ast::Expr::Name(name) => {
-                if name.is_invalid() {
-                    return Err(());
-                }
-
+            ast::Expr::Name(name) if name.is_invalid() => return Err(()),
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
                 let previous_concatenate_context = self
                     .context
                     .inference_flags

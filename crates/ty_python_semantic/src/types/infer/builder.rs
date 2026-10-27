@@ -4321,7 +4321,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .default_type(db, self.program_environment())
                     .is_some()
                 {
-                    if let Some(typevar_tuple) = typevar_tuple {
+                    if let Some(typevar_tuple) = typevar_tuple
+                        && !typevar.is_paramspec(db)
+                    {
                         valid_type_params = false;
                         if let Some(builder) = self
                             .context

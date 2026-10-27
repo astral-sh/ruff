@@ -672,6 +672,21 @@ def non_generic(value: NonGenericAlias[int]) -> None:
     reveal_type(value)  # revealed: Unknown
 ```
 
+### Defaulted `ParamSpec` after a variadic pack
+
+A parameter list following a variadic pack can be omitted when the `ParamSpec` has a default.
+
+```py
+from typing_extensions import Callable, ParamSpec, TypeAliasType, TypeVarTuple, Unpack, assert_type
+
+Ts = TypeVarTuple("Ts")
+P = ParamSpec("P", default=[bool])
+Callback = TypeAliasType("Callback", Callable[P, tuple[Unpack[Ts]]], type_params=(Ts, P))
+
+def f(callback: Callback[int, str]) -> None:
+    assert_type(callback, Callable[[bool], tuple[int, str]])
+```
+
 ### Invalid type parameters
 
 ```py

@@ -571,6 +571,37 @@ reveal_type(TypeVarTupleWithParamSpec[str, int, []]().fn)  # revealed: () -> tup
 reveal_type(TypeVarTupleWithParamSpec[str, int, ...]().fn)  # revealed: (...) -> tuple[str, int]
 ```
 
+### Defaulted `ParamSpec` after a `TypeVarTuple`
+
+Ordinary type arguments go into the pack. An explicit parameter list overrides the `ParamSpec`
+default.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Callable, Concatenate, Generic, ParamSpec, TypeVarTuple, assert_type
+
+Ts = TypeVarTuple("Ts")
+P = ParamSpec("P", default=[bool])
+
+class Callback(Generic[*Ts, P]):
+    fn: Callable[P, tuple[*Ts]]
+
+reveal_type(Callback[int, str]().fn)  # revealed: (bool, /) -> tuple[int, str]
+reveal_type(Callback[list[int]]().fn)  # revealed: (bool, /) -> tuple[list[int]]
+reveal_type(Callback[int, [str]]().fn)  # revealed: (str, /) -> tuple[int]
+reveal_type(Callback[...]().fn)  # revealed: (...) -> tuple[()]
+
+Q = ParamSpec("Q")
+
+def forward(a: Callback[int, Q], b: Callback[str, Concatenate[int, Q]]) -> None:
+    assert_type(a.fn, Callable[Q, tuple[int]])
+    assert_type(b.fn, Callable[Concatenate[int, Q], tuple[str]])
+```
+
 ### Inferred specialization from construction
 
 Calling a generic class without explicit type arguments infers its specialization from the
