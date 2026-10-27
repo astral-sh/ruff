@@ -1,0 +1,323 @@
+{
+  "project": "ruff",
+  "repo": "astral-sh/ruff",
+  "base": "7a8f63f0d71a1d381f99652a5fee3b043b32e8e6",
+  "branch": "zb/ruff-cache-refresh-history-20261027",
+  "workflow": "ci.yaml",
+  "source_workflow_head": "e60b501424731584ce37200ac98990d5fe05e604",
+  "action": "243f4258608cb0f0dace8009ef4c5d8fbd3986c3",
+  "refresh_action": "7a1c709a167933c8e64f25b527696f043d5ba885",
+  "cases": {
+    "linux": {
+      "label": "cargo test (linux)",
+      "file": "ci.yaml",
+      "job": "cargo-test-linux",
+      "matrix": {},
+      "source_workflow_sha256": "695958f2e8accf488843847355fc3ecaa702c6bc7f3bde2e608552fa56972ff0",
+      "scope": "complete job",
+      "variants": [
+        "before",
+        "after",
+        "refresh"
+      ],
+      "seeds": {
+        "before": "linux",
+        "after": "linux",
+        "refresh": "linux"
+      },
+      "before_action": "astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3",
+      "before_workspace": "false",
+      "after_action": "astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3",
+      "after_workspace": "true",
+      "refresh_workspace": "true",
+      "refresh_action": "astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885"
+    }
+  },
+  "seed_source": "e8b4b288b489e7fc4f3c7a27e662acb115e01a0f",
+  "initial_sources": {
+    "after": "6b161598cd07796e178f1f8e1e422743bbd1e165",
+    "before": "6b161598cd07796e178f1f8e1e422743bbd1e165",
+    "refresh": "e8b4b288b489e7fc4f3c7a27e662acb115e01a0f"
+  },
+  "history": [
+    {
+      "index": 0,
+      "sha": "e8b4b288b489e7fc4f3c7a27e662acb115e01a0f",
+      "subject": "Update docker/setup-buildx-action action to v4.4.1 (#29574)",
+      "date": "2026-10-21T09:01:21-04:00",
+      "changed_files": [
+        ".github/workflows/build-docker.yml"
+      ],
+      "categories": [
+        "docs-or-ci-only"
+      ],
+      "pr_eligible": true,
+      "ty_changed": false,
+      "original_history_index": 18,
+      "pr_can_save": false
+    },
+    {
+      "index": 1,
+      "sha": "008d4526cab4aabf974a7e32f23927e0b3449bf1",
+      "subject": "Update docker/build-push-action action to v7.4.0 (#29573)",
+      "date": "2026-10-21T09:01:56-04:00",
+      "changed_files": [
+        ".github/workflows/build-docker.yml"
+      ],
+      "categories": [
+        "docs-or-ci-only"
+      ],
+      "pr_eligible": true,
+      "ty_changed": false,
+      "original_history_index": 19,
+      "pr_can_save": false
+    },
+    {
+      "index": 2,
+      "sha": "9cced9ab2e69d4e91a29dadde291a2c4b0ba6da7",
+      "subject": "[`pyupgrade`] Remove mentions of variance related to fix safety (`UP040`, `UP047`) (#29592)",
+      "date": "2026-10-21T13:50:52+00:00",
+      "changed_files": [
+        "crates/ruff_linter/src/rules/pyupgrade/rules/pep695/non_pep695_generic_function.rs",
+        "crates/ruff_linter/src/rules/pyupgrade/rules/pep695/non_pep695_type_alias.rs"
+      ],
+      "categories": [
+        "rust-source"
+      ],
+      "pr_eligible": true,
+      "ty_changed": false,
+      "original_history_index": 20,
+      "pr_can_save": false
+    },
+    {
+      "index": 3,
+      "sha": "477638fb1b031dbf88c2dfcc745d6d214d40ae2b",
+      "subject": "[ty] Compare protocol receiver restrictions before binding (#29443)",
+      "date": "2026-10-21T09:52:21-04:00",
+      "changed_files": [
+        "crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.md",
+        "crates/ty_python_semantic/resources/mdtest/generics/pep695/classes.md",
+        "crates/ty_python_semantic/resources/mdtest/protocols.md",
+        "crates/ty_python_semantic/src/types/protocol_class.rs",
+        "crates/ty_python_semantic/src/types/signatures.rs"
+      ],
+      "categories": [
+        "rust-source",
+        "ty"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true,
+      "original_history_index": 21,
+      "pr_can_save": false
+    },
+    {
+      "index": 4,
+      "sha": "c46acee0f9d37d2515d303bc4b1c4c500031a56e",
+      "subject": "[ty] Refactor constraint traversal and cache satisfiability checks (#29492)",
+      "date": "2026-10-21T10:15:33-04:00",
+      "changed_files": [
+        "crates/ruff_benchmark/benches/ty_constraint_set.rs",
+        "crates/ty_python_semantic/resources/mdtest/regression/constraint_set_ordering.md",
+        "crates/ty_python_semantic/resources/mdtest/type_properties/constraints.md",
+        "crates/ty_python_semantic/src/types/call/bind.rs",
+        "crates/ty_python_semantic/src/types/constraints.rs",
+        "crates/ty_python_semantic/src/types/constraints/owned.rs",
+        "crates/ty_python_semantic/src/types/constraints/paths.rs",
+        "crates/ty_python_semantic/src/types/constraints/sequents.rs",
+        "crates/ty_python_semantic/src/types/constraints/solutions.rs",
+        "crates/ty_python_semantic/src/types/constraints/variables.rs",
+        "crates/ty_vendored/ty_extensions/_internal.pyi"
+      ],
+      "categories": [
+        "rust-source",
+        "ty"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true,
+      "original_history_index": 22,
+      "pr_can_save": false
+    },
+    {
+      "index": 5,
+      "sha": "6f8de53aa533bf3c2de2ad5e1d6987aee7c9bc72",
+      "subject": "Prefilter bidirectional Unicode checks by UTF-8 leading bytes (#29561)",
+      "date": "2026-10-21T10:11:49-07:00",
+      "changed_files": [
+        "crates/ruff_linter/resources/test/fixtures/pylint/bidirectional_unicode.py",
+        "crates/ruff_linter/src/rules/pylint/rules/bidirectional_unicode.rs"
+      ],
+      "categories": [
+        "rust-source"
+      ],
+      "pr_eligible": true,
+      "ty_changed": false,
+      "original_history_index": 23,
+      "pr_can_save": false
+    },
+    {
+      "index": 6,
+      "sha": "acba99d527b8a9fd2e15490df42d0e6d744a4331",
+      "subject": "Consolidate dependency pins in root Cargo.toml (#29595)",
+      "date": "2026-10-21T17:18:57+00:00",
+      "changed_files": [
+        "Cargo.toml",
+        "crates/ruff_db/Cargo.toml",
+        "crates/ruff_dev/Cargo.toml",
+        "crates/ty/Cargo.toml"
+      ],
+      "categories": [
+        "cargo-dependencies",
+        "ty"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true,
+      "original_history_index": 24,
+      "pr_can_save": false
+    },
+    {
+      "index": 7,
+      "sha": "5da3b41cb6a4d66f528a37318d5c571a57f989f9",
+      "subject": "[ty] Give Self type variables distinct class identities (#29191)",
+      "date": "2026-10-21T13:03:43-07:00",
+      "changed_files": [
+        "crates/ty_ide/src/semantic_tokens.rs",
+        "crates/ty_python_semantic/resources/mdtest/named_tuple.md",
+        "crates/ty_python_semantic/src/types.rs",
+        "crates/ty_python_semantic/src/types/class/named_tuple.rs",
+        "crates/ty_python_semantic/src/types/class/static_literal.rs",
+        "crates/ty_python_semantic/src/types/class/typed_dict.rs",
+        "crates/ty_python_semantic/src/types/diagnostic.rs",
+        "crates/ty_python_semantic/src/types/generics.rs",
+        "crates/ty_python_semantic/src/types/signatures.rs",
+        "crates/ty_python_semantic/src/types/tests.rs",
+        "crates/ty_python_semantic/src/types/typevar.rs",
+        "crates/ty_python_semantic/src/types/variance.rs"
+      ],
+      "categories": [
+        "rust-source",
+        "ty"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true,
+      "original_history_index": 25,
+      "pr_can_save": false
+    },
+    {
+      "index": 8,
+      "sha": "6f06c4a7cd3754b9211f25abd5e212228d5efff7",
+      "subject": "[ty] Remove redundant methods from the docstrings interface (#29602)",
+      "date": "2026-10-21T15:06:50-07:00",
+      "changed_files": [
+        "crates/ty_ide/src/docstring.rs",
+        "crates/ty_ide/src/signature_help.rs",
+        "crates/ty_server/src/server/api/requests/completion.rs",
+        "crates/ty_server/src/server/api/requests/signature_help.rs",
+        "crates/ty_wasm/src/lib.rs"
+      ],
+      "categories": [
+        "rust-source",
+        "ty"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true,
+      "original_history_index": 26,
+      "pr_can_save": false
+    },
+    {
+      "index": 9,
+      "sha": "3bf4988cf062dc76895ff2f8421acf766172392b",
+      "subject": "[ty] Avoid widening compatible generic return alternatives (#29578)",
+      "date": "2026-10-21T16:24:41-07:00",
+      "changed_files": [
+        "crates/ty_python_semantic/resources/mdtest/generics/legacy/functions.md",
+        "crates/ty_python_semantic/resources/mdtest/generics/pep695/functions.md",
+        "crates/ty_python_semantic/src/types/call/bind.rs"
+      ],
+      "categories": [
+        "rust-source",
+        "ty"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true,
+      "original_history_index": 27,
+      "pr_can_save": false
+    },
+    {
+      "index": 10,
+      "sha": "dfe14506d23010aa5dbc4ff6fea702a22ba312bd",
+      "subject": "[ty] Avoid cancelling requests for unrelated file changes (#29604)",
+      "date": "2026-10-21T17:17:08-07:00",
+      "changed_files": [
+        "crates/ty_project/src/db.rs",
+        "crates/ty_project/src/files.rs",
+        "crates/ty_project/src/lib.rs"
+      ],
+      "categories": [
+        "rust-source",
+        "ty"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true,
+      "original_history_index": 28,
+      "pr_can_save": false
+    },
+    {
+      "index": 11,
+      "sha": "ab68285f20c861bda87c0de490968eb644c426a7",
+      "subject": "[ty] Reduce tuple class-pattern benchmark inputs (#29610)",
+      "date": "2026-10-21T17:31:55-07:00",
+      "changed_files": [
+        "crates/ruff_benchmark/benches/ty.rs"
+      ],
+      "categories": [
+        "rust-source"
+      ],
+      "pr_eligible": true,
+      "ty_changed": false,
+      "original_history_index": 29,
+      "pr_can_save": false
+    },
+    {
+      "index": 12,
+      "sha": "7a8f63f0d71a1d381f99652a5fee3b043b32e8e6",
+      "subject": "[ty] Rebalance microbenchmark CI shards (#29612)",
+      "date": "2026-10-21T17:45:57-07:00",
+      "changed_files": [
+        ".github/workflows/ci.yaml"
+      ],
+      "categories": [
+        "docs-or-ci-only"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true,
+      "original_history_index": 30,
+      "pr_can_save": false
+    }
+  ],
+  "prefix_base": "ruff-cache-refresh-20261027-v1",
+  "replicas": 3,
+  "measure_all_producers": true,
+  "require_producer_saves": true,
+  "refresh_comparison": true,
+  "apt_first_cache_comparison": false,
+  "bootstrap_block_length": 3,
+  "bootstrap_sensitivity_lengths": [
+    1,
+    2,
+    4
+  ],
+  "bootstrap_resamples": 50000,
+  "comparison": "Dependency-only, immutable workspace, and source-refreshing workspace caches on identical source commits and job commands. Existing caches start at the last recorded key-changing producer; refreshed caches start at the immediately preceding source commit. The chronological window is the last twelve commits of the previous fixed thirty-commit replay, selected before timing runs.",
+  "strategy": "Three read-only PR-like replicas precede cache production at each eligible source commit. A writable producer runs for every commit, including docs-only changes skipped by the PR planner. For uv commits whose PR policy enables writes, this producer represents the first PR writer and is followed by a separate exact-hit main-like replay, since Depot shares caches across branches. Otherwise the producer represents main. All runs use workflow_dispatch on one experiment branch, isolated by experimental cache prefixes. Initial seeds are excluded from timing. Execution includes post-save steps and excludes queues.",
+  "head": "cff02f3bedfbfa007629578fdc77bf1b4fcd6343",
+  "initial_source_history_indices": {
+    "after": 16,
+    "before": 16,
+    "refresh": 18
+  },
+  "bootstrap_seed": 20261025,
+  "cache_backend": "Depot Cache",
+  "branch_cache_isolation": false,
+  "cache_backend_reference": "https://depot.dev/docs/cache/integrations/github-actions",
+  "main_after_pr_save": false
+}

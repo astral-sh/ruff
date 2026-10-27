@@ -1,0 +1,2 @@
+[default]
+extend-ignore-re = ['\bdepot-[a-z0-9]+\b']
