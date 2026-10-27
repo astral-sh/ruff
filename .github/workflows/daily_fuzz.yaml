@@ -56,7 +56,7 @@ jobs:
           checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: astral-sh/github-actions/rust-workspace-cache@7a1c709a167933c8e64f25b527696f043d5ba885
+      - uses: astral-sh/github-actions/rust-workspace-cache@09a77e55b9cacee25c4170194cb529300c015991
         with:
           # Keep a smaller dependency cache; build savings add little fuzzing time within the fixed budget.
           cache-workspace-crates: "false"
