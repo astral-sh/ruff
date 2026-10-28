@@ -123,7 +123,7 @@ Never edit snapshot files or inline snapshot bodies manually. Regenerate them by
 
 - Code blocks for the same file within a section are concatenated into one file. For inline snapshots, keep each example's code block close to its `# snapshot` block. Ideally, any given code block only has one snapshot in it, but one codeblock containing several snapshots is also acceptable. Repeating a short, independent function definition, including one with the same name, is fine if it keeps the code triggering a snapshot close to the snapshot demonstrating the expected diagnostic on that code. Reuse shared setup when clearer, and check that repeated names do not affect other examples.
 
-- When a Python statement in an mdtest is included only or primarily to check that ty does not emit a diagnostic for it, it is often useful to add a `# no diagnostic` comment on or above the statement to clarify why the statement is there. These can be especially useful if the statement expected to produce 0 diagnostics follows one or more other statements that are all accompanied by `# error` assertions.
+- When a Python statement in an mdtest is included only or primarily to check that ty does not emit a diagnostic for it, it is often useful to add a `# no diagnostic` comment on or above the statement to clarify why the statement is there. These can be especially useful if the statement expected to produce 0 diagnostics follows, or is immediately followed by, one or more other statements that are all accompanied by `# error` assertions.
 
     Statements used as setup for later assertions do not need `# no diagnostic` comments. It is also not necessary to add such comments in cases where it would anyway be extremely obvious why the statement is included.
 
