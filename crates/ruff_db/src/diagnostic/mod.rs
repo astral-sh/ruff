@@ -577,12 +577,13 @@ impl Ord for RenderingSortKey<'_> {
     // For diagnostics at the same location, fall back to severity
     // (with fatal messages sorting before info messages) and then
     // finally the diagnostic ID and concise message.
+    // Diagnostics without a file come first. Whole-file diagnostics sort at offset zero.
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         let left = self.diagnostic;
         let right = other.diagnostic;
         let left_span = left.primary_span_ref();
         let right_span = right.primary_span_ref();
-        if let (Some(left_span), Some(right_span)) = (left_span, right_span) {
+        let location = if let (Some(left_span), Some(right_span)) = (left_span, right_span) {
             let left_file = left_span.file();
             let right_file = right_span.file();
             if left_file != right_file {
@@ -592,12 +593,14 @@ impl Ord for RenderingSortKey<'_> {
                 }
             }
 
-            if let (Some(left_range), Some(right_range)) = (left_span.range(), right_span.range()) {
-                let order = left_range.start().cmp(&right_range.start());
-                if order.is_ne() {
-                    return order;
-                }
-            }
+            let left_start = left_span.range().unwrap_or_default().start();
+            let right_start = right_span.range().unwrap_or_default().start();
+            left_start.cmp(&right_start)
+        } else {
+            left_span.is_some().cmp(&right_span.is_some())
+        };
+        if location.is_ne() {
+            return location;
         }
 
         // Reverse so that, e.g., Fatal sorts before Info.
