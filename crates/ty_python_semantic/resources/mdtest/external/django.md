@@ -469,12 +469,10 @@ class AbstractBook(models.Model):
         abstract = True
 
 class NotAbstract(AbstractBook):
-    # no diagnostic
     class Meta(AbstractBook.Meta):
         ordering = ["id"]
 
 class Abstract(AbstractBook):
-    # no diagnostic
     class Meta(AbstractBook.Meta):
         abstract = True
 
@@ -521,11 +519,9 @@ class AbstractHasId(models.Model):
     class Meta:
         abstract = True
 
-# no diagnostic
 class Book1(AbstractHasTitle, AbstractHasId):
     pass
 
-# no diagnostic
 class Book2(AbstractHasId, AbstractHasTitle):
     pass
 
