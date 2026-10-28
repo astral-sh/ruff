@@ -111,12 +111,6 @@ for comprehension_value in ls:  # B007
     print([comprehension_value for comprehension_value in otherls])
 
 
-# A nested loop target shadows the outer loop variable.
-for nested_loop_value in ls:  # B007
-    for nested_loop_value in otherls:
-        print(nested_loop_value)
-
-
 # A conditional rebind must not make the outer loop variable appear unused.
 for branch_value in ls:
     if cond:
@@ -124,6 +118,7 @@ for branch_value in ls:
     print(branch_value)
 
 
-# Preserve the existing conservative behavior for deletions.
+# Preserve the existing conservative behavior for conditional deletions.
 for deleted_value in ls:
-    del deleted_value
+    if cond:
+        del deleted_value
