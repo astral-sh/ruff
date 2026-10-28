@@ -402,7 +402,8 @@ differ. Ruff uses the most specific module ownership available for dotted import
 reports the installed distribution paths, Ruff also recognizes modules exposed by a workspace
 member's path-based editable install, including packages with custom source layouts.
 Explicit isort sections take precedence. If uv is unavailable, Ruff warns and uses its usual
-classification.
+classification. In `--watch` mode, Ruff rereads uv metadata whenever a source or configuration
+change triggers a check.
 
 For a detailed explanation of `src` resolution, see the [contributing guide](contributing.md).
 
