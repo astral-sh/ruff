@@ -45,6 +45,15 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// A bound type variable tuple, or the runtime object for its unbound declaration.
+    pub(super) fn is_typevartuple_or_instance(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::TypeVar(typevar) => typevar.is_typevartuple(db),
+            Self::KnownInstance(KnownInstanceType::TypeVar(typevar)) => typevar.is_typevartuple(db),
+            _ => false,
+        }
+    }
+
     pub(crate) fn has_typevar(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         any_over_type(db, env, self, false, |ty| matches!(ty, Type::TypeVar(_)))
     }
