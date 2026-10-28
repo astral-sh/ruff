@@ -6,7 +6,8 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::token::{Tokens, parenthesized_range};
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{
-    AnyNodeRef, ArgOrKeyword, Arguments, Expr, ExprUnaryOp, Parameters, Stmt, UnaryOp,
+    AnyNodeRef, ArgOrKeyword, Arguments, Expr, ExprAttribute, ExprName, ExprUnaryOp, Parameters,
+    Stmt, StmtAssign, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::file_to_module;
@@ -30,29 +31,30 @@ impl InlayHint {
     fn variable_type<'db>(
         context: InlayHintImportContext<'_, 'db>,
         expr: &Expr,
-        rhs: &Expr,
+        assignment: &StmtAssign,
         ty: Type<'db>,
-        allow_edits: bool,
+        tokens: &Tokens,
     ) -> Option<Self> {
         let InlayHintImportContext { db, file, .. } = context;
 
-        let position = expr.range().end();
         let env = ProgramEnvironment::from_file(file);
         // Render the type to a string, and get subspans for all the types that make it up
         let details = ty.display(db, &env).to_string_parts();
 
         // Filter out repetitive hints like `x: T = T()`
-        if call_matches_name(rhs, &details.label) {
+        if call_matches_name(&assignment.value, &details.label) {
             return None;
         }
 
+        let range =
+            parenthesized_range(expr.into(), assignment.into(), tokens).unwrap_or(expr.range());
         Some(Self::type_annotation(
             context,
             expr.into(),
-            position,
+            range.end(),
             &details,
             ": ",
-            allow_edits,
+            annotations_are_valid_syntax(assignment),
         ))
     }
 
@@ -400,10 +402,9 @@ struct InlayHintVisitor<'a, 'db> {
     tokens: &'db Tokens,
     hints: Vec<InlayHint>,
     pending_return_hint: Option<(&'a Parameters, InlayHint)>,
-    assignment_rhs: Option<&'a Expr>,
+    assignment: Option<&'a StmtAssign>,
     range: TextRange,
     settings: &'a InlayHintSettings,
-    in_no_edits_allowed: bool,
 }
 
 impl<'a, 'db> InlayHintVisitor<'a, 'db> {
@@ -421,21 +422,22 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             tokens: ast.tokens(),
             hints: Vec::new(),
             pending_return_hint: None,
-            assignment_rhs: None,
+            assignment: None,
             range,
             settings,
-            in_no_edits_allowed: false,
         }
     }
 
-    fn add_type_hint(&mut self, expr: &Expr, rhs: &Expr, ty: Type<'db>, allow_edits: bool) {
-        if !self.settings.variable_types {
+    fn add_type_hint(&mut self, expr: &Expr) {
+        let Some(assignment) = self.assignment else {
+            return;
+        };
+        if !self.settings.variable_types || is_ignored_variable_assignment_target(expr) {
             return;
         }
-
-        if is_ignored_variable_assignment_target(expr) {
+        let Some(ty) = expr.inferred_type(&self.model) else {
             return;
-        }
+        };
 
         let context = InlayHintImportContext {
             db: self.db,
@@ -443,7 +445,9 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             importer: &self.importer,
         };
 
-        if let Some(inlay_hint) = InlayHint::variable_type(context, expr, rhs, ty, allow_edits) {
+        if let Some(inlay_hint) =
+            InlayHint::variable_type(context, expr, assignment, ty, self.tokens)
+        {
             self.hints.push(inlay_hint);
         }
     }
@@ -501,16 +505,12 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
         match stmt {
             Stmt::Assign(assign) => {
                 if !type_hint_is_excessive_for_expr(&assign.value) {
-                    self.assignment_rhs = Some(&*assign.value);
-                }
-                if !annotations_are_valid_syntax(assign) {
-                    self.in_no_edits_allowed = true;
+                    self.assignment = Some(assign);
                 }
                 for target in &assign.targets {
                     self.visit_expr(target);
                 }
-                self.in_no_edits_allowed = false;
-                self.assignment_rhs = None;
+                self.assignment = None;
 
                 self.visit_expr(&assign.value);
 
@@ -550,24 +550,10 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
-            Expr::Name(name) => {
-                if let Some(rhs) = self.assignment_rhs {
-                    if name.ctx.is_store() {
-                        if let Some(ty) = expr.inferred_type(&self.model) {
-                            self.add_type_hint(expr, rhs, ty, !self.in_no_edits_allowed);
-                        }
-                    }
-                }
-                source_order::walk_expr(self, expr);
-            }
-            Expr::Attribute(attribute) => {
-                if let Some(rhs) = self.assignment_rhs {
-                    if attribute.ctx.is_store() {
-                        if let Some(ty) = expr.inferred_type(&self.model) {
-                            self.add_type_hint(expr, rhs, ty, !self.in_no_edits_allowed);
-                        }
-                    }
-                }
+            Expr::Name(ExprName { ctx, .. }) | Expr::Attribute(ExprAttribute { ctx, .. })
+                if ctx.is_store() =>
+            {
+                self.add_type_hint(expr);
                 source_order::walk_expr(self, expr);
             }
             Expr::Call(call) => {
@@ -720,7 +706,7 @@ fn should_skip_import(db: &dyn Db, module: ty_module_resolver::Module, ty: Type)
     module.is_known(db, ty_module_resolver::KnownModule::Builtins) || ty.is_none(db)
 }
 
-fn annotations_are_valid_syntax(stmt_assign: &ruff_python_ast::StmtAssign) -> bool {
+fn annotations_are_valid_syntax(stmt_assign: &StmtAssign) -> bool {
     if stmt_assign.targets.len() > 1 {
         return false;
     }
@@ -1426,6 +1412,7 @@ Source with applied edits:
 
     #[test]
     fn test_assign_statement() {
+        // The type hint and its edit follow the whole assignment target, including its parentheses.
         let mut test = inlay_hint_test(
             "
             def i(x: int, /) -> int:
@@ -1433,7 +1420,7 @@ Source with applied edits:
 
             x = 1
             y = x
-            z = i(1)
+            ((z)) = i(1)
             w = z
             aa = b'foo'
             bb = aa
@@ -1447,7 +1434,7 @@ Source with applied edits:
 
         x = 1
         y[: Literal[1]] = x
-        z[: int] = i(1)
+        ((z))[: int] = i(1)
         w[: int] = z
         aa = b'foo'
         bb[: Literal[b"foo"]] = aa
@@ -1481,10 +1468,10 @@ Source with applied edits:
         LL | class int:
            |       ^^^
         info: Source
-          --> main2.py:LL:5
+          --> main2.py:LL:9
            |
-        LL | z[: int] = i(1)
-           |     ^^^
+        LL | ((z))[: int] = i(1)
+           |         ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -1528,10 +1515,10 @@ Source with applied edits:
         --------------------------------------------------------------------------------
         6  | x = 1
            - y = x
-           - z = i(1)
+           - ((z)) = i(1)
            - w = z
         7  + y: Literal[1] = x
-        8  + z: int = i(1)
+        8  + ((z)): int = i(1)
         9  + w: int = z
         10 | aa = b'foo'
            - bb = aa
