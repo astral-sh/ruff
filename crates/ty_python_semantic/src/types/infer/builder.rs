@@ -44,7 +44,7 @@ use crate::place::{
 };
 use crate::place_load::{
     ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceExprPrefixLoads, PlaceLoadFailure, PlaceLoadMode,
-    PlaceLoadResolutionStep, PlaceLoadSource, PlaceLoadSourceKind, resolve_place_load,
+    PlaceLoadResolutionProcedure, PlaceLoadResolutionStep, PlaceLoadSource, PlaceLoadSourceKind,
 };
 use crate::reachability::{
     ReachabilityEvaluationCache, evaluate_reachability_with_cache, is_end_of_scope_reachable,
@@ -10721,9 +10721,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         name_node: &ast::ExprName,
     ) -> (Type<'db>, Option<Definition<'db>>) {
         let db = self.db();
-        let expr = PlaceExpr::from_expr_name(name_node);
+        let place_expr = PlaceExpr::from_expr_name(name_node);
 
-        let (resolved, _) = self.infer_place_load(expr, ast::ExprRef::Name(name_node));
+        let (resolved, _) = self.infer_place_load(&place_expr, ast::ExprRef::Name(name_node));
         let definition = match resolved.place {
             Place::Defined(place) => place.provenance.definition(),
             Place::Undefined => None,
@@ -10749,7 +10749,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// This also returns the [`ConstraintKey`]s used by expression-level narrowing.
     fn infer_place_load(
         &self,
-        place_expr: PlaceExpr,
+        place_expr: &PlaceExpr,
         expr_ref: ast::ExprRef,
     ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
         let env = self.program_environment();
@@ -10760,13 +10760,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             PlaceLoadMode::AtExpression(expr_ref)
         };
-        let mut resolution =
-            resolve_place_load(self.db(), self.index, self.scope(), place_expr, mode);
+        let mut procedure = PlaceLoadResolutionProcedure::new(
+            self.db(),
+            self.index,
+            self.scope(),
+            place_expr,
+            mode,
+        );
         let mut place = PlaceAndQualifiers::from(Place::Undefined);
         let mut failure = None;
         let mut checked_deprecated = false;
 
-        while let Some(step) = resolution.next() {
+        while let Some(step) = procedure.next() {
             match step {
                 PlaceLoadResolutionStep::Source(source) => {
                     if !checked_deprecated && source.is_post_lexical() {
@@ -10780,10 +10785,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         checked_deprecated = true;
                     }
-                    let narrowing_constraints = resolution.narrowing_constraints_for(&source);
+                    let narrowing_constraints = procedure.narrowing_constraints_for(&source);
                     place = place.or_fall_back_to(self.db(), env, || {
                         self.infer_place_load_source(
-                            resolution.place_expr(),
+                            procedure.place_expr(),
                             source,
                             narrowing_constraints,
                         )
@@ -10817,7 +10822,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             place
         };
 
-        let constraint_keys = resolution.into_constraints();
+        let constraint_keys = procedure.into_constraints();
 
         (place, constraint_keys)
     }
@@ -11163,7 +11168,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut assigned_type = None;
         if let Some(place_expr) = PlaceExpr::try_from_expr(attribute) {
             let (resolved, keys) =
-                self.infer_place_load(place_expr, ast::ExprRef::Attribute(attribute));
+                self.infer_place_load(&place_expr, ast::ExprRef::Attribute(attribute));
             constraint_keys.extend(keys);
             if let Place::Defined(
                 place @ DefinedPlace {

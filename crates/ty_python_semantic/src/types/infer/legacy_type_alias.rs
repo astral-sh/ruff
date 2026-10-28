@@ -17,8 +17,8 @@ use ty_python_core::{
 
 use crate::place::{Place, class_body_implicit_symbol};
 use crate::place_load::{
-    ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolutionStep, PlaceLoadSourceKind,
-    resolve_place_load,
+    ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolutionProcedure, PlaceLoadResolutionStep,
+    PlaceLoadSourceKind,
 };
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::definition_resolution::{ImportAliasResolution, resolve_definition};
@@ -316,11 +316,12 @@ fn referenced_name_definition<'db>(
         };
         (index.expression_scope_id(&expression), mode)
     };
-    let mut resolution = resolve_place_load(
+    let place_expr = PlaceExpr::from_expr_name(name);
+    let mut procedure = PlaceLoadResolutionProcedure::new(
         db,
         index,
         scope.to_scope_id(db, file),
-        PlaceExpr::from_expr_name(name),
+        &place_expr,
         mode,
     );
     let from_owning_scope = |scope, id| {
@@ -331,7 +332,7 @@ fn referenced_name_definition<'db>(
         )
     };
     let env = ProgramEnvironment::from_file(file);
-    while let Some(PlaceLoadResolutionStep::Source(source)) = resolution.next() {
+    while let Some(PlaceLoadResolutionStep::Source(source)) = procedure.next() {
         let (bindings, declarations) = match source.kind {
             PlaceLoadSourceKind::Bindings(bindings) => (bindings, None),
             PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => {
