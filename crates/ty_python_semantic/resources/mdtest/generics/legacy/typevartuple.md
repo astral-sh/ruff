@@ -552,7 +552,7 @@ def _(result: Result[str]) -> None:
 ### `TypeVarTuple` with `ParamSpec`
 
 ```py
-from typing import Callable, Generic, TypeVarTuple, ParamSpec
+from typing import Callable, Generic, ParamSpec, TypeVar, TypeVarTuple, Unpack
 
 P = ParamSpec("P")
 Ts = TypeVarTuple("Ts")
@@ -571,6 +571,18 @@ reveal_type(TypeVarTupleWithParamSpec[str, int, []]().fn)  # revealed: () -> tup
 reveal_type(TypeVarTupleWithParamSpec[str, int, ...]().fn)  # revealed: (...) -> tuple[str, int]
 ```
 
+An empty tuple unpack leaves the preceding arguments in their original slots.
+
+```py
+T = TypeVar("T")
+
+class WithSuffix(Generic[*Ts, P, T]):
+    fn: Callable[P, tuple[*Ts, T]]
+
+def shifted(x: WithSuffix[int, [str], bytes, Unpack[tuple[()]]]) -> None:
+    reveal_type(x.fn)  # revealed: (str, /) -> tuple[int, bytes]
+```
+
 ### Defaulted `ParamSpec` after a `TypeVarTuple`
 
 Ordinary type arguments go into the pack. An explicit parameter list overrides the `ParamSpec`
@@ -582,7 +594,7 @@ python-version = "3.13"
 ```
 
 ```py
-from typing import Callable, Concatenate, Generic, ParamSpec, TypeVarTuple
+from typing import Any, Callable, Concatenate, Generic, ParamSpec, TypeVarTuple
 
 Ts = TypeVarTuple("Ts")
 P = ParamSpec("P", default=[bool])
@@ -593,6 +605,7 @@ class Callback(Generic[*Ts, P]):
 reveal_type(Callback[int, str]().fn)  # revealed: (bool, /) -> tuple[int, str]
 reveal_type(Callback[list[int]]().fn)  # revealed: (bool, /) -> tuple[list[int]]
 reveal_type(Callback[int, [str]]().fn)  # revealed: (str, /) -> tuple[int]
+reveal_type(Callback[int, [str], *tuple[()]]().fn)  # revealed: (str, /) -> tuple[int]
 reveal_type(Callback[...]().fn)  # revealed: (...) -> tuple[()]
 
 Q = ParamSpec("Q")
@@ -600,6 +613,20 @@ Q = ParamSpec("Q")
 def forward(a: Callback[int, Q], b: Callback[str, Concatenate[int, Q]]) -> None:
     reveal_type(a.fn)  # revealed: (**Q@forward) -> tuple[int]
     reveal_type(b.fn)  # revealed: (int, /, *args: Q@forward.args, **kwargs: Q@forward.kwargs) -> tuple[str]
+```
+
+After an explicit parameter list, `Any` supplies a gradual signature for the next `ParamSpec`.
+
+```py
+R = ParamSpec("R", default=[bytes])
+
+class Callbacks(Generic[*Ts, P, R]):
+    first: Callable[P, tuple[*Ts]]
+    second: Callable[R, None]
+
+def gradual(x: Callbacks[[str], Any]) -> None:
+    reveal_type(x.first)  # revealed: (str, /) -> tuple[()]
+    reveal_type(x.second)  # revealed: (...) -> None
 ```
 
 ### Inferred specialization from construction

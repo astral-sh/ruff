@@ -134,6 +134,16 @@ reveal_type(TypeVarTupleWithParamSpec[str, int, []]().fn)  # revealed: () -> tup
 reveal_type(TypeVarTupleWithParamSpec[str, int, ...]().fn)  # revealed: (...) -> tuple[str, int]
 ```
 
+An empty tuple unpack leaves the preceding arguments in their original slots.
+
+```py
+class WithSuffix[*Ts, **P, T]:
+    fn: Callable[P, tuple[*Ts, T]]
+
+def shifted(x: WithSuffix[int, [str], bytes, *tuple[()]]) -> None:
+    reveal_type(x.fn)  # revealed: (str, /) -> tuple[int, bytes]
+```
+
 ### Defaulted `ParamSpec` after a `TypeVarTuple`
 
 Ordinary type arguments go into the pack. An explicit parameter list overrides the `ParamSpec`
@@ -153,6 +163,7 @@ class Callback[*Ts, **P = [bool]]:
 reveal_type(Callback[int, str]().fn)  # revealed: (bool, /) -> tuple[int, str]
 reveal_type(Callback[list[int]]().fn)  # revealed: (bool, /) -> tuple[list[int]]
 reveal_type(Callback[int, [str]]().fn)  # revealed: (str, /) -> tuple[int]
+reveal_type(Callback[int, [str], *tuple[()]]().fn)  # revealed: (str, /) -> tuple[int]
 reveal_type(Callback[...]().fn)  # revealed: (...) -> tuple[()]
 
 def forward[**Q](a: Callback[int, Q], b: Callback[str, Concatenate[int, Q]]) -> None:
@@ -179,7 +190,7 @@ python-version = "3.13"
 ```
 
 ```py
-from typing import Callable
+from typing import Any, Callable
 
 class Callbacks[*Ts, **P = [bool], **Q = [bytes]]:
     first: Callable[P, tuple[*Ts]]
@@ -192,6 +203,10 @@ def f(a: Callbacks[int, str], b: Callbacks[int, [str]], c: Callbacks[int, [str],
     reveal_type(b.second)  # revealed: (bytes, /) -> tuple[int]
     reveal_type(c.first)  # revealed: (str, /) -> tuple[int]
     reveal_type(c.second)  # revealed: (float, /) -> tuple[int]
+
+def gradual(x: Callbacks[[str], Any]) -> None:
+    reveal_type(x.first)  # revealed: (str, /) -> tuple[()]
+    reveal_type(x.second)  # revealed: (...) -> tuple[()]
 ```
 
 An unpacked tuple can fill the fixed parameters and contribute the rest of its elements to the pack.

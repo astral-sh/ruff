@@ -705,64 +705,63 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .iter()
             .position(|typevar| typevar.is_typevartuple(db));
 
-        // In G[*Ts, **P = [bool], **Q = [bytes]], G[int, [str]] binds int to Ts
-        // and [str] to P. Only the trailing parameter lists can override the defaults.
-        let supplied_typevars = if typevartuple_index.is_some()
-            && typevars
+        let pack_before_paramspec = typevartuple_index
+            .filter(|&index| typevars[index + 1..].iter().any(|var| var.is_paramspec(db)));
+
+        // G[int, [str], Any] binds int to the pack, then [str] and Any to successive ParamSpecs.
+        let suffix_len = |pack_index: usize, arguments: &[TypeArgument]| {
+            let available = arguments.len().saturating_sub(pack_index);
+            if !typevars
                 .last()
                 .is_some_and(|last| last.is_paramspec(db) && last.default_type(db).is_some())
-        {
+            {
+                return (typevars_len - pack_index - 1).min(available);
+            }
+
             let paramspec_count = typevars
                 .iter()
                 .rev()
                 .take_while(|var| var.is_paramspec(db))
                 .count();
             let paramspec_start = typevars_len - paramspec_count;
-            let explicit = type_arguments
+            let fixed_suffix = paramspec_start - pack_index - 1;
+            let paramspec_slots = available.saturating_sub(fixed_suffix).min(paramspec_count);
+            let suffix = &arguments[arguments.len() - paramspec_slots..];
+            let explicit = suffix
                 .iter()
-                .rev()
-                .take(paramspec_count)
-                .take_while(|arg| self.is_explicit_paramspec_argument(arg))
-                .count();
+                .position(|arg| arg.ty.is_none())
+                .map_or(0, |index| suffix.len() - index);
             let required = typevars[paramspec_start..]
                 .iter()
                 .take_while(|var| var.default_type(db).is_none())
                 .count();
-            &typevars[..paramspec_start + required.max(explicit)]
-        } else {
-            typevars.as_slice()
-        };
-
-        // A parameter list used by a fixed prefix parameter cannot also fill a suffix parameter.
-        // Count expanded arguments so that one unpack can supply several prefix parameters.
-        let suffix_len = |pack_index: usize, argument_count: usize| {
-            (supplied_typevars.len() - pack_index - 1)
-                .min(argument_count.saturating_sub(pack_index))
-        };
-
-        let is_paramspec_at = |index: usize, argument_count: usize| {
-            let parameter_index = if let Some(pack_index) = typevartuple_index
-                && index >= pack_index
-            {
-                let suffix_start = argument_count - suffix_len(pack_index, argument_count);
-                if index >= suffix_start {
-                    pack_index + 1 + (index - suffix_start)
-                } else {
-                    pack_index
-                }
-            } else {
-                index
-            };
-            supplied_typevars
-                .get(parameter_index)
-                .is_some_and(|var| var.is_paramspec(db))
+            (fixed_suffix + required.max(explicit)).min(available)
         };
         let mut expanded_type_arguments = Vec::with_capacity(type_arguments.len());
 
         for (source_index, expr) in type_arguments.iter().enumerate() {
             let index = expanded_type_arguments.len();
-            let argument_count = index + (type_arguments.len() - source_index);
-            if exactly_one_paramspec || is_paramspec_at(index, argument_count) {
+            // A later unpack can shift a parameter list into or out of a ParamSpec slot.
+            // Infer it only after we know how many arguments each unpack contributes.
+            let fixed_paramspec = typevars.get(index).is_some_and(|var| var.is_paramspec(db));
+            let defer = if pack_before_paramspec.is_some_and(|pack| index >= pack) {
+                self.is_explicit_paramspec_argument(expr)
+            } else if fixed_paramspec && typevartuple_index.is_some() {
+                // Even a leading ParamSpec can shift when its apparent argument is an unpack.
+                match expr {
+                    ast::Expr::Starred(_) | ast::Expr::StringLiteral(_) => false,
+                    ast::Expr::Subscript(subscript) if is_dotted_name(&subscript.value) => {
+                        self.speculate()
+                            .infer_type_expression_reference(&subscript.value)
+                            .0
+                            != Type::SpecialForm(SpecialFormType::Unpack)
+                    }
+                    _ => true,
+                }
+            } else {
+                exactly_one_paramspec || fixed_paramspec
+            };
+            if defer {
                 expanded_type_arguments.push(TypeArgument {
                     node: expr,
                     ty: None,
@@ -798,12 +797,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if is_unpack
                 && let Some(tuple) = provided_type.exact_tuple_instance_spec(db)
                 && let Tuple::Fixed(tuple) = tuple.as_ref()
-                && (typevartuple_index.is_some() || index <= supplied_typevars.len())
-                && (index..index + tuple.len())
-                    .all(|i| !is_paramspec_at(i, argument_count - 1 + tuple.len()))
+                && (typevartuple_index.is_some()
+                    || (index <= typevars_len
+                        && (index..index + tuple.len())
+                            .all(|i| !typevars.get(i).is_some_and(|var| var.is_paramspec(db)))))
             {
-                // Expand `Foo[Unpack[tuple[int, str]]]` to `Foo[int, str]`. ParamSpec arguments
-                // must still use their dedicated inference path.
+                // Expand `Foo[Unpack[tuple[int, str]]]` to `Foo[int, str]`.
                 expanded_type_arguments.extend(tuple.iter_all_elements().map(|ty| TypeArgument {
                     node: expr,
                     ty: Some(ty),
@@ -834,7 +833,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let expanded_type_arguments = if let Some(typevartuple_index) = typevartuple_index {
-            let suffix_len = suffix_len(typevartuple_index, expanded_type_arguments.len());
+            let suffix_len = suffix_len(typevartuple_index, &expanded_type_arguments);
             let typevartuple_end = expanded_type_arguments
                 .len()
                 .saturating_sub(suffix_len)
@@ -1017,13 +1016,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let provided_type = self
                             .infer_paramspec_explicit_specialization_value(
                                 type_argument.node,
+                                type_argument.ty,
                                 exactly_one_paramspec,
                             )
                             .unwrap_or_else(|()| {
                                 error = Some(ExplicitSpecializationError::InvalidParamSpec);
                                 Type::paramspec_value_callable(db, Parameters::unknown())
                             });
-                        inferred_type_arguments[type_argument.source_index] = Some(provided_type);
+                        if type_argument.ty.is_none() {
+                            inferred_type_arguments[type_argument.source_index] =
+                                Some(provided_type);
+                        }
                         provided_type
                     } else {
                         type_argument.ty.unwrap_or_else(|| {
@@ -1326,6 +1329,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_paramspec_explicit_specialization_value(
         &mut self,
         expr: &ast::Expr,
+        inferred_type: Option<Type<'db>>,
         exactly_one_paramspec: bool,
     ) -> Result<Type<'db>, ()> {
         let db = self.db();
@@ -1384,7 +1388,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return Ok(Type::paramspec_value_callable(db, parameters));
             }
 
-            ast::Expr::Subscript(subscript) => {
+            ast::Expr::Subscript(subscript) if inferred_type.is_none() => {
                 let value_ty = self.infer_expression(&subscript.value, TypeContext::default());
 
                 if matches!(value_ty, Type::SpecialForm(SpecialFormType::Concatenate)) {
@@ -1399,12 +1403,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             ast::Expr::Name(name) if name.is_invalid() => return Err(()),
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
+            _ if matches!(expr, ast::Expr::Name(_) | ast::Expr::Attribute(_))
+                || inferred_type.is_some()
+                    && (expr.is_subscript_expr()
+                        || self
+                            .type_expression_flags(expr)
+                            .contains(TypeExpressionFlags::UNPACK)) =>
+            {
                 let previous_concatenate_context = self
                     .context
                     .inference_flags
                     .replace(InferenceFlags::IN_VALID_CONCATENATE_CONTEXT, true);
-                let param_type = self.infer_type_expression(expr);
+                let param_type = inferred_type.map_or_else(
+                    || self.infer_type_expression(expr),
+                    |ty| ty.resolve_type_alias(db),
+                );
                 self.context.inference_flags.set(
                     InferenceFlags::IN_VALID_CONCATENATE_CONTEXT,
                     previous_concatenate_context,
