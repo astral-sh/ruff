@@ -201,14 +201,3 @@ help: Rename unused `comprehension_value` to `_comprehension_value`
 111 |     print([comprehension_value for comprehension_value in otherls])
     |
 note: This is an unsafe fix and may change runtime behavior
-
-B007 Loop control variable `nested_loop_value` not used within loop body
-   --> B007.py:115:5
-    |
-114 | # A nested loop target shadows the outer loop variable.
-115 | for nested_loop_value in ls:  # B007
-    |     ^^^^^^^^^^^^^^^^^
-116 |     for nested_loop_value in otherls:
-117 |         print(nested_loop_value)
-    |
-help: Rename unused `nested_loop_value` to `_nested_loop_value`
