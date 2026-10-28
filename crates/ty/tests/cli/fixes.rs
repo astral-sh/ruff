@@ -2,7 +2,6 @@ use std::fs;
 
 use insta::assert_snapshot;
 use insta_cmd::assert_cmd_snapshot;
-use ruff_python_trivia::textwrap::dedent;
 
 use crate::CliTest;
 
@@ -217,18 +216,27 @@ fn fix_unused_ignore_after_line_continuation() -> anyhow::Result<()> {
             ",
     )?;
 
-    assert!(case.command().arg("--fix").output()?.status.success());
-    assert_eq!(
-        fs::read_to_string(case.root().join("example.py"))?,
-        dedent(
-            r"
-            x = 1
-            +2
-            # This backslash is part of the comment \
-            y = 2
-            "
-        )
-    );
+    assert_cmd_snapshot!(case.command().arg("--fix"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Found 2 diagnostics (2 fixed, 0 remaining).
+
+    ----- stderr -----
+    ");
+
+    let fixed = fs::read_to_string(case.root().join("example.py"))?;
+    // The CLI's path filter would rewrite the literal backslash in the Python comment.
+    insta::with_settings!({filters => []}, {
+        assert_snapshot!(fixed, @r"
+
+        x = 1
+        +2
+        # This backslash is part of the comment \
+        y = 2
+        ");
+    });
+
     Ok(())
 }
 
