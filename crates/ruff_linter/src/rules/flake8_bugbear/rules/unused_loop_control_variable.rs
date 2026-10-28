@@ -112,6 +112,21 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
         // different binding, and nested loop variables should not count as uses of this binding.
         let semantic = checker.semantic();
         let scope = semantic.current_scope();
+        // A nested loop that reuses the same target is already reported by PLW2901. Avoid
+        // reporting B007 for the outer target as well, even though the nested target does not
+        // count as a use of the outer binding.
+        let redefined_in_nested_loop = scope.get_all(name).any(|binding_id| {
+            let binding = semantic.binding(binding_id);
+            matches!(&binding.kind, BindingKind::LoopVar)
+                && binding.start() > expr.start()
+                && stmt_for
+                    .body
+                    .iter()
+                    .any(|stmt| binding.start() >= stmt.start() && binding.end() <= stmt.end())
+        });
+        if redefined_in_nested_loop {
+            continue;
+        }
         let binding_id = scope
             .get_all(name)
             .find(|binding_id| semantic.binding(*binding_id).start() == expr.start());
@@ -143,12 +158,14 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
                         return true;
                     }
 
+                    // Deletion targets are references too. Treat them conservatively as uses to
+                    // match `NameFinder`, including conditional deletions that don't create a
+                    // separate deletion binding.
                     binding.references().any(|reference_id| {
                         let reference = semantic.reference(reference_id);
-                        reference.is_load()
-                            && stmt_for.body.iter().any(|stmt| {
-                                reference.start() >= stmt.start() && reference.end() <= stmt.end()
-                            })
+                        stmt_for.body.iter().any(|stmt| {
+                            reference.start() >= stmt.start() && reference.end() <= stmt.end()
+                        })
                     })
                 })
             })
