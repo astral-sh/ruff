@@ -9731,7 +9731,7 @@ impl<'db> Type<'db> {
 
     /// Maps the typevars bound by `context`, adding `delta` to their occurrence nonces.
     /// Occurrences outside that context retain their identities, preserving captured typevars.
-    pub(crate) fn resolve_typevars(
+    fn resolve_typevars(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
