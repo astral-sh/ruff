@@ -27,7 +27,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/classes.
 12 | 
 13 | # A parameter list for a ParamSpec is distinguishable from the types that fill the pack.
 14 | # CPython raises TypeError here (https://github.com/python/typing/issues/2211).
-15 | class Qux[*Ts, **P = [int, str]]: ...  # no diagnostic
+15 | class Qux[*Ts, **P = [int, str]]: ...
 16 | 
 17 | # error: [invalid-type-variable-default]
 18 | class Quux[*Ts, T1 = int, **P = [int, str]]: ...

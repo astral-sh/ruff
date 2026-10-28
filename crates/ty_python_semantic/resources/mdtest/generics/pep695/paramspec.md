@@ -357,6 +357,16 @@ reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (...) -> None
 reveal_type(OnlyParamSpec[()]().attr)  # revealed: (...) -> None
 ```
 
+A `ParamSpec` can be forwarded as a whole. Its `.args` and `.kwargs` components cannot be passed
+separately as type arguments.
+
+```py
+def components[**Q](
+    a: OnlyParamSpec[Q.args],  # error: [invalid-type-arguments]
+    b: OnlyParamSpec[Q.kwargs],  # error: [invalid-type-arguments]
+) -> None: ...
+```
+
 Specializing a union of generic classes supports the same `ParamSpec` argument forms.
 
 ```py

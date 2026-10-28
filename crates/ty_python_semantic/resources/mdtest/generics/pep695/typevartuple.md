@@ -134,6 +134,108 @@ reveal_type(TypeVarTupleWithParamSpec[str, int, []]().fn)  # revealed: () -> tup
 reveal_type(TypeVarTupleWithParamSpec[str, int, ...]().fn)  # revealed: (...) -> tuple[str, int]
 ```
 
+An empty tuple unpack leaves the preceding arguments in their original slots.
+
+```py
+class WithSuffix[*Ts, **P, T]:
+    fn: Callable[P, tuple[*Ts, T]]
+
+def shifted(x: WithSuffix[int, [str], bytes, *tuple[()]]) -> None:
+    reveal_type(x.fn)  # revealed: (str, /) -> tuple[int, bytes]
+```
+
+### Defaulted `ParamSpec` after a `TypeVarTuple`
+
+Ordinary type arguments go into the pack. An explicit parameter list overrides the `ParamSpec`
+default.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Callable, Concatenate
+
+class Callback[*Ts, **P = [bool]]:
+    fn: Callable[P, tuple[*Ts]]
+
+reveal_type(Callback[int, str]().fn)  # revealed: (bool, /) -> tuple[int, str]
+reveal_type(Callback[list[int]]().fn)  # revealed: (bool, /) -> tuple[list[int]]
+reveal_type(Callback[int, [str]]().fn)  # revealed: (str, /) -> tuple[int]
+reveal_type(Callback[int, [str], *tuple[()]]().fn)  # revealed: (str, /) -> tuple[int]
+reveal_type(Callback[...]().fn)  # revealed: (...) -> tuple[()]
+
+def forward[**Q](a: Callback[int, Q], b: Callback[str, Concatenate[int, Q]]) -> None:
+    reveal_type(a.fn)  # revealed: (**Q@forward) -> tuple[int]
+    reveal_type(b.fn)  # revealed: (int, /, *args: Q@forward.args, **kwargs: Q@forward.kwargs) -> tuple[str]
+```
+
+A forwarded `ParamSpec` can specialize `P`, but it cannot be an element of `Ts`.
+
+```py
+def misplaced[**Q](
+    x: Callback[Q, int],  # error: [invalid-type-arguments] "cannot be used as a TypeVarTuple element"
+    y: Callback[Q.args],  # error: [invalid-type-arguments] "cannot be used as a TypeVarTuple element"
+) -> None: ...
+```
+
+### Multiple trailing `ParamSpec` defaults
+
+Explicit parameter lists bind in declaration order. Any remaining `ParamSpec` uses its default.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any, Callable
+
+class Callbacks[*Ts, **P = [bool], **Q = [bytes]]:
+    first: Callable[P, tuple[*Ts]]
+    second: Callable[Q, tuple[*Ts]]
+
+def f(a: Callbacks[int, str], b: Callbacks[int, [str]], c: Callbacks[int, [str], [float]]) -> None:
+    reveal_type(a.first)  # revealed: (bool, /) -> tuple[int, str]
+    reveal_type(a.second)  # revealed: (bytes, /) -> tuple[int, str]
+    reveal_type(b.first)  # revealed: (str, /) -> tuple[int]
+    reveal_type(b.second)  # revealed: (bytes, /) -> tuple[int]
+    reveal_type(c.first)  # revealed: (str, /) -> tuple[int]
+    reveal_type(c.second)  # revealed: (float, /) -> tuple[int]
+
+def gradual(x: Callbacks[[str], Any]) -> None:
+    reveal_type(x.first)  # revealed: (str, /) -> tuple[()]
+    reveal_type(x.second)  # revealed: (...) -> tuple[()]
+```
+
+An unpacked tuple can fill the fixed parameters and contribute the rest of its elements to the pack.
+The next parameter list still binds to the first `ParamSpec`.
+
+```py
+class Prefixed[T, U, *Ts, **P, **Q = [bytes]]:
+    first: Callable[P, tuple[T, U, *Ts]]
+    second: Callable[Q, tuple[T, U, *Ts]]
+
+def unpacked(x: Prefixed[*tuple[int, str, tuple[float], complex], [bool]]) -> None:
+    reveal_type(x.first)  # revealed: (bool, /) -> tuple[int, str, tuple[float], complex]
+    reveal_type(x.second)  # revealed: (bytes, /) -> tuple[int, str, tuple[float], complex]
+```
+
+When the pack is empty, a parameter list before it still binds to the leading `ParamSpec`.
+
+```py
+class BothSides[**Head, *Ts, **P = [bool], **Q = [bytes]]:
+    head: Callable[Head, None]
+    first: Callable[P, tuple[*Ts]]
+    second: Callable[Q, tuple[*Ts]]
+
+def both_sides(x: BothSides[[float], [str]]) -> None:
+    reveal_type(x.head)  # revealed: (float, /) -> None
+    reveal_type(x.first)  # revealed: (str, /) -> tuple[()]
+    reveal_type(x.second)  # revealed: (bytes, /) -> tuple[()]
+```
+
 ### Inferred specialization from construction
 
 Calling a generic class without explicit type arguments infers its specialization from the
