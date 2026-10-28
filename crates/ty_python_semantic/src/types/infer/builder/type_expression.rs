@@ -83,7 +83,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if alias_definition.is_implicit
             && inference.ty.is_ok()
             && inference.context.has_invalid_type_form
-            && !any_over_type(db, self.program_environment(), ty, false, |ty| {
+            && !any_over_type(db, self.program_environment(), ty, |ty| {
                 matches!(ty, Type::Recursive(_))
             })
         {

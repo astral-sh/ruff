@@ -791,7 +791,7 @@ impl<'db> ReceiverConstraints<'db> {
                 && self.relations.iter().any(|&(receiver, annotation)| {
                     [receiver, annotation].into_iter().any(|ty| {
                         // Aliases can hide type variables; leave their evaluation to the checker.
-                        any_over_type(db, checker.env, ty, false, |ty| {
+                        any_over_type(db, checker.env, ty, |ty| {
                             matches!(ty, Type::TypeVar(_) | Type::TypeAlias(_))
                         })
                     })
@@ -2760,7 +2760,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     .any(|ty| {
                         // Aliases and recursive types can hide typevars. Avoid expanding them just
                         // to decide whether to take a fast path.
-                        any_over_type(db, self.env, ty, false, |ty| {
+                        any_over_type(db, self.env, ty, |ty| {
                             matches!(
                                 ty,
                                 Type::TypeVar(_) | Type::TypeAlias(_) | Type::Recursive(_)
@@ -2926,7 +2926,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             && target.resolve_type_alias(db).is_dynamic()
             && let Type::TypeVar(typevar) = source.return_ty.resolve_type_alias(db)
             && source.parameters().iter().any(|parameter| {
-                any_over_type(db, self.env, parameter.annotated_type(), false, |ty| {
+                any_over_type(db, self.env, parameter.annotated_type(), |ty| {
                     matches!(ty, Type::TypeVar(other) if other.is_same_typevar_as(db, typevar))
                 })
             })
