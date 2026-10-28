@@ -72,9 +72,7 @@ use crate::types::signatures::{
 use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::type_alias::walk_type_alias_arguments;
 use crate::types::typed_dict::TypedDictOpenness;
-use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarKind, TypeVarNonce, TypeVarNonceGenerator, TypeVarSet,
-};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarKind, TypeVarNonceGenerator, TypeVarSet};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
@@ -3685,7 +3683,7 @@ impl<'db> CallableBinding<'db> {
                 continue;
             };
             if nonce_generator.should_freshen(db, generic_context) {
-                overload.freshen_bound_typevars(db, env, nonce);
+                overload.freshen_bound_typevars(db, env, nonce.value());
             }
         }
     }
@@ -8847,14 +8845,12 @@ impl<'db> Binding<'db> {
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        nonce: TypeVarNonce,
+        delta: u32,
     ) {
         let Some(generic_context) = self.signature.generic_context else {
             return;
         };
-        self.signature = self
-            .signature
-            .freshen_bound_typevars(db, env, nonce.value());
+        self.signature = self.signature.freshen_bound_typevars(db, env, delta);
         if let Some(context) = self.constructor_context {
             self.set_constructor_context(
                 db,
@@ -8862,7 +8858,7 @@ impl<'db> Binding<'db> {
                     db,
                     env,
                     generic_context,
-                    nonce,
+                    delta,
                 )),
             );
         }
