@@ -1,4 +1,4 @@
-use crate::config::{Analysis, Rules, ScriptOptions};
+use crate::config::{Analysis, Rules, ScriptMetadata};
 use camino::{Utf8Component, Utf8PathBuf};
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::{Diagnostic, Severity};
@@ -182,6 +182,7 @@ impl SemanticDb for Db {
     fn dependency_metadata(&self, file: File) -> Option<&DependencyMetadata> {
         match file_settings(self, file) {
             FileSettings::Global => self.settings().dependency_metadata(self).as_ref(),
+            FileSettings::InheritProjectConfig => None,
             FileSettings::File {
                 dependency_metadata,
                 ..
@@ -216,8 +217,11 @@ fn file_settings(db: &dyn SemanticDb, file: File) -> FileSettings {
     if source.is_notebook() {
         return FileSettings::Global;
     }
-    let Some(options) = ScriptOptions::from_source(&source) else {
+    let Some(metadata) = ScriptMetadata::from_source(&source) else {
         return FileSettings::Global;
+    };
+    let Some(options) = metadata.into_options() else {
+        return FileSettings::InheritProjectConfig;
     };
 
     FileSettings::File {
@@ -230,6 +234,8 @@ fn file_settings(db: &dyn SemanticDb, file: File) -> FileSettings {
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum FileSettings {
     Global,
+    /// A script without `[tool.ty]` inherits settings but has its own dependency metadata.
+    InheritProjectConfig,
     File {
         rules: MdtestRuleSelection,
         analysis: AnalysisSettings,
@@ -240,14 +246,14 @@ enum FileSettings {
 impl FileSettings {
     fn rules<'db>(&'db self, db: &'db Db) -> &'db RuleSelection {
         match self {
-            Self::Global => db.settings().rule_selection(db),
+            Self::Global | Self::InheritProjectConfig => db.settings().rule_selection(db),
             Self::File { rules, .. } => rules,
         }
     }
 
     fn analysis<'db>(&'db self, db: &'db Db) -> &'db AnalysisSettings {
         match self {
-            Self::Global => db.settings().analysis(db),
+            Self::Global | Self::InheritProjectConfig => db.settings().analysis(db),
             Self::File { analysis, .. } => analysis,
         }
     }

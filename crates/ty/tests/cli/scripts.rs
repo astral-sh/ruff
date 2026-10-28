@@ -4,7 +4,7 @@ use ty_static::EnvVars;
 use crate::CliTest;
 
 #[test]
-fn project_settings_and_overrides_do_not_apply() -> anyhow::Result<()> {
+fn inline_settings_replace_project_settings_and_overrides() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         (
             "pyproject.toml",
@@ -115,7 +115,7 @@ fn unknown_rule_diagnostics_point_to_script_metadata() -> anyhow::Result<()> {
 }
 
 #[test]
-fn python_version_diagnostics_identify_script_metadata() -> anyhow::Result<()> {
+fn script_python_requirement_overrides_project_version() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "script.py",
         r#"
@@ -126,6 +126,28 @@ fn python_version_diagnostics_identify_script_metadata() -> anyhow::Result<()> {
         PythonFinalizationError
         "#,
     )?;
+    case.write_files([
+        (
+            "ty.toml",
+            r#"
+            [environment]
+            python-version = "3.13"
+            "#,
+        ),
+        (
+            "inherited.py",
+            r#"
+            # /// script
+            # dependencies = []
+            # ///
+
+            import sys
+            from typing import Literal, assert_type
+
+            assert_type(sys.version_info[:2], tuple[Literal[3], Literal[13]])
+            "#,
+        ),
+    ])?;
 
     assert_cmd_snapshot!(case.command(), @r#"
     success: false
@@ -161,44 +183,56 @@ fn python_version_diagnostics_identify_script_metadata() -> anyhow::Result<()> {
 }
 
 #[test]
-fn metadata_without_tool_ty_uses_default_settings() -> anyhow::Result<()> {
+fn metadata_without_tool_ty_inherits_project_settings_and_overrides() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         (
             "pyproject.toml",
             r#"
             [tool.ty.rules]
-            all = "ignore"
+            unresolved-reference = "ignore"
 
             [tool.ty.analysis]
             respect-type-ignore-comments = false
+
+            [[tool.ty.overrides]]
+            include = ["scripts/*.py"]
+
+            [tool.ty.overrides.rules]
+            invalid-assignment = "warn"
             "#,
         ),
         (
-            "script.py",
+            "scripts/inherit.py",
             r#"
             # /// script
             # dependencies = []
+            # [tool.uv]
             # ///
 
-            value: int = "not an int"
-            suppressed: int = "not an int"  # type: ignore
+            print(missing)
+            value: int = "not an int"  # type: ignore
+            "#,
+        ),
+        (
+            "scripts/empty.py",
+            r#"
+            # /// script
+            # [tool.ty]
+            # ///
+
+            print(missing)
+            value: int = "not an int"  # type: ignore
             "#,
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command().args(["--output-format", "concise"]), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-assignment]: Object of type `Literal["not an int"]` is not assignable to `int`
-     --> script.py:6:14
-      |
-    6 | value: int = "not an int"
-      |        ---   ^^^^^^^^^^^^ Incompatible value of type `Literal["not an int"]`
-      |        |
-      |        Declared type
-
-    Found 1 diagnostic
+    scripts/empty.py:6:7: error[unresolved-reference] Name `missing` used when not defined
+    scripts/inherit.py:8:14: warning[invalid-assignment] Object of type `Literal["not an int"]` is not assignable to `int`
+    Found 2 diagnostics
 
     ----- stderr -----
     "#);
@@ -464,6 +498,11 @@ fn explicit_config_replaces_inline_metadata() -> anyhow::Result<()> {
             unresolved-reference = "warn"
 
             [analysis]
+            respect-type-ignore-comments = false
+
+            [[overrides]]
+            include = ["script.py"]
+            [overrides.analysis]
             respect-type-ignore-comments = true
             "#,
         ),
@@ -704,11 +743,22 @@ fn python_requirement_overrides_user_configuration() -> anyhow::Result<()> {
 }
 
 #[test]
-fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
+fn scripts_default_to_their_own_directory_as_the_only_root() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("shared.py", "value = 1\n"),
         ("src/layout_dependency.py", "value = 1\n"),
         ("scripts/local_dependency.py", "value = 1\n"),
+        (
+            "scripts/isolated.py",
+            r#"
+            # /// script
+            # [tool.ty.environment]
+            # root = []
+            # ///
+
+            import local_dependency
+            "#,
+        ),
         (
             "scripts/script.py",
             r#"
@@ -723,37 +773,13 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().args(["--output-format", "concise"]), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `layout_dependency`
-     --> scripts/script.py:6:6
-      |
-    6 | from layout_dependency import value as layout_value
-      |      ^^^^^^^^^^^^^^^^^
-    info: Searched in the following paths during module resolution:
-    info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-
-    error[unresolved-import]: Cannot resolve imported module `local_dependency`
-     --> scripts/script.py:7:6
-      |
-    7 | from local_dependency import value as local_value
-      |      ^^^^^^^^^^^^^^^^
-    info: Searched in the following paths during module resolution:
-    info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-
-    error[unresolved-import]: Cannot resolve imported module `shared`
-     --> scripts/script.py:8:6
-      |
-    8 | from shared import value
-      |      ^^^^^^
-    info: Searched in the following paths during module resolution:
-    info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-
+    scripts/isolated.py:7:8: error[unresolved-import] Cannot resolve imported module `local_dependency`
+    scripts/script.py:6:6: error[unresolved-import] Cannot resolve imported module `layout_dependency`
+    scripts/script.py:8:6: error[unresolved-import] Cannot resolve imported module `shared`
     Found 3 diagnostics
 
     ----- stderr -----
@@ -795,12 +821,12 @@ fn configured_source_roots_and_extra_paths_are_relative_to_the_script() -> anyho
 }
 
 #[test]
-fn project_search_paths_do_not_apply_to_scripts() -> anyhow::Result<()> {
+fn scripts_have_separate_roots_and_inherit_project_extra_paths() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         (
-            "pyproject.toml",
+            "ty.toml",
             r#"
-            [tool.ty.environment]
+            [environment]
             root = ["./project-source"]
             extra-paths = ["./project-extra"]
             "#,
@@ -809,7 +835,10 @@ fn project_search_paths_do_not_apply_to_scripts() -> anyhow::Result<()> {
         ("project-extra/extra_only.py", "value = 1\n"),
         (
             "ordinary.py",
-            "from extra_only import value as extra\nfrom project_only import value as project\n",
+            "
+            from extra_only import value as extra
+            from project_only import value as project
+            ",
         ),
         (
             "scripts/script.py",
@@ -824,29 +853,20 @@ fn project_search_paths_do_not_apply_to_scripts() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().args(["--output-format", "concise"]), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `extra_only`
-     --> scripts/script.py:6:6
-      |
-    6 | from extra_only import value as extra
-      |      ^^^^^^^^^^
-    info: Searched in the following paths during module resolution:
-    info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    scripts/script.py:7:6: error[unresolved-import] Cannot resolve imported module `project_only`
+    Found 1 diagnostic
 
-    error[unresolved-import]: Cannot resolve imported module `project_only`
-     --> scripts/script.py:7:6
-      |
-    7 | from project_only import value as project
-      |      ^^^^^^^^^^^^
-    info: Searched in the following paths during module resolution:
-    info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-
-    Found 2 diagnostics
+    ----- stderr -----
+    ");
+    assert_cmd_snapshot!(case.command().args(["--config-file", "ty.toml"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     ");
@@ -925,19 +945,30 @@ fn shared_imports_use_each_scripts_platform() -> anyhow::Result<()> {
 }
 
 #[test]
-fn inherited_file_settings_are_relative_to_the_script() -> anyhow::Result<()> {
+fn user_configuration_paths_are_relative_to_the_active_configuration_root() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("user-extra/project_dependency.py", "value = 1\n"),
         ("scripts/user-extra/user_dependency.py", "value = 1\n"),
         ("cli-extra/cli_dependency.py", "value = 1\n"),
         (
-            "scripts/script.py",
+            "scripts/inline.py",
+            r#"
+            # /// script
+            # [tool.ty]
+            # ///
+
+            from user_dependency import value as user_value
+            from cli_dependency import value as cli_value
+            "#,
+        ),
+        (
+            "scripts/inherit.py",
             r#"
             # /// script
             # dependencies = []
             # ///
 
-            from user_dependency import value as user_value
+            from project_dependency import value as project_value
             from cli_dependency import value as cli_value
             "#,
         ),
@@ -995,7 +1026,8 @@ fn scripts_do_not_use_an_inactive_project_environment() -> anyhow::Result<()> {
     6 | from project_dependency import value
       |      ^^^^^^^^^^^^^^^^^^
     info: Searched in the following paths during module resolution:
-    info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   1. <temp_dir>/scripts (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
     Found 1 diagnostic

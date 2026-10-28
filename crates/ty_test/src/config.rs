@@ -95,12 +95,19 @@ pub(crate) struct ScriptOptions {
     pub(crate) dependency_metadata: Option<DependencyMetadataFixture>,
 }
 
-impl ScriptOptions {
+#[derive(Deserialize)]
+pub(crate) struct ScriptMetadata {
+    tool: Option<ScriptTool>,
+}
+
+impl ScriptMetadata {
     pub(crate) fn from_source(source: &str) -> Option<Self> {
         let tag = ScriptTag::parse(source.as_bytes())?;
-        let metadata: ScriptMetadata = toml::from_str(tag.metadata()).ok()?;
+        toml::from_str(tag.metadata()).ok()
+    }
 
-        let mut options = metadata.tool.and_then(|tool| tool.ty).unwrap_or_default();
+    pub(crate) fn into_options(self) -> Option<ScriptOptions> {
+        let mut options = self.tool?.ty?;
         if let Some(fixture) = &mut options.dependency_metadata {
             for project in &mut fixture.metadata.projects {
                 project.kind = DependencyProjectKind::Script;
@@ -109,11 +116,6 @@ impl ScriptOptions {
 
         Some(options)
     }
-}
-
-#[derive(Deserialize)]
-struct ScriptMetadata {
-    tool: Option<ScriptTool>,
 }
 
 #[derive(Deserialize)]

@@ -1135,8 +1135,6 @@ import indirect  # error: [missing-direct-dependency]
 ```py
 # /// script
 # dependencies = []
-# [tool.ty.rules]
-# missing-direct-dependency = "warn"
 # ///
 
 import indirect  # no diagnostic

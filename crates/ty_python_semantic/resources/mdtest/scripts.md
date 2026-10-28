@@ -1,6 +1,6 @@
-Scripts with PEP 723 metadata are considered single-file projects. They can configure `rules`,
-`analysis`, and their Python environment independently of the enclosing project. Dependencies are
-resolved from existing Python environments; ty does not install them.
+Scripts with PEP 723 metadata inherit the enclosing project's ty configuration unless they have
+their own `[tool.ty]` table. Each script has its own first-party roots and declares its own
+dependencies.
 
 ```toml
 [environment]
@@ -15,10 +15,8 @@ respect-type-ignore-comments = false
 
 # Inline settings
 
-A script can change its `rules`, `analysis`, and `environment` settings. A script does not inherit
-the enclosing project's configuration or Python environment, but can use an activated or explicitly
-configured environment. First-party imports require explicitly configured source roots or extra
-search paths.
+An inline `[tool.ty]` table replaces the enclosing project's ty configuration for that script. Like
+a `ty.toml`, it can configure rules, analysis settings, and the Python environment.
 
 ```py
 # /// script
@@ -35,8 +33,7 @@ print(missing)  # type: ignore
 
 # A metadata block without `tool.ty`
 
-Scripts with a valid metadata block are considered as their own project, even if the metadata block
-does not contain any `tool.ty` section.
+This project disables `type: ignore` comments, so the script reports both assignments.
 
 ```py
 # /// script
@@ -44,7 +41,8 @@ does not contain any `tool.ty` section.
 # ///
 
 value: int = "not an int"  # error: [invalid-assignment]
-suppressed: int = "not an int"  # type: ignore
+# error: [invalid-assignment]
+also_invalid: int = "not an int"  # type: ignore
 ```
 
 # Other Python source kinds

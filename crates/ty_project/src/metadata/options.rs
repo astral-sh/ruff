@@ -388,6 +388,8 @@ impl Options {
                 .iter()
                 .map(|root| root.absolute(context.configuration_root(), system))
                 .collect()
+        } else if let OptionsContext::Script { directory, .. } = context {
+            directory.into_iter().map(SystemPath::to_path_buf).collect()
         } else {
             let project_root = context.configuration_root();
             let mut roots = vec![];
@@ -612,21 +614,28 @@ impl Options {
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum OptionsContext<'a> {
     Project(&'a SystemPath),
-    /// The directory containing a standalone script, or the working directory for a virtual script.
-    Script(&'a SystemPath),
+    Script {
+        /// The script's containing directory, if it has a filesystem path.
+        directory: Option<&'a SystemPath>,
+        /// Relative settings from the enclosing project use the project's root.
+        configuration_root: &'a SystemPath,
+    },
 }
 
 impl<'a> OptionsContext<'a> {
     fn configuration_root(self) -> &'a SystemPath {
         match self {
-            Self::Project(root) | Self::Script(root) => root,
+            Self::Project(root) => root,
+            Self::Script {
+                configuration_root, ..
+            } => configuration_root,
         }
     }
 
     fn project_root(self) -> Option<&'a SystemPath> {
         match self {
             Self::Project(root) => Some(root),
-            Self::Script(_) => None,
+            Self::Script { .. } => None,
         }
     }
 }
@@ -859,8 +868,10 @@ pub struct EnvironmentOptions {
     /// * `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
     /// * `./python`
     ///
-    /// Scripts with inline metadata have no first-party roots by default because they are
-    /// single-file programs. Set `root = ["."]` to allow importing local modules.
+    /// A script with inline metadata has its own roots, even when the enclosing project configures
+    /// `root`. By default, its only root is the directory containing the script, so it can import
+    /// sibling modules. Set `root = []` in the script's `[tool.ty.environment]` table to disable
+    /// first-party roots.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
@@ -890,8 +901,10 @@ pub struct EnvironmentOptions {
     ///    and attempt to infer the Python version of that environment
     /// 3. Fall back to the default value (see below)
     ///
-    /// Scripts with inline metadata use their `requires-python` field instead of
-    /// `project.requires-python`. They do not inherit the Python version of the enclosing project.
+    /// A script with inline metadata uses its own `requires-python` in preference to the
+    /// enclosing project's Python version. An explicit `[tool.ty.environment]` Python version
+    /// in the script takes precedence over its `requires-python`. A script that specifies
+    /// neither `requires-python` nor a `[tool.ty]` table inherits the project's version setting.
     ///
     /// For some language features, ty can also understand conditionals based on comparisons
     /// with `sys.version_info`. These are commonly found in typeshed, for example,
