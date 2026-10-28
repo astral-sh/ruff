@@ -421,22 +421,35 @@ pub struct WorkspaceImports {
     /// A shared namespace may have both first- and third-party owners.
     #[cache_key(ignore)]
     sections: Arc<BTreeMap<String, Option<ImportSection>>>,
+    /// Changes to module names in these directories can invalidate the editor's snapshot.
+    #[cache_key(ignore)]
+    editable_roots: Arc<[PathBuf]>,
     /// Hash the workspace once, since it can be shared by many package caches.
     fingerprint: u64,
 }
 
 impl WorkspaceImports {
-    pub fn new(sections: BTreeMap<String, Option<ImportSection>>) -> Self {
+    pub fn new(
+        sections: BTreeMap<String, Option<ImportSection>>,
+        editable_roots: Vec<PathBuf>,
+    ) -> Self {
         let mut hasher = CacheKeyHasher::new();
         sections.cache_key(&mut hasher);
         Self {
             sections: sections.into(),
+            editable_roots: editable_roots.into(),
             fingerprint: hasher.finish(),
         }
     }
 
     pub fn fingerprint(&self) -> u64 {
         self.fingerprint
+    }
+
+    pub fn contains_editable_path(&self, path: &Path) -> bool {
+        self.editable_roots
+            .iter()
+            .any(|root| path.starts_with(root))
     }
 
     fn categorize(&self, name: &str) -> Option<(&ImportSection, Reason<'_>)> {
@@ -496,11 +509,14 @@ mod tests {
     fn workspace_namespace_ownership() {
         let first = ImportSection::Known(ImportType::FirstParty);
         let third = ImportSection::Known(ImportType::ThirdParty);
-        let imports = WorkspaceImports::new(BTreeMap::from([
-            ("ns".to_owned(), Some(third.clone())),
-            ("ns.mixed".to_owned(), None),
-            ("ns.mixed.local".to_owned(), Some(first.clone())),
-        ]));
+        let imports = WorkspaceImports::new(
+            BTreeMap::from([
+                ("ns".to_owned(), Some(third.clone())),
+                ("ns.mixed".to_owned(), None),
+                ("ns.mixed.local".to_owned(), Some(first.clone())),
+            ]),
+            Vec::new(),
+        );
         for (name, section) in [
             ("ns.external", Some(&third)),
             ("ns.mixed", None),

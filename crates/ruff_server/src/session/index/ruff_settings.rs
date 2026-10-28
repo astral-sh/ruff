@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use anyhow::Context;
 use ignore::{WalkBuilder, WalkState};
 
+use ruff_linter::rules::isort::categorize::WorkspaceImports;
 use ruff_linter::settings::types::GlobPath;
 use ruff_linter::{settings::types::FilePattern, settings::types::PreviewMode};
 use ruff_workspace::Settings;
@@ -22,7 +23,7 @@ use crate::session::Client;
 use crate::session::options::ConfigurationPreference;
 use crate::session::settings::{EditorSettings, ResolvedConfiguration};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct RuffSettings {
     /// The path to this configuration file, used for debugging.
     /// The default fallback configuration does not have a file path.
@@ -32,6 +33,10 @@ pub(crate) struct RuffSettings {
 }
 
 impl RuffSettings {
+    pub(super) fn set_workspace_imports(&mut self, imports: Option<WorkspaceImports>) {
+        self.settings.linter.isort.known_modules.workspace = imports;
+    }
+
     pub(crate) fn path(&self) -> Option<&Path> {
         self.path.as_deref()
     }

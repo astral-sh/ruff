@@ -19,6 +19,10 @@ pub(crate) struct Client {
 }
 
 impl Client {
+    pub(crate) fn main_loop_sender(&self) -> &MainLoopSender {
+        &self.main_loop_sender
+    }
+
     pub(crate) fn new(main_loop_sender: MainLoopSender, client_sender: ConnectionSender) -> Self {
         Self {
             main_loop_sender,

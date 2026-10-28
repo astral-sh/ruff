@@ -20,6 +20,7 @@ mod requests;
 mod traits;
 
 use self::traits::{NotificationHandler, RequestHandler};
+pub(super) use diagnostics::refresh_diagnostics;
 
 use super::{Result, schedule::BackgroundSchedule};
 

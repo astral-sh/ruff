@@ -405,6 +405,9 @@ Explicit isort sections take precedence. If uv is unavailable, Ruff warns and us
 classification. In `--watch` mode, Ruff rereads uv metadata whenever a source or configuration
 change triggers a check.
 
+In trusted workspaces, the language server reads uv metadata in the background for each open
+document's project. Diagnostics refresh when the import classification changes.
+
 For a detailed explanation of `src` resolution, see the [contributing guide](contributing.md).
 
 Ruff can also be configured to treat certain modules as (e.g.) always first-party, regardless of

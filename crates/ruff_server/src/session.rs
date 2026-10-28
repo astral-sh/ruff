@@ -14,7 +14,7 @@ use crate::workspace::Workspaces;
 use crate::{PositionEncoding, TextDocument, WorkspaceTrust};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
-pub(crate) use self::index::DocumentQuery;
+pub(crate) use self::index::{DocumentQuery, UvImports};
 pub(crate) use self::options::ClientOptions;
 pub(crate) use self::options::{AllOptions, WorkspaceOptionsMap};
 pub(crate) use client::Client;
@@ -59,6 +59,14 @@ pub(crate) struct DocumentSnapshot {
 }
 
 impl Session {
+    pub(crate) fn update_uv_imports(&mut self, result: UvImports) -> bool {
+        self.index.update_uv_imports(result)
+    }
+
+    pub(crate) fn use_uv(&self) -> bool {
+        self.index.use_uv()
+    }
+
     pub(crate) fn new(
         client_capabilities: &ClientCapabilities,
         position_encoding: PositionEncoding,
@@ -69,7 +77,7 @@ impl Session {
     ) -> crate::Result<Self> {
         Ok(Self {
             position_encoding,
-            index: index::Index::new(workspaces, &global, client)?,
+            index: index::Index::new(workspaces, &global, client, workspace_trust)?,
             global_settings: global,
             workspace_trust,
             resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
@@ -177,8 +185,8 @@ impl Session {
     }
 
     /// Reloads the settings index based on the provided changes.
-    pub(crate) fn reload_settings(&mut self, changes: &[FileEvent], client: &Client) {
-        self.index.reload_settings(changes, client);
+    pub(crate) fn reload_settings(&mut self, changes: &[FileEvent], client: &Client) -> bool {
+        self.index.reload_settings(changes, client)
     }
 
     /// Open a workspace folder at the given `uri`.
