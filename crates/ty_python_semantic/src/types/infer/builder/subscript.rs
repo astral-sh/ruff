@@ -274,7 +274,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         value_ty,
                         class,
                         generic_context,
-                        Some(self.scope().file_scope_id(db)),
                         Type::from,
                     ));
                 }
@@ -286,7 +285,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         value_ty,
                         type_alias,
                         generic_context,
-                        Some(self.scope().file_scope_id(db)),
                         |alias| Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)),
                     ));
                 }
@@ -514,7 +512,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         value_ty: Type<'db>,
         generic_class: StaticClassLiteral<'db>,
         generic_context: GenericContext<'db>,
-        containing_scope: Option<FileScopeId>,
         make_type: impl Fn(ClassType<'db>) -> Type<'db>,
     ) -> Type<'db> {
         let env = self.program_environment();
@@ -555,7 +552,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             subscript,
             value_ty,
             Some(generic_context),
-            containing_scope,
             specialize,
         );
 
@@ -577,7 +573,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         value_ty: Type<'db>,
         generic_type_alias: TypeAliasType<'db>,
         generic_context: GenericContext<'db>,
-        containing_scope: Option<FileScopeId>,
         make_type: impl Fn(TypeAliasType<'db>) -> Type<'db>,
     ) -> Type<'db> {
         let db = self.db();
@@ -605,19 +600,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             subscript,
             value_ty,
             Some(generic_context),
-            containing_scope,
             specialize,
         )
     }
 
-    /// A containing scope resolves supplied arguments in a value expression. Annotation
-    /// callers omit it so their typevars remain unresolved for later specialization.
     pub(super) fn infer_explicit_callable_specialization(
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
         generic_context: Option<GenericContext<'db>>,
-        containing_scope: Option<FileScopeId>,
         specialize: &dyn Fn(&[Option<Type<'db>>]) -> Type<'db>,
     ) -> Type<'db> {
         let previously_allowed_paramspec = self
@@ -628,7 +619,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             subscript,
             value_ty,
             generic_context,
-            containing_scope,
             specialize,
         );
         self.context.inference_flags.set(
@@ -643,7 +633,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
         generic_context: Option<GenericContext<'db>>,
-        containing_scope: Option<FileScopeId>,
         specialize: &dyn Fn(&[Option<Type<'db>>]) -> Type<'db>,
     ) -> Type<'db> {
         enum ExplicitSpecializationError {
@@ -790,7 +779,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .context
                     .inference_flags
                     .replace(InferenceFlags::IN_VALID_UNPACK_CONTEXT, true);
-                let provided_type = self.infer_and_resolve_type_expression(expr, containing_scope);
+                let provided_type = self.infer_type_expression(expr);
                 self.context.inference_flags.set(
                     InferenceFlags::IN_VALID_UNPACK_CONTEXT,
                     previously_in_valid_unpack_context,
@@ -904,8 +893,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .context
                         .inference_flags
                         .replace(InferenceFlags::IN_VALID_UNPACK_CONTEXT, true);
-                    let provided_type = self
-                        .infer_and_resolve_type_expression(type_argument.node, containing_scope);
+                    let provided_type = self.infer_type_expression(type_argument.node);
                     self.context.inference_flags.set(
                         InferenceFlags::IN_VALID_UNPACK_CONTEXT,
                         previously_in_valid_unpack_context,
@@ -1033,9 +1021,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 error = Some(ExplicitSpecializationError::InvalidParamSpec);
                                 Type::paramspec_value_callable(db, Parameters::unknown())
                             });
-                        let provided_type = containing_scope.map_or(provided_type, |scope| {
-                            self.resolve_lexical_type_in_scope(provided_type, scope)
-                        });
                         if type_argument.ty.is_none() {
                             inferred_type_arguments[type_argument.source_index] =
                                 Some(provided_type);
@@ -1047,10 +1032,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .context
                                 .inference_flags
                                 .replace(InferenceFlags::IN_VALID_UNPACK_CONTEXT, true);
-                            let provided_type = self.infer_and_resolve_type_expression(
-                                type_argument.node,
-                                containing_scope,
-                            );
+                            let provided_type = self.infer_type_expression(type_argument.node);
                             self.context.inference_flags.set(
                                 InferenceFlags::IN_VALID_UNPACK_CONTEXT,
                                 previously_in_valid_unpack_context,

@@ -7,7 +7,7 @@ use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::Parameter;
-use crate::types::typevar::{TypeVarNonce, TypeVarNonceGenerator};
+use crate::types::typevar::TypeVarNonceGenerator;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext,
     TypeMapping, UnionType,
@@ -121,8 +121,7 @@ impl<'db> ConstructorBinding<'db> {
             return;
         }
 
-        let nonce = nonce_generator.next();
-        let delta = nonce.value();
+        let delta = nonce_generator.next().value();
         let type_mapping = TypeMapping::FreshenBoundTypeVars {
             generic_context,
             delta,
@@ -132,7 +131,7 @@ impl<'db> ConstructorBinding<'db> {
         if fresh_instance_type == instance_type {
             return;
         }
-        self.freshen_class_typevars(db, env, generic_context, nonce, fresh_instance_type);
+        self.freshen_class_typevars(db, env, generic_context, delta, fresh_instance_type);
     }
 
     fn freshen_class_typevars(
@@ -140,10 +139,9 @@ impl<'db> ConstructorBinding<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         generic_context: GenericContext<'db>,
-        nonce: TypeVarNonce,
+        delta: u32,
         fresh_instance_type: Type<'db>,
     ) {
-        let delta = nonce.value();
         let type_mapping = TypeMapping::FreshenBoundTypeVars {
             generic_context,
             delta,
@@ -194,7 +192,7 @@ impl<'db> ConstructorBinding<'db> {
                     db,
                     env,
                     generic_context,
-                    nonce,
+                    delta,
                     fresh_instance_type,
                 );
             }

@@ -562,11 +562,6 @@ impl<'db> OverloadLiteral<'db> {
             Type::Callable(callable) => {
                 Either::Left(callable.signatures(db).overloads.iter().cloned())
             }
-            // A function literal can include earlier overloads. Select this definition's
-            // signature while retaining the type mappings applied to its captured typevars.
-            Type::FunctionLiteral(function) => Either::Right(std::iter::once(
-                function.last_definition_signature(db).clone(),
-            )),
             _ => Either::Right(std::iter::once(self.signature(db))),
         }
     }

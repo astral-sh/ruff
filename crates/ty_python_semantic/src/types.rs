@@ -389,10 +389,6 @@ pub(crate) fn may_exist_at_runtime<'db>(db: &'db dyn Db, definition: Definition<
 ///
 /// Use this to inspect the declared type of a variable or parameter. The type of its annotation
 /// expression is an input to declaration inference, and can differ from the declaration's type.
-/// For example, in `def f[T](value: T): ...`, the annotation expression retains an unresolved `T`
-/// for the generic signature, while the parameter declaration resolves `T` to the function body's
-/// non-inferable lexical occurrence. Read the declaration when comparing its type with a use of
-/// `value` in the body.
 ///
 /// To inspect the value assigned by a definition, use [`binding_type`] instead; that type can be
 /// narrower than the declared type.
@@ -408,7 +404,6 @@ pub(crate) fn inferred_declaration<'db>(
 ///
 /// Supports expressions that are evaluated within a type-params sub-scope.
 ///
-/// An annotation expression's type may contain unresolved typevars for a generic signature.
 /// Use [`inferred_declaration`] to read the declared type of the annotated variable or parameter.
 ///
 /// ## Panics

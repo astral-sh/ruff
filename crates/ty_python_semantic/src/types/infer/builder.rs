@@ -898,7 +898,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.scope
     }
 
-    /// Returns call bindings annotated with the call site's enclosing typevar occurrences.
+    /// Returns call bindings annotated with the call site's enclosing binding contexts.
     ///
     /// Call binding uses this as an optimization hint to avoid freshening generic callable
     /// signatures when the callable's generic context cannot collide with a containing scope.
@@ -1936,7 +1936,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
                 }
-                let declared_type = self.resolve_lexical_type(declared_ty.inner_type());
+                let declared_type = declared_ty.inner_type();
                 if self.validate_assignment_type(node, definition, None, declared_type, inferred_ty)
                 {
                     // TODO We currently can't distinguish here between "no declared type" and
@@ -2051,10 +2051,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .inference_flags
             .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
         self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
-        // Capture the containing scope's typevars, leaving the alias's own parameters open.
-        let definition = self.index.expect_single_definition(type_alias);
-        let containing_scope = definition.file_scope(self.db());
-        self.infer_and_resolve_type_expression(&type_alias.value, Some(containing_scope));
+        self.infer_type_expression(&type_alias.value);
         self.context
             .inference_flags
             .remove(InferenceFlags::IN_TYPE_ALIAS);
@@ -4254,9 +4251,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // in the alias value are bound to the alias definition.
         let previous_context = self.typevar_binding_context.replace(definition);
 
-        let containing_scope = self.scope().file_scope_id(db);
-        let value_ty =
-            self.infer_and_resolve_type_expression(value_arg, Some(containing_scope));
+        let value_ty = self.infer_type_expression(value_arg);
         let mut type_params = FxHashSet::default();
         let mut valid_type_params = true;
         // Infer keyword arguments (e.g. `type_params`) so their types are stored.
@@ -4548,13 +4543,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             }
 
-            // Keep the declaration unresolved for member specialization, but resolve this use
-            // of its annotation in the enclosing function's lexical scope.
-            let declared_ty = self.resolve_lexical_type(annotated.inner_type());
             let value_ty = value.as_ref().map(|value| {
                 self.infer_maybe_standalone_expression(
                     value,
-                    TypeContext::declared(Some(declared_ty)),
+                    TypeContext::declared(Some(annotated.inner_type())),
                 )
             });
 
@@ -4589,6 +4581,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // back to the annotated type. If the value is not assignable to the declared
             // type, report an error and fall back to the annotated type.
             let target_ty = if let Some(value_ty) = value_ty {
+                let declared_ty = annotated.inner_type();
                 if value_ty.is_assignable_to(db, env, declared_ty) {
                     value_ty
                 } else {
@@ -4614,7 +4607,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     declared_ty
                 }
             } else {
-                declared_ty
+                annotated.inner_type()
             };
             self.expressions.insert((&**target).into(), target_ty);
         }
@@ -4629,16 +4622,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Pydantic supports field specifiers in annotations via `Annotated[T, Field(...)]`.
         self.setup_dataclass_field_specifiers();
-        let mut declared = self.infer_annotation_expression_allow_pep_613(
+        let declared = self.infer_annotation_expression_allow_pep_613(
             annotation,
             DeferredExpressionState::from(self.defer_annotations()),
         );
         self.dataclass_field_specifiers.clear();
-
-        let containing_scope = self.scope().file_scope_id(self.db());
-        if self.index.scope(containing_scope).kind() == ScopeKind::Class {
-            declared.inner = self.resolve_lexical_type(declared.inner_type());
-        }
 
         declared
     }
@@ -4928,9 +4916,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // RHS (`list[T] | None`), in order to bind `T` to `OptionalList`.
             let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
 
-            let context_ty = self.resolve_lexical_type(declared.inner_type());
-            let inferred_ty = self
-                .infer_maybe_standalone_expression(value, TypeContext::declared(Some(context_ty)));
+            let inferred_ty = self.infer_maybe_standalone_expression(
+                value,
+                TypeContext::declared(Some(declared.inner_type())),
+            );
             let inferred_ty = if is_pep_613_type_alias && target.is_name_expr() {
                 // Alias type inference emits the diagnostic, but this runtime value is
                 // retained as the alias binding.
@@ -5536,7 +5525,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return_ty
                     };
 
-                    TypeContext::declared(Some(self.resolve_lexical_type(context_ty)))
+                    TypeContext::declared(Some(context_ty))
                 })
                 .unwrap_or_default()
         } else {
@@ -10178,7 +10167,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ReturnCallableTypeVarScope::Public,
         )
         .return_ty;
-        let declared_return_ty = self.resolve_lexical_type(declared_return_ty);
         let return_type_span = enclosing_function.spans(self.db()).return_type;
 
         let Some(generator_type_params) =
@@ -10231,7 +10219,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
         .return_ty;
 
-        let annotated_return_ty = self.resolve_lexical_type(annotated_return_ty);
         let Some(outer_expected) =
             annotated_return_ty.generator_types(db, env, GeneratorTypeMode::IteratorDefaults)
         else {
@@ -13470,7 +13457,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         inferred_ty: Type<'db>,
     ) -> Type<'db> {
         let env = builder.program_environment();
-        let declared_ty = builder.resolve_lexical_type(self.declared_ty.unwrap_or(Type::unknown()));
+        let declared_ty = self.declared_ty.unwrap_or(Type::unknown());
 
         let db = builder.db();
         let file_scope_id = self.binding.file_scope(db);

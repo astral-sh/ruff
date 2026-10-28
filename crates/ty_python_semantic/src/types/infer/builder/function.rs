@@ -30,7 +30,7 @@ use crate::{
             OverloadLiteral, function_body_kind, is_implicit_classmethod, report_revealed_type,
             same_module_uncached_raw_signature,
         },
-        generics::{GenericContext, enclosing_generic_contexts, typing_self},
+        generics::{enclosing_generic_contexts, typing_self},
         infer::{
             InferenceFlags, TypeExpressionFlags, TypeInferenceBuilder,
             builder::{
@@ -47,7 +47,7 @@ use crate::{
         signatures::{ReturnCallableTypeVarScope, function_signature_expression_type},
         tuple::{TupleSpec, TupleSpecBuilder, TupleType},
         typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
-        typevar::{TypeVarNonce, TypeVarSet},
+        typevar::TypeVarSet,
         visitor::non_any_dynamic_content,
     },
 };
@@ -62,7 +62,7 @@ use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
 use ty_python_core::{
     Truthiness,
     definition::{Definition, DefinitionKind},
-    scope::{FileScopeId, NodeWithScopeRef},
+    scope::NodeWithScopeRef,
 };
 
 use ruff_python_ast::{self as ast, find_node::covering_node};
@@ -213,34 +213,6 @@ impl<'db> ExpectedReturnType<'db> {
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
-    pub(super) fn resolve_lexical_type(&self, ty: Type<'db>) -> Type<'db> {
-        self.resolve_lexical_type_in_scope(ty, self.scope().file_scope_id(self.db()))
-    }
-
-    pub(super) fn resolve_lexical_type_in_scope(
-        &self,
-        mut ty: Type<'db>,
-        containing_scope: FileScopeId,
-    ) -> Type<'db> {
-        let db = self.db();
-        let Some((containing_scope, _)) = self
-            .index
-            .ancestor_scopes(containing_scope)
-            .find(|(_, scope)| scope.kind().is_function_like())
-        else {
-            return ty;
-        };
-        let env = self.program_environment();
-        for context in self
-            .index
-            .ancestor_scopes(containing_scope)
-            .filter_map(|(_, scope)| GenericContext::lexical_of_node(db, scope.node(), self.index))
-        {
-            ty = ty.resolve_typevars(db, env, context, TypeVarNonce::NONE);
-        }
-        ty
-    }
-
     pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
         let env = self.program_environment();
         let db = self.db();
@@ -292,12 +264,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ReturnCallableTypeVarScope::Public,
             )
             .return_ty;
-            let declared_ty = self.resolve_lexical_type(declared_ty);
             let expected_return = ExpectedReturnType::from_function(db, enclosing_function);
-            let expected_return = ExpectedReturnType {
-                public: self.resolve_lexical_type(expected_return.public),
-                lexical: self.resolve_lexical_type(expected_return.lexical),
-            };
             let expected_ty = expected_return.public();
 
             let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));
@@ -766,9 +733,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ));
         }
 
-        // Function and method signatures capture any enclosing function body's typevars.
-        // Parameters introduced by the function or an intervening class remain unresolved.
-        let inferred_ty = self.resolve_lexical_type(inferred_ty);
         self.add_declaration_with_binding(
             function.into(),
             definition,
@@ -1168,7 +1132,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let default_expr = default.as_ref();
         if let Some(annotation) = parameter.annotation.as_ref() {
-            let declared_ty = self.resolve_lexical_type(self.file_expression_type(annotation));
+            let declared_ty = self.file_expression_type(annotation);
 
             // P.args and P.kwargs are only valid as annotations on *args and **kwargs,
             // not on regular parameters.
@@ -1234,7 +1198,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let default_ty = self.file_expression_type(default_expr);
                 UnionType::from_two_elements(db, env, Type::unknown(), default_ty)
             } else if let Some(ty) = self.special_first_method_parameter_type(parameter) {
-                self.resolve_lexical_type(ty)
+                ty
             } else {
                 Type::unknown()
             };
@@ -1259,7 +1223,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         if let Some(annotation) = parameter.annotation() {
-            let annotated_type = self.resolve_lexical_type(self.file_expression_type(annotation));
+            let annotated_type = self.file_expression_type(annotation);
             let has_unpacked_annotation = self
                 .file_type_expression_flags(annotation)
                 .contains(TypeExpressionFlags::UNPACK);
@@ -1393,7 +1357,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         if let Some(annotation) = parameter.annotation() {
-            let annotated_type = self.resolve_lexical_type(self.file_expression_type(annotation));
+            let annotated_type = self.file_expression_type(annotation);
             let ty = if let Type::TypeVar(typevar) = annotated_type
                 && typevar.is_paramspec(db)
             {

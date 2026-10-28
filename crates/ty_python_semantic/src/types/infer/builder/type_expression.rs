@@ -30,7 +30,7 @@ use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType};
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_core::scope::{FileScopeId, ScopeKind};
+use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder,
@@ -200,17 +200,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        self.infer_and_resolve_type_expression(expression, None)
-    }
-
-    pub(super) fn infer_and_resolve_type_expression(
-        &mut self,
-        expression: &ast::Expr,
-        containing_scope: Option<FileScopeId>,
-    ) -> Type<'db> {
         let ty = self.with_type_expression_context(|builder| {
-            let ty = builder.infer_type_expression_no_store(expression);
-            containing_scope.map_or(ty, |scope| builder.resolve_lexical_type_in_scope(ty, scope))
+            builder.infer_type_expression_no_store(expression)
         });
         self.store_expression_type(expression, ty);
         ty
@@ -1528,7 +1519,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 subscript,
                 alias,
                 parameters,
-                None,
                 &|arguments| {
                     let specialization = parameters
                         .map(|params| params.specialize_partial(db, arguments.iter().copied()));
@@ -1908,7 +1898,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                         subscript,
                                         value_ty,
                                         Some(generic_context),
-                                        None,
                                         specialize,
                                     )
                                 }
@@ -2018,7 +2007,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             subscript,
             value_ty,
             generic_context,
-            (!in_type_expression).then_some(self.scope().file_scope_id(db)),
             specialize,
         )
     }
@@ -2158,7 +2146,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 value_ty,
                                 type_alias,
                                 generic_context,
-                                None,
                                 Type::TypeAlias,
                             ),
                         None => {
@@ -2323,7 +2310,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             value_ty,
                             static_class,
                             generic_context,
-                            None,
                             |class| Type::instance(db, env, class),
                         ),
                     _ => {
