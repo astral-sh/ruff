@@ -220,6 +220,33 @@ impl InlayHint {
         }
     }
 
+    /// Attach the edits that turn this positional argument into a keyword argument.
+    fn enable_call_argument_edit(&mut self, argument: &Expr) {
+        let needs_parentheses = match argument {
+            // The named expression starts at the name on the left of `:=`. The hint starts
+            // at that same name or at the outermost opening parenthesis if the argument is grouped.
+            Expr::Named(_) => self.position == argument.start(),
+            Expr::Generator(generator) => !generator.parenthesized,
+            _ => false,
+        };
+        let mut prefix = InlayHintTextEdit {
+            range: TextRange::empty(self.position),
+            new_text: self.display().to_string(),
+        };
+        self.text_edits = if needs_parentheses {
+            prefix.new_text.push('(');
+            vec![
+                prefix,
+                InlayHintTextEdit {
+                    range: TextRange::empty(argument.end()),
+                    new_text: ")".to_owned(),
+                },
+            ]
+        } else {
+            vec![prefix]
+        };
+    }
+
     fn return_type<'db>(
         context: InlayHintImportContext<'_, 'db>,
         function: &ruff_python_ast::StmtFunctionDef,
@@ -562,7 +589,7 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
                 self.visit_expr(&call.func);
 
-                let mut last_editable_hint_index: Option<usize> = None;
+                let mut last_editable_hint = None;
 
                 // `argument_names` is keyed by positional-arg index, not source-order index,
                 // so track them separately to stay in sync after keyword args appear mid-call.
@@ -572,17 +599,15 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                         if let Some((name, parameter_label_offset)) =
                             details.argument_names.get(&positional_index)
                             && !arg_matches_name(argument, name)
-                        {
-                            if self.add_call_argument_name(
+                            && self.add_call_argument_name(
                                 argument,
                                 &call.arguments,
                                 name,
                                 parameter_label_offset.map(NavigationTarget::from),
-                            ) {
-                                if !argument.is_starred_expr() {
-                                    last_editable_hint_index = Some(self.hints.len() - 1);
-                                }
-                            }
+                            )
+                            && !argument.is_starred_expr()
+                        {
+                            last_editable_hint = Some((self.hints.len() - 1, argument));
                         }
 
                         positional_index += 1;
@@ -593,12 +618,8 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
                 // For the last positional argument, provide an edit to insert
                 // the inlay hint.
-                if let Some(index) = last_editable_hint_index {
-                    let hint: &mut InlayHint = &mut self.hints[index];
-                    hint.text_edits = vec![InlayHintTextEdit {
-                        range: TextRange::empty(hint.position),
-                        new_text: format!("{}=", hint.label.parts()[0].text()),
-                    }];
+                if let Some((index, argument)) = last_editable_hint {
+                    self.hints[index].enable_call_argument_edit(argument);
                 }
             }
             _ => {
@@ -853,14 +874,31 @@ mod tests {
     };
     use ruff_diagnostics::{Edit, Fix};
     use ruff_python_ast::PySourceType;
-    use ruff_python_parser::parse_unchecked_source;
+    use ruff_python_parser::{parse_module, parse_unchecked_source};
     use ruff_python_trivia::textwrap::dedent;
-    use ruff_text_size::{TextLen, TextSize};
+    use ruff_text_size::TextSize;
 
     use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
     use ty_project::ProjectMetadata;
     use ty_project::metadata::options::{AnalysisOptions, Options};
     use ty_python_semantic::ReturnTypeInference;
+
+    /// For a given Python function definition and a call to that function,
+    /// return the edited Python source code after inlay hints have been applied to the function call.
+    ///
+    /// For example, `apply_inlay_hints("def f(x): ...\n", "f(y := 1)")` returns `"f(x=(y := 1))"`.
+    #[track_caller]
+    fn apply_inlay_hints(definition: &str, call: &str) -> String {
+        let mut source = format!("{definition}{call}");
+        let test = inlay_hint_test(&format!("{definition}<START>{call}<END>"));
+        let hints = test.collect_hints(&InlayHintSettings::default());
+
+        let edits = hints.iter().flat_map(|hint| &hint.text_edits);
+        apply_edits(&mut source, edits);
+
+        parse_module(&source).unwrap();
+        source.strip_prefix(definition).unwrap().to_owned()
+    }
 
     fn inlay_hint_test(source: &str) -> InlayHintTest {
         inlay_hint_test_with_options(source, Options::default())
@@ -1281,9 +1319,8 @@ mod tests {
             self.db.write_file(file_name, content).unwrap();
         }
 
-        /// Returns the inlay hints for the given test case with custom settings.
-        fn inlay_hints_with_settings(&mut self, settings: &InlayHintSettings) -> String {
-            let hints = inlay_hints(
+        fn collect_hints(&self, settings: &InlayHintSettings) -> Vec<InlayHint> {
+            inlay_hints(
                 &self.db,
                 ProgramFile::new(
                     &self.db,
@@ -1292,7 +1329,12 @@ mod tests {
                 ),
                 self.range,
                 settings,
-            );
+            )
+        }
+
+        /// Returns the inlay hints for the given test case with custom settings.
+        fn inlay_hints_with_settings(&mut self, settings: &InlayHintSettings) -> String {
+            let hints = self.collect_hints(settings);
 
             let mut inlay_hint_buf = source_text(&self.db, self.file).as_str().to_string();
             let mut text_edit_buf = inlay_hint_buf.clone();
@@ -1334,13 +1376,7 @@ mod tests {
                 .into_iter()
                 .unique_by(|edit| (edit.range, edit.new_text.clone()))
                 .collect();
-            let mut edit_offset = TextSize::default();
-
-            for edit in all_edits.iter().sorted_by_key(|edit| edit.range.start()) {
-                let updated_range = edit.range + edit_offset;
-                text_edit_buf.replace_range(updated_range.to_std_range(), &edit.new_text);
-                edit_offset += edit.new_text.text_len() - edit.range.len();
-            }
+            apply_edits(&mut text_edit_buf, &all_edits);
 
             let edited = parse_unchecked_source(&text_edit_buf, PySourceType::Python);
             if edited.has_invalid_syntax() && !source_has_errors {
@@ -1407,6 +1443,20 @@ Source with applied edits:
             write!(buf, "{}", diag.display(&self.db, &config)).unwrap();
 
             buf
+        }
+    }
+
+    /// Apply edits from right to left so each replacement leaves the remaining offsets unchanged.
+    fn apply_edits<'a>(
+        source: &mut String,
+        edits: impl IntoIterator<Item = &'a InlayHintTextEdit>,
+    ) {
+        for edit in edits
+            .into_iter()
+            .sorted_by_key(|edit| edit.range.start())
+            .rev()
+        {
+            source.replace_range(edit.range.to_std_range(), &edit.new_text);
         }
     }
 
@@ -3855,6 +3905,25 @@ Source with applied edits:
         4 + foo(x=((2)))
           |
         ");
+    }
+
+    #[test]
+    fn accepting_keyword_argument_hints_produces_valid_python() {
+        const DEFINITION: &str = "def f(x): ...\n";
+
+        fn apply_keyword_hint(call: &str) -> String {
+            apply_inlay_hints(DEFINITION, call)
+        }
+
+        // An assignment expression or a sole generator argument can use the call's parentheses.
+        // Inserting just `x=` would produce `f(x=y := 1)` or `f(x=i for i in [1])`. Both are invalid.
+        // As a keyword value, the expression needs its own pair, which may already be present.
+        assert_snapshot!(apply_keyword_hint("f(y := 1)"), @"f(x=(y := 1))");
+        assert_snapshot!(apply_keyword_hint("f((y := 1))"), @"f(x=(y := 1))");
+        assert_snapshot!(apply_keyword_hint("f(f(y := 1))"), @"f(x=f(x=(y := 1)))");
+
+        assert_snapshot!(apply_keyword_hint("f(i for i in [1])"), @"f(x=(i for i in [1]))");
+        assert_snapshot!(apply_keyword_hint("f((i for i in [1]))"), @"f(x=(i for i in [1]))");
     }
 
     #[test]
@@ -7613,16 +7682,7 @@ Source with applied edits:
         "#,
             ),
         );
-        let hints = inlay_hints(
-            &test.db,
-            ProgramFile::new(
-                &test.db,
-                test.file,
-                test.db.program_environment().program(&test.db),
-            ),
-            test.range,
-            &InlayHintSettings::default(),
-        );
+        let hints = test.collect_hints(&InlayHintSettings::default());
 
         assert_eq!(hints.len(), 2);
         let source = source_text(&test.db, test.file);
@@ -7630,14 +7690,7 @@ Source with applied edits:
             .into_iter()
             .map(|hint| {
                 let mut edited = source.as_str().to_string();
-                for edit in hint
-                    .text_edits
-                    .iter()
-                    .sorted_by_key(|edit| edit.range.start())
-                    .rev()
-                {
-                    edited.replace_range(edit.range.to_std_range(), &edit.new_text);
-                }
+                apply_edits(&mut edited, &hint.text_edits);
                 edited
             })
             .join("\n");
