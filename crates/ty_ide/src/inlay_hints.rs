@@ -9,6 +9,7 @@ use ruff_python_ast::{
     AnyNodeRef, ArgOrKeyword, Arguments, Expr, ExprAttribute, ExprName, ExprUnaryOp, Parameters,
     Stmt, StmtAssign, UnaryOp,
 };
+use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::file_to_module;
 use ty_python_core::ProgramFile;
@@ -604,7 +605,13 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                             // pass `x` twice.
                             let is_last_positional =
                                 positional_index + 1 == call.arguments.args.len();
-                            let mode = if is_last_positional && !argument.is_starred_expr() {
+                            // The edit inserts the normalized parameter name. Python accepts
+                            // `def f(ｉｆ): ...`, but `f(if=1)` is a syntax error.
+                            let mode = if is_last_positional
+                                && !argument.is_starred_expr()
+                                && is_identifier(name)
+                                && call.arguments.find_keyword(name).is_none()
+                            {
                                 ArgumentHintMode::Insertable
                             } else {
                                 ArgumentHintMode::DisplayOnly
@@ -888,14 +895,13 @@ mod tests {
         source::source_text,
     };
     use ruff_diagnostics::{Edit, Fix};
-    use ruff_python_ast::PySourceType;
-    use ruff_python_parser::{parse_module, parse_unchecked_source};
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
 
     use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
-    use ty_project::ProjectMetadata;
     use ty_project::metadata::options::{AnalysisOptions, Options};
+    use ty_project::{ProjectMetadata, SemanticDb as _};
+    use ty_python_core::semantic_index;
     use ty_python_semantic::ReturnTypeInference;
 
     /// For a given Python function definition and a call to that function,
@@ -905,14 +911,44 @@ mod tests {
     #[track_caller]
     fn apply_inlay_hints(definition: &str, call: &str) -> String {
         let mut source = format!("{definition}{call}");
-        let test = inlay_hint_test(&format!("{definition}<START>{call}<END>"));
+        let mut test = inlay_hint_test(&format!("{definition}<START>{call}<END>"));
         let hints = test.collect_hints(&InlayHintSettings::default());
 
         let edits = hints.iter().flat_map(|hint| &hint.text_edits);
         apply_edits(&mut source, edits);
 
-        parse_module(&source).unwrap();
+        test.assert_syntax_error_counts_do_not_increase(&source);
         source.strip_prefix(definition).unwrap().to_owned()
+    }
+
+    /// Assert that the only hint in the selected range has the given label and offers no edits.
+    #[track_caller]
+    fn assert_display_only_hint(source: &str, label: &str) {
+        let [hint] = inlay_hint_test(source)
+            .collect_hints(&InlayHintSettings::default())
+            .try_into()
+            .unwrap();
+        assert_eq!(hint.display().to_string(), label);
+        assert!(hint.text_edits.is_empty());
+    }
+
+    #[track_caller]
+    fn assert_error_count_did_not_increase<T: fmt::Display>(
+        kind: &str,
+        original: &[T],
+        edited: &[T],
+        source: &str,
+    ) {
+        assert!(
+            edited.len() <= original.len(),
+            "Inlay hint edits increased the number of {kind} from {} to {}.
+{}
+Source with applied edits:
+{source}",
+            original.len(),
+            edited.len(),
+            edited.iter().join("\n"),
+        );
     }
 
     fn inlay_hint_test(source: &str) -> InlayHintTest {
@@ -1347,14 +1383,41 @@ mod tests {
             )
         }
 
+        /// Assert that `source`, with the hint edits applied, has no more parse errors and no
+        /// more semantic syntax errors than the original file. Existing errors in incomplete
+        /// code may remain.
+        #[track_caller]
+        fn assert_syntax_error_counts_do_not_increase(&mut self, source: &str) {
+            self.db.write_file("edited.py", source).unwrap();
+            let edited = system_path_to_file(&self.db, "edited.py").unwrap();
+            // Open the copy so ty records semantic syntax errors for it even if the project
+            // discovered its files before `edited.py` existed.
+            self.db.project().open_file(&mut self.db, edited);
+
+            let db = &self.db;
+            let original = db.program_file(self.file);
+            let edited = db.program_file(edited);
+            let parsed = |file: ProgramFile<'_>| parsed_module(db, file.python_file(db)).load(db);
+            assert_error_count_did_not_increase(
+                "parse errors",
+                parsed(original).errors(),
+                parsed(edited).errors(),
+                source,
+            );
+            assert_error_count_did_not_increase(
+                "semantic syntax errors",
+                semantic_index(db, original).semantic_syntax_errors(),
+                semantic_index(db, edited).semantic_syntax_errors(),
+                source,
+            );
+        }
+
         /// Returns the inlay hints for the given test case with custom settings.
         fn inlay_hints_with_settings(&mut self, settings: &InlayHintSettings) -> String {
             let hints = self.collect_hints(settings);
 
             let mut inlay_hint_buf = source_text(&self.db, self.file).as_str().to_string();
             let mut text_edit_buf = inlay_hint_buf.clone();
-            let source_has_errors =
-                parse_unchecked_source(&text_edit_buf, PySourceType::Python).has_invalid_syntax();
 
             let mut tbd_diagnostics = Vec::new();
 
@@ -1393,16 +1456,8 @@ mod tests {
                 .collect();
             apply_edits(&mut text_edit_buf, &all_edits);
 
-            let edited = parse_unchecked_source(&text_edit_buf, PySourceType::Python);
-            if edited.has_invalid_syntax() && !source_has_errors {
-                let syntax_errors = edited.errors().iter().map(|error| &error.error).join("\n");
-
-                panic!(
-                    "Fixed source has a syntax error where the source document does not. This is a bug in one of the generated inlay hint edits:
-{syntax_errors}
-Source with applied edits:
-{text_edit_buf}"
-                );
+            if !all_edits.is_empty() {
+                self.assert_syntax_error_counts_do_not_increase(&text_edit_buf);
             }
             self.db.write_file("main2.py", &inlay_hint_buf).unwrap();
             let inlayed_file =
@@ -4369,22 +4424,45 @@ Source with applied edits:
 
     #[test]
     fn argument_name_hint_before_starred_argument_has_no_edit() {
-        let test = inlay_hint_test(
+        // The unpacked `2` goes into `rest`, so only `1` gets a hint. Inserting `x=` would
+        // produce `f(x=1, *[2])`. Python would raise a `TypeError` at runtime because the
+        // unpacked `2` and the keyword argument `x=1` both supply `x`.
+        assert_display_only_hint(
             "
             def f(x, *rest): ...
             f(1, *[2])
             ",
+            "x=",
         );
-        let [hint] = test
-            .collect_hints(&InlayHintSettings::default())
-            .try_into()
-            .unwrap();
+    }
 
-        // The unpacked `2` goes into `rest`, so only `1` gets a hint. Inserting `x=` would
-        // produce `f(x=1, *[2])`. Python would raise a `TypeError` at runtime because the
-        // unpacked `2` and the keyword argument `x=1` both supply `x`.
-        assert_eq!(hint.display().to_string(), "x=");
-        assert!(hint.text_edits.is_empty());
+    #[test]
+    fn argument_name_hint_for_parameter_that_normalizes_to_a_keyword() {
+        // Python accepts the fullwidth spelling in the definition. Inserting the normalized
+        // hint would produce `f(if=1)`, which is a syntax error.
+        assert_display_only_hint(
+            "
+            def f(ｉｆ): ...
+            f(1)
+            ",
+            "if=",
+        );
+
+        // The soft keyword `match` can be used directly as a keyword argument.
+        assert_snapshot!(apply_inlay_hints("def f(match): ...\n", "f(1)"), @"f(match=1)");
+    }
+
+    #[test]
+    fn argument_name_hint_for_keyword_already_in_call_has_no_edit() {
+        // The original call would raise `TypeError` at runtime. Inserting `x=` would make
+        // it a syntax error instead, because `f(x=1, x=2)` repeats an explicit keyword.
+        assert_display_only_hint(
+            "
+            def f(x): ...
+            f(1, x=2)
+            ",
+            "x=",
+        );
     }
 
     #[test]
@@ -5275,15 +5353,6 @@ Source with applied edits:
           |
         3 | foo(y='hello', [y=]1)
           |                 ^
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-          |
-        2 | def foo(x: int, y: str): pass
-          - foo(y='hello', 1)
-        3 + foo(y='hello', y=1)
-          |
         ");
     }
 
