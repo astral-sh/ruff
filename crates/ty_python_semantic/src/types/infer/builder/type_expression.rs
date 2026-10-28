@@ -282,7 +282,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 (resolved.inner_type(), resolved.provenance().definition())
             }
             _ => (
-                self.infer_expression(expression, TypeContext::default()),
+                self.infer_maybe_standalone_expression(expression, TypeContext::default()),
                 None,
             ),
         }
