@@ -191,3 +191,43 @@ def generic_outer(value: T) -> tuple[T, int]:
     integers((value, "text"))  # error: [invalid-argument-type]
     return integers((value, 1))  # no diagnostic
 ```
+
+## Constructor inference through captured alias parameters
+
+A class-local alias captures its class's type parameter. Constructing another instance inside the
+class infers a new specialization without constraining the enclosing instance's type parameter.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    Items = TypeAliasType("Items", list[T])
+
+    def __init__(self, value: Items) -> None: ...
+    def copy(self, value: list[T]) -> None:
+        # revealed: Box[T@Box]
+        reveal_type(Box(value))
+        # revealed: Box[int]
+        reveal_type(Box([1]))
+```
+
+The alias's own parameters retain their specialization while its captured class parameter is
+inferred for the new instance.
+
+```py
+U = TypeVar("U")
+
+class PairBox(Generic[T]):
+    Pair = TypeAliasType("Pair", tuple[T, U], type_params=(U,))
+
+    def __init__(self, value: Pair[int]) -> None: ...
+    def copy(self, value: T) -> None:
+        # revealed: PairBox[T@PairBox]
+        reveal_type(PairBox((value, 1)))
+        # revealed: PairBox[str]
+        reveal_type(PairBox(("text", 1)))
+        PairBox((value, "wrong"))  # error: [invalid-argument-type]
+```
