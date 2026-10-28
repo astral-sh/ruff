@@ -73,7 +73,7 @@ use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, V
 use crate::types::type_alias::walk_type_alias_arguments;
 use crate::types::typed_dict::TypedDictOpenness;
 use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarKind, TypeVarNonceGenerator, TypeVarScope, TypeVarSet,
+    BoundTypeVarIdentity, TypeVarKind, TypeVarNonce, TypeVarNonceGenerator, TypeVarSet,
 };
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
@@ -914,15 +914,13 @@ impl<'db> Bindings<'db> {
         }
     }
 
-    /// Resolves each call candidate in an inferable frame under the call site's lexical scope.
+    /// Resolves each call candidate's generic parameters to distinct inference occurrences.
     pub(crate) fn resolve_typevars(
         mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        parent: Option<TypeVarScope<'db>>,
     ) -> Self {
-        let constraints = ConstraintSetBuilder::new();
-        self.resolve_typevars_in_place(db, env, &constraints, parent);
+        self.resolve_typevars_in_place(db, env, &TypeVarNonceGenerator::default());
         self
     }
 
@@ -930,23 +928,28 @@ impl<'db> Bindings<'db> {
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
-        parent: Option<TypeVarScope<'db>>,
+        nonces: &TypeVarNonceGenerator<'db>,
     ) {
         for item in self.iter_callable_items_mut() {
             for overload in &mut item.callable_mut().overloads {
-                let Some(context) = overload.signature.generic_context else {
+                let Some(generic_context) = overload.signature.generic_context else {
                     continue;
                 };
-                let scope = constraints.inferable_scope(db, context, parent);
-                overload.receiver_scope = Some(scope);
-                overload.signature = overload.signature.resolve_typevars(db, env, scope);
+                let nonce = nonces.next();
+                overload.receiver_typevars = Some((generic_context, nonce));
+                overload.signature =
+                    overload
+                        .signature
+                        .freshen_bound_typevars(db, env, nonce.value());
                 if let Some(context) = overload.constructor_context {
                     overload.set_constructor_context(
                         db,
-                        context.with_instance_type(
-                            context.instance_type().resolve_typevars(db, env, scope),
-                        ),
+                        context.with_instance_type(context.instance_type().resolve_typevars(
+                            db,
+                            env,
+                            generic_context,
+                            nonce,
+                        )),
                     );
                 }
                 overload.return_ty = overload.initial_return_type(db);
@@ -955,7 +958,7 @@ impl<'db> Bindings<'db> {
                 .as_constructor_mut()
                 .and_then(ConstructorBinding::downstream_constructor_mut)
             {
-                downstream.resolve_typevars_in_place(db, env, constraints, parent);
+                downstream.resolve_typevars_in_place(db, env, nonces);
             }
         }
     }
@@ -4396,7 +4399,7 @@ impl<'db> CallableBinding<'db> {
             .map(|&index| {
                 let overload = &self.overloads[index];
                 let arguments =
-                    arguments.resolve_receiver_typevars(db, env, overload.receiver_scope);
+                    arguments.resolve_receiver_typevars(db, env, overload.receiver_typevars);
                 let slots = overload
                     .argument_matches
                     .iter()
@@ -8321,8 +8324,8 @@ pub(crate) struct Binding<'db> {
     /// Constructor metadata used to normalize the declared return type before type checking.
     constructor_context: Option<ConstructorContext<'db>>,
 
-    /// The call's scope for resolving the synthetic receiver alongside this signature.
-    receiver_scope: Option<TypeVarScope<'db>>,
+    /// Resolves the synthetic receiver to the same occurrences as this signature.
+    receiver_typevars: Option<(GenericContext<'db>, TypeVarNonce)>,
 
     /// The inferable typevars in this signature.
     inferable_typevars: TypeVarSet<'db>,
@@ -8415,7 +8418,7 @@ impl<'db> Binding<'db> {
             signature_type,
             return_ty,
             constructor_context: None,
-            receiver_scope: None,
+            receiver_typevars: None,
             inferable_typevars: TypeVarSet::None,
             inference: None,
             is_partial_application: false,
@@ -8914,7 +8917,7 @@ impl<'db> Binding<'db> {
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) {
-        let arguments = arguments.resolve_receiver_typevars(db, env, self.receiver_scope);
+        let arguments = arguments.resolve_receiver_typevars(db, env, self.receiver_typevars);
         let arguments = arguments.as_ref();
         let parameters = self.signature.parameters();
         let mut matcher = ArgumentMatcher::new(arguments, parameters, &mut self.errors);
@@ -8951,7 +8954,7 @@ impl<'db> Binding<'db> {
         arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
     ) {
-        let arguments = arguments.resolve_receiver_typevars(db, env, self.receiver_scope);
+        let arguments = arguments.resolve_receiver_typevars(db, env, self.receiver_typevars);
         let arguments = arguments.as_ref();
 
         // Each overload is an independent inference problem. Two candidates can contain

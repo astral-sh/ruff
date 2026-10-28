@@ -12,12 +12,13 @@ use rustc_hash::FxHashMap;
 use crate::FxIndexMap;
 use crate::ProgramEnvironment;
 use crate::subscript::PyIndex;
+use crate::types::generics::GenericContext;
 use crate::types::tuple::{TupleLength, TupleSpec};
 use crate::types::type_expansion::expand_elements;
 use crate::types::typed_dict::{
     TypedDictOpenness, UnpackedTypedDictKey, extract_unpacked_typed_dict_from_value_type,
 };
-use crate::types::typevar::TypeVarScope;
+use crate::types::typevar::TypeVarNonce;
 use crate::types::{Parameters, Type, TypeContext, UnionType, expand_type};
 
 /// Maximum total number of expanded argument type combinations across all arguments
@@ -751,26 +752,27 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         }
     }
 
-    /// Resolve the synthetic receiver in an overload's scope, preserving explicit arguments
+    /// Resolve the synthetic receiver to an overload's occurrences, preserving explicit arguments
     /// in their enclosing lexical scopes and any argument expansion already performed.
     pub(crate) fn resolve_receiver_typevars(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        scope: Option<TypeVarScope<'db>>,
+        binding: Option<(GenericContext<'db>, TypeVarNonce)>,
     ) -> Cow<'_, Self> {
-        let (Some(scope), Some(CallArgument::Synthetic(types))) = (scope, self.items.first())
+        let (Some((context, nonce)), Some(CallArgument::Synthetic(types))) =
+            (binding, self.items.first())
         else {
             return Cow::Borrowed(self);
         };
         let resolved = CallArgumentTypes {
             fallback_type: types
                 .fallback_type
-                .map(|ty| ty.resolve_typevars(db, env, scope)),
+                .map(|ty| ty.resolve_typevars(db, env, context, nonce)),
             types: types
                 .types
                 .iter()
-                .map(|(context, ty)| (*context, ty.resolve_typevars(db, env, scope)))
+                .map(|(tcx, ty)| (*tcx, ty.resolve_typevars(db, env, context, nonce)))
                 .collect(),
         };
         if resolved == *types {
