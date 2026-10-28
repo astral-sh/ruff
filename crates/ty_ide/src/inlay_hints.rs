@@ -883,21 +883,21 @@ mod tests {
     use ty_project::metadata::options::{AnalysisOptions, Options};
     use ty_python_semantic::ReturnTypeInference;
 
-    /// Return the call after applying the `x=` hint to `f(...)` and checking that it parses.
+    /// For a given Python function definition and a call to that function,
+    /// return the edited Python source code after inlay hints have been applied to the function call.
+    ///
+    /// For example, `apply_inlay_hints("def f(x): ...\n", "f(y := 1)")` returns `"f(x=(y := 1))"`.
     #[track_caller]
-    fn apply_keyword_hint(call: &str) -> String {
-        const DEFINITION: &str = "def f(x): ...\n";
-        let mut source = format!("{DEFINITION}{call}");
-        let test = inlay_hint_test(&source);
-        let [hint] = test
-            .collect_hints(&InlayHintSettings::default())
-            .try_into()
-            .unwrap();
-        assert_eq!(hint.display().to_string(), "x=");
+    fn apply_inlay_hints(definition: &str, call: &str) -> String {
+        let mut source = format!("{definition}{call}");
+        let test = inlay_hint_test(&format!("{definition}<START>{call}<END>"));
+        let hints = test.collect_hints(&InlayHintSettings::default());
 
-        apply_edits(&mut source, &hint.text_edits);
+        let edits = hints.iter().flat_map(|hint| &hint.text_edits);
+        apply_edits(&mut source, edits);
+
         parse_module(&source).unwrap();
-        source.strip_prefix(DEFINITION).unwrap().to_owned()
+        source.strip_prefix(definition).unwrap().to_owned()
     }
 
     fn inlay_hint_test(source: &str) -> InlayHintTest {
@@ -1447,8 +1447,15 @@ Source with applied edits:
     }
 
     /// Apply edits from right to left so each replacement leaves the remaining offsets unchanged.
-    fn apply_edits(source: &mut String, edits: &[InlayHintTextEdit]) {
-        for edit in edits.iter().sorted_by_key(|edit| edit.range.start()).rev() {
+    fn apply_edits<'a>(
+        source: &mut String,
+        edits: impl IntoIterator<Item = &'a InlayHintTextEdit>,
+    ) {
+        for edit in edits
+            .into_iter()
+            .sorted_by_key(|edit| edit.range.start())
+            .rev()
+        {
             source.replace_range(edit.range.to_std_range(), &edit.new_text);
         }
     }
@@ -3902,11 +3909,18 @@ Source with applied edits:
 
     #[test]
     fn accepting_keyword_argument_hints_produces_valid_python() {
+        const DEFINITION: &str = "def f(x): ...\n";
+
+        fn apply_keyword_hint(call: &str) -> String {
+            apply_inlay_hints(DEFINITION, call)
+        }
+
         // An assignment expression or a sole generator argument can use the call's parentheses.
         // Inserting just `x=` would produce `f(x=y := 1)` or `f(x=i for i in [1])`. Both are invalid.
         // As a keyword value, the expression needs its own pair, which may already be present.
         assert_snapshot!(apply_keyword_hint("f(y := 1)"), @"f(x=(y := 1))");
         assert_snapshot!(apply_keyword_hint("f((y := 1))"), @"f(x=(y := 1))");
+        assert_snapshot!(apply_keyword_hint("f(f(y := 1))"), @"f(x=f(x=(y := 1)))");
 
         assert_snapshot!(apply_keyword_hint("f(i for i in [1])"), @"f(x=(i for i in [1]))");
         assert_snapshot!(apply_keyword_hint("f((i for i in [1]))"), @"f(x=(i for i in [1]))");
