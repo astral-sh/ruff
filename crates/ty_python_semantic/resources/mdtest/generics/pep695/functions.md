@@ -3962,13 +3962,11 @@ box.accept(1, other="invalid")
 The argument to `list.extend` must be valid for every possible element type of the receiver,
 including when a type alias refers to that element type.
 
-TODO: Report only the error on `[1]`. Inferring `list[int]` from that argument also produces a
-redundant error on the receiver.
-
 ```py
 def extend[T: (int, str)](values: list[T], other: list[T]) -> None:
     values.extend(other)
 
+    # TODO: Report only the error on `[1]`. The receiver error is redundant.
     # error: 5 [invalid-argument-type] "Expected `list[int]`, found `list[T@extend]`"
     # error: 19 [invalid-argument-type] "Expected `Iterable[T@extend]`, found `list[int]`"
     values.extend([1])
