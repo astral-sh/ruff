@@ -7,7 +7,7 @@ use crate::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         DivergentFlags, GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type,
         TypeContext, TypeMapping, TypeRecursionContext, TypingModule, UnionType, VarianceTerm,
-        cyclic::CycleDetector,
+        cyclic::{ActiveRecursionDetector, CycleDetector, TypeIdentity},
         definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar, walk_specialization_types},
@@ -455,6 +455,25 @@ pub(super) fn walk_type_alias_arguments<'db, V: visitor::TypeVisitor<'db> + ?Siz
     if let Some(specialization) = type_alias.specialization(db) {
         walk_specialization_types(db, specialization, visitor);
     }
+}
+
+/// Visit an alias's value, falling back to its arguments when the recursion guard is hit.
+/// A skipped value is reported through [`visitor::TypeVisitor::notify_skipped_lazy_type_attributes`].
+/// The fallback can visit arguments erased from the value, so callers must allow false positives.
+pub(super) fn walk_type_alias_with_recursion_guard<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    alias: TypeAliasType<'db>,
+    visitor: &V,
+    recursion_guard: &ActiveRecursionDetector<TypeIdentity<'db>>,
+) {
+    recursion_guard.visit(
+        &Type::TypeAlias(alias).to_type_identity(db),
+        || {
+            visitor.notify_skipped_lazy_type_attributes();
+            walk_type_alias_arguments(db, alias, visitor);
+        },
+        || visitor.visit_type(db, alias.value_type(db)),
+    );
 }
 
 pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
