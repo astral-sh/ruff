@@ -2,9 +2,12 @@ use std::{fmt, vec};
 use ty_python_semantic::ProgramEnvironment;
 
 use crate::{Db, FxIndexMap, HasNavigationTargets, NavigationTarget};
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_python_ast::token::{Tokens, parenthesized_range};
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
-use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Parameters, Stmt, UnaryOp};
+use ruff_python_ast::{
+    AnyNodeRef, ArgOrKeyword, Arguments, Expr, ExprUnaryOp, Parameters, Stmt, UnaryOp,
+};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::file_to_module;
 use ty_python_core::ProgramFile;
@@ -334,9 +337,7 @@ pub fn inlay_hints(
     settings: &InlayHintSettings,
 ) -> Vec<InlayHint> {
     let ast = parsed_module(db, file.python_file(db)).load(db);
-    let importer = Importer::new(db, file, &ast);
-
-    let mut visitor = InlayHintVisitor::new(db, file, importer, range, settings);
+    let mut visitor = InlayHintVisitor::new(db, file, &ast, range, settings);
 
     visitor.visit_body(ast.suite());
 
@@ -396,6 +397,7 @@ struct InlayHintVisitor<'a, 'db> {
     db: &'db dyn Db,
     model: SemanticModel<'db>,
     importer: Importer<'db>,
+    tokens: &'db Tokens,
     hints: Vec<InlayHint>,
     pending_return_hint: Option<(&'a Parameters, InlayHint)>,
     assignment_rhs: Option<&'a Expr>,
@@ -408,14 +410,15 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
     fn new(
         db: &'db dyn Db,
         file: ProgramFile<'db>,
-        importer: Importer<'db>,
+        ast: &'db ParsedModuleRef,
         range: TextRange,
         settings: &'a InlayHintSettings,
     ) -> Self {
         Self {
             db,
             model: SemanticModel::new(db, file),
-            importer,
+            importer: Importer::new(db, file, ast),
+            tokens: ast.tokens(),
             hints: Vec::new(),
             pending_return_hint: None,
             assignment_rhs: None,
@@ -447,7 +450,8 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
 
     fn add_call_argument_name(
         &mut self,
-        position: TextSize,
+        argument: &Expr,
+        arguments: &Arguments,
         name: &str,
         navigation_target: Option<NavigationTarget>,
     ) -> bool {
@@ -459,7 +463,9 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             return false;
         }
 
-        let inlay_hint = InlayHint::call_argument_name(position, name, navigation_target);
+        let range = parenthesized_range(argument.into(), arguments.into(), self.tokens)
+            .unwrap_or(argument.range());
+        let inlay_hint = InlayHint::call_argument_name(range.start(), name, navigation_target);
 
         self.hints.push(inlay_hint);
         true
@@ -582,7 +588,8 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                             && !arg_matches_name(argument, name)
                         {
                             if self.add_call_argument_name(
-                                arg_or_keyword.range().start(),
+                                argument,
+                                &call.arguments,
                                 name,
                                 parameter_label_offset.map(NavigationTarget::from),
                             ) {
@@ -3814,16 +3821,19 @@ Source with applied edits:
 
     #[test]
     fn test_function_call_with_positional_or_keyword_parameter() {
+        // Both the hint and its edit go before the argument's outermost parentheses.
         let mut test = inlay_hint_test(
             "
             def foo(x: int): pass
-            foo(1)",
+            foo(1)
+            foo(((2)))",
         );
 
         assert_snapshot!(test.inlay_hints(), @"
 
         def foo(x: int): pass
         foo([x=]1)
+        foo([x=]((2)))
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:2:9
@@ -3836,13 +3846,26 @@ Source with applied edits:
         3 | foo([x=]1)
           |      ^
 
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def foo(x: int): pass
+          |         ^
+        info: Source
+         --> main2.py:4:6
+          |
+        4 | foo([x=]((2)))
+          |      ^
+
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
           |
         2 | def foo(x: int): pass
           - foo(1)
+          - foo(((2)))
         3 + foo(x=1)
+        4 + foo(x=((2)))
           |
         ");
     }
