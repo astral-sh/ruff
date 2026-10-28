@@ -72,7 +72,10 @@ pub(super) fn legacy_type_alias_definition<'db>(
         DefinitionKind::Assignment(assignment) if assignment.unpack().is_none() => {
             module = parsed_module(db, definition.python_file(db)).load(db);
             let value = assignment.value(&module);
-            if value.is_string_literal_expr() {
+            // The parser represents a missing right-hand side as an invalid name.
+            if value.is_string_literal_expr()
+                || value.as_name_expr().is_some_and(ast::ExprName::is_invalid)
+            {
                 return None;
             }
             (value, None)
