@@ -520,8 +520,10 @@ to determine a value:
    and attempt to infer the Python version of that environment
 3. Fall back to the default value (see below)
 
-Scripts with inline metadata use their `requires-python` field instead of
-`project.requires-python`. They do not inherit the Python version of the enclosing project.
+A script with inline metadata uses its own `requires-python` in preference to the
+enclosing project's Python version. An explicit `[tool.ty.environment]` Python version
+in the script takes precedence over its `requires-python`. A script that specifies
+neither `requires-python` nor a `[tool.ty]` table inherits the project's version setting.
 
 For some language features, ty can also understand conditionals based on comparisons
 with `sys.version_info`. These are commonly found in typeshed, for example,
@@ -563,8 +565,10 @@ if they exist and are not packages (i.e. they do not contain `__init__.py` or `_
 * `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
 * `./python`
 
-Scripts with inline metadata have no first-party roots by default because they are
-single-file programs. Set `root = ["."]` to allow importing local modules.
+A script with inline metadata has its own roots, even when the enclosing project configures
+`root`. By default, its only root is the directory containing the script, so it can import
+sibling modules. Set `root = []` in the script's `[tool.ty.environment]` table to disable
+first-party roots.
 
 **Default value**: `null`
 

@@ -27,9 +27,10 @@ pub(crate) struct Script<'db> {
     #[returns(copy)]
     pub(crate) file: File,
 
+    /// File settings from an inline `[tool.ty]`. Otherwise, project file overrides apply.
     #[tracked]
-    #[returns(ref)]
-    pub(crate) settings: Settings,
+    #[returns(as_deref)]
+    pub(crate) inline_settings: Option<Box<Settings>>,
 
     #[tracked]
     #[returns(copy)]
@@ -115,14 +116,21 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
         diagnostics.report_invalid(diagnostic);
     }
 
-    let configuration_root = file
+    let project_metadata = db.project().metadata(db);
+    let has_inline_settings =
+        project_metadata.config_file_override().is_none() && metadata.ty().is_some();
+    let directory = file
         .path(db)
         .as_system_path()
-        .and_then(|path| path.parent())
-        .unwrap_or_else(|| db.system().current_directory());
-    let context = OptionsContext::Script(configuration_root);
-
-    let project_metadata = db.project().metadata(db);
+        .and_then(|path| path.parent());
+    let context = OptionsContext::Script {
+        directory,
+        configuration_root: if has_inline_settings {
+            directory.unwrap_or_else(|| db.system().current_directory())
+        } else {
+            project_metadata.root()
+        },
+    };
 
     let options = resolve_script_options(
         project_metadata,
@@ -131,7 +139,9 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
         file,
         &mut diagnostics,
     );
-    let settings = resolve_script_settings(db, &options, context, &mut diagnostics);
+    let settings = has_inline_settings
+        .then(|| resolve_script_settings(db, &options, context, &mut diagnostics))
+        .map(Box::new);
     let program_settings = resolve_script_program_settings(
         db,
         &options,
@@ -220,12 +230,24 @@ fn resolve_script_options(
     file: File,
     diagnostics: &mut ScriptConfigurationDiagnostics,
 ) -> Options {
-    // When using `--config-file <FILE>`, use the settings from `<FILE>`
-    let inline = if project_metadata.config_file_override().is_some() {
+    // When using `--config-file <FILE>`, use the settings from `<FILE>`.
+    let config = if project_metadata.config_file_override().is_some() {
         project_metadata.options().clone()
     } else {
-        // Otherwise use the script's settings.
-        metadata.to_options(file, diagnostics)
+        let mut config = metadata.to_options(file, diagnostics);
+        if metadata.ty().is_none()
+            && let Some(environment) = &project_metadata.options().environment
+        {
+            // Each script is a standalone program with its own first-party roots.
+            config
+                .environment
+                .get_or_insert_default()
+                .combine_with(EnvironmentOptions {
+                    root: None,
+                    ..environment.clone()
+                });
+        }
+        config
     };
 
     let uv_options = uv_metadata.map(|metadata| Options {
@@ -240,7 +262,7 @@ fn resolve_script_options(
 
     let mut options = Options::default();
     // Merge the options with CLI, LSP, user configuration, and fallback options
-    for layer in project_metadata.options_in_precedence_order(&inline, uv_options.as_ref()) {
+    for layer in project_metadata.options_in_precedence_order(&config, uv_options.as_ref()) {
         options.combine_with(layer.clone());
     }
 
@@ -249,13 +271,6 @@ fn resolve_script_options(
         options.environment.get_or_insert_default().python =
             Some(RelativePathBuf::new(environment, ValueSource::UvMetadata));
     }
-
-    // Unlike Project's, default to `[]` for scripts (unless explicitly specified).
-    options
-        .environment
-        .get_or_insert_default()
-        .root
-        .get_or_insert_default();
 
     options
 }
@@ -478,6 +493,7 @@ mod tests {
             # /// script
             # [tool.ty.environment]
             # python-version = "3.12"
+            # root = [".."]
             # ///
             "#,
         )?;

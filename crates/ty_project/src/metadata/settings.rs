@@ -131,8 +131,9 @@ impl Override {
 /// Resolves the settings for a given file.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
-    if let Some(script) = Script::for_file(db, file) {
-        let settings = script.settings(db);
+    if let Some(script) = Script::for_file(db, file)
+        && let Some(settings) = script.inline_settings(db)
+    {
         return FileSettings::File(Arc::new(OverrideSettings {
             rules: settings.rules().clone(),
             analysis: settings.analysis().clone(),
