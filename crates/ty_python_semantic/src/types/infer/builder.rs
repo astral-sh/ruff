@@ -4255,22 +4255,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut type_params = FxHashSet::default();
         let mut valid_type_params = true;
         // Infer keyword arguments (e.g. `type_params`) so their types are stored.
-        for keyword in &arguments.keywords {
-            if std::ptr::eq(&keyword.value, name_arg) || std::ptr::eq(&keyword.value, value_arg) {
+        for ast::Keyword { arg, value, .. } in &arguments.keywords {
+            if std::ptr::eq(value, name_arg) || std::ptr::eq(value, value_arg) {
                 continue;
             }
-            self.infer_expression(&keyword.value, TypeContext::default());
+            self.infer_expression(value, TypeContext::default());
 
-            if keyword.arg.as_deref() != Some("type_params") {
+            if arg.as_deref() != Some("type_params") {
                 continue;
             }
 
-            let Some(tuple) = keyword.value.as_tuple_expr() else {
+            let Some(tuple) = value.as_tuple_expr() else {
                 valid_type_params = false;
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&INVALID_TYPE_ALIAS_TYPE, &keyword.value)
-                {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_ALIAS_TYPE, value) {
                     builder.into_diagnostic(
                         "The `type_params` argument to `TypeAliasType` must be a tuple literal",
                     );
