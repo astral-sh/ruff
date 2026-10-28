@@ -64,8 +64,9 @@ class Example:
 
 ## Decorated methods
 
-Decorators can change how a method is called, so methods with any decorators are ignored.
-This includes identity decorators that leave the function unchanged.
+Decorators can change how a method is called. Pylint only exempts decorated methods
+that it recognises as static methods. This rule ignores all decorated methods,
+whether or not the decorator returns a static method.
 
 ```py
 def decorate(function):
