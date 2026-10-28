@@ -118,7 +118,9 @@ use crate::types::special_form::TypeQualifier;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType, VariableSegment};
-use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
+use crate::types::type_alias::{
+    ManualPEP695TypeAliasType, PEP695TypeAliasType, type_alias_arguments,
+};
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
@@ -3975,12 +3977,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_typealiastype_assignment_deferred(definition, target, arguments);
                 if !arguments.keywords.is_empty() {
                     let mut call_arguments = self.prepare_call_arguments(arguments);
-                    // The positional arguments and `type_params` have their own validation rules;
-                    // leaving their types unset excludes them from ordinary call type checks.
+                    // Leave the types of `name`, `value`, and `type_params` unset because
+                    // these parameters have their own validation rules.
                     for (index, argument) in arguments.iter_source_order().enumerate() {
                         if let ArgOrKeyword::Keyword(keyword) = argument
                             && let Some(name) = keyword.arg.as_deref()
-                            && name != "type_params"
+                            && !matches!(name, "name" | "value" | "type_params")
                         {
                             call_arguments.insert_type(
                                 index,
@@ -4168,24 +4170,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        if arguments.args.len() != 2 {
+        if arguments.args.len() > 2 {
             return error(
                 &self.context,
                 format_args!(
-                    "Wrong number of arguments in `TypeAliasType` creation: expected 2, found {}",
+                    "Expected at most 2 positional arguments to `TypeAliasType`, got {}",
                     arguments.args.len()
                 ),
                 call_expr,
             );
         }
 
-        let name_param_ty = self.infer_expression(&arguments.args[0], TypeContext::default());
+        let Some((name_arg, _)) = type_alias_arguments(arguments) else {
+            return error(
+                &self.context,
+                "`TypeAliasType` requires both a `name` and a `value` argument",
+                call_expr,
+            );
+        };
+
+        let name_param_ty = self.infer_expression(name_arg, TypeContext::default());
 
         let Some(name) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
             return error(
                 &self.context,
-                "The first argument to `TypeAliasType` must be a string literal",
-                &arguments.args[0],
+                "The `name` argument to `TypeAliasType` must be a string literal",
+                name_arg,
             );
         };
 
@@ -4203,7 +4213,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if name != target_name {
             report_mismatched_type_name(
                 &self.context,
-                &arguments.args[0],
+                name_arg,
                 "TypeAliasType",
                 target_name,
                 Some(name),
@@ -4234,27 +4244,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         arguments: &ast::Arguments,
     ) {
         let db = self.db();
+        let Some((name_arg, value_arg)) = type_alias_arguments(arguments) else {
+            return;
+        };
         // Match the binding context used by eager assignment inference so legacy type variables
         // in the alias value are bound to the alias definition.
         let previous_context = self.typevar_binding_context.replace(definition);
 
-        let value_ty = self.infer_type_expression(&arguments.args[1]);
+        let value_ty = self.infer_type_expression(value_arg);
         let mut type_params = FxHashSet::default();
         let mut valid_type_params = true;
         // Infer keyword arguments (e.g. `type_params`) so their types are stored.
-        for keyword in &arguments.keywords {
-            self.infer_expression(&keyword.value, TypeContext::default());
+        for ast::Keyword { arg, value, .. } in &arguments.keywords {
+            if std::ptr::eq(value, name_arg) || std::ptr::eq(value, value_arg) {
+                continue;
+            }
+            self.infer_expression(value, TypeContext::default());
 
-            if keyword.arg.as_deref() != Some("type_params") {
+            if arg.as_deref() != Some("type_params") {
                 continue;
             }
 
-            let Some(tuple) = keyword.value.as_tuple_expr() else {
+            let Some(tuple) = value.as_tuple_expr() else {
                 valid_type_params = false;
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&INVALID_TYPE_ALIAS_TYPE, &keyword.value)
-                {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_ALIAS_TYPE, value) {
                     builder.into_diagnostic(
                         "The `type_params` argument to `TypeAliasType` must be a tuple literal",
                     );
@@ -4382,7 +4395,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if !type_params.contains(&typevar.identity(self.db()))
                     && let Some(builder) = self
                         .context
-                        .report_lint(&INVALID_TYPE_ALIAS_TYPE, &arguments.args[1])
+                        .report_lint(&INVALID_TYPE_ALIAS_TYPE, value_arg)
                 {
                     builder.into_diagnostic(format_args!(
                         "Type parameter `{}` used in the alias value \
@@ -4395,7 +4408,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.typevar_binding_context = previous_context;
         if let Some(name) = target.as_name_expr() {
-            self.check_type_alias_cycle(&name.id, &arguments.args[1]);
+            self.check_type_alias_cycle(&name.id, value_arg);
         }
     }
 

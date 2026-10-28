@@ -774,15 +774,32 @@ def variadic_outer[*Ts]() -> None:
     VariadicAlias = TypeAliasType("VariadicAlias", tuple[*Ts], type_params=(Ts,))
 ```
 
-### Generic alias from `typing`
+### Aliases from `typing`
 
 ```toml
 [environment]
 python-version = "3.12"
 ```
 
+The standard-library constructor accepts both `name` and `value` by keyword. A quoted `value` is a
+type expression.
+
 ```py
-from typing import TypeAliasType, TypeVar
+from typing import TypeAliasType
+
+Count = TypeAliasType("Count", value=int)
+Text = TypeAliasType(value="str", name="Text")
+
+def check_keywords(count: Count, text: Text) -> None:
+    reveal_type(count)  # revealed: int
+    reveal_type(text)  # revealed: str
+    count = text  # error: [invalid-assignment]
+```
+
+A generic alias declares its type variables with `type_params`.
+
+```py
+from typing import TypeVar
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -864,7 +881,7 @@ from typing_extensions import TypeAliasType
 def get_name() -> str:
     return "IntOrStr"
 
-# error: [invalid-type-alias-type] "The first argument to `TypeAliasType` must be a string literal"
+# error: [invalid-type-alias-type] "The `name` argument to `TypeAliasType` must be a string literal"
 IntOrStr = TypeAliasType(get_name(), int | str)
 ```
 
@@ -879,19 +896,27 @@ IntOrStr = TypeAliasType("WrongName", Union[int, str])
 reveal_type(IntOrStr)  # revealed: TypeAliasType
 ```
 
-#### Invalid keyword arguments
+#### Invalid constructor arguments
 
 ```py
 from typing_extensions import TypeAliasType
 
+# error: [invalid-type-alias-type] "`TypeAliasType` requires both a `name` and a `value` argument"
+Missing = TypeAliasType(name="Missing", type_params=())
+
+# error: [invalid-type-alias-type] "Expected at most 2 positional arguments to `TypeAliasType`, got 3"
+Extra = TypeAliasType("Extra", int, ())
+
 Invalid = TypeAliasType("Invalid", int, bogus=True)  # error: [unknown-argument]
-Duplicate = TypeAliasType("Duplicate", int, name="Duplicate")  # error: [parameter-already-assigned]
+Duplicate = TypeAliasType("Duplicate", int, name="Other")  # error: [parameter-already-assigned]
+DuplicateValue = TypeAliasType("DuplicateValue", int, value=str)  # error: [parameter-already-assigned]
 Unpacked = TypeAliasType("Unpacked", int, **{"bogus": True})  # error: [unknown-argument]
 NonStringKey = TypeAliasType("NonStringKey", int, **{1: 42})  # error: [invalid-argument-type]
 Unsupported = TypeAliasType("Unsupported", int, qualname="Unsupported")  # error: [unknown-argument]
 
-def f(value: Invalid) -> None:
+def f(value: Invalid, duplicate: DuplicateValue) -> None:
     reveal_type(value)  # revealed: int
+    reveal_type(duplicate)  # revealed: int
 ```
 
 #### Not a simple variable assignment
