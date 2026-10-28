@@ -582,7 +582,7 @@ python-version = "3.13"
 ```
 
 ```py
-from typing import Callable, Concatenate, Generic, ParamSpec, TypeVarTuple, assert_type
+from typing import Callable, Concatenate, Generic, ParamSpec, TypeVarTuple
 
 Ts = TypeVarTuple("Ts")
 P = ParamSpec("P", default=[bool])
@@ -598,8 +598,8 @@ reveal_type(Callback[...]().fn)  # revealed: (...) -> tuple[()]
 Q = ParamSpec("Q")
 
 def forward(a: Callback[int, Q], b: Callback[str, Concatenate[int, Q]]) -> None:
-    assert_type(a.fn, Callable[Q, tuple[int]])
-    assert_type(b.fn, Callable[Concatenate[int, Q], tuple[str]])
+    reveal_type(a.fn)  # revealed: (**Q@forward) -> tuple[int]
+    reveal_type(b.fn)  # revealed: (int, /, *args: Q@forward.args, **kwargs: Q@forward.kwargs) -> tuple[str]
 ```
 
 ### Inferred specialization from construction
