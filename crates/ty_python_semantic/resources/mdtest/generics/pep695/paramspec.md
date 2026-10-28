@@ -1618,8 +1618,9 @@ def outer[S: str](fixed: S) -> None:
         return value, fixed
 
     forward(make, "text")  # ok
-    # TODO: Reject this call because `T` cannot satisfy both the argument and the return bound.
-    forward(make, 1)  # ok
+    # error: [invalid-argument-type] "does not satisfy upper bound"
+    # error: [invalid-argument-type] "Expected `str`, found `Literal[1]`"
+    forward(make, 1)
 ```
 
 ### `ParamSpec` in prepended positional parameters
