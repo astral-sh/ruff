@@ -223,8 +223,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         containing_scope: FileScopeId,
     ) -> Type<'db> {
         let db = self.db();
-        // Class declarations capture the enclosing function body's typevars, but keep the
-        // class's own parameters unresolved so member specialization can replace them.
         let Some((containing_scope, _)) = self
             .index
             .ancestor_scopes(containing_scope)
@@ -238,7 +236,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .ancestor_scopes(containing_scope)
             .filter_map(|(_, scope)| GenericContext::lexical_of_node(db, scope.node(), self.index))
         {
-            ty = ty.resolve_typevars(db, env, context, TypeVarNonce::NONE.increment());
+            ty = ty.resolve_typevars(db, env, context, TypeVarNonce::NONE);
         }
         ty
     }

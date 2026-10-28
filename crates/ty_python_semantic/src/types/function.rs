@@ -1798,31 +1798,17 @@ impl<'db> FunctionType<'db> {
             return Type::unknown();
         }
 
-        let class_definition = index.class_definition_of_method(scope.file_scope_id(db));
-        let infer_return = || {
-            let mut inferred = infer_complete_scope_types(db, scope).return_type();
-            for context in self
-                .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Lexical)
-                .generic_context
-                .into_iter()
-                .chain(
-                    class_definition
-                        .and_then(|definition| original_class_type(db, definition))
-                        .and_then(|class| class.generic_context(db)),
-                )
-            {
-                inferred = inferred.abstract_typevars(db, &env, context);
-            }
-            inferred
-        };
-        let Some(class_definition) = class_definition else {
+        let Some(class_definition) = index.class_definition_of_method(scope.file_scope_id(db))
+        else {
             // For free functions, we simply use the type inferred from the function body.
-            return infer_return().apply_type_mapping(
-                db,
-                &env,
-                &TypeMapping::GeneralizeLocalTypes(scope),
-                TypeContext::default(),
-            );
+            return infer_complete_scope_types(db, scope)
+                .return_type()
+                .apply_type_mapping(
+                    db,
+                    &env,
+                    &TypeMapping::GeneralizeLocalTypes(scope),
+                    TypeContext::default(),
+                );
         };
         if self
             .literal(db)
@@ -1850,7 +1836,7 @@ impl<'db> FunctionType<'db> {
             return Type::unknown();
         }
 
-        let mut return_type = infer_return();
+        let mut return_type = infer_complete_scope_types(db, scope).return_type();
         if let Some(inherited) = self.inherited_return_annotation(db) {
             return_type = inherited;
         } else if !self.has_known_decorator(db, FunctionDecorators::FINAL)

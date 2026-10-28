@@ -30,7 +30,7 @@ use crate::types::tuple::{
 };
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarIdentity, TypeVarInstance,
-    TypeVarNonce, TypeVarSet,
+    TypeVarSet,
 };
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
@@ -62,24 +62,18 @@ pub(crate) fn enclosing_generic_contexts<'db>(
         .filter_map(|(_, ancestor_scope)| GenericContext::of_node(db, ancestor_scope.node(), index))
 }
 
-/// Returns enclosing binding contexts and the nonces of their lexical typevar occurrences.
-///
-/// Body inference advances each definition's source occurrence once. Call binding must avoid
-/// those identities when freshening a recursive use of the same generic context.
-pub(crate) fn enclosing_binding_contexts<'db>(
-    db: &'db dyn Db,
-    index: &SemanticIndex<'db>,
+/// Returns the binding contexts introduced by the given scope or any enclosing scope.
+pub(crate) fn enclosing_binding_contexts<'a, 'db>(
+    index: &'a SemanticIndex<'db>,
     scope: FileScopeId,
-) -> impl Iterator<Item = (BindingContext<'db>, TypeVarNonce)> {
+) -> impl Iterator<Item = BindingContext<'db>> + 'a {
     index
         .ancestor_scopes(scope)
-        .filter_map(|(_, scope)| GenericContext::lexical_of_node(db, scope.node(), index))
-        .flat_map(|context| context.variables(db))
-        .map(|typevar| {
-            (
-                typevar.binding_context(db),
-                typevar.freshness(db).increment(),
-            )
+        .filter_map(|(_, ancestor_scope)| match ancestor_scope.node() {
+            NodeWithScopeKind::Class(node) => Some(index.expect_single_definition(node).into()),
+            NodeWithScopeKind::Function(node) => Some(index.expect_single_definition(node).into()),
+            NodeWithScopeKind::TypeAlias(node) => Some(index.expect_single_definition(node).into()),
+            _ => None,
         })
 }
 

@@ -630,13 +630,12 @@ pub(crate) struct Bindings<'db> {
     /// Each element may contain multiple `CallableBinding`s if it came from an intersection.
     elements: SmallVec<[BindingsElement<'db>; 1]>,
 
-    /// Binding contexts that enclose this call site, paired with their typevar occurrence nonces.
+    /// Binding contexts that enclose this call site, if known.
     ///
     /// This is an optimization hint for deciding when direct-call generic freshening is needed.
     /// `None` means the caller did not provide lexical collision information. `Some([])` means the
-    /// caller knows there are no enclosing typevars. Their nonces let freshening avoid collisions
-    /// with the enclosing occurrences without reserving particular nonce values.
-    enclosing_binding_contexts: Option<Box<[(BindingContext<'db>, TypeVarNonce)]>>,
+    /// caller knows there are no enclosing binding contexts.
+    enclosing_binding_contexts: Option<Box<[BindingContext<'db>]>>,
 }
 
 /// The set of overload candidates at a given call-site, before argument type inference.
@@ -901,7 +900,7 @@ impl<'db> Bindings<'db> {
 
     pub(crate) fn with_enclosing_binding_contexts(
         mut self,
-        enclosing_binding_contexts: impl IntoIterator<Item = (BindingContext<'db>, TypeVarNonce)>,
+        enclosing_binding_contexts: impl IntoIterator<Item = BindingContext<'db>>,
     ) -> Self {
         self.enclosing_binding_contexts = Some(enclosing_binding_contexts.into_iter().collect());
         self
@@ -4343,8 +4342,6 @@ impl<'db> CallableBinding<'db> {
             .iter()
             .map(|&index| {
                 let overload = &self.overloads[index];
-                let arguments =
-                    arguments.resolve_receiver_typevars(db, env, overload.receiver_typevars);
                 let slots = overload
                     .argument_matches
                     .iter()
@@ -8102,9 +8099,6 @@ pub(crate) struct Binding<'db> {
     /// Constructor metadata used to normalize the declared return type before type checking.
     constructor_context: Option<ConstructorContext<'db>>,
 
-    /// Resolves the synthetic receiver to the same occurrences as this signature.
-    receiver_typevars: Option<(GenericContext<'db>, TypeVarNonce)>,
-
     /// The inferable typevars in this signature.
     inferable_typevars: TypeVarSet<'db>,
 
@@ -8196,7 +8190,6 @@ impl<'db> Binding<'db> {
             signature_type,
             return_ty,
             constructor_context: None,
-            receiver_typevars: None,
             inferable_typevars: TypeVarSet::None,
             inference: None,
             is_partial_application: false,
@@ -8690,7 +8683,6 @@ impl<'db> Binding<'db> {
         let Some(generic_context) = self.signature.generic_context else {
             return;
         };
-        self.receiver_typevars = Some((generic_context, nonce));
         self.signature = self
             .signature
             .freshen_bound_typevars(db, env, nonce.value());
@@ -8714,8 +8706,6 @@ impl<'db> Binding<'db> {
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) {
-        let arguments = arguments.resolve_receiver_typevars(db, env, self.receiver_typevars);
-        let arguments = arguments.as_ref();
         let parameters = self.signature.parameters();
         let mut matcher = ArgumentMatcher::new(arguments, parameters, &mut self.errors);
         let mut keywords_arguments = vec![];
@@ -8751,9 +8741,6 @@ impl<'db> Binding<'db> {
         arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
     ) {
-        let arguments = arguments.resolve_receiver_typevars(db, env, self.receiver_typevars);
-        let arguments = arguments.as_ref();
-
         // Each overload is an independent inference problem. Two candidates can contain
         // typevars with the same identity but different specialized bounds, so sharing a
         // builder would make the second candidate reuse the first candidate's bounds.

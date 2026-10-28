@@ -9734,7 +9734,7 @@ impl<'db> Type<'db> {
         self.apply_type_mapping(db, env, &type_mapping, TypeContext::default())
     }
 
-    /// Resolves the typevars bound by `context` to a new occurrence.
+    /// Maps the typevars bound by `context`, adding `nonce` to their occurrence nonces.
     /// Occurrences outside that context retain their identities, preserving captured typevars.
     pub(crate) fn resolve_typevars(
         self,
@@ -9751,44 +9751,6 @@ impl<'db> Type<'db> {
                 delta: nonce.value(),
             },
             TypeContext::default(),
-        )
-    }
-
-    /// Restores `context`'s lexical occurrences to unresolved typevars.
-    ///
-    /// This is used during return type inference in a generic function. If the return type that we
-    /// infer in the function's body mentions any of its typevars, those will be resolved to the
-    /// body's non-inferable occurrences of those typevars. They should be unresolved in the
-    /// function's signature.
-    ///
-    /// Inferred attributes likewise need unresolved class typevars so that accessing the member
-    /// on a specialized instance can substitute its type arguments. Captured typevars from an
-    /// enclosing function retain their resolved bindings.
-    pub(crate) fn abstract_typevars(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        context: GenericContext<'db>,
-    ) -> Self {
-        let resolved = GenericContext::from_typevar_instances(
-            db,
-            env,
-            context
-                .variables(db)
-                .map(|typevar| typevar.with_freshness(db, typevar.freshness(db).increment())),
-        );
-        self.apply_specialization(
-            db,
-            Specialization::new(
-                db,
-                resolved,
-                context
-                    .variables(db)
-                    .map(Type::TypeVar)
-                    .collect::<Box<[_]>>(),
-                None,
-                None,
-            ),
         )
     }
 

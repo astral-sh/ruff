@@ -934,14 +934,10 @@ impl Default for TypeVarNonceGenerator<'_> {
 impl<'db> TypeVarNonceGenerator<'db> {
     pub(crate) fn record_enclosing_binding_contexts(
         &self,
-        binding_contexts: impl IntoIterator<Item = (BindingContext<'db>, TypeVarNonce)>,
+        binding_contexts: impl IntoIterator<Item = BindingContext<'db>>,
     ) {
         let mut inner = self.inner.borrow_mut();
-        for (context, nonce) in binding_contexts {
-            inner.enclosing.insert(context);
-            // A recursive call must not reuse an occurrence already fixed by its enclosing body.
-            inner.next = inner.next.max(nonce.increment());
-        }
+        inner.enclosing.extend(binding_contexts);
     }
 
     pub(crate) fn should_freshen(
@@ -1260,18 +1256,6 @@ impl<'db> BoundTypeVarInstance<'db> {
             BindingContext::Synthetic(env.program(db)),
             None,
             TypeVarNonce::NONE,
-        )
-    }
-
-    /// Returns the same typevar with a different occurrence identity.
-    pub(crate) fn with_freshness(self, db: &'db dyn Db, nonce: TypeVarNonce) -> Self {
-        Self::new_internal(
-            db,
-            self.typevar(db),
-            BoundTypeVarIdentity {
-                freshness: nonce,
-                ..self.identity(db)
-            },
         )
     }
 

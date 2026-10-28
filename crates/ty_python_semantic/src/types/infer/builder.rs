@@ -907,7 +907,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         callable_type
             .bindings(db, self.program_environment())
             .with_enclosing_binding_contexts(enclosing_binding_contexts(
-                db,
                 self.index,
                 self.scope().file_scope_id(db),
             ))
