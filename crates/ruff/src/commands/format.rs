@@ -262,7 +262,7 @@ pub(crate) fn format_path(
             .relative_path(path)
             .expect("wrong package cache for file");
 
-        if let Ok(cache_key) = FileCacheKey::from_path(path) {
+        if let Ok(cache_key) = FileCacheKey::from_path(path, None) {
             if cache.is_formatted(relative_path, &cache_key) {
                 return Ok(FormatResult::Unchanged);
             }
@@ -294,7 +294,7 @@ pub(crate) fn format_path(
                     .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?;
 
                 if let Some(cache) = cache {
-                    if let Ok(cache_key) = FileCacheKey::from_path(path) {
+                    if let Ok(cache_key) = FileCacheKey::from_path(path, None) {
                         let relative_path = cache
                             .relative_path(path)
                             .expect("wrong package cache for file");
@@ -311,7 +311,7 @@ pub(crate) fn format_path(
         },
         FormattedSource::Unchanged => {
             if let Some(cache) = cache {
-                if let Ok(cache_key) = FileCacheKey::from_path(path) {
+                if let Ok(cache_key) = FileCacheKey::from_path(path, None) {
                     let relative_path = cache
                         .relative_path(path)
                         .expect("wrong package cache for file");

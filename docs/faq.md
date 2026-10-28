@@ -390,6 +390,20 @@ above, `baz.py` would be identified as part of the Python package beginning at
 `./my_project/src/foo`, and so any imports in `baz.py` that begin with `foo` (like `import foo.bar`)
 would be considered first-party based on this same-package heuristic.
 
+Set `RUFF_UV=1` to use uv workspace metadata for import classification. For example, run
+`RUFF_UV=1 ruff check --select I --fix .` to sort imports using the workspace's package
+ownership. Ruff runs `uv workspace metadata --quiet --active` and respects uv's lockfile and
+network settings. This requires uv 0.12.3 or later. The `UV` environment variable can select
+a specific uv executable.
+
+An import provided by a workspace member is first-party. An import provided by an installed
+distribution outside the workspace is third-party, even when the distribution and import names
+differ. Ruff uses the most specific module ownership available for dotted imports. When uv
+reports the installed distribution paths, Ruff also recognizes modules exposed by a workspace
+member's path-based editable install, including packages with custom source layouts.
+Explicit isort sections take precedence. If uv is unavailable, Ruff warns and uses its usual
+classification.
+
 For a detailed explanation of `src` resolution, see the [contributing guide](contributing.md).
 
 Ruff can also be configured to treat certain modules as (e.g.) always first-party, regardless of

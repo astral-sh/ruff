@@ -32,6 +32,7 @@ use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
 use ruff_workspace::resolver::ConfigurationTransformer;
+use ruff_workspace::uv::UvImportDiscovery;
 use rustc_hash::FxHashMap;
 use toml;
 
@@ -627,7 +628,7 @@ pub struct FormatCommand {
 
 #[derive(Copy, Clone, Debug, clap::Parser)]
 pub struct ServerCommand {
-    /// Treat all workspaces as untrusted, disabling the uv formatter backend.
+    /// Treat all workspaces as untrusted, disabling uv integration.
     #[arg(long)]
     untrusted_workspace: bool,
 
@@ -710,6 +711,7 @@ impl From<&LogLevelArgs> for LogLevel {
 /// Configuration-related arguments passed via the CLI.
 #[derive(Default)]
 pub struct ConfigArguments {
+    pub(crate) use_uv: bool,
     /// Whether the user specified --isolated on the command line
     pub(crate) isolated: bool,
     /// The logging level to be used, derived from command-line arguments passed
@@ -782,6 +784,7 @@ You cannot specify more than one configuration file on the command line.
         }
         Ok(Self {
             isolated,
+            use_uv: false,
             log_level,
             config_file,
             overrides,
@@ -794,6 +797,10 @@ impl ConfigurationTransformer for ConfigArguments {
     fn transform(&self, config: Configuration) -> Configuration {
         let with_config_overrides = self.overrides.clone().combine(config);
         self.per_flag_overrides.transform(with_config_overrides)
+    }
+
+    fn use_uv(&self) -> bool {
+        self.use_uv
     }
 }
 
@@ -852,7 +859,10 @@ impl CheckCommand {
             ..ExplicitConfigOverrides::default()
         };
 
-        let config_args = ConfigArguments::from_cli_arguments(global_options, cli_overrides)?;
+        let config_args = ConfigArguments {
+            use_uv: !global_options.isolated && UvImportDiscovery::enabled(),
+            ..ConfigArguments::from_cli_arguments(global_options, cli_overrides)?
+        };
         Ok((check_arguments, config_args))
     }
 }

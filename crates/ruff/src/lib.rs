@@ -63,9 +63,7 @@ enum ChangeKind {
 /// Return the [`ChangeKind`] based on the list of modified file paths.
 ///
 /// Returns `None` if no relevant changes were detected.
-fn change_detected(event: &notify::Event) -> Option<ChangeKind> {
-    // If any `.toml` files were modified, return `ChangeKind::Configuration`. Otherwise, return
-    // `ChangeKind::SourceFile` if any `.py`, `.pyi`, `.pyw`, or `.ipynb` files were modified.
+fn change_detected(event: &notify::Event, use_uv: bool) -> Option<ChangeKind> {
     let mut source_file = false;
 
     if event.kind.is_access() || event.kind.is_other() {
@@ -76,6 +74,13 @@ fn change_detected(event: &notify::Event) -> Option<ChangeKind> {
         return Some(ChangeKind::Configuration);
     }
     for path in &event.paths {
+        if use_uv
+            && (path.ends_with("uv.lock")
+                || path.ends_with("RECORD")
+                || path.extension().is_some_and(|ext| ext == "pth"))
+        {
+            source_file = true;
+        }
         if let Some(suffix) = path.extension() {
             match suffix.to_str() {
                 Some("toml") => {
@@ -408,7 +413,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         let mut pyproject_config = pyproject_config;
 
         loop {
-            let Some(change_kind) = change_detected(&rx.recv()??) else {
+            let Some(change_kind) = change_detected(&rx.recv()??, config_arguments.use_uv) else {
                 continue;
             };
 
@@ -435,7 +440,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     let diagnostics = if is_stdin {
         commands::check_stdin::check_stdin(
             cli.stdin_filename.map(fs::normalize_path).as_deref(),
-            &pyproject_config,
+            pyproject_config,
             &config_arguments,
             noqa.into(),
             fix_mode,
@@ -550,6 +555,7 @@ mod test_file_change_detector {
 
     #[test]
     fn detect_correct_file_change() {
+        let change_detected = |event: &notify::Event| change_detected(event, false);
         assert_eq!(
             Some(ChangeKind::Configuration),
             change_detected(&notify::Event {
@@ -660,6 +666,17 @@ mod test_file_change_detector {
                 attrs: notify::event::EventAttributes::default(),
             }),
         );
+    }
+
+    #[test]
+    fn detect_uv_metadata_change() {
+        for path in ["uv.lock", "pkg.dist-info/RECORD", "editable.pth"] {
+            let event =
+                notify::Event::new(notify::EventKind::Create(notify::event::CreateKind::File))
+                    .add_path(PathBuf::from(path));
+            assert_eq!(change_detected(&event, false), None);
+            assert_eq!(change_detected(&event, true), Some(ChangeKind::SourceFile));
+        }
     }
 }
 

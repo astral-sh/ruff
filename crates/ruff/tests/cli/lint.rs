@@ -1,6 +1,8 @@
 //! Tests the interaction of the `lint` configuration section
 
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::process::Command;
 use std::str;
 
@@ -12,6 +14,156 @@ use crate::CliTest;
 
 const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["check", "--no-cache", "--output-format", "concise"];
+
+#[cfg(unix)]
+fn mock_uv(test: &CliTest) -> Result<std::path::PathBuf> {
+    test.write_file(
+        "uv",
+        r#"#!/bin/sh
+[ "$*" = 'workspace metadata --quiet --active' ] || exit 1
+exec /bin/cat metadata.json
+"#,
+    )?;
+    let uv = test.root().join("uv");
+    fs::set_permissions(&uv, fs::Permissions::from_mode(0o755))?;
+    Ok(uv)
+}
+
+#[cfg(unix)]
+#[test]
+fn uv_workspace_imports() -> Result<()> {
+    let test = CliTest::with_files([
+        (
+            "pyproject.toml",
+            "[tool.ruff.lint.isort]\nknown-third-party = ['override']",
+        ),
+        ("__init__.py", ""),
+        (
+            "outer.py",
+            "import local\nimport override\n\nimport legacy\n",
+        ),
+        ("nested/pyproject.toml", ""),
+        ("nested/__init__.py", ""),
+        (
+            "nested/inner.py",
+            "import override\n\nimport legacy\nimport local\n",
+        ),
+    ])?;
+    let write_metadata = |project: &str, local_owner: &str| {
+        let root = test.root().join(project);
+        let metadata = serde_json::json!({
+            "schema": {"version": "preview"},
+            "workspace_root": root,
+            "members": [{"id": "member", "path": root}],
+            "module_owners": {"legacy": [{"package_id": "member"}]},
+            "modules": {
+                "local": {"owners": [{"package_id": local_owner}]},
+                "override": {"owners": [{"package_id": "member"}]},
+            },
+        });
+        test.write_file(root.join("metadata.json"), &metadata.to_string())
+    };
+    write_metadata("", "dependency")?;
+    write_metadata("nested", "member")?;
+    let mut check = test.command();
+    check
+        .args([
+            "check",
+            "--quiet",
+            "--select",
+            "I",
+            "--output-format",
+            "concise",
+            "outer.py",
+            "nested/inner.py",
+        ])
+        .env("UV", mock_uv(&test)?);
+    assert_eq!(check.output()?.status.code(), Some(1));
+    assert!(check.env("RUFF_UV", "1").output()?.status.success());
+
+    // Both files share a Python package cache. Only the nested project's owner changed.
+    write_metadata("nested", "dependency")?;
+    assert_cmd_snapshot!(check, @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    nested/inner.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn uv_editable_import_cache() -> Result<()> {
+    let test = CliTest::with_files([
+        ("pyproject.toml", ""),
+        ("member/python/acme/__init__.py", ""),
+        ("member/uninstalled/__init__.py", ""),
+        (
+            "site-packages/member-1.dist-info/RECORD",
+            "editable.pth,,\n",
+        ),
+        ("site-packages/editable.pth", "../member/python\n"),
+        ("site-packages/unrelated.pth", "../member\n"),
+        (
+            "third.py",
+            "import acme.plugins.local\nimport uninstalled\n",
+        ),
+        (
+            "first.py",
+            "import uninstalled\n\nimport acme.plugins.local\n",
+        ),
+    ])?;
+    let metadata = serde_json::json!({
+        "schema": {"version": "preview"},
+        "workspace_root": test.root(),
+        "members": [{"id": "member", "path": test.root().join("member")}],
+        "environment": {"packages": {"member": {"path": test.root().join("site-packages/member-1.dist-info")}}},
+        "modules": {"acme.plugins": {"owners": [{"package_id": "dependency"}]}},
+    });
+    test.write_file("metadata.json", &metadata.to_string())?;
+    let uv = mock_uv(&test)?;
+    let check = |file: &str| {
+        test.command()
+            .args(["check", "--select", "I", file])
+            .env("RUFF_UV", "1")
+            .env("UV", &uv)
+            .output()
+    };
+
+    let module = "member/python/acme/plugins/local.py";
+    assert!(check("third.py")?.status.success());
+    test.write_file(module, "")?;
+    assert_eq!(check("third.py")?.status.code(), Some(1));
+    assert!(check("first.py")?.status.success());
+    fs::remove_file(test.root().join(module))?;
+    assert_eq!(check("first.py")?.status.code(), Some(1));
+    Ok(())
+}
+
+#[test]
+fn uv_workspace_unavailable() -> Result<()> {
+    let case = CliTest::with_file("pyproject.toml", "[project]\nname = 'app'\nversion = '1'")?;
+    case.write_file("local.py", "")?;
+    case.write_file("example.py", "import local\nimport external\n")?;
+    let output = case
+        .check_command()
+        .args(["--select", "I", "--fix", "example.py"])
+        .env("RUFF_UV", "true")
+        .env("UV", case.root().join("missing-uv"))
+        .output()?;
+    assert!(output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("Failed to read uv workspace metadata")
+    );
+    assert_eq!(
+        case.read_file("example.py")?,
+        "import external\n\nimport local\n"
+    );
+    Ok(())
+}
 
 impl CliTest {
     fn check_command(&self) -> Command {

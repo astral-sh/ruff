@@ -18,8 +18,10 @@ use ruff_source_file::find_newline;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
+use crate::uv::UvImportDiscovery;
+
 #[expect(clippy::struct_excessive_bools)]
-#[derive(Debug, CacheKey)]
+#[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     #[cache_key(ignore)]
     pub cache_dir: PathBuf,
@@ -40,6 +42,17 @@ pub struct Settings {
     pub linter: LinterSettings,
     pub formatter: FormatterSettings,
     pub analyze: AnalyzeSettings,
+}
+
+impl Settings {
+    /// Apply workspace import ownership when uv discovery is enabled for this directory.
+    #[must_use]
+    pub fn with_uv_imports(mut self, uv: Option<&UvImportDiscovery>, directory: &Path) -> Self {
+        if let Some(uv) = uv {
+            uv.apply(&mut self, directory);
+        }
+        self
+    }
 }
 
 impl Default for Settings {
@@ -84,7 +97,7 @@ impl fmt::Display for Settings {
     }
 }
 
-#[derive(Debug, CacheKey)]
+#[derive(Debug, Clone, CacheKey)]
 pub struct FileResolverSettings {
     pub exclude: FilePatternSet,
     pub extend_exclude: FilePatternSet,

@@ -3850,6 +3850,7 @@ version = "0.0.20"
 dependencies = [
  "anyhow",
  "colored",
+ "csv",
  "etcetera",
  "glob",
  "globset",
@@ -3885,6 +3886,8 @@ dependencies = [
  "tempfile",
  "toml 1.1.6+spec-1.1.0",
  "unicode-normalization",
+ "walkdir",
+ "which",
 ]
 
 [[package]]

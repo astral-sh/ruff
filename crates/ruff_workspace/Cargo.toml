@@ -33,6 +33,7 @@ ruff_source_file = { workspace = true }
 
 anyhow = { workspace = true }
 colored = { workspace = true }
+csv = { workspace = true }
 glob = { workspace = true }
 globset = { workspace = true }
 ignore = { workspace = true }
@@ -48,11 +49,13 @@ regex = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true }
-serde_json = { workspace = true, optional = true }
+serde_json = { workspace = true }
 shellexpand = { workspace = true }
 strum = { workspace = true }
 toml = { workspace = true }
 unicode-normalization = { workspace = true }
+walkdir = { workspace = true }
+which = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 etcetera = { workspace = true }
@@ -66,7 +69,6 @@ tempfile = { workspace = true }
 default = []
 schemars = [
     "dep:schemars",
-    "dep:serde_json",
     "ruff_formatter/schemars",
     "ruff_linter/schemars",
     "ruff_python_formatter/schemars",
