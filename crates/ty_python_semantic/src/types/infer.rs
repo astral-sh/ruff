@@ -1012,7 +1012,7 @@ impl<'db> InferenceRegion<'db> {
 pub(crate) struct ScopeInference<'db> {
     /// The types of every expression in this region.
     ///
-    /// Annotation expressions can retain unresolved typevars for generic signatures. Use
+    /// Annotation expressions are inputs to declaration inference. Use
     /// [`crate::types::inferred_declaration`] to read the type of the declaration they annotate.
     expressions: FrozenValueMap<ExpressionNodeKey, Type<'db>>,
 
@@ -1205,7 +1205,7 @@ impl<'db> InferredDeclaration<'db> {
 pub(crate) struct DefinitionInference<'db> {
     /// The types of every expression in this region.
     ///
-    /// Annotation expressions can retain unresolved typevars for generic signatures. Use
+    /// Annotation expressions are inputs to declaration inference. Use
     /// [`Self::inferred_declaration`] to read the type of the declaration they annotate.
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
