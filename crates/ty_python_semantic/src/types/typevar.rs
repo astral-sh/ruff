@@ -1599,30 +1599,26 @@ impl<'db> BoundTypeVarInstance<'db> {
         let bound_or_constraints = typevar.bound_or_constraints(db, visitor.env);
         let default = self.default_type(db);
 
-        if bound_or_constraints.is_none() && default.is_none() {
-            return Self::new(
-                db,
-                typevar,
-                self.binding_context(db),
-                self.paramspec_attr(db),
-                nonce,
-            );
-        }
-
-        let typevar = TypeVarInstance::new(
-            db,
-            typevar.identity(db),
-            bound_or_constraints.map(|bound_or_constraints| {
-                bound_or_constraints
-                    .apply_type_mapping_impl(db, type_mapping, visitor)
-                    .into()
-            }),
-            typevar.explicit_variance(db),
-            default.map(|ty| {
-                ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
-                    .into()
-            }),
-        );
+        let mapped_bound_or_constraints = bound_or_constraints.map(|bound_or_constraints| {
+            bound_or_constraints.apply_type_mapping_impl(db, type_mapping, visitor)
+        });
+        let mapped_default = default.map(|ty| {
+            ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
+        });
+        // Replacing unchanged lazy bounds or defaults with eager values changes the interned
+        // typevar even when freshening only needs a new occurrence identity.
+        let typevar =
+            if mapped_bound_or_constraints == bound_or_constraints && mapped_default == default {
+                typevar
+            } else {
+                TypeVarInstance::new(
+                    db,
+                    typevar.identity(db),
+                    mapped_bound_or_constraints.map(Into::into),
+                    typevar.explicit_variance(db),
+                    mapped_default.map(Into::into),
+                )
+            };
 
         Self::new(
             db,
