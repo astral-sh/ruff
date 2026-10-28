@@ -9729,21 +9729,21 @@ impl<'db> Type<'db> {
         self.apply_type_mapping(db, env, &type_mapping, TypeContext::default())
     }
 
-    /// Maps the typevars bound by `context`, adding `nonce` to their occurrence nonces.
+    /// Maps the typevars bound by `context`, adding `delta` to their occurrence nonces.
     /// Occurrences outside that context retain their identities, preserving captured typevars.
     pub(crate) fn resolve_typevars(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         context: GenericContext<'db>,
-        nonce: TypeVarNonce,
+        delta: u32,
     ) -> Self {
         self.apply_type_mapping(
             db,
             env,
             &TypeMapping::FreshenBoundTypeVars {
                 generic_context: context,
-                delta: nonce.value(),
+                delta,
             },
             TypeContext::default(),
         )
