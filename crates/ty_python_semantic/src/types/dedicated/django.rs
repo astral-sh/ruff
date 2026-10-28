@@ -17,7 +17,7 @@ use crate::types::{
 use crate::{Db, ProgramEnvironment};
 
 /// Returns whether `class` is a subclass of Django's `Model`.
-fn is_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
+pub(in crate::types) fn is_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
     class
         .iter_mro(db, None)
         .skip(1)

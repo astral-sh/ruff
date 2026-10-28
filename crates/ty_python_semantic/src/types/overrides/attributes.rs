@@ -20,6 +20,7 @@ use crate::{
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
         class::CodeGeneratorKind,
         context::InferContext,
+        dedicated::django,
         diagnostic::{
             INVALID_ATTRIBUTE_OVERRIDE, INVALID_MUTABLE_OVERRIDE, INVALID_PROPERTY_TYPE_OVERRIDE,
         },
@@ -415,6 +416,16 @@ fn attribute_violation<'db>(
     source: &AttributeContract<'db>,
     target: &AttributeContract<'db>,
 ) -> Option<AttributeViolation<'db>> {
+    // Django encourages a pattern where nested `Meta` classes are used for model configuration
+    // that would lead to invalid override errors. We suppress errors for that exact pattern.
+    if name == "Meta"
+        && receiver
+            .nominal_class(db, env)
+            .and_then(|class| class.static_class_literal(db))
+            .is_some_and(|(class, _)| django::is_model(db, class))
+    {
+        return None;
+    }
     if source.is_method && target.is_method
         || target.qualifiers.contains(TypeQualifiers::FINAL)
         || !source.is_property
