@@ -160,9 +160,36 @@ impl<'a> SectionContexts<'a> {
         // See: https://github.com/astral-sh/ruff/issues/23562
         let mut directive_indent = None;
 
+        // Track doctest blocks. A line inside a doctest's expected output is not
+        // prose, so text such as a repr's trailing `Attributes:` must not be
+        // mistaken for a section header.
+        // See: https://github.com/astral-sh/ruff/issues/29512
+        let mut doctest_indent = None;
+
         while let Some(line) = lines.next() {
             let indent = leading_space(&line);
             let indent_size = indent.text_len();
+            let trimmed = line.trim();
+
+            if let Some(active) = doctest_indent {
+                // Expected output sits at the same indentation as the prompt in
+                // practice (see the xarray repr in #29512), so "same indent" must
+                // count as part of the block. The block ends at a blank line or at
+                // a dedent below the prompt.
+                if !trimmed.is_empty() && indent_size >= active {
+                    previous_line = Some(line);
+                    continue;
+                }
+                doctest_indent = None;
+            }
+
+            // A prompt starts a doctest block; everything after it up to the next
+            // chunk is expected output and must not be parsed as sections.
+            if trimmed.starts_with(">>>") {
+                doctest_indent = Some(indent_size);
+                previous_line = Some(line);
+                continue;
+            }
 
             if let Some(active_indent) = directive_indent
                 && (line.trim().is_empty() || indent_size > active_indent)

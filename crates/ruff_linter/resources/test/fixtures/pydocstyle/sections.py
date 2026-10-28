@@ -630,3 +630,19 @@ def another_valid_google_style_docstring(a: str) -> str:
 
     """
     return a
+
+
+# Section-looking text inside a doctest's expected output is not a section.
+# See https://github.com/astral-sh/ruff/issues/29512
+def doctest_output_attributes(x):
+    """Summary.
+
+    Examples
+    --------
+    >>> print(x)
+    <xarray.Variable (x: 2)> Size: 16B
+    array([1, 2])
+    Attributes:
+        a:        1
+
+    """
