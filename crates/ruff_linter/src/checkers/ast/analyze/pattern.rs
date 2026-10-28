@@ -4,10 +4,14 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::rules::pep8_naming;
+use crate::rules::{pep8_naming, ruff};
 
 /// Run lint rules over a [`Pattern`] syntax node.
 pub(crate) fn pattern(pattern: &Pattern, checker: &Checker) {
+    if checker.is_rule_enabled(Rule::MatchCaptureShadowsVariable) {
+        ruff::rules::match_capture_shadows_variable(checker, pattern);
+    }
+
     let (Pattern::MatchAs(ast::PatternMatchAs {
         name: Some(name), ..
     })
