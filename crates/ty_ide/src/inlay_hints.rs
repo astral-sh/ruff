@@ -589,14 +589,6 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
                 self.visit_expr(&call.func);
 
-                // Python allows `*args` and keywords after a keyword argument. A later plain
-                // positional argument makes inserting `name=` a syntax error, even if it has no hint.
-                let last_plain_positional = call
-                    .arguments
-                    .args
-                    .iter()
-                    .rposition(|argument| !argument.is_starred_expr());
-
                 // `argument_names` is keyed by positional-arg index, not source-order index,
                 // so track them separately to stay in sync after keyword args appear mid-call.
                 let mut positional_index = 0;
@@ -606,7 +598,13 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                             details.argument_names.get(&positional_index)
                             && !arg_matches_name(argument, name)
                         {
-                            let mode = if last_plain_positional == Some(positional_index) {
+                            // A keyword cannot precede a plain positional argument. `args` also
+                            // includes starred arguments. Changing `f(value(), *items())` to
+                            // `f(x=value(), *items())` would evaluate `items()` first and could
+                            // pass `x` twice.
+                            let is_last_positional =
+                                positional_index + 1 == call.arguments.args.len();
+                            let mode = if is_last_positional && !argument.is_starred_expr() {
                                 ArgumentHintMode::Insertable
                             } else {
                                 ArgumentHintMode::DisplayOnly
@@ -4334,6 +4332,26 @@ Source with applied edits:
     }
 
     #[test]
+    fn argument_name_hint_before_starred_argument_has_no_edit() {
+        let test = inlay_hint_test(
+            "
+            def f(x, *rest): ...
+            f(1, *[2])
+            ",
+        );
+        let [hint] = test
+            .collect_hints(&InlayHintSettings::default())
+            .try_into()
+            .unwrap();
+
+        // The unpacked `2` goes into `rest`, so only `1` gets a hint. Inserting `x=` would
+        // produce `f(x=1, *[2])`. Python would raise a `TypeError` at runtime because the
+        // unpacked `2` and the keyword argument `x=1` both supply `x`.
+        assert_eq!(hint.display().to_string(), "x=");
+        assert!(hint.text_edits.is_empty());
+    }
+
+    #[test]
     fn test_function_call_with_keyword_variadic_parameter() {
         let mut test = inlay_hint_test(
             "
@@ -4391,15 +4409,6 @@ Source with applied edits:
           |
         4 | foo([a=]'foo', *t, d='bar')
           |      ^
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-          |
-        3 | t: tuple[int, int] = (23, 42)
-          - foo('foo', *t, d='bar')
-        4 + foo(a='foo', *t, d='bar')
-          |
         ");
     }
 
@@ -4465,6 +4474,8 @@ Source with applied edits:
 
     #[test]
     fn test_function_call_last_plain_positional_before_starred_argument() {
+        // Both hints are display-only. In `foo(a=1, *t)`, the unpacked `2` would fill `a`,
+        // so `a=1` would supply it again.
         let mut test = inlay_hint_test(
             "
             def foo(a: int, b: int): ...
@@ -4499,15 +4510,6 @@ Source with applied edits:
           |
         4 | foo([a=]1, [b=]*t)
           |             ^
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-          |
-        3 | t: tuple[int] = (2,)
-          - foo(1, *t)
-        4 + foo(a=1, *t)
-          |
         ");
     }
 
