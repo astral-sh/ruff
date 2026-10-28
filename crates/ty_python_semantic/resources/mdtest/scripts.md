@@ -1,6 +1,6 @@
 Scripts with PEP 723 metadata inherit the enclosing project's ty configuration unless they have
-their own `[tool.ty]` table. Each script has its own first-party roots and declares its own
-dependencies.
+their own `[tool.ty]` table. Each script declares its own dependencies and has no first-party roots
+by default.
 
 ```toml
 [environment]

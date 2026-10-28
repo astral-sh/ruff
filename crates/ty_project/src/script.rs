@@ -119,18 +119,15 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     let project_metadata = db.project().metadata(db);
     let has_inline_settings =
         project_metadata.config_file_override().is_none() && metadata.ty().is_some();
-    let directory = file
-        .path(db)
-        .as_system_path()
-        .and_then(|path| path.parent());
-    let context = OptionsContext::Script {
-        directory,
-        configuration_root: if has_inline_settings {
-            directory.unwrap_or_else(|| db.system().current_directory())
-        } else {
-            project_metadata.root()
-        },
+    let configuration_root = if has_inline_settings {
+        file.path(db)
+            .as_system_path()
+            .and_then(|path| path.parent())
+            .unwrap_or_else(|| db.system().current_directory())
+    } else {
+        project_metadata.root()
     };
+    let context = OptionsContext::Script(configuration_root);
 
     let options = resolve_script_options(
         project_metadata,
@@ -493,7 +490,6 @@ mod tests {
             # /// script
             # [tool.ty.environment]
             # python-version = "3.12"
-            # root = [".."]
             # ///
             "#,
         )?;

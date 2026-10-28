@@ -565,10 +565,9 @@ if they exist and are not packages (i.e. they do not contain `__init__.py` or `_
 * `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
 * `./python`
 
-A script with inline metadata has its own roots, even when the enclosing project configures
-`root`. By default, its only root is the directory containing the script, so it can import
-sibling modules. Set `root = []` in the script's `[tool.ty.environment]` table to disable
-first-party roots.
+Scripts with inline metadata default to `root = []`, even when the enclosing project
+configures first-party roots. Set `root = ["."]` in the script's `[tool.ty.environment]`
+table to import sibling modules.
 
 **Default value**: `null`
 
