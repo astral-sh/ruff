@@ -201,7 +201,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             && let Some(validations) = validations
             && let Some((limits, exceeded)) = self.limits.traversal_budget()
             && let Some((visits, bounds_per_path)) =
-                self.lower_bound_product_visits(db, env, storage, node, validations, limits)
+                self.binary_lower_bound_visits(db, env, storage, node, validations, limits)
         {
             let Some(extra_visits) = limits.remaining_visits.checked_sub(visits) else {
                 return ControlFlow::Break(exceeded);
@@ -211,11 +211,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         self.visit_node_inner(db, env, storage, path, polarity, node, validations)
     }
 
-    /// Count the work common to every outcome of a product of independent lower bounds. For
-    /// example, `(A ≤ T or B ≤ T) and (C ≤ T or D ≤ T)` has four paths with two bounds apiece.
-    /// Each failure repeats the lower-bound scan when attributing the diagnostic. Together these
-    /// costs bound how many failed paths the budget can accommodate.
-    fn lower_bound_product_visits(
+    /// Count the visits required to validate independent binary choices of lower bounds, e.g.
+    /// `(A ≤ T or B ≤ T) and (C ≤ T or D ≤ T)`. Each rejected path repeats its lower-bound
+    /// scan during failure attribution.
+    fn binary_lower_bound_visits(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -224,7 +223,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         validations: &Validations<'db>,
         limits: &BoundedSolutionLimits,
     ) -> Option<(usize, usize)> {
-        if validations.upper_bounds.len() != 1 || !validations.constrained.is_empty() {
+        if limits.remaining_paths == 0
+            || validations.upper_bounds.len() != 1
+            || !validations.constrained.is_empty()
+        {
             return None;
         }
         let (typevar, upper) = validations.upper_bounds.first()?;
@@ -239,52 +241,43 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
 
         let mut atoms = Vec::new();
         let mut paths = 1usize;
-        let mut visits = 0usize;
-        let mut bounds_per_path = 0usize;
         // Checking pairs for sequents costs quadratic work in the number of atoms.
         let max_atoms = limits.remaining_visits.isqrt();
-        while node != ALWAYS_TRUE {
-            if node == ALWAYS_FALSE {
+        while !node.is_terminal() {
+            if atoms.len() + 2 > max_atoms {
                 return None;
             }
-            // Each positive edge chooses a bound and continues to the same suffix. The
-            // uncertain edge tries the next alternative in this group.
-            let suffix = storage.interior_node_data(node).if_true;
-            let mut alternatives = 0usize;
-            while node != ALWAYS_FALSE {
-                if node == ALWAYS_TRUE || atoms.len() >= max_atoms {
-                    return None;
-                }
-                let choice = storage.interior_node_data(node);
-                if choice.if_true != suffix || choice.if_false != ALWAYS_FALSE {
-                    return None;
-                }
-                atoms.push(choice.constraint.as_atomic(storage)?);
-                visits = visits.saturating_add(paths);
-                alternatives += 1;
-                node = choice.if_uncertain;
+            let first = storage.interior_node_data(node);
+            if first.if_false != ALWAYS_FALSE || first.if_uncertain.is_terminal() {
+                return None;
             }
-            paths = paths.saturating_mul(alternatives);
-            bounds_per_path += 1;
-            node = suffix;
+            let second = storage.interior_node_data(first.if_uncertain);
+            if second.if_true != first.if_true
+                || second.if_uncertain != ALWAYS_FALSE
+                || second.if_false != ALWAYS_FALSE
+            {
+                return None;
+            }
+            // The single upper bound produces at most one candidate per leaf. The walk must
+            // visit at least this many leaves before it can finish or exceed the path budget.
+            paths = paths.saturating_mul(2).min(limits.remaining_paths);
+            atoms.extend([
+                first.constraint.as_atomic(storage)?,
+                second.constraint.as_atomic(storage)?,
+            ]);
+            node = first.if_true;
         }
-
-        // Each terminal consumes one visit plus one visit for every lower bound in the first
-        // scan. A rejected terminal repeats the scan when attributing the declaration failure.
-        let scan_visits = paths.saturating_mul(bounds_per_path);
-        visits = visits.saturating_add(paths).saturating_add(scan_visits);
-        if paths <= 1 || visits.saturating_add(scan_visits) <= limits.remaining_visits {
+        if node != ALWAYS_TRUE || atoms.is_empty() {
             return None;
         }
-        // Preserve which limit is reached first. Even if every terminal produces a candidate,
-        // the next path over the path limit still has to undergo its initial scan.
-        if paths > limits.remaining_paths
-            && limits
-                .remaining_paths
-                .saturating_add(1)
-                .saturating_mul(bounds_per_path + 1)
-                <= limits.remaining_visits
-        {
+        // The subtree connecting any P leaves has P - 1 forks where both sides are visited.
+        // Each such fork visits both TDD nodes. Each leaf visits its terminal and scans one
+        // lower bound per choice, even when only part of the full tree fits the path budget.
+        let bounds_per_path = atoms.len() / 2;
+        let visits = paths
+            .checked_mul(bounds_per_path + 1)?
+            .checked_add(2 * (paths - 1))?;
+        if visits.saturating_add(paths * bounds_per_path) <= limits.remaining_visits {
             return None;
         }
         if !atoms.iter().all(|&atom| {
@@ -812,7 +805,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         // Inference or mixed lower bounds determine whether a solution is chosen, but validity
         // lower bounds also contribute to that solution.
         for (constraint, source) in path.positive_constraints() {
-            // `lower_bound_product_visits` counts this visit for every bound on an eligible path.
+            // `binary_lower_bound_visits` counts this visit for every bound on an eligible path.
             self.limits.visit_node().map_break(Break::Limits)?;
             if path.constraint_is_substituted(constraint) {
                 continue;
