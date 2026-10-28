@@ -10,6 +10,7 @@ PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
 10 | list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
 11 | search("*.png")
    |
+help: Replace with `Path(...).glob(...)`
 
 PTH207 Replace `iglob` with `Path.glob` or `Path.rglob`
   --> PTH207.py:10:6
@@ -20,6 +21,7 @@ PTH207 Replace `iglob` with `Path.glob` or `Path.rglob`
    |      ^^^^^^^^^^
 11 | search("*.png")
    |
+help: Replace with `Path(...).glob(...)`
 
 PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
   --> PTH207.py:11:1
@@ -31,3 +33,198 @@ PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
 12 |
 13 | # if `dir_fd` is set, suppress the diagnostic
    |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:18:1
+   |
+17 | # Display-only suggestions in preview.
+18 | glob.glob("*.py")
+   | ^^^^^^^^^
+19 | glob.iglob(pathname="src/*.py", root_dir=extensions_dir)
+20 | glob.glob("**/*.py", recursive=True)
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `iglob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:19:1
+   |
+17 | # Display-only suggestions in preview.
+18 | glob.glob("*.py")
+19 | glob.iglob(pathname="src/*.py", root_dir=extensions_dir)
+   | ^^^^^^^^^^
+20 | glob.glob("**/*.py", recursive=True)
+21 | glob.glob("*.py", root_dir=None, dir_fd=None, include_hidden=True)
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:20:1
+   |
+18 | glob.glob("*.py")
+19 | glob.iglob(pathname="src/*.py", root_dir=extensions_dir)
+20 | glob.glob("**/*.py", recursive=True)
+   | ^^^^^^^^^
+21 | glob.glob("*.py", root_dir=None, dir_fd=None, include_hidden=True)
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:21:1
+   |
+19 | glob.iglob(pathname="src/*.py", root_dir=extensions_dir)
+20 | glob.glob("**/*.py", recursive=True)
+21 | glob.glob("*.py", root_dir=None, dir_fd=None, include_hidden=True)
+   | ^^^^^^^^^
+22 |
+23 | # Unsupported patterns and arguments still receive a diagnostic, without a fix.
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:24:1
+   |
+23 | # Unsupported patterns and arguments still receive a diagnostic, without a fix.
+24 | glob.glob("/tmp/*.py")
+   | ^^^^^^^^^
+25 | glob.glob(r"C:\tmp\*.py")
+26 | glob.glob("**/*.py")
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:25:1
+   |
+23 | # Unsupported patterns and arguments still receive a diagnostic, without a fix.
+24 | glob.glob("/tmp/*.py")
+25 | glob.glob(r"C:\tmp\*.py")
+   | ^^^^^^^^^
+26 | glob.glob("**/*.py")
+27 | glob.glob("a**b", recursive=True)
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:26:1
+   |
+24 | glob.glob("/tmp/*.py")
+25 | glob.glob(r"C:\tmp\*.py")
+26 | glob.glob("**/*.py")
+   | ^^^^^^^^^
+27 | glob.glob("a**b", recursive=True)
+28 | glob.glob("")
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:27:1
+   |
+25 | glob.glob(r"C:\tmp\*.py")
+26 | glob.glob("**/*.py")
+27 | glob.glob("a**b", recursive=True)
+   | ^^^^^^^^^
+28 | glob.glob("")
+29 | glob.glob(pattern)
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:28:1
+   |
+26 | glob.glob("**/*.py")
+27 | glob.glob("a**b", recursive=True)
+28 | glob.glob("")
+   | ^^^^^^^^^
+29 | glob.glob(pattern)
+30 | glob.glob(b"*.py")
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:29:1
+   |
+27 | glob.glob("a**b", recursive=True)
+28 | glob.glob("")
+29 | glob.glob(pattern)
+   | ^^^^^^^^^
+30 | glob.glob(b"*.py")
+31 | glob.glob("*.py", **options)
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:30:1
+   |
+28 | glob.glob("")
+29 | glob.glob(pattern)
+30 | glob.glob(b"*.py")
+   | ^^^^^^^^^
+31 | glob.glob("*.py", **options)
+32 | glob.glob("*.py", recursive=recursive)
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:31:1
+   |
+29 | glob.glob(pattern)
+30 | glob.glob(b"*.py")
+31 | glob.glob("*.py", **options)
+   | ^^^^^^^^^
+32 | glob.glob("*.py", recursive=recursive)
+33 | glob.glob("*.py", include_hidden=include_hidden)
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:32:1
+   |
+30 | glob.glob(b"*.py")
+31 | glob.glob("*.py", **options)
+32 | glob.glob("*.py", recursive=recursive)
+   | ^^^^^^^^^
+33 | glob.glob("*.py", include_hidden=include_hidden)
+34 | glob.glob(
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:33:1
+   |
+31 | glob.glob("*.py", **options)
+32 | glob.glob("*.py", recursive=recursive)
+33 | glob.glob("*.py", include_hidden=include_hidden)
+   | ^^^^^^^^^
+34 | glob.glob(
+35 |     # Keep this explanation.
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:34:1
+   |
+32 | glob.glob("*.py", recursive=recursive)
+33 | glob.glob("*.py", include_hidden=include_hidden)
+34 | glob.glob(
+   | ^^^^^^^^^
+35 |     # Keep this explanation.
+36 |     "*.py"
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `iglob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:43:12
+   |
+41 |     from pathlib import Path as P
+42 |
+43 |     return glob.iglob("*.py", root_dir="src")
+   |            ^^^^^^^^^^
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:47:12
+   |
+46 | def shadowed_import(Path):
+47 |     return glob.glob("*.py")
+   |            ^^^^^^^^^
+help: Replace with `Path(...).glob(...)`

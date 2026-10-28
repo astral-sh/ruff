@@ -1,0 +1,302 @@
+---
+source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+---
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:9:1
+   |
+ 8 | # PTH207
+ 9 | glob.glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"))
+   | ^^^^^^^^^
+10 | list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
+11 | search("*.png")
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `iglob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:10:6
+   |
+ 8 | # PTH207
+ 9 | glob.glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"))
+10 | list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
+   |      ^^^^^^^^^^
+11 | search("*.png")
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 [*] Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:11:1
+   |
+ 9 | glob.glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"))
+10 | list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
+11 | search("*.png")
+   | ^^^^^^
+12 |
+13 | # if `dir_fd` is set, suppress the diagnostic
+   |
+help: Replace with `Path(...).glob(...)`
+   |
+3  | from glob import glob as search
+4  + import pathlib
+5  |
+--------------------------------------------------------------------------------
+11 | list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
+   - search("*.png")
+12 + pathlib.Path().glob("*.png")
+13 |
+   |
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+
+PTH207 [*] Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:18:1
+   |
+17 | # Display-only suggestions in preview.
+18 | glob.glob("*.py")
+   | ^^^^^^^^^
+19 | glob.iglob(pathname="src/*.py", root_dir=extensions_dir)
+20 | glob.glob("**/*.py", recursive=True)
+   |
+help: Replace with `Path(...).glob(...)`
+   |
+3  | from glob import glob as search
+4  + import pathlib
+5  |
+--------------------------------------------------------------------------------
+18 | # Display-only suggestions in preview.
+   - glob.glob("*.py")
+19 + pathlib.Path().glob("*.py")
+20 | glob.iglob(pathname="src/*.py", root_dir=extensions_dir)
+   |
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+
+PTH207 [*] Replace `iglob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:19:1
+   |
+17 | # Display-only suggestions in preview.
+18 | glob.glob("*.py")
+19 | glob.iglob(pathname="src/*.py", root_dir=extensions_dir)
+   | ^^^^^^^^^^
+20 | glob.glob("**/*.py", recursive=True)
+21 | glob.glob("*.py", root_dir=None, dir_fd=None, include_hidden=True)
+   |
+help: Replace with `Path(...).glob(...)`
+   |
+3  | from glob import glob as search
+4  + import pathlib
+5  |
+--------------------------------------------------------------------------------
+19 | glob.glob("*.py")
+   - glob.iglob(pathname="src/*.py", root_dir=extensions_dir)
+20 + pathlib.Path(extensions_dir).glob("src/*.py")
+21 | glob.glob("**/*.py", recursive=True)
+   |
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+
+PTH207 [*] Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:20:1
+   |
+18 | glob.glob("*.py")
+19 | glob.iglob(pathname="src/*.py", root_dir=extensions_dir)
+20 | glob.glob("**/*.py", recursive=True)
+   | ^^^^^^^^^
+21 | glob.glob("*.py", root_dir=None, dir_fd=None, include_hidden=True)
+   |
+help: Replace with `Path(...).glob(...)`
+   |
+3  | from glob import glob as search
+4  + import pathlib
+5  |
+--------------------------------------------------------------------------------
+20 | glob.iglob(pathname="src/*.py", root_dir=extensions_dir)
+   - glob.glob("**/*.py", recursive=True)
+21 + pathlib.Path().glob("**/*.py")
+22 | glob.glob("*.py", root_dir=None, dir_fd=None, include_hidden=True)
+   |
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+
+PTH207 [*] Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:21:1
+   |
+19 | glob.iglob(pathname="src/*.py", root_dir=extensions_dir)
+20 | glob.glob("**/*.py", recursive=True)
+21 | glob.glob("*.py", root_dir=None, dir_fd=None, include_hidden=True)
+   | ^^^^^^^^^
+22 |
+23 | # Unsupported patterns and arguments still receive a diagnostic, without a fix.
+   |
+help: Replace with `Path(...).glob(...)`
+   |
+3  | from glob import glob as search
+4  + import pathlib
+5  |
+--------------------------------------------------------------------------------
+21 | glob.glob("**/*.py", recursive=True)
+   - glob.glob("*.py", root_dir=None, dir_fd=None, include_hidden=True)
+22 + pathlib.Path().glob("*.py")
+23 |
+   |
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:24:1
+   |
+23 | # Unsupported patterns and arguments still receive a diagnostic, without a fix.
+24 | glob.glob("/tmp/*.py")
+   | ^^^^^^^^^
+25 | glob.glob(r"C:\tmp\*.py")
+26 | glob.glob("**/*.py")
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:25:1
+   |
+23 | # Unsupported patterns and arguments still receive a diagnostic, without a fix.
+24 | glob.glob("/tmp/*.py")
+25 | glob.glob(r"C:\tmp\*.py")
+   | ^^^^^^^^^
+26 | glob.glob("**/*.py")
+27 | glob.glob("a**b", recursive=True)
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:26:1
+   |
+24 | glob.glob("/tmp/*.py")
+25 | glob.glob(r"C:\tmp\*.py")
+26 | glob.glob("**/*.py")
+   | ^^^^^^^^^
+27 | glob.glob("a**b", recursive=True)
+28 | glob.glob("")
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:27:1
+   |
+25 | glob.glob(r"C:\tmp\*.py")
+26 | glob.glob("**/*.py")
+27 | glob.glob("a**b", recursive=True)
+   | ^^^^^^^^^
+28 | glob.glob("")
+29 | glob.glob(pattern)
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:28:1
+   |
+26 | glob.glob("**/*.py")
+27 | glob.glob("a**b", recursive=True)
+28 | glob.glob("")
+   | ^^^^^^^^^
+29 | glob.glob(pattern)
+30 | glob.glob(b"*.py")
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:29:1
+   |
+27 | glob.glob("a**b", recursive=True)
+28 | glob.glob("")
+29 | glob.glob(pattern)
+   | ^^^^^^^^^
+30 | glob.glob(b"*.py")
+31 | glob.glob("*.py", **options)
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:30:1
+   |
+28 | glob.glob("")
+29 | glob.glob(pattern)
+30 | glob.glob(b"*.py")
+   | ^^^^^^^^^
+31 | glob.glob("*.py", **options)
+32 | glob.glob("*.py", recursive=recursive)
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:31:1
+   |
+29 | glob.glob(pattern)
+30 | glob.glob(b"*.py")
+31 | glob.glob("*.py", **options)
+   | ^^^^^^^^^
+32 | glob.glob("*.py", recursive=recursive)
+33 | glob.glob("*.py", include_hidden=include_hidden)
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:32:1
+   |
+30 | glob.glob(b"*.py")
+31 | glob.glob("*.py", **options)
+32 | glob.glob("*.py", recursive=recursive)
+   | ^^^^^^^^^
+33 | glob.glob("*.py", include_hidden=include_hidden)
+34 | glob.glob(
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:33:1
+   |
+31 | glob.glob("*.py", **options)
+32 | glob.glob("*.py", recursive=recursive)
+33 | glob.glob("*.py", include_hidden=include_hidden)
+   | ^^^^^^^^^
+34 | glob.glob(
+35 |     # Keep this explanation.
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:34:1
+   |
+32 | glob.glob("*.py", recursive=recursive)
+33 | glob.glob("*.py", include_hidden=include_hidden)
+34 | glob.glob(
+   | ^^^^^^^^^
+35 |     # Keep this explanation.
+36 |     "*.py"
+   |
+help: Replace with `Path(...).glob(...)`
+
+PTH207 [*] Replace `iglob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:43:12
+   |
+41 |     from pathlib import Path as P
+42 |
+43 |     return glob.iglob("*.py", root_dir="src")
+   |            ^^^^^^^^^^
+help: Replace with `Path(...).glob(...)`
+   |
+42 |
+   -     return glob.iglob("*.py", root_dir="src")
+43 +     return P("src").glob("*.py")
+44 |
+   |
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+
+PTH207 [*] Replace `glob` with `Path.glob` or `Path.rglob`
+  --> PTH207.py:47:12
+   |
+46 | def shadowed_import(Path):
+47 |     return glob.glob("*.py")
+   |            ^^^^^^^^^
+help: Replace with `Path(...).glob(...)`
+   |
+3  | from glob import glob as search
+4  + import pathlib
+5  |
+--------------------------------------------------------------------------------
+47 | def shadowed_import(Path):
+   -     return glob.glob("*.py")
+48 +     return pathlib.Path().glob("*.py")
+   |
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically

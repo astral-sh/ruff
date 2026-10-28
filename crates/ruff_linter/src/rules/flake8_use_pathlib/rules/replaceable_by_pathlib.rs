@@ -4,11 +4,9 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::rules::flake8_use_pathlib::helpers::{
-    is_file_descriptor, is_keyword_only_argument_non_default,
-};
+use crate::rules::flake8_use_pathlib::helpers::is_file_descriptor;
 use crate::rules::flake8_use_pathlib::{
-    rules::Glob,
+    rules::glob_call,
     violations::{Joiner, OsListdir, OsPathJoin, OsPathSplitext, PyPath},
 };
 use crate::{Edit, Fix};
@@ -44,22 +42,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
         }
         // PTH207
         ["glob", function @ ("glob" | "iglob")] => {
-            // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
-            // Signature as of Python 3.13 (https://docs.python.org/3/library/glob.html#glob.glob)
-            // ```text
-            //               0           1              2            3                 4
-            // glob.glob(pathname, *, root_dir=None, dir_fd=None, recursive=False, include_hidden=False)
-            // ```
-            if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
-                return;
-            }
-
-            checker.report_diagnostic_if_enabled(
-                Glob {
-                    function: function.to_string(),
-                },
-                range,
-            );
+            glob_call(checker, call, function);
         }
         // PTH208
         ["os", "listdir"] => {

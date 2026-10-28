@@ -101,6 +101,19 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn glob_preview() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_use_pathlib/PTH207.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(Rule::Glob)
+            },
+        )?;
+        assert_diagnostics!("glob_preview", diagnostics);
+        Ok(())
+    }
+
     #[test_case(Path::new("full_name.py"))]
     #[test_case(Path::new("import_as.py"))]
     #[test_case(Path::new("import_from_as.py"))]

@@ -1,7 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{Expr, ExprCall};
+use ruff_text_size::Ranged;
 
-use crate::Violation;
+use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::importer::ImportRequest;
+use crate::rules::flake8_use_pathlib::helpers::is_keyword_only_argument_non_default;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the use of `glob.glob()` and `glob.iglob()`.
@@ -43,6 +48,12 @@ use crate::codes::Category;
 /// it can be less performant than the lower-level alternatives that work directly with strings,
 /// especially on older versions of Python.
 ///
+/// ## Fix safety
+/// In preview, a display-only fix is available for literal relative patterns.
+/// The suggestion requires manual review: `Path.glob()` yields `Path` objects
+/// instead of strings, includes hidden files, and may differ in its handling of
+/// symlinks. Unlike `glob.glob()`, it does not return a list.
+///
 /// ## References
 /// - [Python documentation: `Path.glob`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.glob)
 /// - [Python documentation: `Path.rglob`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.rglob)
@@ -58,9 +69,96 @@ pub(crate) struct Glob {
 }
 
 impl Violation for Glob {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let Glob { function } = self;
         format!("Replace `{function}` with `Path.glob` or `Path.rglob`")
     }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace with `Path(...).glob(...)`".to_string())
+    }
+}
+
+pub(crate) fn glob_call(checker: &Checker, call: &ExprCall, function: &str) {
+    if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
+        return;
+    }
+    let Some(mut diagnostic) = checker.report_diagnostic_if_enabled(
+        Glob {
+            function: function.to_string(),
+        },
+        call.func.range(),
+    ) else {
+        return;
+    };
+    if !checker.settings().preview.is_enabled()
+        || call.arguments.args.len() > 1
+        || checker.comment_ranges().intersects(call.range())
+        || call.arguments.keywords.iter().any(|keyword| {
+            !matches!(
+                keyword.arg.as_deref(),
+                Some("pathname" | "root_dir" | "dir_fd" | "recursive" | "include_hidden")
+            )
+        })
+    {
+        return;
+    }
+    let Some(Expr::StringLiteral(pattern)) = call.arguments.find_argument_value("pathname", 0)
+    else {
+        return;
+    };
+    let value = pattern.value.to_str();
+    // Path.glob requires a relative pattern. Avoid platform-dependent drive
+    // prefixes and separators rather than interpreting them on the host OS.
+    if value.is_empty() || value.starts_with('/') || value.contains(['\\', ':']) {
+        return;
+    }
+    let recursive = match call.arguments.find_keyword("recursive") {
+        None => false,
+        Some(keyword) => match &keyword.value {
+            Expr::BooleanLiteral(boolean) => boolean.value,
+            _ => return,
+        },
+    };
+    if value.contains("**")
+        && (!recursive
+            || value
+                .split('/')
+                .any(|part| part.contains("**") && part != "**"))
+    {
+        return;
+    }
+    if call
+        .arguments
+        .find_keyword("include_hidden")
+        .is_some_and(|keyword| !matches!(&keyword.value, Expr::BooleanLiteral(_)))
+    {
+        return;
+    }
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import("pathlib", "Path"),
+            call.start(),
+            checker.semantic(),
+        )?;
+        let root = call
+            .arguments
+            .find_keyword("root_dir")
+            .filter(|keyword| !keyword.value.is_none_literal_expr())
+            .map_or("", |keyword| checker.locator().slice(&keyword.value));
+        Ok(Fix::applicable_edits(
+            Edit::range_replacement(
+                format!(
+                    "{binding}({root}).glob({})",
+                    checker.locator().slice(pattern)
+                ),
+                call.range(),
+            ),
+            [import_edit],
+            Applicability::DisplayOnly,
+        ))
+    });
 }
