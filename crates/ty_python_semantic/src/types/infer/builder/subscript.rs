@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 use ty_module_resolver::file_to_module;
 
 use super::TypeInferenceBuilder;
+use super::post_inference::type_param_validation::check_no_default_after_typevar_tuple;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
@@ -27,7 +28,7 @@ use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::typed_dict::{
     TypedDictAssignmentKind, TypedDictExtraItems, TypedDictKeyAssignment,
 };
-use crate::types::typevar::{BindingContext, TypeVarSet};
+use crate::types::typevar::{BindingContext, TypeVarKind, TypeVarSet};
 use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, ClassType,
     CycleDetector, DisplaySettings, DynamicType, InternedType, KnownClass, KnownInstanceType,
@@ -1582,6 +1583,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => value_ty.subscript(db, env, slice_ty, expr_context),
         };
+
+        if let Ok(Type::KnownInstance(
+            KnownInstanceType::SubscriptedGeneric(Some(context))
+            | KnownInstanceType::SubscriptedProtocol(Some(context)),
+        )) = subscript_result
+            && let Some(arguments) = subscript.slice.as_tuple_expr()
+        {
+            check_no_default_after_typevar_tuple(
+                &self.context,
+                context.variables(db).zip(&arguments.elts),
+                |(param, arg)| {
+                    param
+                        .is_typevartuple(db)
+                        .then(|| (param.name(db), arg.range()))
+                },
+                |(param, arg)| {
+                    (param.kind(db) == TypeVarKind::LegacyTypeVar
+                        && param.typevar(db).default_type(db, env).is_some())
+                    .then(|| (param.name(db), arg.range()))
+                },
+            );
+        }
 
         subscript_result.map_err(|error| {
             error.report_diagnostics(&self.context, subscript);
