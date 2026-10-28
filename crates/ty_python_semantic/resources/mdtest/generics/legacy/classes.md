@@ -3602,8 +3602,9 @@ func(G())  # error: [invalid-argument-type]
 
 ## Default type parameter after `TypeVarTuple`
 
-A `TypeVar` with a default cannot immediately follow a `TypeVarTuple` in a legacy `Generic[...]` or
-`Protocol[...]` base. The last type argument could fill either the pack or the defaulted `TypeVar`.
+A `TypeVar` with a default cannot follow a `TypeVarTuple` in a legacy `Generic[...]` or
+`Protocol[...]` base. A specialization could bind the last type argument to the `TypeVar` or use its
+default and bind one more argument to the pack.
 
 ```toml
 [environment]
@@ -3645,6 +3646,24 @@ class Grault(Generic[Unpack[Us], Unpack[Ts2]]): ...
 # These are fine:
 class Ok1(Generic[U, *Ts]): ...
 class Ok2(Generic[U, Unpack[Ts]]): ...
+```
+
+A required `TypeVar` between the pack and the defaulted `TypeVar` leaves the same ambiguity.
+
+```py
+# snapshot: invalid-type-variable-default
+class Separated(Generic[*Ts, U, T]): ...
+```
+
+```snapshot
+error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
+  --> src/mdtest_snippet.py:36:33
+   |
+36 | class Separated(Generic[*Ts, U, T]): ...
+   |                         ---     ^ `T` has a default
+   |                         |
+   |                         `Ts` is a TypeVarTuple
+info: Using the default would let the TypeVarTuple consume an extra positional type argument
 ```
 
 ## Inferring constructor type arguments through growing recursive aliases

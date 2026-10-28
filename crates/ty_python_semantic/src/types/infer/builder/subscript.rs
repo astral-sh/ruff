@@ -6,14 +6,15 @@ use ruff_text_size::Ranged;
 use ty_module_resolver::file_to_module;
 
 use super::TypeInferenceBuilder;
+use super::post_inference::type_param_validation::check_no_default_after_typevar_tuple;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY,
-    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_DEFAULT, NOT_SUBSCRIPTABLE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
+    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
     report_invalid_arguments_to_annotated, report_not_subscriptable,
 };
 use crate::types::dict::dict_literal_key_value_types;
@@ -1588,27 +1589,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | KnownInstanceType::SubscriptedProtocol(Some(context)),
         )) = subscript_result
             && let Some(arguments) = subscript.slice.as_tuple_expr()
-            && self.context.is_lint_enabled(&INVALID_TYPE_VARIABLE_DEFAULT)
         {
-            for ((pack, parameter), argument) in context
-                .variables(db)
-                .tuple_windows()
-                .zip(arguments.elts.iter().skip(1))
-            {
-                if pack.is_typevartuple(db)
-                    && parameter.kind(db) == TypeVarKind::LegacyTypeVar
-                    && parameter.typevar(db).default_type(db, env).is_some()
-                    && let Some(builder) = self
-                        .context
-                        .report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, argument)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Type parameter `{}` with a default follows TypeVarTuple `{}`",
-                        parameter.name(db),
-                        pack.name(db),
-                    ));
-                }
-            }
+            check_no_default_after_typevar_tuple(
+                &self.context,
+                context.variables(db).zip(&arguments.elts),
+                |(param, arg)| {
+                    param
+                        .is_typevartuple(db)
+                        .then(|| (param.name(db), arg.range()))
+                },
+                |(param, arg)| {
+                    (param.kind(db) == TypeVarKind::LegacyTypeVar
+                        && param.typevar(db).default_type(db, env).is_some())
+                    .then(|| (param.name(db), arg.range()))
+                },
+            );
         }
 
         subscript_result.map_err(|error| {
