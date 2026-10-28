@@ -141,4 +141,15 @@ help: Replace with `Path("foo", "bar", "baz").write_text("test")`
    - with Path("foo", "bar", "baz").open("w") as f:
    -     f.write("test")
 25 + Path("foo", "bar", "baz").write_text("test")
+26 |
    |
+
+FURB103 `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test")`
+  --> FURB103_1.py:29:6
+   |
+28 | # See: https://github.com/astral-sh/ruff/issues/29452
+29 | with Path("file.txt").open("w") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+30 |     flag and f.write("test")
+   |
+help: Replace with `Path("file.txt").write_text("test")`

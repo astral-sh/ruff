@@ -154,7 +154,7 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                     );
 
                     if let Some(fix) =
-                        generate_fix(self.checker, &open, self.with_stmt, &suggestion)
+                        generate_fix(self.checker, &open, self.with_stmt, expr, &suggestion)
                     {
                         diagnostic.set_fix(fix);
                     }
@@ -205,9 +205,18 @@ fn generate_fix(
     checker: &Checker,
     open: &FileOpen,
     with_stmt: &ast::StmtWith,
+    call_expr: &Expr,
     suggestion: &str,
 ) -> Option<Fix> {
-    if !(with_stmt.items.len() == 1 && matches!(with_stmt.body.as_slice(), [Stmt::Expr(_)])) {
+    if with_stmt.items.len() != 1 {
+        return None;
+    }
+
+    let [Stmt::Expr(ast::StmtExpr { value, .. })] = with_stmt.body.as_slice() else {
+        return None;
+    };
+
+    if value.as_ref() != call_expr {
         return None;
     }
 

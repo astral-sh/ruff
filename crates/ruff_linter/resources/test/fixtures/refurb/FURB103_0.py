@@ -167,3 +167,15 @@ with open("tmp_path/pyproject.toml", "w") as f:
 # `open` accepts a file descriptor, but `Path` does not
 with open(3, "w") as f:
     f.write("test")
+
+# See: https://github.com/astral-sh/ruff/issues/29452
+# Do not offer fix when `write()` is nested within an expression
+with open("file.txt", "w") as f:
+    flag and f.write("test")
+
+with open("file.txt", "w") as f:
+    print(f.write("test"))
+
+with open("file.txt", "w") as f:
+    f.write("test") if flag else None
+
