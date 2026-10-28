@@ -1806,6 +1806,7 @@ impl<'db> Signature<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        bound_receiver: Type<'db>,
     ) -> Option<Self> {
         let context = self.generic_context?;
         if context.len(db) != 1 || !self.has_implicit_positional_receiver_annotation() {
@@ -1822,7 +1823,17 @@ impl<'db> Signature<'db> {
             .value
             .first_mut()?;
         receiver.annotated_type = match receiver.annotated_type() {
-            Type::SubclassOf(_) => bound.to_meta_type(db, env),
+            Type::SubclassOf(_) => {
+                let class_bound = bound.to_meta_type(db, env);
+                // The meta-type of a protocol only admits nominal subclasses. If the class
+                // does not inherit the protocol, let inference check structural conformance.
+                if bound.is_protocol_instance()
+                    && !bound_receiver.is_assignable_to(db, env, class_bound)
+                {
+                    return None;
+                }
+                class_bound
+            }
             _ => bound,
         };
         signature.generic_context = None;

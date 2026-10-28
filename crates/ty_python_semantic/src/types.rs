@@ -7014,7 +7014,7 @@ impl<'db> Type<'db> {
                         {
                             specialized.overloads
                         } else if let Some(specialized) =
-                            overload.with_unused_self_upper_bound(db, env)
+                            overload.with_unused_self_upper_bound(db, env, self_instance)
                         {
                             smallvec_inline![specialized]
                         } else {

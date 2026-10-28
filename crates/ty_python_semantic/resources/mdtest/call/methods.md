@@ -923,6 +923,18 @@ reveal_type(P.f.__func__.__get__(C)())  # revealed: int
 P.f.__func__.__get__(C())()  # error: [invalid-argument-type]
 ```
 
+A class that implements the protocol structurally is also a valid receiver.
+
+```py
+class Structural:
+    @classmethod
+    def f(cls) -> int:
+        return 0
+
+reveal_type(P.f.__func__.__get__(Structural)())  # revealed: int
+P.f.__func__.__get__(int)()  # error: [invalid-argument-type]
+```
+
 ### Accessing the classmethod as a static member
 
 `inspect.getattr_static` bypasses descriptor binding and returns the `classmethod` descriptor.
