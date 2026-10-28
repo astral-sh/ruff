@@ -2,6 +2,7 @@ use std::fs;
 
 use insta::assert_snapshot;
 use insta_cmd::assert_cmd_snapshot;
+use ruff_python_trivia::textwrap::dedent;
 
 use crate::CliTest;
 
@@ -219,7 +220,14 @@ fn fix_unused_ignore_after_line_continuation() -> anyhow::Result<()> {
     assert!(case.command().arg("--fix").output()?.status.success());
     assert_eq!(
         fs::read_to_string(case.root().join("example.py"))?,
-        "\nx = 1\n+2\n# This backslash is part of the comment \\\ny = 2\n"
+        dedent(
+            r"
+            x = 1
+            +2
+            # This backslash is part of the comment \
+            y = 2
+            "
+        )
     );
     Ok(())
 }

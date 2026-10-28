@@ -59,10 +59,6 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
         unused.push(suppression);
     }
 
-    if unused.is_empty() {
-        return;
-    }
-
     let mut unused_iter = unused
         .iter()
         .filter(|suppression| {
@@ -74,6 +70,10 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
             !context.is_suppression_used(suppression.id())
         })
         .peekable();
+
+    if unused_iter.peek().is_none() {
+        return;
+    }
 
     let source = source_text(context.db, context.file());
     let parsed = parsed_module(context.db, context.python_file).load(context.db);
