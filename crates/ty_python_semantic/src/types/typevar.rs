@@ -883,7 +883,7 @@ impl<'db> TypeVarInstance<'db> {
 ///
 /// `0` is the source-level occurrence. Higher values distinguish other occurrences of the same
 /// typevar. Inferability is determined by membership in a [`TypeVarSet`], not by the nonce itself.
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::SalsaValue)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct TypeVarNonce(u32);
 
 // This type does not have any heap storage.
@@ -897,7 +897,7 @@ impl TypeVarNonce {
         self.0
     }
 
-    pub(super) fn increment(self) -> Self {
+    fn increment(self) -> Self {
         Self(
             self.0
                 .checked_add(1)
@@ -953,24 +953,14 @@ impl<'db> TypeVarNonceGenerator<'db> {
             let file = scope.program_file(db);
             definition.program_file(db) == file
                 && contexts.all(|other| other == first)
-                && enclosing_binding_contexts(db, semantic_index(db, file), scope.file_scope_id(db))
-                    .any(|(enclosing, _)| enclosing == first)
+                && enclosing_binding_contexts(semantic_index(db, file), scope.file_scope_id(db))
+                    .any(|enclosing| enclosing == first)
         });
         matches_enclosing || !self.seen.borrow_mut().insert(generic_context)
     }
 
-    pub(crate) fn next(&self, db: &'db dyn Db) -> TypeVarNonce {
-        let mut nonce = self.next.get();
-        if nonce == TypeVarNonce::FIRST
-            && let Some(scope) = self.call_site_scope
-        {
-            // A recursive call must not reuse an occurrence already fixed by its enclosing body.
-            let index = semantic_index(db, scope.program_file(db));
-            for (_, lexical_nonce) in enclosing_binding_contexts(db, index, scope.file_scope_id(db))
-            {
-                nonce = nonce.max(lexical_nonce.increment());
-            }
-        }
+    pub(crate) fn next(&self) -> TypeVarNonce {
+        let nonce = self.next.get();
         self.next.set(nonce.increment());
         nonce
     }
@@ -1262,18 +1252,6 @@ impl<'db> BoundTypeVarInstance<'db> {
             BindingContext::Synthetic(env.program(db)),
             None,
             TypeVarNonce::NONE,
-        )
-    }
-
-    /// Returns the same typevar with a different occurrence identity.
-    pub(crate) fn with_freshness(self, db: &'db dyn Db, nonce: TypeVarNonce) -> Self {
-        Self::new_internal(
-            db,
-            self.typevar(db),
-            BoundTypeVarIdentity {
-                freshness: nonce,
-                ..self.identity(db)
-            },
         )
     }
 

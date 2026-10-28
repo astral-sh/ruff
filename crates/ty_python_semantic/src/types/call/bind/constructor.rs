@@ -121,7 +121,7 @@ impl<'db> ConstructorBinding<'db> {
             return;
         }
 
-        let nonce = nonce_generator.next(db);
+        let nonce = nonce_generator.next();
         let delta = nonce.value();
         let type_mapping = TypeMapping::FreshenBoundTypeVars {
             generic_context,
@@ -173,7 +173,6 @@ impl<'db> ConstructorBinding<'db> {
                         .filter(|typevar| typevar.typevar(db).is_self(db)),
                 ),
             );
-            overload.receiver_typevars = Some((signature_context, nonce));
             overload.signature = overload.signature.apply_type_mapping_impl(
                 db,
                 &TypeMapping::FreshenBoundTypeVars {
