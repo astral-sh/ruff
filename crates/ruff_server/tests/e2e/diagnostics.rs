@@ -15,7 +15,7 @@ fn inline_script_configuration_in_open_document() -> Result<()> {
         .build();
     server.open_text_document(
         "script.py",
-        "# /// script\n# dependencies = []\n# ///\nimport os\n",
+        "# /// script\n# [tool.ruff]\n# ///\nimport os\n",
         1,
     );
     let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) =
@@ -39,7 +39,7 @@ fn inline_script_configuration_in_open_document() -> Result<()> {
     let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) =
         server.document_diagnostic_request("script.py", None)
     else {
-        anyhow::bail!("expected a full report after removing the script block");
+        anyhow::bail!("expected a full report after removing the inline table");
     };
     assert!(report.full_document_diagnostic_report.items.is_empty());
     Ok(())
@@ -57,7 +57,7 @@ fn script_requires_python_in_open_document() -> Result<()> {
     let code = "from typing import Optional\nx: Optional[int]\n";
     server.open_text_document(
         "script.py",
-        format!("# /// script\n# requires-python = '>=3.10'\n# tool.ruff.lint.select = ['UP045']\n# ///\n{code}"),
+        format!("# /// script\n# requires-python = '>=3.10'\n# ///\n{code}"),
         1,
     );
     let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) =

@@ -4069,9 +4069,8 @@ fn a005_module_shadowing_strict_default() -> Result<()> {
 #[test]
 fn inline_script_configuration() -> Result<()> {
     let test = CliTest::with_file("ruff.toml", "lint.select = ['T201']")?;
-    test.write_file("ordinary.py", "import os\nprint(missing)\n")?;
     for (filename, metadata) in [
-        ("other_tool.py", "[tool.other]"),
+        ("inherited.py", "[tool.other]"),
         ("defaults.py", "[tool.ruff]"),
         ("configured.py", "[tool.ruff.lint]\n# select = ['F821']"),
     ] {
@@ -4088,12 +4087,9 @@ fn inline_script_configuration() -> Result<()> {
     defaults.py:4:1: I001 [*] Import block is un-sorted or un-formatted
     defaults.py:4:8: F401 [*] `os` imported but unused
     defaults.py:5:7: F821 Undefined name `missing`
-    ordinary.py:2:1: T201 `print` found
-    other_tool.py:4:1: I001 [*] Import block is un-sorted or un-formatted
-    other_tool.py:4:8: F401 [*] `os` imported but unused
-    other_tool.py:5:7: F821 Undefined name `missing`
-    Found 8 errors.
-    [*] 4 fixable with `--fix` (1 unsafe fix available with `--fix --unsafe-fixes`).
+    inherited.py:5:1: T201 `print` found
+    Found 5 errors.
+    [*] 2 fixable with `--fix` (1 unsafe fix available with `--fix --unsafe-fixes`).
 
     ----- stderr -----
     ");
@@ -4182,7 +4178,7 @@ fn script_requires_python() -> Result<()> {
         "pyproject.toml",
         r#"
 [project]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 [tool.ruff]
 per-file-target-version = { "old_*.py" = "py39" }
 [tool.ruff.lint]
@@ -4198,15 +4194,14 @@ select = ["UP045"]
     ] {
         test.write_file(name, &format!("# /// script\n# {metadata}\n# ///\n{code}"))?;
     }
-    assert_cmd_snapshot!(test.check_command().args(["--select=UP045", "."]), @"
+    assert_cmd_snapshot!(test.check_command().arg("."), @"
     success: false
     exit_code: 1
     ----- stdout -----
     fallback.py:5:4: UP045 [*] Use `X | None` for type annotations
-    old_fallback.py:5:4: UP045 [*] Use `X | None` for type annotations
     old_script.py:5:4: UP045 [*] Use `X | None` for type annotations
-    Found 3 errors.
-    [*] 3 fixable with `--fix`.
+    Found 2 errors.
+    [*] 2 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -4227,12 +4222,7 @@ fn script_requires_python_cli_override_and_cache() -> Result<()> {
     ])?;
     let check = |args: &[&str]| {
         test.command()
-            .args([
-                "check",
-                "--select=UP045",
-                "--output-format=concise",
-                "script.py",
-            ])
+            .args(["check", "--output-format=concise", "script.py"])
             .args(args)
             .output()
     };
@@ -4263,7 +4253,7 @@ fn script_requires_python_stdin() -> Result<()> {
         "ruff.toml",
         "target-version = 'py39'\nlint.select = ['UP045']",
     )?;
-    assert_cmd_snapshot!(test.check_command().args(["--select=UP045", "--fix", "-"]).pass_stdin(
+    assert_cmd_snapshot!(test.check_command().args(["--fix", "-"]).pass_stdin(
         "# /// script\n# requires-python = '>=3.10'\n# ///\nfrom typing import Optional\nx: Optional[int]\n"
     ), @"
     success: true

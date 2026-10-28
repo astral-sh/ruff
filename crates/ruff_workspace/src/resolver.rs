@@ -294,8 +294,8 @@ impl<'a, T: ConfigurationTransformer> SettingsForSource<'a, T> {
         &self.project.settings
     }
 
-    /// A PEP 723 script has its own lint and format settings, even if it only
-    /// declares dependencies. An inline `extend` is resolved from the script's directory.
+    /// Resolve settings that depend on the contents of a Python script. An inline
+    /// `[tool.ruff]` is a configuration file in its own right, even when empty.
     pub fn resolve_script(
         &self,
         path: Option<&Path>,
@@ -311,20 +311,39 @@ impl<'a, T: ConfigurationTransformer> SettingsForSource<'a, T> {
             return Ok(None);
         };
 
-        let root = fs::normalize_path(path.and_then(Path::parent).unwrap_or(Path::new(".")));
-        let mut configuration = Configuration::from_options(metadata.options, path, &root)?;
-        if let Some(version) = metadata.target_version {
-            configuration.target_version.get_or_insert(version.into());
-            // Only the script's own per-file targets can override its requirement.
-            configuration
-                .per_file_target_version
-                .get_or_insert_default();
+        if let Some(options) = metadata.options {
+            let root = fs::normalize_path(path.and_then(Path::parent).unwrap_or(Path::new(".")));
+            let mut configuration = Configuration::from_options(options, path, &root)?;
+            if let Some(version) = metadata.target_version {
+                configuration.target_version.get_or_insert(version.into());
+                // Only the script's own per-file targets can override its requirement.
+                configuration
+                    .per_file_target_version
+                    .get_or_insert_default();
+            }
+            if let Some(extend) = &configuration.extend {
+                let base = resolve_configuration(&root.join(extend), ConfigurationOrigin::Unknown)?;
+                configuration = configuration.combine(base);
+            }
+            return ConfigurationAndSettings::new(configuration, self.overrides, &root, path)
+                .map(Some);
         }
-        if let Some(extend) = &configuration.extend {
-            let base = resolve_configuration(&root.join(extend), ConfigurationOrigin::Unknown)?;
-            configuration = configuration.combine(base);
-        }
-        ConfigurationAndSettings::new(configuration, self.overrides, &root, path).map(Some)
+
+        let Some(version) = metadata.target_version else {
+            return Ok(None);
+        };
+        let configuration = Configuration {
+            target_version: Some(version.into()),
+            per_file_target_version: Some(Vec::new()),
+            ..self.project.configuration.clone()
+        };
+        ConfigurationAndSettings::new(
+            configuration,
+            self.overrides,
+            &self.project.settings.file_resolver.project_root,
+            self.project.config_path.as_deref(),
+        )
+        .map(Some)
     }
 
     pub fn linter(
