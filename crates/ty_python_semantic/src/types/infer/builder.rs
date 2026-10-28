@@ -898,7 +898,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.scope
     }
 
-    /// Returns call bindings annotated with the call site's enclosing binding contexts.
+    /// Returns call bindings annotated with the call site's enclosing typevar occurrences.
     ///
     /// Call binding uses this as an optimization hint to avoid freshening generic callable
     /// signatures when the callable's generic context cannot collide with a containing scope.
@@ -907,10 +907,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         callable_type
             .bindings(db, self.program_environment())
             .with_enclosing_binding_contexts(enclosing_binding_contexts(
+                db,
                 self.index,
                 self.scope().file_scope_id(db),
             ))
-            .resolve_typevars(db, self.program_environment())
     }
 
     fn settings(&self) -> &AnalysisSettings {

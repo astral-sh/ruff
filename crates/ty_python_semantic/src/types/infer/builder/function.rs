@@ -238,7 +238,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .ancestor_scopes(containing_scope)
             .filter_map(|(_, scope)| GenericContext::lexical_of_node(db, scope.node(), self.index))
         {
-            ty = ty.resolve_typevars(db, env, context, TypeVarNonce::LEXICAL);
+            ty = ty.resolve_typevars(db, env, context, TypeVarNonce::NONE.increment());
         }
         ty
     }

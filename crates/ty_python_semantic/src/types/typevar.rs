@@ -869,9 +869,8 @@ impl<'db> TypeVarInstance<'db> {
 
 /// A nonce that gives a bound typevar occurrence a fresh identity.
 ///
-/// `0` identifies an unresolved generic template, and `1` its fixed lexical occurrence inside
-/// the definition's body. Higher values distinguish newly opened generic binders. Inferability
-/// is determined by membership in a [`TypeVarSet`], not by the nonce itself.
+/// `0` is the source-level occurrence. Higher values distinguish other occurrences of the same
+/// typevar. Inferability is determined by membership in a [`TypeVarSet`], not by the nonce itself.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct TypeVarNonce(u32);
 
@@ -880,20 +879,17 @@ impl get_size2::GetSize for TypeVarNonce {}
 
 impl TypeVarNonce {
     pub(crate) const NONE: Self = Self(0);
-    pub(crate) const LEXICAL: Self = Self(1);
-    const FIRST: Self = Self(2);
+    const FIRST: Self = Self(1);
 
     pub(crate) const fn value(self) -> u32 {
         self.0
     }
 
-    /// Returns the next fresh nonce, skipping the reserved template and lexical occurrences.
     pub(crate) fn increment(self) -> Self {
         Self(
             self.0
                 .checked_add(1)
-                .expect("exhausted bound typevar freshness nonces")
-                .max(Self::FIRST.0),
+                .expect("exhausted bound typevar freshness nonces"),
         )
     }
 
@@ -938,10 +934,14 @@ impl Default for TypeVarNonceGenerator<'_> {
 impl<'db> TypeVarNonceGenerator<'db> {
     pub(crate) fn record_enclosing_binding_contexts(
         &self,
-        binding_contexts: impl IntoIterator<Item = BindingContext<'db>>,
+        binding_contexts: impl IntoIterator<Item = (BindingContext<'db>, TypeVarNonce)>,
     ) {
         let mut inner = self.inner.borrow_mut();
-        inner.enclosing.extend(binding_contexts);
+        for (context, nonce) in binding_contexts {
+            inner.enclosing.insert(context);
+            // A recursive call must not reuse an occurrence already fixed by its enclosing body.
+            inner.next = inner.next.max(nonce.increment());
+        }
     }
 
     pub(crate) fn should_freshen(
@@ -1263,11 +1263,8 @@ impl<'db> BoundTypeVarInstance<'db> {
         )
     }
 
-    /// Resolves an unresolved typevar, preserving bindings already captured from another scope.
-    pub(crate) fn resolve(self, db: &'db dyn Db, nonce: TypeVarNonce) -> Self {
-        if self.freshness(db) != TypeVarNonce::NONE {
-            return self;
-        }
+    /// Returns the same typevar with a different occurrence identity.
+    pub(crate) fn with_freshness(self, db: &'db dyn Db, nonce: TypeVarNonce) -> Self {
         Self::new_internal(
             db,
             self.typevar(db),
@@ -1929,7 +1926,7 @@ pub struct BoundTypeVarIdentity<'db> {
     /// If [`Some`], this indicates that this type variable is the `args` or `kwargs` component
     /// of a `ParamSpec` i.e., `P.args` or `P.kwargs`.
     pub(super) paramspec_attr: Option<ParamSpecAttrKind>,
-    /// Identifies a template, lexical occurrence, or opened binder; see [`TypeVarNonce`].
+    /// The freshness nonce for this bound typevar occurrence; `0` is the source-level occurrence.
     freshness: TypeVarNonce,
 }
 

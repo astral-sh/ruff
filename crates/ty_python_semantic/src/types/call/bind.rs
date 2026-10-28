@@ -630,12 +630,13 @@ pub(crate) struct Bindings<'db> {
     /// Each element may contain multiple `CallableBinding`s if it came from an intersection.
     elements: SmallVec<[BindingsElement<'db>; 1]>,
 
-    /// Binding contexts that enclose this call site, if known.
+    /// Binding contexts that enclose this call site, paired with their typevar occurrence nonces.
     ///
     /// This is an optimization hint for deciding when direct-call generic freshening is needed.
     /// `None` means the caller did not provide lexical collision information. `Some([])` means the
-    /// caller knows there are no enclosing binding contexts.
-    enclosing_binding_contexts: Option<Box<[BindingContext<'db>]>>,
+    /// caller knows there are no enclosing typevars. Their nonces let freshening avoid collisions
+    /// with the enclosing occurrences without reserving particular nonce values.
+    enclosing_binding_contexts: Option<Box<[(BindingContext<'db>, TypeVarNonce)]>>,
 }
 
 /// The set of overload candidates at a given call-site, before argument type inference.
@@ -898,58 +899,9 @@ impl<'db> Bindings<'db> {
         self
     }
 
-    /// Resolves each call candidate's generic parameters to distinct inference occurrences.
-    pub(crate) fn resolve_typevars(
-        mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Self {
-        self.resolve_typevars_in_place(db, env, &TypeVarNonceGenerator::default());
-        self
-    }
-
-    fn resolve_typevars_in_place(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        nonces: &TypeVarNonceGenerator<'db>,
-    ) {
-        for item in self.iter_callable_items_mut() {
-            for overload in &mut item.callable_mut().overloads {
-                let Some(generic_context) = overload.signature.generic_context else {
-                    continue;
-                };
-                let nonce = nonces.next();
-                overload.receiver_typevars = Some((generic_context, nonce));
-                overload.signature =
-                    overload
-                        .signature
-                        .freshen_bound_typevars(db, env, nonce.value());
-                if let Some(context) = overload.constructor_context {
-                    overload.set_constructor_context(
-                        db,
-                        context.with_instance_type(context.instance_type().resolve_typevars(
-                            db,
-                            env,
-                            generic_context,
-                            nonce,
-                        )),
-                    );
-                }
-                overload.return_ty = overload.initial_return_type(db);
-            }
-            if let Some(downstream) = item
-                .as_constructor_mut()
-                .and_then(ConstructorBinding::downstream_constructor_mut)
-            {
-                downstream.resolve_typevars_in_place(db, env, nonces);
-            }
-        }
-    }
-
     pub(crate) fn with_enclosing_binding_contexts(
         mut self,
-        enclosing_binding_contexts: impl IntoIterator<Item = BindingContext<'db>>,
+        enclosing_binding_contexts: impl IntoIterator<Item = (BindingContext<'db>, TypeVarNonce)>,
     ) -> Self {
         self.enclosing_binding_contexts = Some(enclosing_binding_contexts.into_iter().collect());
         self
@@ -3727,7 +3679,7 @@ impl<'db> CallableBinding<'db> {
                 continue;
             };
             if nonce_generator.should_freshen(db, generic_context) {
-                overload.freshen_bound_typevars(db, env, nonce.value());
+                overload.freshen_bound_typevars(db, env, nonce);
             }
         }
     }
@@ -8733,12 +8685,26 @@ impl<'db> Binding<'db> {
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        delta: u32,
+        nonce: TypeVarNonce,
     ) {
-        if self.signature.generic_context.is_none() {
+        let Some(generic_context) = self.signature.generic_context else {
             return;
+        };
+        self.receiver_typevars = Some((generic_context, nonce));
+        self.signature = self
+            .signature
+            .freshen_bound_typevars(db, env, nonce.value());
+        if let Some(context) = self.constructor_context {
+            self.set_constructor_context(
+                db,
+                context.with_instance_type(context.instance_type().resolve_typevars(
+                    db,
+                    env,
+                    generic_context,
+                    nonce,
+                )),
+            );
         }
-        self.signature = self.signature.freshen_bound_typevars(db, env, delta);
         self.return_ty = self.initial_return_type(db);
     }
 
