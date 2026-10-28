@@ -203,6 +203,28 @@ fn fix() -> anyhow::Result<()> {
 }
 
 #[test]
+fn fix_unused_ignore_after_line_continuation() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "example.py",
+        r"
+            x = 1 \
+                # ty: ignore[invalid-assignment]
+            +2
+            # This backslash is part of the comment \
+            # type: ignore
+            y = 2
+            ",
+    )?;
+
+    assert!(case.command().arg("--fix").output()?.status.success());
+    assert_eq!(
+        fs::read_to_string(case.root().join("example.py"))?,
+        "\nx = 1\n+2\n# This backslash is part of the comment \\\ny = 2\n"
+    );
+    Ok(())
+}
+
+#[test]
 fn fix_unfixable() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("has_syntax_error.py", "x = (\n"),
