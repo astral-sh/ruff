@@ -9867,7 +9867,7 @@ impl<'db> Type<'db> {
             env,
             context
                 .variables(db)
-                .map(|typevar| typevar.resolve(db, TypeVarNonce::LEXICAL)),
+                .map(|typevar| typevar.with_freshness(db, typevar.freshness(db).increment())),
         );
         self.apply_specialization(
             db,

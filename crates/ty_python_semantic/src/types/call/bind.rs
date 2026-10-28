@@ -228,7 +228,7 @@ fn freshen_generic_contexts_in_type<'db>(
                 env,
                 &TypeMapping::FreshenBoundTypeVars {
                     generic_context,
-                    delta: nonce_generator.next().value(),
+                    delta: nonce_generator.next(db).value(),
                 },
                 TypeContext::default(),
             )
@@ -910,55 +910,6 @@ impl<'db> Bindings<'db> {
                 {
                     downstream.shrink_to_fit();
                 }
-            }
-        }
-    }
-
-    /// Resolves each call candidate's generic parameters to distinct inference occurrences.
-    pub(crate) fn resolve_typevars(
-        mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Self {
-        self.resolve_typevars_in_place(db, env, &TypeVarNonceGenerator::default());
-        self
-    }
-
-    fn resolve_typevars_in_place(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        nonces: &TypeVarNonceGenerator<'db>,
-    ) {
-        for item in self.iter_callable_items_mut() {
-            for overload in &mut item.callable_mut().overloads {
-                let Some(generic_context) = overload.signature.generic_context else {
-                    continue;
-                };
-                let nonce = nonces.next();
-                overload.receiver_typevars = Some((generic_context, nonce));
-                overload.signature =
-                    overload
-                        .signature
-                        .freshen_bound_typevars(db, env, nonce.value());
-                if let Some(context) = overload.constructor_context {
-                    overload.set_constructor_context(
-                        db,
-                        context.with_instance_type(context.instance_type().resolve_typevars(
-                            db,
-                            env,
-                            generic_context,
-                            nonce,
-                        )),
-                    );
-                }
-                overload.return_ty = overload.initial_return_type(db);
-            }
-            if let Some(downstream) = item
-                .as_constructor_mut()
-                .and_then(ConstructorBinding::downstream_constructor_mut)
-            {
-                downstream.resolve_typevars_in_place(db, env, nonces);
             }
         }
     }
@@ -3728,13 +3679,13 @@ impl<'db> CallableBinding<'db> {
         // We can use a single new nonce here for all of the generic overloads, since overloads are
         // not able to share generic contexts. That means we cannot freshen two overloads in a way
         // that causes their typevars to collide.
-        let nonce = nonce_generator.next();
+        let nonce = nonce_generator.next(db);
         for overload in &mut self.overloads {
             let Some(generic_context) = overload.signature.generic_context else {
                 continue;
             };
             if nonce_generator.should_freshen(db, generic_context) {
-                overload.freshen_bound_typevars(db, env, nonce.value());
+                overload.freshen_bound_typevars(db, env, nonce);
             }
         }
     }
@@ -8902,12 +8853,26 @@ impl<'db> Binding<'db> {
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        delta: u32,
+        nonce: TypeVarNonce,
     ) {
-        if self.signature.generic_context.is_none() {
+        let Some(generic_context) = self.signature.generic_context else {
             return;
+        };
+        self.receiver_typevars = Some((generic_context, nonce));
+        self.signature = self
+            .signature
+            .freshen_bound_typevars(db, env, nonce.value());
+        if let Some(context) = self.constructor_context {
+            self.set_constructor_context(
+                db,
+                context.with_instance_type(context.instance_type().resolve_typevars(
+                    db,
+                    env,
+                    generic_context,
+                    nonce,
+                )),
+            );
         }
-        self.signature = self.signature.freshen_bound_typevars(db, env, delta);
         self.return_ty = self.initial_return_type(db);
     }
 

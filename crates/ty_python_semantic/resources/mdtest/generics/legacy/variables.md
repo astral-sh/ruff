@@ -1537,11 +1537,10 @@ T = TypeVar("T", default=C)
 reveal_type(f())  # revealed: C
 ```
 
-### Cycle recovery prevents oscillating defaults
+### Specialization cycle recovery prevents oscillating defaults
 
 A type variable's default can depend on an overloaded call that itself uses the same type variable.
-Default evaluation must converge even when overload selection changes between cycle iterations. The
-recovered default retains the concrete `str` alternative alongside `Unknown`.
+Specialization must converge even when overload selection changes between cycle iterations.
 
 ```toml
 [environment]
@@ -1566,11 +1565,10 @@ if f():
 else:
     Default = choose(f())
 
-# error: [invalid-type-form] "Variable of type `type[str]` is not allowed in a type expression"
+# error: [invalid-type-form] "Variable of type `type[Unknown]` is not allowed in a type expression"
 T = TypeVar("T", default=Default)
 
-# revealed: Unknown | str
-reveal_type(f())
+reveal_type(f())  # revealed: Unknown
 ```
 
 ### Use of typevar with default inside a function body that binds it

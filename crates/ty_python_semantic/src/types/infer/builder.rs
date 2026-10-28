@@ -907,7 +907,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         callable_type
             .bindings(db, self.program_environment())
             .with_call_site_scope(self.scope())
-            .resolve_typevars(db, self.program_environment())
     }
 
     fn settings(&self) -> &AnalysisSettings {
