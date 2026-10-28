@@ -598,6 +598,15 @@ pub(crate) fn infer_predicate_truthiness<'db>(
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _| Truthiness::Ambiguous,
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, current: Truthiness, _| {
+        // A predicate can guard one of its own inputs. Keep both outcomes when iterations
+        // disagree, but give the initial ambiguous result a chance to resolve first.
+        if cycle.iteration() > crate::TAINTED_CYCLES {
+            previous.union(current)
+        } else {
+            current
+        }
+    },
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn cached_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
