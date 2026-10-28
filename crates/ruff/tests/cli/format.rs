@@ -2462,7 +2462,7 @@ fn range_formatting_notebook() -> Result<()> {
 
 #[test]
 fn inline_script_formatter() -> Result<()> {
-    let test = CliTest::with_file("ruff.toml", "format.quote-style = 'single'")?;
+    let test = CliTest::with_file("ruff.toml", "preview = true\nformat.quote-style = 'single'")?;
     test.write_file("shared.toml", "format.quote-style = 'single'")?;
     for (name, metadata) in [
         ("inherited.py", "dependencies = []"),
@@ -2474,6 +2474,13 @@ fn inline_script_formatter() -> Result<()> {
             &format!("# /// script\n# {metadata}\n# ///\nx = 'hello'\n"),
         )?;
     }
+    assert!(
+        test.command()
+            .args(["format", "--no-preview", "--check", "scripts"])
+            .output()?
+            .status
+            .success()
+    );
     assert!(
         test.command()
             .args(["format", "scripts"])
@@ -2523,7 +2530,7 @@ fn inline_script_formatter() -> Result<()> {
 fn script_requires_python_formatter() -> Result<()> {
     let test = CliTest::with_file(
         "ruff.toml",
-        "per-file-target-version = { 'script.py' = 'py39' }",
+        "preview = true\nper-file-target-version = { 'script.py' = 'py39' }",
     )?;
     let script = "# /// script\n# requires-python = '>=3.10'\n# ///\nwith open('a_really_long_foo') as foo, open('a_really_long_bar') as bar, open('a_really_long_baz') as baz:\n    pass\n";
     test.write_file("script.py", script)?;

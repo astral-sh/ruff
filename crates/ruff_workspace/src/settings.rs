@@ -6,13 +6,13 @@ use ruff_linter::display_settings;
 use ruff_linter::settings::LinterSettings;
 use ruff_linter::settings::types::{
     CompiledPerFileTargetVersionList, ExtensionMapping, FilePattern, FilePatternSet, OutputFormat,
-    UnsafeFixes,
+    PreviewMode, UnsafeFixes,
 };
 use ruff_macros::CacheKey;
-use ruff_python_ast::{PySourceType, PythonVersion};
+use ruff_python_ast::{PySourceType, PythonVersion, SourceType};
 use ruff_python_formatter::{
-    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, NestedStringQuoteStyle, PreviewMode,
-    PyFormatOptions, QuoteStyle,
+    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, NestedStringQuoteStyle,
+    PreviewMode as FormatterPreviewMode, PyFormatOptions, QuoteStyle,
 };
 use ruff_source_file::find_newline;
 use std::fmt;
@@ -21,6 +21,8 @@ use std::path::{Path, PathBuf};
 #[expect(clippy::struct_excessive_bools)]
 #[derive(Debug, CacheKey)]
 pub struct Settings {
+    /// Top-level preview mode for features shared by the linter and formatter.
+    pub preview: PreviewMode,
     #[cache_key(ignore)]
     pub cache_dir: PathBuf,
     #[cache_key(ignore)]
@@ -42,10 +44,17 @@ pub struct Settings {
     pub analyze: AnalyzeSettings,
 }
 
+impl Settings {
+    pub fn should_read_script_metadata(&self, source_type: SourceType) -> bool {
+        self.preview.is_enabled() && source_type == SourceType::Python(PySourceType::Python)
+    }
+}
+
 impl Default for Settings {
     fn default() -> Self {
         let project_root = path_dedot::CWD.as_path();
         Self {
+            preview: PreviewMode::Disabled,
             cache_dir: cache_dir(project_root),
             fix: false,
             fix_only: false,
@@ -72,6 +81,7 @@ impl fmt::Display for Settings {
                 self.fix_only,
                 self.output_format,
                 self.output_prefer_rule_codes,
+                self.preview,
                 self.show_fixes,
                 self.unsafe_fixes,
                 self.file_resolver | nested,
@@ -181,7 +191,7 @@ impl FileResolverSettings {
 pub struct FormatterSettings {
     pub exclude: FilePatternSet,
     pub extension: ExtensionMapping,
-    pub preview: PreviewMode,
+    pub preview: FormatterPreviewMode,
     /// The non-path-resolved Python version specified by the `target-version` input option.
     ///
     /// See [`FormatterSettings::resolve_target_version`] for a way to obtain the Python version for
@@ -277,7 +287,7 @@ impl Default for FormatterSettings {
             extension: ExtensionMapping::default(),
             unresolved_target_version: default_options.target_version(),
             per_file_target_version: CompiledPerFileTargetVersionList::default(),
-            preview: PreviewMode::Disabled,
+            preview: FormatterPreviewMode::Disabled,
             line_width: default_options.line_width(),
             line_ending: LineEnding::Auto,
             indent_style: default_options.indent_style(),

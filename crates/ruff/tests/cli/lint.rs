@@ -4068,7 +4068,7 @@ fn a005_module_shadowing_strict_default() -> Result<()> {
 
 #[test]
 fn inline_script_configuration() -> Result<()> {
-    let test = CliTest::with_file("ruff.toml", "lint.select = ['T201']")?;
+    let test = CliTest::with_file("ruff.toml", "preview = true\nlint.select = ['T201']")?;
     for (filename, metadata) in [
         ("inherited.py", "[tool.other]"),
         ("defaults.py", "[tool.ruff]"),
@@ -4083,11 +4083,11 @@ fn inline_script_configuration() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    configured.py:6:7: F821 Undefined name `missing`
-    defaults.py:4:1: I001 [*] Import block is un-sorted or un-formatted
-    defaults.py:4:8: F401 [*] `os` imported but unused
-    defaults.py:5:7: F821 Undefined name `missing`
-    inherited.py:5:1: T201 `print` found
+    configured.py:6:7: undefined-name: Undefined name `missing`
+    defaults.py:4:1: unsorted-imports: [*] Import block is un-sorted or un-formatted
+    defaults.py:4:8: unused-import: [*] `os` imported but unused
+    defaults.py:5:7: undefined-name: Undefined name `missing`
+    inherited.py:5:1: print: `print` found
     Found 5 errors.
     [*] 2 fixable with `--fix` (1 unsafe fix available with `--fix --unsafe-fixes`).
 
@@ -4100,7 +4100,7 @@ fn inline_script_configuration() -> Result<()> {
 fn inline_script_namespace_packages() -> Result<()> {
     let test = CliTest::with_file(
         "ruff.toml",
-        "namespace-packages = ['pkg']\nlint.select = ['N999']",
+        "preview = true\nnamespace-packages = ['pkg']\nlint.select = ['N999']",
     )?;
     let check = || test.check_command().arg("pkg/Invalid-Name.py").output();
     test.write_file(
@@ -4110,7 +4110,7 @@ fn inline_script_namespace_packages() -> Result<()> {
     assert!(check()?.status.success());
 
     test.write_file("pkg/Invalid-Name.py", "# /// script\n# tool.ruff.lint.select = ['N999']\n# tool.ruff.namespace-packages = ['.']\n# ///\n")?;
-    assert!(str::from_utf8(&check()?.stdout)?.contains("N999"));
+    assert!(str::from_utf8(&check()?.stdout)?.contains("invalid-module-name"));
     Ok(())
 }
 
@@ -4118,22 +4118,29 @@ fn inline_script_namespace_packages() -> Result<()> {
 fn invalid_inline_script_configuration() -> Result<()> {
     let test = CliTest::with_file(
         "script.py",
-        "# /// script\n# tool.ruff.lint.select = ['UNKNOWN']\n# ///\n",
+        "# /// script\n# tool.ruff.preview = true\n# tool.ruff.extend = 'missing.toml'\n# ///\n",
     )?;
-    let output = test.check_command().arg("script.py").output()?;
+    assert!(
+        test.check_command()
+            .arg("script.py")
+            .output()?
+            .status
+            .success()
+    );
+    let output = test
+        .check_command()
+        .args(["--preview", "script.py"])
+        .output()?;
     assert_eq!(output.status.code(), Some(1));
     let diagnostics = str::from_utf8(&output.stdout)?;
     assert!(
         diagnostics.contains("invalid-script-metadata"),
         "{diagnostics}"
     );
-    assert!(
-        diagnostics.contains("Unknown rule selector `UNKNOWN`"),
-        "{diagnostics}"
-    );
+    assert!(diagnostics.contains("missing.toml"), "{diagnostics}");
     assert!(
         test.check_command()
-            .args(["--isolated", "script.py"])
+            .args(["--preview", "--isolated", "script.py"])
             .output()?
             .status
             .success()
@@ -4144,7 +4151,7 @@ fn invalid_inline_script_configuration() -> Result<()> {
 #[test]
 fn inline_script_extend_and_cache() -> Result<()> {
     let test = CliTest::with_files([
-        ("ruff.toml", "lint.select = ['F401']"),
+        ("ruff.toml", "preview = true\nlint.select = ['F401']"),
         ("shared.toml", "lint.select = ['T201']"),
         (
             "scripts/example.py",
@@ -4162,13 +4169,13 @@ fn inline_script_extend_and_cache() -> Result<()> {
     // This explicit override matches the project and changes the script's rule selection.
     let output = check(&["--select=F401"])?;
     assert_eq!(output.status.code(), Some(1));
-    assert!(str::from_utf8(&output.stdout)?.contains("F401"));
+    assert!(str::from_utf8(&output.stdout)?.contains("unused-import"));
 
     assert!(check(&[])?.status.success());
     test.write_file("shared.toml", "lint.select = ['F401']")?;
     let output = check(&[])?;
     assert_eq!(output.status.code(), Some(1));
-    assert!(str::from_utf8(&output.stdout)?.contains("F401"));
+    assert!(str::from_utf8(&output.stdout)?.contains("unused-import"));
     Ok(())
 }
 
@@ -4180,6 +4187,7 @@ fn script_requires_python() -> Result<()> {
 [project]
 requires-python = ">=3.10"
 [tool.ruff]
+preview = true
 per-file-target-version = { "old_*.py" = "py39" }
 [tool.ruff.lint]
 select = ["UP045"]
@@ -4198,8 +4206,8 @@ select = ["UP045"]
     success: false
     exit_code: 1
     ----- stdout -----
-    fallback.py:5:4: UP045 [*] Use `X | None` for type annotations
-    old_script.py:5:4: UP045 [*] Use `X | None` for type annotations
+    fallback.py:5:4: non-pep604-annotation-optional: [*] Use `X | None` for type annotations
+    old_script.py:5:4: non-pep604-annotation-optional: [*] Use `X | None` for type annotations
     Found 2 errors.
     [*] 2 fixable with `--fix`.
 
@@ -4213,7 +4221,7 @@ fn script_requires_python_cli_override_and_cache() -> Result<()> {
     let test = CliTest::with_files([
         (
             "ruff.toml",
-            "target-version = 'py310'\nper-file-target-version = { 'script.py' = 'py310' }\nlint.select = ['UP045']",
+            "preview = true\ntarget-version = 'py310'\nper-file-target-version = { 'script.py' = 'py310' }\nlint.select = ['UP045']",
         ),
         (
             "script.py",
@@ -4240,7 +4248,7 @@ fn script_requires_python_cli_override_and_cache() -> Result<()> {
         let output = check(args)?;
         assert_eq!(output.status.code(), Some(1), "{args:?}");
         assert!(
-            str::from_utf8(&output.stdout)?.contains("UP045"),
+            str::from_utf8(&output.stdout)?.contains("non-pep604-annotation-optional"),
             "{args:?}"
         );
     }
@@ -4253,7 +4261,7 @@ fn script_requires_python_stdin() -> Result<()> {
         "ruff.toml",
         "target-version = 'py39'\nlint.select = ['UP045']",
     )?;
-    assert_cmd_snapshot!(test.check_command().args(["--fix", "-"]).pass_stdin(
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--fix", "-"]).pass_stdin(
         "# /// script\n# requires-python = '>=3.10'\n# ///\nfrom typing import Optional\nx: Optional[int]\n"
     ), @"
     success: true

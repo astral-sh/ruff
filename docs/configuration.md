@@ -317,6 +317,10 @@ Note that in these last two cases, the behavior of Ruff may differ depending on 
 
 ### Inline script metadata
 
+Enable [preview mode](preview.md) with `--preview` or top-level `preview = true` to use
+PEP 723 metadata for linting and formatting. With preview disabled, Ruff ignores the
+script's `requires-python` and `[tool.ruff]` settings.
+
 A Python script without a `[tool.ruff]` table uses the project's lint and format settings.
 It can still declare its own minimum Python version.
 

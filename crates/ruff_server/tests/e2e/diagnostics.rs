@@ -11,7 +11,7 @@ use crate::TestServerBuilder;
 fn inline_script_configuration_in_open_document() -> Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_workspace(".")?
-        .with_file("ruff.toml", "lint.ignore = ['F401']")?
+        .with_file("ruff.toml", "preview = true\nlint.ignore = ['F401']")?
         .build();
     server.open_text_document(
         "script.py",
@@ -51,7 +51,7 @@ fn script_requires_python_in_open_document() -> Result<()> {
         .with_workspace(".")?
         .with_file(
             "ruff.toml",
-            "per-file-target-version = { 'script.py' = 'py39' }\nlint.select = ['UP045']",
+            "preview = true\nper-file-target-version = { 'script.py' = 'py39' }\nlint.select = ['UP045']",
         )?
         .build();
     let code = "from typing import Optional\nx: Optional[int]\n";

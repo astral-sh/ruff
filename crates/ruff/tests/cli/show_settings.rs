@@ -68,26 +68,32 @@ fn display_settings_from_nested_directory() -> anyhow::Result<()> {
 #[test]
 fn script_requires_python_show_settings() -> anyhow::Result<()> {
     let test = CliTest::with_files([
-        ("ruff.toml", "target-version = 'py39'"),
+        (
+            "ruff.toml",
+            "target-version = 'py39'\nlint.preview = true\nformat.preview = true",
+        ),
         (
             "script.py",
             "# /// script\n# requires-python = '>=3.12'\n# ///\n",
         ),
     ])?;
-    let output = test
-        .command()
-        .args(["check", "--show-settings", "script.py"])
-        .output()?;
-    assert!(output.status.success());
-    let settings = String::from_utf8(output.stdout)?;
-    assert!(settings.contains("linter.unresolved_target_version = 3.12"));
-    assert!(settings.contains("formatter.unresolved_target_version = 3.12"));
+    for (flag, version) in [(None, "3.9"), (Some("--preview"), "3.12")] {
+        let output = test
+            .command()
+            .args(["check", "--show-settings", "script.py"])
+            .args(flag)
+            .output()?;
+        assert!(output.status.success());
+        let settings = String::from_utf8(output.stdout)?;
+        assert!(settings.contains(&format!("linter.unresolved_target_version = {version}")));
+        assert!(settings.contains(&format!("formatter.unresolved_target_version = {version}")));
+    }
     Ok(())
 }
 
 #[test]
 fn inline_script_target_version() -> anyhow::Result<()> {
-    let test = CliTest::with_file("ruff.toml", "target-version = 'py39'")?;
+    let test = CliTest::with_file("ruff.toml", "preview = true\ntarget-version = 'py39'")?;
     for (metadata, expected) in [
         ("[tool.ruff]", "3.11"),
         ("requires-python = '>=3.12'\n# [tool.ruff]", "3.12"),

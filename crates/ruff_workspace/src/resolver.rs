@@ -23,7 +23,7 @@ use ruff_linter::fs;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging::{detect_package_root, is_package};
 use ruff_linter::settings::LinterSettings;
-use ruff_python_ast::{PySourceType, SourceType};
+use ruff_python_ast::SourceType;
 
 use crate::configuration::Configuration;
 use crate::pyproject::settings_toml;
@@ -302,7 +302,11 @@ impl<'a, T: ConfigurationTransformer> SettingsForSource<'a, T> {
         source_type: SourceType,
         source: &str,
     ) -> Result<Option<ConfigurationAndSettings>> {
-        if source_type != SourceType::Python(PySourceType::Python) {
+        if !self
+            .project
+            .settings
+            .should_read_script_metadata(source_type)
+        {
             return Ok(None);
         }
         let Some(metadata) =

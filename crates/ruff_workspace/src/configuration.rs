@@ -319,6 +319,7 @@ impl Configuration {
         let future_annotations = lint.future_annotations.unwrap_or_default();
 
         Ok(Settings {
+            preview: global_preview,
             cache_dir: self
                 .cache_dir
                 .clone()

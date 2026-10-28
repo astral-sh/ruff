@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use anyhow::{Result, bail};
 use itertools::Itertools;
 
-use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{PyprojectDiscovery, ResolvedFile, project_files_in_path};
 
 use crate::args::ConfigArguments;
@@ -34,7 +33,7 @@ pub(crate) fn show_settings(
     let resolved = resolver.resolve_with_path(&path);
 
     let source_type = resolved.settings.linter.extension.get_source_type(&path);
-    let script = if source_type == SourceType::Python(PySourceType::Python)
+    let script = if resolved.settings.should_read_script_metadata(source_type)
         && let Ok(source) = fs::read_to_string(&path)
     {
         resolved.with_overrides(config_arguments).resolve_script(
