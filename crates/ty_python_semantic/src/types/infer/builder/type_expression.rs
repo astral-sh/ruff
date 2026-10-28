@@ -9,7 +9,7 @@ use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
-use super::{DeferredExpressionState, TypeInferenceBuilder};
+use super::{DeferredExpressionState, InferenceRegion, TypeInferenceBuilder};
 use crate::types::call::CallArguments;
 use crate::types::diagnostic::{
     self, CYCLIC_TYPE_ALIAS_DEFINITION, EXPERIMENTAL_SYNTAX, INVALID_INIT_TYPE_VARIABLE,
@@ -3652,22 +3652,34 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return ty;
         }
 
-        if !self
-            .inference_flags()
-            .contains(InferenceFlags::CHECK_UNBOUND_TYPEVARS)
+        let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty else {
+            return ty;
+        };
+        // In a PEP 695 pack default, an earlier parameter of the same generic can still
+        // appear as its declaration object. A parameter declared elsewhere is out of scope.
+        let unbound_in_pack_default = match self.region {
+            InferenceRegion::Deferred(default)
+                if matches!(default.kind(db), DefinitionKind::TypeVarTuple(_)) =>
+            {
+                typevar
+                    .definition(db)
+                    .is_some_and(|definition| definition.scope(db) != self.scope())
+            }
+            _ => false,
+        };
+        if !unbound_in_pack_default
+            && !self
+                .inference_flags()
+                .contains(InferenceFlags::CHECK_UNBOUND_TYPEVARS)
         {
             return ty;
         }
-        if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty {
-            if let Some(builder) = self.context.report_lint(&UNBOUND_TYPE_VARIABLE, expression) {
-                builder.into_diagnostic(format_args!(
-                    "Type variable `{name}` is not bound to any outer generic context",
-                    name = typevar.name(self.db())
-                ));
-            }
-            Type::unknown()
-        } else {
-            ty
+        if let Some(builder) = self.context.report_lint(&UNBOUND_TYPE_VARIABLE, expression) {
+            builder.into_diagnostic(format_args!(
+                "Type variable `{name}` is not bound to any outer generic context",
+                name = typevar.name(db)
+            ));
         }
+        Type::unknown()
     }
 }

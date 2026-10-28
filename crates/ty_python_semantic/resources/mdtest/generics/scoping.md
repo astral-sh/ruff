@@ -700,6 +700,32 @@ class C[T]:
     type Ok[U = int] = list[U]  # OK
 ```
 
+### Unbound type variable tuple in a default
+
+A type variable tuple declared at module scope cannot supply the default for a PEP 695 type
+parameter. A function can use a pack declared earlier in its own parameter list.
+
+```py
+from typing import TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+# error: [unbound-type-variable]
+type Alias[*Us = Unpack[Ts]] = tuple[*Us]
+
+# error: [unbound-type-variable]
+def invalid[*Us = *Ts](*args: *Us) -> tuple[*Us]:
+    return args
+
+# error: [unbound-type-variable]
+type Nested[*Us = Unpack[tuple[int, Unpack[Ts]]]] = tuple[*Us]
+
+type Valid[T, *Us = Unpack[tuple[T]]] = tuple[*Us]  # no diagnostic
+
+def valid[*Ts, *Us = Unpack[Ts]](x: tuple[*Ts], y: tuple[*Us]) -> tuple[*Us]:  # no diagnostic
+    return y
+```
+
 ### Legacy TypeVar in method with outer-scope class TypeVar
 
 <!-- snapshot-diagnostics -->

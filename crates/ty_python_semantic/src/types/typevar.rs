@@ -45,11 +45,13 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// A bound type variable tuple, or the runtime object for its unbound declaration.
+    /// A bound type variable tuple, or the runtime object for an unbound legacy declaration.
     pub(super) fn is_typevartuple_or_instance(self, db: &'db dyn Db) -> bool {
         match self {
             Self::TypeVar(typevar) => typevar.is_typevartuple(db),
-            Self::KnownInstance(KnownInstanceType::TypeVar(typevar)) => typevar.is_typevartuple(db),
+            Self::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
+                typevar.kind(db) == TypeVarKind::LegacyTypeVarTuple
+            }
             _ => false,
         }
     }
