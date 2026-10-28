@@ -42,6 +42,7 @@ use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annot
 use crate::types::typevar::{
     TypeVarInstance, TypeVarSet, max_typevar_freshness_matching_generic_context,
 };
+use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ClassLiteral, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor,
@@ -49,10 +50,25 @@ use crate::types::{
     TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder,
     VarianceInferable, VarianceTerm, infer_complete_scope_types, todo_type,
 };
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderSet, Program};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, name::Name};
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
+
+/// Cache the bound check across methods and overloads on the same receiver type.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+fn receiver_bound_needs_inference<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    bound: Type<'db>,
+) -> bool {
+    any_over_type_expanding_aliases(
+        db,
+        &ProgramEnvironment::from_program(program),
+        bound,
+        |ty| matches!(ty, Type::TypeVar(_) | Type::Recursive(_)),
+    )
+}
 
 /// Selects which binding context to use for type variables that only appear in a return-position
 /// `Callable`.
@@ -1800,14 +1816,13 @@ impl<'db> Signature<'db> {
         .then_some(typevar)
     }
 
-    /// When only the implicit receiver uses `Self`, the call only needs to satisfy its upper bound.
-    /// The bound can still depend on class type arguments. For `list[T].extend`, it is `list[T]`.
-    pub(super) fn with_unused_self_upper_bound(
+    /// Returns the declared receiver bound when only the implicit receiver uses `Self`.
+    pub(super) fn unused_self_receiver_bound(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         bound_receiver: Type<'db>,
-    ) -> Option<Self> {
+    ) -> Option<Type<'db>> {
         let context = self.generic_context?;
         if context.len(db) != 1 || !self.has_implicit_positional_receiver_annotation() {
             return None;
@@ -1818,11 +1833,7 @@ impl<'db> Signature<'db> {
         }
 
         let bound = self_typevar.typevar(db).upper_bound(db, env)?;
-        let mut signature = self.clone();
-        let receiver = Arc::make_mut(&mut signature.parameters.data)
-            .value
-            .first_mut()?;
-        receiver.annotated_type = match receiver.annotated_type() {
+        Some(match self.parameters.get(0)?.annotated_type() {
             Type::SubclassOf(_) => {
                 let class_bound = bound.to_meta_type(db, env);
                 // The meta-type of a protocol only admits nominal subclasses. If the class
@@ -1835,7 +1846,30 @@ impl<'db> Signature<'db> {
                 class_bound
             }
             _ => bound,
+        })
+    }
+
+    /// Removes the unused `Self` once the receiver bound is concrete.
+    pub(super) fn with_unused_self_upper_bound(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bound_receiver: Type<'db>,
+    ) -> Option<Self> {
+        let bound = self.unused_self_receiver_bound(db, env, bound_receiver)?;
+        // An argument can constrain a variable in the receiver bound, even through a type alias.
+        let needs_inference = match bound {
+            Type::NominalInstance(instance) if !instance.is_definition_generic(db) => false,
+            _ => receiver_bound_needs_inference(db, env.program(db), bound),
         };
+        if needs_inference {
+            return None;
+        }
+        let mut signature = self.clone();
+        Arc::make_mut(&mut signature.parameters.data)
+            .value
+            .first_mut()?
+            .annotated_type = bound;
         signature.generic_context = None;
         Some(signature)
     }

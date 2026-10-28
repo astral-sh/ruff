@@ -9054,6 +9054,33 @@ impl<'db> Binding<'db> {
     ) {
         let mut reported_argument_errors: FxHashMap<_, SmallVec<[_; 1]>> = FxHashMap::default();
         for error in &self.errors {
+            // A bad argument to e.g. `list[T].extend([1])` can also make inference expect
+            // `list[int]` for the receiver. Report the argument if the receiver already has
+            // its declared type. A receiver mismatch can still be the only evidence of an error.
+            if let BindingError::InvalidArgumentType {
+                argument_index: None,
+                parameter,
+                provided_ty,
+                ..
+            } = error
+                && parameter.signature_parameter_index == 0
+                && self.errors.iter().any(|error| {
+                    matches!(
+                        error,
+                        BindingError::InvalidArgumentType {
+                            argument_index: Some(_),
+                            ..
+                        }
+                    )
+                })
+                && self.signature.unused_self_receiver_bound(
+                    context.db(),
+                    context.program_environment(),
+                    *provided_ty,
+                ) == Some(*provided_ty)
+            {
+                continue;
+            }
             // Multiple elements of one starred argument can produce the same type error for a
             // variadic parameter. Deduplicate only when reporting: overload selection uses the
             // number of binding errors, so removing errors earlier could change inference.

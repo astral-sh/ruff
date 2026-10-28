@@ -3975,6 +3975,34 @@ def extend[T: (int, str)](values: list[T], other: list[T]) -> None:
     aliased.extend([1])
 ```
 
+## Generic callbacks in bound method calls
+
+A callback registered for an arbitrary `T` must return that `T` for every input. The identity
+function returns its input, which can be any `object`.
+
+```py
+from collections.abc import Callable
+
+def identity[V](value: V) -> V:
+    return value
+
+def register[T](callbacks: list[Callable[[object], T]], callback: Callable[[object], T]) -> None:
+    callbacks.append(callback)  # no diagnostic
+    callbacks.append(identity)  # error: [invalid-argument-type]
+
+    type Callback = Callable[[object], T]
+    aliased: list[Callback] = callbacks
+    aliased.append(identity)  # error: [invalid-argument-type]
+```
+
+When a dictionary lookup uses `identity` as its default, it can return either kind of callback.
+
+```py
+def lookup[T](callbacks: dict[str, Callable[[object], T]]) -> None:
+    # revealed: ((object, /) -> T@lookup) | (def identity[V](value: V) -> V)
+    reveal_type(callbacks.get("key", identity))
+```
+
 ## `~T` is never assignable to `T`
 
 ```py
