@@ -1816,13 +1816,13 @@ impl<'db> Signature<'db> {
         .then_some(typevar)
     }
 
-    /// Returns the declared receiver bound when only the implicit receiver uses `Self`.
-    pub(super) fn unused_self_receiver_bound(
+    /// Replaces an unused `Self` with its upper bound when the bound needs no further inference.
+    pub(super) fn with_unused_self_upper_bound(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         bound_receiver: Type<'db>,
-    ) -> Option<Type<'db>> {
+    ) -> Option<Self> {
         let context = self.generic_context?;
         if context.len(db) != 1 || !self.has_implicit_positional_receiver_annotation() {
             return None;
@@ -1833,7 +1833,7 @@ impl<'db> Signature<'db> {
         }
 
         let bound = self_typevar.typevar(db).upper_bound(db, env)?;
-        Some(match self.parameters.get(0)?.annotated_type() {
+        let bound = match self.parameters.get(0)?.annotated_type() {
             Type::SubclassOf(_) => {
                 let class_bound = bound.to_meta_type(db, env);
                 // The meta-type of a protocol only admits nominal subclasses. If the class
@@ -1846,17 +1846,7 @@ impl<'db> Signature<'db> {
                 class_bound
             }
             _ => bound,
-        })
-    }
-
-    /// Removes the unused `Self` once the receiver bound is concrete.
-    pub(super) fn with_unused_self_upper_bound(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        bound_receiver: Type<'db>,
-    ) -> Option<Self> {
-        let bound = self.unused_self_receiver_bound(db, env, bound_receiver)?;
+        };
         // An argument can constrain a variable in the receiver bound, even through a type alias.
         let needs_inference = match bound {
             Type::NominalInstance(instance) if !instance.is_definition_generic(db) => false,
