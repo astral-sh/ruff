@@ -97,8 +97,7 @@ use crate::types::function::{
     same_module_uncached_raw_signature,
 };
 use crate::types::generics::{
-    GenericContext, Specialization, SpecializationBuilder, bind_typevar,
-    enclosing_binding_contexts, enclosing_typevar_scope,
+    GenericContext, Specialization, SpecializationBuilder, bind_typevar, enclosing_binding_contexts,
 };
 use crate::types::infer::builder::binary_expressions::BinaryInferenceState;
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
@@ -911,11 +910,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.index,
                 self.scope().file_scope_id(db),
             ))
-            .resolve_typevars(
-                db,
-                self.program_environment(),
-                enclosing_typevar_scope(db, self.index, self.scope().file_scope_id(db)),
-            )
+            .resolve_typevars(db, self.program_environment())
     }
 
     fn settings(&self) -> &AnalysisSettings {

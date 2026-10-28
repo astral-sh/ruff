@@ -30,7 +30,7 @@ use crate::{
             OverloadLiteral, function_body_kind, is_implicit_classmethod, report_revealed_type,
             same_module_uncached_raw_signature,
         },
-        generics::{enclosing_generic_contexts, enclosing_typevar_scope, typing_self},
+        generics::{GenericContext, enclosing_generic_contexts, typing_self},
         infer::{
             InferenceFlags, TypeExpressionFlags, TypeInferenceBuilder,
             builder::{
@@ -47,7 +47,7 @@ use crate::{
         signatures::{ReturnCallableTypeVarScope, function_signature_expression_type},
         tuple::{TupleSpec, TupleSpecBuilder, TupleType},
         typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
-        typevar::TypeVarSet,
+        typevar::{TypeVarNonce, TypeVarSet},
         visitor::non_any_dynamic_content,
     },
 };
@@ -233,10 +233,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return ty;
         };
         let env = self.program_environment();
-        let mut scope = enclosing_typevar_scope(db, self.index, containing_scope);
-        while let Some(frame) = scope {
-            ty = ty.resolve_typevars(db, env, frame);
-            scope = frame.parent(db);
+        for context in self
+            .index
+            .ancestor_scopes(containing_scope)
+            .filter_map(|(_, scope)| GenericContext::lexical_of_node(db, scope.node(), self.index))
+        {
+            ty = ty.resolve_typevars(db, env, context, TypeVarNonce::LEXICAL);
         }
         ty
     }

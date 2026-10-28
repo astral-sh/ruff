@@ -110,7 +110,7 @@ pub(crate) use crate::types::typevar::{
     TypeVarBoundOrConstraints, TypeVarNonce,
 };
 pub use crate::types::typevar::{BoundTypeVarInstance, TypeVarKind};
-use crate::types::typevar::{TypeVarDomain, TypeVarInstance, TypeVarScope, TypeVarSet};
+use crate::types::typevar::{TypeVarDomain, TypeVarInstance, TypeVarSet};
 use crate::types::union_type_instance::UnionTypeInstance;
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::{VarianceInferable, VarianceTerm};
@@ -9734,23 +9734,27 @@ impl<'db> Type<'db> {
         self.apply_type_mapping(db, env, &type_mapping, TypeContext::default())
     }
 
-    /// Resolves unresolved occurrences of the typevars bound by `scope`.
-    /// Already-resolved occurrences and typevars belonging to other contexts are unchanged.
+    /// Resolves the typevars bound by `context` to a new occurrence.
+    /// Occurrences outside that context retain their identities, preserving captured typevars.
     pub(crate) fn resolve_typevars(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        scope: TypeVarScope<'db>,
+        context: GenericContext<'db>,
+        nonce: TypeVarNonce,
     ) -> Self {
         self.apply_type_mapping(
             db,
             env,
-            &TypeMapping::ResolveTypeVars(scope),
+            &TypeMapping::FreshenBoundTypeVars {
+                generic_context: context,
+                delta: nonce.value(),
+            },
             TypeContext::default(),
         )
     }
 
-    /// Restores `context`'s occurrences in `scope` to unresolved typevars.
+    /// Restores `context`'s lexical occurrences to unresolved typevars.
     ///
     /// This is used during return type inference in a generic function. If the return type that we
     /// infer in the function's body mentions any of its typevars, those will be resolved to the
@@ -9765,14 +9769,13 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         context: GenericContext<'db>,
-        scope: TypeVarScope<'db>,
     ) -> Self {
         let resolved = GenericContext::from_typevar_instances(
             db,
             env,
             context
                 .variables(db)
-                .map(|typevar| typevar.resolve(db, scope)),
+                .map(|typevar| typevar.resolve(db, TypeVarNonce::LEXICAL)),
         );
         self.apply_specialization(
             db,
@@ -10203,7 +10206,6 @@ impl<'db> Type<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::GeneralizeLocalTypes(_)
-                | TypeMapping::ResolveTypeVars(_)
                 | TypeMapping::RescopeReturnCallables(_)
                 | TypeMapping::Promote(PromotionMode::Off, _)
                 | TypeMapping::Promote(
@@ -10227,7 +10229,6 @@ impl<'db> Type<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::GeneralizeLocalTypes(_)
-                | TypeMapping::ResolveTypeVars(_)
                 | TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -11594,8 +11595,6 @@ pub enum TypeMapping<'a, 'db> {
     /// Apply eager expansion to the type.
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
-    /// Resolves unresolved typevars bound by this scope's generic context.
-    ResolveTypeVars(TypeVarScope<'db>),
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
@@ -11653,7 +11652,7 @@ impl<'db> TypeMapping<'_, 'db> {
     ) -> Option<GenericContext<'db>> {
         let env = visitor.env;
         match self {
-            TypeMapping::FreshenBoundTypeVars { .. } | TypeMapping::ResolveTypeVars(_) => {
+            TypeMapping::FreshenBoundTypeVars { .. } => {
                 // A default can refer back to this signature, so keep the enclosing
                 // traversal's recursion guard when mapping its generic context.
                 Some(GenericContext::from_typevar_instances(
@@ -11759,7 +11758,6 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::GeneralizeLocalTypes(_)
-            | TypeMapping::ResolveTypeVars(_)
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
     }

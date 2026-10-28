@@ -39,7 +39,7 @@ use crate::types::relation::{
 use crate::types::tuple::{Tuple, TupleType, VariableSegment};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
 use crate::types::typevar::{
-    TypeVarInstance, TypeVarScope, TypeVarSet, max_typevar_freshness_matching_generic_context,
+    TypeVarInstance, TypeVarSet, max_typevar_freshness_matching_generic_context,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
@@ -1212,20 +1212,6 @@ impl<'db> Signature<'db> {
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             },
         }
-    }
-
-    pub(crate) fn resolve_typevars(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        scope: TypeVarScope<'db>,
-    ) -> Self {
-        self.apply_type_mapping_impl(
-            db,
-            &TypeMapping::ResolveTypeVars(scope),
-            TypeContext::default(),
-            &ApplyTypeMappingVisitor::new(env),
-        )
     }
 
     pub(crate) fn freshen_bound_typevars(
@@ -5582,11 +5568,8 @@ impl<'db> Parameters<'db> {
             .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
             .collect();
 
-        let kind = if matches!(
-            type_mapping,
-            TypeMapping::FreshenBoundTypeVars { .. } | TypeMapping::ResolveTypeVars(_)
-        ) {
-            let map = |paramspec| {
+        let kind = if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. }) {
+            let freshen = |paramspec| {
                 Type::TypeVar(paramspec)
                     .apply_type_mapping_impl(db, &type_mapping, tcx, visitor)
                     .as_typevar()
@@ -5594,9 +5577,11 @@ impl<'db> Parameters<'db> {
             };
             // The structural tail and its two component annotations identify the same ParamSpec.
             match self.data.kind {
-                ParametersKind::ParamSpec(paramspec) => ParametersKind::ParamSpec(map(paramspec)),
+                ParametersKind::ParamSpec(paramspec) => {
+                    ParametersKind::ParamSpec(freshen(paramspec))
+                }
                 ParametersKind::Concatenate(ConcatenateTail::ParamSpec(paramspec)) => {
-                    ParametersKind::Concatenate(ConcatenateTail::ParamSpec(map(paramspec)))
+                    ParametersKind::Concatenate(ConcatenateTail::ParamSpec(freshen(paramspec)))
                 }
                 kind => kind,
             }
@@ -5604,7 +5589,7 @@ impl<'db> Parameters<'db> {
             self.data.kind
         };
         let parameters = Self::new(value, kind);
-        if matches!(type_mapping, TypeMapping::ResolveTypeVars(_)) {
+        if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. }) {
             // Resolving typevar identities does not specialize a pack. Keep its fixed boundaries
             // in the starred annotation so call binding can infer the residual tuple shape.
             parameters

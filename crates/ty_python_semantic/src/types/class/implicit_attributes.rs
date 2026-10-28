@@ -10,7 +10,7 @@ use crate::{
     types::{
         KnownClass, Truthiness, Type, TypeContext, UnionBuilder, definition_expression_type,
         function::{is_implicit_classmethod, is_implicit_staticmethod},
-        generics::{GenericContext, enclosing_typevar_scope},
+        generics::GenericContext,
         infer::infer_unpack_types,
         infer_expression_type, inferred_declaration,
         member::Member,
@@ -122,12 +122,9 @@ impl<'db> StaticClassLiteral<'db> {
         result.member = result.member.map_type(|ty| {
             let class_scope = attribute.class_body_scope(db);
             let index = semantic_index(db, class_scope.program_file(db));
-            if let Some(context) = GenericContext::of_node(db, class_scope.node(db), index)
-                && let Some(scope) =
-                    enclosing_typevar_scope(db, index, class_scope.file_scope_id(db))
-            {
+            if let Some(context) = GenericContext::of_node(db, class_scope.node(db), index) {
                 let env = ProgramEnvironment::from_scope(class_scope);
-                ty.abstract_typevars(db, &env, context, scope)
+                ty.abstract_typevars(db, &env, context)
             } else {
                 ty
             }

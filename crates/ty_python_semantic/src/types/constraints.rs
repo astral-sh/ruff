@@ -106,10 +106,8 @@ use ty_static::EnvVars;
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
-use crate::types::generics::GenericContext;
 use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarInstance, TypeVarScope,
-    TypeVarScopeKind, TypeVarSet,
+    BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarInstance, TypeVarSet,
 };
 use crate::types::visitor::{
     NonAtomicType, TypeCollector, TypeKind, TypeVisitor, any_over_type_expanding_aliases,
@@ -1055,12 +1053,6 @@ struct ConstraintSetStorage<'db> {
     /// are stored in the dense local arenas below.
     compacted: Option<Arc<OwnedConstraintSetInner<'db>>>,
 
-    /// `Inferable` and `Quantified` [`TypeVarScope`]s contain a nonce, to let us distinguish
-    /// difference binders of the same generic context. Those are tracked relative to the current
-    /// constraint set solve being performed, so this is where we keep track of the next nonce
-    /// value.
-    next_typevar_scope_nonce: u16,
-
     /// Constraints are the variables of our BDD. They are interned to give them a space-efficient
     /// identity. Constraints are added to this arena as they are encountered when constructing
     /// constraint sets. The ordering within the arena defines the BDD variable ordering in our BDD
@@ -1265,41 +1257,6 @@ impl<'db> ConstraintSetBuilder<'db> {
         let mut storage = self.storage.borrow_mut();
         let (node, source_order) = storage.load_with_provenance(db, env, other, Some(provenance));
         ConstraintSet::from_node(self, node, source_order)
-    }
-
-    pub(crate) fn inferable_scope(
-        &self,
-        db: &'db dyn Db,
-        generic_context: GenericContext<'db>,
-        parent: Option<TypeVarScope<'db>>,
-    ) -> TypeVarScope<'db> {
-        let mut storage = self.storage.borrow_mut();
-        let nonce = storage.next_typevar_scope_nonce;
-        storage.next_typevar_scope_nonce += 1;
-        TypeVarScope::new(
-            db,
-            TypeVarScopeKind::Inferable(nonce),
-            generic_context,
-            parent,
-        )
-    }
-
-    #[expect(dead_code, reason = "XXX")]
-    pub(crate) fn quantified_scope(
-        &self,
-        db: &'db dyn Db,
-        generic_context: GenericContext<'db>,
-        parent: Option<TypeVarScope<'db>>,
-    ) -> TypeVarScope<'db> {
-        let mut storage = self.storage.borrow_mut();
-        let nonce = storage.next_typevar_scope_nonce;
-        storage.next_typevar_scope_nonce += 1;
-        TypeVarScope::new(
-            db,
-            TypeVarScopeKind::Quantified(nonce),
-            generic_context,
-            parent,
-        )
     }
 }
 

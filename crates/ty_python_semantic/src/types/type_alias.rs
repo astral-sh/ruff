@@ -721,7 +721,8 @@ impl<'db> TypeAliasType<'db> {
     ) -> Type<'db> {
         let ty = Type::TypeAlias(self);
         match type_mapping {
-            TypeMapping::ApplyRecursiveSubstitution(_) | TypeMapping::ResolveTypeVars(_) => {
+            TypeMapping::ApplyRecursiveSubstitution(_)
+            | TypeMapping::FreshenBoundTypeVars { .. } => {
                 Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
             }
             TypeMapping::Materialize(_) if self.materialization_kind(db).is_some() => ty,
