@@ -388,10 +388,7 @@ impl Options {
                 .iter()
                 .map(|root| root.absolute(context.configuration_root(), system))
                 .collect()
-        } else if let OptionsContext::Script { directory, .. } = context {
-            directory.into_iter().map(SystemPath::to_path_buf).collect()
-        } else {
-            let project_root = context.configuration_root();
+        } else if let Some(project_root) = context.project_root() {
             let mut roots = vec![];
             let is_package = |dir: &SystemPath| {
                 system.is_file(&dir.join("__init__.py"))
@@ -439,6 +436,9 @@ impl Options {
             roots.push(project_root.to_path_buf());
 
             roots
+        } else {
+            // A standalone script has no implicit first-party roots.
+            Vec::new()
         };
 
         // collect the existing site packages
@@ -614,28 +614,21 @@ impl Options {
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum OptionsContext<'a> {
     Project(&'a SystemPath),
-    Script {
-        /// The script's containing directory, if it has a filesystem path.
-        directory: Option<&'a SystemPath>,
-        /// Relative settings from the enclosing project use the project's root.
-        configuration_root: &'a SystemPath,
-    },
+    /// The directory used to resolve relative settings for the script.
+    Script(&'a SystemPath),
 }
 
 impl<'a> OptionsContext<'a> {
     fn configuration_root(self) -> &'a SystemPath {
         match self {
-            Self::Project(root) => root,
-            Self::Script {
-                configuration_root, ..
-            } => configuration_root,
+            Self::Project(root) | Self::Script(root) => root,
         }
     }
 
     fn project_root(self) -> Option<&'a SystemPath> {
         match self {
             Self::Project(root) => Some(root),
-            Self::Script { .. } => None,
+            Self::Script(_) => None,
         }
     }
 }
@@ -868,10 +861,9 @@ pub struct EnvironmentOptions {
     /// * `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
     /// * `./python`
     ///
-    /// A script with inline metadata has its own roots, even when the enclosing project configures
-    /// `root`. By default, its only root is the directory containing the script, so it can import
-    /// sibling modules. Set `root = []` in the script's `[tool.ty.environment]` table to disable
-    /// first-party roots.
+    /// Scripts with inline metadata default to `root = []`, even when the enclosing project
+    /// configures first-party roots. Set `root = ["."]` in the script's `[tool.ty.environment]`
+    /// table to import sibling modules.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
