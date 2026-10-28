@@ -29,6 +29,31 @@ def _(n: int, value: int | str):
     accept_nested([n], value)  # no diagnostic
 ```
 
+## Repeated type variables in an alias body
+
+Both occurrences of `T` participate in inference for the callback, whether the parameter uses
+`Pair[T]` or `tuple[T, T]`.
+
+```py
+from collections.abc import Callable, Sequence
+from typing import Generic, TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+Pair = TypeAliasType("Pair", tuple[T, T], type_params=(T,))
+
+class First(Generic[T]):
+    def __call__(self, items: Sequence[T]) -> T:
+        return items[0]
+
+def apply_to_pair(fn: Callable[[T], T], pair: Pair[T]) -> None: ...
+def apply_to_tuple(fn: Callable[[T], T], pair: tuple[T, T]) -> None: ...
+
+items = [["text"]]
+apply_to_pair(First(), (items, items))  # no diagnostic
+apply_to_tuple(First(), (items, items))  # no diagnostic
+```
+
 ## Unused alias parameters in call inference
 
 An argument of type `Ignore[T]` supplies no information about `T`. Passing `None` explicitly
@@ -76,6 +101,24 @@ Wrapped = TypeAliasType("Wrapped", Growing[T, object, int], type_params=(T,))
 def apply_wrapped(fn: Callable[[T], T], x: T, y: T, unused: Wrapped[T] = None) -> None: ...
 
 apply_wrapped(First(), values, values, None)  # no diagnostic
+```
+
+## An alias parameter used through a recursive reference
+
+The tuple branch of `Layer[int, T]` contains `Layer[T, list[int]]`, whose list branch is `list[T]`.
+The sibling argument supplies `int | str` as the element type of `[n]`.
+
+```py
+from typing import TypeVar
+
+A = TypeVar("A")
+B = TypeVar("B")
+T = TypeVar("T")
+Layer = list[A] | tuple["Layer[B, list[A]]"]
+
+def accept(value: Layer[int, T], sibling: T) -> None: ...
+def _(n: int, sibling: int | str):
+    accept(([n],), sibling)  # no diagnostic
 ```
 
 ## Ambiguous overload returns through generic aliases

@@ -43,7 +43,7 @@ use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, PathBoundSolution, SolutionPaths, Solutions,
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
-use crate::types::cyclic::PairVisitor;
+use crate::types::cyclic::{ActiveRecursionDetector, PairVisitor};
 use crate::types::dedicated::pydantic::{self, ConfigBoolean};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_DATACLASS,
@@ -7994,9 +7994,7 @@ struct ParamSpecArgumentContext<'a, 'call, 'db> {
 
 /// Returns the number of occurrences of inferable type variables in the provided type.
 ///
-/// An alias argument contributes only if its parameter affects the alias's value. For example,
-/// `Items[T]` contributes one occurrence for `type Items[T] = list[T]`, while `type Ignore[T] = None`
-/// contributes none.
+/// Count occurrences in the specialized body of an alias, up to the alias expansion budget.
 fn inferable_typevar_occurrences<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -8008,27 +8006,37 @@ fn inferable_typevar_occurrences<'db>(
         inferable: TypeVarSet<'db>,
         count: Cell<usize>,
         stack: RefCell<SmallVec<[Type<'db>; 8]>>,
+        active_aliases: ActiveRecursionDetector<TypeIdentity<'db>>,
+        remaining_alias_nodes: Cell<usize>,
     }
 
     impl<'db> InferableTypeVarVisitor<'_, 'db> {
-        fn visit_alias_arguments(
-            &self,
-            db: &'db dyn Db,
-            constructor: Type<'db>,
-            arguments: Specialization<'db>,
-        ) {
-            for (parameter, &argument) in arguments
-                .generic_context(db)
-                .variables(db)
-                .zip(arguments.types(db))
-            {
-                if constructor
-                    .variance_of(db, self.env, parameter.identity(db))
-                    .is_used_in_alias(db)
-                {
-                    self.visit_type(db, argument);
-                }
+        fn visit_alias(&self, db: &'db dyn Db, alias: Type<'db>, value: Type<'db>) {
+            // Nested applications of Pair[T] = tuple[T, T] can expand exponentially. Limit
+            // the work per outer alias, including when the body contains no inferable variables.
+            const MAX_ALIAS_NODES: usize = 256;
+            if self.active_aliases.is_empty() {
+                self.remaining_alias_nodes.set(MAX_ALIAS_NODES);
             }
+            self.active_aliases.visit_type(
+                db,
+                alias,
+                || {
+                    // A growing recursive reference has no finite expansion. Count each
+                    // inferable variable that still contributes to its specialized value once.
+                    let count = self
+                        .inferable
+                        .iter(db)
+                        .filter(|var| {
+                            value
+                                .variance_of(db, self.env, var.identity(db))
+                                .is_used_in_alias(db)
+                        })
+                        .count();
+                    self.count.set(self.count.get() + count);
+                },
+                || self.visit_type(db, value),
+            );
         }
     }
 
@@ -8060,6 +8068,12 @@ fn inferable_typevar_occurrences<'db>(
             if self.stack.borrow().contains(&ty) {
                 return;
             }
+            if !self.active_aliases.is_empty() {
+                let Some(remaining) = self.remaining_alias_nodes.get().checked_sub(1) else {
+                    return;
+                };
+                self.remaining_alias_nodes.set(remaining);
+            }
 
             self.stack.borrow_mut().push(ty);
             walk_non_atomic_type(db, non_atomic_type, self);
@@ -8067,19 +8081,15 @@ fn inferable_typevar_occurrences<'db>(
         }
 
         fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-            if let Some(arguments) = alias.specialization(db) {
-                self.visit_alias_arguments(db, Type::TypeAlias(alias.unspecialized(db)), arguments);
-            }
+            self.visit_alias(db, Type::TypeAlias(alias), alias.value_type(db));
         }
 
         fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-            if let Some(arguments) = recursive.arguments(db) {
-                self.visit_alias_arguments(
-                    db,
-                    Type::Recursive(recursive.constructor(db)),
-                    arguments,
-                );
-            }
+            self.visit_alias(
+                db,
+                Type::Recursive(recursive),
+                recursive.unfold(db, self.env).into_type(),
+            );
         }
     }
 
@@ -8088,6 +8098,8 @@ fn inferable_typevar_occurrences<'db>(
         inferable,
         count: Cell::new(0),
         stack: RefCell::default(),
+        active_aliases: ActiveRecursionDetector::default(),
+        remaining_alias_nodes: Cell::default(),
     };
     visitor.visit_type(db, ty);
     visitor.count.get()
