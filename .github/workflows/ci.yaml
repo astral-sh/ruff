@@ -731,6 +731,7 @@ jobs:
           ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/ --prefix TST
           ./scripts/add_rule.py --name FirstRule --prefix TST --code 001 --linter test --category correctness
       - run: cargo check
+      - run: uv run --python="${PYTHON_VERSION}" --directory=./python/ruff-ecosystem python -m unittest discover -s tests
       # Lint/format/type-check py-fuzzer
       # (dogfooding with ty is done in a separate job)
       # Pass `--python` explicitly because the fuzzer's locked dependencies may
@@ -744,6 +745,8 @@ jobs:
     name: "ecosystem"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-24.04-8' || 'ubuntu-latest' }}
     needs: determine_changes
+    outputs:
+      html-files: ${{ steps.reports.outputs.html-files }}
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     # Ecosystem check needs linter and/or formatter changes.
     if: |
@@ -801,7 +804,7 @@ jobs:
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem check ./target/debug/ruff-baseline ./target/debug/ruff --cache "$RUNNER_TEMP/ruff-ecosystem-checkouts" --output-format markdown | tee ecosystem-result-check-stable
+          ruff-ecosystem check ./target/debug/ruff-baseline ./target/debug/ruff --cache "$RUNNER_TEMP/ruff-ecosystem-checkouts" --output-format markdown --html-output ecosystem-html/check-stable.html | tee ecosystem-result-check-stable
 
           cat ecosystem-result-check-stable > "$GITHUB_STEP_SUMMARY"
           echo "### Linter (stable)"  > ecosystem-result
@@ -814,7 +817,7 @@ jobs:
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem check ./target/debug/ruff-baseline ./target/debug/ruff --cache "$RUNNER_TEMP/ruff-ecosystem-checkouts" --output-format markdown --force-preview | tee ecosystem-result-check-preview
+          ruff-ecosystem check ./target/debug/ruff-baseline ./target/debug/ruff --cache "$RUNNER_TEMP/ruff-ecosystem-checkouts" --output-format markdown --force-preview --html-output ecosystem-html/check-preview.html | tee ecosystem-result-check-preview
 
           cat ecosystem-result-check-preview > "$GITHUB_STEP_SUMMARY"
           echo "### Linter (preview)" >> ecosystem-result
@@ -827,7 +830,7 @@ jobs:
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem format ./target/debug/ruff-baseline ./target/debug/ruff --cache "$RUNNER_TEMP/ruff-ecosystem-checkouts" --output-format markdown | tee ecosystem-result-format-stable
+          ruff-ecosystem format ./target/debug/ruff-baseline ./target/debug/ruff --cache "$RUNNER_TEMP/ruff-ecosystem-checkouts" --output-format markdown --html-output ecosystem-html/format-stable.html | tee ecosystem-result-format-stable
 
           cat ecosystem-result-format-stable > "$GITHUB_STEP_SUMMARY"
           echo "### Formatter (stable)" >> ecosystem-result
@@ -840,7 +843,7 @@ jobs:
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem format ./target/debug/ruff-baseline ./target/debug/ruff --cache "$RUNNER_TEMP/ruff-ecosystem-checkouts" --output-format markdown --force-preview | tee ecosystem-result-format-preview
+          ruff-ecosystem format ./target/debug/ruff-baseline ./target/debug/ruff --cache "$RUNNER_TEMP/ruff-ecosystem-checkouts" --output-format markdown --force-preview --html-output ecosystem-html/format-preview.html | tee ecosystem-result-format-preview
 
           cat ecosystem-result-format-preview > "$GITHUB_STEP_SUMMARY"
           echo "### Formatter (preview)" >> ecosystem-result
@@ -852,6 +855,37 @@ jobs:
         with:
           name: ecosystem-result
           path: ecosystem-result
+          if-no-files-found: "error"
+
+      - name: Collect HTML reports
+        id: reports
+        env:
+          HTML_FILES: |
+            {
+              "check-stable.html": {"content-type": "text/html; charset=utf-8", "label": "Linter (stable)"},
+              "check-preview.html": {"content-type": "text/html; charset=utf-8", "label": "Linter (preview)"},
+              "format-stable.html": {"content-type": "text/html; charset=utf-8", "label": "Formatter (stable)"},
+              "format-preview.html": {"content-type": "text/html; charset=utf-8", "label": "Formatter (preview)"}
+            }
+        run: |
+          python - <<'PYTHON'
+          import json
+          import os
+          from pathlib import Path
+
+          files = {
+              name: metadata for name, metadata in json.loads(os.environ["HTML_FILES"]).items()
+              if (Path("ecosystem-html") / name).is_file()
+          }
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"html-files={json.dumps(files)}\n")
+          PYTHON
+
+      - name: Upload full reports
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ecosystem-html
+          path: ecosystem-html/
           if-no-files-found: "error"
 
       - name: Fail on ecosystem errors
@@ -879,6 +913,9 @@ jobs:
       artifact: ecosystem-result
       filename: ecosystem-result
       title: "`ruff-ecosystem` results"
+      full-report-artifact: ecosystem-html
+      upload-html: true
+      html-files: ${{ needs.ecosystem.outputs.html-files }}
 
   fuzz-ty:
     name: "Fuzz for new ty panics/timeouts"
