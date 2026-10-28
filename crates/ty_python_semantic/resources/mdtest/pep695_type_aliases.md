@@ -283,6 +283,19 @@ def f(x: Foo[int]):
     reveal_type(x.foo())  # revealed: int
 ```
 
+## Generic aliases in bound method receivers
+
+An integer is an invalid receiver for `set.clear`, regardless of the set's element type. Expanding
+this element type would visit the same nested tuple many times.
+
+```py
+type Fan[T] = tuple[T, T, T, T, T, T, T, T]
+type Layer[T] = Fan[Fan[Fan[Fan[T]]]]
+type Payload = Layer[Layer[Layer[int]]]
+
+set[Payload].clear.__get__(0)()  # error: [invalid-argument-type]
+```
+
 ## Unpacking tuple aliases
 
 Both unpack spellings accept a tuple alias and preserve positional argument types and arity.

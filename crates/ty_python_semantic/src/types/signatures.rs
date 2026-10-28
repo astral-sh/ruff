@@ -42,7 +42,6 @@ use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annot
 use crate::types::typevar::{
     TypeVarInstance, TypeVarSet, max_typevar_freshness_matching_generic_context,
 };
-use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ClassLiteral, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor,
@@ -62,11 +61,19 @@ fn receiver_bound_needs_inference<'db>(
     program: Program<'db>,
     bound: Type<'db>,
 ) -> bool {
-    any_over_type_expanding_aliases(
+    // An alias can capture a type variable. Leave it to ordinary inference without
+    // evaluating its body just to decide whether this optimization applies.
+    any_over_type(
         db,
         &ProgramEnvironment::from_program(program),
         bound,
-        |ty| matches!(ty, Type::TypeVar(_) | Type::Recursive(_)),
+        false,
+        |ty| {
+            matches!(
+                ty,
+                Type::TypeVar(_) | Type::TypeAlias(_) | Type::Recursive(_)
+            )
+        },
     )
 }
 
