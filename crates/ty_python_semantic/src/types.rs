@@ -7013,21 +7013,8 @@ impl<'db> Type<'db> {
                             )
                         {
                             specialized.overloads
-                        } else if overload.has_implicit_positional_receiver_annotation()
-                            && overload
-                                .generic_context
-                                .is_some_and(|context| context.len(db) == 1)
-                            // For `list[T].extend`, the argument can narrow the expected
-                            // receiver to `list[int]`. Keep those constraints together. An
-                            // unexpanded alias can also hide a type variable from this check.
-                            && !any_over_type(db, env, self_instance, false, |ty| {
-                                matches!(ty, Type::TypeVar(_) | Type::TypeAlias(_) | Type::Recursive(_))
-                            })
-                            && let Some(specialized) = overload.bind_unused_self(
-                                db,
-                                env,
-                                bound_method.typing_self_type(db),
-                            )
+                        } else if let Some(specialized) =
+                            overload.with_unused_self_upper_bound(db, env)
                         {
                             smallvec_inline![specialized]
                         } else {

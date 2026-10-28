@@ -574,7 +574,6 @@ T = TypeVar("T", int, str)
 def extend(values: list[T], other: list[T]) -> None:
     values.extend(other)
 
-    # error: 5 [invalid-argument-type] "Expected `list[int]`, found `list[T@extend]`"
     # error: 19 [invalid-argument-type] "Expected `Iterable[T@extend]`, found `list[int]`"
     values.extend([1])
 ```
