@@ -485,21 +485,21 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         arguments: &Arguments,
         name: &str,
         navigation_target: Option<NavigationTarget>,
-    ) -> bool {
-        if !self.settings.call_argument_names {
-            return false;
-        }
-
-        if name.starts_with('_') {
-            return false;
+        mode: ArgumentHintMode,
+    ) {
+        if !self.settings.call_argument_names || name.starts_with('_') {
+            return;
         }
 
         let range = parenthesized_range(argument.into(), arguments.into(), self.tokens)
             .unwrap_or(argument.range());
-        let inlay_hint = InlayHint::call_argument_name(range.start(), name, navigation_target);
+        let mut inlay_hint = InlayHint::call_argument_name(range.start(), name, navigation_target);
+        match mode {
+            ArgumentHintMode::DisplayOnly => {}
+            ArgumentHintMode::Insertable => inlay_hint.enable_call_argument_edit(argument),
+        }
 
         self.hints.push(inlay_hint);
-        true
     }
 }
 
@@ -589,7 +589,13 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
                 self.visit_expr(&call.func);
 
-                let mut last_editable_hint = None;
+                // Python allows `*args` and keywords after a keyword argument. A later plain
+                // positional argument makes inserting `name=` a syntax error, even if it has no hint.
+                let last_plain_positional = call
+                    .arguments
+                    .args
+                    .iter()
+                    .rposition(|argument| !argument.is_starred_expr());
 
                 // `argument_names` is keyed by positional-arg index, not source-order index,
                 // so track them separately to stay in sync after keyword args appear mid-call.
@@ -599,15 +605,19 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                         if let Some((name, parameter_label_offset)) =
                             details.argument_names.get(&positional_index)
                             && !arg_matches_name(argument, name)
-                            && self.add_call_argument_name(
+                        {
+                            let mode = if last_plain_positional == Some(positional_index) {
+                                ArgumentHintMode::Insertable
+                            } else {
+                                ArgumentHintMode::DisplayOnly
+                            };
+                            self.add_call_argument_name(
                                 argument,
                                 &call.arguments,
                                 name,
                                 parameter_label_offset.map(NavigationTarget::from),
-                            )
-                            && !argument.is_starred_expr()
-                        {
-                            last_editable_hint = Some((self.hints.len() - 1, argument));
+                                mode,
+                            );
                         }
 
                         positional_index += 1;
@@ -615,18 +625,25 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
                     self.visit_expr(arg_or_keyword.value());
                 }
-
-                // For the last positional argument, provide an edit to insert
-                // the inlay hint.
-                if let Some((index, argument)) = last_editable_hint {
-                    self.hints[index].enable_call_argument_edit(argument);
-                }
             }
             _ => {
                 source_order::walk_expr(self, expr);
             }
         }
     }
+}
+
+/// Whether a parameter-name hint offers an edit to pass a positional argument by keyword.
+///
+/// Given `def f(x, y): ...`, the `x=` hint in `f(1, 2)` is display-only. Inserting it would
+/// leave the positional argument `2` after the keyword argument `x=1`, which is a syntax error.
+/// Accepting the `y=` hint produces `f(1, y=2)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ArgumentHintMode {
+    /// Show the parameter name without offering a text edit.
+    DisplayOnly,
+    /// Offer a text edit that converts the positional argument to a keyword argument.
+    Insertable,
 }
 
 /// Given a positional argument, check if the expression is the "same name"
@@ -4297,6 +4314,23 @@ Source with applied edits:
         def foo(*args: int): pass
         foo(1)
         ");
+    }
+
+    #[test]
+    fn argument_name_hint_before_variadic_arguments_has_no_edit() {
+        const DEFINITION: &str = "def f(x, *rest): ...\n";
+        assert_snapshot!(apply_inlay_hints(DEFINITION, "f(1)"), @"f(x=1)");
+
+        // The second argument binds to `*rest` and has no hint. Keep the hint for `x` visible,
+        // but inserting it would turn `f(1, 2)` into the invalid call `f(x=1, 2)`.
+        let test = inlay_hint_test(&format!("{DEFINITION}f(1, 2)"));
+        let [hint] = test
+            .collect_hints(&InlayHintSettings::default())
+            .try_into()
+            .unwrap();
+
+        assert_eq!(hint.display().to_string(), "x=");
+        assert!(hint.text_edits.is_empty());
     }
 
     #[test]
