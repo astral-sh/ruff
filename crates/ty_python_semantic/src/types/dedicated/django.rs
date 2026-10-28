@@ -288,7 +288,10 @@ fn primary_key_member<'db>(
             break;
         }
         if let Some(field) = own_primary_key(db, base) {
-            return (name == "pk").then(|| field.apply_optional_specialization(db, specialization));
+            return (name == "pk").then(|| {
+                foreign_key_id_type(db, env, field, specialization)
+                    .unwrap_or_else(|| field.ty.apply_optional_specialization(db, specialization))
+            });
         }
     }
 
@@ -304,11 +307,13 @@ fn primary_key_member<'db>(
 }
 
 /// Find a field constructed with `primary_key=True` in this class body.
-fn own_primary_key<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> Option<Type<'db>> {
+fn own_primary_key<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<&'db Field<'db>> {
     own_model_fields(db, class)
         .iter()
         .find(|field| field.metadata.primary_key)
-        .map(|field| field.ty)
 }
 
 /// Synthesize `<field>_id` attributes for foreign keys using the referenced field's type.
@@ -332,6 +337,16 @@ fn foreign_key_id_member<'db>(
     let field = own_model_fields(db, class)
         .iter()
         .find(|field| field.name == field_name)?;
+    foreign_key_id_type(db, env, field, specialization)
+}
+
+/// Return a relation field's stored ID type, used by both `<field>_id` and `pk`.
+fn foreign_key_id_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    field: &Field<'db>,
+    specialization: Option<Specialization<'db>>,
+) -> Option<Type<'db>> {
     let field_ty = field.ty.apply_optional_specialization(db, specialization);
     let foreign_key = KnownClass::DjangoForeignKey.try_to_class_literal(db, env)?;
     if !field_ty

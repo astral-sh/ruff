@@ -211,6 +211,83 @@ def _(book: Book, ebook: Ebook):
     reveal_type(ebook.id)  # revealed: str
 ```
 
+### Relation primary keys
+
+When a `OneToOneField` or `ForeignKey` is the primary key, `pk` has the referenced key's value type,
+while the relation attribute still returns the related model.
+
+```py
+from django.db import models
+
+class Book(models.Model):
+    id = models.UUIDField(primary_key=True)
+
+class Ebook(models.Model):
+    book = models.OneToOneField(Book, on_delete=models.CASCADE, primary_key=True)
+
+class Review(models.Model):
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, primary_key=True)
+
+def _(ebook: Ebook, review: Review):
+    reveal_type(ebook.book)  # revealed: Book
+    reveal_type(ebook.book_id)  # revealed: UUID
+    reveal_type(ebook.pk)  # revealed: UUID
+    ebook.id  # error: [unresolved-attribute]
+
+    reveal_type(review.book)  # revealed: Book
+    reveal_type(review.book_id)  # revealed: UUID
+    reveal_type(review.pk)  # revealed: UUID
+    review.id  # error: [unresolved-attribute]
+```
+
+Subclasses inherit the primary key's value type. Relations to a model whose primary key is itself a
+relation also resolve to the underlying value type.
+
+```py
+class SpecialEdition(Ebook):
+    pass
+
+class Download(models.Model):
+    ebook = models.OneToOneField(Ebook, on_delete=models.CASCADE, primary_key=True)
+
+def _(edition: SpecialEdition, download: Download):
+    reveal_type(edition.pk)  # revealed: UUID
+    edition.id  # error: [unresolved-attribute]
+
+    reveal_type(download.ebook)  # revealed: Ebook
+    reveal_type(download.ebook_id)  # revealed: UUID
+    reveal_type(download.pk)  # revealed: UUID
+```
+
+### Relation primary keys with an explicit target field
+
+With `to_field`, both `pk` and `<field>_id` have the referenced field's value type, even when it
+differs from the related model's primary key.
+
+```py
+from django.db import models
+
+class Book(models.Model):
+    isbn = models.CharField(max_length=13, unique=True)
+
+class Ebook(models.Model):
+    book = models.OneToOneField(Book, to_field="isbn", on_delete=models.CASCADE, primary_key=True)
+
+class Review(models.Model):
+    book = models.ForeignKey(Book, to_field="isbn", on_delete=models.CASCADE, primary_key=True)
+
+def _(book: Book, ebook: Ebook, review: Review):
+    reveal_type(book.pk)  # revealed: int
+
+    reveal_type(ebook.book)  # revealed: Book
+    reveal_type(ebook.book_id)  # revealed: str
+    reveal_type(ebook.pk)  # revealed: str
+
+    reveal_type(review.book)  # revealed: Book
+    reveal_type(review.book_id)  # revealed: str
+    reveal_type(review.pk)  # revealed: str
+```
+
 ## Foreign key IDs
 
 ### Automatic primary key
