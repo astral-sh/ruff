@@ -44,7 +44,7 @@ reveal_type(returns_unknown(""))  # revealed: Unknown
 ```
 
 For all the functions defined above, the inferred return type is also reflected in the inferred
-signature:
+signature.
 
 ```py
 # TODO: should be `def returns_1() -> Literal[1]`
@@ -57,7 +57,7 @@ reveal_type(returns_unknown)  # revealed: def returns_unknown(unknown) -> Unknow
 ```
 
 If a function has multiple return statements with different types, ty unions those to determine the
-overall return type:
+overall return type.
 
 ```py
 def returns_literal_1_or_a(flag: bool):
@@ -70,7 +70,7 @@ reveal_type(returns_literal_1_or_a(True))  # revealed: Literal[1, "a"]
 ```
 
 If control flow in a function can reach the end, or if all return statements `return` without an
-expression, ty infers the return type as `None`:
+expression, ty infers the return type as `None`.
 
 ```py
 def implicit_none_1():
@@ -92,7 +92,7 @@ reveal_type(implicit_none_3(True))  # revealed: None
 
 If the function has a mix of return statements with and without expressions, or some code paths that
 do not have a return statement at all, ty will include `None` in the inferred return type to account
-for the paths that return nothing:
+for the paths that return nothing.
 
 ```py
 def returns_int_or_none_1(flag: bool):
@@ -109,7 +109,7 @@ reveal_type(returns_int_or_none_1(True))  # revealed: Literal[1] | None
 reveal_type(returns_int_or_none_2(True))  # revealed: Literal[1] | None
 ```
 
-Return type inference takes narrowed types into account, so this function can only return `str`:
+Return type inference takes narrowed types into account, so this function can only return `str`.
 
 ```py
 def to_str(x: int | str):
@@ -125,7 +125,7 @@ reveal_type(to_str(1))  # revealed: str
 ### Returning from a loop
 
 A `return` statement in a loop can be reached through multiple control flow paths, so the inferred
-return type should be a union of all possible types:
+return type should be a union of all possible types.
 
 ```py
 def returns_from_loop(some_condition):
@@ -154,7 +154,7 @@ reveal_type(can_only_return_int(True))  # revealed: Literal[1]
 
 ### Branches that do not return
 
-Here, the `else` branch never returns, so there is no path that implicitly returns `None`:
+Here, the `else` branch never returns, so there is no path that implicitly returns `None`.
 
 ```py
 def non_returning_else(flag: bool):
@@ -182,7 +182,7 @@ reveal_type(type_name(1))  # revealed: Literal["int", "str"]
 ### Returning from `finally` clauses
 
 The `finally` clause always executes, even if there is a `return` statement in the `try` block. So
-this function can only return `str`:
+this function can only return `str`.
 
 ```py
 def returns_from_finally():
@@ -251,7 +251,7 @@ reveal_type(my_exit())  # revealed: Never
 
 ## Generic functions
 
-A generic function without a return type annotation can also have its return type inferred:
+A generic function without a return type annotation can also have its return type inferred.
 
 ```py
 def generic_identity[T](x: T):
@@ -267,7 +267,7 @@ def _(x: int, y: str):
     reveal_type(swap(x, y))  # revealed: tuple[str, int]
 ```
 
-If there are multiple paths, the inferred return type can be included in a union:
+If there are multiple paths, the inferred return type can be included in a union.
 
 ```py
 def returns_t_or_none[T](x: T, flag: bool):
@@ -285,7 +285,7 @@ def _(flag: bool):
 
 We generally infer precise singleton types (`<class 'Inner'>`) for classes. However, if a nested
 class is returned from a function, each function call would create a new class object, and they
-wouldn't be identical:
+wouldn't be identical.
 
 ```py
 def returns_class():
@@ -312,7 +312,7 @@ just treat it as `Unknown`.
 reveal_type(Inner1)  # revealed: Unknown
 ```
 
-Unfortunately, this means that we cannot infer precise types for attributes/methods on those types:
+Unfortunately, this means that we cannot infer precise types for attributes/methods on those types.
 
 ```py
 reveal_type(Inner1().attr)  # revealed: Unknown
@@ -325,7 +325,7 @@ nested class.
 
 The same problem occurs for nested functions. Here, we can promote the function to a corresponding
 `Callable` type (which is basically what the synthetic protocol approach would do for nested
-classes):
+classes).
 
 ```py
 def returns_callable():
@@ -386,7 +386,7 @@ reveal_type(yields_and_returns())  # revealed: Unknown
 
 ## Asynchronous functions
 
-For async functions, the inferred return type will be wrapped in `CoroutineType`:
+For async functions, the inferred return type will be wrapped in `CoroutineType`.
 
 ```py
 async def async_func():
@@ -398,7 +398,7 @@ reveal_type(async_func)  # revealed: def async_func() -> CoroutineType[Any, Any,
 
 ## Decorated functions
 
-Decorators that pass through the original function should not affect return type inference:
+Decorators that pass through the original function should not affect return type inference.
 
 ```py
 from typing import Callable
@@ -413,7 +413,7 @@ def returns_1():
 reveal_type(returns_1())  # revealed: Literal[1]
 ```
 
-This should also work with decorators that use `Callable` and `ParamSpec`:
+This should also work with decorators that use `Callable` and `ParamSpec`.
 
 ```py
 def identity_2[**P, R](func: Callable[P, R]) -> Callable[P, R]:
@@ -428,7 +428,7 @@ reveal_type(returns_2())  # revealed: Unknown
 ```
 
 In principle, return type inference can also be used to support unannotated decorators, but this
-might be much harder to support:
+might be much harder to support.
 
 ```py
 def identity_3(func):
@@ -458,7 +458,7 @@ reveal_type(returns_4_but_will_be_replaced())  # revealed: Literal["a"]
 ### Overrides
 
 Methods on classes need special treatment for return type inference, since they can be overridden on
-a subclass. To illustrate, consider the following example:
+a subclass. To illustrate, consider the following example.
 
 ```py
 class Base:
@@ -480,7 +480,7 @@ of `Base.method`, accepting the fact that it will lead to some false positives. 
 promote to `int` though (instead of `Literal[1]`), or otherwise we would even get errors on an
 override that returns `2`.
 
-So here is the example without return type annotations:
+So here is the example without return type annotations.
 
 ```py
 class BaseNA:
@@ -499,7 +499,7 @@ def _(base: BaseNA, derived: DerivedNA):
 ### Final classes and methods
 
 A method on a final class, or a final method, cannot be overridden. So its inferred return type can
-be precise and does not need to be widened:
+be precise and does not need to be widened.
 
 ```py
 from typing import final
@@ -521,7 +521,7 @@ reveal_type(SomeClass().final_method())  # revealed: Literal["a"]
 ### Overriding annotated base class methods
 
 Another interesting case is when the base class method has an explicit return type annotation, but
-the child class does not:
+the child class does not.
 
 ```py
 class Parent:
@@ -533,13 +533,13 @@ class Child(Parent):
         return 1
 ```
 
-In this case, we let the child class "inherit" the base class annotation:
+In this case, we let the child class "inherit" the base class annotation.
 
 ```py
 reveal_type(Child().method())  # revealed: int | None
 ```
 
-This also works for subclasses further down:
+This also works for subclasses further down.
 
 ```py
 class GrandChild(Child):
@@ -550,7 +550,7 @@ reveal_type(GrandChild().method())  # revealed: int | None
 ```
 
 The inherited return annotation takes precedence over the inferred body return type, even if a
-subclass method returns an incompatible value:
+subclass method returns an incompatible value.
 
 ```py
 class IncompatibleChild(Parent):
@@ -590,7 +590,7 @@ def _(task: Task, job: Job):
 ```
 
 For the child classes, we can infer a stricter (wider) return type based on their own
-implementations. Unioning in the inferred return type of the child method body seems appropriate:
+implementations. Unioning in the inferred return type of the child method body seems appropriate.
 
 ```py
 # Here, the return types could plausibly also include `None` from the base class method, but since we
@@ -622,7 +622,7 @@ def _(abstract: Abstract):
     reveal_type(abstract.get_with_default_implementation())  # revealed: Unknown
 ```
 
-Concrete overrides still infer their own return types:
+Concrete overrides still infer their own return types.
 
 ```py
 class Concrete(Abstract):
@@ -686,7 +686,7 @@ reveal_type(Special())  # revealed: Special
 ```
 
 Whether we support return type inference on `__new__` or not, the following constructor calls should
-be inferred as creating an instance of the class:
+be inferred as creating an instance of the class.
 
 ```py
 class Normal:
@@ -706,7 +706,7 @@ reveal_type(Direct())  # revealed: Direct
 
 `__init__` methods are expected to return `None`, and if they don't, the runtime will raise a
 `TypeError`. So there is very little gain from inferring the return type of `__init__`, and we
-currently exclude them explicitly:
+currently exclude them explicitly.
 
 ```py
 class StrangeInit:
@@ -724,7 +724,7 @@ reveal_type(StrangeInit.__init__(instance))  # revealed: Unknown
 ### Methods returning `self`
 
 A method that returns `self` should have its return type inferred as `Self`, so that subclasses get
-the return type specialized accordingly:
+the return type specialized accordingly.
 
 ```py
 class Fluent:
@@ -743,7 +743,7 @@ FluentSub().set_value(1).set_value(2)
 reveal_type(FluentSub().set_value(1))  # revealed: FluentSub | Unknown
 ```
 
-This also works when the type of `self` has been widened or narrowed:
+This also works when the type of `self` has been widened or narrowed.
 
 ```py
 class WidenedReceiver:
@@ -766,7 +766,7 @@ reveal_type(NarrowedReceiver.method)  # revealed: def method(self: NarrowedRecei
 ### Methods returning `cls`
 
 Similar to the above, a classmethod that returns `cls` should have its return type inferred as
-`type[Self]`:
+`type[Self]`.
 
 ```py
 class Factory:
@@ -812,7 +812,7 @@ def _(pair_int_str: Pair[int, str]):
     reveal_type(pair_int_str.get_both())  # revealed: tuple[int, str] | Unknown
 ```
 
-This also works for classmethods:
+This also works for classmethods.
 
 ```py
 class Factory[T]:
@@ -823,7 +823,7 @@ class Factory[T]:
 reveal_type(Factory[int].identity(1))  # revealed: int | Unknown
 ```
 
-Static methods also retain the class's type arguments:
+Static methods also retain the class's type arguments.
 
 ```py
 class Box[T]:
@@ -838,7 +838,7 @@ value: int = Box[int].identity(1)  # no diagnostic
 ## Overloaded functions
 
 Return type inference (on the actual implementation function) should not influence the return type
-of the overload set somehow:
+of the overload set somehow.
 
 ```py
 from typing import overload
@@ -861,7 +861,7 @@ reveal_type(func("a"))  # revealed: str
 ### Stub files
 
 Stub bodies do not provide return type information. An omitted annotation remains `Unknown`, even
-when the body contains an actual `return` statement:
+when the body contains an actual `return` statement.
 
 `library.pyi`:
 
@@ -883,7 +883,7 @@ reveal_type(seems_to_return_1())  # revealed: Unknown
 ### `TYPE_CHECKING` blocks
 
 We treat `if TYPE_CHECKING` blocks in the same way as stubs, and disable return type inference
-completely for functions defined within such blocks:
+completely for functions defined within such blocks.
 
 ```py
 from typing import TYPE_CHECKING
@@ -900,7 +900,7 @@ reveal_type(seems_to_return_1())  # revealed: Unknown
 ### Basic
 
 Recursive functions can make return type inference more interesting, since type inference of the
-returned expression can be self-referential:
+returned expression can be self-referential.
 
 ```py
 def factorial(n: int):
@@ -924,7 +924,7 @@ reveal_type(fibonacci)  # revealed: def fibonacci(n: int) -> Unknown
 reveal_type(fibonacci(5))  # revealed: int
 ```
 
-In some cases, fixed-point iteration might be able to determine a precise return type:
+In some cases, fixed-point iteration might be able to determine a precise return type.
 
 ```py
 def alternating(n: int):
@@ -938,7 +938,7 @@ reveal_type(alternating(3))  # revealed: int
 
 ### Divergent
 
-A function that would never return normally should still be analyzed without errors:
+A function that would never return normally should still be analyzed without errors.
 
 ```py
 def divergent():
@@ -956,7 +956,7 @@ reveal_type(expanding(5))  # revealed: tuple[Divergent, Divergent]
 
 ### Mutual recursion
 
-Functions that mutually depend on each others' return values can also be analyzed:
+Functions that mutually depend on each others' return values can also be analyzed.
 
 ```py
 def left(n: int):
@@ -977,7 +977,7 @@ reveal_type(right(3))  # revealed: Literal["a", 1]
 
 ### `functools.wraps`
 
-Consider this untyped decorator using `functools.wraps`:
+Consider this untyped decorator using `functools.wraps`.
 
 ```py
 from functools import wraps
@@ -1002,7 +1002,7 @@ logging_len = logged(len)
 reveal_type(logging_len)  # revealed: _Wrapped[(...), Unknown, (arg), Unknown]
 ```
 
-The wrapped function can be called, and the `__wrapped__` attribute can be accessed:
+The wrapped function can be called, and the `__wrapped__` attribute can be accessed.
 
 ```py
 logging_len([1, 2, 3])
@@ -1010,7 +1010,7 @@ logging_len.__wrapped__
 ```
 
 When a method is decorated with `logged`, the descriptor behavior of the method should be preserved,
-i.e. `method` should be callable with an implicitly bound `self` argument:
+i.e. `method` should be callable with an implicitly bound `self` argument.
 
 ```py
 class C:
@@ -1023,7 +1023,7 @@ instance = C()
 instance.method()  # error: [missing-argument]
 ```
 
-Calling `method` on the class object itself is also possible:
+Calling `method` on the class object itself is also possible.
 
 ```py
 C.method(instance)  # also no diagnostic
@@ -1032,7 +1032,7 @@ C.method(instance)  # also no diagnostic
 ### `NotImplemented`
 
 An unannotated `__eq__` method inherits the `bool` return annotation from `object.__eq__`, so
-returning `NotImplemented` does not affect the inferred return type, which remains `bool`:
+returning `NotImplemented` does not affect the inferred return type, which remains `bool`.
 
 ```py
 class C:
@@ -1048,7 +1048,7 @@ reveal_type(C.__eq__(C(1), C(2)))  # revealed: bool
 ```
 
 Consequently, the following two comparisons, which implicitly call `C.__eq__`, also have a `bool`
-result:
+result.
 
 ```py
 reveal_type(C(1) == C(2))  # revealed: bool

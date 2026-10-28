@@ -11,7 +11,7 @@ dependencies = ["SQLAlchemy==2.0.44"]
 
 ## ORM Model
 
-This test makes sure that ty understands SQLAlchemy's `dataclass_transform` setup:
+This test makes sure that ty understands SQLAlchemy's `dataclass_transform` setup.
 
 ```py
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -31,7 +31,7 @@ reveal_type(user.internal_name)  # revealed: str
 ```
 
 Unfortunately, SQLAlchemy overrides `__init__` and explicitly accepts all combinations of keyword
-arguments. This is why we currently cannot flag invalid constructor calls:
+arguments. This is why we currently cannot flag invalid constructor calls.
 
 ```py
 reveal_type(User.__init__)  # revealed: def __init__(self, **kw: Any) -> Unknown
@@ -42,7 +42,7 @@ invalid_user = User(invalid_arg=42)
 
 ## Basic query example
 
-First, set up a `Session`:
+First, set up a `Session`.
 
 ```py
 from sqlalchemy import select, Integer, Text, Boolean
@@ -55,7 +55,7 @@ engine = create_engine("sqlite://example.db")
 session = Session(engine)
 ```
 
-And define a simple model:
+And define a simple model.
 
 ```py
 class Base(DeclarativeBase):
@@ -69,7 +69,7 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
 ```
 
-Finally, we can execute queries:
+Finally, we can execute queries.
 
 ```py
 stmt = select(User)
@@ -95,7 +95,7 @@ assert row is not None
 reveal_type(alice3)  # revealed: User
 ```
 
-This also works with more complex queries:
+This also works with more complex queries.
 
 ```py
 stmt = select(User).where(User.is_admin == True).order_by(User.name).limit(10)
@@ -103,7 +103,7 @@ admin_users = session.scalars(stmt).all()
 reveal_type(admin_users)  # revealed: Sequence[User]
 ```
 
-We can also specify particular columns to select:
+We can also specify particular columns to select.
 
 ```py
 stmt = select(User.id, User.name)
@@ -137,7 +137,7 @@ alice_id = session.scalar(stmt)
 reveal_type(alice_id)  # revealed: int | None
 ```
 
-Using the legacy `query` API also works:
+Using the legacy `query` API also works.
 
 ```py
 users_legacy = session.query(User).all()
@@ -166,7 +166,7 @@ for row in query:
 
 ## Async API
 
-The async API is supported as well:
+The async API is supported as well.
 
 ```py
 from sqlalchemy.ext.asyncio import AsyncSession

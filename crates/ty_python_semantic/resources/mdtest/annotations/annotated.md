@@ -130,7 +130,7 @@ def _(x: Annotated[(int,)]):
 ```
 
 Runtime inference preserves an `Annotated` object when a type argument is present, even if that type
-is `Unknown`. With no type argument, the entire expression recovers as `Unknown`:
+is `Unknown`. With no type argument, the entire expression recovers as `Unknown`.
 
 ```py
 from ty_extensions._internal import Unknown

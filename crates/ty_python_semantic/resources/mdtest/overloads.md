@@ -42,7 +42,7 @@ reveal_type(add(1, 2))  # revealed: int
 These scenarios are to verify that the overloaded and non-overloaded definitions are correctly
 overridden by each other.
 
-An overloaded function is overriding another overloaded function:
+An overloaded function is overriding another overloaded function.
 
 ```py
 from typing import overload
@@ -70,7 +70,7 @@ reveal_type(foo())  # revealed: None
 reveal_type(foo(""))  # revealed: str
 ```
 
-A non-overloaded function is overriding an overloaded function:
+A non-overloaded function is overriding an overloaded function.
 
 ```py
 def foo(x: int) -> int:
@@ -79,7 +79,7 @@ def foo(x: int) -> int:
 reveal_type(foo)  # revealed: def foo(x: int) -> int
 ```
 
-An overloaded function is overriding a non-overloaded function:
+An overloaded function is overriding a non-overloaded function.
 
 ```py
 reveal_type(foo)  # revealed: def foo(x: int) -> int
@@ -249,7 +249,7 @@ def takes_base_any(base: BaseForAny[Any]) -> None:
 
 ## Overloads without a positional receiver
 
-An overload without a positional receiver cannot be called as a bound method:
+An overload without a positional receiver cannot be called as a bound method.
 
 ```py
 from collections.abc import Callable
@@ -934,7 +934,7 @@ class PartialFoo(ABC):
 
 As in other areas of ty, we treat `TYPE_CHECKING` blocks the same as "inline stub files", so we
 permit overloaded functions to exist without an implementation if all overloads are defined inside
-an `if TYPE_CHECKING` block:
+an `if TYPE_CHECKING` block.
 
 ```py
 from typing import overload, TYPE_CHECKING
@@ -993,7 +993,7 @@ def c(x: int) -> int: ...
 If an `@overload`-decorated function has a non-trivial body, it likely indicates a misunderstanding
 on the part of the user. We emit a warning-level diagnostic to alert them of this.
 
-`...`, `pass` and docstrings are all fine:
+`...`, `pass` and docstrings are all fine.
 
 ```py
 from typing import overload
@@ -1018,7 +1018,7 @@ def x(y):
     return y
 ```
 
-Anything else, however, will trigger the lint:
+Anything else, however, will trigger the lint.
 
 ```py
 @overload
@@ -1097,7 +1097,7 @@ def generic_parameter_type(x: int) -> int | str:
 
 A method that refers to a type variable from its enclosing class is not itself generic. In
 particular, overload consistency must still account for keyword names that may be included in an
-enclosing `ParamSpec`:
+enclosing `ParamSpec`.
 
 ```py
 from typing import Generic, ParamSpec, overload

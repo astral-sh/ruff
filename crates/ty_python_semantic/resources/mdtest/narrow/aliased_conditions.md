@@ -212,7 +212,7 @@ def _(l: list[int | None], lb: list[bool]):
 ## Narrowing is invalidated when target is reassigned
 
 If the target is reassigned between the definition of the alias and its use as a condition,
-narrowing does not take place:
+narrowing does not take place.
 
 ```py
 def _(x: int | None, cond: bool):
@@ -631,7 +631,7 @@ def _(x: int | None):
         reveal_type(x)  # revealed: None
 ```
 
-The same applies to a lazy scope:
+The same applies to a lazy scope.
 
 ```py
 def _(x: int | None):
@@ -688,7 +688,7 @@ def _(x: int | None):
         reveal_type(x)  # revealed: None
 ```
 
-The same applies to a lazy scope:
+The same applies to a lazy scope.
 
 ```py
 def _(x: int | None):

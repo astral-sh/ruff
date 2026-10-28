@@ -5,7 +5,7 @@
 ### Python 3.10
 
 Before Python 3.11, `async` comprehensions could not be used within outer sync comprehensions, even
-within an `async` function ([CPython issue](https://github.com/python/cpython/issues/77527)):
+within an `async` function ([CPython issue](https://github.com/python/cpython/issues/77527)).
 
 ```toml
 [environment]
@@ -29,7 +29,7 @@ error[invalid-syntax]: cannot use an asynchronous comprehension inside of a sync
   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
-If all of the comprehensions are `async`, on the other hand, the code was still valid:
+If all of the comprehensions are `async`, on the other hand, the code was still valid.
 
 ```py
 async def test():
@@ -47,7 +47,7 @@ info: It has no `__aiter__` method
 ```
 
 These are a couple of tricky but valid cases to check that nested scope handling is wired up
-correctly in the `SemanticSyntaxContext` trait:
+correctly in the `SemanticSyntaxContext` trait.
 
 ```py
 async def f():
@@ -61,7 +61,7 @@ async def f():
 
 ### Python 3.11
 
-All of these same examples are valid after Python 3.11:
+All of these same examples are valid after Python 3.11.
 
 ```toml
 [environment]
@@ -133,7 +133,7 @@ match 2:
 
 ## Duplicate `match` class attribute
 
-Attribute names in class patterns must be unique:
+Attribute names in class patterns must be unique.
 
 ```toml
 [environment]
@@ -168,7 +168,7 @@ f(x=1, x=2)
 f(1, x=2)
 ```
 
-Duplicate keywords are also invalid in class definitions:
+Duplicate keywords are also invalid in class definitions.
 
 ```py
 # error: [invalid-syntax] "Duplicate keyword argument `metaclass`"
@@ -216,7 +216,7 @@ async def g():
 
 ## Rebound comprehension variable
 
-Walrus operators cannot rebind variables already in use as iterators:
+Walrus operators cannot rebind variables already in use as iterators.
 
 ```py
 # error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
@@ -309,7 +309,7 @@ xs = [1]
 
 ## Multiple case assignments
 
-Variable names in pattern matching must be unique within a single pattern:
+Variable names in pattern matching must be unique within a single pattern.
 
 ```toml
 [environment]
@@ -334,7 +334,7 @@ match d:
 
 ## Duplicate type parameter
 
-Type parameter names must be unique in a generic class or function definition:
+Type parameter names must be unique in a generic class or function definition.
 
 ```toml
 [environment]
@@ -353,7 +353,7 @@ def f[X, Y, X]():
 
 ## Invalid star expression
 
-Star expressions can't be used in certain contexts:
+Star expressions can't be used in certain contexts.
 
 ```py
 def func():

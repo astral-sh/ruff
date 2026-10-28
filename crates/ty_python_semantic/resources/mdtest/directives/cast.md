@@ -120,7 +120,7 @@ f(cast(val=["foo"], typ=list[Literal["foo"]]))  # error: [redundant-cast]
 f(extension_cast(list[Literal["foo"]], ["foo"]))  # error: [redundant-cast]
 ```
 
-Annotated assignments and return types also supply type context through a cast:
+Annotated assignments and return types also supply type context through a cast.
 
 ```py
 items: list[Literal["foo"]] = cast(list[Literal["foo"]], ["foo"])  # error: [redundant-cast]
@@ -129,13 +129,13 @@ def make_items() -> list[Literal["foo"]]:
     return cast(list[Literal["foo"]], ["foo"])  # error: [redundant-cast]
 ```
 
-A value incompatible with the outer context still produces a disjoint-cast diagnostic:
+A value incompatible with the outer context still produces a disjoint-cast diagnostic.
 
 ```py
 f(cast(list[Literal["foo"]], [42]))  # error: [disjoint-cast]
 ```
 
-The outer context can also provide the `TypedDict` type of a dictionary literal:
+The outer context can also provide the `TypedDict` type of a dictionary literal.
 
 ```py
 from typing import TypedDict
@@ -157,7 +157,7 @@ Casts of incomplete or incompatible `TypedDict` literals therefore do not cause 
 `redundant-cast`.
 
 We do not yet detect disjointness between `dict` and `TypedDict` types. Adding that support may
-cause some of these casts to emit `disjoint-cast` in the future:
+cause some of these casts to emit `disjoint-cast` in the future.
 
 ```py
 from typing import TypedDict, cast
@@ -185,7 +185,7 @@ def make_item() -> Item:
 Type context can also introduce diagnostics in lambda bodies. Here, using the outer context would
 make the lambda parameter an `int` and report `call-non-callable`. We therefore fall back to the
 inference attempt that does not use the type context, and emit neither `redundant-cast` nor
-`call-non-callable`:
+`call-non-callable`.
 
 ```py
 from typing import Callable
@@ -194,7 +194,7 @@ def callback() -> Callable[[int], str]:
     return cast(Callable[[int], str], lambda value: value())  # no diagnostic
 ```
 
-Diagnostics that occur without the outer context are still reported, once:
+Diagnostics that occur without the outer context are still reported, once.
 
 ```py
 # error: [unresolved-reference]
@@ -273,7 +273,7 @@ def cast_union(value: int | str) -> None:
 
 ### Disjoint casts with unpacked arguments
 
-Argument unpacking does not prevent us from reporting disjoint casts:
+Argument unpacking does not prevent us from reporting disjoint casts.
 
 ```py
 from typing import cast
@@ -286,7 +286,7 @@ cast(str, **{"val": 1})  # error: [disjoint-cast]
 
 ### Disjoint casts involving generic types
 
-Incompatible generic specializations are rejected:
+Incompatible generic specializations are rejected.
 
 ```py
 from typing import Any, cast
@@ -310,7 +310,7 @@ def cast_generic(
 
 But `cast`s are permitted between two different specializations of the same invariant generic type
 when those two different specializations overlap. This can occur with certain dynamic
-specializations of invariant generics:
+specializations of invariant generics.
 
 ```py
 def cast_generic_invalid(
@@ -793,7 +793,7 @@ info: field `value` is required in `Source` but mutable and not-required in `Tar
 ### Casts to `Never`
 
 `Never` is disjoint from every type, but excluded from `disjoint-cast`. It is assumed that the user
-knows what they're doing if they cast to `Never` explicitly:
+knows what they're doing if they cast to `Never` explicitly.
 
 ```py
 from typing_extensions import Never, cast
@@ -802,7 +802,7 @@ x = cast(Never, 0)  # no diagnostic
 ```
 
 Upcasts from a `Never`-inferred type to a supertype are also permitted without the rule being
-triggered:
+triggered.
 
 ```py
 from typing_extensions import Never, cast
@@ -825,7 +825,7 @@ without using a `cast`.
 
 ### Casts in stub files
 
-`disjoint-cast` is not applied to stub files:
+`disjoint-cast` is not applied to stub files.
 
 `stub.pyi`:
 
@@ -841,7 +841,7 @@ This is partly to accommodate the fact that the typing spec
 member's value cannot be unambiguously expressed as a static assignment. Without a special case for
 stubs, we would emit a false-positive diagnostic on this example from the spec. This is due to the
 fact that `EllipsisType` (the type of `...`) is disjoint from almost every other type, since it is
-`@final`:
+`@final`.
 
 `stub2.pyi`:
 
@@ -863,7 +863,7 @@ runtime, the only possible useful applications of `cast` in a stub file are spec
 enum one above. There are no soundness implications to using `cast` in a stub file.
 
 For similar reasons, we also do not apply the rule in `if TYPE_CHECKING` blocks, which are also not
-executed at runtime:
+executed at runtime.
 
 `regular_py_file.py`:
 
@@ -879,7 +879,7 @@ if TYPE_CHECKING:
 The target type of a cast does not provide type context for its value. In the following example,
 inferring `[42]` using the cast's target, `list[object]`, would make the cast appear redundant.
 However, removing the cast changes the loop variable's type from `object` to `Literal[42]`, so
-reporting `redundant-cast` would be incorrect here:
+reporting `redundant-cast` would be incorrect here.
 
 ```py
 from typing import cast
@@ -898,7 +898,7 @@ this at the point where we might otherwise emit a `disjoint-cast` diagnostic by 
 `[42]` could equally well have been inferred as `list[object]` if it had been inferred with the
 right type context.
 
-The same principle is applied to other collection literals:
+The same principle is applied to other collection literals.
 
 ```py
 # revealed: set[str]
@@ -912,7 +912,7 @@ for x, y in cast(dict[object, object], reveal_type({"foo": 42})).items():  # no 
 ```
 
 In situations where reinferring the type with type context would still lead to a disjoint type for
-the collection literal, we continue to report `disjoint-cast`:
+the collection literal, we continue to report `disjoint-cast`.
 
 ```py
 # revealed: set[int]

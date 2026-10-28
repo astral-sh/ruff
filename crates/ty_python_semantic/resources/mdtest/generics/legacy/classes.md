@@ -49,7 +49,7 @@ reveal_type(generic_context(StarredTypeVarAndTypeVarTuple))
 ```
 
 Inheriting from `Generic` multiple times yields a `duplicate-base` diagnostic, just like any other
-class:
+class.
 
 ```py
 class Bad(Generic[T], Generic[T]): ...  # error: [duplicate-base]
@@ -220,7 +220,7 @@ child: Child[int]
 ## Protocol instances as generic arguments
 
 `Generic` and `Protocol` expect type variables, not protocol instances. This also applies to a
-specialized protocol whose methods use its type parameter:
+specialized protocol whose methods use its type parameter.
 
 ```toml
 [environment]
@@ -241,7 +241,7 @@ def _(value: HasMethod[int]) -> None:
 ```
 
 A method's own type parameter does not make the protocol instance a valid argument either. Here, `U`
-appears in the method signature, but the returned protocol does not use its argument:
+appears in the method signature, but the returned protocol does not use its argument.
 
 ```py
 class Q[T](Protocol):
@@ -255,14 +255,14 @@ def _(value: HasGenericMethod[int]) -> None:
     Protocol[value]  # error: [invalid-argument-type]
 ```
 
-A nested specialization in a method return type is also invalid:
+A nested specialization in a method return type is also invalid.
 
 ```py
 def _(value: HasMethod[HasMethod[int]]) -> None:
     Generic[value]  # error: [invalid-argument-type]
 ```
 
-The same applies to a nested specialization in an attribute:
+The same applies to a nested specialization in an attribute.
 
 ```py
 class P[T](Protocol):
@@ -274,7 +274,7 @@ def _(value: P[P[int]]) -> None:
 
 ## Finite recursive protocols as generic arguments
 
-`Generic` and `Protocol` reject protocol instances even when their methods are recursive:
+`Generic` and `Protocol` reject protocol instances even when their methods are recursive.
 
 ```toml
 [environment]
@@ -293,7 +293,7 @@ def _(value: P[int]) -> None:
     Generic[value]  # error: [invalid-argument-type]
 ```
 
-The same restriction applies when the method returns a different specialization of the protocol:
+The same restriction applies when the method returns a different specialization of the protocol.
 
 ```py
 def _(value: P[str]) -> None:
@@ -301,7 +301,7 @@ def _(value: P[str]) -> None:
 ```
 
 A property that swaps its type arguments returns to the original specialization after two steps.
-This finite cycle does not change which arguments are valid:
+This finite cycle does not change which arguments are valid.
 
 ```py
 class Swapped[A, B](Protocol):
@@ -315,7 +315,7 @@ def _(value: Swapped[int, str]) -> None:
 ## Runtime `TypeVarTuple` arguments
 
 A list is not a valid argument to `Generic` or `Protocol`, even when it contains runtime
-`TypeVarTuple` objects:
+`TypeVarTuple` objects.
 
 ```toml
 [environment]
@@ -333,7 +333,7 @@ def _(value: TypeVarTuple) -> None:
     class ProtocolBase(Protocol[[value]]): ...  # error: [invalid-argument-type]
 ```
 
-The `typing_extensions` variant has the same behavior:
+The `typing_extensions` variant has the same behavior.
 
 ```py
 from typing_extensions import TypeVarTuple as TypeVarTupleExtensions
@@ -343,7 +343,7 @@ def _(value: TypeVarTupleExtensions) -> None:
     Protocol[[value]]  # error: [invalid-argument-type]
 ```
 
-Naming the list type with an alias does not make the argument valid:
+Naming the list type with an alias does not make the argument valid.
 
 ```py
 type Alias = list[TypeVarTuple]
@@ -352,7 +352,7 @@ def _(alias: Alias) -> None:
     Generic[alias]  # error: [invalid-argument-type]
 ```
 
-A `NewType` based on that list type is also invalid:
+A `NewType` based on that list type is also invalid.
 
 ```py
 from typing import NewType
@@ -363,7 +363,7 @@ def _(newtype: X) -> None:
     Generic[newtype]  # error: [invalid-argument-type]
 ```
 
-Nor does a type variable's bound make the list a valid argument:
+Nor does a type variable's bound make the list a valid argument.
 
 ```py
 from typing import TypeVar
@@ -374,7 +374,7 @@ def _(bounded: T) -> None:
     Generic[bounded]  # error: [invalid-argument-type]
 ```
 
-We reject protocol instances even when specialized with `TypeVarTuple`:
+We reject protocol instances even when specialized with `TypeVarTuple`.
 
 ```py
 class Unused[T](Protocol):
@@ -384,7 +384,7 @@ def _(value: Unused[TypeVarTuple]) -> None:
     Generic[value]  # error: [invalid-argument-type]
 ```
 
-The protocol remains invalid if one of its members uses that argument:
+The protocol remains invalid if one of its members uses that argument.
 
 ```py
 class Used[T](Protocol):
@@ -395,7 +395,7 @@ def _(value: Used[TypeVarTuple]) -> None:
 ```
 
 A protocol parameter's bound does not make an instance a valid argument, even when the protocol is
-specialized with `Any`:
+specialized with `Any`.
 
 ```py
 from typing import Any
@@ -410,7 +410,7 @@ def _(value: Bounded[Any]) -> None:
 ## Type variable defaults in generic arguments
 
 A type-variable default does not restrict values annotated with that type variable. A default
-containing a `TypeVarTuple` therefore does not make these arguments valid:
+containing a `TypeVarTuple` therefore does not make these arguments valid.
 
 ```toml
 [environment]
@@ -430,7 +430,7 @@ def _(value: T) -> None:
 ## Recursive structural types in generic arguments
 
 A recursive protocol instance is not a valid `Generic` argument, even when its members keep changing
-specialization:
+specialization.
 
 ```toml
 [environment]
@@ -449,7 +449,7 @@ def _(value: Recursive[int]) -> None:
     Generic[value]  # error: [invalid-argument-type]
 ```
 
-The recursive reference can also appear in a method's return type:
+The recursive reference can also appear in a method's return type.
 
 ```py
 class RecursiveMethod[T](Protocol):
@@ -459,7 +459,7 @@ def _(value: RecursiveMethod[int]) -> None:
     Generic[value]  # error: [invalid-argument-type]
 ```
 
-The same restriction applies to properties whose return types keep changing specialization:
+The same restriction applies to properties whose return types keep changing specialization.
 
 ```py
 class RecursiveProperty[T](Protocol):
@@ -471,7 +471,7 @@ def _(value: RecursiveProperty[int]) -> None:
 ```
 
 Mutually recursive methods can keep changing specialization too. Each round below adds another
-`list` around the argument:
+`list` around the argument.
 
 ```py
 class Left[T](Protocol):
@@ -484,7 +484,7 @@ def _(value: Left[int]) -> None:
     Generic[value]  # error: [invalid-argument-type]
 ```
 
-We also reject a non-generic protocol instance whose method returns the growing type:
+We also reject a non-generic protocol instance whose method returns the growing type.
 
 ```py
 class Root(Protocol):
@@ -494,7 +494,7 @@ def _(value: Root) -> None:
     Generic[value]  # error: [invalid-argument-type]
 ```
 
-A growing recursive `TypedDict` is also invalid:
+A growing recursive `TypedDict` is also invalid.
 
 ```py
 class Payload[T](TypedDict):
@@ -507,7 +507,7 @@ def _(value: Payload[int]) -> None:
 ## Recursive bounds in generic arguments
 
 A recursive bound on an unused protocol parameter does not make the protocol instance a valid
-`Generic` argument:
+`Generic` argument.
 
 ```toml
 [environment]
@@ -615,7 +615,7 @@ child: Child[int]
 
 When inheriting from the same generic ancestor through multiple paths, the type argument ordering
 must be consistent. It is an error for a class to explicitly inherit from a generic base class that
-also appears elsewhere in the MRO with a different specialization:
+also appears elsewhere in the MRO with a different specialization.
 
 ```py
 from typing import TypeVar, Generic, Any
@@ -789,7 +789,7 @@ Dynamic = type("Dynamic", (Combined, BytesBase), {})
 
 <!-- snapshot-diagnostics -->
 
-The type parameter can be specified explicitly:
+The type parameter can be specified explicitly.
 
 ```py
 from typing_extensions import Generic, Literal, TypeVar
@@ -803,14 +803,14 @@ reveal_type(C[int]())  # revealed: C[int]
 reveal_type(C[Literal[5]]())  # revealed: C[Literal[5]]
 ```
 
-The specialization must match the generic types:
+The specialization must match the generic types.
 
 ```py
 # error: [invalid-type-arguments] "Too many type arguments to class `C`: expected 1, got 2"
 reveal_type(C[int, int]())  # revealed: C[Unknown]
 ```
 
-If the type variable has an upper bound, the specialized type must satisfy that bound:
+If the type variable has an upper bound, the specialized type must satisfy that bound.
 
 ```py
 from typing import Union
@@ -837,7 +837,7 @@ reveal_type(BoundedByUnion[str]())  # revealed: BoundedByUnion[str]
 reveal_type(BoundedByUnion[int | str]())  # revealed: BoundedByUnion[int | str]
 ```
 
-If the type variable is constrained, the specialized type must satisfy those constraints:
+If the type variable is constrained, the specialized type must satisfy those constraints.
 
 ```py
 ConstrainedT = TypeVar("ConstrainedT", int, str)
@@ -860,7 +860,7 @@ reveal_type(Constrained[int | str]())  # revealed: Constrained[int | str]
 reveal_type(Constrained[object]())  # revealed: Constrained[Unknown]
 ```
 
-If the type variable has a default, it can be omitted:
+If the type variable has a default, it can be omitted.
 
 ```py
 WithDefaultU = TypeVar("WithDefaultU", default=int)
@@ -874,7 +874,7 @@ reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
 reveal_type(WithDefault[str, str, str]())  # revealed: WithDefault[Unknown, Unknown]
 ```
 
-Type variable defaults can reference earlier type variables, but not later ones:
+Type variable defaults can reference earlier type variables, but not later ones.
 
 ```py
 from typing_extensions import TypeVar, Generic
@@ -894,7 +894,7 @@ WithDefaultU2 = TypeVar("WithDefaultU2", default=int)
 class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU2]): ...
 ```
 
-A type variable default cannot reference a type variable that is not a type parameter of the class:
+A type variable default cannot reference a type variable that is not a type parameter of the class.
 
 ```py
 from typing_extensions import TypeVar, Generic
@@ -912,7 +912,7 @@ class Bad(Generic[Start2T, Stop2T, StepT]): ...
 ## Specializing generic class objects from context
 
 A `type[...]` annotation informs the specialization of a bare generic class, taking precedence over
-any type variable defaults:
+any type variable defaults.
 
 ```py
 from typing_extensions import Generic, TypeVar
@@ -925,7 +925,7 @@ defaulted_factory: type[C[str]] = C
 reveal_type(defaulted_factory())  # revealed: C[str]
 ```
 
-The context can also refer to a type variable of an enclosing class:
+The context can also refer to a type variable of an enclosing class.
 
 ```py
 class Box(Generic[T]):
@@ -944,14 +944,14 @@ reveal_type(Box[str]().factory()())  # revealed: Box[str]
 reveal_type(Connection[str]().factory())  # revealed: Box[str]
 ```
 
-A declared union containing a class type is narrowed to provide useful type context:
+A declared union containing a class type is narrowed to provide useful type context.
 
 ```py
 factory: type[Box[str]] | None = Box
 reveal_type(factory())  # revealed: Box[str]
 ```
 
-Without a concrete type context, the default still applies:
+Without a concrete type context, the default still applies.
 
 ```py
 def value(factory: type[Box[T]]) -> T:
@@ -963,7 +963,7 @@ reveal_type(value(Box))  # revealed: int
 ## Aliases of unsubscripted generic classes
 
 An implicit alias preserves the generic class object. A PEP 613 alias uses the class's default
-specialization, including when that alias is assigned to another name:
+specialization, including when that alias is assigned to another name.
 
 ```py
 from typing_extensions import Generic, TypeAlias, TypeVar
@@ -1134,7 +1134,7 @@ NonGenericSubclass[bytes]
 ## Diagnostics for bad specializations
 
 We show the user where the type variable was defined if a specialization is given that doesn't
-satisfy the type variable's upper bound or constraints:
+satisfy the type variable's upper bound or constraints.
 
 <!-- snapshot-diagnostics -->
 
@@ -1164,7 +1164,7 @@ y: Constrained[str]  # error: [invalid-type-arguments]
 
 ## Inferring generic class parameters
 
-We can infer the type parameter from a type context:
+We can infer the type parameter from a type context.
 
 ```py
 from typing_extensions import Generic, TypeVar
@@ -1178,14 +1178,14 @@ c: C[int] = C()
 reveal_type(c)  # revealed: C[int]
 ```
 
-The typevars of a fully specialized generic class should no longer be visible:
+The typevars of a fully specialized generic class should no longer be visible.
 
 ```py
 reveal_type(c.x)  # revealed: int
 ```
 
 If the type parameter is not specified explicitly, and there are no constraints that let us infer a
-specific type, we infer the typevar's default type:
+specific type, we infer the typevar's default type.
 
 ```py
 DefaultT = TypeVar("DefaultT", default=int)
@@ -1195,7 +1195,7 @@ class D(Generic[DefaultT]): ...
 reveal_type(D())  # revealed: D[int]
 ```
 
-If a typevar does not provide a default, we use `Unknown`:
+If a typevar does not provide a default, we use `Unknown`.
 
 ```py
 reveal_type(C())  # revealed: C[Unknown]
@@ -1203,7 +1203,7 @@ reveal_type(C())  # revealed: C[Unknown]
 
 ## Inferring generic class parameters from bounded receivers
 
-The nominal specialization of a generic class can be inferred from the upper bound of `Self`:
+The nominal specialization of a generic class can be inferred from the upper bound of `Self`.
 
 ```py
 from typing_extensions import Generic, TypeVar
@@ -1223,7 +1223,7 @@ def identity(value: T) -> T:
     return value
 ```
 
-The same applies to a type variable with an explicit upper bound:
+The same applies to a type variable with an explicit upper bound.
 
 ```py
 S = TypeVar("S", bound=Box[int])
@@ -1233,7 +1233,7 @@ def _(box: S) -> None:
     reveal_type(identity(box))  # revealed: S@_
 ```
 
-The specialization inferred from the bound cannot violate the bounds of a constrained type variable:
+The specialization inferred from the bound cannot violate the bounds of a constrained type variable.
 
 ```py
 ConstrainedT = TypeVar("ConstrainedT", int, str)
@@ -1247,7 +1247,7 @@ def _(box: S) -> None:
     combine(box, "")
 ```
 
-A type variable cannot be substituted for its bound in non-covariant position:
+A type variable cannot be substituted for its bound in non-covariant position.
 
 ```py
 ContravariantT = TypeVar("ContravariantT", contravariant=True)
@@ -1291,7 +1291,7 @@ reveal_type(C(1))  # revealed: C[int]
 wrong_innards: C[int] = C("five")
 ```
 
-An explicit `cls: type[Self]` annotation does not affect the inferred type:
+An explicit `cls: type[Self]` annotation does not affect the inferred type.
 
 ```py
 from typing_extensions import Self
@@ -1325,7 +1325,7 @@ reveal_type(C(1))  # revealed: C[int]
 wrong_innards: C[int] = C("five")
 ```
 
-An explicit `self: Self` annotation does not affect the inferred type:
+An explicit `self: Self` annotation does not affect the inferred type.
 
 ```py
 from typing_extensions import Self
@@ -1658,7 +1658,7 @@ reveal_type(C[float](float()))  # revealed: C[float]
 C[str](int())  # error: [invalid-argument-type]
 ```
 
-Inferring a gradual type from an argument also takes precedence over the default:
+Inferring a gradual type from an argument also takes precedence over the default.
 
 ```py
 from ty_extensions._internal import Unknown
@@ -1668,7 +1668,7 @@ def gradual(unknown: Unknown, dynamic: Any):
     reveal_type(C(dynamic))  # revealed: C[Any]
 ```
 
-The same applies when `__new__` is defined directly and returns the generic class instead of `Self`:
+The same applies when `__new__` is defined directly and returns the generic class instead of `Self`.
 
 ```py
 class Direct(Generic[T]):
@@ -1681,7 +1681,7 @@ reveal_type(Direct(int()))  # revealed: Direct[int]
 reveal_type(Direct())  # revealed: Direct[str]
 ```
 
-An explicitly annotated `self` can infer the class's type argument through a method type variable:
+An explicitly annotated `self` can infer the class's type argument through a method type variable.
 
 ```py
 V = TypeVar("V")
@@ -1693,7 +1693,7 @@ reveal_type(ExplicitSelf(int()))  # revealed: ExplicitSelf[int]
 ```
 
 Each method can solve different type variables. A default that references another type variable uses
-that variable's inferred type:
+that variable's inferred type.
 
 ```py
 U = TypeVar("U", default=T)
@@ -1708,7 +1708,7 @@ reveal_type(Pair(int(), bytes()))  # revealed: Pair[int, bytes]
 reveal_type(Pair(int()))  # revealed: Pair[int, int]
 ```
 
-When both methods infer a type, we combine their results even if one happens to equal the default:
+When both methods infer a type, we combine their results even if one happens to equal the default.
 
 ```py
 class Both(Generic[T]):
@@ -2175,7 +2175,7 @@ reveal_type(D())  # revealed: D[Unknown, Unknown]
 ## Generic subclass
 
 When a generic subclass fills its superclass's type parameter with one of its own, the actual types
-propagate through:
+propagate through.
 
 ```py
 from typing_extensions import Generic, Self, TypeVar
@@ -2285,7 +2285,7 @@ reveal_type(DescriptorChild[int].descriptor)  # revealed: int
 ## Unions of generic intersections
 
 Sharing one class constraint does not make two intersections interchangeable. Neither of these
-alternatives covers the other:
+alternatives covers the other.
 
 ```py
 from typing import Generic, TypeVar
@@ -2304,7 +2304,7 @@ def different_classes(value: Intersection[Cell[int], Marker] | Intersection[Mark
 ```
 
 An alternative with an additional constraint is redundant when the other constraints match. Here,
-`T` is invariant by default, so `Cell[bool]` is not a subtype of `Cell[int]`:
+`T` is invariant by default, so `Cell[bool]` is not a subtype of `Cell[int]`.
 
 ```py
 def specializations(
@@ -2315,7 +2315,7 @@ def specializations(
     reveal_type(incompatible)  # revealed: (Cell[bool] & Marker) | (Cell[int] & Marker)
 ```
 
-An inherited specialization can also make an intersection redundant:
+An inherited specialization can also make an intersection redundant.
 
 ```py
 class Child(Cell[int]): ...
@@ -3067,7 +3067,7 @@ reveal_type(type(Invalid[int]))  # revealed: type[Unknown]
 reveal_type(Invalid[int].value)  # revealed: Unknown
 ```
 
-The specialized class remains a class object, so it cannot be assigned to `None`:
+The specialized class remains a class object, so it cannot be assigned to `None`.
 
 ```py
 meta: OtherMeta = Invalid[int]
@@ -3075,7 +3075,7 @@ none: None = Invalid[int]  # error: [invalid-assignment]
 ```
 
 The metaclass also remains unknown when the invalid class is reached through type-variable bounds or
-constraints:
+constraints.
 
 ```py
 Bounded = TypeVar("Bounded", bound=Invalid[int])
@@ -3092,7 +3092,7 @@ def constrained(cls: type[Constrained]):
     none: None = cls  # error: [invalid-assignment]
 ```
 
-An explicit metaclass is retained after a conflict, including its specialization:
+An explicit metaclass is retained after a conflict, including its specialization.
 
 ```py
 class Explicit(Generic[T], Base, metaclass=Meta[str]): ...  # error: [conflicting-metaclass]
@@ -3216,7 +3216,7 @@ def unknown(series: Series[Unknown]):
     reveal_type(series + 1)  # revealed: Series[Unknown]
 ```
 
-Concrete receivers select the matching overload:
+Concrete receivers select the matching overload.
 
 ```py
 def _(integers: Series[int], strings: Series[str]):
@@ -3224,7 +3224,7 @@ def _(integers: Series[int], strings: Series[str]):
     reveal_type(strings + 1)  # revealed: Series[str]
 ```
 
-The returned instance supports known methods, and ty still rejects missing attributes:
+The returned instance supports known methods, and ty still rejects missing attributes.
 
 ```py
 def _(series: Series[Any]):
@@ -3287,7 +3287,7 @@ def _(x: Any):
 ## Parameter packs in ambiguous overload returns
 
 Equivalent `ParamSpec` arguments are preserved while other type arguments are merged. Differing
-parameter packs currently make the entire ambiguous return type unknown:
+parameter packs currently make the entire ambiguous return type unknown.
 
 ```py
 from typing import Any, Generic, TypeVar, overload
@@ -3313,7 +3313,7 @@ def _(x: Any):
     reveal_type(parameters(x))  # revealed: Unknown
 ```
 
-The same applies to `TypeVarTuple` arguments:
+The same applies to `TypeVarTuple` arguments.
 
 ```py
 Ts = TypeVarTuple("Ts")
@@ -3361,7 +3361,7 @@ class Pair(Generic[T, U]):
 
 ## Materialized `TypeIs` return types
 
-A generic `TypeIs` in the return type of a class method is materialized along with the outer class:
+A generic `TypeIs` in the return type of a class method is materialized along with the outer class.
 
 ```py
 from typing import Any, Generic, TypeVar
@@ -3386,7 +3386,7 @@ def _(top: Top[Predicate[Any]], bottom: Bottom[Predicate[Any]], value: object) -
     reveal_type(bottom.matches(value))  # revealed: Bottom[TypeIs[Any @ value]]
 ```
 
-An explicit `TypeIs[Any]` return type remains unmaterialized:
+An explicit `TypeIs[Any]` return type remains unmaterialized.
 
 ```py
 def _(top: Top[Predicate[Any]], bottom: Bottom[Predicate[Any]], value: object) -> None:
@@ -3397,7 +3397,7 @@ def _(top: Top[Predicate[Any]], bottom: Bottom[Predicate[Any]], value: object) -
 ## Materialized recursive generic protocols
 
 Materialization leaves recursive return types unchanged when a receiver annotation names a fixed
-specialization:
+specialization.
 
 ```py
 from __future__ import annotations
@@ -3415,7 +3415,7 @@ static_assert(is_equivalent_to(Fixed[int], Top[Fixed[int]]))
 static_assert(is_equivalent_to(Fixed[int], Bottom[Fixed[int]]))
 ```
 
-The receiver itself can name a growing specialization:
+The receiver itself can name a growing specialization.
 
 ```py
 class Growing(Protocol[T_co]):
@@ -3425,7 +3425,7 @@ class Growing(Protocol[T_co]):
 static_assert(is_equivalent_to(Growing[int], Top[Growing[int]]))
 ```
 
-Overloads can require different receiver specializations:
+Overloads can require different receiver specializations.
 
 ```py
 from typing import overload
@@ -3441,7 +3441,7 @@ static_assert(is_equivalent_to(Overloaded[int], Top[Overloaded[int]]))
 ```
 
 Static bounds and constraints also leave materialization unchanged, including when the receiver's
-type argument grows:
+type argument grows.
 
 ```py
 BoundedT = TypeVar("BoundedT", bound=object, covariant=True)
@@ -3517,7 +3517,7 @@ reveal_type(Sub)  # revealed: <class 'Sub'>
 
 #### With string forward references
 
-A similar case can work in a non-stub file, if forward references are stringified:
+A similar case can work in a non-stub file, if forward references are stringified.
 
 ```py
 from typing_extensions import Generic, TypeVar
@@ -3537,7 +3537,7 @@ class Sub2(Base2["Sub2", U]): ...  # error: [missing-type-argument]
 
 #### Without string forward references
 
-In a non-stub file, without stringified forward references, this raises a `NameError`:
+In a non-stub file, without stringified forward references, this raises a `NameError`.
 
 ```py
 from typing_extensions import Generic, TypeVar
@@ -3579,7 +3579,7 @@ class D(D[int], Generic[T]): ...
 ### Cyclic inheritance in a stub file combined with constrained type variables
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/1390>; we used to panic on
-this:
+this.
 
 `stub.pyi`:
 
@@ -3998,7 +3998,7 @@ def bound_pairs_reversed(a: Box[str], b: Box[T], cond: bool):
     reveal_type(pair())
 ```
 
-An expected return type also provides context for the call:
+An expected return type also provides context for the call.
 
 ```py
 def contextual_argument(a: Box[str], b: Box[T], cond: bool) -> tuple[Box[str], str] | tuple[Box[T], T]:
@@ -4175,14 +4175,14 @@ class Integers(Any, Base[int]):
 reveal_type(Integers.items)  # revealed: list[int]
 ```
 
-An incompatible default is rejected:
+An incompatible default is rejected.
 
 ```py
 class Invalid(Any, Base[int]):
     items = ["wrong"]  # error: [invalid-assignment]
 ```
 
-A generic subclass retains its type parameter in the inherited annotation:
+A generic subclass retains its type parameter in the inherited annotation.
 
 ```py
 class Child(Any, Base[T]):

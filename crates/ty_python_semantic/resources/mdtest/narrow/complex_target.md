@@ -69,7 +69,7 @@ if e.x is not None:
         reveal_type(e.x)  # revealed: int
 ```
 
-Narrowing can be "reset" by assigning to the attribute:
+Narrowing can be "reset" by assigning to the attribute.
 
 ```py
 c = C()
@@ -84,7 +84,7 @@ if c.x is None:
 reveal_type(c.x)  # revealed: int | None
 ```
 
-Narrowing can also be "reset" by assigning to the object:
+Narrowing can also be "reset" by assigning to the object.
 
 ```py
 c = C()
@@ -288,7 +288,7 @@ def _(t9: tuple[int | None, str] | tuple[str, int]):
 
 ### Tagged unions of tuples (equality narrowing)
 
-Narrow unions of tuples based on literal tag elements using `==` comparison:
+Narrow unions of tuples based on literal tag elements using `==` comparison.
 
 ```py
 from typing import Literal
@@ -366,7 +366,7 @@ def _(x: tuple[Literal["a"], A] | tuple[Literal["b"], B]):
 ```
 
 A tuple can have several literal tags. Matching a different tag rules out that tuple, while
-excluding only one of its possible tags leaves it in the union:
+excluding only one of its possible tags leaves it in the union.
 
 ```py
 def multiple_tags(x: tuple[Literal["a"], int] | tuple[Literal["b", "c"], str]):
@@ -381,7 +381,7 @@ def multiple_tags(x: tuple[Literal["a"], int] | tuple[Literal["b", "c"], str]):
         reveal_type(x)  # revealed: tuple[Literal["b", "c"], str]
 ```
 
-Enum literals are supported as tuple tags, including `IntEnum` literals:
+Enum literals are supported as tuple tags, including `IntEnum` literals.
 
 ```py
 from enum import Enum, IntEnum
@@ -409,7 +409,7 @@ def _(x: tuple[Literal[IntTag.A], int] | tuple[Literal[IntTag.B], str]):
 ```
 
 An `IntEnum` member compares equal to its integer value. A tuple whose tags are `IntTag.A` or `1`
-therefore always matches `1`, and is excluded from the other branch:
+therefore always matches `1`, and is excluded from the other branch.
 
 ```py
 def enum_tag_equal_to_integer(
@@ -423,7 +423,7 @@ def enum_tag_equal_to_integer(
 
 An enum can customize `__ne__` independently of `__eq__`. An ambiguous inequality keeps tuples whose
 tag is that enum member in both branches, even when its literal type differs from the comparison
-value:
+value.
 
 ```py
 class NeverUnequal(Enum):
@@ -443,7 +443,7 @@ def custom_inequality(
 ```
 
 An ambiguous tag keeps its tuple in both branches. Other tuples can still be excluded when their
-literal tags make the comparison always true or always false:
+literal tags make the comparison always true or always false.
 
 ```py
 def _(x: tuple[Literal["tag1"], A] | tuple[str, B] | tuple[Literal["tag2"], C]):
@@ -454,7 +454,7 @@ def _(x: tuple[Literal["tag1"], A] | tuple[str, B] | tuple[Literal["tag2"], C]):
 ```
 
 This also applies when a tag is a union of literal and non-literal types. The non-literal
-alternative can compare equal to the tag being checked:
+alternative can compare equal to the tag being checked.
 
 ```py
 class MatchesAnything:
@@ -471,7 +471,7 @@ def nonliteral_tag_union(
 ```
 
 An `int` tag can contain a subclass with custom equality, so it can match a string literal. This
-preserves the tuple with that tag without preventing narrowing of the literal tags:
+preserves the tuple with that tag without preventing narrowing of the literal tags.
 
 ```py
 def integer_tag(x: tuple[int, A] | tuple[Literal["a"], B] | tuple[Literal["b"], C]):
@@ -482,7 +482,7 @@ def integer_tag(x: tuple[int, A] | tuple[Literal["a"], B] | tuple[Literal["b"], 
 ```
 
 If the index is out of bounds for any tuple in the union, we also skip narrowing (a diagnostic will
-be emitted elsewhere for the out-of-bounds access):
+be emitted elsewhere for the out-of-bounds access).
 
 ```py
 def _(x: tuple[A, Literal["a"]] | tuple[B]):
@@ -494,7 +494,7 @@ def _(x: tuple[A, Literal["a"]] | tuple[B]):
         reveal_type(x)  # revealed: tuple[A, Literal["a"]] | tuple[B]
 ```
 
-We can still narrow tuples when non-tuple types are present in the union:
+We can still narrow tuples when non-tuple types are present in the union.
 
 ```py
 def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B] | list[int]):
@@ -520,7 +520,7 @@ def truthy(value: tuple[Literal[True], int] | tuple[Literal[False], str]):
         reveal_type(value[1])  # revealed: str
 ```
 
-Negating the check selects the tuple with the falsy element. Negative indices work too:
+Negating the check selects the tuple with the falsy element. Negative indices work too.
 
 ```py
 def negated(value: tuple[Literal[True], int] | tuple[Literal[False], str]):
@@ -528,7 +528,7 @@ def negated(value: tuple[Literal[True], int] | tuple[Literal[False], str]):
         reveal_type(value[1])  # revealed: str
 ```
 
-Calling `bool` on the element has the same effect as checking its truthiness directly:
+Calling `bool` on the element has the same effect as checking its truthiness directly.
 
 ```py
 def explicit_bool(value: tuple[Literal[True], int] | tuple[Literal[False], str]):
@@ -536,7 +536,7 @@ def explicit_bool(value: tuple[Literal[True], int] | tuple[Literal[False], str])
         reveal_type(value[1])  # revealed: int
 ```
 
-The checked element can also be a union of literals that are all truthy or all falsy:
+The checked element can also be a union of literals that are all truthy or all falsy.
 
 ```py
 def literal_tags(value: tuple[Literal[0, ""], str] | tuple[Literal[1, "x"], int]):
@@ -546,7 +546,7 @@ def literal_tags(value: tuple[Literal[0, ""], str] | tuple[Literal[1, "x"], int]
         reveal_type(value[1])  # revealed: str
 ```
 
-A `bool` element can be either true or false, so its tuple remains possible in both branches:
+A `bool` element can be either true or false, so its tuple remains possible in both branches.
 
 ```py
 def ambiguous(value: tuple[bool, int] | tuple[Literal[False], str]):
@@ -569,7 +569,7 @@ def instance(value: tuple[int, str] | tuple[str, int]):
 ```
 
 An `int | str` element can pass or fail the `str` check, so its tuple remains possible in both
-branches:
+branches.
 
 ```py
 def overlapping(value: tuple[int | str, bytes] | tuple[str, int]):
@@ -608,7 +608,7 @@ def check(value: tuple[int, str] | tuple[str, int]):
         reveal_type(value[1])  # revealed: str
 ```
 
-The checked element can be passed by keyword:
+The checked element can be passed by keyword.
 
 ```py
 def keyword(value: tuple[int, str] | tuple[str, int]):
@@ -731,7 +731,7 @@ def instance(flag: bool):
         reveal_type(value)  # revealed: Literal[1]
 ```
 
-The same applies to user-defined `TypeIs` checks:
+The same applies to user-defined `TypeIs` checks.
 
 ```py
 from typing_extensions import TypeIs
@@ -779,7 +779,7 @@ def positional(flag: bool):
         reveal_type(value)  # revealed: Literal[0]
 ```
 
-This also applies when the later argument is passed by keyword:
+This also applies when the later argument is passed by keyword.
 
 ```py
 def keyword(flag: bool):
@@ -789,7 +789,7 @@ def keyword(flag: bool):
 ```
 
 An assignment expression in a comprehension also replaces the tuple, because it assigns to the name
-in the containing function:
+in the containing function.
 
 ```py
 def comprehension(flag: bool):
@@ -798,7 +798,7 @@ def comprehension(flag: bool):
         reveal_type(value)  # revealed: int
 ```
 
-Replacing an object prevents narrowing its tuple attribute based on a check of the old object:
+Replacing an object prevents narrowing its tuple attribute based on a check of the old object.
 
 ```py
 class Container:
@@ -811,7 +811,7 @@ def attribute(container: Container):
 
 ### Tuple tags with non-literal comparators
 
-A boolean comparison value can match either boolean tag value, but cannot match a string literal:
+A boolean comparison value can match either boolean tag value, but cannot match a string literal.
 
 ```py
 from typing import Literal
@@ -824,7 +824,7 @@ def boolean_comparator(value: tuple[bool, int] | tuple[Literal["other"], str], o
 ```
 
 When the comparison value is a union of literals, a matching tuple can have any of those tags. An
-unequal comparison can retain every tuple because the comparison value is not fixed:
+unequal comparison can retain every tuple because the comparison value is not fixed.
 
 ```py
 def union_comparator(
@@ -838,7 +838,7 @@ def union_comparator(
 ```
 
 An intersection can restrict an enum comparison value to some of its members. A tuple with the whole
-enum as its tag remains possible, while an excluded member cannot match:
+enum as its tag remains possible, while an excluded member cannot match.
 
 ```py
 from enum import Enum
@@ -861,7 +861,7 @@ def intersection_comparator(
 
 ### PEP 695 type aliases
 
-Tuple narrowing also works when the union is defined via a PEP 695 type alias:
+Tuple narrowing also works when the union is defined via a PEP 695 type alias.
 
 ```toml
 [environment]
@@ -937,7 +937,7 @@ if d.c is not None and d.c[0].x[0] is not None:
 
 ## Narrowing with negative subscripts
 
-Narrowing should work with negative subscripts like `x[-1]`:
+Narrowing should work with negative subscripts like `x[-1]`.
 
 ```py
 def _(x: list[int | None]):
@@ -951,7 +951,7 @@ def _(x: list[str | None]):
         reveal_type(x[-1])  # revealed: str
 ```
 
-Nested negative subscripts should also work:
+Nested negative subscripts should also work.
 
 ```py
 def _(x: list[list[int | None]]):
@@ -1005,7 +1005,7 @@ def _(t: tuple[int, str, None] | tuple[None, None, int]):
 
 ## Narrowing with explicit positive subscripts
 
-Narrowing should work with explicit positive subscripts like `x[+1]`:
+Narrowing should work with explicit positive subscripts like `x[+1]`.
 
 ```py
 def _(x: list[int | None]):
@@ -1020,7 +1020,7 @@ def _(x: list[int | None]):
 
 Narrowing should work with boolean subscripts like `x[True]` and `x[False]`. We treat `bool`
 subscripts the same as `int` subscripts because `True` always has the same hash and index value as
-`1`, and `False` always has the same hash and index value as `0`:
+`1`, and `False` always has the same hash and index value as `0`.
 
 ```py
 def _(x: tuple[object, object]):
@@ -1051,7 +1051,7 @@ def _(x: list[list[int | None]]):
 
 ## Narrowing with bytes literal subscripts
 
-Narrowing should work with bytes literal subscripts like `x[b"key"]`:
+Narrowing should work with bytes literal subscripts like `x[b"key"]`.
 
 ```py
 def _(d: dict[bytes, str | None]):

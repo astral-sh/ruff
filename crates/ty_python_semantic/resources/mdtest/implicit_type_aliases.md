@@ -6,7 +6,7 @@ with `typing.TypeAlias` are collectively called legacy type aliases.
 
 ## Basic
 
-An implicit alias denotes the type described by its right-hand side:
+An implicit alias denotes the type described by its right-hand side.
 
 ```py
 MyInt = int
@@ -41,7 +41,7 @@ def inspect(value: MyAny):
 
 ## Unions
 
-We also support unions in type aliases:
+We also support unions in type aliases.
 
 ```py
 from typing_extensions import Any, Never, Literal, LiteralString, Tuple, Annotated, Optional, Union, Callable, TypeVar
@@ -208,7 +208,7 @@ def _(
 ```
 
 If a type is unioned with itself in a value expression, the result is just that type. No
-`types.UnionType` instance is created:
+`types.UnionType` instance is created.
 
 ```py
 IntOrInt = int | int
@@ -222,13 +222,13 @@ def _(int_or_int: IntOrInt, list_of_int_or_list_of_int: ListOfIntOrListOfInt):
     reveal_type(list_of_int_or_list_of_int)  # revealed: list[int]
 ```
 
-`NoneType` has no special or-operator behavior, so this is an error:
+`NoneType` has no special or-operator behavior, so this is an error.
 
 ```py
 None | None  # error: [unsupported-operator] "Operator `|` is not supported between two objects of type `None`"
 ```
 
-Implicit aliases should also work when one union member is a `NewType` pseudo-class:
+Implicit aliases should also work when one union member is a `NewType` pseudo-class.
 
 ```py
 from typing import NewType
@@ -242,7 +242,7 @@ def _(x: FooOrStr):
     reveal_type(x)  # revealed: Foo | str
 ```
 
-Implicit aliases should also work when one union member is a `TypeAliasType`:
+Implicit aliases should also work when one union member is a `TypeAliasType`.
 
 ```toml
 [environment]
@@ -293,7 +293,7 @@ def _(int_or_one: IntOrOne):
 ```
 
 If you were to somehow get hold of an opaque instance of `types.UnionType`, that could not be used
-as a type expression:
+as a type expression.
 
 ```py
 from types import UnionType
@@ -308,7 +308,7 @@ f(int | str)
 ## `|` operator between class objects and non-class objects
 
 Using the `|` operator between a class object and a non-class object does not create a `UnionType`
-instance; it calls the relevant dunder as normal:
+instance; it calls the relevant dunder as normal.
 
 ```py
 class Foo:
@@ -342,7 +342,7 @@ reveal_type(Invalid() | list[int])  # revealed: Unknown
 
 A drawback of our extensive special casing of `|` operations between class objects is that
 `__(r)or__` methods on metaclasses are completely disregarded if two classes are `|`'d together. We
-respect the metaclass dunder if a class is `|`'d with a non-class, however:
+respect the metaclass dunder if a class is `|`'d with a non-class, however.
 
 ```py
 class Meta(type):
@@ -422,7 +422,7 @@ def g(obj: Y):
 
 ### Functionality
 
-Implicit type aliases can also be generic:
+Implicit type aliases can also be generic.
 
 ```py
 from typing_extensions import TypeVar, ParamSpec, Callable, Union, Annotated
@@ -493,7 +493,7 @@ def _(
     reveal_type(optional_int)  # revealed: int | None
 ```
 
-Generic implicit type aliases can be partially specialized:
+Generic implicit type aliases can be partially specialized.
 
 ```py
 DictStrTo = MyDict[str, U]
@@ -507,7 +507,7 @@ def _(
 ```
 
 Using specializations of generic implicit type aliases in other implicit type aliases works as
-expected:
+expected.
 
 ```py
 IntsOrNone = MyList[int] | None
@@ -544,7 +544,7 @@ def _(
     reveal_type(callable_int_to_str)  # revealed: (int, /) -> str
 ```
 
-A generic implicit type alias can also be used in another generic implicit type alias:
+A generic implicit type alias can also be used in another generic implicit type alias.
 
 ```py
 from typing_extensions import Any
@@ -569,7 +569,7 @@ def _(
     reveal_type(type_or_list)  # revealed: type[Any] | list[Any]
 ```
 
-A runtime union of two generic alias values preserves the distinct bindings of their type variables:
+A runtime union of two generic alias values preserves the distinct bindings of their type variables.
 
 ```py
 First = T | int
@@ -579,7 +579,7 @@ reveal_type(Both)  # revealed: <types.UnionType special-form 'T@First | int | T@
 ```
 
 If a generic implicit type alias is used unspecialized in a type expression, we use the default
-specialization. For type variables without defaults, this is `Unknown`:
+specialization. For type variables without defaults, this is `Unknown`.
 
 ```py
 def _(
@@ -608,7 +608,7 @@ def _(
     reveal_type(optional_unknown)  # revealed: Unknown | None
 ```
 
-For a type variable with a default, we use the default type:
+For a type variable with a default, we use the default type.
 
 ```py
 T_default = TypeVar("T_default", default=int)
@@ -627,7 +627,7 @@ def _(
     reveal_type(list_of_int_or_none)  # revealed: list[int] | None
 ```
 
-(Generic) implicit type aliases can be used as base classes:
+(Generic) implicit type aliases can be used as base classes.
 
 ```py
 from typing_extensions import Generic
@@ -682,7 +682,7 @@ def inspect(
 
 Renaming a type variable preserves its identity; it does not create an alias that accepts type
 arguments. An alias containing that variable, even a transparent `Annotated` wrapper, can be
-specialized:
+specialized.
 
 ```py
 Renamed = T
@@ -700,7 +700,7 @@ def inspect(
 ```
 
 The parameters are preserved only when the right-hand side is a name or attribute. A reference
-nested inside another type expression uses the alias's default specialization:
+nested inside another type expression uses the alias's default specialization.
 
 ```py
 OptionalItems = Items | None
@@ -719,7 +719,7 @@ def invalid(
 ### Forwarding conditionally defined aliases
 
 A possibly missing name or attribute still preserves an alias's parameters when it has only one
-definition. The forwarding assignment reports that the reference might not exist:
+definition. The forwarding assignment reports that the reference might not exist.
 
 ```toml
 [rules]
@@ -750,7 +750,7 @@ def inspect(direct: Forwarded[int], attribute: ForwardedAttribute[bytes]):
 ```
 
 A conditional class binding can fall back to a builtin. With two possible values, the forwarded type
-uses their default specializations:
+uses their default specializations.
 
 ```py
 class Scope:
@@ -766,7 +766,7 @@ class Scope:
 
 ### Forwarding separately annotated bindings
 
-Name lookup preserves an assignment's narrowed value even when it has a separate annotation:
+Name lookup preserves an assignment's narrowed value even when it has a separate annotation.
 
 ```py
 from typing_extensions import TypeVar
@@ -781,7 +781,7 @@ def inspect(value: Forwarded[int]):
 ```
 
 Reading an attribute assigned in the class body instead uses the declared type, which does not
-describe a type alias:
+describe a type alias.
 
 ```py
 class Holder:
@@ -794,7 +794,7 @@ def inspect(value: ForwardedAttribute):  # error: [invalid-type-form]
     reveal_type(value)  # revealed: Unknown
 ```
 
-An assignment to the attribute in the current scope narrows the value used for forwarding:
+An assignment to the attribute in the current scope narrows the value used for forwarding.
 
 ```py
 class LocallyAssigned:
@@ -811,7 +811,7 @@ def inspect(specialized: ForwardedLocalAttribute[int], default: ForwardedLocalAt
 ### Forwarding PEP 695 aliases
 
 Assigning a PEP 695 alias to another name preserves its type parameters and defaults, including when
-the right-hand side is a module attribute:
+the right-hand side is a module attribute.
 
 ```toml
 [environment]
@@ -841,7 +841,7 @@ def inspect(specialized: Forwarded[int], attribute: ForwardedAttribute[bytes], d
 
 ### Generic typed dictionaries in aliases
 
-First, define a generic typed dictionary whose field uses a legacy type variable:
+First, define a generic typed dictionary whose field uses a legacy type variable.
 
 ```py
 from typing import Generic, TypeVar, TypedDict
@@ -853,7 +853,7 @@ class Item(TypedDict, Generic[T]):
 ```
 
 An implicit union alias remains generic when its only type variable appears in the typed dictionary,
-and specialization preserves the dictionary's field type:
+and specialization preserves the dictionary's field type.
 
 ```py
 OptionalItem = Item[T] | None
@@ -865,14 +865,14 @@ def _(item: OptionalItem[int]):
         reveal_type(item["value"])  # revealed: int
 ```
 
-Without an explicit type argument, the alias uses the type variable's default specialization:
+Without an explicit type argument, the alias uses the type variable's default specialization.
 
 ```py
 def _(item: OptionalItem):
     reveal_type(item)  # revealed: Item[Unknown] | None
 ```
 
-The type variable is also discovered when the typed dictionary is nested inside a container:
+The type variable is also discovered when the typed dictionary is nested inside a container.
 
 ```py
 Items = list[Item[T]]
@@ -885,7 +885,7 @@ def _(items: Items[str]):
 ### Type-variable order in generic typed-dictionary aliases
 
 Type variables that appear inside a typed dictionary are collected in the same order as variables in
-other union members:
+other union members.
 
 ```py
 from typing import Generic, TypeVar, TypedDict
@@ -908,7 +908,7 @@ def _(first: TypedDictFirst[int, str], last: TypedDictLast[str, int], repeated: 
 
 ### Imported aliases
 
-Generic implicit type aliases can be imported from other modules and specialized:
+Generic implicit type aliases can be imported from other modules and specialized.
 
 `my_types.py`:
 
@@ -950,7 +950,7 @@ def _(
 ### Type variables through module aliases
 
 Assigning a module to another name preserves access to its type variables, including in string
-annotations. Aliases using those variables remain generic:
+annotations. Aliases using those variables remain generic.
 
 `variables.py`:
 
@@ -977,7 +977,7 @@ def inspect(specialized: Pair[int, str], default: Pair):
 ### Imported tagged typed-dictionary aliases
 
 A stub can define a generic tagged union containing a typed dictionary and expose a concrete
-specialization through a function signature:
+specialization through a function signature.
 
 `events.pyi`:
 
@@ -999,7 +999,7 @@ DecodedEvent = Union[ObjectEvent[T], BookmarkEvent, None]
 def get_event() -> DecodedEvent[int]: ...
 ```
 
-After excluding the other union members, Python code sees the concrete typed-dictionary field type:
+After excluding the other union members, Python code sees the concrete typed-dictionary field type.
 
 `main.py`:
 
@@ -1015,7 +1015,7 @@ if event is not None and event["type"] != "BOOKMARK":
 
 ### In stringified annotations
 
-Generic implicit type aliases can be specialized in stringified annotations:
+Generic implicit type aliases can be specialized in stringified annotations.
 
 ```py
 from typing_extensions import TypeVar
@@ -1053,7 +1053,7 @@ def g(obj: Y[bool, range]):
 
 ### Error cases
 
-A generic alias that is already fully specialized cannot be specialized again:
+A generic alias that is already fully specialized cannot be specialized again.
 
 ```toml
 [environment]
@@ -1152,7 +1152,7 @@ def _(doubly_specialized: MyListOfInts[int]):
 ### Incorrect number of type arguments
 
 Specializing a generic implicit type alias with an incorrect number of type arguments also results
-in an error:
+in an error.
 
 ```py
 from typing_extensions import TypeVar
@@ -1173,7 +1173,7 @@ def _(
     reveal_type(dict_too_few_args)  # revealed: dict[Unknown, Unknown]
 ```
 
-Trying to specialize a non-name node results in an error:
+Trying to specialize a non-name node results in an error.
 
 ```py
 from ty_extensions._internal import TypeOf
@@ -1192,7 +1192,7 @@ def _(
 
 ### Union without a binding context
 
-Similarly, if you try to specialize a union type without a binding context, we emit an error:
+Similarly, if you try to specialize a union type without a binding context, we emit an error.
 
 ```py
 from typing import TypeVar
@@ -1273,7 +1273,7 @@ error[not-subscriptable]: Cannot subscript non-generic type `A[int]`
 
 #### Shadowed definitions
 
-When a generic type alias shadows a definition from an outer scope, the inner definition is used:
+When a generic type alias shadows a definition from an outer scope, the inner definition is used.
 
 ```py
 from typing_extensions import TypeVar
@@ -1337,7 +1337,7 @@ def inspect(direct: Direct[int], quoted: Quoted[int]):
 
 #### Statically unknown conditions
 
-If several definitions are visible, we emit an error:
+If several definitions are visible, we emit an error.
 
 ```py
 from typing_extensions import TypeVar
@@ -1406,7 +1406,7 @@ def _(
     reveal_type(enum_literal)  # revealed: Literal[Color.RED]
 ```
 
-We reject invalid uses:
+We reject invalid uses.
 
 ```py
 # error: [invalid-type-form] "Type arguments for `Literal` must be `None`, a literal value (int, bool, str, or bytes), or an enum member"
@@ -1451,7 +1451,7 @@ reveal_type(C().old)  # revealed: int
 ```
 
 If the metadata argument is missing, we emit an error (because this code fails at runtime), but
-still use the first element as the type, when used in annotations:
+still use the first element as the type, when used in annotations.
 
 ```py
 # error: [invalid-type-form] "Special form `typing.Annotated` expected at least 2 arguments (one type and at least one metadata element)"
@@ -1465,7 +1465,7 @@ def _(wrongly_annotated_int: WronglyAnnotatedInt):
 
 Starting with Python 3.14, `Optional[int]` creates an instance of `typing.Union`, which is an alias
 for `types.UnionType`. We only support this new behavior and do not attempt to model the details of
-the pre-3.14 behavior:
+the pre-3.14 behavior.
 
 ```py
 from typing import Optional
@@ -1478,7 +1478,7 @@ def _(optional_int: MyOptionalInt):
     reveal_type(optional_int)  # revealed: int | None
 ```
 
-A special case is `Optional[None]`, which is equivalent to `None`:
+A special case is `Optional[None]`, which is equivalent to `None`.
 
 ```py
 JustNone = Optional[None]
@@ -1521,7 +1521,7 @@ def _(
 
 ## `Tuple`
 
-We support implicit type aliases using `typing.Tuple`:
+We support implicit type aliases using `typing.Tuple`.
 
 ```py
 from typing import Tuple
@@ -1538,7 +1538,7 @@ def _(int_and_str: IntAndStr, single_int: SingleInt, ints: Ints, empty_tuple: Em
     reveal_type(empty_tuple)  # revealed: tuple[()]
 ```
 
-Invalid uses cause diagnostics:
+Invalid uses cause diagnostics.
 
 ```py
 from typing import Tuple
@@ -1552,7 +1552,7 @@ def _(invalid: Invalid):
 
 ## `Union`
 
-We support implicit type aliases using `typing.Union`:
+We support implicit type aliases using `typing.Union`.
 
 ```py
 from typing import Union
@@ -1571,7 +1571,7 @@ def _(
     reveal_type(int_or_str_or_bytes)  # revealed: int | str | bytes
 ```
 
-If a single type is given, no `types.UnionType` instance is created:
+If a single type is given, no `types.UnionType` instance is created.
 
 ```py
 JustInt = Union[int]
@@ -1583,7 +1583,7 @@ def _(just_int: JustInt):
 ```
 
 An empty `typing.Union` leads to a `TypeError` at runtime, so we emit an error. We still infer
-`Never` when used as a type expression, which seems reasonable for an empty union:
+`Never` when used as a type expression, which seems reasonable for an empty union.
 
 ```py
 # error: [invalid-type-form] "`typing.Union` requires at least one type argument"
@@ -1595,7 +1595,7 @@ def _(empty: EmptyUnion):
     reveal_type(empty)  # revealed: Never
 ```
 
-Other invalid uses are also caught:
+Other invalid uses are also caught.
 
 ```py
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
@@ -1611,7 +1611,7 @@ def _(
 
 ### `type[…]`
 
-We support implicit type aliases using `type[…]`:
+We support implicit type aliases using `type[…]`.
 
 ```py
 from typing import Any, Union, Protocol, TypeVar, Generic
@@ -1677,7 +1677,7 @@ def _(
     reveal_type(subclass_of_p)  # revealed: type[P]
 ```
 
-Using `type[]` with a union type alias distributes the `type[]` over the union elements:
+Using `type[]` with a union type alias distributes the `type[]` over the union elements.
 
 ```py
 from typing import Union
@@ -1705,7 +1705,7 @@ def _(
     reveal_type(subclass_of_union_alias2())  # revealed: C | D
 ```
 
-Invalid uses result in diagnostics:
+Invalid uses result in diagnostics.
 
 ```py
 from typing import Literal
@@ -1731,7 +1731,7 @@ A generic alias can also be specialized inside a `type[…]` annotation.
 
 #### Valid specializations
 
-The PEP 613 spelling and `typing.Type[…]` take the same path:
+The PEP 613 spelling and `typing.Type[…]` take the same path.
 
 ```py
 from typing import Generic, Type, TypeAlias, TypeVar
@@ -1759,7 +1759,7 @@ def partially_specialized(x: type[PairAlias[int, T]]):
 
 #### Incorrect type-argument counts
 
-A generic alias specialized inside `type[…]` must receive the correct number of type arguments:
+A generic alias specialized inside `type[…]` must receive the correct number of type arguments.
 
 ```py
 from typing import Generic, TypeVar
@@ -1783,7 +1783,7 @@ def _(
 
 #### Type-variable bounds
 
-Specializing an alias inside `type[…]` enforces the upper bound of its type variable:
+Specializing an alias inside `type[…]` enforces the upper bound of its type variable.
 
 ```py
 from typing import Generic, TypeVar
@@ -1803,7 +1803,7 @@ def _(
 
 #### Type-variable constraints
 
-Specializing an alias inside `type[…]` also enforces constraints on its type variable:
+Specializing an alias inside `type[…]` also enforces constraints on its type variable.
 
 ```py
 from typing import Generic, TypeVar
@@ -1823,7 +1823,7 @@ def _(
 
 #### Bounds on union-valued aliases
 
-The upper bound of a type variable is enforced even when its alias resolves to a union:
+The upper bound of a type variable is enforced even when its alias resolves to a union.
 
 ```py
 from typing import TypeVar
@@ -1840,7 +1840,7 @@ def _(
 
 #### Invalid nested subscripts
 
-Subscripting an already-subscripted alias inside `type[…]` is invalid, just as it is outside it:
+Subscripting an already-subscripted alias inside `type[…]` is invalid, just as it is outside it.
 
 ```py
 from typing import Generic, TypeVar
@@ -1861,7 +1861,7 @@ def _(
 
 #### Assignments to class-backed aliases
 
-An object assigned to a specialized alias inside `type[…]` must match the class it represents:
+An object assigned to a specialized alias inside `type[…]` must match the class it represents.
 
 ```py
 from typing import Generic, TypeVar
@@ -1879,7 +1879,7 @@ assigned: type[PairAlias[int, str]] = int
 
 #### Assignments to union-valued aliases
 
-An object assigned to a union-valued alias inside `type[…]` must match one of the union elements:
+An object assigned to a union-valued alias inside `type[…]` must match one of the union elements.
 
 ```py
 from typing import TypeVar
@@ -1894,7 +1894,7 @@ assigned_union: type[UnionAlias[int]] = str
 #### Other alias representations
 
 An alias does not have to be backed by a class. Stringified, transparent, `Annotated` and
-union-valued aliases all specialize inside `type[…]` the same way they do outside it:
+union-valued aliases all specialize inside `type[…]` the same way they do outside it.
 
 ```py
 from __future__ import annotations
@@ -1923,7 +1923,7 @@ def _(
 #### Callable aliases
 
 A callable is not a class object, so specializing a `Callable` alias inside `type[…]` is rejected,
-just as a directly spelled callable is:
+just as a directly spelled callable is.
 
 ```py
 from typing import Callable, TypeVar
@@ -1941,7 +1941,7 @@ def _(
 
 ### `Type[…]`
 
-The same also works for `typing.Type[…]`:
+The same also works for `typing.Type[…]`.
 
 ```py
 from typing import Any, Union, Protocol, TypeVar, Generic, Type
@@ -2007,7 +2007,7 @@ def _(
     reveal_type(subclass_of_p)  # revealed: type[P]
 ```
 
-Invalid uses result in diagnostics:
+Invalid uses result in diagnostics.
 
 ```py
 # error: [invalid-type-form]
@@ -2016,7 +2016,7 @@ InvalidSubclass = Type[1]
 
 ## Other `typing` special forms
 
-The following special forms from the `typing` module are also supported in implicit type aliases:
+The following special forms from the `typing` module are also supported in implicit type aliases.
 
 ```py
 from typing import List, Dict, Set, FrozenSet, ChainMap, Counter, DefaultDict, Deque, OrderedDict
@@ -2063,7 +2063,7 @@ def _(
     reveal_type(my_ordered_dict)  # revealed: OrderedDict[str, int]
 ```
 
-All of them are supported in unions:
+All of them are supported in unions.
 
 ```py
 NoneOrList = None | List[str]
@@ -2147,7 +2147,7 @@ def _(
     reveal_type(ordered_dict_or_none)  # revealed: OrderedDict[str, int] | None
 ```
 
-Invalid uses result in diagnostics:
+Invalid uses result in diagnostics.
 
 ```py
 from typing import List, Dict
@@ -2188,7 +2188,7 @@ def _(
 
 ## `Callable[...]`
 
-We support implicit type aliases using `Callable[...]`:
+We support implicit type aliases using `Callable[...]`.
 
 ```py
 from typing import Callable, Union
@@ -2211,7 +2211,7 @@ def _(
     reveal_type(gradual_callable)  # revealed: (...) -> str
 ```
 
-Nested callables work as expected:
+Nested callables work as expected.
 
 ```py
 TakesCallable = Callable[[Callable[[int], str]], bytes]
@@ -2222,7 +2222,7 @@ def _(takes_callable: TakesCallable, returns_callable: ReturnsCallable):
     reveal_type(returns_callable)  # revealed: (int, /) -> ((str, /) -> bytes)
 ```
 
-Invalid uses result in diagnostics:
+Invalid uses result in diagnostics.
 
 ```py
 # error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
@@ -2246,7 +2246,7 @@ From the [typing spec on type aliases](https://typing.python.org/en/latest/spec/
 > Type aliases may be as complex as type hints in annotations – anything that is acceptable as a
 > type hint is acceptable in a type alias
 
-An assignment of a string literal creates a string variable, rather than an implicit type alias:
+An assignment of a string literal creates a string variable, rather than an implicit type alias.
 
 ```py
 AliasForStr = "str"
@@ -2257,7 +2257,7 @@ def _(s: AliasForStr):
 ```
 
 A union with a string operand is invalid at runtime. We report that error, but still interpret the
-original union expression when the alias is used as a type:
+original union expression when the alias is used as a type.
 
 ```py
 IntOrStr = int | "str"  # error: [unsupported-operator]
@@ -2269,7 +2269,7 @@ def _(int_or_str: IntOrStr):
 ```
 
 This alias has no type parameters and is thus not subscriptable, even though its runtime value is
-`Unknown`:
+`Unknown`.
 
 ```py
 def invalid(value: IntOrStr[int]):  # error: [not-subscriptable]
@@ -2277,7 +2277,7 @@ def invalid(value: IntOrStr[int]):  # error: [not-subscriptable]
 ```
 
 We *do* support stringified annotations if they appear in a position where a type expression is
-syntactically expected:
+syntactically expected.
 
 ```py
 from typing import Union, List, Dict, Annotated, Callable
@@ -2326,7 +2326,7 @@ class Node:
 ## Invalid implicit aliases
 
 A valid runtime expression can still be invalid as a type expression. We reject using such a value
-as an annotation, rather than reporting an error on its ordinary assignment:
+as an annotation, rather than reporting an error on its ordinary assignment.
 
 ```py
 Number = 1 + 2
@@ -2362,7 +2362,7 @@ info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotat
 ```
 
 An expression that evaluates to a class does not automatically define a type alias. The diagnostic
-explains why its original definition is invalid as a type expression:
+explains why its original definition is invalid as a type expression.
 
 ```py
 Called = type(1)
@@ -2390,7 +2390,7 @@ info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotat
 
 Other calls, indexing into a list or dictionary, conditional expressions, and boolean operations
 also remain ordinary values, even if they evaluate to a class or `Any`. Assigning such a value to
-another name does not make it a type alias:
+another name does not make it a type alias.
 
 ```py
 Evaluated = eval("int")
@@ -2422,7 +2422,7 @@ def inspect(
     reveal_type(indexed_mixed)  # revealed: Unknown
 ```
 
-Errors in type arguments remain visible even when the alias itself is invalid:
+Errors in type arguments remain visible even when the alias itself is invalid.
 
 ```py
 def invalid_arguments(
@@ -2438,7 +2438,7 @@ def invalid_arguments(
 ): ...
 ```
 
-Invalid aliases in string annotations also recover without evaluating nested runtime expressions:
+Invalid aliases in string annotations also recover without evaluating nested runtime expressions.
 
 ```py
 def invalid_string(value: "CalledGeneric[lambda: int]"): ...  # error: [invalid-type-form]
@@ -2446,7 +2446,7 @@ def invalid_string(value: "CalledGeneric[lambda: int]"): ...  # error: [invalid-
 
 ## Invalid expressions with nested scopes
 
-Lambdas and comprehensions are invalid type arguments, even when they refer to type variables:
+Lambdas and comprehensions are invalid type arguments, even when they refer to type variables.
 
 ```py
 from typing import TypeVar
@@ -2464,7 +2464,7 @@ def inspect(lambda_alias: LambdaAlias, comprehension_alias: ComprehensionAlias):
 
 Importing a value, accessing it through its module, or assigning it to another name does not make it
 a valid type alias, even when the value is a class. This also holds when the defining module is a
-dependency that is not checked:
+dependency that is not checked.
 
 ```toml
 [environment]
@@ -2507,7 +2507,7 @@ info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotat
 ```
 
 Quoted attribute references name the attribute used in the annotation, while the explanation points
-to its original definition:
+to its original definition.
 
 `quoted.py`:
 
@@ -2534,7 +2534,7 @@ info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
 
-The same restriction applies to direct imports, module attributes, and local assignments:
+The same restriction applies to direct imports, module attributes, and local assignments.
 
 ```py
 import values
@@ -2596,7 +2596,7 @@ info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotat
 
 ## Disabled invalid implicit alias diagnostics
 
-Disabling `invalid-type-form` does not make invalid aliases valid:
+Disabling `invalid-type-form` does not make invalid aliases valid.
 
 ```toml
 [rules]
@@ -2612,7 +2612,7 @@ def inspect(number: Number, specialized: Number[int]):
 ```
 
 An invalid union member cannot be hidden by simplification, and forwarding or nesting the alias
-preserves its `Unknown` fallback:
+preserves its `Unknown` fallback.
 
 ```py
 from typing_extensions import Self
@@ -2676,7 +2676,7 @@ def _(
     reveal_type(recursive_dict4)  # revealed: RecursiveDict4
 ```
 
-Truthiness operations inspect the closed unfolding of a recursive alias:
+Truthiness operations inspect the closed unfolding of a recursive alias.
 
 ```py
 def is_empty(value: RecursiveList1) -> bool:
@@ -3601,7 +3601,7 @@ class Holder:
 ### Forwarding generic recursive aliases
 
 A forwarded alias preserves type arguments even when the recursive definition refers back to the
-forwarded name:
+forwarded name.
 
 ```py
 from typing import TypeVar
@@ -3675,7 +3675,7 @@ def inspect(value: Growing[int]):
 
 ### Projection through a recursive alias argument
 
-Projecting a generic member through a recursive alias keeps the recursive result closed:
+Projecting a generic member through a recursive alias keeps the recursive result closed.
 
 ```toml
 [environment]
@@ -3701,7 +3701,7 @@ def _(properties: ByModuleProperties):
 python-version = "3.13"
 ```
 
-A recursive tuple preserves its specialized elements at each level:
+A recursive tuple preserves its specialized elements at each level.
 
 ```py
 from typing import TypeVarTuple
@@ -3716,7 +3716,7 @@ def _(tree: TupleTree[int, str]):
         reveal_type(tail[1])  # revealed: str
 ```
 
-A recursive callable preserves its parameter specification in the callbacks it returns:
+A recursive callable preserves its parameter specification in the callbacks it returns.
 
 ```py
 from typing import Callable, ParamSpec, TypeVar
@@ -3803,7 +3803,7 @@ def invalid(value: Tree[str]): ...  # error: [not-subscriptable]
 ### Recursive typed-dictionary fields in generic aliases
 
 A recursive field on a non-generic typed dictionary does not make an unrelated enclosing generic
-alias recursive:
+alias recursive.
 
 ```py
 from typing import TypeVar, TypedDict

@@ -34,7 +34,7 @@ flask.Markup("unsafe %s" % content)  # error: [unsafe-markup-use]
 Markup(object="safe")
 ```
 
-This case is not currently detected, despite also being unsafe:
+This case is not currently detected, despite also being unsafe.
 
 ```py
 Markup(object="unsafe {}".format(content))

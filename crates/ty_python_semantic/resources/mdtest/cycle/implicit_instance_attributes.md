@@ -116,7 +116,7 @@ reveal_type(Tuples().prepended)  # revealed: tuple[int, ...]
 ## Cycle normalization preserves non-gradual variadic parameters
 
 Normalizing a recursive implicit-attribute type does not reinterpret specialized variadic parameters
-as gradual:
+as gradual.
 
 ```py
 from typing import Any, Callable, Generic, TypeVar

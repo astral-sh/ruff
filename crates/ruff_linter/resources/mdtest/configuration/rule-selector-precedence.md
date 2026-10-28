@@ -28,7 +28,7 @@ assert True  # error: [assert]
 
 ## Categories take precedence over `ALL`
 
-`unused-import` (`F401`) is a `suspicious` rule:
+`unused-import` (`F401`) is a `suspicious` rule.
 
 ```toml
 [lint]

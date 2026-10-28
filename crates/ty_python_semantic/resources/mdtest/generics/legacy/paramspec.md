@@ -13,7 +13,7 @@ reveal_type(P)  # revealed: ParamSpec
 reveal_type(P.__name__)  # revealed: Literal["P"]
 ```
 
-The paramspec name can also be provided as a keyword argument:
+The paramspec name can also be provided as a keyword argument.
 
 ```py
 from typing import ParamSpec
@@ -443,7 +443,7 @@ reveal_type(C3().x)  # revealed: (str, /) -> None
 ### Forward references in stub files
 
 Stubs natively support forward references, so patterns that would raise `NameError` at runtime are
-allowed in stub files:
+allowed in stub files.
 
 ```pyi
 from typing_extensions import ParamSpec
@@ -635,7 +635,7 @@ error[unbound-type-variable]: ParamSpec `P` is not in scope
 
 A `ParamSpec` moved to an enclosing factory's returned callable remains lexically visible within the
 factory's body. A nested function referring to it through its components owns its own binding,
-consistently with an ordinary return-only `TypeVar`:
+consistently with an ordinary return-only `TypeVar`.
 
 ```py
 def callable_factory() -> Callable[P, int]:
@@ -699,7 +699,7 @@ class Foo3(Generic[P]):
     ) -> None: ...
 ```
 
-Error messages for `invalid-paramspec` also use the actual parameter names:
+Error messages for `invalid-paramspec` also use the actual parameter names.
 
 ```py
 def bar(c: Callable[P, int]) -> None:
@@ -982,7 +982,7 @@ remaining(1)  # error: [invalid-argument-type]
 ```
 
 When constructed inline, `Callback` infers the positional-only prefix based on the outer type
-context:
+context.
 
 ```py
 remaining = without_first(Callback(original))
@@ -1250,7 +1250,7 @@ type parameter lists.
 ### Binding contexts
 
 A nested definition can use a `ParamSpec` from an enclosing class or function without adding it to
-its own generic context:
+its own generic context.
 
 ```py
 from typing import Callable, Generic, ParamSpec
@@ -1883,7 +1883,7 @@ forward(target, "a", ["a"])
 ### Forwarded arguments with type-variable constraints
 
 A constrained generic callback can receive an argument matching any of its constraints. Capturing
-its parameters in a `ParamSpec` does not restrict the callback to its first constraint:
+its parameters in a `ParamSpec` does not restrict the callback to its first constraint.
 
 ```py
 from collections.abc import Callable
@@ -1902,7 +1902,7 @@ forward(identity, b"text")  # no diagnostic
 ### Generic constructors with bounded return types
 
 A class object can be passed as a callable that constructs instances. `Factory` takes no constructor
-arguments, but its instances have a generic, writable `value` attribute:
+arguments, but its instances have a generic, writable `value` attribute.
 
 ```py
 from typing import Generic, TypeVar
@@ -1915,7 +1915,7 @@ class Factory(Generic[T]):
 
 The `construct` helper captures a callable's parameters in `P`, forwards its arguments, and returns
 the resulting instance. The bound on `R` requires that instance to be assignable to
-`Factory[object]`:
+`Factory[object]`.
 
 ```py
 from typing import Callable, ParamSpec

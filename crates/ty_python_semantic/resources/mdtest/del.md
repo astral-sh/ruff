@@ -81,7 +81,7 @@ def delete_nonlocal():
 
 Without a `global x` or `nonlocal x` declaration in `foo`, `del x` in `foo` causes `print(x)` in an
 inner function `bar` to resolve to `foo`'s binding, in this case an unresolved reference / unbound
-local error:
+local error.
 
 ```py
 x = 1
@@ -99,7 +99,7 @@ def foo():
 ## But `del` doesn't force local resolution of `global` or `nonlocal` variables
 
 However, with `global x` in `foo`, `print(x)` in `bar` resolves in the global scope, despite the
-`del` in `foo`:
+`del` in `foo`.
 
 ```py
 x = 1
@@ -114,7 +114,7 @@ def foo():
 ```
 
 `nonlocal x` has a similar effect, if we add an extra `enclosing` scope to give it something to
-refer to:
+refer to.
 
 ```py
 def enclosing():

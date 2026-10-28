@@ -19,7 +19,7 @@ x == ~2  # error: [magic-value-comparison]
 Comparisons against `sys.version`, `sys.version_info`, and
 `sys.implementation.version` are exempt, including subscripts and attribute
 access on them. The literal in those comparisons names a specific Python
-version, not an unnamed constant, so no diagnostics fire below:
+version, not an unnamed constant, so no diagnostics fire below.
 
 ```py
 import sys
@@ -54,7 +54,7 @@ if 0 < sys.implementation.version[0] < 4:
 
 The exemption only applies when the magic value is compared *against* a
 member of the `sys.version` family. An unrelated comparison with the same
-literal still fires:
+literal still fires.
 
 ```py
 x = 3

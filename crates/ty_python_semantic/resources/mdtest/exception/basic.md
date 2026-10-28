@@ -126,7 +126,7 @@ except ZeroDivisionError and ValueError as caught:
 ```
 
 We do not emit an `invalid-exception-caught` if a class is caught that has `Any` or `Unknown` in its
-MRO, as the dynamic element in the MRO could materialize to some subclass of `BaseException`:
+MRO, as the dynamic element in the MRO could materialize to some subclass of `BaseException`.
 
 ```py
 from compat import BASE_EXCEPTION_CLASS  # error: [unresolved-import] "Cannot resolve imported module `compat`"

@@ -192,7 +192,7 @@ class C(A, B): ...  # error: [instance-layout-conflict]
 ## Explicitly annotated `__slots__`
 
 We do not emit false positives on classes with empty `__slots__` definitions, even if the
-`__slots__` definitions are annotated with variadic tuples:
+`__slots__` definitions are annotated with variadic tuples.
 
 ```py
 class Foo:
@@ -272,7 +272,7 @@ class Foo(range, str): ...  # error: [subclass-of-final-class]
 ## Multiple "disjoint bases" where one is a subclass of the other
 
 A class is permitted to multiple-inherit from multiple disjoint bases if one is a subclass of the
-other:
+other.
 
 ```py
 class A:
@@ -299,7 +299,7 @@ class FF(CC, DD): ...  # fine
 ```
 
 CPython's layout check operates on runtime classes, so type arguments in a generic disjoint base's
-inheritance hierarchy do not affect whether the disjoint bases can coexist:
+inheritance hierarchy do not affect whether the disjoint bases can coexist.
 
 ```py
 import asyncio
@@ -314,7 +314,7 @@ class SubClass(Task, Future): ...  # fine
 
 Adding a base whose disjoint base is a common ancestor of two conflicting disjoint bases does not
 resolve the conflict. Here, `Plain` contributes the disjoint base `object`, which is an ancestor of
-both `int` and `str`:
+both `int` and `str`.
 
 ```py
 class Plain: ...
@@ -323,7 +323,7 @@ class B(int, str, Plain): ...  # error: [instance-layout-conflict]
 ```
 
 A shared ancestor with non-empty `__slots__` also does not resolve conflicts between its subclasses,
-even when that ancestor appears directly in the bases list:
+even when that ancestor appears directly in the bases list.
 
 ```py
 class Base:
@@ -409,7 +409,7 @@ is not declared — a case in which we union with `Unknown` for other public sym
 this is that `__slots__` has a special handling in the runtime. Modifying it externally is actually
 allowed, but those changes do not take effect. If you have a class `C` with `__slots__ = ("foo",)`
 and externally set `C.__slots__ = ("bar",)`, you still can't access `C.bar`. And you can still
-access `C.foo`. We therefore issue a diagnostic for such assignments:
+access `C.foo`. We therefore issue a diagnostic for such assignments.
 
 ```py
 class A:

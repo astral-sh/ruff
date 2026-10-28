@@ -3,7 +3,7 @@
 ## Conditional local override of builtin
 
 If a builtin name is conditionally shadowed by a local variable, the function's binding scope
-terminates name resolution. The name can be unbound, but it cannot refer to the builtin:
+terminates name resolution. The name can be unbound, but it cannot refer to the builtin.
 
 ```py
 def _(flag: bool) -> None:
@@ -20,7 +20,7 @@ def _(flag: bool) -> None:
 ## Conditionally global override of builtin
 
 If a builtin name is conditionally shadowed by a global variable, a name lookup should union the
-builtin type with the conditionally-defined type:
+builtin type with the conditionally-defined type.
 
 ```py
 def flag() -> bool:

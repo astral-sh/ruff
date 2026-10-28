@@ -81,7 +81,7 @@ def f():
 ## Nested function after conditional rebinding
 
 A nested function should resolve a `global` name through the enclosing scope, even if that scope
-conditionally rebinds it:
+conditionally rebinds it.
 
 ```py
 x = 1
@@ -252,7 +252,7 @@ y: int = 42
 
 ## Global declarations affect the inferred type of the binding
 
-Even if the `global` declaration isn't used in an assignment, we conservatively assume it could be:
+Even if the `global` declaration isn't used in an assignment, we conservatively assume it could be.
 
 ```py
 x = 1
@@ -266,7 +266,7 @@ def f():
 ## Global variables need an explicit definition in the global scope
 
 You're allowed to use the `global` keyword to define new global variables that don't have any
-explicit definition in the global scope, but we consider that fishy and prefer to lint on it:
+explicit definition in the global scope, but we consider that fishy and prefer to lint on it.
 
 ```py
 x = 1
@@ -277,7 +277,7 @@ def f():
     global x, y, z  # error: [unresolved-global] "Invalid global declaration of `z`: `z` has no declarations or bindings in the global scope"
 ```
 
-You don't need a definition for implicit globals, but you do for built-ins:
+You don't need a definition for implicit globals, but you do for built-ins.
 
 ```py
 def f():
@@ -288,7 +288,7 @@ def f():
 ## Nested class after global rebinding
 
 Even if a `global` declaration is unresolved at module scope, nested eager scopes in the same
-function should still see a rebinding that already happened:
+function should still see a rebinding that already happened.
 
 ```py
 def factory():
@@ -300,7 +300,7 @@ def factory():
 ```
 
 An explicit module-level binding remains visible when the enclosing function only conditionally
-rebinds that global:
+rebinds that global.
 
 ```py
 value = 0
@@ -315,7 +315,7 @@ def conditional_global_factory(flag: bool):
 ```
 
 If the condition is known to be false, the nested class should see only the original module-level
-binding and should not report an unresolved reference:
+binding and should not report an unresolved reference.
 
 ```py
 from typing import Literal
@@ -332,7 +332,7 @@ def known_false_global_factory(flag: Literal[False]):
 ```
 
 A module-level declaration also remains visible when the enclosing function only conditionally binds
-that global:
+that global.
 
 ```py
 declared_value: int
@@ -346,7 +346,7 @@ def conditional_declared_global_factory(flag: bool):
         reveal_type(declared_value)  # revealed: int
 ```
 
-If the rebinding is conditional, an unbound enclosing snapshot continues to the implicit global:
+If the rebinding is conditional, an unbound enclosing snapshot continues to the implicit global.
 
 ```py
 def conditional_factory(flag: bool):
@@ -373,7 +373,7 @@ def conditional_builtin_factory(flag: bool):
 ## Comprehension after global rebinding
 
 A comprehension is also an eager nested scope, so it should see both the original module-level
-binding and a conditional global rebinding:
+binding and a conditional global rebinding.
 
 ```py
 value = 0
@@ -454,7 +454,7 @@ class B:
 
 A `global` write from an inner scope can affect the target variable's inferred type in the global
 scope defining scope. For the same reason, reads in a nested function can also see later bindings in
-their own scope:
+their own scope.
 
 `global1.py`:
 
@@ -480,7 +480,7 @@ could've narrowed that to `Literal[1]`, but we don't/can't track what functions 
 (anywhere really, but especially not in the global scope), so we're being conservative. On the other
 hand, the reveal of `Literal[2]` after the binding in `g` is the opposite, an aggressive assumption
 that's not generally sound. Consider this counterexample where `f` and `g` are siblings that both
-assign to `x`:
+assign to `x`.
 
 `global2.py`:
 
@@ -513,7 +513,7 @@ bindings from outer or sibling scopes, but we conservatively include bindings fr
 within the current one, once we've encountered them (i.e. in a top-to-bottom reading of the code).
 This second behavior is _also_ unsound, because nested functions can "escape" the scope where
 they're defined and affect reads on lines above their definition. But again these are the behaviors
-that users expect. Here's the shadowing behavior in more detail:
+that users expect. Here's the shadowing behavior in more detail.
 
 `global3.py`:
 
@@ -566,7 +566,7 @@ reveal_type(x)  # revealed: Literal[1, 3]
 
 Using `+=` in a loop usually triggers fixpoint analysis, where after the list of `Literal` values
 reaches an upper limit we widen the type to `int`. The same applies to `global` augmented
-assignments, since the inner function body could run any number of times:
+assignments, since the inner function body could run any number of times.
 
 ```py
 x = 1
@@ -614,7 +614,7 @@ if isinstance(x, int):
 ## Conditional `global` bindings leave parent scope bindings visible
 
 Normal branching and merging rules apply to the shadowing behavior described in the previous
-section:
+section.
 
 ```py
 def flag() -> bool:
@@ -644,7 +644,7 @@ def foo():
 We don't need to think about this ordering in normal execution, since the body of a function doesn't
 get to cause any side effects until the function is called. But we do need to think about it in
 inference, because of the (generally unsound) rule mentioned above about considering nested bindings
-visible after we encounter them. That can matter in unusual situations like this one:
+visible after we encounter them. That can matter in unusual situations like this one.
 
 ```py
 x = 1
@@ -659,7 +659,7 @@ def f(y=reveal_type(x)):  # revealed: Literal[1]
 
 Class bodies are evaluated eagerly, so global bindings in a class scope should behave more like
 normal assignments. Currently we treat them like lazy nested bindings from function scopes, which
-results in types that are wider than they should be:
+results in types that are wider than they should be.
 
 ```py
 x = 1
@@ -675,7 +675,7 @@ x = 3
 reveal_type(x)  # revealed: Literal[2, 3]
 ```
 
-However, nested bindings in function scopes within a class are still lazy:
+However, nested bindings in function scopes within a class are still lazy.
 
 ```py
 y = 1
@@ -691,7 +691,7 @@ reveal_type(y)  # revealed: Literal[2, 3]
 ```
 
 Similarly, class bodies within a function scope also behave lazily from the perspective of callers
-of that function:
+of that function.
 
 ```py
 z = 1

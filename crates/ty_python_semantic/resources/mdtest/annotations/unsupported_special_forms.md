@@ -3,7 +3,7 @@
 ## Not yet supported
 
 Several special forms are unsupported by ty currently. However, we also don't emit false-positive
-errors if you use one in an annotation:
+errors if you use one in an annotation.
 
 ```py
 from typing_extensions import Self, TypeVarTuple, Unpack, TypeGuard, TypeIs, Concatenate, ParamSpec, TypeAlias, Callable, TypeVar
@@ -166,7 +166,7 @@ reveal_mro(F)  # revealed: (<class 'F'>, @Todo(Support for Callable as a base cl
 python-version = "3.12"
 ```
 
-Some of these are not subscriptable:
+Some of these are not subscriptable.
 
 ```py
 from typing_extensions import Self, TypeAlias, TypeVar

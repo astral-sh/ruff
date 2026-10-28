@@ -5,7 +5,7 @@
 `inspect.getattr_static` is a function that returns attributes of an object without invoking the
 descriptor protocol (for caveats, see the [official documentation]).
 
-Consider the following example:
+Consider the following example.
 
 ```py
 import inspect
@@ -20,7 +20,7 @@ class C:
 ```
 
 If we access attributes on an instance of `C` as usual, the descriptor protocol is invoked, and we
-get a type of `str` for the `descriptor` attribute:
+get a type of `str` for the `descriptor` attribute.
 
 ```py
 c = C()
@@ -29,14 +29,14 @@ reveal_type(c.normal)  # revealed: int
 reveal_type(c.descriptor)  # revealed: str
 ```
 
-However, if we use `inspect.getattr_static`, we can see the underlying `Descriptor` type:
+However, if we use `inspect.getattr_static`, we can see the underlying `Descriptor` type.
 
 ```py
 reveal_type(inspect.getattr_static(c, "normal"))  # revealed: int
 reveal_type(inspect.getattr_static(c, "descriptor"))  # revealed: Descriptor
 ```
 
-For non-existent attributes, a default value can be provided:
+For non-existent attributes, a default value can be provided.
 
 ```py
 reveal_type(inspect.getattr_static(C, "normal", "default-arg"))  # revealed: int
@@ -44,7 +44,7 @@ reveal_type(inspect.getattr_static(C, "non_existent", "default-arg"))  # reveale
 ```
 
 When a non-existent attribute is accessed without a default value, the runtime raises an
-`AttributeError`. We could emit a diagnostic for this case, but that is currently not supported:
+`AttributeError`. We could emit a diagnostic for this case, but that is currently not supported.
 
 ```py
 def _():
@@ -52,7 +52,7 @@ def _():
     reveal_type(inspect.getattr_static(C, "non_existent"))  # revealed: Never
 ```
 
-We can access attributes on objects of all kinds:
+We can access attributes on objects of all kinds.
 
 ```py
 import sys
@@ -64,7 +64,7 @@ reveal_type(inspect.getattr_static(inspect, "getattr_static"))
 reveal_type(inspect.getattr_static(1, "real"))  # revealed: property
 ```
 
-(Implicit) instance attributes can also be accessed through `inspect.getattr_static`:
+(Implicit) instance attributes can also be accessed through `inspect.getattr_static`.
 
 ```py
 class D:
@@ -74,7 +74,7 @@ class D:
 reveal_type(inspect.getattr_static(D(), "instance_attr"))  # revealed: int
 ```
 
-And attributes on metaclasses can be accessed when probing the class:
+And attributes on metaclasses can be accessed when probing the class.
 
 ```py
 class Meta(type):
@@ -85,7 +85,7 @@ class E(metaclass=Meta): ...
 reveal_type(inspect.getattr_static(E, "attr"))  # revealed: int
 ```
 
-Metaclass attributes cannot be added when probing an instance of the class:
+Metaclass attributes cannot be added when probing an instance of the class.
 
 ```py
 reveal_type(inspect.getattr_static(E(), "attr", "non_existent"))  # revealed: Literal["non_existent"]
@@ -94,7 +94,7 @@ reveal_type(inspect.getattr_static(E(), "attr", "non_existent"))  # revealed: Li
 ## Error cases
 
 We can only infer precise types if the attribute is a literal string. In all other cases, we fall
-back to `Any`:
+back to `Any`.
 
 ```py
 import inspect
@@ -107,7 +107,7 @@ def _(attr_name: str):
     reveal_type(inspect.getattr_static(C(), attr_name, 1))  # revealed: Any
 ```
 
-But we still detect errors in the number or type of arguments:
+But we still detect errors in the number or type of arguments.
 
 ```py
 # error: [missing-argument] "No arguments provided for required parameters `obj`, `attr` of function `getattr_static`"
@@ -151,7 +151,7 @@ def _(a: Any, tuple_of_any: tuple[Any]):
 
 ## Classmethod and staticmethod descriptors
 
-`getattr_static` returns the raw `classmethod` or `staticmethod` descriptor:
+`getattr_static` returns the raw `classmethod` or `staticmethod` descriptor.
 
 ```py
 from inspect import getattr_static
@@ -172,7 +172,7 @@ reveal_type(type(some_classmethod))  # revealed: <class 'classmethod'>
 reveal_type(type(some_staticmethod))  # revealed: <class 'staticmethod'>
 ```
 
-These objects expose the original function through the `__func__` attribute:
+These objects expose the original function through the `__func__` attribute.
 
 ```py
 reveal_type(some_classmethod.__func__)  # revealed: def some_classmethod(cls) -> int
@@ -181,7 +181,7 @@ reveal_type(some_staticmethod.__func__)  # revealed: def some_staticmethod() -> 
 
 Attributes like `__kwdefaults__`, which are available on functions, are not directly accessible on
 the raw `classmethod` or `staticmethod` descriptors (this is a regression test for
-<https://github.com/astral-sh/ty/issues/1452>):
+<https://github.com/astral-sh/ty/issues/1452>).
 
 ```py
 some_classmethod.__kwdefaults__  # error: [unresolved-attribute]

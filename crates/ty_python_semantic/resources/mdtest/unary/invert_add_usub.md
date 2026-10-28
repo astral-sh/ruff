@@ -39,7 +39,7 @@ TypeVars with bounds support unary operators if the bound type supports them.
 ### TypeVar with `float` bound
 
 Since `float` is treated as `int | float` in type annotations, TypeVars bounded by `float` should
-support unary `+` and `-` operators:
+support unary `+` and `-` operators.
 
 ```py
 from typing import TypeVar
@@ -57,7 +57,7 @@ def pos_float_bound(a: T) -> float:
 
 ### TypeVar with `int` bound
 
-TypeVars bounded by `int` should support all unary numeric operators:
+TypeVars bounded by `int` should support all unary numeric operators.
 
 ```py
 from typing import TypeVar
@@ -76,7 +76,7 @@ def invert_int_bound(a: U) -> int:
 ### Constrained TypeVar
 
 Constrained TypeVars support unary operators if all constraints support them. When the operator
-returns the same type for each constraint (e.g., `-int -> int`), the TypeVar is preserved:
+returns the same type for each constraint (e.g., `-int -> int`), the TypeVar is preserved.
 
 ```py
 from typing import TypeVar

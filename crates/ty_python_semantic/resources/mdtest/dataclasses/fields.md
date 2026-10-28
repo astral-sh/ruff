@@ -124,7 +124,7 @@ reveal_type(dc2.z)  # revealed: str
 ## `default_factory`
 
 The `default_factory` argument can be used to specify a callable that provides a default value for a
-field:
+field.
 
 ```py
 from dataclasses import dataclass, field
@@ -150,7 +150,7 @@ reveal_type(data.timestamp)  # revealed: datetime
 python-version = "3.12"
 ```
 
-If `kw_only` is set to `True`, the field can only be set using keyword arguments:
+If `kw_only` is set to `True`, the field can only be set using keyword arguments.
 
 ```py
 from dataclasses import dataclass, field
@@ -181,7 +181,7 @@ python-version = "3.12"
 ```
 
 Although `_` is the conventional name, any name can be used for the sentinel. Accessing the sentinel
-field on an instance or the class should not resolve to `KW_ONLY`:
+field on an instance or the class should not resolve to `KW_ONLY`.
 
 ```py
 from dataclasses import dataclass, KW_ONLY
@@ -201,7 +201,7 @@ DC.sentinel
 ```
 
 When a child uses `_: KW_ONLY` and a parent defines `_` as a real field, the parent's `_` field is
-inherited and the sentinel only affects subsequent fields in the child:
+inherited and the sentinel only affects subsequent fields in the child.
 
 ```py
 from dataclasses import dataclass, KW_ONLY
@@ -275,7 +275,7 @@ class B:
 reveal_type(B.__init__)  # revealed: (self: B) -> None
 ```
 
-Test constructor calls:
+Test constructor calls.
 
 ```py
 # These should NOT error because A's `field(...)` call is treated like any other default value

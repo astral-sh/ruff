@@ -7,7 +7,7 @@ function or class as an argument and returns a modified version of it.
 
 A decorated function definition is conceptually similar to `def f(x): ...` followed by
 `f = decorator(f)`. This means that the type of a decorated function is the same as the return type
-of the decorator (which does not necessarily need to be a callable type):
+of the decorator (which does not necessarily need to be a callable type).
 
 ```py
 def custom_decorator(f) -> int:
@@ -21,7 +21,7 @@ reveal_type(f)  # revealed: int
 
 ## Type-annotated decorator
 
-More commonly, a decorator returns a modified callable type:
+More commonly, a decorator returns a modified callable type.
 
 ```py
 from typing import Callable
@@ -40,7 +40,7 @@ reveal_type(even(4))  # revealed: bool
 ## Decorators which take arguments
 
 Decorators can be arbitrary expressions. This is often useful when the decorator itself takes
-arguments:
+arguments.
 
 ```py
 from typing import Callable
@@ -59,7 +59,7 @@ reveal_type(even(14))  # revealed: bool
 ```
 
 Decorator expressions can also introduce bindings that remain visible after the decorated
-definition:
+definition.
 
 ```py
 from typing import TypeVar
@@ -81,7 +81,7 @@ reveal_type(seen)  # revealed: Literal[True]
 ## Multiple decorators
 
 Multiple decorators can be applied to a single function. They are applied in "bottom-up" order,
-meaning that the decorator closest to the function definition is applied first:
+meaning that the decorator closest to the function definition is applied first.
 
 ```py
 def maps_to_str(f) -> str:
@@ -186,7 +186,7 @@ reveal_type(Foo().foo)  # revealed: str
 ### `functools.cached_property` on a generic class
 
 A cached property must preserve the type variable bound by its enclosing generic class, including
-when the return type is a union:
+when the return type is a union.
 
 ```py
 from functools import cached_property
@@ -261,7 +261,7 @@ reveal_type(f)  # revealed: Unknown
 #### Wrong argument type
 
 Here, we emit a diagnostic since `wrong_signature` takes an `int` instead of a callable type as the
-first argument:
+first argument.
 
 ```py
 def wrong_signature(f: int) -> str:
@@ -296,7 +296,7 @@ reveal_type(stacked)  # revealed: bool
 
 #### Wrong number of arguments
 
-Decorators need to be callable with a single argument. If they are not, we emit a diagnostic:
+Decorators need to be callable with a single argument. If they are not, we emit a diagnostic.
 
 ```py
 def takes_two_arguments(f, g) -> str:
@@ -339,7 +339,7 @@ def f() -> None: ...
 
 When a class is used as a decorator, its constructor (`__init__` or `__new__`) must accept the
 decorated function as an argument. If the class's constructor doesn't accept the right arguments, we
-emit an error:
+emit an error.
 
 ```py
 class NoInit: ...
@@ -359,7 +359,7 @@ reveal_type(bar)  # revealed: int
 
 ### Class, with correct signature, used as a decorator
 
-When a class's constructor accepts the decorated function/class, no error is emitted:
+When a class's constructor accepts the decorated function/class, no error is emitted.
 
 ```py
 from typing import Callable
@@ -386,7 +386,7 @@ reveal_type(MyClass)  # revealed: AcceptsType
 
 ### Generic class, used as a decorator
 
-Generic class decorators are validated through constructor calls:
+Generic class decorators are validated through constructor calls.
 
 ```py
 from typing import Generic, TypeVar, Callable
@@ -405,7 +405,7 @@ def returns_str() -> str:
 
 ### `type[SomeClass]` used as a decorator
 
-Using `type[SomeClass]` as a decorator validates against the class's constructor:
+Using `type[SomeClass]` as a decorator validates against the class's constructor.
 
 ```py
 class Base: ...
@@ -418,7 +418,7 @@ def apply_decorator(cls: type[Base]) -> None:
 
 ## Class decorators
 
-Class decorator calls are validated, emitting diagnostics for invalid arguments:
+Class decorator calls are validated, emitting diagnostics for invalid arguments.
 
 ```py
 def takes_int(x: int) -> int:
@@ -431,7 +431,7 @@ class Foo: ...
 reveal_type(Foo)  # revealed: int
 ```
 
-Using `None` as a decorator is an error:
+Using `None` as a decorator is an error.
 
 ```py
 # error: [call-non-callable]
@@ -441,7 +441,7 @@ class Bar: ...
 reveal_type(Bar)  # revealed: <class 'Bar'>
 ```
 
-A decorator can enforce type constraints on the class being decorated:
+A decorator can enforce type constraints on the class being decorated.
 
 ```py
 def decorator(cls: type[int]) -> type[int]:
@@ -454,7 +454,7 @@ class Baz: ...
 reveal_type(Baz)  # revealed: type[int]
 ```
 
-Class decorators can also replace the class object with an instance:
+Class decorators can also replace the class object with an instance.
 
 ```py
 from dataclasses import dataclass
@@ -540,7 +540,7 @@ class OverloadedCacheClient:
 ```
 
 When a class decorator returns `Unknown`, we preserve the current binding. Unannotated decorators
-have an `Unknown` return type because we do not infer returned classes from decorator bodies:
+have an `Unknown` return type because we do not infer returned classes from decorator bodies.
 
 ```py
 from ty_extensions._internal import Unknown
@@ -565,7 +565,7 @@ reveal_type(Animal())  # revealed: Animal
 Animal().set_full_name("John")  # error: [unresolved-attribute]
 ```
 
-This also applies to unannotated callables that are not function definitions:
+This also applies to unannotated callables that are not function definitions.
 
 ```py
 lambda_decorator = lambda cls: cls
@@ -600,7 +600,7 @@ reveal_type(CallableInstanceDecorated)  # revealed: <class 'CallableInstanceDeco
 
 An explicit return annotation can also produce `Unknown`, for example when a type variable is not
 specialized. We preserve the class binding in these cases too, but use the return type when it is
-known:
+known.
 
 ```py
 class ExplicitReturnDecorator(Generic[T]):
@@ -643,7 +643,7 @@ reveal_type(RegularCallableReplacementDecorated)  # revealed: <class 'RegularCal
 ```
 
 An unknown class decorator preserves the class binding while still reporting the unresolved
-reference:
+reference.
 
 ```py
 # error: [unresolved-reference] "Name `unknown_class_decorator` used when not defined"
@@ -660,7 +660,7 @@ UnknownDecorated().method("a")  # error: [invalid-argument-type]
 
 If an earlier decorator replaces the class with an instance, an `Unknown` return type preserves that
 instance's type. This applies both to unannotated decorators and to decorators whose return
-annotations evaluate to `Unknown`:
+annotations evaluate to `Unknown`.
 
 ```py
 def unannotated_identity(cls):
@@ -679,7 +679,7 @@ class WrappedThenUnknown: ...
 reveal_type(WrappedThenUnknown)  # revealed: WrapBackend
 ```
 
-Metadata decorators still apply above an unannotated class-preserving decorator:
+Metadata decorators still apply above an unannotated class-preserving decorator.
 
 ```py
 from typing_extensions import deprecated
@@ -697,7 +697,7 @@ DeprecatedThenUnannotated()  # error: [deprecated] "use OtherClass"
 ## Unknown return annotations on class decorators
 
 An unresolved return annotation produces `Unknown`. This preserves the class binding and allows
-outer metadata decorators to apply to the class:
+outer metadata decorators to apply to the class.
 
 ```py
 from dataclasses import dataclass
@@ -717,7 +717,7 @@ C("a")  # error: [invalid-argument-type]
 
 ## Explicitly dynamic class decorators
 
-Unlike `Unknown`, an explicit `Any` return type replaces the class binding:
+Unlike `Unknown`, an explicit `Any` return type replaces the class binding.
 
 ```py
 from typing import Any
@@ -731,7 +731,7 @@ class C: ...
 reveal_type(C)  # revealed: Any
 ```
 
-An explicit `type[Any]` return type also replaces the binding:
+An explicit `type[Any]` return type also replaces the binding.
 
 ```py
 def class_decorator(cls: type) -> type[Any]:
@@ -746,7 +746,7 @@ reveal_type(D)  # revealed: type[Any]
 ## Preserving the original class object
 
 If a class decorator returns the original class object, we preserve the class binding so it can
-still be used in annotations and as a base class:
+still be used in annotations and as a base class.
 
 ```py
 from typing import TypeVar
@@ -765,7 +765,7 @@ class DerivedPreservedClass(PreservedClass):
     value: PreservedClass
 ```
 
-Class decorator factories that preserve the original class object also preserve the class binding:
+Class decorator factories that preserve the original class object also preserve the class binding.
 
 ```py
 from collections.abc import Callable
@@ -802,7 +802,7 @@ class DerivedFactoryPreservedClass(FactoryPreservedClass):
 ## Intersection-returning class decorators
 
 Class decorators can return intersections that expose attributes added to the decorated class
-object:
+object.
 
 ```py
 from ty_extensions import Intersection
@@ -831,7 +831,7 @@ reveal_type(UserSchema.resource.fetch())  # revealed: str
 ## Metadata decorators above intersection-returning decorators
 
 Metadata decorators stacked above an intersection-returning class decorator still apply to the
-original class object, while preserving the extra intersection members:
+original class object, while preserving the extra intersection members.
 
 ```py
 from dataclasses import dataclass
@@ -863,7 +863,7 @@ reveal_type(RegisteredDataclass(1))  # revealed: RegisteredDataclass
 ## Class-preserving decorators above intersection-returning decorators
 
 Class-preserving decorators stacked above an intersection-returning class decorator preserve the
-existing intersection members:
+existing intersection members.
 
 ```py
 from ty_extensions import Intersection
@@ -900,7 +900,7 @@ reveal_type(RegisteredIdentity.resource.fetch())  # revealed: str
 A decorator that returns `Any` erases the original function's signature. Unannotated decorators have
 the same effect because their `Unknown` return type is equivalent to `Any`. Our opt-in diagnostic
 `dynamic-function-decorator-return` identifies and flags these cases, which will be undesirable for
-users who want strict typing enforced on their codebases:
+users who want strict typing enforced on their codebases.
 
 ```py
 from typing import Any, Callable
@@ -999,7 +999,7 @@ help: Add a return type annotation to `CallableDecorator.__call__`
 ### Dynamic decorators on overloaded function implementations
 
 A dynamic decorator on an overload implementation does not obscure the externally visible overload
-signatures, so it does not trigger `dynamic-function-decorator-return`:
+signatures, so it does not trigger `dynamic-function-decorator-return`.
 
 ```py
 from collections.abc import Callable
@@ -1024,7 +1024,7 @@ reveal_type(decorated("hello"))  # revealed: str
 ### Subdiagnostics suggest adding annotations, where appropriate
 
 Decorators imported from another first-party module point to their definition. If the diagnostic was
-triggered due to a missing return-type annotation, we suggest adding one:
+triggered due to a missing return-type annotation, we suggest adding one.
 
 `decorator.py`:
 
@@ -1062,7 +1062,7 @@ help: Add a return type annotation to `dynamic`
 
 But we refrain from suggesting the user add a return annotation to the implementation of an
 overloaded decorator function: the return annotation of the implementation is irrelevant to the
-diagnostic in the following example:
+diagnostic in the following example.
 
 ```py
 from typing import overload, Callable, Any
@@ -1132,7 +1132,7 @@ info[dynamic-function-decorator-return]: Decorator returns `Unknown`
 help: Add a return type annotation to `dynamic`
 ```
 
-When multiple overloads match, the definition annotation spans every overload:
+When multiple overloads match, the definition annotation spans every overload.
 
 ```py
 from collections.abc import Callable
@@ -1299,7 +1299,7 @@ help: Add a return type annotation to `dynamic`
 ### Edge case: the decorator has a union type
 
 This comes up very rarely, so for simplicity's sake we just don't have any secondary annotations
-here:
+here.
 
 ```py
 from collections.abc import Callable

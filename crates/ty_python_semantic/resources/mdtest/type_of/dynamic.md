@@ -64,7 +64,7 @@ x: type[object] = A()  # error: [invalid-assignment]
 
 `Any` represents an unknown set of possible runtime values. If `x` is of type `Any`, the type of
 `x.__class__` is also unknown and remains dynamic, *except* that we know it must be a class object
-of some kind. As such, the type of `x.__class__` is `type[Any]` rather than `Any`:
+of some kind. As such, the type of `x.__class__` is `type[Any]` rather than `Any`.
 
 ```py
 from typing import Any

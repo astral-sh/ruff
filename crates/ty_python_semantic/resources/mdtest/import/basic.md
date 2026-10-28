@@ -318,7 +318,7 @@ reveal_type(Foo())  # revealed: Foo
 <!-- snapshot-diagnostics -->
 
 If multiple members are imported from a module that cannot be resolved, only a single diagnostic is
-emitted for the `import from` statement:
+emitted for the `import from` statement.
 
 ```py
 # error: [unresolved-import]

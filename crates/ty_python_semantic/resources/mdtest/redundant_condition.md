@@ -23,7 +23,7 @@ redundant-condition-strict = "error"
 
 ## Basic cases
 
-We catch testing a function without calling it:
+We catch testing a function without calling it.
 
 ```py
 def func(): ...
@@ -184,7 +184,7 @@ warning[redundant-condition]: An empty tuple is always falsy
 ```
 
 Annotating a variable as `tuple[X]` is almost always a mistake (the user almost always meant to
-write `tuple[X, ...]`), so we point to the annotation and suggest an arbitrary-length tuple instead:
+write `tuple[X, ...]`), so we point to the annotation and suggest an arbitrary-length tuple instead.
 
 ```py
 class Bar:
@@ -233,7 +233,7 @@ warning[redundant-condition]: A 1-element tuple is always truthy
    |            ^ Inferred type `tuple[str]` is always truthy
 ```
 
-If the original tuple annotation was variadic, our suggested hint suggests a variadic replacement:
+If the original tuple annotation was variadic, our suggested hint suggests a variadic replacement.
 
 ```py
 def f(*args: *tuple[int]):
@@ -673,7 +673,7 @@ warning[redundant-condition]: A 1-element tuple is always truthy
 ```
 
 Captured variables retain the annotation hint when their type comes from a declaration in the
-enclosing scope:
+enclosing scope.
 
 ```py
 def outer():
@@ -799,7 +799,7 @@ def _():
 
 An always-falsy `match` guard makes its `case` body unreachable. We add a secondary annotation to
 the first nontrivial statement's first line to note this. An always-truthy guard leaves its case
-body reachable, meanwhile, so no secondary annotation is added in this case:
+body reachable, meanwhile, so no secondary annotation is added in this case.
 
 ```py
 def f(x: str | int, empty: tuple[()]):
@@ -839,7 +839,7 @@ help: Replace with `func()`
 note: This is an unsafe fix and may change runtime behavior
 ```
 
-An always-falsy loop condition similarly makes the loop body unreachable:
+An always-falsy loop condition similarly makes the loop body unreachable.
 
 ```py
 def _(empty: tuple[()]):
@@ -864,7 +864,7 @@ warning[redundant-condition]: An empty tuple is always falsy
    |         ------ This statement is unreachable
 ```
 
-The same is true for `match` guards:
+The same is true for `match` guards.
 
 ```py
 def negated_guard(nonempty: tuple[str, str]):
@@ -885,7 +885,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
 
 The condition of a loop guard can be false because it negates an always-truthy operand. The
 diagnostic identifies the operand, and we also add a secondary annotation identifying the code that
-cannot execute:
+cannot execute.
 
 ```py
 def negated_loop(nonempty: tuple[str, str]):
@@ -904,7 +904,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
 ```
 
 Negating an empty tuple makes a loop condition true. Without a reachable `break`, the statement
-after the loop is unreachable:
+after the loop is unreachable.
 
 ```py
 def negated_infinite_loop(empty: tuple[()]):
@@ -928,7 +928,7 @@ warning[redundant-condition]: An empty tuple is always falsy
 
 The `else` suite of a `while` loop is only reachable if the loop condition can be falsy. Here,
 `nonempty` is always truthy, so the `else` suite is unreachable. The `break` exits the loop without
-running the `else` suite, allowing the final `print` to run:
+running the `else` suite, allowing the final `print` to run.
 
 ```py
 def loop_else(nonempty: tuple[int, int]):
@@ -957,7 +957,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
   |         ------ This statement is unreachable
 ```
 
-Without a reachable `break`, both the `else` suite and the following statements are unreachable:
+Without a reachable `break`, both the `else` suite and the following statements are unreachable.
 
 ```py
 def infinite_loop(value: int):
@@ -986,7 +986,7 @@ error[redundant-condition-strict]: Condition is always true
 
 A truthy operand alone does not make the `else` suite unreachable when another operand can stop the
 loop; the `else` branch here is reachable and does not receive a diagnostic falsely describing it as
-unreachable:
+unreachable.
 
 ```py
 def conditional_loop(nonempty: tuple[int, int], enabled: bool):
@@ -1008,7 +1008,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
 
 An irrefutable pattern with an always-true guard selects its case whenever it is reached. The
 diagnostic points to the first later case with a nontrivial body, skipping cases containing only
-`pass`:
+`pass`.
 
 ```py
 def catchall(value: object, nonempty: tuple[int, int]):
@@ -1040,7 +1040,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
 ```
 
 A [capture pattern](https://docs.python.org/3/reference/compound_stmts.html#capture-patterns) is
-also irrefutable. Boolean guards diagnosed by the strict rule receive the same annotation:
+also irrefutable. Boolean guards diagnosed by the strict rule receive the same annotation.
 
 ```py
 def capture(value: object, number: int):
@@ -1064,7 +1064,7 @@ error[redundant-condition-strict]: Condition is always true
 ```
 
 An always-true guard on a refutable pattern does not prevent later cases from matching; we do not
-describe any code as unreachable here:
+describe any code as unreachable here.
 
 ```py
 def refutable(value: object, nonempty: tuple[int, int]):
@@ -1085,7 +1085,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
 
 An irrefutable pattern can also fall through when its guard has ambiguous truthiness. We do not
 describe any code as unreachable here, as a diagnostic on one truthy operand does not imply that the
-whole guard succeeds:
+whole guard succeeds.
 
 ```py
 def conditional_guard(value: object, nonempty: tuple[int, int], enabled: bool):
@@ -1107,7 +1107,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
 ## Always truthy values appearing later in compound conditions
 
 A subexpression in a compound condition can be inferred as always truthy or always falsy even if the
-condition overall is inferred as having ambiguous truthiness. We still report these subexpressions:
+condition overall is inferred as having ambiguous truthiness. We still report these subexpressions.
 
 ```py
 def func(): ...
@@ -1289,7 +1289,7 @@ def uncalled_functions(flag: bool):
 
 The `not` operator also tests truthiness, so we report the uncalled function in
 `not (ready if flag else False)`. `not` expressions are flagged in all contexts, not just
-`if`/`elif`/`while`/`assert` tests:
+`if`/`elif`/`while`/`assert` tests.
 
 ```py
 def negated_expression(flag: bool) -> bool:
@@ -1297,7 +1297,7 @@ def negated_expression(flag: bool) -> bool:
 ```
 
 Passing a function as an argument does not test its truthiness. Here, `callable()` checks whether
-`ready` or `None` can be called, so there is no redundant truthiness test of `ready`:
+`ready` or `None` can be called, so there is no redundant truthiness test of `ready`.
 
 ```py
 def callable_check(flag: bool):
@@ -1307,7 +1307,7 @@ def callable_check(flag: bool):
 
 Boolean branches inside an assertion remain exempt, since the assertion can defend against
 incorrectly typed runtime values. Outside assertions, an always-true conditional expression is
-reported as a whole:
+reported as a whole.
 
 ```py
 def boolean_branches(value: int, flag: bool):
@@ -1333,7 +1333,7 @@ def conditional_expression(value: object, flag: bool):
 
 ### Falsy tuple subclasses
 
-A nonempty tuple subclass can still be falsy if it overrides `__bool__`:
+A nonempty tuple subclass can still be falsy if it overrides `__bool__`.
 
 ```py
 from typing import Literal
@@ -1350,7 +1350,7 @@ def check_falsy_tuple(value: FalsyTuple):
 ### Call fixes for asynchronous functions
 
 Simply calling an asynchronous function would not resolve the redundant condition: the function must
-be called *and* awaited, so this is what the autofix suggests:
+be called *and* awaited, so this is what the autofix suggests.
 
 ```py
 async def coroutine(): ...
@@ -1378,7 +1378,7 @@ note: This is an unsafe fix and may change runtime behavior
 ### Call fixes for always-truthy return values
 
 Calling a function with an always-truthy return value does not resolve the redundant condition --
-but they still probably meant to call the function, so we still offer autofixes in these cases:
+but they still probably meant to call the function, so we still offer autofixes in these cases.
 
 ```py
 from typing import Literal
@@ -1433,7 +1433,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 If a function has parameters, we still offer a "fix", but we do not attempt to make the fix valid --
 it's just to show the user visually what kind of edit we're suggesting that they make. The fix is
-"display-only" to indicate that it's almost certainly incorrect:
+"display-only" to indicate that it's almost certainly incorrect.
 
 ```py
 def wut(x): ...
@@ -1481,7 +1481,7 @@ note: This suggestion may be incorrect or produce invalid syntax. It requires ma
 ### Call fixes for overloaded functions
 
 When every overload returns a coroutine, we suggest calling and awaiting the function regardless of
-which overload the intended arguments select:
+which overload the intended arguments select.
 
 ```py
 from typing import overload
@@ -1515,7 +1515,7 @@ note: This suggestion may be incorrect or produce invalid syntax. It requires ma
 ```
 
 If an overload returns a non-awaitable value, calling and awaiting the function might be invalid. We
-suggest only calling the function in this case:
+suggest only calling the function in this case.
 
 ```py
 @overload
@@ -1641,7 +1641,7 @@ help: Replace with `terminate_via_alias()`
 note: This is an unsafe fix and may change runtime behavior
 ```
 
-A call that never returns has no condition to diagnose:
+A call that never returns has no condition to diagnose.
 
 ```py
 async def check_nonreturning_call():
@@ -1652,7 +1652,7 @@ async def check_nonreturning_call():
 ### Call fixes for synchronous functions returning coroutines
 
 A synchronous function can explicitly return a coroutine. Calling and awaiting that function is a
-valid suggestion:
+valid suggestion.
 
 ```py
 from types import CoroutineType
@@ -1688,7 +1688,7 @@ note: This is an unsafe fix and may change runtime behavior
 ### `await` fixes in synchronous functions and lambdas
 
 An awaitable in a synchronous function or a lambda still produces a diagnostic, but suggesting
-`await` would create invalid syntax, so we also do not add an autofix here:
+`await` would create invalid syntax, so we also do not add an autofix here.
 
 ```py
 async def coroutine(): ...
@@ -1718,7 +1718,7 @@ warning[redundant-condition]: Condition is always truthy
 ### `await` fixes in comprehensions and generator expressions
 
 Awaiting an expression is valid within a comprehension in an asynchronous function or within a
-generator expression:
+generator expression.
 
 ```py
 async def coroutine(): ...
@@ -1761,7 +1761,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 ### `await` fixes for assignment expressions
 
-Assignment expressions need parentheses so the assignment still happens before awaiting its result:
+Assignment expressions need parentheses so the assignment still happens before awaiting its result.
 
 ```py
 async def coroutine(): ...
@@ -1788,7 +1788,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 ### `await` fixes for unary and binary operations
 
-Unary and binary operations need parentheses so the entire original expression is awaited:
+Unary and binary operations need parentheses so the entire original expression is awaited.
 
 ```py
 class AwaitableOperations:
@@ -1840,7 +1840,7 @@ note: This is an unsafe fix and may change runtime behavior
 ### `await` fixes in conditional expressions
 
 When a conditional expression is tested for truthiness, each awaitable branch receives its own
-`await` fix:
+`await` fix.
 
 ```py
 async def coroutine(): ...
@@ -1886,7 +1886,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 ### `await` fixes for already-awaited expressions
 
-An expression that has already been awaited needs parentheses before adding another `await`:
+An expression that has already been awaited needs parentheses before adding another `await`.
 
 ```py
 from types import CoroutineType
@@ -1922,7 +1922,7 @@ note: This is an unsafe fix and may change runtime behavior
 Annotations, type aliases, type-parameter bounds, and generic class bases cannot contain `await`,
 even when they appear inside an asynchronous function. This includes the first iterable of a
 comprehension or generator expression in an annotation, which is evaluated in the enclosing scope.
-Their diagnostics therefore have no autofix:
+Their diagnostics therefore have no autofix.
 
 ```py
 from typing import Annotated
@@ -2107,7 +2107,7 @@ warning[redundant-condition]: Condition is always truthy
 
 A generator expression introduces a scope where `await` is valid even when the generator appears
 inside an annotation. This also permits awaiting in the first iterable of a comprehension nested in
-the generator's body:
+the generator's body.
 
 ```py
 from typing import Annotated
@@ -2151,7 +2151,7 @@ note: This is an unsafe fix and may change runtime behavior
 ### `await` fixes in class bases and parameter defaults
 
 Non-generic class bases and function parameter defaults can contain `await` when they are evaluated
-in an asynchronous function, even if the function being defined has type parameters:
+in an asynchronous function, even if the function being defined has type parameters.
 
 ```py
 async def coroutine(): ...
@@ -2200,7 +2200,7 @@ note: This is an unsafe fix and may change runtime behavior
 ### `await` fixes in runtime type expressions and annotated assignment values
 
 Type expressions used as runtime values and the values of annotated assignments are ordinary Python
-expressions, so they can contain `await` inside an asynchronous function:
+expressions, so they can contain `await` inside an asynchronous function.
 
 ```py
 from typing import Annotated
@@ -2244,7 +2244,7 @@ note: This is an unsafe fix and may change runtime behavior
 ### `await` fixes in compound conditions
 
 An awaitable in the final operand of a compound condition still receives an autofix when the
-condition as a whole has ambiguous truthiness:
+condition as a whole has ambiguous truthiness.
 
 ```py
 async def coroutine(): ...
@@ -2272,7 +2272,7 @@ note: This is an unsafe fix and may change runtime behavior
 ### `await` fixes at module scope
 
 Python modules do not allow top-level `await`, so awaitable conditions at module scope have no
-autofix:
+autofix.
 
 ```py
 async def coroutine(): ...
@@ -2444,7 +2444,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 ## Notebook cells
 
-Notebook cells do allow top-level `await`, so the same condition receives an autofix there:
+Notebook cells do allow top-level `await`, so the same condition receives an autofix there.
 
 ```ipynb
 {
@@ -2488,7 +2488,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 ## Strict version
 
-Our stricter `redundant-condition-strict` rule extends this logic to boolean and integer tests:
+Our stricter `redundant-condition-strict` rule extends this logic to boolean and integer tests.
 
 ```py
 from typing import Literal
@@ -2526,7 +2526,7 @@ error[redundant-condition-strict]: Condition is always false
 ```
 
 We offer bespoke diagnostics for common mistakes such as accidentally comparing a string with a
-bytestring:
+bytestring.
 
 ```py
 def falsy(flag: bool):
@@ -2598,7 +2598,7 @@ error[redundant-condition-strict]: `x` always has length 1
 ```
 
 We avoid annotating the inferred types of comparison conditions for very obvious AST literals such
-as the `None` keyword or number-literal expressions, including signed numbers:
+as the `None` keyword or number-literal expressions, including signed numbers.
 
 ```py
 def f(x: None):
@@ -2653,7 +2653,7 @@ error[redundant-condition-strict]: Condition is always false
 ```
 
 `redundant-condition-strict` is also emitted on negated conditions where the negated condition is
-inferred as an instance of `bool`:
+inferred as an instance of `bool`.
 
 ```py
 def negated_conditions():
@@ -2680,7 +2680,7 @@ def negated_conditional_contexts(flag: bool):
 ```
 
 If an always-true loop has no reachable `break`, we also add a secondary annotation noting that the
-following statement is unreachable:
+following statement is unreachable.
 
 ```py
 def negated_conditional_contexts(flag: bool):
@@ -2727,7 +2727,7 @@ error[redundant-condition-strict]: Condition is always true
 ```
 
 For a branch with a multiline body, the secondary annotation ends on its first statement's first
-line rather than quoting the entire suite (which could be very long):
+line rather than quoting the entire suite (which could be very long).
 
 ```py
 def g(x: int | str):
@@ -2755,7 +2755,7 @@ error[redundant-condition-strict]: Condition is always true
 ```
 
 In cases where an always-false `if` test makes its own nontrivial body unreachable, we also issue a
-subdiagnostic warning:
+subdiagnostic warning.
 
 ```py
 def f(x: int):
@@ -2813,7 +2813,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
    | |____________________________- This following branch is unreachable
 ```
 
-We also warn when always-true, always-terminal `if`s make the remaining suite unreachable:
+We also warn when always-true, always-terminal `if`s make the remaining suite unreachable.
 
 ```py
 def f(x: int):
@@ -2836,7 +2836,7 @@ error[redundant-condition-strict]: Condition is always true
 ```
 
 Outside a statement condition, a `not` expression still tests its operand's truthiness. The strict
-rule reports redundant boolean and integer operands in assignments and return expressions:
+rule reports redundant boolean and integer operands in assignments and return expressions.
 
 ```py
 def negated_boolean_assignment(value: str):
@@ -2857,7 +2857,7 @@ def compound_conditions(x: str):
 ```
 
 A reachable `break` keeps the statement after the loop reachable, so this loop diagnostic has no
-secondary annotation alerting the user to unreachable code:
+secondary annotation alerting the user to unreachable code.
 
 ```py
 def compound_conditions(x: str):
@@ -2873,7 +2873,7 @@ error[redundant-condition-strict]: Condition is always true
     |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
 ```
 
-Here, however, the always-false `match` guard makes its case body unreachable:
+Here, however, the always-false `match` guard makes its case body unreachable.
 
 ```py
     match x:
@@ -2894,7 +2894,7 @@ error[redundant-condition-strict]: Condition is always false
 ## Unreachable branches after trivial clauses
 
 An always-truthy `elif` makes every later branch unreachable. If the immediately following branch
-has a trivial body, we point to the first later branch with a nontrivial body:
+has a trivial body, we point to the first later branch with a nontrivial body.
 
 ```py
 def later_branch(nonempty: tuple[int, int], flag: bool):
@@ -2925,7 +2925,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
 ## Reachability after loop exits
 
 An always-taken `break` makes the remaining statements in the loop body unreachable, while the
-statements after the loop remain reachable:
+statements after the loop remain reachable.
 
 ```py
 def exits_loop(items: list[int], nonempty: tuple[int, int]):
@@ -2950,7 +2950,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
   |         -------------------------- This following statement is unreachable
 ```
 
-An always-taken `continue` also makes the remaining statements in the loop body unreachable:
+An always-taken `continue` also makes the remaining statements in the loop body unreachable.
 
 ```py
 def continues_loop(items: list[int], value: int):
@@ -3047,7 +3047,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 When a condition's outcome is unknown, the strict rule reports individual operands with fixed
 truthiness. These checks do not affect the outcome: `value is not None` is always true given the
-annotation, while `value is None` is always false. The result depends on `enabled` in either case:
+annotation, while `value is None` is always false. The result depends on `enabled` in either case.
 
 ```py
 def check(value: int, enabled: bool):
@@ -3062,7 +3062,7 @@ def check(value: int, enabled: bool):
 ```
 
 The same operand checks apply to loops, match guards, conditional expressions, and comprehension
-filters:
+filters.
 
 ```py
 def condition_contexts(value: int, enabled: bool):
@@ -3082,7 +3082,7 @@ def condition_contexts(value: int, enabled: bool):
 ```
 
 Nested conditions are reported at the largest expression with fixed truthiness. Negation does not
-hide a redundant operand when the complete condition still has unknown truthiness:
+hide a redundant operand when the complete condition still has unknown truthiness.
 
 ```py
 def nested(value: int, enabled: bool):
@@ -3097,7 +3097,7 @@ def nested(value: int, enabled: bool):
 ```
 
 When separate operands are redundant, both are reported. An always-true operand later in an `and`
-expression does not replace a diagnostic on an earlier operand:
+expression does not replace a diagnostic on an earlier operand.
 
 ```py
 def separate_operands(value: int, text: str, enabled: bool):
@@ -3110,7 +3110,7 @@ def separate_operands(value: int, text: str, enabled: bool):
 ```
 
 An operand can have fixed truthiness due to short-circuit evaluation, even when its value type does
-not guarantee that truthiness:
+not guarantee that truthiness.
 
 ```py
 def short_circuit_operands(value: object, enabled: bool):
@@ -3130,7 +3130,7 @@ error[redundant-condition-strict]: Condition is always false
 
 The strict rule also checks the body and `else` expression of a conditional expression used as a
 condition. Here, `value is not None` is always true, even though the complete condition can be false
-when it evaluates to `enabled`:
+when it evaluates to `enabled`.
 
 ```py
 def conditional_branch(value: int, select: bool, enabled: bool):
@@ -3159,7 +3159,7 @@ def calls(never: Never, flag: bool, predicate: Callable[[object], bool]):
 ```
 
 The same applies to a call with a fixed return type, including when `not` tests its result while
-computing a value:
+computing a value.
 
 ```py
 from typing import Literal
@@ -3235,7 +3235,7 @@ determined to be always true without checking the truthiness of the empty string
 
 The strings `"yes"` and `""` would normally trigger `redundant-condition`, since one always counts
 as true and the other always counts as false. Because neither is reached here, we report only
-`redundant-condition-strict` on each complete condition:
+`redundant-condition-strict` on each complete condition.
 
 ```py
 from typing import Literal
@@ -3258,7 +3258,7 @@ In `False if True else "yes"`, the middle `True` selects `False`, so the first `
 In `"yes" if False else True`, the middle `False` selects the `True` after `else`, so the second
 `if` body always runs. We report both complete conditions under `redundant-condition-strict`. As
 with the `and` and `or` examples above, neither string is evaluated, so we do not report a warning
-on the string or let its presence hide the warning about the complete condition:
+on the string or let its presence hide the warning about the complete condition.
 
 ```py
 def unreachable_branches():
@@ -3308,7 +3308,7 @@ warning[redundant-condition]: An empty tuple is always falsy
   |             -------------------- This statement is unreachable
 ```
 
-An always-true `or` operand makes the `else` branch unreachable:
+An always-true `or` operand makes the `else` branch unreachable.
 
 ```py
 def true_or_operand(flag: bool, nonempty: tuple[str, str]):
@@ -3330,7 +3330,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
    | |____________________________- This following branch is unreachable
 ```
 
-Negating the compound test instead makes the `if` body unreachable:
+Negating the compound test instead makes the `if` body unreachable.
 
 ```py
 def true_or_operand(flag: bool, nonempty: tuple[str, str]):
@@ -3349,7 +3349,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
 ```
 
 One operand does not explain the branch's reachability when another operand determines the result.
-In this condition, the empty tuple makes the `and` test false:
+In this condition, the empty tuple makes the `and` test false.
 
 ```py
 def contributing_operands(empty: tuple[()], nonempty: tuple[str, str]):
@@ -3376,7 +3376,7 @@ warning[redundant-condition]: An empty tuple is always falsy
    |         -------------------- This statement is unreachable
 ```
 
-But here, the nonempty tuple makes the `or` test true:
+But here, the nonempty tuple makes the `or` test true.
 
 ```py
 def contributing_operands(empty: tuple[()], nonempty: tuple[str, str]):
@@ -3408,7 +3408,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
 ```
 
 If each operand must be truthy for an `and` expression to be true, neither operand alone explains
-why the `else` branch is unreachable:
+why the `else` branch is unreachable.
 
 ```py
 def jointly_truthy(first: tuple[str, str], second: tuple[int, int]):
@@ -3481,7 +3481,7 @@ def compound_expression_tests():
 ```
 
 Each branch of a conditional expression can contain its own boolean test. Both `not func`
-expressions are redundant, regardless of which one runs:
+expressions are redundant, regardless of which one runs.
 
 ```py
 def selected_values(flag: bool):
@@ -3522,7 +3522,7 @@ note: This is an unsafe fix and may change runtime behavior
 ```
 
 A boolean test inside a `lambda` body and another in the surrounding tuple are separate uses of the
-function object. Both are reported once, even though the tuple is passed to the same `if` condition:
+function object. Both are reported once, even though the tuple is passed to the same `if` condition.
 
 ```py
 def enclosing_scope_after_lambda():
@@ -3537,7 +3537,7 @@ def enclosing_scope_after_lambda():
 
 `Annotated[int, ...]` describes an `int` with additional metadata. That metadata can contain
 ordinary expressions, including boolean tests, even when the annotation is quoted. We skip both
-`redundant-condition` rules inside string annotations, including for compound tests:
+`redundant-condition` rules inside string annotations, including for compound tests.
 
 ```py
 from typing import Annotated
@@ -3551,7 +3551,7 @@ strict_conditional: "Annotated[int, 1 if 1 == 1 else 0]"  # no diagnostic
 ```
 
 Unquoted annotations still report redundant tests in their metadata. The function object `func` is
-always truthy, and the comparison `1 == 1` is always true:
+always truthy, and the comparison `1 == 1` is always true.
 
 ```py
 unquoted: Annotated[int, not not func]  # error: [redundant-condition]
@@ -3560,7 +3560,7 @@ unquoted_strict: Annotated[int, 1 if 1 == 1 else 0]  # error: [redundant-conditi
 
 ## Redundant boolean tests in call arguments
 
-Boolean tests in call arguments are independent of the enclosing condition's truthiness:
+Boolean tests in call arguments are independent of the enclosing condition's truthiness.
 
 ```py
 def accepts(value: bool) -> bool:
@@ -3618,14 +3618,14 @@ if ():  # error: [redundant-condition] "Expression `()` is always falsy (has typ
 
 ## Multiline conditions in concise diagnostics
 
-Concise diagnostics usually quote source code in their diagnostics:
+Concise diagnostics usually quote source code in their diagnostics.
 
 ```py
 if 1 + 1 == 2:  # error: [redundant-condition-strict] "Condition `1 + 1 == 2` is always true"
     pass
 ```
 
-But the source code is omitted if the full condition is split over multiple lines:
+But the source code is omitted if the full condition is split over multiple lines.
 
 ```py
 def multiline_conditions(value: int):
@@ -3689,7 +3689,7 @@ redundant-condition-strict = "error"
 When a final `elif` condition is always true, an `else` branch calling `assert_never` makes the
 exhaustiveness check explicit. The argument is a variable whose type is a union before the chain
 narrows it, and which narrows to `Never` when the final condition is false. The original condition
-and body are preserved:
+and body are preserved.
 
 ```py
 def exhaustive(value: str | int):
@@ -3720,7 +3720,7 @@ note: This is an unsafe fix and may change runtime behavior
 ```
 
 The assertion uses the existing indentation of the branch body, including unconventional
-indentation:
+indentation.
 
 ```py
 # fmt: off
@@ -3752,7 +3752,7 @@ note: This is an unsafe fix and may change runtime behavior
 ```
 
 Comments inside a parenthesized condition, after the branch header, and in its body are all
-preserved. Trailing body comments remain before the new `else`:
+preserved. Trailing body comments remain before the new `else`.
 
 ```py
 def commented_condition(value: str | int):
@@ -3787,7 +3787,7 @@ note: This is an unsafe fix and may change runtime behavior
 ```
 
 An unparenthesized assignment expression is valid in an `elif` condition but must be parenthesized
-when moved into an assertion:
+when moved into an assertion.
 
 ```py
 def assignment_expression(value: str | int):
@@ -3815,7 +3815,7 @@ note: This is an unsafe fix and may change runtime behavior
 ```
 
 If the branch body begins on the same line as its header, the new `else` still goes on a separate
-line. Its body uses the file's indentation style:
+line. Its body uses the file's indentation style.
 
 ```py
 # fmt: off
@@ -3845,7 +3845,7 @@ help: Add an `else` branch that calls `assert_never`
 note: This is an unsafe fix and may change runtime behavior
 ```
 
-A multiline header can also have a body on the same line as its closing colon:
+A multiline header can also have a body on the same line as its closing colon.
 
 ```py
 # fmt: off
@@ -3878,7 +3878,7 @@ note: This is an unsafe fix and may change runtime behavior
 ```
 
 Parser recovery can produce an `elif` branch with no statements. The redundant condition is still
-reported, but no autofix is offered for the incomplete branch:
+reported, but no autofix is offered for the incomplete branch.
 
 ```py
 def empty_branch(value: str | int):
@@ -4180,7 +4180,7 @@ note: This is an unsafe fix and may change runtime behavior
 ## Exhaustiveness checks for comparisons
 
 Equality comparisons can narrow a literal union to `Never`. The new assertion reuses the tested
-variable rather than evaluating the comparison again:
+variable rather than evaluating the comparison again.
 
 ```py
 from typing import Literal
@@ -4218,7 +4218,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 ## Exhaustiveness checks with imported aliases
 
-An existing runtime import of `assert_never` can be reused, including an alias:
+An existing runtime import of `assert_never` can be reused, including an alias.
 
 ```py
 from typing import assert_never as unreachable
@@ -4250,7 +4250,7 @@ note: This is an unsafe fix and may change runtime behavior
 ## Exhaustiveness checks with qualified imports
 
 A qualified module import can also be reused. The assertion goes after the entire branch body,
-including nested statements:
+including nested statements.
 
 ```py
 import typing as t
@@ -4283,7 +4283,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 ## Exhaustiveness checks with a shadowed function name
 
-When `assert_never` is already bound, a qualified import avoids that binding:
+When `assert_never` is already bound, a qualified import avoids that binding.
 
 ```py
 def exhaustive(value: str | int, assert_never: int):
@@ -4317,7 +4317,7 @@ note: This is an unsafe fix and may change runtime behavior
 ## Exhaustiveness checks with shadowed imports
 
 When both the function and module names are shadowed, the fix converts the original condition into a
-defensive assertion. An import elsewhere in the module does not make a shadowed alias usable:
+defensive assertion. An import elsewhere in the module does not make a shadowed alias usable.
 
 ```py
 import typing as t
@@ -4350,7 +4350,7 @@ note: This is an unsafe fix and may change runtime behavior
 ## Exhaustiveness checks with a deleted import
 
 An imported alias that has been deleted cannot be reused. A new qualified import provides a runtime
-binding for the assertion:
+binding for the assertion.
 
 ```py
 from typing import assert_never as unreachable
@@ -4387,7 +4387,7 @@ note: This is an unsafe fix and may change runtime behavior
 ## Exhaustiveness checks without a reusable variable
 
 Calling a function again could change its result or have side effects, so the fix retains the
-original condition as an assertion when the tested value is not a plain variable:
+original condition as an assertion when the tested value is not a plain variable.
 
 ```py
 def get_value() -> int:
@@ -4421,7 +4421,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 Python 3.10 does not provide `typing.assert_never`. The fact that we vendor a stub for
 `typing_extensions` from typeshed is not sufficient to establish that the package will be available
-at runtime, so the fix converts the original condition into an assertion instead:
+at runtime, so the fix converts the original condition into an assertion instead.
 
 ```toml
 [environment]
@@ -4462,7 +4462,7 @@ On older Python versions, `assert_never` can be imported from `typing_extensions
 `typing_extensions` is declared as a direct dependency and the version of `typing_extensions`
 installed into `site-packages` exports the function. The `typing_extensions` stub that we vendor
 from typeshed is not sufficient to establish runtime availability of
-`typing_extensions.assert_never`:
+`typing_extensions.assert_never`.
 
 ```toml
 [environment]
@@ -4484,7 +4484,7 @@ typing_extensions = ["extensions"]
 
 ### Available runtime function
 
-If the installed version of `typing_extensions` provides `assert_never`, the fix can import it:
+If the installed version of `typing_extensions` provides `assert_never`, the fix can import it.
 
 `/.venv/<path-to-site-packages>/typing_extensions.py`:
 
@@ -4528,7 +4528,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 We cannot provide an `assert_never` autofix if the installed version of `typing_extensions` does not
 export `assert_never`, even though the bundled stub from typeshed claims that `typing_extensions`
-always exposes `assert_never`. Here, we provide an autofix that adds an `assert` instead:
+always exposes `assert_never`. Here, we provide an autofix that adds an `assert` instead.
 
 `/.venv/<path-to-site-packages>/typing_extensions.py`:
 
@@ -4567,7 +4567,7 @@ note: This is an unsafe fix and may change runtime behavior
 A dependency declaration alone does not establish that `typing_extensions` is installed at runtime.
 If only the bundled stub from typeshed is available, and `typing_extensions` cannot be found in
 `site-packages` despite the dependency declaration, the fix adds an `assert` instead of using
-`assert_never`:
+`assert_never`.
 
 `/.venv/<path-to-site-packages>/unrelated.py`:
 
@@ -4605,7 +4605,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 If `typing_extensions` is installed in `site-packages`, this still does not justify adding a runtime
 import unless `typing_extensions` is also declared as a direct dependency. The containing
-workspace's declaration does not make it a direct dependency of a nested project:
+workspace's declaration does not make it a direct dependency of a nested project.
 
 ```toml
 [environment]
@@ -4938,7 +4938,7 @@ if 0:  # no diagnostic
     pass
 ```
 
-For consistency, we do the same for `if True:`, `if 1:`, `if 2:`, etc.:
+For consistency, we do the same for `if True:`, `if 1:`, `if 2:`, etc.
 
 ```py
 if 1:  # no diagnostic
@@ -4952,7 +4952,7 @@ if 2:  # no diagnostic
 ```
 
 `assert None` also comes up unexpectedly often in certain ecosystem projects to assert an
-unreachable region, so we special-case a literal `None` too:
+unreachable region, so we special-case a literal `None` too.
 
 ```py
 assert None  # no diagnostic
@@ -4964,7 +4964,7 @@ Assertion tests and their subexpressions are exempt from both rules when their i
 is a subtype of `bool` or `int`, or when their truthiness is fixed only by short-circuit evaluation.
 Other always-truthy or always-falsy values remain eligible for the ordinary rule, or the strict rule
 if they contain a walrus expression. These exemptions avoid false positives on defensive assertions
-such as the following, which are common in well written Python code:
+such as the following, which are common in well written Python code.
 
 ```py
 def f(x: str, y: str | int, z: str | int | bytes):
@@ -4978,7 +4978,7 @@ def f(x: str, y: str | int, z: str | int | bytes):
 ```
 
 The ordinary rule still applies inside assertion tests. An assertion message computes a value, so
-neither rule checks its `and` or `or` operands:
+neither rule checks its `and` or `or` operands.
 
 ```py
 def func(): ...
@@ -4990,7 +4990,7 @@ def assertion_boundaries(x: str, flag: bool):
 ```
 
 Boolean and short-circuit operands within assertions remain exempt when the complete assertion has
-unknown truthiness. This includes boolean tests nested inside call arguments:
+unknown truthiness. This includes boolean tests nested inside call arguments.
 
 ```py
 def accepts(value: bool) -> bool:
@@ -5010,7 +5010,7 @@ def nested_boolean_assertion(value: int, flag: bool):
 ```
 
 Short-circuit conditions remain exempt when they are the complete assertion, whether they always
-succeed or always fail:
+succeed or always fail.
 
 ```py
 def short_circuit_assertion(value: object):
@@ -5019,7 +5019,7 @@ def short_circuit_assertion(value: object):
 ```
 
 The strict rule can still fire in assertion tests that use a walrus expression when their inferred
-value type has fixed truthiness and is not a subtype of `bool` or `int`:
+value type has fixed truthiness and is not a subtype of `bool` or `int`.
 
 ```py
 # error: [redundant-condition-strict]
@@ -5029,7 +5029,7 @@ assert (value := "foo")
 Always falsy variables that are not AST literals are still reported as redundant assertions by
 `redundant-condition`. Since these assertions always fail, we also add a secondary annotation to the
 first nontrivial following statement, indicating that it is unreachable. For a multiline statement,
-the secondary annotation ends on its first line:
+the secondary annotation ends on its first line.
 
 ```py
 def failing_assertion(value: None):
@@ -5052,7 +5052,7 @@ warning[redundant-condition]: `None` is always falsy
 ```
 
 Negating an always-truthy operand also makes an assertion fail, leaving its following statements
-unreachable:
+unreachable.
 
 ```py
 def negated_assertion(nonempty: tuple[str, str]):
@@ -5071,7 +5071,7 @@ warning[redundant-condition]: A 2-element tuple is always truthy
 ```
 
 An always-false operand of an `and` expression also makes an assertion fail even when the other
-operand is unknown:
+operand is unknown.
 
 ```py
 def compound_assertion(enabled: bool, empty: tuple[()]):
@@ -5094,7 +5094,7 @@ warning[redundant-condition]: An empty tuple is always falsy
 Certain stdlib constants are heavily special-cased by ty, leading us to infer that certain `if`
 tests involving these constants will always be truthy or always be falsy. Since the branches of code
 here are deliberately unreachable, we try to avoid emitting false-positive diagnostics on these as
-well:
+well.
 
 `a.py`:
 
@@ -5150,7 +5150,7 @@ elif os.name == "nt":  # no diagnostic
 This also applies to the enabled-by-default `redundant-condition` rule, which only applies when
 checking a condition that is not inferred as being assignable to `int`. A value that depends on an
 environment guard is exempt whether it is assigned using a conditional expression or an `if`
-statement:
+statement.
 
 `b.py`:
 
@@ -5176,7 +5176,7 @@ if line_prefix:  # no diagnostic
 ```
 
 This even applies to cases where the value of one of these constants is aliased to a variable in the
-module namespace:
+module namespace.
 
 `c.py`:
 
@@ -5421,7 +5421,7 @@ class PlatformAttributeCycle:
 ## Environment-dependent assignments that reach the use
 
 Only assignments that reach a condition can make it environment-dependent. A later assignment or an
-overwritten value does not exempt an otherwise redundant condition:
+overwritten value does not exempt an otherwise redundant condition.
 
 ```py
 import sys
@@ -5440,7 +5440,7 @@ def overwritten_assignment():
 ```
 
 Following an alias uses the assignments that reach its source expression. Reassigning the source
-afterward does not change the alias's origin:
+afterward does not change the alias's origin.
 
 ```py
 def fixed_alias():
@@ -5458,7 +5458,7 @@ def environment_alias():
         pass
 ```
 
-An augmented assignment also depends on the previous value of its target:
+An augmented assignment also depends on the previous value of its target.
 
 ```py
 def augmented_assignment():
@@ -5470,7 +5470,7 @@ def augmented_assignment():
 
 ## Environment-dependent assignments in separate branches
 
-An assignment in one branch does not affect a use in the other branch:
+An assignment in one branch does not affect a use in the other branch.
 
 ```py
 import sys
@@ -5485,7 +5485,7 @@ def separate_branches(flag: bool):
 ```
 
 After branches merge, a reaching environment-dependent assignment still exempts the condition.
-Assignments selected by an environment guard retain that exemption too:
+Assignments selected by an environment guard retain that exemption too.
 
 ```py
 def reaching_assignment(flag: bool):
@@ -5505,7 +5505,7 @@ def reaching_guard():
         pass
 ```
 
-An environment guard around a use does not change the origin of an earlier assignment:
+An environment guard around a use does not change the origin of an earlier assignment.
 
 ```py
 def fixed_value_under_environment_guard():
@@ -5518,7 +5518,7 @@ def fixed_value_under_environment_guard():
 ## Environment-dependent values across scope boundaries
 
 A class body sees the enclosing bindings present when it executes. A function can instead read a
-module variable assigned after the function is defined:
+module variable assigned after the function is defined.
 
 ```py
 import sys
@@ -5539,7 +5539,7 @@ later_platform = sys.platform
 ```
 
 An assignment before the use also replaces an environment-dependent value reached through a `global`
-or `nonlocal` declaration:
+or `nonlocal` declaration.
 
 ```py
 global_value = sys.platform
@@ -5561,7 +5561,7 @@ def outer():
 ```
 
 A walrus assignment in an eagerly evaluated comprehension can supply the environment-dependent value
-to its enclosing scope:
+to its enclosing scope.
 
 ```py
 def comprehension_assignment():
@@ -5571,7 +5571,7 @@ def comprehension_assignment():
         pass
 ```
 
-Star imports preserve the imported value's environment-dependent origin:
+Star imports preserve the imported value's environment-dependent origin.
 
 ```py
 from sys import *
@@ -5582,7 +5582,7 @@ if platform == "linux":  # no diagnostic
 
 ## Environment-dependent attribute assignments that reach the use
 
-An attribute with a definite assignment at the use follows the same rules as a local variable:
+An attribute with a definite assignment at the use follows the same rules as a local variable.
 
 ```py
 import sys
@@ -5606,7 +5606,7 @@ class Config:
             pass
 ```
 
-Aliases of attributes also retain the origin of the value at the source expression:
+Aliases of attributes also retain the origin of the value at the source expression.
 
 ```py
 class AttributeAlias:
@@ -5622,7 +5622,7 @@ class AttributeAlias:
 
 Without a definite assignment at the use, an instance attribute can obtain its value from another
 method. Its environment-dependent origin still exempts the condition, including when an ordinary
-assignment in the current method only occurs on some paths:
+assignment in the current method only occurs on some paths.
 
 ```py
 import sys
@@ -5644,7 +5644,7 @@ class Config:
 ```
 
 An augmented assignment reads its previous value, including an implicit instance attribute or a
-variable in an enclosing scope:
+variable in an enclosing scope.
 
 ```py
 class AugmentedConfig:
@@ -5668,7 +5668,7 @@ def augmented_global():
 ## Environment-dependent assignment guards
 
 An assignment can depend on nested conditions or aliases of environment guards. The assigned value
-remains exempt when tested inside a function:
+remains exempt when tested inside a function.
 
 ```py
 import sys
@@ -5687,7 +5687,7 @@ def nested_guards(enabled: bool):
 ```
 
 Boolean values assigned under compound environment guards are also exempt, although they would
-otherwise be reported by the strict rule:
+otherwise be reported by the strict rule.
 
 ```py
 import os
@@ -5704,7 +5704,7 @@ if enabled:  # no diagnostic
 ```
 
 Assignments in `match` cases depend on the subject being matched, just as assignments in an `if`
-statement depend on its condition:
+statement depend on its condition.
 
 ```py
 match sys.platform:
@@ -5719,7 +5719,7 @@ if marker:  # no diagnostic
 ```
 
 Ordinary predicates do not exempt assignments. A predicate can itself refer to the variable being
-assigned without making it environment-dependent:
+assigned without making it environment-dependent.
 
 ```py
 def ordinary_guard(flag: bool):
@@ -5737,7 +5737,7 @@ def recursive_guard():
 ```
 
 A completed environment-dependent branch or a call that merely reads an environment constant does
-not make subsequent assignments environment-dependent:
+not make subsequent assignments environment-dependent.
 
 ```py
 if sys.platform == "win32":
@@ -5844,7 +5844,7 @@ with nullcontext((1,)) as fixed:
 If the top-level expression is a `lambda` or a generator, we know that the inferred type of the
 expression will always be the same regardless of whether a subexpression is defined in terms of
 `sys.version_info`, `sys.platform`, `os.name`, or similar. Therefore we continue to emit diagnostics
-on these:
+on these.
 
 ```py
 import sys
@@ -5867,7 +5867,7 @@ warning[redundant-condition]: Function object is always truthy
 However, if a `lambda`, generator or similar is found as a subexpression, we recurse into that
 subexpression to search for references to `sys.version_info`, `os.name`, `sys.platform` and
 `typing.TYPE_CHECKING`. This is because calls can execute `lambda` bodies or consume generator
-expressions:
+expressions.
 
 ```py
 if (lambda: sys.version_info >= (3, 12))():  # no diagnostic
@@ -5999,7 +5999,7 @@ def f11(x: str):
 ```
 
 We also avoid emitting the diagnostic if the exhaustiveness check just follows the `if` check, and
-is not in an `else` branch:
+is not in an `else` branch.
 
 ```py
 def g(x: int | str):
@@ -6022,7 +6022,7 @@ def g2(x: int | str):
     assert False, "unreachable"
 ```
 
-This also works if the entire block is nested:
+This also works if the entire block is nested.
 
 ```py
 def unrelated_condition() -> bool:
@@ -6043,7 +6043,7 @@ def h(x: int | str):
 ```
 
 An assertion that always succeeds does not establish exhaustiveness, whether it appears in the
-conditional body, an `else` block, or immediately after the statement:
+conditional body, an `else` block, or immediately after the statement.
 
 ```py
 def successful_assertion_in_body(value: int):
@@ -6084,7 +6084,7 @@ defensive check. Non-boolean conditions still produce the ordinary diagnostic, e
 a defensive exit and the strict rule is enabled.
 
 Note that in some cases we add secondary annotations to note that a later statement is inferred as
-unreachable, but we do not do that here:
+unreachable, but we do not do that here.
 
 ```py
 def defensive_elif(items: list[int], value: int):
@@ -6127,7 +6127,7 @@ Defensive runtime type checks are therefore common in well-written Python code.
 
 In these examples, a caller could pass `None` despite the `int` annotation. We report no diagnostic
 on the redundant condition because it can help reject that input: `value is not None` would be false
-and lead to the `else` branch, while `value is None` would be true and enter the raising body:
+and lead to the `else` branch, while `value is None` would be true and enter the raising body.
 
 ```py
 def defensive_else(value: int, enabled: bool):
@@ -6146,7 +6146,7 @@ def defensive_body(value: int, enabled: bool):
 ```
 
 Negation reverses which branch an operand's truthiness contributes to. Defensive exits following an
-early return also exempt the condition from being reported by either rule:
+early return also exempt the condition from being reported by either rule.
 
 ```py
 def negated_defensive_body(value: int, enabled: bool):
@@ -6161,7 +6161,7 @@ def defensive_fallthrough(value: int, enabled: bool):
 
 A defensive exit does not exempt an operand whose opposite truthiness would contribute to taking the
 other branch. For example, a false result for `value is not None` below would skip the `raise`
-rather than reach it:
+rather than reach it.
 
 ```py
 def nondefensive_operand(value: int, enabled: bool):
@@ -6174,7 +6174,7 @@ def negated_nondefensive_operand(value: int, enabled: bool):
 ```
 
 Tests inside call arguments are independent of the enclosing condition's branches, so they do not
-inherit its defensive-exit exemption:
+inherit its defensive-exit exemption.
 
 ```py
 def accepts(value: bool) -> bool:
@@ -6193,7 +6193,7 @@ recognised in the same way as defensive checks in explicit `else` branches. Ordi
 however, does not establish an implicit `else`.
 
 For example, an unrelated assertion after an `if` does not suppress a redundant-condition diagnostic
-when the `if` body ends in an ordinary call:
+when the `if` body ends in an ordinary call.
 
 ```py
 def fallthrough(value: int, limit: int):
@@ -6202,7 +6202,7 @@ def fallthrough(value: int, limit: int):
     assert limit > 0
 ```
 
-The same applies to a final `elif` whose body falls through:
+The same applies to a final `elif` whose body falls through.
 
 ```py
 def fallthrough_elif(value: int | str):
@@ -6218,7 +6218,7 @@ We recognize an implicit `else` when the preceding `if` or `elif` branch ends in
 
 A `break` skips the rest of the loop body, so the statement following the `break` here acts as an
 implicit `else`. We therefore do not emit a `redundant-condition-strict` diagnostic here, since the
-branch is clearly marked as "deliberately unreachable" by the fact that it always raises:
+branch is clearly marked as "deliberately unreachable" by the fact that it always raises.
 
 ```py
 def break_after_valid_value(values: list[int]):
@@ -6229,7 +6229,7 @@ def break_after_valid_value(values: list[int]):
 ```
 
 A `continue` also skips the rest of the loop body, so the same exemption applies -- no
-`redundant-condition-strict` diagnostic is emitted here:
+`redundant-condition-strict` diagnostic is emitted here.
 
 ```py
 def continue_after_valid_value(values: list[int]):
@@ -6240,7 +6240,7 @@ def continue_after_valid_value(values: list[int]):
 ```
 
 Non-boolean conditions still produce `redundant-condition` when the truthy branch ends in `break` or
-`continue`, even if the following statements raise, however:
+`continue`, even if the following statements raise, however.
 
 ```py
 def non_boolean_break(values: list[tuple[int, int]]):
@@ -6257,7 +6257,7 @@ def non_boolean_continue(values: list[tuple[int, int]]):
 ```
 
 A nested `if` must have an explicit `else`, and every branch must end in one of the recognized
-exits. These exits can be mixed within the nested conditional:
+exits. These exits can be mixed within the nested conditional.
 
 ```py
 from typing import Never
@@ -6282,7 +6282,7 @@ def nested_exits(value: int, choice: int, valid: bool):
 
 Potentially failing assertions count as exits even when they might succeed, because this heuristic
 prioritises minimising false positives over catching every possible error. An assertion that always
-succeeds does not count as an exit:
+succeeds does not count as an exit.
 
 ```py
 def successful_assertion(value: int):
@@ -6292,7 +6292,7 @@ def successful_assertion(value: int):
 ```
 
 A nested conditional that has a branch that falls through, or lacks an explicit `else`, does not
-establish an implicit `else` after the outer `if`:
+establish an implicit `else` after the outer `if`.
 
 ```py
 def nested_fallthrough(value: int, flag: bool):
@@ -6311,7 +6311,7 @@ def nested_without_else(value: int, flag: bool):
 ```
 
 An ordinary return in the implicit `else` is not a defensive exit, so it does not establish
-exhaustiveness:
+exhaustiveness.
 
 ```py
 def ordinary_return(value: int):
@@ -6356,7 +6356,7 @@ async def not_awaited(value: int):
 ## Dunder methods that return `NotImplemented`
 
 In dunder methods, it is usually more idiomatic to `return NotImplemented` rather than `raise` if
-you're writing code with defensive runtime checks. We support this pattern too:
+you're writing code with defensive runtime checks. We support this pattern too.
 
 ```py
 class Foo:
@@ -6378,7 +6378,7 @@ expressions are used to continue the boolean-expression chain:
 It is arguably always possible to write this kind of code in a clearer, more obvious way, so we
 still emit a diagnostic on code like this, even though it may be deliberate. However, we use the
 `redundant-condition-strict` rule for these patterns, so that the rule that is enabled by default is
-unopinionated:
+unopinionated.
 
 ```py
 def coinflip1() -> bool:

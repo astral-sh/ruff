@@ -39,7 +39,7 @@ help: Replace with escape sequence
 
 ### Format specs and literal parts
 
-However, escapes are valid in format specs and literal f-string text:
+However, escapes are valid in format specs and literal f-string text.
 
 ```py
 format_spec = f"{value:}"  # snapshot: invalid-character-backspace

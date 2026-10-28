@@ -11,7 +11,7 @@ typing, and we can heuristically pick the "right" type for unannotated attribute
 
 We promote the inferred type of an unannotated attribute to our best guess of its intended public
 type. For example, we promote literal types to their nominal supertype, because it is unlikely the
-author intended the `value` attribute to always hold the literal `0`:
+author intended the `value` attribute to always hold the literal `0`.
 
 ```py
 class Counter:
@@ -24,7 +24,7 @@ reveal_type(Counter().value)  # revealed: int
 Class literals stored in inferred attributes are widened when accessed through an instance. A
 subclass can override an undeclared class attribute, so a method that accesses the attribute through
 `self` cannot assume that it still holds the original class object. Direct access on a specific
-class object remains exact:
+class object remains exact.
 
 ```py
 from typing import Final, NewType, TypeVar, final
@@ -108,7 +108,7 @@ class FixedResponse:
         reveal_type(self.response_class == Response)  # revealed: Literal[True]
 ```
 
-The same widening applies to undeclared instance attributes assigned in methods:
+The same widening applies to undeclared instance attributes assigned in methods.
 
 ```py
 class InstanceResponse: ...
@@ -120,7 +120,7 @@ class Wrapper:
 reveal_type(Wrapper().response_class)  # revealed: type[InstanceResponse]
 ```
 
-Widening distributes over unions of class literals:
+Widening distributes over unions of class literals.
 
 ```py
 class UnionA: ...
@@ -136,7 +136,7 @@ reveal_type(EitherClass().value)  # revealed: type[UnionA | UnionB]
 ```
 
 Module-level variables keep their narrow inferred type. In particular, class literals in an
-invariant collection remain precise enough for exhaustive equality checks:
+invariant collection remain precise enough for exhaustive equality checks.
 
 ```py
 class OffsetA: ...
@@ -157,7 +157,7 @@ def choose(name: str) -> None:
 
 It's similarly unlikely that an unannotated attribute initialized to a singleton type (like `None`)
 is intended to always and only hold the value `None`. But unlike literal types, `None` doesn't have
-an obvious candidate super-type to widen to. In this case, we do widen by unioning with `Unknown`:
+an obvious candidate super-type to widen to. In this case, we do widen by unioning with `Unknown`.
 
 ```py
 class Wrapper:
@@ -171,7 +171,7 @@ wrapper.value = 1
 ```
 
 In this example, the public type is `None | Unknown`, so we also catch uses that are incompatible
-with `None`:
+with `None`.
 
 ```py
 def accepts_int(i: int) -> None:
@@ -187,7 +187,7 @@ def f(w: Wrapper) -> None:
 ```
 
 The same widening also applies to undeclared instance attributes that are only assigned inside
-`__init__`:
+`__init__`.
 
 ```py
 class InstanceWrapper:
@@ -220,7 +220,7 @@ w.value = "a"
 ## Declaring a narrower type to avoid promotion
 
 It's also possible to declare a narrower type to avoid promotion. For example, if we know that an
-attribute will always hold one of two literal values, we may want to avoid promotion of the literal:
+attribute will always hold one of two literal values, we may want to avoid promotion of the literal.
 
 ```py
 from typing import Literal
@@ -233,7 +233,7 @@ reveal_type(Constant().value)  # revealed: Literal[0, 1]
 ```
 
 This also works to avoid widening of singleton types, if for some reason you want an attribute that
-can only ever hold that one singleton value:
+can only ever hold that one singleton value.
 
 ```py
 class NoneWrapper:

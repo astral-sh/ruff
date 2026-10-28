@@ -7,7 +7,7 @@ The `@functools.total_ordering` decorator allows a class to define a single comp
 ## Basic usage
 
 When a class defines `__eq__` and `__lt__`, the decorator synthesizes `__le__`, `__gt__`, and
-`__ge__`:
+`__ge__`.
 
 ```py
 from functools import total_ordering
@@ -40,7 +40,7 @@ reveal_type(s1 >= s2)  # revealed: bool
 
 ## Stacked with class-preserving decorator
 
-Metadata from `@total_ordering` still applies above an explicitly typed class-preserving decorator:
+Metadata from `@total_ordering` still applies above an explicitly typed class-preserving decorator.
 
 ```py
 from functools import total_ordering
@@ -71,7 +71,7 @@ reveal_type(left >= right)  # revealed: bool
 
 When the source ordering method accepts a broader type (like `object`) for its `other` parameter,
 the synthesized comparison methods should use the same signature. This allows comparisons with types
-other than the class itself:
+other than the class itself.
 
 ```py
 from functools import total_ordering
@@ -148,7 +148,7 @@ a > 15  # error: [unsupported-operator]
 ## Overloaded ordering method
 
 When the source ordering method is overloaded, the synthesized comparison methods should preserve
-all overloads:
+all overloads.
 
 ```py
 from functools import total_ordering
@@ -189,7 +189,7 @@ a <= "string"  # error: [unsupported-operator]
 ## Using `__gt__` as the root comparison method
 
 When a class defines `__eq__` and `__gt__`, the decorator synthesizes `__lt__`, `__le__`, and
-`__ge__`:
+`__ge__`.
 
 ```py
 from functools import total_ordering
@@ -223,7 +223,7 @@ reveal_type(p1 >= p2)  # revealed: bool
 ## Inherited `__eq__`
 
 A class only needs to define a single comparison method. The `__eq__` method can be inherited from
-`object`:
+`object`.
 
 ```py
 from functools import total_ordering
@@ -250,7 +250,7 @@ reveal_type(s1 >= s2)  # revealed: bool
 
 ## Inherited ordering methods
 
-The decorator also works when the ordering method is inherited from a superclass:
+The decorator also works when the ordering method is inherited from a superclass.
 
 ```py
 from functools import total_ordering
@@ -279,7 +279,7 @@ reveal_type(c1 >= c2)  # revealed: bool
 
 The decorator always prefers `__lt__` > `__le__` > `__gt__` > `__ge__`, regardless of whether the
 method is defined locally or inherited. In this example, the inherited `__lt__` takes precedence
-over the locally-defined `__gt__`:
+over the locally-defined `__gt__`.
 
 ```py
 from functools import total_ordering
@@ -313,7 +313,7 @@ reveal_type(c1 >= c2)  # revealed: bool
 ## Explicitly-defined methods are not overridden
 
 When a class explicitly defines multiple comparison methods, the decorator does not override them.
-We use a narrower return type (`Literal[True]`) to verify that the explicit methods are preserved:
+We use a narrower return type (`Literal[True]`) to verify that the explicit methods are preserved.
 
 ```py
 from functools import total_ordering
@@ -344,7 +344,7 @@ reveal_type(t1 >= t2)  # revealed: bool
 
 ## Combined with `@dataclass`
 
-The decorator works with `@dataclass`:
+The decorator works with `@dataclass`.
 
 ```py
 from dataclasses import dataclass
@@ -377,7 +377,7 @@ reveal_type(p1 >= p2)  # revealed: bool
 ## Missing ordering method
 
 If a class has `@total_ordering` but doesn't define any ordering method (itself or in a superclass),
-a diagnostic is emitted at the decorator site:
+a diagnostic is emitted at the decorator site.
 
 ```py
 from functools import total_ordering
@@ -398,7 +398,7 @@ n1 >= n2  # error: [unsupported-operator]
 ## Without the decorator
 
 Without `@total_ordering`, classes that only define `__lt__` will not have `__le__` or `__ge__`
-synthesized:
+synthesized.
 
 ```py
 class NoDecorator:
@@ -440,7 +440,7 @@ def __le__(self, other):
 
 If `__lt__` returns `int`, then the synthesized `__le__` could return either `int` (from
 `self < other`) or `bool` (from `self == other`). Since `bool` is a subtype of `int`, the union
-simplifies to `int`:
+simplifies to `int`.
 
 ```py
 from functools import total_ordering
@@ -471,7 +471,7 @@ reveal_type(a > b)  # revealed: int
 reveal_type(a >= b)  # revealed: int
 ```
 
-When the root method returns a type that is not a supertype of `bool`, the union is preserved:
+When the root method returns a type that is not a supertype of `bool`, the union is preserved.
 
 ```py
 from functools import total_ordering
@@ -504,7 +504,7 @@ reveal_type(a >= b)  # revealed: str | bool
 ## Function call form
 
 When `total_ordering` is called as a function (not as a decorator), the same validation is
-performed:
+performed.
 
 ```py
 from functools import total_ordering
@@ -517,7 +517,7 @@ class NoOrderingMethod:
 InvalidOrderedClass = total_ordering(NoOrderingMethod)
 ```
 
-When the class does define an ordering method, no error is emitted:
+When the class does define an ordering method, no error is emitted.
 
 ```py
 from functools import total_ordering
@@ -536,7 +536,7 @@ reveal_type(ValidOrderedClass)  # revealed: type[HasOrderingMethod]
 
 ## Function call form with `type()`
 
-When `total_ordering` is called on a class created with `type()`, the same validation is performed:
+When `total_ordering` is called on a class created with `type()`, the same validation is performed.
 
 ```py
 from functools import total_ordering
@@ -555,7 +555,7 @@ InvalidFunctional = total_ordering(InvalidFunctionalBase)
 ## Inherited from functional class
 
 When a class inherits from a functional class that defines an ordering method, `@total_ordering`
-correctly detects it:
+correctly detects it.
 
 ```py
 from functools import total_ordering
@@ -587,7 +587,7 @@ reveal_type(o1 > o2)  # revealed: bool
 reveal_type(o1 >= o2)  # revealed: bool
 ```
 
-When the dynamic base class does not define any ordering method, `@total_ordering` emits an error:
+When the dynamic base class does not define any ordering method, `@total_ordering` emits an error.
 
 ```py
 from functools import total_ordering
@@ -605,7 +605,7 @@ class NoOrder(NoOrderBase):
 
 When a `type()`-constructed class has a dynamic namespace, we assume it might provide an ordering
 method (since we can't know what's in the namespace). No error is emitted when such a class is
-passed to `@total_ordering`:
+passed to `@total_ordering`.
 
 ```py
 from functools import total_ordering

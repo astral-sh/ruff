@@ -176,7 +176,7 @@ reveal_type(a.implicit_self())  # revealed: A
 reveal_type(a.implicit_self)  # revealed: bound method A.implicit_self() -> A
 ```
 
-Calling an instance method explicitly verifies the first argument:
+Calling an instance method explicitly verifies the first argument.
 
 ```py
 A.implicit_self(a)
@@ -185,7 +185,7 @@ A.implicit_self(a)
 A.implicit_self(1)
 ```
 
-Passing `self` implicitly also verifies the type:
+Passing `self` implicitly also verifies the type.
 
 ```py
 from typing import Never, Callable
@@ -197,7 +197,7 @@ class Strange:
 Strange().can_not_be_called()
 ```
 
-If the method is a class or static method then first argument is not inferred as `Self`:
+If the method is a class or static method then first argument is not inferred as `Self`.
 
 ```py
 A.a_classmethod()
@@ -268,7 +268,7 @@ async def _():
     reveal_type(await B().async_method())  # revealed: B
 ```
 
-This also works for generic classes:
+This also works for generic classes.
 
 ```py
 from typing import Self, Generic, TypeVar
@@ -285,7 +285,7 @@ reveal_type(G[int]().id())  # revealed: G[int]
 reveal_type(G[str]().id())  # revealed: G[str]
 ```
 
-Free functions and nested functions do not use implicit `Self`:
+Free functions and nested functions do not use implicit `Self`.
 
 ```py
 def not_a_method(self):
@@ -453,7 +453,7 @@ class Child(Parent):
 reveal_type(Child().copy())  # revealed: Child
 ```
 
-The same applies to classmethods with `Self` return types:
+The same applies to classmethods with `Self` return types.
 
 ```py
 from typing import Self
@@ -535,7 +535,7 @@ class LinkedList:
 reveal_type(LinkedList().next())  # revealed: LinkedList
 ```
 
-Dataclass fields can also use `Self` in their annotations:
+Dataclass fields can also use `Self` in their annotations.
 
 ```py
 from dataclasses import dataclass
@@ -548,7 +548,7 @@ class Node:
 Node(Node())
 ```
 
-Attributes annotated with `Self` can be assigned on instances:
+Attributes annotated with `Self` can be assigned on instances.
 
 ```py
 from typing import Self
@@ -560,7 +560,7 @@ def _(c: MyClass):
     c.field = c
 ```
 
-A generic type alias preserves `Self` when it is used in an attribute annotation:
+A generic type alias preserves `Self` when it is used in an attribute annotation.
 
 ```py
 type Identity[T] = T
@@ -577,7 +577,7 @@ reveal_type(AliasedNode().parent)  # revealed: AliasedNode
 Self from class body annotations and method signatures represent the same logical type variable.
 When a method returns an attribute annotated with `Self` in the class body, the class-body `Self`
 and the method's `Self` should be considered the same type, even though they have different binding
-contexts internally:
+contexts internally.
 
 ```py
 from typing import Self
@@ -599,7 +599,7 @@ reveal_type(SubChain().advance())  # revealed: SubChain
 reveal_type(SubChain().advance_twice())  # revealed: SubChain
 ```
 
-Self-typed attributes that flow through generic containers should also work:
+Self-typed attributes that flow through generic containers should also work.
 
 ```py
 from typing import Self
@@ -627,7 +627,7 @@ class TreeNode:
         return node
 ```
 
-Attributes can also refer to a generic parameter:
+Attributes can also refer to a generic parameter.
 
 ```py
 from typing import Generic, TypeVar
@@ -664,7 +664,7 @@ def _(s: Sub):
 ## Passing `self` as a callable
 
 When `self` is passed to a generic function expecting a callable type, the parameter and return
-types of the callable are inferred from the class's `__call__` method:
+types of the callable are inferred from the class's `__call__` method.
 
 ```py
 from typing import Callable
@@ -681,7 +681,7 @@ class Printer:
         return ", ".join(map(self, values))
 ```
 
-If `__call__` returns `Self`, the class's `Self` type is preserved as the inferred return type:
+If `__call__` returns `Self`, the class's `Self` type is preserved as the inferred return type.
 
 ```py
 from typing import Self
@@ -915,7 +915,7 @@ class Baz(Bar[Self]): ...
 
 ## Explicit instance-method receivers with `Self`
 
-An instance method can use `Self` when its first parameter is unannotated or annotated as `Self`:
+An instance method can use `Self` when its first parameter is unannotated or annotated as `Self`.
 
 ```py
 from __future__ import annotations
@@ -932,7 +932,7 @@ class Valid:
         return self
 ```
 
-A different receiver annotation is valid when the method's signature does not use `Self`:
+A different receiver annotation is valid when the method's signature does not use `Self`.
 
 ```py
 class WithoutSelf:
@@ -941,7 +941,7 @@ class WithoutSelf:
 ```
 
 Any other annotation for the first parameter is incompatible with `Self`, even an annotation that
-names the class itself:
+names the class itself.
 
 ```py
 class Invalid:
@@ -958,7 +958,7 @@ class Invalid:
         raise NotImplementedError
 ```
 
-The invalid receiver does not change the inferred return type of the bound method:
+The invalid receiver does not change the inferred return type of the bound method.
 
 ```py
 reveal_type(Invalid().concrete)  # revealed: bound method Invalid.concrete() -> Invalid
@@ -967,7 +967,7 @@ reveal_type(Invalid().concrete)  # revealed: bound method Invalid.concrete() -> 
 ## Explicit classmethod receivers with `Self`
 
 A class method receives the class as its first argument. When the method uses `Self`, that argument
-can be unannotated or annotated as `type[Self]`:
+can be unannotated or annotated as `type[Self]`.
 
 ```py
 from __future__ import annotations
@@ -986,7 +986,7 @@ class Valid:
         return cls()
 ```
 
-A class method can also use a different receiver annotation when its signature does not use `Self`:
+A class method can also use a different receiver annotation when its signature does not use `Self`.
 
 ```py
 class WithoutSelf:
@@ -995,7 +995,7 @@ class WithoutSelf:
         return cls()
 ```
 
-Other annotations are incompatible with `Self`, including `Self` without the enclosing `type`:
+Other annotations are incompatible with `Self`, including `Self` without the enclosing `type`.
 
 ```py
 class Invalid:
@@ -1015,7 +1015,7 @@ class Invalid:
 ## `Self` in unions with explicit receivers
 
 An incompatible receiver makes `Self` invalid even when the surrounding union simplifies to
-`object`. This applies to both return and parameter annotations:
+`object`. This applies to both return and parameter annotations.
 
 ```py
 from typing import Self
@@ -1028,7 +1028,7 @@ class Example:
 ## `Self` in type aliases with explicit receivers
 
 An incompatible receiver also makes `Self` invalid when it appears as an argument to a generic type
-alias, whether the alias is used in a return or parameter annotation:
+alias, whether the alias is used in a return or parameter annotation.
 
 ```py
 from typing import Self
@@ -1044,7 +1044,7 @@ class Example:
 
 ## Multiple `Self` annotations with explicit receivers
 
-An incompatible receiver produces a separate error for each `Self` annotation:
+An incompatible receiver produces a separate error for each `Self` annotation.
 
 ```py
 from typing import Self, Union
@@ -1058,7 +1058,7 @@ class Multiple:
 ```
 
 Two occurrences in the same annotation also produce separate errors, each pointing at its own
-`Self`:
+`Self`.
 
 ```py
 class Repeated:
@@ -1083,7 +1083,7 @@ error[invalid-type-form]: `Self` requires `self: Self` or `cls: type[Self]` for 
 ```
 
 Suppressing the error on the return annotation does not suppress the error on a parameter
-annotation:
+annotation.
 
 ```py
 class SuppressedReturn:
@@ -1097,7 +1097,7 @@ class SuppressedReturn:
 ## Generic methods with explicit receiver annotations
 
 Methods with their own type parameters follow the same rules for `Self` in both instance methods and
-class methods:
+class methods.
 
 ```py
 from typing import Self
@@ -1111,7 +1111,7 @@ class Valid:
         return cls()
 ```
 
-A method's own type parameter cannot replace `Self` in its receiver annotation:
+A method's own type parameter cannot replace `Self` in its receiver annotation.
 
 ```py
 class Invalid:
@@ -1125,7 +1125,7 @@ class Invalid:
 
 ## Quoted `Self` with explicit receiver annotations
 
-A receiver annotation and a `Self` return annotation can both be quoted:
+A receiver annotation and a `Self` return annotation can both be quoted.
 
 ```py
 from typing import Self
@@ -1140,7 +1140,7 @@ class Valid:
 ```
 
 An incompatible receiver makes a quoted `Self` invalid, including when the quoted union simplifies
-to `object`:
+to `object`.
 
 ```py
 class InvalidReturn:
@@ -1159,7 +1159,7 @@ error[invalid-type-form]: `Self` requires `self: Self` or `cls: type[Self]` for 
    |                                 ^^^^
 ```
 
-A quoted parameter annotation is also invalid when it passes `Self` to a type alias:
+A quoted parameter annotation is also invalid when it passes `Self` to a type alias.
 
 ```py
 type Identity[T] = T
@@ -1203,7 +1203,7 @@ class StaticMethodTests:
 
 ## Aliased staticmethod decorator
 
-Using an aliased `staticmethod` decorator should still be detected:
+Using an aliased `staticmethod` decorator should still be detected.
 
 ```py
 from typing import Self
@@ -1222,7 +1222,7 @@ class AliasedStaticMethod:
 `__new__` is a static method even without an explicit `@staticmethod` decorator, but at runtime it
 is heavily special-cased by the interpreter to behave more like a classmethod. It always receives a
 `cls` parameter with type `type[Self]` and typically returns an object of type `Self`, so `Self` is
-permitted in `__new__`:
+permitted in `__new__`.
 
 ```py
 from typing import Self
@@ -1243,7 +1243,7 @@ reveal_type(SubclassWithNew())  # revealed: SubclassWithNew
 
 ## Stacked decorators with staticmethod
 
-When `@staticmethod` is stacked with other decorators, `Self` should still be invalid:
+When `@staticmethod` is stacked with other decorators, `Self` should still be invalid.
 
 ```py
 from typing import Self, Callable
@@ -1307,7 +1307,7 @@ class AnnotableMeta(type):
 
 ## Indirect metaclass inheritance
 
-Classes that inherit from `type` indirectly (through another metaclass) are also metaclasses:
+Classes that inherit from `type` indirectly (through another metaclass) are also metaclasses.
 
 ```py
 from typing import Self
@@ -1327,7 +1327,7 @@ class MultiLevelMeta(IndirectMetaclass):
 ## Classes using a metaclass are not metaclasses
 
 A class that uses a metaclass (via `metaclass=...`) is _not_ itself a metaclass. `Self` should be
-valid in such classes:
+valid in such classes.
 
 ```py
 from typing import Self
@@ -1351,7 +1351,7 @@ reveal_type(SubclassOfMetaclassUser().another())  # revealed: SubclassOfMetaclas
 
 ## Nested class inside a metaclass
 
-A nested class inside a metaclass is _not_ a metaclass (unless it also inherits from `type`):
+A nested class inside a metaclass is _not_ a metaclass (unless it also inherits from `type`).
 
 ```py
 from typing import Self
@@ -1375,7 +1375,7 @@ class OuterMeta(type):
 
 ## `builtins.staticmethod`
 
-Using the fully qualified `builtins.staticmethod` should also be detected:
+Using the fully qualified `builtins.staticmethod` should also be detected.
 
 ```py
 from typing import Self
@@ -1390,7 +1390,7 @@ class BuiltinsStaticMethod:
 
 ## EnumMeta is a metaclass
 
-`enum.EnumMeta` (or `enum.EnumType` in Python 3.11+) is a metaclass, so `Self` should be invalid:
+`enum.EnumMeta` (or `enum.EnumType` in Python 3.11+) is a metaclass, so `Self` should be invalid.
 
 ```py
 from typing import Self
@@ -1472,7 +1472,7 @@ reveal_type(D().instance_method)
 reveal_type(D.class_method)
 ```
 
-A generic type alias does not prevent binding `Self` in the method signature:
+A generic type alias does not prevent binding `Self` in the method signature.
 
 ```py
 from typing import Self
@@ -1487,7 +1487,7 @@ class Aliased:
 reveal_type(Aliased().copy)
 ```
 
-`Self` also binds in a parameter annotation when the return type does not contain `Self`:
+`Self` also binds in a parameter annotation when the return type does not contain `Self`.
 
 ```py
 class ParameterOnly:
@@ -1501,7 +1501,7 @@ ParameterOnly().consume(object())  # error: [invalid-argument-type]
 ```
 
 Nested uses of the same alias still bind `Self` to the concrete receiver, including when a subclass
-inherits the method:
+inherits the method.
 
 ```py
 class NestedAlias:
@@ -1552,7 +1552,7 @@ reveal_type(generic_context(C.f))
 
 ## Non-positional first parameters
 
-This makes sure that we don't bind `self` if it's not a positional parameter:
+This makes sure that we don't bind `self` if it's not a positional parameter.
 
 ```py
 from ty_extensions._internal import RegularCallableTypeOf

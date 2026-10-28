@@ -194,7 +194,7 @@ static_assert(is_subtype_of(tuple[int], tuple[object, ...]))
 
 While a homogeneous tuple type is not a subtype of any heterogeneous tuple types, a heterogeneous
 tuple type can be a subtype of a homogeneous tuple type, and homogeneous tuple types can be subtypes
-of `Sequence`:
+of `Sequence`.
 
 ```pyi
 from typing import Literal, Any, Sequence
@@ -990,7 +990,7 @@ static_assert(is_subtype_of(Covariant[RecursiveGradual], Covariant[object]))
 ## Generic protocol materializations
 
 Every gradual type is a supertype of its bottom materialization and a subtype of its top
-materialization. Here, we check this for generic protocols:
+materialization. Here, we check this for generic protocols.
 
 ```py
 from typing import Any, Protocol
@@ -1009,7 +1009,7 @@ static_assert(not is_subtype_of(Top[Unbounded[Any]], Unbounded[Any]))
 static_assert(not is_subtype_of(Top[Unbounded[Any]], Bottom[Unbounded[Any]]))
 ```
 
-The same relations hold when the type parameter has a bound:
+The same relations hold when the type parameter has a bound.
 
 ```py
 class Bounded[T: str](Protocol):
@@ -1024,7 +1024,7 @@ static_assert(not is_subtype_of(Top[Bounded[Any]], Bounded[Any]))
 static_assert(not is_subtype_of(Top[Bounded[Any]], Bottom[Bounded[Any]]))
 ```
 
-These relations also hold between distinct protocols with the same members:
+These relations also hold between distinct protocols with the same members.
 
 ```py
 class EquivalentBounded[T: str](Protocol):
@@ -1039,7 +1039,7 @@ static_assert(not is_subtype_of(Top[Bounded[Any]], EquivalentBounded[Any]))
 static_assert(not is_subtype_of(Top[Bounded[Any]], Bottom[EquivalentBounded[Any]]))
 ```
 
-The same relations also hold when the type parameter has constraints:
+The same relations also hold when the type parameter has constraints.
 
 ```py
 class Constrained[T: (str, bytes)](Protocol):
@@ -1056,7 +1056,7 @@ static_assert(not is_subtype_of(Constrained[str], Top[Constrained[bytes]]))
 ```
 
 A bound also limits the parameter type of a contravariant protocol. The same structural relations
-hold between distinct protocols with this method:
+hold between distinct protocols with this method.
 
 ```py
 class Writer[T: str](Protocol):
@@ -1074,7 +1074,7 @@ static_assert(not is_subtype_of(Top[Writer[Any]], Bottom[EquivalentWriter[Any]])
 ```
 
 Constraints also limit both the read and write types of a mutable attribute. These protocols are
-invariant, and their structural relations still respect the materialization directions:
+invariant, and their structural relations still respect the materialization directions.
 
 ```py
 class Cell[T: (str, bytes)](Protocol):
@@ -1092,7 +1092,7 @@ static_assert(not is_subtype_of(Top[Cell[Any]], Bottom[EquivalentCell[Any]]))
 ```
 
 If a class inherits from the protocol explicitly, we treat it as a subtype, even if it has invalid
-overrides:
+overrides.
 
 ```py
 class InvalidOverride(Bounded[str]):
@@ -1177,7 +1177,7 @@ static_assert(not is_subtype_of(Callable[[int], None], TypeOf[int_param]))
 static_assert(not is_subtype_of(Callable[[float], None], TypeOf[float_param]))
 ```
 
-Parameter name is not required to be the same for positional-only parameters at the same position:
+Parameter name is not required to be the same for positional-only parameters at the same position.
 
 ```py
 def int_param_different_name(b: int, /) -> None: ...
@@ -1186,7 +1186,7 @@ static_assert(is_subtype_of(RegularCallableTypeOf[int_param], RegularCallableTyp
 static_assert(is_subtype_of(RegularCallableTypeOf[int_param_different_name], RegularCallableTypeOf[int_param]))
 ```
 
-Multiple positional-only parameters are checked in order:
+Multiple positional-only parameters are checked in order.
 
 ```py
 def multi_param1(a: float, b: int, c: str, /) -> None: ...
@@ -1228,7 +1228,7 @@ static_assert(not is_subtype_of(Callable[[int], None], TypeOf[int_with_default])
 static_assert(not is_subtype_of(Callable[[float], None], TypeOf[float_with_default]))
 ```
 
-As the parameter itself is optional, it can be omitted in the supertype:
+As the parameter itself is optional, it can be omitted in the supertype.
 
 ```py
 def empty() -> None: ...
@@ -1239,7 +1239,7 @@ static_assert(not is_subtype_of(RegularCallableTypeOf[empty], RegularCallableTyp
 ```
 
 The subtype can include any number of positional-only parameters as long as they have the default
-value:
+value.
 
 ```py
 def multi_param(a: float = 1, b: int = 2, c: str = "3", /) -> None: ...
@@ -1313,7 +1313,7 @@ static_assert(is_subtype_of(RegularCallableTypeOf[int_with_default], RegularCall
 static_assert(not is_subtype_of(RegularCallableTypeOf[empty], RegularCallableTypeOf[int_with_default]))
 ```
 
-Multiple standard parameters are checked in order along with their names:
+Multiple standard parameters are checked in order along with their names.
 
 ```py
 def multi_param1(a: float, b: int, c: str) -> None: ...
@@ -1323,7 +1323,7 @@ static_assert(is_subtype_of(RegularCallableTypeOf[multi_param1], RegularCallable
 static_assert(not is_subtype_of(RegularCallableTypeOf[multi_param2], RegularCallableTypeOf[multi_param1]))
 ```
 
-The subtype can include as many standard parameters as long as they have the default value:
+The subtype can include as many standard parameters as long as they have the default value.
 
 ```py
 def multi_param_default(a: float = 1, b: int = 2, c: str = "s") -> None: ...
@@ -1362,7 +1362,7 @@ static_assert(is_subtype_of(RegularCallableTypeOf[standard_with_default], Regula
 static_assert(is_subtype_of(RegularCallableTypeOf[standard_with_default], RegularCallableTypeOf[empty]))
 ```
 
-The position of the keyword-only parameters does not matter:
+The position of the keyword-only parameters does not matter.
 
 ```py
 def multi_standard(a: float, b: int, c: str) -> None: ...
@@ -1400,7 +1400,7 @@ static_assert(is_subtype_of(RegularCallableTypeOf[standard_with_default], Regula
 static_assert(is_subtype_of(RegularCallableTypeOf[standard_with_default], RegularCallableTypeOf[empty]))
 ```
 
-The position of the positional-only parameters matter:
+The position of the positional-only parameters matter.
 
 ```py
 def multi_standard(a: float, b: int, c: str) -> None: ...
@@ -1445,7 +1445,7 @@ static_assert(is_subtype_of(RegularCallableTypeOf[variadic_float], RegularCallab
 static_assert(not is_subtype_of(RegularCallableTypeOf[variadic_int], RegularCallableTypeOf[variadic_float]))
 ```
 
-The variadic parameter does not need to be present in the supertype:
+The variadic parameter does not need to be present in the supertype.
 
 ```py
 def empty() -> None: ...
@@ -1767,7 +1767,7 @@ static_assert(not is_assignable_to(RegularCallableTypeOf[only_variadic], Regular
 
 #### Keyword-only
 
-For keyword-only parameters, the name should be the same:
+For keyword-only parameters, the name should be the same.
 
 ```py
 from ty_extensions import static_assert
@@ -1782,7 +1782,7 @@ static_assert(not is_subtype_of(RegularCallableTypeOf[keyword_int], RegularCalla
 static_assert(not is_subtype_of(RegularCallableTypeOf[keyword_int], RegularCallableTypeOf[keyword_b]))
 ```
 
-But, the order of the keyword-only parameters is not required to be the same:
+But, the order of the keyword-only parameters is not required to be the same.
 
 ```py
 def keyword_ab(*, a: float, b: float) -> None: ...
@@ -1814,7 +1814,7 @@ static_assert(not is_subtype_of(RegularCallableTypeOf[empty], RegularCallableTyp
 ```
 
 Keyword-only parameters with default values can be mixed with the ones without default values in any
-order:
+order.
 
 ```py
 # A keyword-only parameter with a default value follows the one without a default value (it's valid)
@@ -1837,7 +1837,7 @@ static_assert(not is_subtype_of(RegularCallableTypeOf[keywords1], RegularCallabl
 static_assert(is_subtype_of(RegularCallableTypeOf[standard], RegularCallableTypeOf[keywords1]))
 ```
 
-The subtype can include additional standard parameters as long as it has the default value:
+The subtype can include additional standard parameters as long as it has the default value.
 
 ```py
 def standard_with_default(b: float, a: float, c: float = 1) -> None: ...
@@ -1847,7 +1847,7 @@ static_assert(not is_subtype_of(RegularCallableTypeOf[standard_without_default],
 static_assert(is_subtype_of(RegularCallableTypeOf[standard_with_default], RegularCallableTypeOf[keywords1]))
 ```
 
-Here, we mix keyword-only parameters with standard parameters:
+Here, we mix keyword-only parameters with standard parameters.
 
 ```py
 def keywords2(*, a: int, c: int, b: int) -> None: ...
@@ -1857,7 +1857,7 @@ static_assert(not is_subtype_of(RegularCallableTypeOf[keywords2], RegularCallabl
 static_assert(is_subtype_of(RegularCallableTypeOf[mixed], RegularCallableTypeOf[keywords2]))
 ```
 
-But, we shouldn't consider any unmatched positional-only parameters:
+But, we shouldn't consider any unmatched positional-only parameters.
 
 ```py
 def mixed_positional(b: float, /, a: float, *, c: float) -> None: ...
@@ -1865,7 +1865,7 @@ def mixed_positional(b: float, /, a: float, *, c: float) -> None: ...
 static_assert(not is_subtype_of(RegularCallableTypeOf[mixed_positional], RegularCallableTypeOf[keywords2]))
 ```
 
-But, an unmatched variadic parameter is still valid:
+But, an unmatched variadic parameter is still valid.
 
 ```py
 def mixed_variadic(*args: float, a: float, b: float, c: float, **kwargs: float) -> None: ...
@@ -1888,7 +1888,7 @@ static_assert(is_subtype_of(RegularCallableTypeOf[kwargs_float], RegularCallable
 static_assert(not is_subtype_of(RegularCallableTypeOf[kwargs_int], RegularCallableTypeOf[kwargs_float]))
 ```
 
-A variadic parameter can be added in a subtype, since callers can omit it:
+A variadic parameter can be added in a subtype, since callers can omit it.
 
 ```py
 def empty() -> None: ...
@@ -1897,7 +1897,7 @@ static_assert(is_subtype_of(RegularCallableTypeOf[kwargs_int], RegularCallableTy
 static_assert(not is_subtype_of(RegularCallableTypeOf[empty], RegularCallableTypeOf[kwargs_int]))
 ```
 
-A positional parameter with default can also be added to the subtype, since callers can omit it:
+A positional parameter with default can also be added to the subtype, since callers can omit it.
 
 ```py
 def positional_with_default(x: int = 0) -> None: ...
@@ -1941,7 +1941,7 @@ static_assert(is_subtype_of(RegularCallableTypeOf[kwargs], RegularCallableTypeOf
 static_assert(is_subtype_of(RegularCallableTypeOf[kwargs], RegularCallableTypeOf[keyword_variadic]))
 ```
 
-This is valid only for keyword-only parameters, not any other parameter kind:
+This is valid only for keyword-only parameters, not any other parameter kind.
 
 ```py
 def mixed1(a: int, *, b: int) -> None: ...
@@ -2585,7 +2585,7 @@ def check_classmethods(base: Base, child: Child):
 
 Bound methods retain structural relationships between their captured `TypedDict` receivers. Equal
 schemas remain compatible even when they have different class names, and an extra required field
-makes the receiver more specific:
+makes the receiver more specific.
 
 ```py
 from typing import TypedDict
@@ -2611,7 +2611,7 @@ def check(first: First, same: Same, extended: Extended):
 ### Recursive `TypedDict` receivers
 
 Recursive fields do not make methods with incompatible captured receivers interchangeable. The
-literal tags below still distinguish the two schemas:
+literal tags below still distinguish the two schemas.
 
 ```py
 from __future__ import annotations
@@ -2636,7 +2636,7 @@ def check(left: Left, right: Right):
 ### Distinct method implementations
 
 A compatible receiver and signature do not make methods with different `__func__` values
-interchangeable:
+interchangeable.
 
 ```py
 from ty_extensions import static_assert

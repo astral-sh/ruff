@@ -21,7 +21,7 @@ reveal_type(lambda a: a)  # revealed: (a) -> Unknown
 reveal_type(lambda a, b: a + b)  # revealed: (a, b) -> Unknown
 ```
 
-But, it can have default values:
+But, it can have default values.
 
 ```py
 reveal_type(lambda a=1: a)  # revealed: (a=1) -> Unknown | Literal[1]

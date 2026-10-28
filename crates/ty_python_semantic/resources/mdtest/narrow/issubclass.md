@@ -95,7 +95,7 @@ def _(t: type[object]):
 
 ### Handling of `None`
 
-`types.NoneType` is only available in Python 3.10 and later:
+`types.NoneType` is only available in Python 3.10 and later.
 
 ```toml
 [environment]
@@ -182,7 +182,7 @@ def final_classes(value: type, classes: FinalClasses, explicit_classes: Explicit
         reveal_type(value)  # revealed: type
 ```
 
-A tuple tree with no class objects can only make the check fail:
+A tuple tree with no class objects can only make the check fail.
 
 ```py
 OnlyTuples = tuple["OnlyTuples", ...]
@@ -246,7 +246,7 @@ def f(x: type[int | str | bytes | range]):
 ```
 
 Although `issubclass()` usually only works if all elements in the `UnionType` are class objects, at
-runtime a special exception is made for `None` so that `issubclass(x, int | None)` can work:
+runtime a special exception is made for `None` so that `issubclass(x, int | None)` can work.
 
 ```py
 def _(x: type):
@@ -260,7 +260,7 @@ def _(x: type):
 
 Except for the `None` special case mentioned above, narrowing can only take place if all elements in
 the PEP-604 union are class literals. If any elements are generic aliases or other types, the
-`issubclass()` call may fail at runtime, so no narrowing can take place:
+`issubclass()` call may fail at runtime, so no narrowing can take place.
 
 ```toml
 [environment]
@@ -288,7 +288,7 @@ info: A `UnionType` instance can only be used as the second argument to `issubcl
 info: Element `<class 'list[int]'>` in the union is not a class object
 ```
 
-The same validation also applies when an invalid `UnionType` is nested inside a tuple:
+The same validation also applies when an invalid `UnionType` is nested inside a tuple.
 
 ```py
 def _(x: type[int | list | bytes]):  # error: [missing-type-argument]
@@ -359,7 +359,7 @@ info: Element `<class 'list[int]'>` in the union `list[int] | bytes` is not a cl
 
 ## `classinfo` is a `types.UnionType`
 
-Python 3.10 added the ability to use `Union[int, str]` as the second argument to `issubclass()`:
+Python 3.10 added the ability to use `Union[int, str]` as the second argument to `issubclass()`.
 
 ```py
 from typing import Union
@@ -386,7 +386,7 @@ def f(x: type[int | str | bytes | range]):
 strict-generic-narrowing = true
 ```
 
-Without a known specialization, narrowing to a generic class uses the top materialization:
+Without a known specialization, narrowing to a generic class uses the top materialization.
 
 ```py
 def _(cls: type) -> None:
@@ -396,7 +396,7 @@ def _(cls: type) -> None:
 ```
 
 When narrowing from a generic superclass to a generic subclass, we intersect with the top
-materialization of the subclass:
+materialization of the subclass.
 
 ```py
 from typing import Sequence
@@ -442,7 +442,7 @@ python-version = "3.12"
 ```
 
 When we check a generic `@final` class against `type[GenericFinal]`, we can conclude that the check
-always succeeds:
+always succeeds.
 
 ```py
 from typing import final
@@ -460,7 +460,7 @@ def f(x: type[GenericFinal]):  # error: [missing-type-argument]
         reveal_type(x)  # revealed: Never
 ```
 
-This also works if the typevar has an upper bound:
+This also works if the typevar has an upper bound.
 
 ```py
 @final
@@ -483,7 +483,7 @@ def g(x: type[BoundedGenericFinal]):  # error: [missing-type-argument]
 #### Too wide
 
 `type[object]` is a subtype of `object`, but not every `object` can be passed as the first argument
-to `issubclass`:
+to `issubclass`.
 
 ```py
 class A: ...
@@ -499,7 +499,7 @@ if issubclass(t, A):
 
 `Literal[1]` and `type` are entirely disjoint, so the inferred type of `Literal[1] & type[int]` is
 eagerly simplified to `Never` as a result of the type narrowing in the `if issubclass(t, int)`
-branch:
+branch.
 
 ```py
 t = 1
@@ -626,7 +626,7 @@ def _(x: type[UsesMeta1], y: type[UsesMeta2]):
 
 If an intersection with only positive members is used as the second argument, and all positive
 members of the intersection are valid arguments for the second argument to `isinstance()`, we
-intersect with each positive member of the intersection:
+intersect with each positive member of the intersection.
 
 ```toml
 [environment]

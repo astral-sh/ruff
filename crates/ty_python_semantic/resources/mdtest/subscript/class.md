@@ -19,7 +19,7 @@ class Identity:
 reveal_type(Identity[0])  # revealed: str
 ```
 
-`__class_getitem__` is implicitly a classmethod, so it can be called like this:
+`__class_getitem__` is implicitly a classmethod, so it can be called like this.
 
 ```py
 reveal_type(Identity.__class_getitem__(0))  # revealed: str

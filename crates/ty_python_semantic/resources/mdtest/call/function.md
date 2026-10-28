@@ -270,7 +270,7 @@ f(__x=1)
 ```
 
 But not if they follow a non-positional-only parameter. When enabled,
-`invalid-legacy-positional-parameter` flags this as an incorrect use of the legacy convention:
+`invalid-legacy-positional-parameter` flags this as an incorrect use of the legacy convention.
 
 ```py
 from typing import overload
@@ -286,7 +286,7 @@ def g(): ...
 ```
 
 Because the lint is a syntactic check, we emit it for each overload if multiple overloads violate
-the lint:
+the lint.
 
 ```py
 import tkinter
@@ -317,7 +317,7 @@ def new_signature(): ...
 def g4(a, __b): ...  # error: [invalid-legacy-positional-parameter]
 ```
 
-Parameters are also not understood as positional-only if they both start and end with `__`:
+Parameters are also not understood as positional-only if they both start and end with `__`.
 
 ```py
 def h(__x__: str): ...
@@ -325,7 +325,7 @@ def h(__x__: str): ...
 h(__x__="foo")
 ```
 
-And if *any* parameters use the new PEP-570 convention, the old convention does not apply:
+And if *any* parameters use the new PEP-570 convention, the old convention does not apply.
 
 ```py
 def i(x: str, /, __y: int): ...
@@ -333,7 +333,7 @@ def i(x: str, /, __y: int): ...
 i("foo", __y=42)  # fine
 ```
 
-And `self`/`cls` are implicitly positional-only:
+And `self`/`cls` are implicitly positional-only.
 
 ```py
 class C:
@@ -1210,7 +1210,7 @@ python-version = "3.12"
 ```
 
 A tuple union retains its minimum length when followed by another positional argument. Both members
-here supply at least one element, so the call always has too many arguments:
+here supply at least one element, so the call always has too many arguments.
 
 ```py
 def one(a: int) -> None: ...
@@ -1218,7 +1218,7 @@ def _(args: tuple[int] | tuple[int, int]) -> None:
     one(*args, 1)  # error: [too-many-positional-arguments] "expected 1, got 2"
 ```
 
-The minimum can include several required elements:
+The minimum can include several required elements.
 
 ```py
 def two(a: int, b: int) -> None: ...
@@ -1226,7 +1226,7 @@ def _(args: tuple[int, int] | tuple[int, int, int]) -> None:
     two(*args, 1)  # error: [too-many-positional-arguments] "expected 2, got 3"
 ```
 
-Type aliases preserve the same minimum:
+Type aliases preserve the same minimum.
 
 ```py
 type Nonempty = tuple[int] | tuple[int, int]
@@ -1235,7 +1235,7 @@ def _(args: Nonempty) -> None:
     one(*args, 1)  # error: [too-many-positional-arguments] "expected 1, got 2"
 ```
 
-An empty tuple member or an iterable of unknown length can leave room for the later argument:
+An empty tuple member or an iterable of unknown length can leave room for the later argument.
 
 ```py
 def optional(a: int, b: int = 0) -> None: ...
@@ -1248,7 +1248,7 @@ def _(args: list[int] | tuple[int]) -> None:
 
 When a tuple union is followed by another positional argument, we currently combine its element
 types before checking the call. Here, we treat the tuple as an iterable of `int | str`. This reports
-an error for both `a` and `b`, even though only `b` can receive a `str`:
+an error for both `a` and `b`, even though only `b` can receive a `str`.
 
 ```py
 def f(a: int, b: int, c: int = 0) -> None: ...
@@ -1327,7 +1327,7 @@ def _(args: tuple[str, str, str]) -> None:
 ```
 
 If no later argument is known to supply a positional value, we still assume that the first iterable
-fills every remaining positional parameter:
+fills every remaining positional parameter.
 
 ```py
 # Multiple variable-length variadics are ambiguous
@@ -1364,7 +1364,7 @@ def _(args: list[str]) -> None:
     f(*args, 1.0)  # no diagnostic
 ```
 
-Arguments on either side of the iterable reduce the number of parameters it can fill:
+Arguments on either side of the iterable reduce the number of parameters it can fill.
 
 ```py
 def _(args: list[str]) -> None:
@@ -1372,7 +1372,7 @@ def _(args: list[str]) -> None:
     f("a", *args, 1.0)  # no diagnostic
 ```
 
-The later argument must match the type of its parameter:
+The later argument must match the type of its parameter.
 
 ```py
 def _(args: list[str]) -> None:
@@ -1380,7 +1380,7 @@ def _(args: list[str]) -> None:
     f(*args, "c")
 ```
 
-Even an empty iterable cannot make room for more arguments than the callable accepts:
+Even an empty iterable cannot make room for more arguments than the callable accepts.
 
 ```py
 def _(args: list[str]) -> None:
@@ -1390,7 +1390,7 @@ def _(args: list[str]) -> None:
 
 ### Variable-length unpacking with positional and keyword arguments
 
-Both positional and keyword arguments leave fewer parameters for the unpacked iterable:
+Both positional and keyword arguments leave fewer parameters for the unpacked iterable.
 
 ```py
 def f(a: str, b: float, c: int) -> None: ...
@@ -1398,7 +1398,7 @@ def _(args: list[str]) -> None:
     f(*args, 1.0, c=1)  # no diagnostic
 ```
 
-Unpacking a dictionary afterwards does not prevent the positional argument from filling `b`:
+Unpacking a dictionary afterwards does not prevent the positional argument from filling `b`.
 
 ```py
 def g(a: str, b: float) -> None: ...
@@ -1408,7 +1408,7 @@ def _(args: list[str], kwargs: dict[str, int]) -> None:
 
 ### Variable-length unpacking followed by another unpacked argument
 
-A later unpacked tuple also needs room for its elements:
+A later unpacked tuple also needs room for its elements.
 
 ```py
 def f(a: str, b: str, c: float) -> None: ...
@@ -1416,21 +1416,21 @@ def _(args: list[str]) -> None:
     f(*args, *(1.0,))  # no diagnostic
 ```
 
-If the tuple fills every parameter, the earlier iterable must be empty:
+If the tuple fills every parameter, the earlier iterable must be empty.
 
 ```py
 def _(args: list[str], tail: tuple[str, str, float]) -> None:
     f(*args, *tail)  # no diagnostic
 ```
 
-A variable-length tuple needs room for at least its required elements:
+A variable-length tuple needs room for at least its required elements.
 
 ```py
 def _(args: list[str], more: tuple[float, *tuple[float, ...]]) -> None:
     f(*args, *more)  # no diagnostic
 ```
 
-A later iterable with no required elements can be empty. Only the explicit `1.0` needs room here:
+A later iterable with no required elements can be empty. Only the explicit `1.0` needs room here.
 
 ```py
 def _(args: list[str], more: list[float]) -> None:
@@ -1439,7 +1439,7 @@ def _(args: list[str], more: list[float]) -> None:
 
 ### Required tuple elements before a later positional argument
 
-The variable-length part of a tuple can be empty, leaving only its required final element:
+The variable-length part of a tuple can be empty, leaving only its required final element.
 
 ```py
 def f(a: str, b: float) -> None: ...
@@ -1447,7 +1447,7 @@ def _(args: tuple[*tuple[bytes, ...], str]) -> None:
     f(*args, 1.0)  # no diagnostic
 ```
 
-That final element cannot be omitted when its type is incompatible:
+That final element cannot be omitted when its type is incompatible.
 
 ```py
 def _(args: tuple[*tuple[str, ...], bytes]) -> None:
@@ -1455,7 +1455,7 @@ def _(args: tuple[*tuple[str, ...], bytes]) -> None:
     f(*args, 1.0)
 ```
 
-Required elements at both ends of the tuple keep their order when the variable-length part is empty:
+Required elements at both ends of the tuple keep their order when the variable-length part is empty.
 
 ```py
 def g(a: str, b: bytes, c: float) -> None: ...
@@ -1463,7 +1463,7 @@ def _(args: tuple[str, *tuple[int, ...], bytes]) -> None:
     g(*args, 1.0)  # no diagnostic
 ```
 
-When the variable-length part supplies one element, both required final elements still follow it:
+When the variable-length part supplies one element, both required final elements still follow it.
 
 ```py
 def h(a: str, b: bytes, c: int, d: float) -> None: ...
@@ -1471,7 +1471,7 @@ def _(args: tuple[*tuple[str, ...], bytes, int]) -> None:
     h(*args, 1.0)  # no diagnostic
 ```
 
-We still report excess arguments when the tuple's required elements cannot all fit:
+We still report excess arguments when the tuple's required elements cannot all fit.
 
 ```py
 def _(args: tuple[str, *tuple[str, ...], float, float]) -> None:
@@ -1482,7 +1482,7 @@ def _(args: tuple[str, *tuple[str, ...], float, float]) -> None:
 ### Later positional arguments and variadic parameters
 
 When the callable has a variadic parameter, we still assume the unpacked iterable fills the named
-positional parameters. Later arguments then go to the variadic parameter:
+positional parameters. Later arguments then go to the variadic parameter.
 
 ```py
 def log(fmt: str, *args: object) -> None: ...
@@ -1491,7 +1491,7 @@ def _(parts: list[str]) -> None:
 ```
 
 This remains a limitation: we reject calls that would succeed if the iterable were shorter. With two
-strings in `args`, `1.0` would fill `c`:
+strings in `args`, `1.0` would fill `c`.
 
 ```py
 def v(a: str, b: str, c: float, *rest: str) -> None: ...
@@ -1506,7 +1506,7 @@ def _(args: list[str]) -> None:
 
 We also reject the middle-argument example from <https://github.com/astral-sh/ty/issues/3649>. The
 first iterable fills four parameters, leaving `text` to fill `e`. The call would succeed if each
-iterable supplied two integers instead:
+iterable supplied two integers instead.
 
 ```py
 def f(a: int, b: int, c: str, d: int, e: int) -> None: ...
@@ -2386,7 +2386,7 @@ def some_fn(a: int):
 some_fn(*None)
 ```
 
-This also applies when the type might not be iterable:
+This also applies when the type might not be iterable.
 
 ```py
 def f(*args: int) -> int:

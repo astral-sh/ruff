@@ -9,7 +9,7 @@ assignment diagnostic in various syntactical positions.
 x: int = "three"  # snapshot: invalid-assignment
 ```
 
-Here, we point to the type annotation directly:
+Here, we point to the type annotation directly.
 
 ```snapshot
 error[invalid-assignment]: Object of type `Literal["three"]` is not assignable to `int`
@@ -28,7 +28,7 @@ x: int
 x = "three"  # snapshot: invalid-assignment
 ```
 
-The diagnostic points to the earlier type annotation as well as the incompatible value:
+The diagnostic points to the earlier type annotation as well as the incompatible value.
 
 ```snapshot
 error[invalid-assignment]: Object of type `Literal["three"]` is not assignable to `int`
@@ -301,7 +301,7 @@ error[invalid-assignment]: Object of type `float` is not assignable to `int`
   | ^^^^^ Augmented assignment produces a value of type `float`
 ```
 
-The concise diagnostic reports the incompatible assignment:
+The concise diagnostic reports the incompatible assignment.
 
 ```py
 # error: [invalid-assignment] "Object of type `float` is not assignable to `int`"

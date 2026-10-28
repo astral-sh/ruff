@@ -154,7 +154,7 @@ foo("a", "b", "c")
 
 At present (2025-02-18), this renders three different diagnostic messages. But arguably, these could
 all be folded into one diagnostic. Fixing this requires at least better support for multi-spans in
-the diagnostic model and possibly also how diagnostics are emitted by the type checker itself:
+the diagnostic model and possibly also how diagnostics are emitted by the type checker itself.
 
 ```snapshot
 error[invalid-argument-type]: Argument to function `foo` is incorrect

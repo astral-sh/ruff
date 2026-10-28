@@ -89,7 +89,7 @@ reveal_type(UnknownLengthTupleSubclass.__len__)  # revealed: (self: tuple[int, .
 reveal_type(UnknownLengthTupleSubclass().__len__)  # revealed: () -> int
 ```
 
-If `__len__` is overridden, we use the overridden return type:
+If `__len__` is overridden, we use the overridden return type.
 
 ```py
 from typing import Literal

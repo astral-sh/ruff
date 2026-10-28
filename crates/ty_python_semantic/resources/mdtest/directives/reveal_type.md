@@ -16,7 +16,7 @@ from typing_extensions import reveal_type
 reveal_type(1)  # revealed: Literal[1]
 ```
 
-This also works with the fully qualified name:
+This also works with the fully qualified name.
 
 ```py
 import typing_extensions
@@ -24,7 +24,7 @@ import typing_extensions
 typing_extensions.reveal_type(1)  # revealed: Literal[1]
 ```
 
-The return type of `reveal_type` is the type of the argument:
+The return type of `reveal_type` is the type of the argument.
 
 ```py
 from typing_extensions import assert_type
@@ -37,7 +37,7 @@ def _(x: int):
 ## Without importing it
 
 For convenience, we also allow `reveal_type` to be used without importing it, even if that would
-fail at runtime. The diagnostic offers a fix to import it from `typing`:
+fail at runtime. The diagnostic offers a fix to import it from `typing`.
 
 ```py
 # snapshot: undefined-reveal

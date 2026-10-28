@@ -77,7 +77,7 @@ reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
 When `__new__` is a lambda with an unknown return type, constructor calls still infer the class
-instance type:
+instance type.
 
 ```py
 class LambdaNew:
@@ -311,7 +311,7 @@ reveal_type(C())  # revealed: C
 
 ### Mutually recursive class objects
 
-The same fallback applies when two classes use each other as their `__new__` method:
+The same fallback applies when two classes use each other as their `__new__` method.
 
 ```py
 class A:
@@ -325,7 +325,7 @@ reveal_type(A())  # revealed: A
 
 ### Recursive generic constructors
 
-A constructor can also return to the same generic class with the same specialization:
+A constructor can also return to the same generic class with the same specialization.
 
 ```py
 class C[T]:
@@ -339,7 +339,7 @@ reveal_type(C[int]())  # revealed: C[int]
 ### Shared constructors in union branches
 
 A constructor that occurs in separate union branches is not recursive. Both branches reach the same
-finite signature:
+finite signature.
 
 ```py
 class End:
@@ -361,7 +361,7 @@ reveal_type(C())  # revealed: int
 ### Finite generic constructor chains
 
 Returning to the same generic class is safe when subsequent constructors reach a callable signature.
-Here, each step consumes a nested specialization until it reaches `End.__new__`:
+Here, each step consumes a nested specialization until it reaches `End.__new__`.
 
 ```py
 class End[T]:
@@ -379,7 +379,7 @@ reveal_type(C[Inner]())  # revealed: int
 ```
 
 A finite chain can even grow its arguments. `Factory` returns to `C` with a larger argument, but
-`End` does not expand the nested `Factory` type:
+`End` does not expand the nested `Factory` type.
 
 ```py
 class Factory[T]:
@@ -391,7 +391,7 @@ reveal_type(C[Factory[int]]())  # revealed: int
 ### Descriptor-sensitive constructor receivers
 
 An exact class object and a value of `type[C]` can select different descriptor overloads. This
-constructor returns to `C` with a different receiver type before reaching a finite signature:
+constructor returns to `C` with a different receiver type before reaching a finite signature.
 
 ```py
 from collections.abc import Callable
@@ -415,7 +415,7 @@ reveal_type(C())  # revealed: int
 ### Argument checks after recursive `__new__`
 
 The recursive `__new__` fallback accepts arbitrary arguments, but an ordinary `__init__` still
-validates them against the class's specialization:
+validates them against the class's specialization.
 
 ```py
 class C[T]:
@@ -431,7 +431,7 @@ C[int]("wrong")
 
 ### A recursive class object in place of `__init__`
 
-Class-valued `__init__` methods can also lead back to the constructor being expanded:
+Class-valued `__init__` methods can also lead back to the constructor being expanded.
 
 ```py
 class C:
@@ -441,7 +441,7 @@ reveal_type(C())  # revealed: C
 ```
 
 The fallback does not override a known non-instance return from `__new__`, which bypasses
-`__init__`:
+`__init__`.
 
 ```py
 class ReturnsInt:
@@ -455,7 +455,7 @@ reveal_type(ReturnsInt())  # revealed: int
 
 ### A recursive class object in place of metaclass `__call__`
 
-A metaclass's `__call__` can refer back to the class being constructed:
+A metaclass's `__call__` can refer back to the class being constructed.
 
 ```py
 class Meta(type):
@@ -469,7 +469,7 @@ reveal_type(C())  # revealed: C
 ### A cycle through a callable instance
 
 Constructor expansion can pass through an instance's `__call__` before returning to the original
-class:
+class.
 
 ```py
 class C:
@@ -484,7 +484,7 @@ reveal_type(C())  # revealed: C
 ### A metaclass bypassing a recursive `__new__`
 
 A metaclass `__call__` that returns an unrelated type bypasses `__new__`. A recursive signature in
-the unused `__new__` does not prevent us from inferring the metaclass method's return type:
+the unused `__new__` does not prevent us from inferring the metaclass method's return type.
 
 ```py
 class Meta(type):
@@ -552,7 +552,7 @@ reveal_type(Wrapped(callback, values))  # revealed: Wrapped[frozenset[frozenset[
 
 A decorator can preserve `cls` explicitly with `Concatenate`, re-expressing the receiver with its
 own type variable. Constraint inference checks the synthetic receiver; the later assignability pass
-must not reject it merely because that decorator-scoped type variable remains unsolved:
+must not reject it merely because that decorator-scoped type variable remains unsolved.
 
 ```pyi
 from typing_extensions import Concatenate
@@ -567,7 +567,7 @@ reveal_type(WrappedCls())  # revealed: WrappedCls
 ```
 
 A decorator can also return a callback protocol instead of `Callable`. Its inferred `type[Self]`
-receiver must likewise not be rejected by the later assignability pass:
+receiver must likewise not be rejected by the later assignability pass.
 
 ```pyi
 class CallableObject(Protocol[P, R_co]):
@@ -584,7 +584,7 @@ reveal_type(WrappedObject())  # revealed: WrappedObject
 
 The explicit `cls` type in a signature-preserving decorator can also be expressed with a generic
 type alias. The alias must be resolved when identifying the constructor receiver, or the later
-assignability pass rejects the synthetic argument against the decorator's unsolved receiver type:
+assignability pass rejects the synthetic argument against the decorator's unsolved receiver type.
 
 ```toml
 [environment]
@@ -745,7 +745,7 @@ x: int = ReturnsInt()  # OK
 y: ReturnsInt = ReturnsInt()  # error: [invalid-assignment]
 ```
 
-In this case, we don't validate `__init__`:
+In this case, we don't validate `__init__`.
 
 ```py
 class ReturnsIntWithInit:
@@ -795,7 +795,7 @@ reveal_type(A())  # revealed: A & Mixin
 
 ### `__new__` returning the class type
 
-When `__new__` returns the type of the instance being constructed, we use that type:
+When `__new__` returns the type of the instance being constructed, we use that type.
 
 ```py
 class Normal:
@@ -805,7 +805,7 @@ class Normal:
 reveal_type(Normal())  # revealed: Normal
 ```
 
-And we do validate `__init__`:
+And we do validate `__init__`.
 
 ```py
 class NormalWithInit:
@@ -1194,7 +1194,7 @@ def check(a: tuple[int, ...], b: tuple[str, ...]) -> None:
 ### Mixed `__new__` overloads
 
 If some `__new__` overloads are instance-returning and some are not, the return type (and `__init__`
-validation) are resolved correctly for each call site:
+validation) are resolved correctly for each call site.
 
 ```py
 from __future__ import annotations
@@ -1228,7 +1228,7 @@ reveal_type(Test("bad"))  # revealed: Test
 reveal_type(Test("ok"))  # revealed: Test
 ```
 
-The same mechanism should also hold for a `Self`-returning overload:
+The same mechanism should also hold for a `Self`-returning overload.
 
 ```py
 from typing import overload
@@ -1318,7 +1318,7 @@ reveal_type(Foo[Any]())  # revealed: Unknown
 ### Multiple matching `__new__` overloads
 
 If overload resolution for `__new__` falls back to `Unknown` because the argument is `Any` or
-`Unknown`, we should still validate downstream constructors:
+`Unknown`, we should still validate downstream constructors.
 
 ```py
 from typing import Any, overload
@@ -2150,7 +2150,7 @@ reveal_type(Foo())  # revealed: Foo
 ```
 
 An explicit `Self` annotation on the callable's receiver refers to the callable instance, not the
-class being constructed:
+class being constructed.
 
 ```py
 from typing_extensions import Self
@@ -2164,7 +2164,7 @@ class WithSelfCallable:
 reveal_type(WithSelfCallable(1))  # revealed: WithSelfCallable
 ```
 
-For a classmethod `__call__`, the `cls: type[Self]` receiver refers to the callable's class:
+For a classmethod `__call__`, the `cls: type[Self]` receiver refers to the callable's class.
 
 ```py
 class ClassmethodCallable:

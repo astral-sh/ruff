@@ -168,14 +168,14 @@ Some `str.format` calls parse fine but have no f-string that behaves the same, s
 alone.
 
 A signed name such as `+0` is a keyword, not a positional index, so the call raises `KeyError`.
-There is no keyword argument to interpolate, so the call is skipped:
+There is no keyword argument to interpolate, so the call is skipped.
 
 ```py
 "{+0}".format(0)
 "{-0}".format(0)
 ```
 
-A non-identifier attribute is `getattr(x, " a")`, whereas `f"{x. a}"` reads `x.a`:
+A non-identifier attribute is `getattr(x, " a")`, whereas `f"{x. a}"` reads `x.a`.
 
 ```py
 "{. a}".format(x)
@@ -189,20 +189,20 @@ A string key that contains the quote the f-string would wrap it in:
 
 A string key containing a backslash. `str.format` takes the key literally, but quoted inside a
 replacement field it becomes a regular string literal, where a backslash starts an escape sequence in
-a raw string or escapes the closing quote at the end of the key:
+a raw string or escapes the closing quote at the end of the key.
 
 ```py
 r"{[\n]}".format(x)
 "{[\]}".format(x)
 ```
 
-A conversion other than `s`, `r`, or `a` raises `ValueError`:
+A conversion other than `s`, `r`, or `a` raises `ValueError`.
 
 ```py
 "{!?}".format(0)
 ```
 
-Mixing automatic and manual field numbering also raises `ValueError`:
+Mixing automatic and manual field numbering also raises `ValueError`.
 
 ```py
 "{} {1}".format(x, y)
@@ -212,7 +212,7 @@ Mixing automatic and manual field numbering also raises `ValueError`:
 ## A signed element index is a string key
 
 Inside brackets, `str.format` only reads an all-digit index as an integer. A signed one is a string
-key, so it converts to a quoted subscript rather than an integer one:
+key, so it converts to a quoted subscript rather than an integer one.
 
 ```py
 "{0[+1]}".format(d)  # snapshot: f-string

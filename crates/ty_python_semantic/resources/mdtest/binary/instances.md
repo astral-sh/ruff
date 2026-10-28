@@ -85,7 +85,7 @@ reveal_type(x + x)  # revealed: Unknown
 
 ## Reflected
 
-We also support inference for reflected operations:
+We also support inference for reflected operations.
 
 ```py
 class A:
@@ -147,7 +147,7 @@ reveal_type(B() | A())  # revealed: A
 
 ## Returning a different type
 
-The magic methods aren't required to return the type of `self`:
+The magic methods aren't required to return the type of `self`.
 
 ```py
 class A:
@@ -166,7 +166,7 @@ reveal_type(B() - A())  # revealed: int
 ## Non-reflected precedence in general
 
 In general, if the left-hand side defines `__add__` and the right-hand side defines `__radd__` and
-the right-hand side is not a subtype of the left-hand side, `lhs.__add__` will take precedence:
+the right-hand side is not a subtype of the left-hand side, `lhs.__add__` will take precedence.
 
 ```py
 class A:
@@ -217,7 +217,7 @@ class C(B): ...
 reveal_type(A() + C())  # revealed: Literal["right", "left"]
 ```
 
-Excluding an unrelated class from either operand preserves both possible dispatch results:
+Excluding an unrelated class from either operand preserves both possible dispatch results.
 
 ```py
 class Excluded: ...
@@ -235,7 +235,7 @@ def narrowed(left: A, right: B):
 the first `|=` produces a `Permission`, because reflected-method precedence depends on the operands'
 runtime classes. The enum literal is not a subtype of the specific integer literal `0`, but its
 runtime class is a strict subclass of `int`. The same applies when the right operand is a TypeVar
-whose upper bound has that runtime-class relationship:
+whose upper bound has that runtime-class relationship.
 
 ```py
 from enum import IntFlag, auto
@@ -265,7 +265,7 @@ def add_permission(permission: P) -> P:
 ## Runtime-class precedence ignores generic specializations
 
 Generic specializations do not exist at runtime, so they cannot affect whether the right operand's
-runtime class is a strict subclass of the left operand's runtime class:
+runtime class is a strict subclass of the left operand's runtime class.
 
 ```py
 from typing import Generic, Literal, TypeVar
@@ -288,7 +288,7 @@ def add_generic(left: GenericBase[int], right: GenericChild[str]) -> Literal["le
 ## Class objects use their metaclasses for reflected precedence
 
 The runtime classes of class objects are their metaclasses. If the right operand's metaclass is a
-strict subclass of the left operand's metaclass, its reflected method takes precedence:
+strict subclass of the left operand's metaclass, its reflected method takes precedence.
 
 ```py
 from typing import Literal
@@ -311,7 +311,7 @@ reveal_type(A + B)  # revealed: Literal["right"]
 
 The upper bound of a TypeVar is not necessarily its runtime class, so it cannot decide definitively
 whether the right-hand operand's reflected method takes precedence. A `NewType` constructor also
-returns its argument unchanged, so an inhabitant can have a runtime class below the NewType's base:
+returns its argument unchanged, so an inhabitant can have a runtime class below the NewType's base.
 
 ```py
 from typing import Literal, NewType, TypeVar
@@ -346,7 +346,7 @@ def add_newtype(left: Base, right: NewChild) -> Literal["base", "child"]:
 ## Reflected precedence 2
 
 If the right-hand operand is a subtype of the left-hand operand, but does not override the reflected
-method, the left-hand operand's non-reflected method still takes precedence:
+method, the left-hand operand's non-reflected method still takes precedence.
 
 ```py
 class A:
@@ -387,7 +387,7 @@ reveal_type(A() - B())  # revealed: B
 
 ## Callable instances as dunders
 
-Believe it or not, this is supported at runtime:
+Believe it or not, this is supported at runtime.
 
 ```py
 class A:
@@ -400,7 +400,7 @@ class B:
 reveal_type(B() + B())  # revealed: int
 ```
 
-We also infer `int` if the callable is declared:
+We also infer `int` if the callable is declared.
 
 ```py
 class B2:
@@ -546,7 +546,7 @@ reveal_type(A[0])  # revealed: str
 
 ### Dunder as instance attribute
 
-The magic method must exist on the class, not just on the instance:
+The magic method must exist on the class, not just on the instance.
 
 ```py
 def add_impl(self, other) -> int:
@@ -573,7 +573,7 @@ reveal_type(A() + A())
 
 ### Wrong position
 
-A left-hand dunder method doesn't apply for the right-hand operand, or vice versa:
+A left-hand dunder method doesn't apply for the right-hand operand, or vice versa.
 
 ```py
 class A:

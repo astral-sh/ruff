@@ -262,7 +262,7 @@ old()  # TODO: error: [deprecated] "use Replacement directly"
 
 <!-- snapshot-diagnostics -->
 
-The typeshed declaration of the decorator is as follows:
+The typeshed declaration of the decorator is as follows.
 
 ```ignore
 class deprecated:
@@ -295,7 +295,7 @@ invalid_deco()
 ```
 
 The argument is supposed to be a LiteralString, and we can handle simple constant propagations like
-this:
+this.
 
 ```py
 from typing_extensions import deprecated
@@ -308,7 +308,7 @@ def invalid_deco(): ...
 invalid_deco()  # error: [deprecated] "message"
 ```
 
-However sufficiently opaque LiteralStrings we can't resolve, and so we lose the message:
+However sufficiently opaque LiteralStrings we can't resolve, and so we lose the message.
 
 ```py
 from typing_extensions import deprecated, LiteralString
@@ -323,7 +323,7 @@ valid_deco()  # error: [deprecated]
 ```
 
 Fully dynamic strings are technically allowed at runtime, but typeshed mandates that the input is a
-LiteralString, so we can/should emit a diagnostic for this:
+LiteralString, so we can/should emit a diagnostic for this.
 
 ```py
 from typing_extensions import deprecated

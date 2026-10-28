@@ -185,7 +185,7 @@ def recursive_constraints[T: (Meta[T], int)](value: type[T]):
 ## Three-argument form (dynamic class creation)
 
 A three-argument call to `type()` creates a new class. We synthesize a class type using the name
-from the first argument:
+from the first argument.
 
 ```py
 class Base: ...
@@ -206,7 +206,7 @@ testCaseClass = type("Foo", (Base,), {})
 tests.append(testCaseClass)  # No error - type[Foo] is assignable to type[Base]
 ```
 
-The name can also be provided indirectly via a variable with a string literal type:
+The name can also be provided indirectly via a variable with a string literal type.
 
 ```py
 name = "IndirectClass"
@@ -223,7 +223,7 @@ reveal_type(DerivedClass)  # revealed: <class 'DerivedClass'>
 
 ## Distinct class types
 
-Each `type()` call produces a distinct class type, even if they have the same name and bases:
+Each `type()` call produces a distinct class type, even if they have the same name and bases.
 
 ```py
 from ty_extensions import static_assert
@@ -254,7 +254,7 @@ takes_foo2(foo1)
 ```
 
 The classes also remain distinct when both calls occur in the same string annotation, even though
-the surrounding type expression is invalid:
+the surrounding type expression is invalid.
 
 ```py
 # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
@@ -264,7 +264,7 @@ distinct: "static_assert(type('Foo', (), {}) is not type('Foo', (), {}))[int]"
 ## Instances and attribute access
 
 Instances of dynamic classes are typed with the synthesized class name. Attributes from all base
-classes are accessible:
+classes are accessible.
 
 ```py
 class Base:
@@ -293,7 +293,7 @@ reveal_type(bar.base_attr)  # revealed: int
 reveal_type(bar.mixin_attr)  # revealed: str
 ```
 
-Attributes from the namespace dict (third argument) are tracked:
+Attributes from the namespace dict (third argument) are tracked.
 
 ```py
 class Base: ...
@@ -308,7 +308,7 @@ foo = Foo()
 reveal_type(foo.custom_attr)  # revealed: Literal[42]
 ```
 
-Methods from the namespace dictionary use the descriptor protocol:
+Methods from the namespace dictionary use the descriptor protocol.
 
 ```py
 def dynamic_method(self) -> int:
@@ -319,7 +319,7 @@ reveal_type(DynamicBase().method())  # revealed: int
 ```
 
 When the namespace dict is not a literal (e.g., passed as a parameter), attribute access returns
-`Unknown` since we can't know what attributes might be defined:
+`Unknown` since we can't know what attributes might be defined.
 
 ```py
 from typing import Any
@@ -339,7 +339,7 @@ def f(attributes: dict[str, Any]):
 ```
 
 When a namespace dictionary is partially dynamic (e.g., a dict literal with spread or non-literal
-keys), static attributes have precise types while unknown attributes return `Unknown`:
+keys), static attributes have precise types while unknown attributes return `Unknown`.
 
 ```py
 from typing import Any
@@ -360,7 +360,7 @@ def f(extra_attrs: dict[str, Any], y: str):
 
 When a `TypedDict` is passed as the namespace argument, we synthesize a class type with the known
 keys from the `TypedDict` as attributes. Since `TypedDict` instances are "open" (they can have
-arbitrary additional string keys), unknown attributes return `Unknown`:
+arbitrary additional string keys), unknown attributes return `Unknown`.
 
 ```py
 from typing import TypedDict
@@ -417,7 +417,7 @@ def h(ns: ClosedNamespace):
 
 ## Inheritance from dynamic classes
 
-Regular classes can inherit from dynamic classes:
+Regular classes can inherit from dynamic classes.
 
 ```py
 class Base:
@@ -460,7 +460,7 @@ def check_int_subclass(x: IntSubclass | str) -> None:
 ## Disjointness
 
 Dynamic classes are not considered disjoint from unrelated types (since a subclass could inherit
-from both):
+from both).
 
 ```py
 class Base: ...
@@ -475,7 +475,7 @@ def check_disjointness(x: Foo | int) -> None:
         reveal_type(x)  # revealed: Foo & ~int
 ```
 
-Disjointness also works for `type[]` of dynamic classes:
+Disjointness also works for `type[]` of dynamic classes.
 
 ```py
 from ty_extensions import static_assert
@@ -499,7 +499,7 @@ static_assert(not is_disjoint_from(type[Foo], type[Bar]))
 
 ## Using dynamic classes with `super()`
 
-Dynamic classes can be used as the pivot class in `super()` calls:
+Dynamic classes can be used as the pivot class in `super()` calls.
 
 ```py
 class Base:
@@ -528,7 +528,7 @@ reveal_type(super(DynamicChild, rc).method())  # revealed: int
 
 ## Dynamic class inheritance chains
 
-Dynamic classes can inherit from other dynamic classes:
+Dynamic classes can inherit from other dynamic classes.
 
 ```py
 class Base:
@@ -556,7 +556,7 @@ takes_parent(child)  # No error - `ChildCls` is a subtype of `Parent`
 ## Dataclass transform inheritance
 
 Dynamic classes that inherit from a `@dataclass_transform()` decorated base class are recognized as
-dataclass-like and have the synthesized `__dataclass_fields__` attribute:
+dataclass-like and have the synthesized `__dataclass_fields__` attribute.
 
 ```py
 from dataclasses import Field
@@ -577,7 +577,7 @@ reveal_type(DynamicModel.__dataclass_fields__)  # revealed: dict[str, Field[Any]
 
 ## Applying `@dataclass` decorator directly
 
-Applying the `@dataclass` decorator directly to a dynamic class is supported:
+Applying the `@dataclass` decorator directly to a dynamic class is supported.
 
 ```py
 from dataclasses import dataclass
@@ -620,7 +620,7 @@ conflicting_container = type("InlineConflictingContainer", (IntContainerBase, St
 
 ## `type()` and `__class__` on dynamic instances
 
-`type(instance)` returns the class of the dynamic instance:
+`type(instance)` returns the class of the dynamic instance.
 
 ```py
 class Base: ...
@@ -644,7 +644,7 @@ foo = Foo()
 reveal_type(foo.__class__)  # revealed: type[Foo]
 ```
 
-`__class__` on the dynamic class itself returns the metaclass (consistent with static classes):
+`__class__` on the dynamic class itself returns the metaclass (consistent with static classes).
 
 ```py
 class StaticClass: ...
@@ -658,7 +658,7 @@ reveal_type(DynamicClass.__class__)  # revealed: <class 'type'>
 
 ## Subtype relationships
 
-Dynamic instances are subtypes of `object`:
+Dynamic instances are subtypes of `object`.
 
 ```py
 class Base: ...
@@ -679,7 +679,7 @@ takes_object(empty)  # No error
 
 ## Attributes from `builtins.type`
 
-Attributes defined on `builtins.type` are accessible on dynamic classes:
+Attributes defined on `builtins.type` are accessible on dynamic classes.
 
 ```py
 T = type("T", (), {})
@@ -694,7 +694,7 @@ reveal_type(T.__mro__)  # revealed: tuple[type, ...]
 `type[Any]` and `type[Unknown]` are gradual forms with an unknown metaclass that is at least `type`.
 Attributes defined as data descriptors on `type` (like `__mro__`) resolve to their declared types
 intersected with `Unknown`, reflecting uncertainty about whether the unknown metaclass overrides
-them:
+them.
 
 ```py
 from typing import Any
@@ -707,7 +707,7 @@ def f(a: type[Any], b: type[Unknown]):
 
 ## Invalid calls
 
-Other numbers of arguments are invalid:
+Other numbers of arguments are invalid.
 
 ```py
 # error: [no-matching-overload] "No overload of class `type` matches arguments"
@@ -727,7 +727,7 @@ reveal_type(type("Bar", (int,), {}, weird_other_arg=42))  # revealed: <class 'Ba
 reveal_type(type("Baz", (), {}, metaclass=type))  # revealed: <class 'Baz'>
 ```
 
-The following calls are also invalid, due to incorrect argument types:
+The following calls are also invalid, due to incorrect argument types.
 
 ```py
 class Base: ...
@@ -747,7 +747,7 @@ type("Foo", (Base,), {b"attr": 1})
 ```
 
 Assigned calls still preserve list-literal base information after reporting the invalid `bases`
-argument:
+argument.
 
 ```py
 class Base:
@@ -768,7 +768,7 @@ reveal_type(FromStarredList().attr)  # revealed: int
 
 `type[...]` (SubclassOf) types are valid class bases, but the exact class is not known, so the MRO
 cannot be resolved. `Unknown` is inserted into the MRO and `unsupported-dynamic-base` is emitted.
-This gives exactly one diagnostic rather than cascading errors:
+This gives exactly one diagnostic rather than cascading errors.
 
 ```py
 from ty_extensions._internal import reveal_mro
@@ -791,7 +791,7 @@ def f(x: type[Base]):
 ```
 
 `type[Any]` and `type[Unknown]` already carry the dynamic kind, so no diagnostic is needed. An
-unknowable MRO is already inherent to `Any`/`Unknown`:
+unknowable MRO is already inherent to `Any`/`Unknown`.
 
 ```py
 from typing import Any
@@ -804,7 +804,7 @@ def g(x: type[Any]):
 
 ## MRO errors
 
-MRO errors are detected and reported:
+MRO errors are detected and reported.
 
 ```py
 class A: ...
@@ -815,7 +815,7 @@ Dup = type("Dup", (A, A), {})
 ```
 
 Unknown bases (from unresolved imports) don't trigger duplicate-base diagnostics, since we can't
-know if they represent the same type:
+know if they represent the same type.
 
 ```py
 from unresolved_module import Bar, Baz  # error: [unresolved-import]
@@ -841,7 +841,7 @@ Conflict = type("Conflict", (X, Y), {})
 
 ## Cyclic base class MRO
 
-A dynamic class inheriting from a static class with a cyclic MRO also produces an error:
+A dynamic class inheriting from a static class with a cyclic MRO also produces an error.
 
 ```pyi
 class Cyclic(Cyclic): ...  # error: [cyclic-class-definition]
@@ -853,7 +853,7 @@ CyclicChild = type("CyclicChild", (Cyclic,), {})
 ## `inconsistent-mro` errors with autofixes
 
 A common cause of "inconsistent MRO" errors is where a class inherits from `Generic[]`, but
-`Generic[]` is not the last base class. We provide an autofix for this common error:
+`Generic[]` is not the last base class. We provide an autofix for this common error.
 
 ```py
 from typing import Generic, TypeVar
@@ -989,7 +989,7 @@ note: This is an unsafe fix and may change runtime behavior
 ## MRO error highlighting (snapshot)
 
 This snapshot test documents the diagnostic highlighting range for dynamic class literals.
-Currently, the entire `type()` call expression is highlighted:
+Currently, the entire `type()` call expression is highlighted.
 
 ```py
 class A: ...
@@ -1008,7 +1008,7 @@ error[duplicate-base]: Duplicate base class <class 'A'> in class `Dup`
 
 ## Metaclass conflicts
 
-Metaclass conflicts are detected and reported:
+Metaclass conflicts are detected and reported.
 
 ```py
 class Meta1(type): ...
@@ -1024,7 +1024,7 @@ Bad = type("Bad", (A, B), {})
 
 Dynamic classes can define `__slots__` in the namespace dictionary. Non-empty `__slots__` makes the
 class a "disjoint base", which prevents it from being used alongside other disjoint bases in a class
-hierarchy:
+hierarchy.
 
 ```py
 # Dynamic class with non-empty __slots__
@@ -1042,7 +1042,7 @@ NoSlots = type("NoSlots", (), {})
 StringSlots = type("StringSlots", (), {"__slots__": "x"})
 ```
 
-Dynamic classes with non-empty `__slots__` cannot coexist with other disjoint bases:
+Dynamic classes with non-empty `__slots__` cannot coexist with other disjoint bases.
 
 ```py
 class RegularSlotted:
@@ -1057,7 +1057,7 @@ class Conflict(
 ): ...
 ```
 
-Two dynamic classes with non-empty `__slots__` also conflict:
+Two dynamic classes with non-empty `__slots__` also conflict.
 
 ```py
 A = type("A", (), {"__slots__": ("x",)})
@@ -1071,7 +1071,7 @@ class Conflict(
 ```
 
 `instance-layout-conflict` errors are also emitted for classes that inherit from dynamic classes
-with disjoint bases:
+with disjoint bases.
 
 ```py
 from typing import Any
@@ -1094,7 +1094,7 @@ def f(ns: dict[str, Any]):
 ```
 
 When the namespace dictionary is dynamic (not a literal), we can't determine if `__slots__` is
-defined, so no diagnostic is emitted:
+defined, so no diagnostic is emitted.
 
 ```py
 from typing import Any
@@ -1112,7 +1112,7 @@ def f(ns: dict[str, Any]):
 
 ## `instance-layout-conflict` diagnostic snapshots
 
-When the bases are a tuple literal, the diagnostic includes annotations for each conflicting base:
+When the bases are a tuple literal, the diagnostic includes annotations for each conflicting base.
 
 ```py
 class A:
@@ -1141,7 +1141,7 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
 ```
 
 When the bases are not a tuple literal (e.g., a variable), the diagnostic is emitted without
-per-base annotations:
+per-base annotations.
 
 ```py
 class C:
@@ -1156,7 +1156,7 @@ Y = type("Y", bases, {})
 ```
 
 When a class is created in the metadata of a string annotation, the diagnostic still highlights the
-class-creation call, not the whole string:
+class-creation call, not the whole string.
 
 ```py
 from typing import Annotated
@@ -1185,7 +1185,7 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
 ### Self-referential
 
 Self-referential class definitions using `type()` are detected. The name being defined is referenced
-in the bases tuple before it's available:
+in the bases tuple before it's available.
 
 ```pyi
 # error: [unresolved-reference] "Name `X` used when not defined"
@@ -1194,7 +1194,7 @@ X = type("X", (X,), {})
 
 ### No string literal bases
 
-String literals directly in the bases tuple are not valid class bases:
+String literals directly in the bases tuple are not valid class bases.
 
 ```py
 # error: [invalid-base] "Invalid class base with type `Literal["X"]`"
@@ -1204,7 +1204,7 @@ X = type("X", ("X",), {})
 ### Forward references via string annotations
 
 However, forward references via string annotations are supported, similar to regular class
-definitions. This works with `NamedTuple` where field annotations can be forward references:
+definitions. This works with `NamedTuple` where field annotations can be forward references.
 
 ```py
 from typing import NamedTuple
@@ -1216,7 +1216,7 @@ reveal_type(X)  # revealed: <class 'X'>
 
 ### Static class inheriting from dynamic class with forward ref
 
-Forward references also work when a static class inherits from a dynamic class that references it:
+Forward references also work when a static class inherits from a dynamic class that references it.
 
 ```py
 from typing import NamedTuple
@@ -1227,7 +1227,7 @@ class Y(type("X", (NamedTuple("NT", [("field", "Y | int")]),), {})): ...
 reveal_type(Y)  # revealed: <class 'Y'>
 ```
 
-Forward references via subscript annotations on generic bases are supported:
+Forward references via subscript annotations on generic bases are supported.
 
 ```py
 # Forward reference to X via subscript annotation in tuple base
@@ -1239,7 +1239,7 @@ reveal_type(X)  # revealed: <class 'X'>
 ## Dynamic class names (non-literal strings)
 
 When the class name is not a string literal, we still create a class literal type but with a
-placeholder name `<unknown>`:
+placeholder name `<unknown>`.
 
 ```py
 def make_class(name: str):
@@ -1258,7 +1258,7 @@ def make_classes(name1: str, name2: str):
     inner(cls2())
 ```
 
-When the name comes from a union of string literals, we also use a placeholder name:
+When the name comes from a union of string literals, we also use a placeholder name.
 
 ```py
 import random
@@ -1275,7 +1275,7 @@ reveal_type(cls)  # revealed: <class '<unknown>'>
 
 When the bases tuple is a function parameter with a non-literal tuple type, we still create a class
 literal type but with `Unknown` in the MRO. This means instances are treated highly dynamically -
-any attribute access returns `Unknown`:
+any attribute access returns `Unknown`.
 
 ```py
 from ty_extensions._internal import reveal_mro
@@ -1299,7 +1299,7 @@ def make_class(bases: tuple[type, ...]):
 ```
 
 When `bases` is a module-level variable holding a tuple of class literals, we can extract the base
-classes:
+classes.
 
 ```py
 class Base:
@@ -1335,7 +1335,7 @@ reveal_type(Cls2)  # revealed: <class 'Cls2'>
 ```
 
 When `*args` or `**kwargs` fill an unknown number of parameters, we cannot determine which overload
-of `type()` is being called:
+of `type()` is being called.
 
 ```py
 def f(*args, **kwargs):
@@ -1365,7 +1365,7 @@ def f(*args, **kwargs):
 
 ## Explicit type annotations
 
-When an explicit type annotation is provided, the inferred type is checked against it:
+When an explicit type annotation is provided, the inferred type is checked against it.
 
 ```py
 # The annotation `type` is compatible with the inferred class literal type
@@ -1387,7 +1387,7 @@ Bad: type[Unrelated] = type("Bad", (Base,), {})
 
 ## Dynamic class calls in string annotations
 
-Dynamic class constructors can appear as `Annotated` metadata inside valid string annotations:
+Dynamic class constructors can appear as `Annotated` metadata inside valid string annotations.
 
 ```py
 from collections import namedtuple
@@ -1412,7 +1412,7 @@ def f(
 ```
 
 An invalid subscript of a `type()` call should produce the usual diagnostic, including when the call
-appears in a nested string annotation:
+appears in a nested string annotation.
 
 ```py
 # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
@@ -1493,7 +1493,7 @@ synthesized.
 ### Invalid special bases
 
 Dynamic classes cannot directly inherit from `Generic`, `Protocol`, or `TypedDict`. These special
-forms require class syntax for their semantics to be properly applied:
+forms require class syntax for their semantics to be properly applied.
 
 ```py
 from typing import Generic, NamedTuple, Protocol, TypeVar
@@ -1515,7 +1515,7 @@ NamedTupleClass = type("NamedTupleClass", (NamedTuple,), {"x": int})
 ```
 
 `NamedTuple` is also not allowed as a base for dynamic classes, since creating a NamedTuple requires
-class syntax for the field declarations to be properly processed:
+class syntax for the field declarations to be properly processed.
 
 ```py
 from typing import NamedTuple
@@ -1527,7 +1527,7 @@ NT = type("NT", (NamedTuple,), {})
 ### Protocol bases
 
 When a dynamic class inherits from a source-defined protocol, it also inherits the protocol's
-`_ProtocolMeta` metaclass:
+`_ProtocolMeta` metaclass.
 
 ```py
 from typing import Protocol
@@ -1556,7 +1556,7 @@ class Invalid(ProtoImpl, metaclass=Meta): ...
 
 ### TypedDict bases
 
-Inheriting from a class that is itself a TypedDict is valid:
+Inheriting from a class that is itself a TypedDict is valid.
 
 ```py
 from typing_extensions import TypedDict
@@ -1592,7 +1592,7 @@ reveal_mro(Point3D)  # revealed: (<class 'Point3D'>, <class 'Point'>, <class 'tu
 ### Enum bases
 
 Creating a class via `type()` that inherits from any Enum class fails at runtime because `EnumMeta`
-expects special attributes in the class dict that `type()` doesn't provide:
+expects special attributes in the class dict that `type()` doesn't provide.
 
 ```py
 from enum import Enum
@@ -1616,7 +1616,7 @@ InvalidExtension = type("InvalidExtension", (EmptyEnum,), {})
 ## `__init_subclass__` keyword arguments
 
 When a base class defines `__init_subclass__` with required arguments, those should be passed to
-`type()`. This is not yet supported:
+`type()`. This is not yet supported.
 
 ```py
 class Base:
@@ -1636,7 +1636,7 @@ DynamicChild = type("DynamicChild", (Base,), {}, required_arg="value")
 
 ## Empty bases tuple
 
-When the bases tuple is empty, the class implicitly inherits from `object`:
+When the bases tuple is empty, the class implicitly inherits from `object`.
 
 ```py
 from ty_extensions._internal import reveal_mro
@@ -1759,7 +1759,7 @@ def _(base1: Any, base2: Any):
 
 ## Custom metaclass via bases
 
-When a base class has a custom metaclass, the dynamic class inherits that metaclass:
+When a base class has a custom metaclass, the dynamic class inherits that metaclass.
 
 ```py
 class MyMeta(type):
@@ -1778,7 +1778,7 @@ reveal_type(Dynamic.custom_attr)  # revealed: str
 ## `final()` on dynamic classes
 
 Using `final()` as a function (not a decorator) on dynamic classes will not be understood by type
-checkers. The class is passed through unchanged, and subclassing will not be prevented:
+checkers. The class is passed through unchanged, and subclassing will not be prevented.
 
 ```py
 from typing import final

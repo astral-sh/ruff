@@ -4,7 +4,7 @@
 
 ## `@final` class
 
-Classes decorated with `@final` cannot be subclassed:
+Classes decorated with `@final` cannot be subclassed.
 
 ```py
 from typing import final
@@ -18,7 +18,7 @@ X = type("X", (FinalClass,), {})  # error: [subclass-of-final-class]
 
 ## `Generic` base
 
-Dynamic classes created via `type()` cannot inherit from `Generic`:
+Dynamic classes created via `type()` cannot inherit from `Generic`.
 
 ```py
 from typing import Generic, TypeVar
@@ -30,7 +30,7 @@ X = type("X", (Generic[T],), {})  # error: [invalid-base]
 
 ## `Protocol` base
 
-Dynamic classes created via `type()` cannot inherit from `Protocol`:
+Dynamic classes created via `type()` cannot inherit from `Protocol`.
 
 ```py
 from typing import Protocol
@@ -41,7 +41,7 @@ X = type("X", (Protocol,), {})  # error: [unsupported-dynamic-base]
 ## `TypedDict` base
 
 Dynamic classes created via `type()` cannot inherit from `TypedDict` directly. Use
-`TypedDict("Name", ...)` instead:
+`TypedDict("Name", ...)` instead.
 
 ```py
 from typing_extensions import TypedDict
@@ -52,7 +52,7 @@ X = type("X", (TypedDict,), {})  # error: [invalid-base]
 ## Enum base
 
 Dynamic classes created via `type()` cannot inherit from Enum classes because `EnumMeta` expects
-special dict attributes that `type()` doesn't provide:
+special dict attributes that `type()` doesn't provide.
 
 ```py
 from enum import Enum
@@ -65,7 +65,7 @@ X = type("X", (MyEnum,), {})  # error: [invalid-base]
 
 ## Enum with members
 
-Enums with members are final and cannot be subclassed at all:
+Enums with members are final and cannot be subclassed at all.
 
 ```py
 from enum import Enum

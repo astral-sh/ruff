@@ -25,7 +25,7 @@ We avoid promoting literal types that originate from an explicit annotation.
 
 ## Implicitly inferred literal types are promotable
 
-Any literal types that are implicitly inferred are promotable:
+Any literal types that are implicitly inferred are promotable.
 
 ```py
 from enum import Enum
@@ -72,7 +72,7 @@ def _(source: Literal["foo", "bar"]):
     reveal_type(promote(x8))  # revealed: list[str]
 ```
 
-Function types are also promoted to their `Callable` form:
+Function types are also promoted to their `Callable` form.
 
 ```py
 def f(_: int) -> int:
@@ -84,7 +84,7 @@ reveal_type(promote(f))  # revealed: list[(_: int) -> int]
 
 ## Invariant collection literals are promoted
 
-The elements of invariant collection literals, i.e. lists, dictionaries, and sets, are promoted:
+The elements of invariant collection literals, i.e. lists, dictionaries, and sets, are promoted.
 
 ```py
 reveal_type([1, 2, 3])  # revealed: list[int]
@@ -92,7 +92,7 @@ reveal_type({"a": 1, "b": 2, "c": 3})  # revealed: dict[str, int]
 reveal_type({"a", "b", "c"})  # revealed: set[str]
 ```
 
-Covariant collection literals are not promoted:
+Covariant collection literals are not promoted.
 
 ```py
 reveal_type((1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
@@ -197,7 +197,7 @@ def get_padding() -> int | tuple[int] | tuple[int, int]:
 reveal_type([get_padding()])  # revealed: list[int | tuple[int] | tuple[int, int]]
 ```
 
-No promotion occurs in a collection that mixes literal and non-literal tuples:
+No promotion occurs in a collection that mixes literal and non-literal tuples.
 
 ```py
 def get_segment() -> tuple[int] | tuple[int, int, int, int]:
@@ -309,7 +309,7 @@ reveal_type(segments)  # revealed: dict[str, tuple[int, ...]]
 ## Non-tuple elements do not block tuple-size promotion
 
 A non-literal tuple blocks tuple-size promotion because its shape must be preserved. A tuple nested
-inside a non-tuple element's type arguments does not:
+inside a non-tuple element's type arguments does not.
 
 ```toml
 [environment]
@@ -324,7 +324,7 @@ def _(box: Box[tuple[int, str]]) -> None:
     reveal_type([(1,), (1, 2), box])
 ```
 
-A tuple in a callable's return type does not prevent promotion either:
+A tuple in a callable's return type does not prevent promotion either.
 
 ```py
 from collections.abc import Callable
@@ -334,7 +334,7 @@ def _(callback: Callable[[], tuple[int, str]]) -> None:
     reveal_type([(1,), (1, 2), callback])
 ```
 
-Protocol members can also contain tuples without blocking promotion:
+Protocol members can also contain tuples without blocking promotion.
 
 ```py
 from typing import Protocol
@@ -346,7 +346,7 @@ def _(protocol: Proto) -> None:
     reveal_type([(1,), (1, 2), protocol])  # revealed: list[Proto | tuple[int, ...]]
 ```
 
-The same applies to `TypedDict` fields:
+The same applies to `TypedDict` fields.
 
 ```py
 from typing import TypedDict
@@ -361,7 +361,7 @@ def _(payload: Payload) -> None:
 ## Recursive members do not block tuple-size promotion
 
 Tuple-valued and recursive protocol members do not prevent neighboring tuple literals from being
-promoted:
+promoted.
 
 ```toml
 [environment]
@@ -381,7 +381,7 @@ def _(x: Recursive[int]) -> None:
     reveal_type([(1,), (1, 2), x])  # revealed: list[Recursive[int] | tuple[int, ...]]
 ```
 
-The same applies to recursive `TypedDict` fields:
+The same applies to recursive `TypedDict` fields.
 
 ```py
 from typing import TypedDict
@@ -416,7 +416,7 @@ def _(x: Bounded[int]) -> None:
     reveal_type([(1,), (1, 2), x])
 ```
 
-The supplied type argument also takes precedence over a default:
+The supplied type argument also takes precedence over a default.
 
 ```py
 U = TypeVar("U", default=tuple[int, str])
@@ -428,7 +428,7 @@ def _(x: Defaulted[int]) -> None:
     reveal_type([(1,), (1, 2), x])
 ```
 
-A default also does not fix the type of a value annotated with the type variable:
+A default also does not fix the type of a value annotated with the type variable.
 
 ```py
 def _(x: U) -> None:
@@ -438,7 +438,7 @@ def _(x: U) -> None:
 ## Tuple-size promotion uses alias values
 
 Tuple-size promotion inspects alias values. `Alias[Alias[str]]` resolves to `str`, so it does not
-block promotion:
+block promotion.
 
 ```toml
 [environment]
@@ -452,7 +452,7 @@ def _(x: Alias[Alias[str]]) -> None:
     reveal_type([(1,), (1, 2), x])  # revealed: list[str | tuple[int, ...]]
 ```
 
-Even a recursively specialized alias permits promotion when its value is a `list`:
+Even a recursively specialized alias permits promotion when its value is a `list`.
 
 ```py
 type Recursive[T] = list[Recursive[list[T]]]
@@ -465,7 +465,7 @@ def _(x: Recursive[int]) -> None:
 ## Invariant and contravariant return types are promoted
 
 We promote in non-covariant position in the return type of a generic function, or constructor of a
-generic class:
+generic class.
 
 ```py
 from typing import Callable, Literal, Any
@@ -525,7 +525,7 @@ reveal_type(f12(1))  # revealed: ((int, /) -> bool) | None
 reveal_type(f13(1))  # revealed: ((bool, /) -> Invariant[int]) | None
 ```
 
-This also works if the type variable is nested inside a union:
+This also works if the type variable is nested inside a union.
 
 ```py
 def f14[T](x: T) -> Covariant[T | None]:
@@ -561,7 +561,7 @@ reveal_type(f18(1))  # revealed: Covariant[Any & ~int]
 reveal_type(f19(1))  # revealed: Invariant[Any & int]
 ```
 
-We also promote a callable's return type, if the whole callable is in invariant position:
+We also promote a callable's return type, if the whole callable is in invariant position.
 
 ```py
 def f20[T](x: T) -> Invariant[Callable[[], T]]:
@@ -571,7 +571,7 @@ reveal_type(f20(1))  # revealed: Invariant[() -> int]
 ```
 
 When the same nested type occurs in both covariant and contravariant positions, both occurrences
-contribute to promotion:
+contribute to promotion.
 
 ```py
 def f21[T](x: T) -> tuple[Covariant[T | None], Contravariant[T | None]]:
@@ -596,7 +596,7 @@ x2 = ([1, 2], [(3,), (4,)], ["5", "6"])
 reveal_type(x2)  # revealed: tuple[list[int], list[tuple[int]], list[str]]
 ```
 
-However, this promotion should not take place in contravariant position:
+However, this promotion should not take place in contravariant position.
 
 ```py
 from typing import Generic, TypeVar
@@ -632,7 +632,7 @@ reveal_type([transform])  # revealed: list[(value: NarrowA) -> A]
 ## Literal annotations are respected
 
 Literal types that are explicitly annotated will not be promoted, even if they are initially
-declared in a promotable position:
+declared in a promotable position.
 
 ```py
 from enum import Enum
@@ -738,7 +738,7 @@ reveal_type(x24)  # revealed: ((Literal[1], /) -> bool) | None
 
 ## Literal annotations see through subtyping
 
-Literal annotations are respected even if the inferred type is a subtype of the declared type:
+Literal annotations are respected even if the inferred type is a subtype of the declared type.
 
 ```py
 from typing import Any, Iterable, Literal, MutableSequence, Sequence
@@ -882,7 +882,7 @@ def _(upper: Callable[[int], None]):
 ## Literal annotations from declaration are respected
 
 Literal types that are explicitly annotated when declared will not be promoted, even if they are
-later used in a promotable position:
+later used in a promotable position.
 
 ```py
 from enum import Enum
@@ -944,7 +944,7 @@ def _(x: Literal[1]):
     reveal_type(maybe_make_callable(x))  # revealed: ((Literal[1], /) -> bool) | None
 ```
 
-Literal promotability is respected by unions:
+Literal promotability is respected by unions.
 
 ```py
 from typing import Literal
@@ -983,7 +983,7 @@ def _(x1: X | None, x2: X):
 
 ## Negative intersection elements are removed
 
-Truthiness narrowing should not leak into invariant literal container inference:
+Truthiness narrowing should not leak into invariant literal container inference.
 
 ```py
 class A: ...
@@ -1001,7 +1001,7 @@ Since module-literal types are "literal" types in a certain sense (each type is 
 we used to promote module-literal types to `types.ModuleType`. We no longer do, because
 `types.ModuleType` is a very broad type that is not particularly useful. The fake
 `types.ModuleType.__getattr__` method that typeshed provides also meant that you would not receive
-any errors from clearly incorrect code like this:
+any errors from clearly incorrect code like this.
 
 `module1.py`:
 

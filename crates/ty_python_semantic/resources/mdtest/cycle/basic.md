@@ -24,7 +24,7 @@ if not (lambda: f):  # error: [redundant-condition] "always truthy"
 
 ## Function signature
 
-Deferred annotations can result in cycles in resolving a function signature:
+Deferred annotations can result in cycles in resolving a function signature.
 
 ```py
 from __future__ import annotations
@@ -66,7 +66,7 @@ def repeat(flag: bool) -> None:
 ## Alternating between fixed-length tuples
 
 A loop can alternate between a finite set of tuple shapes without growing the tuple. The inferred
-type preserves those shapes:
+type preserves those shapes.
 
 ```py
 def alternate(flag: bool):
@@ -246,7 +246,7 @@ class C:
         reveal_type(inner_d)
 ```
 
-We do, however, still check assignability of the default value to the parameter type:
+We do, however, still check assignability of the default value to the parameter type.
 
 ```py
 class D:
@@ -294,7 +294,7 @@ assert f  # error: [redundant-condition] "always truthy"
 def f(x=lambda: f): ...
 ```
 
-The same cycle must converge when the parameter and return type are annotated:
+The same cycle must converge when the parameter and return type are annotated.
 
 ```py
 g = lambda: g
@@ -326,7 +326,7 @@ def f(x=lambda: f): ...
 
 ### Self-referential property construction
 
-Constructing a property explicitly has the same behavior as decorator syntax:
+Constructing a property explicitly has the same behavior as decorator syntax.
 
 ```py
 f = lambda: f
@@ -340,7 +340,7 @@ f = property(getter)
 ### Self-referential callable decorators
 
 The cycle is not specific to properties. A decorator that returns a callable with a fixed signature
-must also terminate:
+must also terminate.
 
 ```py
 from collections.abc import Callable

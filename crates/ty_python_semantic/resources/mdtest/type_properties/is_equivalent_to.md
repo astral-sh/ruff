@@ -413,7 +413,7 @@ static_assert(
 )
 ```
 
-Putting it all together, the following two callables are equivalent:
+Putting it all together, the following two callables are equivalent.
 
 ```py
 def f5(a1: int, /, b: float, c: bool = False, *args1: int, d: int = 1, e: str, **kwargs1: float) -> None: ...
@@ -509,7 +509,7 @@ static_assert(not is_equivalent_to(RegularCallableTypeOf[f13], RegularCallableTy
 ### Unions containing `Callable`s
 
 Two unions containing different `Callable` types are equivalent even if the unions are differently
-ordered:
+ordered.
 
 ```py
 from ty_extensions import static_assert
@@ -523,7 +523,7 @@ static_assert(is_equivalent_to(RegularCallableTypeOf[f] | int | str, str | int |
 
 ### Unions containing `Callable`s containing unions
 
-Differently ordered unions inside `Callable`s inside unions can still be equivalent:
+Differently ordered unions inside `Callable`s inside unions can still be equivalent.
 
 ```py
 from typing import Callable
@@ -691,7 +691,7 @@ def _(
 
 Note that `variadic_without_annotation` and `variadic_with_annotation` are *not* considered
 gradually equivalent to `Callable[..., Any]`, because the latter is not a function-like callable
-type:
+type.
 
 ```py
 static_assert(not is_equivalent_to(CallableTypeOf[variadic_without_annotation], Callable[..., Any]))
@@ -750,7 +750,7 @@ static_assert(not is_equivalent_to(RegularCallableTypeOf[f1], RegularCallableTyp
 ## Module-literal types
 
 Two "copies" of a single-file module are considered equivalent types, even if the different copies
-were originally imported in different first-party modules:
+were originally imported in different first-party modules.
 
 `module.py`:
 
@@ -774,7 +774,7 @@ We currently do not consider module-literal types to be equivalent if the underl
 package and the different "copies" of the module were originally imported in different modules. This
 is because we might consider submodules to be available as attributes on one copy but not on the
 other, depending on whether those submodules were explicitly imported in the original importing
-module:
+module.
 
 `module2.py`:
 
@@ -811,7 +811,7 @@ static_assert(not is_equivalent_to(TypeOf[imported], TypeOf[other_imported]))
 
 ## Bound-super types
 
-Two bound-super types are equivalent if the pivot class and the instance are equivalent:
+Two bound-super types are equivalent if the pivot class and the instance are equivalent.
 
 ```toml
 [environment]

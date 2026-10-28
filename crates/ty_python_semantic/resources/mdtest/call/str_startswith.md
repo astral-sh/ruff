@@ -25,7 +25,7 @@ reveal_type("".startswith(""))  # revealed: Literal[True]
 reveal_type("".startswith(" "))  # revealed: Literal[False]
 ```
 
-Make sure that we fall back to `bool` for more complex cases:
+Make sure that we fall back to `bool` for more complex cases.
 
 ```py
 reveal_type("abc".startswith("b", 1))  # revealed: bool
@@ -34,7 +34,7 @@ reveal_type("abc".startswith("bc", 1, 3))  # revealed: bool
 reveal_type("abc".startswith(("a", "x")))  # revealed: bool
 ```
 
-And similarly, we should still infer `bool` if the instance or the prefix are not string literals:
+And similarly, we should still infer `bool` if the instance or the prefix are not string literals.
 
 ```py
 from typing_extensions import LiteralString
@@ -48,7 +48,7 @@ def _(string_instance: str, literalstring: LiteralString):
 ```
 
 Unlike bound methods for some other classes implemented in C, `"foo".startswith` is an instance of
-`types.BuiltinFunctionType` at runtime, rather than `types.MethodWrapperType`:
+`types.BuiltinFunctionType` at runtime, rather than `types.MethodWrapperType`.
 
 ```py
 import types

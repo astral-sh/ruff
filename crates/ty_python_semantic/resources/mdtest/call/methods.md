@@ -4,7 +4,7 @@
 
 > Note: See also this related section in the descriptor guide: [Functions and methods].
 
-Say we have a simple class `C` with a function definition `f` inside its body:
+Say we have a simple class `C` with a function definition `f` inside its body.
 
 ```py
 class C:
@@ -27,7 +27,7 @@ object (in which case it is `None`), or from an instance (in which case it is th
 Here, `inspect.getattr_static` is used to bypass the descriptor protocol and directly access the
 function attribute. The way the special `__get__` method *on functions* works is as follows. In the
 former case, if the `instance` argument is `None`, `__get__` simply returns the function itself. In
-the latter case, it returns a *bound method* object:
+the latter case, it returns a *bound method* object.
 
 ```py
 from inspect import getattr_static
@@ -42,7 +42,7 @@ reveal_type(getattr_static(C, "f").__get__(C(), C))  # revealed: bound method C.
 ```
 
 In conclusion, this is why we see the following two types when accessing the `f` attribute on the
-class object `C` and on an instance `C()`:
+class object `C` and on an instance `C()`.
 
 ```py
 reveal_type(C.f)  # revealed: def f(self, x: int) -> str
@@ -51,7 +51,7 @@ reveal_type(C().f)  # revealed: bound method C.f(x: int) -> str
 
 A bound method is a callable object that contains a reference to the `instance` that it was called
 on (can be inspected via `__self__`), and the function object that it refers to (can be inspected
-via `__func__`):
+via `__func__`).
 
 ```py
 bound_method = C().f
@@ -60,14 +60,14 @@ reveal_type(bound_method.__self__)  # revealed: C
 reveal_type(bound_method.__func__)  # revealed: def f(self, x: int) -> str
 ```
 
-When we call the bound method, the `instance` is implicitly passed as the first argument (`self`):
+When we call the bound method, the `instance` is implicitly passed as the first argument (`self`).
 
 ```py
 reveal_type(C().f(1))  # revealed: str
 reveal_type(bound_method(1))  # revealed: str
 ```
 
-When we call the function object itself, we need to pass the `instance` explicitly:
+When we call the function object itself, we need to pass the `instance` explicitly.
 
 ```py
 # error: [invalid-argument-type] "Argument to function `C.f` is incorrect: Expected `C`, found `Literal[1]`"
@@ -77,7 +77,7 @@ C.f(1)
 reveal_type(C.f(C(), 1))  # revealed: str
 ```
 
-When we access methods from derived classes, they will be bound to instances of the derived class:
+When we access methods from derived classes, they will be bound to instances of the derived class.
 
 ```py
 class D(C):
@@ -86,7 +86,7 @@ class D(C):
 reveal_type(D().f)  # revealed: bound method D.f(x: int) -> str
 ```
 
-If we access an attribute on a bound method object itself, it will defer to `types.MethodType`:
+If we access an attribute on a bound method object itself, it will defer to `types.MethodType`.
 
 ```py
 reveal_type(bound_method.__hash__)  # revealed: bound method MethodType.__hash__() -> int
@@ -94,7 +94,7 @@ reveal_type(bound_method.__hash__)  # revealed: bound method MethodType.__hash__
 
 If an attribute is not available on the bound method object, it will be looked up on the underlying
 function object. We model this explicitly, which means that we can access `__kwdefaults__` on bound
-methods, even though it is not available on `types.MethodType`:
+methods, even though it is not available on `types.MethodType`.
 
 ```py
 reveal_type(bound_method.__kwdefaults__)  # revealed: dict[str, Any] | None
@@ -223,7 +223,7 @@ def generic_bounds[U: E1 | E2, I: E1 & E2](union: U, intersection: I):
 
 #### Classmethods
 
-The same works for classmethods, when accessed on unions or intersections of `type[..]` types:
+The same works for classmethods, when accessed on unions or intersections of `type[..]` types.
 
 ```py
 from typing import Self
@@ -261,7 +261,7 @@ def _(
     reveal_type(intersection_internal.f())  # revealed: list[E1 & E2]
 ```
 
-This also works with protocols:
+This also works with protocols.
 
 ```py
 from typing import Protocol
@@ -309,7 +309,7 @@ def _(
 #### Instance methods
 
 If the called method is defined on only one element, attribute access fails on the union, but still
-succeeds on the intersection type:
+succeeds on the intersection type.
 
 ```py
 from typing import Self
@@ -393,7 +393,7 @@ def _(
     reveal_type(intersection_internal.f())  # revealed: list[E1 & E2]
 ```
 
-This also works with protocols:
+This also works with protocols.
 
 ```py
 from typing import Protocol
@@ -488,7 +488,7 @@ def check_variadic(value: Variadic) -> None:
 ## Bound methods without a positional receiver
 
 A method can be retrieved from an instance even when it cannot accept the implicit receiver (has
-zero parameters):
+zero parameters).
 
 ```py
 from typing import Callable, Protocol
@@ -500,20 +500,20 @@ class NoReceiver:
 bound_method = NoReceiver().method
 ```
 
-However, this method cannot be called:
+However, this method cannot be called.
 
 ```py
 bound_method()  # error: [too-many-positional-arguments]
 ```
 
-This method also cannot be assigned to a callable that expects no positional arguments:
+This method also cannot be assigned to a callable that expects no positional arguments.
 
 ```py
 c1: Callable[[], int] = bound_method  # error: [invalid-assignment]
 ```
 
 When accessed on the class, `method` can be called and can be assigned to a callable that expects no
-positional arguments:
+positional arguments.
 
 ```py
 NoReceiver.method()
@@ -521,7 +521,7 @@ c2: Callable[[], int] = NoReceiver.method
 ```
 
 The bound method cannot be assigned to a protocol with a method that expects a receiver in this
-position, so this assignment fails:
+position, so this assignment fails.
 
 ```py
 class HasMethod(Protocol):
@@ -531,7 +531,7 @@ class HasMethod(Protocol):
 m: HasMethod = NoReceiver()
 ```
 
-Our error message here could be better:
+Our error message here could be better.
 
 ```snapshot
 error[invalid-assignment]: Object of type `NoReceiver` is not assignable to `HasMethod`
@@ -552,7 +552,7 @@ info: └── protocol member `method` is incompatible
 python-version = "3.11"
 ```
 
-All of these are valid ways to define a receiver for a method:
+All of these are valid ways to define a receiver for a method.
 
 ```py
 from typing import Callable, Protocol, Self
@@ -580,7 +580,7 @@ reveal_type(Valid().variadic())  # revealed: int
 reveal_type(Valid().unpacked())  # revealed: int
 ```
 
-On the other hand, these are all invalid:
+On the other hand, these are all invalid.
 
 ```py
 from typing import Protocol
@@ -626,7 +626,7 @@ Invalid().unpacked_empty()
 
 ## `Self` in unpacked bound-method parameters
 
-Binding a receiver consumes the first element of a fixed unpacked tuple:
+Binding a receiver consumes the first element of a fixed unpacked tuple.
 
 ```toml
 [environment]
@@ -668,7 +668,7 @@ Very few methods are defined on `object`, `None`, and other types not disjoint f
 descriptor-binding behavior works on these types in exactly the same way as descriptor binding on
 other types. This is despite the fact that `None` is used as a sentinel internally by the descriptor
 protocol to indicate that a method was accessed on the class itself rather than an instance of the
-class:
+class.
 
 ```py
 from typing import Protocol, Literal
@@ -710,7 +710,7 @@ assert_type(a.non_existing_method(), Any)
 
 ## Error cases: Calling `__get__` for methods
 
-The `__get__` method on `types.FunctionType` has the following overloaded signature in typeshed:
+The `__get__` method on `types.FunctionType` has the following overloaded signature in typeshed.
 
 ```pyi
 from types import FunctionType, MethodType
@@ -722,7 +722,7 @@ def __get__(self, instance: None, owner: type, /) -> FunctionType: ...
 def __get__(self, instance: object, owner: type | None = None, /) -> MethodType: ...
 ```
 
-Here, we test that this signature is enforced correctly:
+Here, we test that this signature is enforced correctly.
 
 ```py
 from inspect import getattr_static
@@ -767,7 +767,7 @@ method_wrapper(C(), C, "one too many")
 ## Fallback to metaclass
 
 When a method is accessed on a class object, it is looked up on the metaclass if it is not found on
-the class itself. This also creates a bound method that is bound to the class object itself:
+the class itself. This also creates a bound method that is bound to the class object itself.
 
 ```py
 from __future__ import annotations
@@ -783,14 +783,14 @@ reveal_type(C.f)  # revealed: bound method <class 'C'>.f(arg: int) -> str
 reveal_type(C.f(1))  # revealed: str
 ```
 
-The method `f` cannot be accessed from an instance of the class:
+The method `f` cannot be accessed from an instance of the class.
 
 ```py
 # error: [unresolved-attribute] "Object of type `C` has no attribute `f`"
 C().f
 ```
 
-A metaclass function can be shadowed by a method on the class:
+A metaclass function can be shadowed by a method on the class.
 
 ```py
 from typing import Any, Literal
@@ -802,7 +802,7 @@ class D(metaclass=Meta):
 reveal_type(D.f(1))  # revealed: Literal["a"]
 ```
 
-If the class method is possibly missing, we union the return types:
+If the class method is possibly missing, we union the return types.
 
 ```py
 def flag() -> bool:
@@ -821,7 +821,7 @@ reveal_type(E.f(1))  # revealed: str | Any
 ### Basic
 
 When a `@classmethod` attribute is accessed, it returns a bound method object, even when accessed on
-the class object itself:
+the class object itself.
 
 ```py
 from __future__ import annotations
@@ -835,14 +835,14 @@ reveal_type(C.f)  # revealed: bound method <class 'C'>.f(x: int) -> str
 reveal_type(C().f)  # revealed: bound method type[C].f(x: int) -> str
 ```
 
-The `cls` method argument is then implicitly passed as the first argument when calling the method:
+The `cls` method argument is then implicitly passed as the first argument when calling the method.
 
 ```py
 reveal_type(C.f(1))  # revealed: str
 reveal_type(C().f(1))  # revealed: str
 ```
 
-When the class method is called incorrectly, we detect it:
+When the class method is called incorrectly, we detect it.
 
 ```py
 C.f("incorrect")  # error: [invalid-argument-type]
@@ -850,7 +850,7 @@ C.f()  # error: [missing-argument]
 C.f(1, 2)  # error: [too-many-positional-arguments]
 ```
 
-If the `cls` parameter is wrongly annotated, we emit an error at the call site:
+If the `cls` parameter is wrongly annotated, we emit an error at the call site.
 
 ```py
 class D:
@@ -863,7 +863,7 @@ class D:
 D.f()
 ```
 
-When a class method is accessed on a derived class, it is bound to that derived class:
+When a class method is accessed on a derived class, it is bound to that derived class.
 
 ```py
 class Derived(C):
@@ -879,7 +879,7 @@ reveal_type(Derived().f(1))  # revealed: str
 ### Implicit receivers in generic final classes
 
 For a generic final class, an implicit `type[Self]` receiver can bind to another classmethod on the
-exact generic class object:
+exact generic class object.
 
 ```toml
 [environment]
@@ -903,7 +903,7 @@ class GenericFinal[T]:
 
 `inspect.getattr_static` bypasses descriptor binding and returns the `classmethod` descriptor.
 Ordinary attribute access (`C.f` or `C().f`) instead returns a bound method. We model the descriptor
-explicitly, but display it using the wrapped function's name and signature:
+explicitly, but display it using the wrapped function's name and signature.
 
 ```py
 from inspect import getattr_static
@@ -917,7 +917,7 @@ reveal_type(getattr_static(C, "f"))  # revealed: def f(cls) -> Unknown
 reveal_type(getattr_static(C, "f").__get__)
 ```
 
-Calling the `classmethod` descriptor's `__get__` binds the wrapped function to the class:
+Calling the `classmethod` descriptor's `__get__` binds the wrapped function to the class.
 
 ```py
 reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: bound method <class 'C'>.f() -> Unknown
@@ -925,7 +925,7 @@ reveal_type(getattr_static(C, "f").__get__(C(), C))  # revealed: bound method <c
 reveal_type(getattr_static(C, "f").__get__(C()))  # revealed: bound method type[C].f() -> Unknown
 ```
 
-The `owner` argument takes precedence over the `instance` argument:
+The `owner` argument takes precedence over the `instance` argument.
 
 ```py
 reveal_type(getattr_static(C, "f").__get__("dummy", C))  # revealed: bound method <class 'C'>.f() -> Unknown
@@ -939,7 +939,7 @@ python-version = "3.12"
 ```
 
 When a `@classmethod` is additionally decorated with another decorator, it is still treated as a
-class method:
+class method.
 
 ```py
 def does_nothing[T](f: T) -> T:
@@ -1002,7 +1002,7 @@ with Child().create() as child:
 
 #### Basics
 
-The [`__init_subclass__`] method is implicitly a classmethod:
+The [`__init_subclass__`] method is implicitly a classmethod.
 
 ```py
 class Base:
@@ -1147,7 +1147,7 @@ class Valid(Base, arg=5, metaclass=object): ...
 class Invalid(Base, metaclass=type, arg="foo"): ...
 ```
 
-Overload matching is performed correctly:
+Overload matching is performed correctly.
 
 ```py
 from typing import Literal, overload
@@ -1208,7 +1208,7 @@ class MissingArg(Base): ...  # error: [missing-argument]
 class InvalidType(Base, arg="foo"): ...  # error: [invalid-argument-type]
 ```
 
-Keyword splats are allowed if their type can be determined:
+Keyword splats are allowed if their type can be determined.
 
 ```py
 from typing import TypedDict
@@ -1234,7 +1234,7 @@ invalid_type: InvalidType = {"arg": "foo"}
 class InvalidType(RequiresKwarg, **invalid_type): ...
 ```
 
-So are generics:
+So are generics.
 
 ```py
 from typing import Generic, TypeVar, Literal, overload
@@ -1376,7 +1376,7 @@ reveal_type(C.f(1))  # revealed: str
 reveal_type(C().f(1))  # revealed: str
 ```
 
-When the static method is called incorrectly, we detect it:
+When the static method is called incorrectly, we detect it.
 
 ```py
 C.f("incorrect")  # error: [invalid-argument-type]
@@ -1384,7 +1384,7 @@ C.f()  # error: [missing-argument]
 C.f(1, 2)  # error: [too-many-positional-arguments]
 ```
 
-When a static method is accessed on a derived class, it behaves identically:
+When a static method is accessed on a derived class, it behaves identically.
 
 ```py
 class Derived(C):
@@ -1460,7 +1460,7 @@ class C:
 
 `getattr_static` bypasses descriptor binding and returns the `staticmethod` descriptor. Ordinary
 attribute access (`C.f` or `C().f`) instead returns the underlying function. We model the descriptor
-explicitly, but display it using the wrapped function's name and signature:
+explicitly, but display it using the wrapped function's name and signature.
 
 ```py
 reveal_type(getattr_static(C, "f"))  # revealed: def f() -> Unknown
@@ -1484,7 +1484,7 @@ python-version = "3.12"
 ```
 
 When a `@staticmethod` is additionally decorated with another decorator, it is still treated as a
-static method:
+static method.
 
 ```py
 from __future__ import annotations
@@ -1510,7 +1510,7 @@ reveal_type(C().f2(1))  # revealed: str
 ```
 
 When a `@staticmethod` is decorated with `@contextmanager`, accessing it from an instance should not
-bind `self`:
+bind `self`.
 
 ```py
 from contextlib import contextmanager
@@ -1537,7 +1537,7 @@ reveal_type(D().ctx(5))  # revealed: _GeneratorContextManager[int, None, None]
 ### `__new__`
 
 `__new__` is an implicit `@staticmethod`; accessing it on an instance does not bind the `cls`
-argument:
+argument.
 
 ```py
 from typing_extensions import Self
@@ -1557,7 +1557,7 @@ class X:
 ```
 
 Calling `object.__new__` from an overriding `__new__` method preserves `Self`, so an invalid
-attribute access on the result is reported:
+attribute access on the result is reported.
 
 ```py
 class Item:
@@ -1569,7 +1569,7 @@ class Item:
         return result
 ```
 
-Explicitly marking `__new__` as a static method does not change the inferred result:
+Explicitly marking `__new__` as a static method does not change the inferred result.
 
 ```py
 class StaticItem:
@@ -1580,7 +1580,7 @@ class StaticItem:
         return result
 ```
 
-`Self` is also preserved through a chain of inherited `__new__` calls:
+`Self` is also preserved through a chain of inherited `__new__` calls.
 
 ```py
 class Foo: ...
@@ -1602,7 +1602,7 @@ class Baz(Bar):
 
 Bound-method attributes are resolved first on `types.MethodType`, then, if absent, on the underlying
 function object. A protocol refinement of the bound method must not be used as the receiver for that
-underlying-function fallback:
+underlying-function fallback.
 
 ```py
 from typing import Protocol, runtime_checkable

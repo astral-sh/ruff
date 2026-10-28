@@ -33,7 +33,7 @@ reveal_type(Foo.y)  # revealed: int
 ## Unpacking ellipsis literal in assignment
 
 No diagnostic is emitted if an ellipsis literal is "unpacked" in a stub file as part of an
-assignment statement:
+assignment statement.
 
 ```pyi
 x, y = ...
@@ -44,7 +44,7 @@ reveal_type(y)  # revealed: Unknown
 ## Unpacking ellipsis literal in for loops
 
 Iterating over an ellipsis literal as part of a `for` loop in a stub is invalid, however, and
-results in a diagnostic:
+results in a diagnostic.
 
 ```pyi
 # error: [not-iterable] "Object of type `EllipsisType` is not iterable"

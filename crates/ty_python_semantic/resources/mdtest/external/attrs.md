@@ -67,7 +67,7 @@ p.data = "not a dict"  # error: [invalid-assignment]
 
 ## Dedicated support for the `default` decorator?
 
-We currently do not support this:
+We currently do not support this.
 
 ```py
 from attrs import define, field

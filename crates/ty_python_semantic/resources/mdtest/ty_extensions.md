@@ -102,7 +102,7 @@ def explicit_unknown(x: Unknown, y: tuple[str, Unknown], z: Unknown = 1) -> None
     reveal_type(z)  # revealed: Unknown
 ```
 
-`Unknown` can be subclassed, just like `Any`:
+`Unknown` can be subclassed, just like `Any`.
 
 ```py
 class C(Unknown): ...
@@ -182,7 +182,7 @@ static_assert(sys.version_info >= (3, 6))
 
 ### Narrowing constraints
 
-Static assertions can be used to enforce narrowing constraints:
+Static assertions can be used to enforce narrowing constraints.
 
 ```py
 from ty_extensions import static_assert
@@ -221,7 +221,7 @@ static_assert(b"")  # error: "Static assertion error: argument of type `Literal[
 
 ### Error messages
 
-We provide various tailored error messages for wrong argument types to `static_assert`:
+We provide various tailored error messages for wrong argument types to `static_assert`.
 
 ```py
 from ty_extensions import static_assert
@@ -244,7 +244,7 @@ static_assert(InvalidBoolDunder())
 
 ### Custom error messages
 
-Alternatively, users can provide custom error messages:
+Alternatively, users can provide custom error messages.
 
 ```py
 from ty_extensions import static_assert
@@ -259,7 +259,7 @@ static_assert(False, error_message)
 ```
 
 There are limitations to what we can still infer as a string literal. In those cases, we simply fall
-back to the default message:
+back to the default message.
 
 ```py
 shouted_message = "A custom message".upper()
@@ -434,7 +434,7 @@ We use `TypeOf` to get the inferred type of an expression. This is useful when w
 it in a type expression. For example, if we want to make sure that the class literal type `str` is a
 subtype of `type[str]`, we cannot use `is_subtype_of(str, type[str])`, as that would test if the
 type `str` itself is a subtype of `type[str]`. Instead, we can use `TypeOf[str]` to get the type of
-the expression `str`:
+the expression `str`.
 
 ```py
 from ty_extensions import static_assert
@@ -451,7 +451,7 @@ class Base: ...
 class Derived(Base): ...
 ```
 
-`TypeOf` can also be used in annotations:
+`TypeOf` can also be used in annotations.
 
 ```py
 def type_of_annotation() -> None:
@@ -473,7 +473,7 @@ def f(x: TypeOf) -> None:
 ## Self-referential `TypeOf` in annotations
 
 A function can reference itself via `TypeOf` in a deferred annotation. This should not cause a stack
-overflow:
+overflow.
 
 ```py
 from ty_extensions._internal import TypeOf
@@ -482,7 +482,7 @@ def foo(x: "TypeOf[foo]"):
     reveal_type(x)  # revealed: def foo(x: def foo(...)) -> Unknown
 ```
 
-A direct self-reference in a variable annotation is resolved from the later assignment:
+A direct self-reference in a variable annotation is resolved from the later assignment.
 
 ```toml
 [environment]
@@ -630,7 +630,7 @@ generic_context(property_getter)
 ## Deeply nested `TypeOf` chains
 
 Multiple redefinitions of a function with `TypeOf[foo]` as the return type create a chain of
-distinct function types. The display of such chains is truncated to prevent extremely long output:
+distinct function types. The display of such chains is truncated to prevent extremely long output.
 
 ```py
 from ty_extensions._internal import TypeOf
@@ -700,7 +700,7 @@ c3: CallableTypeOf[(f3,)]
 c4: CallableTypeOf[()]
 ```
 
-Using it in annotation to reveal the signature of the callable object:
+Using it in annotation to reveal the signature of the callable object.
 
 ```py
 from typing_extensions import Self
@@ -741,7 +741,7 @@ def _(
 
 A callable instance upcast to a callable type is still a regular callable when stored as a class
 attribute, even if its `__call__` method is function-like. Explicit descriptor behavior is still
-respected:
+respected.
 
 ```py
 from functools import partial
@@ -774,7 +774,7 @@ DescriptorOwner().callback(1)  # error: [too-many-positional-arguments]
 DescriptorOwner().callback()
 ```
 
-Narrowed callable enum values can still be used with callable type extraction:
+Narrowed callable enum values can still be used with callable type extraction.
 
 ```py
 from enum import Enum

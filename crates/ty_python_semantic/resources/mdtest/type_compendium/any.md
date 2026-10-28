@@ -35,7 +35,7 @@ static_assert(is_assignable_to(type[Any], Any))
 static_assert(is_assignable_to(Any, type[Any]))
 ```
 
-`Any` is also assignable to itself (like every type):
+`Any` is also assignable to itself (like every type).
 
 ```py
 static_assert(is_assignable_to(Any, Any))
@@ -45,7 +45,7 @@ static_assert(is_assignable_to(Any, Any))
 
 The union `Any | T` of `Any` with a fully static type `T` describes an unknown set of values that is
 *at least as large* as the set of values described by `T`. It represents an unknown fully-static
-type with *lower bound* `T`. Again, this can be demonstrated using the assignable-to relation:
+type with *lower bound* `T`. Again, this can be demonstrated using the assignable-to relation.
 
 ```py
 from ty_extensions import static_assert
@@ -66,7 +66,7 @@ static_assert(not is_assignable_to(Any | Medium, Small))
 ```
 
 The union `Any | object` is equivalent to `object`. This is true for every union with `object`, but
-it is worth demonstrating:
+it is worth demonstrating.
 
 ```py
 static_assert(is_equivalent_to(Any | object, object))
@@ -77,7 +77,7 @@ static_assert(is_equivalent_to(object | Any, object))
 
 The intersection `Any & T` of `Any` with a fully static type `T` describes an unknown set of values
 that is *no larger than* the set of values described by `T`. It represents an unknown fully-static
-type with *upper bound* `T`:
+type with *upper bound* `T`.
 
 ```pyi
 from ty_extensions import static_assert
@@ -93,14 +93,14 @@ static_assert(is_assignable_to(Medium, Any & Medium))
 ```
 
 `Any & Medium` is no larger than `Medium`, so we cannot assign `Big` to it. There is no possible
-materialization of `Any & Medium` that would make it as big as `Big`:
+materialization of `Any & Medium` that would make it as big as `Big`.
 
 ```pyi
 static_assert(not is_assignable_to(Big, Any & Medium))
 ```
 
 `Any & Never` represents an "unknown" fully-static type which is no larger than `Never`. There is no
-such fully-static type, except for `Never` itself. So `Any & Never` is equivalent to `Never`:
+such fully-static type, except for `Never` itself. So `Any & Never` is equivalent to `Never`.
 
 ```pyi
 from typing_extensions import Never

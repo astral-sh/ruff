@@ -29,7 +29,7 @@ reveal_type(T.__name__)  # revealed: Literal["T"]
 
 ### Type variable name as a keyword argument
 
-The typevar name can also be provided as a keyword argument:
+The typevar name can also be provided as a keyword argument.
 
 ```py
 from typing import TypeVar
@@ -160,7 +160,7 @@ if False:
 UnreachableT = TypeVar("UnreachableT")
 ```
 
-Definitions in version-dependent fallback branches are also mutually exclusive:
+Definitions in version-dependent fallback branches are also mutually exclusive.
 
 ```toml
 [environment]
@@ -403,7 +403,7 @@ class Holder(Generic[T, B]): ...
 reveal_type(Holder[bool]())  # revealed: Holder[bool, Box[bool]]
 ```
 
-We reject a nested type argument whose upper bound is incompatible with the generic's bound:
+We reject a nested type argument whose upper bound is incompatible with the generic's bound.
 
 ```py
 U = TypeVar("U", bound=str)
@@ -437,7 +437,7 @@ reveal_type(Holder[str]())  # revealed: Holder[str, Box[str]]
 ```
 
 We reject a nested type argument if one of its constraints is incompatible with the generic's
-constraints:
+constraints.
 
 ```py
 U = TypeVar("U", int, bytes)
@@ -459,7 +459,7 @@ python-version = "3.13"
 
 <!-- snapshot-diagnostics -->
 
-The default must be assignable to the bound:
+The default must be assignable to the bound.
 
 ```py
 from typing import TypeVar
@@ -474,7 +474,7 @@ S = TypeVar("S", bound=float, default=int)
 
 <!-- snapshot-diagnostics -->
 
-The default must be one of the constrained types, even if it is a subtype of one of them:
+The default must be one of the constrained types, even if it is a subtype of one of them.
 
 ```py
 from typing import Any, TypeVar
@@ -496,7 +496,7 @@ V = TypeVar("V", int, str, default=Any)
 
 <!-- snapshot-diagnostics -->
 
-When the default is a TypeVar, its upper bound must be assignable to the outer TypeVar's bound:
+When the default is a TypeVar, its upper bound must be assignable to the outer TypeVar's bound.
 
 ```py
 from typing import Generic, TypeVar
@@ -518,7 +518,7 @@ U = TypeVar("U", default=T3, bound=float)
 <!-- snapshot-diagnostics -->
 
 An unbounded TypeVar has an implicit upper bound of `object`, which is not assignable to a more
-restrictive bound:
+restrictive bound.
 
 ```py
 from typing import Generic, TypeVar
@@ -533,7 +533,7 @@ S = TypeVar("S", default=T1, bound=int)
 
 <!-- snapshot-diagnostics -->
 
-When the default TypeVar has constraints, every constraint must be assignable to the outer bound:
+When the default TypeVar has constraints, every constraint must be assignable to the outer bound.
 
 ```py
 from typing import Generic, TypeVar
@@ -558,7 +558,7 @@ V = TypeVar("V", default=T2, bound=int)
 <!-- snapshot-diagnostics -->
 
 When the default TypeVar has constraints, they must all appear in the outer TypeVar's constraint
-list:
+list.
 
 ```py
 from typing import Generic, TypeVar
@@ -579,7 +579,7 @@ U = TypeVar("U", bool, complex, default=T1)
 <!-- snapshot-diagnostics -->
 
 A bounded or unbounded TypeVar (one without constraints) cannot be used as the default for a
-constrained TypeVar, because there is no guarantee it will satisfy any of the constraints:
+constrained TypeVar, because there is no guarantee it will satisfy any of the constraints.
 
 ```py
 from typing import Generic, TypeVar
@@ -609,7 +609,7 @@ S = TypeVar("S")
 reveal_type(S.__bound__)  # revealed: None
 ```
 
-The upper bound must be a valid type expression:
+The upper bound must be a valid type expression.
 
 ```py
 from typing import TypedDict
@@ -634,7 +634,7 @@ reveal_type(S.__constraints__)  # revealed: tuple[()]
 
 ### Constraints are not simplified
 
-Constraints are not simplified relative to each other, even if one is a subtype of the other:
+Constraints are not simplified relative to each other, even if one is a subtype of the other.
 
 ```py
 from typing import TypeVar
@@ -737,7 +737,7 @@ sink_obj: Sink[object] = Sink[int]()  # error: [invalid-assignment]
 sink_int: Sink[int] = Sink[object]()
 ```
 
-Both assignments are errors when the type variable is inferred to be invariant:
+Both assignments are errors when the type variable is inferred to be invariant.
 
 ```py
 from typing import Generic, TypeVar
@@ -773,7 +773,7 @@ mixed_contravariant: Mixed[int, int] = Mixed[int, object]()
 mixed_not_contravariant: Mixed[int, object] = Mixed[int, int]()  # error: [invalid-assignment]
 ```
 
-Variance cannot be specified explicitly when variance inference is requested:
+Variance cannot be specified explicitly when variance inference is requested.
 
 ```py
 from typing import TypeVar
@@ -849,7 +849,7 @@ T = TypeVar("T", invalid_keyword=True)
 ### Forward references in stubs
 
 Stubs natively support forward references, so patterns that would raise `NameError` at runtime are
-allowed in stub files:
+allowed in stub files.
 
 `stub.pyi`:
 
@@ -906,7 +906,7 @@ from typing import TypeVar
 T = TypeVar("T", default=int)
 ```
 
-But this raises an error in a non-stub file:
+But this raises an error in a non-stub file.
 
 ```py
 from typing import TypeVar
@@ -935,7 +935,7 @@ reveal_type(T.__default__)  # revealed: Unknown
 
 ## Callability
 
-A typevar bound to a Callable type is callable:
+A typevar bound to a Callable type is callable.
 
 ```py
 from typing import Callable, TypeVar
@@ -949,7 +949,7 @@ def bound(f: T):
 
 ## Constrained callability
 
-Same with a constrained typevar, as long as all constraints are callable:
+Same with a constrained typevar, as long as all constraints are callable.
 
 ```py
 from typing import Callable, TypeVar
@@ -1284,7 +1284,7 @@ def union_bound(obj: Bounded):
 ## Static method assignments through type variables
 
 An instance assignment shadows a static method with its underlying function. This also works when
-the instance has a bounded or constrained type variable as its type:
+the instance has a bounded or constrained type variable as its type.
 
 ```py
 from typing import TypeVar
@@ -1309,7 +1309,7 @@ def constrained(obj: Constrained):
 ```
 
 A class assignment replaces the static method descriptor itself. We reject assigning the unwrapped
-function through a generic class object:
+function through a generic class object.
 
 ```py
 def bounded_class(cls: type[Bound]):
@@ -1341,7 +1341,7 @@ class Writable(Protocol):
 ```
 
 For a constrained type variable, the assignment must be valid for every constraint. These class
-objects also cannot satisfy a protocol that requires a writable enum member:
+objects also cannot satisfy a protocol that requires a writable enum member.
 
 ```py
 Constrained = TypeVar("Constrained", A, B)
@@ -1352,7 +1352,7 @@ def constrained(cls: type[Constrained]):
     cls.label = "label"
 ```
 
-The same applies to a union bound, including one defined through a type alias:
+The same applies to a union bound, including one defined through a type alias.
 
 ```py
 Both: TypeAlias = A | B
@@ -1365,7 +1365,7 @@ def union_bound(cls: type[Bound]):
 ```
 
 One enum alternative is enough to reject the write, even if another class allows assignment to the
-attribute:
+attribute.
 
 ```py
 class Plain:
@@ -1385,7 +1385,7 @@ def mixed_bound(cls: type[MixedBound]):
 
 ### Bounds and constraints
 
-A typevar's bounds and constraints cannot be generic, cyclic or otherwise:
+A typevar's bounds and constraints cannot be generic, cyclic or otherwise.
 
 ```py
 from typing import Any, TypeVar, Generic
@@ -1412,7 +1412,7 @@ class Foo(Generic[S]):
 
 ### Recursive bounds
 
-However, they are lazily evaluated and can cyclically refer to their own type:
+However, they are lazily evaluated and can cyclically refer to their own type.
 
 ```py
 from typing import TypeVar, Generic
@@ -1428,7 +1428,7 @@ reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
 
 ### Invalid specialization in a recursive bound
 
-An invalid specialization in a recursive bound doesn't cause a panic:
+An invalid specialization in a recursive bound doesn't cause a panic.
 
 ```py
 from typing import TypeVar, Generic
@@ -1452,7 +1452,7 @@ python-version = "3.13"
 ```
 
 Defaults can be generic, but can only refer to typevars from the same scope if they were defined
-earlier in that scope:
+earlier in that scope.
 
 ```py
 from typing import Generic, TypeVar

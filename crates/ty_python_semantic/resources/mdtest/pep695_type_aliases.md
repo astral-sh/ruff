@@ -1,6 +1,6 @@
 # PEP 695 type aliases
 
-PEP 695 type aliases are only available in Python 3.12 and later:
+PEP 695 type aliases are only available in Python 3.12 and later.
 
 ```toml
 [environment]
@@ -111,7 +111,7 @@ type OptionalInt = int | None
 x: OptionalInt = "1"
 ```
 
-Attribute-assignment diagnostics retain the declared alias name, including aliases within a union:
+Attribute-assignment diagnostics retain the declared alias name, including aliases within a union.
 
 ```py
 class C:
@@ -129,7 +129,7 @@ def assign(c: C) -> None:
 
 The right-hand side of a type alias definition is a type expression, not an annotation expression.
 Type qualifiers like `ClassVar` and `Final` are only valid in annotation expressions, so they cannot
-appear at the top level of a PEP 695 alias definition:
+appear at the top level of a PEP 695 alias definition.
 
 ```py
 from typing_extensions import ClassVar, Final, Required, NotRequired, ReadOnly
@@ -228,7 +228,7 @@ class Foo:
     pass
 ```
 
-But narrowing of names used in the type alias is still respected:
+But narrowing of names used in the type alias is still respected.
 
 ```py
 def _(flag: bool):
@@ -329,7 +329,7 @@ def invalid_explicit(*args: Unpack[NotTuple]) -> None: ...  # error: [invalid-ty
 
 ## Stringified values
 
-Stringifying the right-hand side of a type alias is redundant, but allowed:
+Stringifying the right-hand side of a type alias is redundant, but allowed.
 
 ```py
 type X = "int | str"
@@ -340,7 +340,7 @@ def f(obj: X):
 
 The right-hand side of a PEP-695 type alias will not usually be executed, but can be if the user
 accesses the `.__value__` attribute. Normal runtime rules still therefore apply regarding partially
-stringified alias values:
+stringified alias values.
 
 ```py
 # snapshot: unsupported-operator
@@ -364,7 +364,7 @@ info: A type alias scope is lazy but will be executed at runtime if the `__value
 
 ## In unions and intersections
 
-We can "break apart" a type alias by e.g. adding it to a union:
+We can "break apart" a type alias by e.g. adding it to a union.
 
 ```py
 type IntOrStr = int | str

@@ -25,7 +25,7 @@ b = t[-4]  # error: [index-out-of-bounds]
 reveal_type(b)  # revealed: Unknown
 ```
 
-Precise types for index operations are also inferred for tuple subclasses:
+Precise types for index operations are also inferred for tuple subclasses.
 
 ```py
 class I0: ...
@@ -143,7 +143,7 @@ reveal_mro(os.stat_result)
 reveal_type(os.stat_result.__getitem__)
 ```
 
-But perhaps the most commonly used tuple subclass instance is the singleton `sys.version_info`:
+But perhaps the most commonly used tuple subclass instance is the singleton `sys.version_info`.
 
 ```py
 import sys
@@ -154,7 +154,7 @@ reveal_type(type(sys.version_info).__getitem__)
 
 Because of the synthesized `__getitem__` overloads we synthesize for tuples and tuple subclasses,
 tuples are naturally understood as being subtypes of protocols that have precise return types from
-`__getitem__` method members:
+`__getitem__` method members.
 
 ```py
 from typing import Protocol, Literal
@@ -506,7 +506,7 @@ reveal_mro(C)
 
 ### Correspondence with `tuple`
 
-`typing.Tuple` can be used interchangeably with `tuple`:
+`typing.Tuple` can be used interchangeably with `tuple`.
 
 ```py
 from typing import Any, Tuple

@@ -101,7 +101,7 @@ a = f"""
 """  # type: ignore
 ```
 
-For multiline-interpolation, put the ignore comment on the expression's start or end line:
+For multiline-interpolation, put the ignore comment on the expression's start or end line.
 
 ```py
 # fmt:off
@@ -285,20 +285,20 @@ ty ignore `type-ignore` comments if `respect-type-ignore-comments` is set to fal
 respect-type-ignore-comments = false
 ```
 
-`type: ignore` comments can't be used to suppress an error:
+`type: ignore` comments can't be used to suppress an error.
 
 ```py
 # error: [unresolved-reference]
 a = b + 10  # type: ignore
 ```
 
-ty doesn't report or remove unused `type: ignore` comments:
+ty doesn't report or remove unused `type: ignore` comments.
 
 ```py
 a = 10 + 5  # type: ignore
 ```
 
-ty doesn't report invalid `type: ignore` comments:
+ty doesn't report invalid `type: ignore` comments.
 
 ```py
 a = 10 + 4  # type: ignoreee

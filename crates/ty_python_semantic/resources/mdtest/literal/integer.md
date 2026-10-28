@@ -2,7 +2,7 @@
 
 ## Literals
 
-We can infer an integer literal type:
+We can infer an integer literal type.
 
 ```py
 reveal_type(1)  # revealed: Literal[1]
@@ -17,7 +17,7 @@ reveal_type(x)  # revealed: Literal[1]
 
 ## Overflow
 
-We only track integer literals within the range of an i64:
+We only track integer literals within the range of an i64.
 
 ```py
 reveal_type(9223372036854775808)  # revealed: int
@@ -25,7 +25,7 @@ reveal_type(9223372036854775808)  # revealed: int
 
 ## Big int
 
-We don't support big integer literals; we just infer `int` type instead:
+We don't support big integer literals; we just infer `int` type instead.
 
 ```py
 x = 10_000_000_000_000_000_000

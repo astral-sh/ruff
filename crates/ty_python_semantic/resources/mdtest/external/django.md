@@ -1,6 +1,6 @@
 # Django
 
-Django support in ty currently relies on the stubs from [django-types]:
+Django support in ty currently relies on the stubs from [django-types].
 
 ```toml
 [environment]
@@ -13,7 +13,7 @@ dependencies = ["django-types==0.24.0"]
 
 ## Basic model
 
-Define a basic model by subclassing Django's `Model`:
+Define a basic model by subclassing Django's `Model`.
 
 ```py
 from datetime import date
@@ -25,7 +25,7 @@ class Book(models.Model):
     pages = models.IntegerField()
 ```
 
-Create an instance of this model:
+Create an instance of this model.
 
 ```py
 book = Book(
@@ -37,7 +37,7 @@ book = Book(
 book.save()
 ```
 
-Attribute access yields types based on the field definitions:
+Attribute access yields types based on the field definitions.
 
 ```py
 reveal_type(book.title)  # revealed: str
@@ -45,7 +45,7 @@ reveal_type(book.published)  # revealed: date
 reveal_type(book.pages)  # revealed: int
 ```
 
-Attribute assignments are checked against the field's *input* type:
+Attribute assignments are checked against the field's *input* type.
 
 ```py
 book.title = "The Restaurant at the End of the Universe"
@@ -60,7 +60,7 @@ book.published = 123  # error: [invalid-assignment]
 book.pages = None  # error: [invalid-assignment]
 ```
 
-Fields can be omitted during construction (and assigned before saving), so this is also fine:
+Fields can be omitted during construction (and assigned before saving), so this is also fine.
 
 ```py
 Book(
@@ -69,7 +69,7 @@ Book(
 )
 ```
 
-Invalid field types lead to a type error:
+Invalid field types lead to a type error.
 
 ```py
 # TODO: Reject the invalid type for `published`.
@@ -80,7 +80,7 @@ Book(
 )
 ```
 
-Unrecognized keyword arguments also lead to an error:
+Unrecognized keyword arguments also lead to an error.
 
 ```py
 # TODO: Reject the unknown keyword `publised`.
@@ -109,7 +109,7 @@ def _(book: Book):
 
 ## Field names
 
-The `name` parameter overrides the name of the attribute:
+The `name` parameter overrides the name of the attribute.
 
 ```py
 from django.db import models
@@ -195,7 +195,7 @@ def _(ebook: Ebook):
 
 ### Explicit `id` field
 
-An explicitly declared `id` keeps its field type:
+An explicitly declared `id` keeps its field type.
 
 ```py
 from django.db import models
@@ -216,7 +216,7 @@ def _(book: Book, ebook: Ebook):
 ### Automatic primary key
 
 A `ForeignKey` field `author` can be used to access the referenced `Author` instance via `.author`.
-It also creates an `.author_id` attribute which contains that instance's primary-key value:
+It also creates an `.author_id` attribute which contains that instance's primary-key value.
 
 ```py
 from django.db import models
@@ -240,7 +240,7 @@ def _(book: Book):
 ```
 
 A `ForeignKey` adds a reverse accessor to the related model. By default, its name is the lowercase
-source model name followed by `_set`. The `related_name` parameter overrides this name:
+source model name followed by `_set`. The `related_name` parameter overrides this name.
 
 ```py
 def _(author: Author):
@@ -253,7 +253,7 @@ def _(author: Author):
     reveal_type(author.edited_books.all())  # revealed: Unknown
 ```
 
-Setting `related_name="+"` disables the reverse accessor:
+Setting `related_name="+"` disables the reverse accessor.
 
 ```py
 class Review(models.Model):
@@ -265,7 +265,7 @@ def _(author: Author):
 
 ### Custom primary key
 
-The type of `<field>_id` follows the related model's primary key, which need not be an integer:
+The type of `<field>_id` follows the related model's primary key, which need not be an integer.
 
 ```py
 from django.db import models
@@ -285,7 +285,7 @@ def _(review: Review):
 ### Explicit target field
 
 With `to_field`, `<field>_id` contains the value of that field instead of the primary key. In the
-following example, the foreign key refers to the `isbn` field, not to `Book`'s primary key (`id`):
+following example, the foreign key refers to the `isbn` field, not to `Book`'s primary key (`id`).
 
 ```py
 from django.db import models
@@ -306,7 +306,7 @@ def _(review: Review):
 ## Choices
 
 The `choices` parameter can be used to map the actual stored values for a field to human-readable
-labels. Django adds `get_<field>_display()` methods for fields that have `choices` defined:
+labels. Django adds `get_<field>_display()` methods for fields that have `choices` defined.
 
 ```py
 from django.db import models
@@ -328,7 +328,7 @@ reveal_type(article.status)  # revealed: str
 reveal_type(article.get_status_display())  # revealed: str
 ```
 
-An explicit `name` determines the names of generated methods, overriding the assignment name:
+An explicit `name` determines the names of generated methods, overriding the assignment name.
 
 ```py
 reveal_type(article.get_access_display())  # revealed: str
@@ -341,7 +341,7 @@ article.get_visibility_display()  # error: [unresolved-attribute]
 
 Django adds `get_next_by_<field>()` and `get_previous_by_<field>()` methods for date fields that do
 not have `null=True`. These methods return the next/previous instance of the corresponding model
-when ordered by that specific date field:
+when ordered by that specific date field.
 
 ```py
 from django.db import models
@@ -360,7 +360,7 @@ def _(article: Article):
     article.get_previous_by_reviewed()  # error: [unresolved-attribute]
 ```
 
-`DateTimeField` also generates these methods:
+`DateTimeField` also generates these methods.
 
 ```py
 def _(article: Article):
@@ -368,7 +368,7 @@ def _(article: Article):
     reveal_type(article.get_previous_by_updated())  # revealed: Article
 ```
 
-Keyword arguments filter the candidate instances:
+Keyword arguments filter the candidate instances.
 
 ```py
 def _(article: Article):
@@ -376,7 +376,7 @@ def _(article: Article):
     reveal_type(article.get_previous_by_published(published__year=2026))  # revealed: Article
 ```
 
-These methods return `Self`, so when invoked on subclasses, we get back instances of the subclass:
+These methods return `Self`, so when invoked on subclasses, we get back instances of the subclass.
 
 ```py
 class NewsArticle(Article):

@@ -402,7 +402,7 @@ reveal_type(RecursiveAttr3().i)  # revealed: int
 
 We set a much higher limit for non-recursive unions of enum literals, because huge enums are common
 in generated code and it becomes frustrating if reachability analysis fails when matching over these
-enums:
+enums.
 
 ```py
 from enum import Enum
@@ -917,7 +917,7 @@ def f(x: Intersection[Huge, Not[Literal[Huge.OPTION499]]]):
 
 ## Simplifying gradually-equivalent types
 
-If two types are gradually equivalent, we can keep just one of them in a union:
+If two types are gradually equivalent, we can keep just one of them in a union.
 
 ```py
 from typing import Any, Union
@@ -1178,7 +1178,7 @@ def test[T: (Callable[[int], int], Callable[[str], str])](
 python-version = "3.12"
 ```
 
-The same issue appears when the nested union comes from a callable type alias:
+The same issue appears when the nested union comes from a callable type alias.
 
 ```py
 from typing import Callable

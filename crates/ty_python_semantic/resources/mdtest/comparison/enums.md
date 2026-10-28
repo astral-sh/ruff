@@ -21,7 +21,7 @@ reveal_type(Answer.NO is not Answer.YES)  # revealed: Literal[True]
 ```
 
 Equality result inference uses the same runtime semantics as equality narrowing. This allows us to
-recognize when two enum domains cannot contain equal values, even if neither operand is a singleton:
+recognize when two enum domains cannot contain equal values, even if neither operand is a singleton.
 
 ```py
 from enum import Enum
@@ -41,7 +41,7 @@ def compare(
     reveal_type(left != right)  # revealed: Literal[True]
 ```
 
-Scalar enum members from different classes compare according to their underlying values:
+Scalar enum members from different classes compare according to their underlying values.
 
 ```py
 from enum import Enum
@@ -59,7 +59,7 @@ reveal_type(X.A != Y.A)  # revealed: Literal[False]
 reveal_type(X.A == Y.B)  # revealed: Literal[False]
 ```
 
-When equality semantics are custom, result inference falls back to the corresponding dunder method:
+When equality semantics are custom, result inference falls back to the corresponding dunder method.
 
 ```py
 from enum import Enum

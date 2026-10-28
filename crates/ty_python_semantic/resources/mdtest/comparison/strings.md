@@ -41,7 +41,7 @@ def _(value: LiteralString):
 ## Equality with sequences
 
 A `Sequence[str]` can be a string, including the empty string, so comparing it with a string literal
-has an unknown result:
+has an unknown result.
 
 ```py
 from collections.abc import Sequence
@@ -53,7 +53,7 @@ def _(value: Sequence[str]):
     reveal_type("" != value)  # revealed: bool
 ```
 
-The result is also unknown when the string's precise literal value is not known:
+The result is also unknown when the string's precise literal value is not known.
 
 ```py
 from typing_extensions import LiteralString

@@ -76,7 +76,7 @@ static_assert(is_disjoint_from(UsesMeta1, UsesMeta2))
 
 ## `@final` builtin types
 
-Some builtin types are declared as `@final`:
+Some builtin types are declared as `@final`.
 
 ```py
 from ty_extensions import static_assert
@@ -161,7 +161,7 @@ static_assert(is_disjoint_from(A, B))
 
 As well as certain classes that are implemented in C extensions, any class that declares non-empty
 `__slots__` is also considered a "disjoint base"; these types are also considered to be disjoint by
-ty:
+ty.
 
 ```py
 from ty_extensions import static_assert
@@ -184,7 +184,7 @@ static_assert(not is_disjoint_from(B, C))
 static_assert(not is_disjoint_from(type[B], type[C]))
 ```
 
-Two disjoint bases are not disjoint if one inherits from the other, however:
+Two disjoint bases are not disjoint if one inherits from the other, however.
 
 ```py
 class D(A):
@@ -501,7 +501,7 @@ static_assert(not is_disjoint_from(TypeOf[f], object))
 
 Different specializations of an unbound method have incompatible signatures and are considered to
 inhabit disjoint types, even if the two different specializations occupy the same memory address at
-runtime:
+runtime.
 
 ```toml
 [environment]
@@ -526,7 +526,7 @@ reveal_type(str_method(C[str](), "a"))  # revealed: str
 ### Partial functions
 
 Partials of distinct function literals are disjoint because their read-only `func` attributes cannot
-refer to the same function. The same applies to their `__call__` methods:
+refer to the same function. The same applies to their `__call__` methods.
 
 ```py
 from collections.abc import Callable
@@ -551,7 +551,7 @@ static_assert(is_disjoint_from(TypeOf[partial_g.__call__], TypeOf[partial_f.__ca
 ```
 
 The partial of a function literal is not disjoint from the partial of a callable type with the same
-signature:
+signature.
 
 ```py
 def _(h: Callable[[], int]):
@@ -563,7 +563,7 @@ def _(h: Callable[[], int]):
     static_assert(not is_disjoint_from(TypeOf[partial_h.__call__], TypeOf[partial_f.__call__]))
 ```
 
-A partial is also not disjoint from its top materialization:
+A partial is also not disjoint from its top materialization.
 
 ```py
 def _(h: Callable[[], Any]):
@@ -615,7 +615,7 @@ static_assert(is_disjoint_from(TypeOf[F1().foo], TypeOf[F2().foo]))
 ### Bound `@final` methods
 
 Two different `@final` methods are disjoint, even if they share the same name and neither class is
-`@final`, because no subclass could satisfy both without overriding one:
+`@final`, because no subclass could satisfy both without overriding one.
 
 ```py
 from typing import final
@@ -634,7 +634,7 @@ static_assert(is_disjoint_from(TypeOf[C().foo], TypeOf[D().foo]))
 ```
 
 We do have to be careful not to get confused when the same `@final` method has different (but
-compatible) bound self types:
+compatible) bound self types.
 
 ```py
 class E(C): ...
@@ -645,7 +645,7 @@ static_assert(is_disjoint_from(TypeOf[E().foo], TypeOf[D().foo]))
 ```
 
 Also, we can't establish disjointness when only one of the methods is `@final`. Consider this tricky
-multiple inheritance case:
+multiple inheritance case.
 
 ```py
 class F:

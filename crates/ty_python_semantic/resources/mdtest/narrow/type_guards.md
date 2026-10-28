@@ -457,7 +457,7 @@ def _(x: P):
         reveal_type(x)  # revealed: B | (P & A)
 ```
 
-Attribute and subscript narrowing is supported:
+Attribute and subscript narrowing is supported.
 
 ```py
 from typing_extensions import Any, Generic, Protocol, TypeVar
@@ -485,7 +485,7 @@ def _(a: tuple[Foo, Bar] | tuple[Bar, Foo], c: C[Any]):
         reveal_type(c.v)  # revealed: Any & Bar
 ```
 
-Indirect usage is supported within the same scope:
+Indirect usage is supported within the same scope.
 
 ```py
 def _(a: Foo | Bar):
@@ -507,7 +507,7 @@ def _(a: Foo | Bar):
         reveal_type(a)  # revealed: Foo & ~Bar
 ```
 
-Further writes to the narrowed place invalidate the narrowing:
+Further writes to the narrowed place invalidate the narrowing.
 
 ```py
 def _(x: Foo | Bar, flag: bool) -> None:
@@ -521,7 +521,7 @@ def _(x: Foo | Bar, flag: bool) -> None:
         reveal_type(x)  # revealed: Foo | Bar
 ```
 
-The `TypeIs` type remains effective across generic boundaries:
+The `TypeIs` type remains effective across generic boundaries.
 
 ```py
 from typing_extensions import TypeVar
@@ -543,7 +543,7 @@ def _(a: Foo):
         reveal_type(a)  # revealed: Foo & Bar
 ```
 
-Type guard narrowing also works when the callee has a `Callable` type:
+Type guard narrowing also works when the callee has a `Callable` type.
 
 ```py
 from typing import Callable
@@ -555,7 +555,7 @@ def _(x: Foo | Bar, is_bar: Callable[[object], TypeIs[Bar]]):
         reveal_type(x)  # revealed: Foo & ~Bar
 ```
 
-A `TypeIs` function can also be used to narrow to a specific callable type:
+A `TypeIs` function can also be used to narrow to a specific callable type.
 
 ```py
 def is_callable_that_returns_int(arg: object) -> TypeIs[Callable[[object], int]]:
@@ -591,7 +591,7 @@ missing-type-argument = "ignore"
 ```
 
 In non-strict narrowing mode, a `TypeIs` function that returns a gradual specialization of a generic
-class narrows from `object` to that gradual specialization:
+class narrows from `object` to that gradual specialization.
 
 ```py
 from typing import Any
@@ -624,7 +624,7 @@ def _(obj: object):
 
 When narrowing from a union of a specific `Getter` specialization and another type, the positive
 branch retains the specific `Getter` specialization and the negative branch excludes `Getter`
-entirely:
+entirely.
 
 ```py
 from typing import final
@@ -648,7 +648,7 @@ def _(obj: Unrelated | Getter[int]):
 ```
 
 If the other type is not final, the positive branch retains the possibility of multiple inheritance
-between `Overlapping` and `Getter`:
+between `Overlapping` and `Getter`.
 
 ```py
 class Overlapping: ...
@@ -668,7 +668,7 @@ def _(obj: Overlapping | Getter[int]):
         reveal_type(obj)  # revealed: Overlapping & ~Getter[object]
 ```
 
-The same also works for invariant generics:
+The same also works for invariant generics.
 
 ```py
 def is_list(value: object) -> TypeIs[list]:
@@ -718,7 +718,7 @@ def _(value: int | list) -> int:
 ```
 
 Similarly, for gradual protocols, `TypeIs` narrowing retains the gradualness of protocol members in
-non-strict mode, when narrowing from object:
+non-strict mode, when narrowing from object.
 
 ```py
 from typing import Protocol, runtime_checkable
@@ -746,7 +746,7 @@ def _(obj: object):
 ```
 
 When narrowing from a union of a specific `Reader` implementation and another type, the positive
-branch retains the specific `Reader` implementation, and the negative branch excludes it entirely:
+branch retains the specific `Reader` implementation, and the negative branch excludes it entirely.
 
 ```py
 class SpecificReader:
@@ -770,7 +770,7 @@ def _(obj: SpecificReader | Unrelated):
 
 Conversely, narrowing a gradual implementation with a fully static protocol retains the
 intersection. `GradualReader.read` can return any type, but `IntReader.read` restricts the return
-type to `int`, so the narrowed return type is `Any & int`:
+type to `int`, so the narrowed return type is `Any & int`.
 
 ```py
 @runtime_checkable
@@ -809,7 +809,7 @@ strict-generic-narrowing = true
 missing-type-argument = "ignore"
 ```
 
-In strict narrowing mode, we narrow to the top-materialization of the generic class:
+In strict narrowing mode, we narrow to the top-materialization of the generic class.
 
 ```py
 from typing import Any
@@ -842,7 +842,7 @@ def _(obj: object):
 
 Like in non-strict mode, when narrowing from a union of a specific `Getter` specialization and
 another type, the positive branch retains the specific `Getter` specialization and the negative
-branch excludes `Getter` entirely:
+branch excludes `Getter` entirely.
 
 ```py
 from typing import final
@@ -866,7 +866,7 @@ def _(obj: Unrelated | Getter[int]):
 ```
 
 Like in non-strict mode, if the other type is not final, the positive branch retains the possibility
-of multiple inheritance between `Overlapping` and `Getter`:
+of multiple inheritance between `Overlapping` and `Getter`.
 
 ```py
 class Overlapping: ...
@@ -886,7 +886,7 @@ def _(obj: Overlapping | Getter[int]):
         reveal_type(obj)  # revealed: Overlapping & ~Getter[object]
 ```
 
-The same also works for invariant generics:
+The same also works for invariant generics.
 
 ```py
 def is_list(value: object) -> TypeIs[list]:
@@ -936,7 +936,7 @@ def _(value: int | list) -> int:
 ```
 
 Similarly, for gradual protocols, `TypeIs` narrowing in strict mode also narrows to the
-top-materialization of the protocol:
+top-materialization of the protocol.
 
 ```py
 from typing import Protocol, runtime_checkable
@@ -964,7 +964,7 @@ def _(obj: object):
 ```
 
 When narrowing from a union of a specific `Reader` implementation and another type, the positive
-branch retains the specific `Reader` implementation, and the negative branch excludes it entirely:
+branch retains the specific `Reader` implementation, and the negative branch excludes it entirely.
 
 ```py
 class SpecificReader:
@@ -987,7 +987,7 @@ def _(obj: SpecificReader | Unrelated):
 ```
 
 Narrowing a gradual implementation with a fully static protocol retains the same intersection as in
-non-strict mode, since materialization does not change the protocol:
+non-strict mode, since materialization does not change the protocol.
 
 ```py
 @runtime_checkable
@@ -1015,7 +1015,7 @@ def _(obj: GradualReader):
 ## Materialized `TypeIs` narrowing
 
 A `TypeIs[Any]` guard may materialize to any type, and so it narrows its argument to `Never` in the
-negative branch:
+negative branch.
 
 ```py
 from typing import Any, Callable
@@ -1030,7 +1030,7 @@ def _(predicate: Callable[[object], TypeIs[Any]], value: int) -> None:
 ```
 
 The top materialization of the guard, however, does not narrow its argument, as it describes the
-union of guards for all static types:
+union of guards for all static types.
 
 ```py
 def _(predicate: Top[Callable[[object], TypeIs[Any]]], value: int) -> None:
@@ -1041,7 +1041,7 @@ def _(predicate: Top[Callable[[object], TypeIs[Any]]], value: int) -> None:
 ```
 
 The static component of a top-materialized gradual `TypeIs` guard constrains the possible
-materializations of its argument:
+materializations of its argument.
 
 ```py
 def _(predicate: Top[Callable[[object], TypeIs[int | Any]]], value: int | str) -> None:

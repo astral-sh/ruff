@@ -86,7 +86,7 @@ def f(y: X):
 
 ## Runtime union operands
 
-`None` can be combined with classes and type forms in either order:
+`None` can be combined with classes and type forms in either order.
 
 ```py
 from typing import Annotated, Callable, Literal, NewType, TypeVar
@@ -106,7 +106,7 @@ reveal_type(UserId | None)  # revealed: <types.UnionType special-form 'UserId | 
 reveal_type(None | Alias)  # revealed: <types.UnionType special-form 'None | int'>
 ```
 
-Ordinary values do not become type union operands merely because their type is known to ty:
+Ordinary values do not become type union operands merely because their type is known to ty.
 
 ```py
 from functools import partial
@@ -193,7 +193,7 @@ def invalid(value: {} | row | None | bytes): ...
 
 ## Recursive assignments to invalid union operands
 
-An invalid operation still produces a diagnostic when its operand is inferred recursively:
+An invalid operation still produces a diagnostic when its operand is inferred recursively.
 
 ```py
 from functools import partial

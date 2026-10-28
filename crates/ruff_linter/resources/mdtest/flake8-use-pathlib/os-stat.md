@@ -38,7 +38,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 ### No `follow_symlinks` also uses `stat`
 
-The default value is `True`, as above:
+The default value is `True`, as above.
 
 ```py
 import os
@@ -143,7 +143,7 @@ help: Replace with `Path(...).stat()`
 note: This is an unsafe fix and may change runtime behavior
 ```
 
-This is also the case for dynamic values:
+This is also the case for dynamic values.
 
 ```py
 follow = True

@@ -2,7 +2,7 @@
 
 ## Union on one side of the comparison
 
-Comparisons on union types need to consider all possible cases:
+Comparisons on union types need to consider all possible cases.
 
 ```py
 from typing import Literal
@@ -50,7 +50,7 @@ def _(
 ## Union on both sides of the comparison
 
 With unions on both sides, we need to consider the full cross product of options when building the
-resulting (union) type:
+resulting (union) type.
 
 ```py
 from typing import Literal
@@ -67,7 +67,7 @@ def _(small: Literal[1, 2], large: Literal[2, 3]):
 
 Make sure we emit a diagnostic if *any* of the possible comparisons is unsupported. For now, we fall
 back to `bool` for the result type instead of trying to infer something more precise from the other
-(supported) variants:
+(supported) variants.
 
 ```py
 from typing import Literal

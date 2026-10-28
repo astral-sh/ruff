@@ -494,7 +494,7 @@ def _(t: Literal[True], tn: Literal[True] | None):
         reveal_type(tn)  # revealed: Literal[True]
 ```
 
-Both operands should also be narrowed in chained comparisons:
+Both operands should also be narrowed in chained comparisons.
 
 ```py
 from typing import Literal
@@ -507,7 +507,7 @@ def _(a: Literal[1], b: Literal[1, 2], c: Literal[1, 2, 3]):
 
 When a generic class object is compared with an exact class object, the exact class object is not
 widened to the generic type. The intersection is retained because it preserves the relationship
-between the class object and `T`:
+between the class object and `T`.
 
 ```toml
 [environment]
@@ -651,7 +651,7 @@ def literal_string(value: object, text: LiteralString) -> None:
 
 The same string object (same memory address) can be referenced by multiple different expressions
 (due to aliasing or interning). Some of those expressions may be validly typed as having literal
-origin and others may not. Checking string identity does not assume this is impossible:
+origin and others may not. Checking string identity does not assume this is impossible.
 
 ```py
 def negated_string_literal(value: Not[Literal["hello"]]) -> None:

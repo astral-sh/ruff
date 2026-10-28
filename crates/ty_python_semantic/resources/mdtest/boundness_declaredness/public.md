@@ -37,7 +37,7 @@ of unioning it with `T_inferred`.
 ### Declared and bound
 
 If a symbol has a declared type (`int`), we use that even if there is a more precise inferred type
-(`Literal[1]`), or a conflicting inferred type (`str` vs. `Literal[2]` below):
+(`Literal[1]`), or a conflicting inferred type (`str` vs. `Literal[2]` below).
 
 ```py
 from typing import Any
@@ -106,7 +106,7 @@ reveal_type(Public.b)  # revealed: Any
 ### Possibly undeclared and bound
 
 If a symbol is possibly undeclared but definitely bound, we use the union of the declared and
-inferred types:
+inferred types.
 
 ```py
 from typing import Any
@@ -140,7 +140,7 @@ Public.a = None
 
 If a symbol is possibly undeclared and possibly unbound, we also use the union of the declared and
 inferred types. This case is interesting because the "possibly declared" definition might not be the
-same as the "possibly bound" definition:
+same as the "possibly bound" definition.
 
 ```py
 from typing import Any
@@ -191,7 +191,7 @@ Public.a = None
 
 If a symbol is *undeclared*, we use the inferred type directly. Note that we treat this case
 differently from the case where a symbol is implicitly declared with `Unknown`, possibly due to the
-usage of an unknown name in the annotation:
+usage of an unknown name in the annotation.
 
 ```py
 class Public:

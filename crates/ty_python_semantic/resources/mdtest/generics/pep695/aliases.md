@@ -43,7 +43,7 @@ You cannot use the same typevar more than once.
 type RepeatedTypevar[T, T] = tuple[T, T]
 ```
 
-Legacy type variables cannot be used:
+Legacy type variables cannot be used.
 
 ```py
 from typing import TypeVar
@@ -56,7 +56,7 @@ type TA1[K] = dict[K, V]
 
 ## Specializing type aliases explicitly
 
-The type parameter can be specified explicitly:
+The type parameter can be specified explicitly.
 
 ```py
 from typing import Literal
@@ -68,14 +68,14 @@ def _(a: C[int], b: C[Literal[5]]):
     reveal_type(b)  # revealed: Literal[5]
 ```
 
-The specialization must match the generic types:
+The specialization must match the generic types.
 
 ```py
 # error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
 reveal_type(C[int, int])  # revealed: <type alias 'C[Unknown]'>
 ```
 
-And non-generic types cannot be specialized:
+And non-generic types cannot be specialized.
 
 ```py
 from typing import TypeVar, Protocol, TypedDict
@@ -176,7 +176,7 @@ def _(x: Union[int]):
     reveal_type(x)  # revealed: Unknown
 ```
 
-If the type variable has an upper bound, the specialized type must satisfy that bound:
+If the type variable has an upper bound, the specialized type must satisfy that bound.
 
 ```py
 type Bounded[T: int] = list[T]
@@ -208,7 +208,7 @@ def _(x: TupleOfIntAndStr[int, int]):
     reveal_type(x)  # revealed: tuple[int, Unknown]
 ```
 
-If the type variable is constrained, the specialized type must satisfy those constraints:
+If the type variable is constrained, the specialized type must satisfy those constraints.
 
 ```py
 type Constrained[T: (int, str)] = list[T]
@@ -238,7 +238,7 @@ def _(x: TupleOfIntOrStr[int, object]):
     reveal_type(x)  # revealed: tuple[int, Unknown]
 ```
 
-If the type variable has a default, it can be omitted:
+If the type variable has a default, it can be omitted.
 
 ```py
 type WithDefault[T, U = int] = dict[T, U]
@@ -247,7 +247,7 @@ reveal_type(WithDefault[str, str])  # revealed: <type alias 'WithDefault[str, st
 reveal_type(WithDefault[str])  # revealed: <type alias 'WithDefault[str, int]'>
 ```
 
-If the type alias is not specialized explicitly, it is implicitly specialized to `Unknown`:
+If the type alias is not specialized explicitly, it is implicitly specialized to `Unknown`.
 
 ```py
 type G[T] = list[T]
@@ -265,7 +265,7 @@ def _(g: G):
     reveal_type(g)  # revealed: list[int]
 ```
 
-Bare generic aliases used inside another specialized alias are also specialized with their defaults:
+Bare generic aliases used inside another specialized alias are also specialized with their defaults.
 
 ```py
 type Defaulted[T = int] = T
@@ -276,14 +276,14 @@ def _(x: Outer[str]):
     y: int = x
 ```
 
-Self-referential defaults should not crash type inference:
+Self-referential defaults should not crash type inference.
 
 ```py
 # error: [cyclic-type-alias-definition] "Type alias `A` has a circular definition"
 type A[T = A] = A[int]
 ```
 
-An explicit alias specialization overrides the alias type parameter's default:
+An explicit alias specialization overrides the alias type parameter's default.
 
 ```py
 type ExplicitAlias[
@@ -296,7 +296,7 @@ def explicit_alias_default(x: ExplicitAlias):
 ```
 
 A self-referential default that does not reference itself in the alias body should also not crash,
-even when the default is evaluated (e.g., by omitting the type argument):
+even when the default is evaluated (e.g., by omitting the type argument).
 
 ```py
 type B[T = B] = list[T]
@@ -306,7 +306,7 @@ def _(x: B) -> None:
 ```
 
 Mutually-referential defaults (where two type aliases reference each other via their typevar
-defaults) should also not crash:
+defaults) should also not crash.
 
 ```py
 type X[T = Y] = list[T]
@@ -316,7 +316,7 @@ def _(x: X, y: Y) -> None:
     pass
 ```
 
-Indirect self-references through a chain of type aliases should also not crash:
+Indirect self-references through a chain of type aliases should also not crash.
 
 ```py
 type P[T = R] = list[T]
@@ -406,7 +406,7 @@ reveal_type(B[int]())  # revealed: Unknown
 
 ## Recursive Truthiness
 
-Make sure we handle cycles correctly when computing the truthiness of a generic type alias:
+Make sure we handle cycles correctly when computing the truthiness of a generic type alias.
 
 ```py
 type X[T: X] = T
@@ -616,7 +616,7 @@ def f(x: Minus[Boolean, TrueLiteral]):
 ## Solving generics with type alias parameters
 
 A generic function parameter annotated with a PEP 695 type alias that contains a type variable
-should properly infer the specialization from the argument:
+should properly infer the specialization from the argument.
 
 ```py
 type MyList[T] = list[T]
@@ -635,7 +635,7 @@ d: dict[str, int] = {"a": 1}
 reveal_type(get_value(d, "a"))  # revealed: int
 ```
 
-It also works in the reverse direction, where the type alias is used as the argument type:
+It also works in the reverse direction, where the type alias is used as the argument type.
 
 ```py
 type MyList[T] = list[T]
@@ -665,7 +665,7 @@ def test[X: int](items: list[X]) -> list[X]:
     return items
 ```
 
-This also works for more complex cases with multiple generic functions:
+This also works for more complex cases with multiple generic functions.
 
 ```py
 type OptionalList[T] = list[T] | None
@@ -680,7 +680,7 @@ def _(values: list[int]) -> OptionalList[int]:
     return result
 ```
 
-Union type aliases also work correctly with TypedDict dict literal inference:
+Union type aliases also work correctly with TypedDict dict literal inference.
 
 ```py
 from typing import TypedDict
@@ -728,7 +728,7 @@ def _():
 ## Fully qualified type alias names in error messages
 
 When two type aliases have the same name but are in different scopes, they should be fully qualified
-in error messages to distinguish them:
+in error messages to distinguish them.
 
 ```py
 class A:
@@ -750,7 +750,7 @@ def f(b: C.B[C.D]) -> None:
 
 ## Fully qualified type alias names in nested classes
 
-Type aliases in nested classes should include the full class path:
+Type aliases in nested classes should include the full class path.
 
 ```py
 class Outer1:
@@ -768,7 +768,7 @@ def g(x: Outer1.Inner.Alias, y: Outer2.Inner.Alias) -> None:
 
 ## Fully qualified generic type aliases
 
-Ambiguous generic type aliases should also be fully qualified:
+Ambiguous generic type aliases should also be fully qualified.
 
 ```py
 class X:
@@ -785,7 +785,7 @@ def h(x: X.GenAlias[int], y: Y.GenAlias[int]) -> None:
 ## Different specializations of the same generic type alias
 
 Different specializations of the same generic type alias refer to the same definition, so they
-should not be qualified:
+should not be qualified.
 
 ```py
 class Box[T]:
@@ -800,7 +800,7 @@ def transmute_inner[T, V](x: RefBox[T]) -> RefBox[V]:
 
 ## Non-ambiguous type aliases should not be qualified
 
-Type aliases with unique names should NOT be qualified:
+Type aliases with unique names should NOT be qualified.
 
 ```py
 class P:
@@ -817,7 +817,7 @@ def i(x: P.UniqueAlias1, y: Q.UniqueAlias2) -> None:
 ## Class and type alias with same name
 
 When a class and a type alias have the same name in different scopes, both should be fully qualified
-to distinguish them in error messages:
+to distinguish them in error messages.
 
 ```py
 class Container1:

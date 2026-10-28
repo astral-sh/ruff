@@ -22,7 +22,7 @@ reveal_type(sys.version_info)  # revealed: _version_info
 ## Literal types from comparisons
 
 Comparing `sys.version_info` with a 2-element tuple of literal integers always produces a `Literal`
-type:
+type.
 
 ```py
 import sys
@@ -49,7 +49,7 @@ reveal_type((3, 9) != sys.version_info)  # revealed: Literal[True]
 ## Non-literal types from comparisons
 
 Comparing `sys.version_info` with tuples of other lengths will sometimes produce `Literal` types,
-sometimes not:
+sometimes not.
 
 ```py
 import sys
@@ -69,7 +69,7 @@ reveal_type(sys.version_info == (3, 8, 1, "finallllll", 0))  # revealed: Literal
 ## Imports and aliases
 
 Comparisons with `sys.version_info` still produce literal types, even if the symbol is aliased to
-another name:
+another name.
 
 ```py
 from sys import version_info
@@ -84,7 +84,7 @@ reveal_type(bar >= (3, 9))  # revealed: Literal[True]
 
 ## Non-stdlib modules named `sys`
 
-Only comparisons with the symbol `version_info` from the `sys` module produce literal types:
+Only comparisons with the symbol `version_info` from the `sys` module produce literal types.
 
 `package/__init__.py`:
 
@@ -107,7 +107,7 @@ reveal_type(version_info >= (3, 9))  # revealed: bool
 
 ## Accessing fields by name
 
-The fields of `sys.version_info` can be accessed by name:
+The fields of `sys.version_info` can be accessed by name.
 
 ```py
 import sys
@@ -118,7 +118,7 @@ reveal_type(sys.version_info.minor >= 10)  # revealed: Literal[False]
 ```
 
 But the `micro`, `releaselevel` and `serial` fields are inferred as `@Todo` until we support
-properties on instance types:
+properties on instance types.
 
 ```py
 reveal_type(sys.version_info.micro)  # revealed: int
@@ -128,7 +128,7 @@ reveal_type(sys.version_info.serial)  # revealed: int
 
 ## Accessing fields by index/slice
 
-The fields of `sys.version_info` can be accessed by index or by slice:
+The fields of `sys.version_info` can be accessed by index or by slice.
 
 ```py
 import sys
@@ -150,7 +150,7 @@ reveal_type(sys.version_info[3] == "finalllllll")  # revealed: Literal[False]
 
 The `version` field of `sys.implementation` is also a `_version_info`, but not necessarily the
 Python language version. For example, non-CPython implementations can use a different versioning
-scheme. Only the singleton `sys.version_info` should use ty's configured Python version:
+scheme. Only the singleton `sys.version_info` should use ty's configured Python version.
 
 ```py
 import sys

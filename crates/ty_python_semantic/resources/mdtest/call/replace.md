@@ -24,7 +24,7 @@ reveal_type(t)  # revealed: time
 
 ### Dataclasses
 
-Dataclasses support the `__replace__` protocol:
+Dataclasses support the `__replace__` protocol.
 
 ```py
 from dataclasses import dataclass
@@ -38,7 +38,7 @@ class Point:
 reveal_type(Point.__replace__)  # revealed: (self: Point, *, x: int = ..., y: int = ...) -> Point
 ```
 
-The `__replace__` method can either be called directly or through the `replace` function:
+The `__replace__` method can either be called directly or through the `replace` function.
 
 ```py
 a = Point(1, 2)
@@ -50,7 +50,7 @@ b = replace(a, x=3, y=4)
 reveal_type(b)  # revealed: Point
 ```
 
-A call to `replace` does not require all keyword arguments:
+A call to `replace` does not require all keyword arguments.
 
 ```py
 c = a.__replace__(y=4)
@@ -60,7 +60,7 @@ d = replace(a, y=4)
 reveal_type(d)  # revealed: Point
 ```
 
-Invalid calls to `__replace__` or `replace` will raise an error:
+Invalid calls to `__replace__` or `replace` will raise an error.
 
 ```py
 e = a.__replace__(x="wrong")  # error: [invalid-argument-type]
@@ -106,7 +106,7 @@ reveal_type(replace(metaclass_model, value=2))  # revealed: MetaclassModel
 
 ### NamedTuples
 
-NamedTuples also support the `__replace__` protocol:
+NamedTuples also support the `__replace__` protocol.
 
 ```py
 from typing import NamedTuple
@@ -119,7 +119,7 @@ class Point(NamedTuple):
 reveal_type(Point.__replace__)  # revealed: (self: Self, *, x: int = ..., y: int = ...) -> Self
 ```
 
-The `__replace__` method can either be called directly or through the `replace` function:
+The `__replace__` method can either be called directly or through the `replace` function.
 
 ```py
 a = Point(1, 2)
@@ -131,7 +131,7 @@ b = replace(a, x=3, y=4)
 reveal_type(b)  # revealed: Point
 ```
 
-Invalid calls to `__replace__` will raise an error:
+Invalid calls to `__replace__` will raise an error.
 
 ```py
 # error: [unknown-argument] "Argument `z` does not match any known parameter"

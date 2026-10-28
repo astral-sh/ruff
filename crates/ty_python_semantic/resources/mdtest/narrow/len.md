@@ -67,7 +67,7 @@ def _(x: tuple[int, ...]):
 
 Exact length constraints specialize exact tuple types to the observed length and eliminate types
 whose encoded length is incompatible with the comparison. Types that do not encode their length
-remain unchanged:
+remain unchanged.
 
 ```toml
 [environment]
@@ -130,7 +130,7 @@ def _(x: Literal[b"", b"a"], y: Literal["a", "ab"]):
 ```
 
 Exact length narrowing projects through type-variable constraints and bounds while preserving the
-type variable:
+type variable.
 
 ```py
 from typing import TypeVar, assert_never
@@ -178,7 +178,7 @@ def variable_tuple(value: VariableTuple) -> VariableTuple:
     return value
 ```
 
-Tuple subclasses are filtered using their tuple spec while preserving the subclass:
+Tuple subclasses are filtered using their tuple spec while preserving the subclass.
 
 ```py
 class One(tuple[int]): ...
@@ -193,7 +193,7 @@ def _(value: One | Two | Variable):
 ```
 
 Types whose `__len__` return types encode one or more possible lengths are filtered while
-unknown-length alternatives are preserved:
+unknown-length alternatives are preserved.
 
 ```py
 from typing import Literal
@@ -230,7 +230,7 @@ def _(value: LengthOneOrTwo | LengthThree):
 ```
 
 Boolean-valued `__len__` return types are normalized to their corresponding integer lengths before
-filtering:
+filtering.
 
 ```py
 from typing import Literal
@@ -250,7 +250,7 @@ def _(value: TrueLength | FalseLength):
         reveal_type(value)  # revealed: FalseLength
 ```
 
-Length narrowing preserves a tuple's shape when a required element has type `Never`:
+Length narrowing preserves a tuple's shape when a required element has type `Never`.
 
 ```py
 from typing import Never
@@ -320,7 +320,7 @@ def never_prefix[*Ts](value: tuple[Never, *Ts]) -> str:
 ## Ordered length comparisons
 
 Ordered length comparisons select the compatible tuple alternatives in both branches. A length check
-can establish that an index is valid, including when `len` appears on the right:
+can establish that an index is valid, including when `len` appears on the right.
 
 ```py
 def _(value: tuple[int] | tuple[int, int]):
@@ -349,7 +349,7 @@ def _(value: tuple[int] | tuple[int, int]):
 ## Ordered length comparisons with variable tuples
 
 A variable-length tuple remains possible when some of its lengths satisfy the comparison. Its
-required elements can rule it out when the comparison requires a shorter tuple:
+required elements can rule it out when the comparison requires a shorter tuple.
 
 ```toml
 [environment]
@@ -378,7 +378,7 @@ def _(value: tuple[str] | tuple[int, *tuple[bytes, ...], int]):
 ## Ordered length comparisons with string and bytes literals
 
 String and bytes literals encode their lengths, so ordered comparisons can select between them.
-String lengths count Unicode code points:
+String lengths count Unicode code points.
 
 ```py
 from typing import Literal
@@ -398,7 +398,7 @@ def _(text: Literal["é", "ab"], data: Literal[b"", b"a"]):
 ## Ordered length comparisons with custom lengths
 
 A custom type is excluded only when none of its declared lengths satisfy the comparison. A list
-remains possible in either branch because its type does not encode its length:
+remains possible in either branch because its type does not encode its length.
 
 ```py
 from typing import Literal
@@ -426,7 +426,7 @@ def _(value: Short | Long | list[int]):
 ## Ordered length comparisons with type variables
 
 Filtering a type variable's upper bound preserves the type variable, so the narrowed value can still
-be returned with its original type:
+be returned with its original type.
 
 ```py
 from typing import TypeVar
@@ -445,7 +445,7 @@ def identity(value: TupleValue) -> TupleValue:
 ## Ordered length comparisons at zero
 
 Lengths are nonnegative, and boolean literals compare as their integer values. Zero separates empty
-tuples from nonempty tuples, while a negative upper bound excludes both alternatives:
+tuples from nonempty tuples, while a negative upper bound excludes both alternatives.
 
 ```py
 from typing_extensions import assert_never
@@ -464,7 +464,7 @@ def _(value: tuple[()] | tuple[int]):
 
 ## Regression tests
 
-Length constraints must not become stale after mutating a value that does not encode its length:
+Length constraints must not become stale after mutating a value that does not encode its length.
 
 ```py
 def _(items: list[int]):
@@ -475,7 +475,7 @@ def _(items: list[int]):
 
 ## Aliased exact lengths
 
-PEP 695 aliases are resolved before extracting literal lengths:
+PEP 695 aliases are resolved before extracting literal lengths.
 
 ```toml
 [environment]
@@ -508,7 +508,7 @@ def _(x: Literal["foo", ""] | tuple[int, ...]):
 
 If a custom type defines a `__len__` method and a `__bool__` method, and both return `Literal`
 types, and the truthiness of the `__len__` return type is consistent with the truthiness of the
-`__bool__` return type, narrowing can still safely take place:
+`__bool__` return type, narrowing can still safely take place.
 
 ```py
 from typing import Literal
@@ -590,7 +590,7 @@ def f(
 ## Types that are not narrowed
 
 For `str`, `list`, and other types where a subclass could have a `__bool__` that disagrees with
-`__len__`, we do not narrow:
+`__len__`, we do not narrow.
 
 ```py
 def not_narrowed_str(x: str):
@@ -607,7 +607,7 @@ def not_narrowed_list(x: list[int]):
 ## Mixed unions (narrowable and non-narrowable)
 
 When a union contains both narrowable and non-narrowable types, we narrow the narrowable parts while
-leaving the non-narrowable parts unchanged:
+leaving the non-narrowable parts unchanged.
 
 ```py
 from typing import Literal
@@ -623,7 +623,7 @@ def _(x: Literal["foo", ""] | list[int]):
 ## Narrowing away empty literals
 
 This pattern is common when a prior truthiness check narrows a type, and then a conditional
-expression adds an empty literal back:
+expression adds an empty literal back.
 
 ```py
 def _(lines: list[str]):

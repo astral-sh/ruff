@@ -8,7 +8,7 @@ useful for `sys.version_info` branches, which can make new features available ba
 version:
 
 If we can statically determine that the condition is always true, then we can also understand that
-`SomeFeature` is always bound, without raising any errors:
+`SomeFeature` is always bound, without raising any errors.
 
 ```py
 import sys
@@ -22,7 +22,7 @@ reveal_type(C.SomeFeature)  # revealed: str
 ```
 
 Another scenario where this is useful is for `typing.TYPE_CHECKING` branches, which are often used
-for conditional imports:
+for conditional imports.
 
 `module.py`:
 
@@ -210,7 +210,7 @@ other
 For the rest of this test suite, we will mostly use `True` and `False` literals to indicate
 statically known conditions, but here, we show that the results are truly based on type inference,
 not some special handling of specific conditions in semantic index building. We use two modules to
-demonstrate this, since semantic index building is inherently single-module:
+demonstrate this, since semantic index building is inherently single-module.
 
 `module.py`:
 
@@ -297,7 +297,7 @@ reveal_type(x)  # revealed: Literal[2]
 
 ### Ambiguous
 
-Just for comparison, we still infer the combined type if the condition is not statically known:
+Just for comparison, we still infer the combined type if the condition is not statically known.
 
 ```py
 def flag() -> bool:
@@ -477,7 +477,7 @@ reveal_type(x)  # revealed: Literal[2, 3, 4]
 
 #### Multiple `elif` branches, always false
 
-Make sure that we include bindings from all non-`False` branches:
+Make sure that we include bindings from all non-`False` branches.
 
 ```py
 def flag() -> bool:
@@ -505,7 +505,7 @@ reveal_type(x)  # revealed: Literal[2, 3, 6, 7, 8]
 
 #### Multiple `elif` branches, always true
 
-Make sure that we only include the binding from the first `elif True` branch:
+Make sure that we only include the binding from the first `elif True` branch.
 
 ```py
 def flag() -> bool:
@@ -1081,7 +1081,7 @@ reveal_type(x)  # revealed: Literal[2]
 
 ### Ambiguous
 
-Make sure that we still infer the combined type if the condition is not statically known:
+Make sure that we still infer the combined type if the condition is not statically known.
 
 ```py
 def flag() -> bool:
@@ -1137,7 +1137,7 @@ reveal_type(x)  # revealed: Literal[1]
 #### `if` nested inside `while True`
 
 These are regression test for <https://github.com/astral-sh/ty/issues/365>. First, make sure that we
-do not panic in the original scenario:
+do not panic in the original scenario.
 
 ```py
 def flag() -> bool:
@@ -1153,7 +1153,7 @@ while True:
 c  # error: [possibly-unresolved-reference]
 ```
 
-And also check that we understand control flow correctly:
+And also check that we understand control flow correctly.
 
 ```py
 c = 1
@@ -1206,7 +1206,7 @@ reveal_type(x)  # revealed: Literal[2]
 
 ### Literal subject, always true, with guard
 
-Make sure we don't infer a static truthiness in case there is a case guard:
+Make sure we don't infer a static truthiness in case there is a case guard.
 
 ```py
 def flag() -> bool:
@@ -1257,7 +1257,7 @@ reveal_type(x)  # revealed: Literal[1]
 
 ### Literal subject, always false, with guard
 
-For definitely-false cases, the presence of a guard has no influence:
+For definitely-false cases, the presence of a guard has no influence.
 
 ```py
 def flag() -> bool:
@@ -1538,7 +1538,7 @@ x
 ### Ambiguous, possibly unbound
 
 For comparison, we still detect definitions inside non-statically known branches as possibly
-unbound:
+unbound.
 
 ```py
 def flag() -> bool:
@@ -1707,7 +1707,7 @@ from module import symbol
 ## Non-definitely bound symbols in conditions
 
 When a non-definitely bound symbol is used as a (part of a) condition, we always infer an ambiguous
-truthiness. If we didn't do that, `x` would be considered definitely bound in the following example:
+truthiness. If we didn't do that, `x` would be considered definitely bound in the following example.
 
 ```py
 def _(flag: bool):
@@ -1740,7 +1740,7 @@ def _(flag: bool):
 ## Unreachable code
 
 A closely related feature is the ability to detect unreachable code. For example, we do not emit a
-diagnostic here:
+diagnostic here.
 
 ```py
 if False:

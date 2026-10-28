@@ -422,7 +422,7 @@ def _(c: Callable[[int, str], Callable[[int], int]]):
 ## Gradual form
 
 The `Callable` special form supports the use of `...` in place of the list of parameter types. This
-is a [gradual form] indicating that the type is consistent with any input signature:
+is a [gradual form] indicating that the type is consistent with any input signature.
 
 ```py
 from typing import Callable
@@ -442,14 +442,14 @@ def _(c: Callable[Concatenate[int, str, ...], int]):
     reveal_type(c)  # revealed: (int, str, /, *args: Any, **kwargs: Any) -> int
 ```
 
-Other type expressions can be nested inside `Concatenate`:
+Other type expressions can be nested inside `Concatenate`.
 
 ```py
 def _(c: Callable[Concatenate[int | str, type[str], ...], int]):
     reveal_type(c)  # revealed: (int | str, type[str], /, *args: Any, **kwargs: Any) -> int
 ```
 
-But providing fewer than 2 arguments to `Concatenate` is an error:
+But providing fewer than 2 arguments to `Concatenate` is an error.
 
 ```py
 # fmt: off
@@ -530,7 +530,7 @@ def _(c: Callable[[int], int]):
 ```
 
 Unlike other type checkers, we do _not_ allow attributes to be accessed that would only be available
-on function-like callables:
+on function-like callables.
 
 ```py
 def f_wrong(c: Callable[[], None]):
@@ -542,7 +542,7 @@ def f_wrong(c: Callable[[], None]):
 ```
 
 We do this, because at runtime, calls to `f_wrong` with a non-function callable would raise an
-`AttributeError`:
+`AttributeError`.
 
 ```py
 class MyCallable:
@@ -553,7 +553,7 @@ f_wrong(MyCallable())  # raises `AttributeError` at runtime
 ```
 
 If users want to read/write to attributes such as `__qualname__`, they need to check the existence
-of the attribute first:
+of the attribute first.
 
 ```py
 def f_okay(c: Callable[[], None]):

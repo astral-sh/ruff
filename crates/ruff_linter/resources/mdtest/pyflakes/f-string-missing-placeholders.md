@@ -160,7 +160,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 ## Not docstring positions
 
-The fix stays safe when removing the prefix does not create a docstring:
+The fix stays safe when removing the prefix does not create a docstring.
 
 ```py
 c = d = 3

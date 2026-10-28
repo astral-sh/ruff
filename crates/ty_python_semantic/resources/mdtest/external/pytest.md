@@ -11,7 +11,7 @@ dependencies = ["pytest==9.0.1"]
 
 ## `pytest.fail`
 
-Make sure that we recognize `pytest.fail` calls as terminal:
+Make sure that we recognize `pytest.fail` calls as terminal.
 
 ```py
 import pytest

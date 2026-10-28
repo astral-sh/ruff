@@ -6,7 +6,7 @@ annotation of `complex` actually means `int | float | complex`. See
 
 ## float
 
-An annotation of `float` means `int | float`, so `int` is assignable to it:
+An annotation of `float` means `int | float`, so `int` is assignable to it.
 
 ```py
 def takes_float(x: float):
@@ -17,7 +17,7 @@ def passes_int_to_float(x: int):
     takes_float(x)
 ```
 
-It also applies to variable annotations:
+It also applies to variable annotations.
 
 ```py
 def assigns_int_to_float(x: int):
@@ -25,7 +25,7 @@ def assigns_int_to_float(x: int):
     y: float = x
 ```
 
-It doesn't work the other way around:
+It doesn't work the other way around.
 
 ```py
 def takes_int(x: int):
@@ -59,7 +59,7 @@ reveal_type(1.0)  # revealed: float*
 ## complex
 
 An annotation of `complex` means `int | float | complex`, so `int` and `float` are both assignable
-to it (but not the other way around):
+to it (but not the other way around).
 
 ```py
 def takes_complex(x: complex):
@@ -101,7 +101,7 @@ reveal_type(1j)  # revealed: complex*
 
 ## Shadowed numeric builtins
 
-Canonical numeric names remain qualified when a module defines a class with the same name:
+Canonical numeric names remain qualified when a module defines a class with the same name.
 
 ```py
 import builtins
@@ -125,7 +125,7 @@ def pass_builtin_float(x: builtins.float):
 ## Narrowing
 
 `int`, `float` and `complex` are all disjoint, which means that the union `int | float` can easily
-be narrowed to `int` or `float`:
+be narrowed to `int` or `float`.
 
 ```py
 from typing_extensions import assert_type

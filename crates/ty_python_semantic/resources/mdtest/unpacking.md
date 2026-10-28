@@ -338,7 +338,7 @@ reveal_type(first)  # revealed: Literal[1]
 reveal_type(rest)  # revealed: list[str]
 ```
 
-The starred target can also precede the fixed targets:
+The starred target can also precede the fixed targets.
 
 ```py
 *rest, last = ["one", "two", 3]
@@ -347,7 +347,7 @@ reveal_type(last)  # revealed: Literal[3]
 ```
 
 A starred target between fixed targets excludes both the prefix and the suffix from its element
-type:
+type.
 
 ```py
 [first, *rest, last] = [1, "two", "three", 4]
@@ -588,7 +588,7 @@ def fixed_ends(values: list[str]):
 ### Tuple unions in starred expressions
 
 Unpacking tuples of different lengths combines their element types but preserves their minimum
-length:
+length.
 
 ```py
 def _(values: tuple[int] | tuple[str, str]) -> None:
@@ -596,14 +596,14 @@ def _(values: tuple[int] | tuple[str, str]) -> None:
 ```
 
 Required elements in variable-length tuples also contribute to the minimum, whether they precede or
-follow the variable-length part:
+follow the variable-length part.
 
 ```py
 def _(values: tuple[int, *tuple[int, ...]] | tuple[*tuple[str, ...], str]) -> None:
     reveal_type((*values,))  # revealed: tuple[int | str, *tuple[int | str, ...]]
 ```
 
-If any member can be empty, the unpacked result can be empty too:
+If any member can be empty, the unpacked result can be empty too.
 
 ```py
 def _(values: tuple[()] | tuple[int]) -> None:

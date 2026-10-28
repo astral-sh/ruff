@@ -3,7 +3,7 @@
 ## Literal comparisons
 
 These tests assert that we infer precise `Literal` types for comparisons between objects inferred as
-having `Literal` bytes types:
+having `Literal` bytes types.
 
 ```py
 reveal_type(b"abc" == b"abc")  # revealed: Literal[True]
@@ -47,7 +47,7 @@ reveal_type(b"abc" is not b"ab")  # revealed: Literal[True]
 ## Equality with sequences
 
 A `Sequence[int]` can be a `bytes` object, including an empty one, so comparing it with a bytes
-literal has an unknown result:
+literal has an unknown result.
 
 ```py
 from collections.abc import Sequence

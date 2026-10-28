@@ -88,7 +88,7 @@ reveal_type({"a": 1, "b": 2}["a"])  # revealed: Literal[1, 2]
 {"a": 1}[0]  # error: [invalid-argument-type]
 ```
 
-This also allows a lookup table to convert between literal unions:
+This also allows a lookup table to convert between literal unions.
 
 ```py
 from typing import Literal
@@ -100,7 +100,7 @@ def expand_letter(letter: Letter) -> Word:
     return {"A": "Alpha", "B": "Beta", "C": "Charlie"}[letter]  # no diagnostic
 ```
 
-The key need not itself have a literal type:
+The key need not itself have a literal type.
 
 ```py
 def _(string_key: str, integer_key: int):
@@ -108,7 +108,7 @@ def _(string_key: str, integer_key: int):
     reveal_type({1: "a", 2: "b"}[integer_key])  # revealed: Literal["a", "b"]
 ```
 
-Nested mutable values still permit mutation:
+Nested mutable values still permit mutation.
 
 ```py
 values = {"a": [1]}["a"]
@@ -116,7 +116,7 @@ reveal_type(values)  # revealed: list[int]
 values.append(2)  # no diagnostic
 ```
 
-A dictionary stored in a variable still permits later mutation and promotes its value type:
+A dictionary stored in a variable still permits later mutation and promotes its value type.
 
 ```py
 def _(key: str):
@@ -129,7 +129,7 @@ def _(key: str):
 ## Dictionary escaping through a bound view method
 
 A saved view method exposes its dictionary through `__self__`, so its key and value types still
-permit mutation:
+permit mutation.
 
 ```py
 method = {"a": 1}.values
@@ -142,7 +142,7 @@ reveal_type(method())  # revealed: dict_values[str, int]
 ## Key narrowing
 
 The original assignment to each key, as well as future assignments, are used to narrow access to
-individual keys:
+individual keys.
 
 ```py
 from typing import TypedDict
@@ -228,7 +228,7 @@ reveal_type(d["outer"]["current"])  # revealed: str
 
 ## Dict unpacking in function calls
 
-Narrowing is also performed for dictionary unpacking expressions:
+Narrowing is also performed for dictionary unpacking expressions.
 
 ```py
 def f1(a: int): ...
@@ -472,7 +472,7 @@ def loop_carried_value(c: C, repeat: bool) -> int:
 ## Rejected annotations in stubs
 
 Annotation-only declarations in stubs are also bindings. A rejected annotation should fall back to
-the type obtained by normal member lookup:
+the type obtained by normal member lookup.
 
 `stub.pyi`:
 

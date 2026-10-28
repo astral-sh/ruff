@@ -147,7 +147,7 @@ def f(x: Callable[..., Any], y: Callable[[int], str]):
 ```
 
 But instances of `types.FunctionType` (whether they're defined using a `def` statement or a `lambda`
-expression) are always truthy, and this is also true for bound methods:
+expression) are always truthy, and this is also true for bound methods.
 
 ```py
 from types import FunctionType

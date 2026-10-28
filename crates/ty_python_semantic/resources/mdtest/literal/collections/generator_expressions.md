@@ -2,7 +2,7 @@
 
 ## Basic
 
-We infer specialized `GeneratorType` instance types for generator expressions:
+We infer specialized `GeneratorType` instance types for generator expressions.
 
 ```py
 # revealed: GeneratorType[int, None, None]
@@ -29,7 +29,7 @@ reveal_type(*xs for xs in list_of_lists)
 (*value for value in not_iterables)  # error: [not-iterable] "Object of type `int` is not iterable"
 ```
 
-When used in a loop, the yielded type can be inferred:
+When used in a loop, the yielded type can be inferred.
 
 ```py
 squares = (x**2 for x in range(10))
@@ -39,7 +39,7 @@ for s in squares:
 ```
 
 `GeneratorType` is covariant in its yielded type, so it can be used where a wider yielded type is
-expected:
+expected.
 
 ```py
 from typing import Iterator
@@ -53,7 +53,7 @@ process_numbers(numbers)
 
 ## Async generators
 
-For async generator expressions, we infer specialized `AsyncGeneratorType` instance types:
+For async generator expressions, we infer specialized `AsyncGeneratorType` instance types.
 
 ```py
 import asyncio
@@ -78,7 +78,7 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-An `await` expression in the generator expression's implicit scope also makes it asynchronous:
+An `await` expression in the generator expression's implicit scope also makes it asynchronous.
 
 ```py
 async def is_even(value: int) -> bool:
@@ -92,7 +92,7 @@ async def filter_values() -> None:
 ```
 
 This includes `await` expressions in the yielded element and in the iterable of any `for` clause
-after the first:
+after the first.
 
 ```py
 async def get_values(value: int = 0) -> list[int]:
@@ -108,7 +108,7 @@ async def await_locations() -> None:
 
 The iterable in the first `for` clause is evaluated in the enclosing scope, so an `await` there does
 not make the generator expression asynchronous. The same rule means that the first iterable of a
-nested generator expression can make the outer generator asynchronous:
+nested generator expression can make the outer generator asynchronous.
 
 ```py
 async def first_iterable() -> None:
@@ -118,7 +118,7 @@ async def first_iterable() -> None:
 ```
 
 An asynchronous nested generator expression does not make the outer generator asynchronous, but an
-asynchronous nested container comprehension does:
+asynchronous nested container comprehension does.
 
 ```py
 from collections.abc import AsyncIterator

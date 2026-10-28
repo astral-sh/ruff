@@ -253,7 +253,7 @@ reveal_type(dunder_all_names(exporter))
 
 ### Augmenting list with a list or submodule `__all__` (2)
 
-The same again, but the submodule is an attribute expression rather than a name expression:
+The same again, but the submodule is an attribute expression rather than a name expression.
 
 `exporter/__init__.py`:
 

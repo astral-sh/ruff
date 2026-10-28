@@ -8,7 +8,7 @@ select = ["PLW0717"]
 
 ## Diagnostic range
 
-Avoid marking the entire `try` statement:
+Avoid marking the entire `try` statement.
 
 ```py
 # snapshot: too-many-statements-in-try-clause
@@ -34,7 +34,7 @@ error[PLW0717]: Try clause contains too many statements (6 > 5)
 ## Context managers
 
 Avoid emitting a diagnostic when the `try` statement is being used like a context manager, i.e. it
-catches no exceptions and just ensures that some kind of cleanup is run in a `finally` clause:
+catches no exceptions and just ensures that some kind of cleanup is run in a `finally` clause.
 
 ```py
 try:

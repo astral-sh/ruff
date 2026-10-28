@@ -35,7 +35,7 @@ def _(
 ```
 
 The `&` and `~` operators cannot be used in value positions, since that would lead to a runtime
-error:
+error.
 
 ```py
 # error: [unsupported-operator] "Operator `&` is not supported between objects of type `<class 'A'>` and `<class 'B'>`"
@@ -50,7 +50,7 @@ Box[A & B]
 
 On Python 3.13 and earlier, annotations are evaluated eagerly by default, so these operators result
 in runtime errors. We emit a diagnostic, but still interpret the annotation as an intersection or
-negation type:
+negation type.
 
 ```toml
 [environment]
@@ -73,7 +73,7 @@ def _(
 
 ## Deferred annotations on Python 3.13
 
-The operators can be used on Python 3.13 if annotations are deferred using a future import:
+The operators can be used on Python 3.13 if annotations are deferred using a future import.
 
 ```toml
 [environment]
@@ -91,7 +91,7 @@ def _(a_and_b: A & B, not_a: ~A) -> None:
     reveal_type(not_a)  # revealed: ~A
 ```
 
-Stringified annotations also defer evaluation:
+Stringified annotations also defer evaluation.
 
 ```py
 def _(a_and_b: "A & B", not_a: "~A") -> None:
@@ -153,7 +153,7 @@ C: TypeAlias = "~C"  # error: [cyclic-type-alias-definition]
 D: TypeAlias = "D & int"  # error: [cyclic-type-alias-definition]
 ```
 
-The same restriction applies to PEP 695 aliases:
+The same restriction applies to PEP 695 aliases.
 
 ```py
 type E = ~E & E  # error: [cyclic-type-alias-definition]
@@ -164,7 +164,7 @@ type H = H & int  # error: [cyclic-type-alias-definition]
 
 ## Mutually recursive aliases
 
-An unguarded cycle can also pass through another alias:
+An unguarded cycle can also pass through another alias.
 
 ```toml
 [environment]
@@ -229,7 +229,7 @@ def _(a: A, b: B):
     reveal_type(b)  # revealed: ~list[B] | list[Any]
 ```
 
-The same applies to stringified aliases declared with `TypeAlias`:
+The same applies to stringified aliases declared with `TypeAlias`.
 
 ```py
 from typing import TypeAlias

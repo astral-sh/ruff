@@ -366,7 +366,7 @@ A `raise` statement is terminal. Inside a `try` statement, it jumps to a matchin
 propagates out of the statement. We do not yet determine which typed handler matches the exception,
 so every handler sees the same possible values.
 
-When only one branch raises, the exception handler sees only the value assigned in that branch:
+When only one branch raises, the exception handler sees only the value assigned in that branch.
 
 ```py
 def raise_in_then_branch(cond: bool):
@@ -383,7 +383,7 @@ def raise_in_then_branch(cond: bool):
     reveal_type(x)  # revealed: Literal["raise", "else"]
 ```
 
-If both branches raise, the handler sees either value and the `else` clause cannot run:
+If both branches raise, the handler sees either value and the `else` clause cannot run.
 
 ```py
 def raise_in_both_branches(cond: bool):
@@ -402,7 +402,7 @@ def raise_in_both_branches(cond: bool):
     reveal_type(x)  # revealed: Literal["raise1", "raise2"]
 ```
 
-Nested conditions do not make values from non-raising branches visible to the exception handler:
+Nested conditions do not make values from non-raising branches visible to the exception handler.
 
 ```py
 def raise_in_nested_branch(cond1: bool, cond2: bool):
@@ -422,7 +422,7 @@ def raise_in_nested_branch(cond1: bool, cond2: bool):
     reveal_type(x)  # revealed: Literal["else1", "raise", "else2"]
 ```
 
-Multiple raising branches inside a nested condition remain visible to the handler:
+Multiple raising branches inside a nested condition remain visible to the handler.
 
 ```py
 def raise_in_both_nested_branches(cond1: bool, cond2: bool):
@@ -599,7 +599,7 @@ def returns_through_finally() -> None:
 ## Continuing after a suppressing context manager inside `try`
 
 When a context manager suppresses an exception, a later assignment determines the value observed by
-the `finally` block:
+the `finally` block.
 
 ```py
 from contextlib import suppress
@@ -616,7 +616,7 @@ finally:
 ## Continuing after a suppressing context manager and `finally`
 
 After an exception is suppressed, assignments in the `finally` block remain visible on the
-continuing path:
+continuing path.
 
 ```py
 from contextlib import suppress
@@ -633,7 +633,7 @@ def continues_after_finally() -> str:
 
 ## Raising from a context manager inside `try`
 
-A `finally` block remains reachable when a context manager propagates an exception:
+A `finally` block remains reachable when a context manager propagates an exception.
 
 ```py
 from contextlib import nullcontext
@@ -649,7 +649,7 @@ finally:
 ## Unreachable bindings after a context manager inside `try`
 
 Assignments and imports after the propagating context manager cannot make the `finally` block
-unreachable:
+unreachable.
 
 ```py
 from contextlib import nullcontext
@@ -667,7 +667,7 @@ finally:
 ## Code after a terminal context manager and `finally`
 
 A non-suppressing manager does not allow a raised exception to continue past `finally` or implicitly
-return from an annotated function:
+return from an annotated function.
 
 ```py
 from contextlib import nullcontext
@@ -684,7 +684,7 @@ def does_not_continue() -> int:
 
 ## Narrowing after a terminal context manager and `finally`
 
-A branch that raises through a non-suppressing manager remains terminal after its cleanup:
+A branch that raises through a non-suppressing manager remains terminal after its cleanup.
 
 ```py
 from contextlib import nullcontext
@@ -702,7 +702,7 @@ def narrows_after_finally(value: str | None) -> None:
 ## Loop control after a terminal context manager and `finally`
 
 A `break` through a non-suppressing manager and its enclosing cleanup cannot reach a later
-assignment in the loop:
+assignment in the loop.
 
 ```py
 from contextlib import nullcontext
@@ -718,7 +718,7 @@ for _ in [1]:
 after_break  # error: [unresolved-reference]
 ```
 
-The same applies to `continue`:
+The same applies to `continue`.
 
 ```py
 for _ in [1]:
@@ -735,7 +735,7 @@ after_continue  # error: [unresolved-reference]
 ## Nested `finally` suites after a terminal context manager
 
 The outer cleanup observes assignments made in the inner cleanup, but execution does not continue
-after either suite:
+after either suite.
 
 ```py
 from contextlib import nullcontext
@@ -756,7 +756,7 @@ def nested_cleanup() -> None:
 ## Terminal `except` branches after a context manager
 
 An `except` branch that assigns a value before returning still contributes that value to the
-`finally` block:
+`finally` block.
 
 ```py
 from contextlib import nullcontext
@@ -778,7 +778,7 @@ def handler_returns() -> None:
 
 ## Named `except` branches after a context manager
 
-Binding an exception does not make a terminal `except` branch a continuing entry into `finally`:
+Binding an exception does not make a terminal `except` branch a continuing entry into `finally`.
 
 ```py
 from contextlib import nullcontext
@@ -800,7 +800,7 @@ def named_handler() -> None:
 
 ## Multiple terminal `except` branches after a context manager
 
-Every terminal `except` branch contributes its assignment to the `finally` block:
+Every terminal `except` branch contributes its assignment to the `finally` block.
 
 ```py
 from contextlib import nullcontext
@@ -825,7 +825,7 @@ def multiple_handlers() -> None:
 
 ## `except` branches without terminal statements after a context manager
 
-An `except` branch with no terminal statements determines the value observed by `finally`:
+An `except` branch with no terminal statements determines the value observed by `finally`.
 
 ```py
 from contextlib import nullcontext
@@ -843,7 +843,7 @@ finally:
 ## Unreachable assignments after a context manager inside `except`
 
 A context manager propagates an exception from an `except` branch even when an unreachable
-assignment follows:
+assignment follows.
 
 ```py
 from contextlib import nullcontext
@@ -861,7 +861,7 @@ finally:
 
 ## Raising from a context manager inside a named `except` branch
 
-Clearing a named exception does not hide the terminal path from `finally`:
+Clearing a named exception does not hide the terminal path from `finally`.
 
 ```py
 from contextlib import nullcontext
@@ -879,7 +879,7 @@ finally:
 ## Terminal nested `except` branches without their own `finally`
 
 An unreachable assignment and a binding in the terminal inner `except` branch do not prevent the
-path from reaching the outer `finally` block:
+path from reaching the outer `finally` block.
 
 ```py
 from contextlib import nullcontext
@@ -898,7 +898,7 @@ def nested_unreachable_assignment() -> None:
         missing_after_nested_unreachable_assignment  # error: [unresolved-reference]
 ```
 
-A `break` through an inner `except` branch also reaches the outer `finally` block:
+A `break` through an inner `except` branch also reaches the outer `finally` block.
 
 ```py
 for _ in [1]:
@@ -915,7 +915,7 @@ for _ in [1]:
 
 ## Unreachable assignments after a context manager inside `else`
 
-A context manager propagates an exception from `else` even when an unreachable assignment follows:
+A context manager propagates an exception from `else` even when an unreachable assignment follows.
 
 ```py
 from contextlib import nullcontext
@@ -936,7 +936,7 @@ finally:
 ## Possibly unbound names in `finally` after a context manager
 
 When an assignment raises before binding a name, a `finally` block can observe that the name is
-undefined:
+undefined.
 
 ```py
 from contextlib import nullcontext
@@ -1518,7 +1518,7 @@ Free references inside of a function body refer to variables defined in the cont
 Function bodies are _lazy scopes_: at runtime, these references are not resolved immediately at the
 point of the function definition. Instead, they are resolved _at the time of the call_, which means
 that their values (and types) can be different for different invocations. For simplicity, we
-currently consider _all reachable bindings_ in the containing scope:
+currently consider _all reachable bindings_ in the containing scope.
 
 ```py
 def top_level_return(cond1: bool, cond2: bool):

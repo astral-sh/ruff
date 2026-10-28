@@ -307,7 +307,7 @@ def update(flag: bool) -> None:
 
 ## Unsound named and unpacked assignments
 
-Assignment expressions are also checked against an existing annotation:
+Assignment expressions are also checked against an existing annotation.
 
 ```py
 from typing import Any
@@ -724,7 +724,7 @@ class MetaclassModel(metaclass=ModelMetaclass):
 ## Assignments in stub files
 
 In stub files, assigning to an ellipsis (`= ...`) is a syntactic special case that is allowed
-regardless of the declared type. We do not emit `unsound-assignment` for this:
+regardless of the declared type. We do not emit `unsound-assignment` for this.
 
 ```pyi
 def f(x: int = ...): ...  # no error

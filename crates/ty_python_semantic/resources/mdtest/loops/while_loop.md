@@ -168,7 +168,7 @@ reveal_type(loop_only)  # revealed: int
 
 ### A more complex example
 
-Here the loop condition narrows both the loop-back value and the end-of-loop value:
+Here the loop condition narrows both the loop-back value and the end-of-loop value.
 
 ```py
 def random() -> bool:
@@ -241,7 +241,7 @@ reveal_type(x)  # revealed: Literal["E"]
 
 ### Interaction between `break` and a narrowing condition
 
-Here the loop condition forces `x` to be `False` at loop exit, because there is no `break`:
+Here the loop condition forces `x` to be `False` at loop exit, because there is no `break`.
 
 ```py
 def random() -> bool:
@@ -254,7 +254,7 @@ while x:
 reveal_type(x)  # revealed: Literal[False]
 ```
 
-However, we can't narrow `x` like this when there's a `break` in the loop:
+However, we can't narrow `x` like this when there's a `break` in the loop.
 
 ```py
 x = random()
@@ -346,7 +346,7 @@ reveal_type(my_dict["x"])  # revealed: int
 
 ### `del` prevents bindings from reaching the loopback
 
-This `x` cannot reach the use at the top of the loop:
+This `x` cannot reach the use at the top of the loop.
 
 ```py
 def random() -> bool:
@@ -359,7 +359,7 @@ while random():
 ```
 
 On the other hand, if `x` is defined before the loop, the `del` makes it a
-`[possibly-unresolved-reference]`:
+`[possibly-unresolved-reference]`.
 
 ```py
 x = 0
@@ -386,7 +386,7 @@ x
 ### Statically unreachable `del` branches don't poison cyclic loopback
 
 This creates a loop-header cycle through `if x`, but the `del x` branch should still disappear once
-the loopback type settles:
+the loopback type settles.
 
 ```py
 def random() -> bool:
@@ -401,7 +401,7 @@ while random():
     reveal_type(x)  # revealed: Literal[1]
 ```
 
-Comparison-guarded `del` branches should also disappear once the loopback type settles:
+Comparison-guarded `del` branches should also disappear once the loopback type settles.
 
 ```py
 x = 1
@@ -637,7 +637,7 @@ while random():
 
 ### Conditional unpacking and loop exits converge normally
 
-This reduced example from issue #3057 used to panic with "too many cycle iterations":
+This reduced example from issue #3057 used to panic with "too many cycle iterations".
 
 ```py
 def fetch(req) -> tuple:  # error: [missing-type-argument]
@@ -689,7 +689,7 @@ while True:
 
 The following is a deceptively-simple-looking case of narrowing that was difficult to get right in
 the initial implementation of cyclic control flow. We start with a non-empty linked list, and we
-advance it in a loop until there's exactly one node left:
+advance it in a loop until there's exactly one node left.
 
 ```py
 class Node:
@@ -947,7 +947,7 @@ def decrement(tokens: list[int], branch: int, value: int):
 ### `global` and `nonlocal` keywords in a loop
 
 We need to make sure that the loop header definition doesn't count as a "use" prior to the
-`global`/`nonlocal` declaration, or else we'll emit a false-positive semantic syntax error:
+`global`/`nonlocal` declaration, or else we'll emit a false-positive semantic syntax error.
 
 ```py
 x = 0
@@ -962,7 +962,7 @@ def _():
             y = 99
 ```
 
-On the other hand, we don't want to shadow true positives:
+On the other hand, we don't want to shadow true positives.
 
 ```py
 x = 0
@@ -984,7 +984,7 @@ visible, then `UNBOUND` should not be definitely-visible. That makes intuitive s
 binding should shadow `UNBOUND` entirely, or if it was made in a branch then it should attach the
 negated branch condition to `UNBOUND`. However, loop header bindings are an exception to this rule,
 because they don't shadow prior bindings. In this example `UNBOUND` is definitely-visible, and we
-need to avoid panicking:
+need to avoid panicking.
 
 ```py
 while True:

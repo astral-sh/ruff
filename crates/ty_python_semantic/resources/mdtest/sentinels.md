@@ -2,7 +2,7 @@
 
 ## `typing_extensions.Sentinel`
 
-Sentinels constructed with `typing_extensions.Sentinel` can be used directly in type expressions:
+Sentinels constructed with `typing_extensions.Sentinel` can be used directly in type expressions.
 
 ```toml
 [environment]
@@ -70,7 +70,7 @@ def reverse_negative_check(x: int | MISSING | OTHER) -> None:
         reveal_type(x)  # revealed: MISSING
 ```
 
-Sentinel values can also be combined with types at runtime:
+Sentinel values can also be combined with types at runtime.
 
 ```py
 reveal_type(MISSING | None)  # revealed: <types.UnionType special-form 'MISSING | None'>
@@ -81,7 +81,7 @@ reveal_type(MISSING | MISSING)  # revealed: MISSING
 ```
 
 When enabled, `mismatched-sentinel-name` reports names that do not match their assigned variables,
-including when the constructor has an alias or an explicit representation:
+including when the constructor has an alias or an explicit representation.
 
 ```py
 from typing_extensions import Sentinel as SentinelAlias
@@ -101,7 +101,7 @@ info[mismatched-sentinel-name]: The name passed to `sentinel` does not match the
 ```
 
 Sentinel objects are always truthy, expose the standard sentinel metadata attributes, and are
-rejected as class bases:
+rejected as class bases.
 
 ```py
 MISSING = Sentinel("MISSING")
@@ -113,7 +113,7 @@ class MissingSubclass(MISSING):  # error: [invalid-base]
     pass
 ```
 
-Sentinels declared in class scope can also be used in type expressions:
+Sentinels declared in class scope can also be used in type expressions.
 
 ```py
 class C:
@@ -150,7 +150,7 @@ def class_reverse_negative(x: int | C.MARKER) -> None:
         reveal_type(x)  # revealed: MARKER
 ```
 
-Sentinel declarations are recognized only in module and class scope:
+Sentinel declarations are recognized only in module and class scope.
 
 ```py
 def outer():
@@ -159,7 +159,7 @@ def outer():
     def inner(x: LOCAL) -> None: ...  # error: [invalid-type-form]
 ```
 
-Sentinels are not generic:
+Sentinels are not generic.
 
 ```py
 MISSING = Sentinel("MISSING")
@@ -167,7 +167,7 @@ MISSING = Sentinel("MISSING")
 def f(x: MISSING[int]) -> None: ...  # error: [invalid-type-form]
 ```
 
-Invalid sentinel constructor calls fall back to the normal call path:
+Invalid sentinel constructor calls fall back to the normal call path.
 
 ```py
 NAME = "NAME"
@@ -182,7 +182,7 @@ UNKNOWN_KEYWORD = Sentinel("UNKNOWN_KEYWORD", unknown=NAME)  # error: [unknown-a
 ## `builtins.sentinel`
 
 On Python 3.15+, `typing_extensions.Sentinel` is still available, but it is a re-export of
-`builtins.sentinel`:
+`builtins.sentinel`.
 
 ```toml
 [environment]
@@ -251,7 +251,7 @@ def reverse_negative_check(x: int | MISSING | OTHER) -> None:
 ```
 
 When enabled, `mismatched-sentinel-name` also checks builtin sentinels, including when the builtin
-is imported under an alias or given an explicit representation:
+is imported under an alias or given an explicit representation.
 
 ```py
 from builtins import sentinel as sentinel_alias
@@ -271,7 +271,7 @@ info[mismatched-sentinel-name]: The name passed to `sentinel` does not match the
 ```
 
 Sentinel objects are always truthy, expose the standard sentinel metadata attributes, and are
-rejected as class bases:
+rejected as class bases.
 
 ```py
 MISSING = sentinel("MISSING")
@@ -283,7 +283,7 @@ class MissingSubclass(MISSING):  # error: [invalid-base]
     pass
 ```
 
-Sentinels declared in class scope can also be used in type expressions:
+Sentinels declared in class scope can also be used in type expressions.
 
 ```py
 class C:
@@ -320,7 +320,7 @@ def class_reverse_negative(x: int | C.MARKER) -> None:
         reveal_type(x)  # revealed: MARKER
 ```
 
-Sentinel declarations are recognized only in module and class scope:
+Sentinel declarations are recognized only in module and class scope.
 
 ```py
 def outer():
@@ -329,7 +329,7 @@ def outer():
     def inner(x: LOCAL) -> None: ...  # error: [invalid-type-form]
 ```
 
-Sentinels are not generic:
+Sentinels are not generic.
 
 ```py
 MISSING = sentinel("MISSING")
@@ -337,7 +337,7 @@ MISSING = sentinel("MISSING")
 def f(x: MISSING[int]) -> None: ...  # error: [invalid-type-form]
 ```
 
-Invalid sentinel constructor calls fall back to the normal call path:
+Invalid sentinel constructor calls fall back to the normal call path.
 
 ```py
 NAME = "NAME"
@@ -349,7 +349,7 @@ UNKNOWN_REPR = sentinel("UNKNOWN_REPR", repr=UNKNOWN)  # error: [unresolved-refe
 UNKNOWN_KEYWORD = sentinel("UNKNOWN_KEYWORD", unknown=NAME)  # error: [unknown-argument]
 ```
 
-`typing_extensions.Sentinel` continues to work on Python 3.15:
+`typing_extensions.Sentinel` continues to work on Python 3.15.
 
 ```py
 import typing_extensions

@@ -87,28 +87,28 @@ async def main():
 python-version = "3.12"  # Use 3.12 to be able to use PEP 695 generics
 ```
 
-Let's look at the example from the beginning again:
+Let's look at the example from the beginning again.
 
 ```py
 async def retrieve() -> int:
     return 42
 ```
 
-When we look at the signature of this function, we see that it actually returns a `CoroutineType`:
+When we look at the signature of this function, we see that it actually returns a `CoroutineType`.
 
 ```py
 reveal_type(retrieve)  # revealed: def retrieve() -> CoroutineType[Any, Any, int]
 ```
 
 The expression `await retrieve()` desugars into a call to the `__await__` dunder method on the
-`CoroutineType` object, followed by a `yield from`. Let's first see the return type of `__await__`:
+`CoroutineType` object, followed by a `yield from`. Let's first see the return type of `__await__`.
 
 ```py
 reveal_type(retrieve().__await__())  # revealed: Generator[Any, None, int]
 ```
 
 We can see that this returns a `Generator` that yields `Any`, and eventually returns `int`. For the
-final type of the `await` expression, we retrieve that third argument of the `Generator` type:
+final type of the `await` expression, we retrieve that third argument of the `Generator` type.
 
 ```py
 from typing import Generator
@@ -121,7 +121,7 @@ def _():
 ## Un-annotated async functions
 
 An `async def` with no annotated return type is still known to return `CoroutineType` of `Unknown`,
-not just `Unknown`:
+not just `Unknown`.
 
 ```py
 async def f():
@@ -156,7 +156,7 @@ async def test():
 ```
 
 The return type of awaiting an intersection is the intersection of the return types of awaiting each
-element:
+element.
 
 ```py
 from typing import Coroutine
@@ -171,7 +171,7 @@ async def test(x: Intersection[Coroutine[object, object, A], Coroutine[object, o
 ```
 
 If some intersection elements are not awaitable, we skip them and use the return types from the
-awaitable elements:
+awaitable elements.
 
 ```py
 from typing import Coroutine
@@ -185,7 +185,7 @@ async def test(x: Intersection[Coroutine[object, object, str], NotAwaitable]):
 ```
 
 When an intersection includes `Any`, awaiting succeeds for both elements. `Any` is awaitable and
-returns `Any`:
+returns `Any`.
 
 ```py
 from typing import Coroutine, Any
@@ -197,7 +197,7 @@ async def test(x: Intersection[Coroutine[object, object, int], Any]):
 ```
 
 When an intersection has three or more elements, some awaitable and some not, the non-awaitable
-elements are skipped:
+elements are skipped.
 
 ```py
 from typing import Coroutine
@@ -212,7 +212,7 @@ async def test(x: Intersection[Coroutine[object, object, A], Coroutine[object, o
     reveal_type(y)  # revealed: A & B
 ```
 
-If all intersection elements fail to be awaitable, the await is invalid:
+If all intersection elements fail to be awaitable, the await is invalid.
 
 ```py
 from ty_extensions import Intersection
@@ -254,7 +254,7 @@ python-version = "3.12"
 ```
 
 The return type of awaiting an intersection is the intersection of the return types of awaiting each
-element:
+element.
 
 ```py
 from typing import Coroutine

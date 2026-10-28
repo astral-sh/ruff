@@ -697,7 +697,7 @@ reveal_type(f2)  # revealed: Overload[(y: str) -> str, (y: int) -> int]
 ```
 
 But, it's possible to add the additional parameter just to the overload signatures and not the
-implementation:
+implementation.
 
 ```py
 @overload

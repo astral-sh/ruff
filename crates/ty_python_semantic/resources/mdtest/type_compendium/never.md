@@ -36,7 +36,7 @@ def _(t: T):
 
 `Never` is assignable to every type. This fact is useful when calling error-handling functions in a
 context that requires a value of a specific type. For example, changing the `Never` return type to
-`None` below would cause a type error:
+`None` below would cause a type error.
 
 ```py
 from ty_extensions import static_assert
@@ -59,7 +59,7 @@ def f(divisor: int) -> None:
 
 `Never` can be used in functions to indicate that the function never returns. For example, if a
 function always raises an exception, if it calls `sys.exit()`, if it enters an infinite loop, or if
-it calls itself recursively. All of these functions "Never" return control back to the caller:
+it calls itself recursively. All of these functions "Never" return control back to the caller.
 
 ```py
 from typing_extensions import Never
@@ -81,7 +81,7 @@ def recursive_never() -> Never:
 ```
 
 Similarly, if `Never` is used in parameter positions, it indicates that the function can "Never" be
-called, because it can never be passed a value of type `Never` (there are none):
+called, because it can never be passed a value of type `Never` (there are none).
 
 ```py
 def can_not_be_called(n: Never) -> int:
@@ -91,7 +91,7 @@ def can_not_be_called(n: Never) -> int:
 ## `Never` is disjoint from every other type
 
 Two types `A` and `B` are disjoint if their intersection is empty. Since `Never` has no inhabitants,
-it is disjoint from every other type:
+it is disjoint from every other type.
 
 ```py
 from ty_extensions import static_assert
@@ -108,7 +108,7 @@ static_assert(is_disjoint_from(Never, Never))
 
 ## Unions with `Never`
 
-`Never` can always be removed from unions:
+`Never` can always be removed from unions.
 
 ```py
 from ty_extensions import static_assert
@@ -123,7 +123,7 @@ static_assert(is_equivalent_to(P | Never | Q | None, P | Q | None))
 
 ## Intersections with `Never`
 
-Intersecting with `Never` results in `Never`:
+Intersecting with `Never` results in `Never`.
 
 ```pyi
 from ty_extensions import static_assert
@@ -139,7 +139,7 @@ static_assert(is_equivalent_to(P & Never & Q, Never))
 ## `Never` is the complement of `object`
 
 `object` describes the set of all possible values, while `Never` describes the empty set. The two
-types are complements of each other:
+types are complements of each other.
 
 ```pyi
 from ty_extensions import static_assert
@@ -161,7 +161,7 @@ This duality is also reflected in other facts:
 ## Lists of `Never`
 
 `list[Never]` is a reasonable type that is *not* equivalent to `Never`. The empty list inhabits this
-type:
+type.
 
 ```py
 from typing_extensions import Never
@@ -172,7 +172,7 @@ x: list[Never] = []
 ## Tuples involving `Never`
 
 A type like `tuple[int, Never]` remains distinct from `Never`. A tuple annotation can describe
-user-defined subclasses, so its element types remain part of the type:
+user-defined subclasses, so its element types remain part of the type.
 
 ```py
 from ty_extensions import static_assert
@@ -193,7 +193,7 @@ t: tuple[Never, ...] = ()
 
 ## `NoReturn` is the same as `Never`
 
-The `NoReturn` type is a different name for `Never`:
+The `NoReturn` type is a different name for `Never`.
 
 ```py
 from ty_extensions import static_assert

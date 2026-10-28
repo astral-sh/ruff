@@ -274,7 +274,7 @@ from .parser import X  # error: [unresolved-import]
 Relative imports in `site-packages` are correctly resolved even when the `site-packages` search path
 is a subdirectory of the first-party search path. Note that mdtest sets the first-party search path
 to `/src/`, which is why the virtual environment in this test is a subdirectory of `/src/`, even
-though this is not how a typical Python project would be structured:
+though this is not how a typical Python project would be structured.
 
 ```toml
 [environment]

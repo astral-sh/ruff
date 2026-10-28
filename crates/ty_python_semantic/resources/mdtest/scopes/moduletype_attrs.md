@@ -35,7 +35,7 @@ def foo():
 ```
 
 However, three attributes on `types.ModuleType` are not present as implicit module globals; these
-are excluded:
+are excluded.
 
 ```py
 # error: [unresolved-reference]
@@ -55,7 +55,7 @@ reveal_type(__init__)
 
 Typeshed annotates `types.ModuleType.__doc__` as `str | None`, but a module with a literal docstring
 always has `__doc__` set (unless Python is run in `-OO` mode, which we ignore as a possibility). In
-that case, we narrow `__doc__` to `str`:
+that case, we narrow `__doc__` to `str`.
 
 ```py
 """Some docstring"""
@@ -67,7 +67,7 @@ reveal_type(__doc__)  # revealed: str
 
 A `ModuleType` attribute can be overridden in the global scope with a different type, but it must be
 a type assignable to the declaration on `ModuleType` unless it is accompanied by an explicit
-redeclaration:
+redeclaration.
 
 `module.py`:
 
@@ -103,7 +103,7 @@ def nested_scope():
 `ModuleType` attributes can also be accessed as attributes on module-literal types. The special
 attributes `__dict__` and `__init__`, and all attributes on `builtins.object`, can also be accessed
 as attributes on module-literal types, despite the fact that these are inaccessible as globals from
-inside the module. They can even be accessed on namespace packages:
+inside the module. They can even be accessed on namespace packages.
 
 `namespace_package/foo.py`:
 
@@ -143,7 +143,7 @@ reveal_type(namespace_package.__dict__)  # revealed: dict[str, Any]
 
 Typeshed includes a fake `__getattr__` method in the stub for `types.ModuleType` to help out with
 dynamic imports; but we ignore that for module-literal types where we know exactly which module
-we're dealing with:
+we're dealing with.
 
 `b.py`:
 
@@ -155,7 +155,7 @@ reveal_type(typing.__getattr__)  # revealed: Unknown
 ```
 
 However, if we have a `ModuleType` instance, we make `__getattr__` available. This means that
-arbitrary attribute accesses are allowed (with a result type of `Any`):
+arbitrary attribute accesses are allowed (with a result type of `Any`).
 
 `c.py`:
 
@@ -175,7 +175,7 @@ def f(module: types.ModuleType):
 
 It's impossible to override the `__dict__` attribute of `types.ModuleType` instances from inside the
 module; we should prioritize the attribute in the `types.ModuleType` stub over a variable named
-`__dict__` in the module's global namespace:
+`__dict__` in the module's global namespace.
 
 `foo.py`:
 
@@ -199,7 +199,7 @@ reveal_type(foo_dict)  # revealed: dict[str, Any]
 
 Attributes overridden in the module namespace take priority. If a builtin name is conditionally
 defined as a global, however, a name lookup should union the `ModuleType` type with the
-conditionally defined type:
+conditionally defined type.
 
 ```py
 __file__ = "foo"
@@ -216,7 +216,7 @@ reveal_type(__name__)  # revealed: str
 
 ## Conditionally global or `ModuleType` attribute, with annotation
 
-The same is true if the name is annotated:
+The same is true if the name is annotated.
 
 ```py
 # error: [invalid-declaration] "Cannot shadow implicit global attribute `__file__` with declaration of type `int`"

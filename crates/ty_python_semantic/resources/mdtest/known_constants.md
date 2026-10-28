@@ -18,7 +18,7 @@ reveal_type(typing.TYPE_CHECKING)  # revealed: Literal[True]
 
 ### Aliased
 
-Make sure that we still infer the correct type if the constant has been given a different name:
+Make sure that we still infer the correct type if the constant has been given a different name.
 
 ```py
 from typing import TYPE_CHECKING as TC
@@ -29,7 +29,7 @@ reveal_type(TC)  # revealed: Literal[True]
 ### Qualified conditions
 
 Qualified references to `TYPE_CHECKING` are evaluated eagerly, allowing narrowing from the
-statically reachable branch to be preserved after the condition:
+statically reachable branch to be preserved after the condition.
 
 ```py
 import typing
@@ -48,7 +48,7 @@ def typing_alias_qualified(value: int | None) -> None:
 
 ### `typing_extensions` re-export
 
-This should behave in the same way as `typing.TYPE_CHECKING`:
+This should behave in the same way as `typing.TYPE_CHECKING`.
 
 ```py
 from typing_extensions import TYPE_CHECKING
@@ -152,7 +152,7 @@ TYPE_CHECKING: Literal[False] = False
 TYPE_CHECKING: Literal[True] = False
 ```
 
-The same rules apply in a stub file:
+The same rules apply in a stub file.
 
 ```pyi
 from typing import Literal

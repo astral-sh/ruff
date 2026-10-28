@@ -41,7 +41,7 @@ help: Replace with augmented assignment
 note: This is an unsafe fix and may change runtime behavior
 ```
 
-Parentheses around the moved operand are preserved:
+Parentheses around the moved operand are preserved.
 
 ```py
 to_multiply = (not True) + to_multiply  # snapshot: non-augmented-assignment

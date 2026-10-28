@@ -1,6 +1,6 @@
 # `except*`
 
-`except*` is only available in Python 3.11 and later:
+`except*` is only available in Python 3.11 and later.
 
 ```toml
 [environment]

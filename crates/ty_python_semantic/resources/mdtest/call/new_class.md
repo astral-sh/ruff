@@ -142,7 +142,7 @@ unless `exec_body` populates the namespace dynamically, and then attribute types
 ### Iterable bases
 
 Any iterable of bases is accepted. When the iterable is a list literal, we should still preserve the
-real base-class information:
+real base-class information.
 
 ```py
 import types
@@ -164,7 +164,7 @@ reveal_type(FromStarredList().base_attr)  # revealed: int
 ### Enum bases
 
 Unlike `type()`, `types.new_class()` properly handles metaclasses, so inheriting from `enum.Enum` or
-an empty enum subclass is valid:
+an empty enum subclass is valid.
 
 ```py
 import types
@@ -208,7 +208,7 @@ reveal_type(type(types.new_class("Dynamic", (Interface,))))  # revealed: <class 
 ### Generic and TypedDict bases
 
 Even though `types.new_class()` handles `__mro_entries__` at runtime, ty does not yet model the full
-typing semantics of dynamically-created generic classes or TypedDicts, so these bases are rejected:
+typing semantics of dynamically-created generic classes or TypedDicts, so these bases are rejected.
 
 ```py
 import types
@@ -238,7 +238,7 @@ conflicting_container = types.new_class("InlineConflictingContainer", (IntContai
 
 `type[X]` represents "some subclass of X". This is a valid base class, but the exact class is not
 known, so the MRO cannot be resolved. `Unknown` is inserted and `unsupported-dynamic-base` is
-emitted:
+emitted.
 
 ```py
 import types
@@ -258,7 +258,7 @@ def f(x: type[Base]):
 ```
 
 `type[Any]` and `type[Unknown]` already carry the dynamic kind, so no diagnostic is needed. An
-unknowable MRO is already inherent to `Any`/`Unknown`:
+unknowable MRO is already inherent to `Any`/`Unknown`.
 
 ```py
 import types
@@ -273,7 +273,7 @@ def g(x: type[Any]):
 ## Instance layout conflicts
 
 As with a `class` statement, the bases of a class created with `types.new_class()` cannot have
-conflicting instance memory layouts:
+conflicting instance memory layouts.
 
 ```py
 import types
@@ -285,7 +285,7 @@ Conflict = types.new_class("Conflict", (int, str))
 ## Dynamic namespace via `exec_body`
 
 When `exec_body` is provided, it can populate the class namespace dynamically, so attribute access
-returns `Unknown`. Without `exec_body`, the namespace is empty and attribute access is an error:
+returns `Unknown`. Without `exec_body`, the namespace is empty and attribute access is an error.
 
 ```py
 import types
@@ -323,7 +323,7 @@ reveal_type(instance2.base_attr)  # revealed: Unknown
 
 ## Forward references via string annotations
 
-Forward references via subscript annotations on generic bases are supported:
+Forward references via subscript annotations on generic bases are supported.
 
 ```py
 import types

@@ -72,7 +72,7 @@ direct_as_int: int = SubclassOfAny()
 indirect_as_int: int = IndirectSubclass()
 ```
 
-This includes final classes:
+This includes final classes.
 
 ```py
 from typing import final
@@ -88,7 +88,7 @@ class OtherFinalClass: ...
 f: FinalClass | OtherFinalClass = SubclassOfAny()
 ```
 
-This behavior is preserved through dynamically created subclasses:
+This behavior is preserved through dynamically created subclasses.
 
 ```py
 from typing import Any, final
@@ -110,7 +110,7 @@ b: FinalClass = B()
 c: FinalClass = C()
 ```
 
-`Annotated` metadata on a base does not change this behavior:
+`Annotated` metadata on a base does not change this behavior.
 
 ```py
 from typing import Annotated, Any, Literal, final
@@ -128,7 +128,7 @@ x: FinalClass = B()
 y: Literal[1] = B()
 ```
 
-This behavior is also preserved when the subclass inherits from a generic alias:
+This behavior is also preserved when the subclass inherits from a generic alias.
 
 ```py
 from typing import Any, Generic, Literal, TypeVar, final
@@ -147,7 +147,7 @@ literal: Literal[1] = SubclassOfGenericAlias()
 
 A base expression whose inferred type is `Any` does not count as explicitly inheriting from `Any`.
 The dynamic MRO entry makes instances assignable to non-final classes, but unlike an explicit `Any`
-base, not to final or literal types:
+base, not to final or literal types.
 
 ```py
 from typing import Any, Literal, final
@@ -170,7 +170,7 @@ def check_dynamic_base(base: Any):
 ```
 
 Similarly, inheriting from a name whose inferred type is `Unknown` makes instances assignable to
-non-final classes, but not to final classes:
+non-final classes, but not to final classes.
 
 ```py
 from typing import final
@@ -189,7 +189,7 @@ ordinary_unknown: Arbitrary = FromUnknownBase()
 final_unknown: FinalClass = FromUnknownBase()  # error: [invalid-assignment]
 ```
 
-A subclass of `Any` can also be assigned to arbitrary `Callable` and `Protocol` types:
+A subclass of `Any` can also be assigned to arbitrary `Callable` and `Protocol` types.
 
 ```py
 from typing import Callable, Any, Protocol
@@ -225,7 +225,7 @@ takes_other_protocol(SubclassOfAny())
 ```
 
 Error context from a failed structural check should be discarded when assignability succeeds due to
-an explicit `Any` base:
+an explicit `Any` base.
 
 ```py
 from typing import Any, Callable
@@ -256,7 +256,7 @@ info:     └── incompatible return types: `bytes` is not assignable to `int
 ```
 
 A subclass of `Any` is also assignable to literal types through the dynamic element of its instance
-type:
+type.
 
 ```py
 from typing import Any, Literal
@@ -268,7 +268,7 @@ x: Literal[1] = MockAny()
 ```
 
 A use case where subclasses of `Any` come up is in mocking libraries, where the mock object should
-be assignable to (almost) any type:
+be assignable to (almost) any type.
 
 ```py
 from unittest.mock import MagicMock
@@ -281,7 +281,7 @@ x: int = MagicMock()
 `typing.Any` is a class at runtime on Python 3.11+, and `typing_extensions.Any` is always a class.
 On earlier versions of Python, `typing.Any` was an instance of `typing._SpecialForm`, but this is
 not currently modeled by ty. We currently infer `Any` has having all attributes a class would have
-on all versions of Python:
+on all versions of Python.
 
 ```py
 from typing import Any
@@ -295,7 +295,7 @@ static_assert(is_assignable_to(TypeOf[Any], type))
 
 ## Invalid
 
-`Any` cannot be parameterized:
+`Any` cannot be parameterized.
 
 ```py
 from typing import Any
@@ -305,26 +305,26 @@ def f(x: Any[int]):
     reveal_type(x)  # revealed: Unknown
 ```
 
-`Any` cannot be called (this leads to a `TypeError` at runtime):
+`Any` cannot be called (this leads to a `TypeError` at runtime).
 
 ```py
 Any()  # error: [call-non-callable] "Object of type `<special-form 'typing.Any'>` is not callable"
 ```
 
-`Any` also cannot be used as a metaclass (under the hood, this leads to an implicit call to `Any`):
+`Any` also cannot be used as a metaclass (under the hood, this leads to an implicit call to `Any`).
 
 ```py
 class F(metaclass=Any): ...  # error: [invalid-metaclass] "Metaclass type `<special-form 'typing.Any'>` is not callable"
 ```
 
-And `Any` cannot be used in `isinstance()` checks:
+And `Any` cannot be used in `isinstance()` checks.
 
 ```py
 # error: [invalid-argument-type] "`typing.Any` cannot be used with `isinstance()`: This call will raise `TypeError` at runtime"
 isinstance("", Any)
 ```
 
-The same applies when `Any` is nested inside a tuple, including non-literal tuples:
+The same applies when `Any` is nested inside a tuple, including non-literal tuples.
 
 ```py
 isinstance("", (int, Any))  # error: [invalid-argument-type]
@@ -333,7 +333,7 @@ classes = (int, Any)
 isinstance("", classes)  # error: [invalid-argument-type]
 ```
 
-But `issubclass()` checks are fine:
+But `issubclass()` checks are fine.
 
 ```py
 issubclass(object, Any)  # no error!

@@ -12,7 +12,7 @@ the two types that are being compared.
 
 ## Basic
 
-Mainly for comparison: this is the most basic kind of `invalid-assignment` diagnostic:
+Mainly for comparison: this is the most basic kind of `invalid-assignment` diagnostic.
 
 ```py
 def _(source: str):
@@ -507,7 +507,7 @@ info: the first parameter is missing
 In the following example, the arguments provided to the `accept()` call are not accepted by the
 signature of the `callback` function, and so we report an error on the outer call.
 
-We don't currently add error context in this code path, but we could add it in the future:
+We don't currently add error context in this code path, but we could add it in the future.
 
 ```py
 from collections.abc import Callable
@@ -535,7 +535,7 @@ info: Function signature here
 ```
 
 The following case is similar, but exercises a different code path. Here, we could also add error
-context to improve the diagnostic in the future:
+context to improve the diagnostic in the future.
 
 ```py
 def wrapper2[**P](fn: Callable[P, None]) -> Callable[P, None]:
@@ -640,7 +640,7 @@ info: parameter `x` has an incompatible type: `str` is not assignable to `bytes`
 info: This violates the Liskov Substitution Principle
 ```
 
-We call out the correct (target) parameter if they are listed in a different order:
+We call out the correct (target) parameter if they are listed in a different order.
 
 ```py
 class ParentXY:
@@ -719,7 +719,7 @@ info: This violates the Liskov Substitution Principle
 ## Bound methods with incompatible specializations
 
 When both the captured receiver and the method signature are incompatible, the diagnostic explains
-the incompatible return types:
+the incompatible return types.
 
 ```py
 from ty_extensions._internal import TypeOf
@@ -1051,7 +1051,7 @@ info:     └── ... omitted 1 union element without additional context
 ## Type variable upper bounds
 
 Assignability context is included when an explicit type argument does not satisfy a type variable's
-upper bound:
+upper bound.
 
 ```py
 from typing import Generic, TypeVar
@@ -1448,7 +1448,7 @@ info:                     └── read type `bytes` is not assignable to `str`
 Assignability errors against protocols are often caused because a method in the protocol class
 should have used positional-only parameters, but didn't. In this situation, we point out the likely
 cause of the assignability error in a dedicated `help:` message that points out that the issue may
-be due to the protocol itself rather than the type being assigned to the protocol:
+be due to the protocol itself rather than the type being assigned to the protocol.
 
 ```py
 from typing import Protocol
@@ -1478,7 +1478,7 @@ help: `Source` might be assignable to `Target` if the parameter `expected` were 
 
 The same suggestion applies for the case where a positional-or-keyword parameter was apparently
 demanded by a protocol member, but only a positional-only parameter was supplied in the type that
-was assigned to the protocol:
+was assigned to the protocol.
 
 ```py
 class Target2(Protocol):
@@ -1506,7 +1506,7 @@ help: `Source2` might be assignable to `Target2` if the parameter `expected` wer
 
 Making a parameter positional-only resolves a name mismatch but does not necessarily make the method
 compatible, because its parameter type can still be incorrect. For this reason, we hedge our bets a
-little in our `help:` message (we say "*might* be assignable", rather than "*will* be assignable"):
+little in our `help:` message (we say "*might* be assignable", rather than "*will* be assignable").
 
 ```py
 class Target3(Protocol):
@@ -1565,7 +1565,7 @@ help: `Source4` might be assignable to `Child` if the parameter `expected` were 
 
 ## Type aliases
 
-Type aliases should be expanded in diagnostics to understand the underlying incompatibilities:
+Type aliases should be expanded in diagnostics to understand the underlying incompatibilities.
 
 ```py
 from typing import Protocol
@@ -1734,7 +1734,7 @@ info:     └── protocol member `foo` is not defined on type `DoesNotSupport
 ## Assigning an overload set
 
 This test makes sure that error context from failed overload candidates does not leak
-(`IncompatibleFoo.bar` is assignable to `SupportsFooAndBar.bar`):
+(`IncompatibleFoo.bar` is assignable to `SupportsFooAndBar.bar`).
 
 ```py
 from typing import Protocol, overload, SupportsIndex
@@ -1817,7 +1817,7 @@ info: Consider using the covariant supertype `collections.abc.Sequence`
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
 ```
 
-We do the same for other invariant generic classes:
+We do the same for other invariant generic classes.
 
 ```py
 from collections import ChainMap, Counter, OrderedDict, defaultdict, deque
@@ -2013,7 +2013,7 @@ info: `MutableSequence` is invariant in its type parameter
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
 ```
 
-We also show this hint for custom invariant generic classes:
+We also show this hint for custom invariant generic classes.
 
 ```py
 from typing import Generic, TypeVar
@@ -2039,7 +2039,7 @@ info: `MyContainer` is invariant in its type parameter
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
 ```
 
-We do *not* show this hint if the element types themselves wouldn't be assignable:
+We do *not* show this hint if the element types themselves wouldn't be assignable.
 
 ```py
 def _(source: list[int]):
@@ -2056,7 +2056,7 @@ error[invalid-assignment]: Object of type `list[int]` is not assignable to `list
    |             Declared type
 ```
 
-We do not emit any error if the collection types are covariant:
+We do not emit any error if the collection types are covariant.
 
 ```py
 from collections.abc import Sequence

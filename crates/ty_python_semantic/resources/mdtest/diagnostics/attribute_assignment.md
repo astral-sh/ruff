@@ -17,7 +17,7 @@ instance.attr = 1  # fine
 C.attr = 1  # fine
 ```
 
-But if the type is incorrect, we emit an error:
+But if the type is incorrect, we emit an error.
 
 ```py
 instance.attr = "wrong"  # snapshot: invalid-assignment
@@ -60,7 +60,7 @@ instance.attr = "wrong"  # error: [invalid-assignment]
 ```
 
 When trying to set them on class objects, we generate a useful diagnostic that mentions that the
-attribute is only available on instances:
+attribute is only available on instances.
 
 ```py
 C.attr = 1  # snapshot: invalid-attribute-access
@@ -149,7 +149,7 @@ class WithNew:
 
 ## `ClassVar`s
 
-These can only be set on class objects:
+These can only be set on class objects.
 
 ```py
 from typing import ClassVar
@@ -179,7 +179,7 @@ error[invalid-attribute-access]: Cannot assign to ClassVar `attr` from an instan
 
 ## Unknown attributes
 
-When trying to set an attribute that is not defined, we also emit errors:
+When trying to set an attribute that is not defined, we also emit errors.
 
 ```py
 class C: ...
@@ -250,7 +250,7 @@ SlottedChild().value = 1
 
 ## Possibly-missing attributes
 
-When trying to set an attribute that is not defined in all branches, we emit errors:
+When trying to set an attribute that is not defined in all branches, we emit errors.
 
 ```py
 def _(flag: bool) -> None:

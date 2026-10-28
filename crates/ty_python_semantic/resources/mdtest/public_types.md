@@ -9,7 +9,7 @@ flow of a program, we currently make the simplifying assumption that an inner sc
 should therefore be the union of all possible types that the symbol could have.
 
 In the following example, depending on when `inner()` is called, the type of `x` could either be `A`
-or `B`:
+or `B`.
 
 ```py
 class A: ...
@@ -30,7 +30,7 @@ def outer() -> None:
     inner()
 ```
 
-Similarly, if control flow in the outer scope can split, the public type of `x` should reflect that:
+Similarly, if control flow in the outer scope can split, the public type of `x` should reflect that.
 
 ```py
 def outer(flag: bool) -> None:
@@ -52,7 +52,7 @@ def outer(flag: bool) -> None:
     inner()
 ```
 
-If a binding is not reachable, it is not considered in the public type:
+If a binding is not reachable, it is not considered in the public type.
 
 ```py
 def outer() -> None:
@@ -97,7 +97,7 @@ def outer(flag: bool) -> None:
     inner()
 ```
 
-If a symbol is only conditionally bound, we do not raise any errors:
+If a symbol is only conditionally bound, we do not raise any errors.
 
 ```py
 def outer(flag: bool) -> None:
@@ -122,7 +122,7 @@ def outer(flag: bool) -> None:
 
 The public type is available, even if the end of the outer scope is unreachable. This is a
 regression test. A previous version of ty used the end-of-scope position to determine the public
-type, which would have resulted in incorrect type inference here:
+type, which would have resulted in incorrect type inference here.
 
 ```py
 def outer() -> None:
@@ -154,7 +154,7 @@ def outer(x: A) -> None:
     raise
 ```
 
-An arbitrary level of nesting is supported:
+An arbitrary level of nesting is supported.
 
 ```py
 def f0() -> None:
@@ -253,7 +253,7 @@ def outer(x: A | None):
 
 ## At module level
 
-The behavior is the same if the outer scope is the global scope of a module:
+The behavior is the same if the outer scope is the global scope of a module.
 
 ```py
 def flag() -> bool:
@@ -276,7 +276,7 @@ if flag():
 ## Mixed declarations and bindings
 
 When a declaration only appears in one branch, we also consider the types of the symbol's bindings
-in other branches:
+in other branches.
 
 ```py
 def flag() -> bool:
@@ -295,7 +295,7 @@ def _():
 
 This pattern appears frequently with conditional imports. The `import` statement is both a
 declaration and a binding, but we still add `None` to the public type union in a situation like
-this:
+this.
 
 ```py
 try:
@@ -314,7 +314,7 @@ def _():
 ### Shadowing
 
 Since we do not analyze control flow in the outer scope here, we assume that `inner()` could be
-called between the two assignments to `x`:
+called between the two assignments to `x`.
 
 ```py
 def outer() -> None:
@@ -348,7 +348,7 @@ def f(x: A):
 ### With implementation
 
 Overloads need special treatment, because here, we do not want to consider *all* possible
-definitions of `f`. This would otherwise result in a union of all three definitions of `f`:
+definitions of `f`. This would otherwise result in a union of all three definitions of `f`.
 
 ```py
 from typing import overload
@@ -366,7 +366,7 @@ def _():
     reveal_type(f)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
 ```
 
-This also works if there are conflicting declarations:
+This also works if there are conflicting declarations.
 
 ```py
 def flag() -> bool:
@@ -408,7 +408,7 @@ def _():
     reveal_type(f)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
 ```
 
-This also works if there are conflicting declarations:
+This also works if there are conflicting declarations.
 
 ```pyi
 def flag() -> bool:

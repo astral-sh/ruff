@@ -10,7 +10,7 @@ C = 1  # error: [invalid-assignment]
 
 ## Explicit
 
-No diagnostic is raised in the case of explicit shadowing:
+No diagnostic is raised in the case of explicit shadowing.
 
 ```py
 class C: ...

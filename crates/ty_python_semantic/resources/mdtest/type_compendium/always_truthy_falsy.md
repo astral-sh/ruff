@@ -13,7 +13,7 @@ statically infer that `bool(at)` is always `True`, i.e. that the expression `boo
 
 ## Examples
 
-Here, we give a few examples of values that belong to these types:
+Here, we give a few examples of values that belong to these types.
 
 ```py
 from ty_extensions import AlwaysTruthy, AlwaysFalsy
@@ -47,7 +47,7 @@ af = CustomAlwaysFalsyType()
 
 ## `AlwaysTruthy` and `AlwaysFalsy` are disjoint
 
-It follows directly from the definition that `AlwaysTruthy` and `AlwaysFalsy` are disjoint types:
+It follows directly from the definition that `AlwaysTruthy` and `AlwaysFalsy` are disjoint types.
 
 ```py
 from ty_extensions import static_assert, AlwaysTruthy, AlwaysFalsy
@@ -64,7 +64,7 @@ types describe the set of values that *can* be truthy (`bool(t)` can return `Tru
 
 Finally, we can also define the type `AmbiguousTruthiness = Truthy & Falsy`, which describes the set
 of values that can be truthy *and* falsy. This intersection is not empty. In the following, we give
-examples for values that belong to these three types:
+examples for values that belong to these three types.
 
 ```pyi
 from ty_extensions import static_assert, AlwaysTruthy, AlwaysFalsy

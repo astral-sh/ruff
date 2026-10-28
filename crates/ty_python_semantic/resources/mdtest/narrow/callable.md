@@ -10,7 +10,7 @@ strict-generic-narrowing = false
 ```
 
 Narrowing with `callable(x)` or `isinstance(x, Callable)` narrows a union to just the callable
-types, while preserving their signatures:
+types, while preserving their signatures.
 
 ```py
 from typing import Any, Callable
@@ -115,7 +115,7 @@ strict-generic-narrowing = true
 ```
 
 If a top-callable is part of an intersection, it should still contribute its return type even when
-the other intersection elements are not callable:
+the other intersection elements are not callable.
 
 ```py
 from typing import Callable
@@ -275,7 +275,7 @@ def _(subj: tuple[abc.Callable[..., int]] | tuple[None]) -> None:
             reveal_type(subj[0])  # revealed: (...) -> int
 ```
 
-`collections.abc.Callable` has no `__match_args__`, so it does not accept positional subpatterns:
+`collections.abc.Callable` has no `__match_args__`, so it does not accept positional subpatterns.
 
 ```py
 from collections import abc

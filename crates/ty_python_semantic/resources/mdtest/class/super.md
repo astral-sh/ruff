@@ -132,7 +132,7 @@ def _(x: object, y: SomeTypedDict, z: Callable[[int, str], bool]):
 reveal_type(super(list[int], []))
 ```
 
-`super(pivot_class, owner)` can be called from inside methods, just like single-argument `super()`:
+`super(pivot_class, owner)` can be called from inside methods, just like single-argument `super()`.
 
 ```py
 class Super:
@@ -313,7 +313,7 @@ class E(enum.Enum):
 
 When the second argument to `super()` is a class object, the call can still be valid if that class
 object is an instance of the pivot metaclass. This includes both concrete class objects and
-`type[T]`-style annotations in metaclass methods:
+`type[T]`-style annotations in metaclass methods.
 
 <!-- snapshot-diagnostics -->
 
@@ -665,7 +665,7 @@ super(object, object()).__class__
 ```
 
 An inhabitant of `type[Protocol]` may be either a nominal subclass of the protocol or a structural
-implementation, so the protocol's presence in the class's MRO is unknown:
+implementation, so the protocol's presence in the class's MRO is unknown.
 
 ```py
 class StructuralProtocol(typing.Protocol): ...
@@ -685,7 +685,7 @@ reveal_type(super(typing.ChainMap, collections.ChainMap()))  # revealed: Unknown
 
 It's not valid to inherit from unsubscripted `typing.Generic` or `typing.Protocol`, but it _is_
 valid as the first argument to `super()`. Still required that it be in the second argument's MRO,
-though:
+though.
 
 ```py
 # revealed: <super: <special-form 'typing.Generic'>, <class 'SupportsInt'>>

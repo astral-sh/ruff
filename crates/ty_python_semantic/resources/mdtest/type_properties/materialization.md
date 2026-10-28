@@ -191,7 +191,7 @@ def _(top: Top[C3], bottom: Bottom[C3]) -> None:
 
 `TypeIs` is invariant in its type argument, and so the top and bottom materializations of
 `TypeIs[Any]` cannot simplify to `TypeIs[object]` and `TypeIs[Never]`, and are instead represented
-with the `Top` and `Bottom` special forms:
+with the `Top` and `Bottom` special forms.
 
 ```py
 from typing import Any
@@ -207,7 +207,7 @@ static_assert(not is_equivalent_to(Top[TypeIs[Any]], TypeIs[object]))
 static_assert(not is_equivalent_to(Bottom[TypeIs[Any]], TypeIs[Never]))
 ```
 
-`TypeIs[int]` is a subtype of `Top[TypeIs[Any]]`, but not `TypeIs[object]`:
+`TypeIs[int]` is a subtype of `Top[TypeIs[Any]]`, but not `TypeIs[object]`.
 
 ```py
 static_assert(not is_subtype_of(TypeIs[int], TypeIs[object]))
@@ -220,7 +220,7 @@ static_assert(not is_subtype_of(Top[TypeIs[Any]], TypeIs[int]))
 static_assert(not is_subtype_of(TypeIs[int], Bottom[TypeIs[Any]]))
 ```
 
-A static `TypeIs` type is equivalent to its top and bottom materializations:
+A static `TypeIs` type is equivalent to its top and bottom materializations.
 
 ```py
 static_assert(is_equivalent_to(Top[TypeIs[int]], TypeIs[int]))
@@ -228,7 +228,7 @@ static_assert(is_equivalent_to(Bottom[TypeIs[int]], TypeIs[int]))
 ```
 
 Materializations are fully static, so they are subtypes of themselves and cannot be materialized
-further:
+further.
 
 ```py
 static_assert(is_subtype_of(Top[TypeIs[Any]], Top[TypeIs[Any]]))
@@ -239,7 +239,7 @@ static_assert(is_equivalent_to(Bottom[Top[TypeIs[Any]]], Top[TypeIs[Any]]))
 ```
 
 The static component of a gradual `TypeIs` type constrains the possible materializations of its
-argument:
+argument.
 
 ```py
 static_assert(is_subtype_of(TypeIs[int], Top[TypeIs[int | Any]]))
@@ -248,7 +248,7 @@ static_assert(not is_subtype_of(TypeIs[str], Top[TypeIs[int | Any]]))
 ```
 
 In contrast, `TypeGuard` is covariant, so the top and bottom materializations of `TypeGuard[Any]`
-simplify to `TypeGuard[object]` and `TypeGuard[Never]`:
+simplify to `TypeGuard[object]` and `TypeGuard[Never]`.
 
 ```py
 from typing_extensions import TypeGuard
@@ -297,7 +297,7 @@ static_assert(is_equivalent_to(Bottom[Callable[..., Never]], EquivalentToBottom)
 static_assert(not is_equivalent_to(Top[Callable[..., object]], Callable[..., object]))
 ```
 
-Gradual parameters can be top- and bottom-materialized even if the return type is not `Any`:
+Gradual parameters can be top- and bottom-materialized even if the return type is not `Any`.
 
 ```py
 type GradualParams = Callable[..., int]
@@ -326,7 +326,7 @@ def _(top: Top[RegularCallableTypeOf[f]], bottom: Bottom[RegularCallableTypeOf[f
     reveal_type(bottom)  # revealed: Overload[(x: int) -> Never, (*args: object, **kwargs: object) -> str]
 ```
 
-The top callable can be represented in a `ParamSpec`:
+The top callable can be represented in a `ParamSpec`.
 
 ```py
 def takes_paramspec[**P](f: Callable[P, None]) -> Callable[P, None]:
@@ -337,7 +337,7 @@ def _(top: Top[Callable[..., None]]):
     reveal_type(revealed)  # revealed: Top[(...) -> None]
 ```
 
-The top callable is not a subtype of `(*object, **object) -> object`:
+The top callable is not a subtype of `(*object, **object) -> object`.
 
 ```py
 type TopCallable = Top[Callable[..., Any]]
@@ -840,7 +840,7 @@ static_assert(is_equivalent_to(Bottom[(Any | Foo) & tuple[str]], Foo & tuple[str
 ## Intersections of invariant generics
 
 The intersection `list[Any] & list[int]` is eagerly simplified to `list[int]`. Therefore, this is
-just a fully-static type where bottom and top materialization are the same:
+just a fully-static type where bottom and top materialization are the same.
 
 ```pyi
 from typing import Any
@@ -855,7 +855,7 @@ def _(
 ```
 
 Unfortunately, we get a seemingly different result when we distribute `Top[..]` and `Bottom[..]`
-over the intersection first:
+over the intersection first.
 
 ```pyi
 def _(
@@ -1054,7 +1054,7 @@ static_assert(is_equivalent_to(Bottom[GenericContravariant[Any]], GenericContrav
 ```
 
 When all invariant type parameters are fully static (e.g. type variables rather than gradual types
-like `Any`), `Top` simplifies away since there is no dynamic component to materialize:
+like `Any`), `Top` simplifies away since there is no dynamic component to materialize.
 
 ```py
 class Foo: ...
@@ -1076,7 +1076,7 @@ def f(
     reveal_type(unbounded)  # revealed: InvariantUnbounded[T_unbounded@f]
 ```
 
-Parameters in callable are contravariant, so the variance should be flipped:
+Parameters in callable are contravariant, so the variance should be flipped.
 
 ```py
 from typing import Callable
@@ -1554,7 +1554,7 @@ def _(
 ): ...
 ```
 
-It is also invalid to use multiple arguments:
+It is also invalid to use multiple arguments.
 
 ```py
 def _(
@@ -1563,7 +1563,7 @@ def _(
 ): ...
 ```
 
-The argument must be a type expression:
+The argument must be a type expression.
 
 ```py
 def _(
@@ -1867,7 +1867,7 @@ def unresolved[T]():
     static_assert(not is_subtype_of(Top[list[Unknown]], list[T]))
 ```
 
-A declared upper bound on `T` can make this relation true:
+A declared upper bound on `T` can make this relation true.
 
 ```pyi
 def bounded[T: int]():
@@ -2083,7 +2083,7 @@ python-version = "3.12"
 
 ### Instance attributes
 
-For a mutable `Any` attribute, `Top` reads `object` and writes `Never`; `Bottom` does the reverse:
+For a mutable `Any` attribute, `Top` reads `object` and writes `Never`; `Bottom` does the reverse.
 
 ```py
 from typing import Any, Protocol
@@ -2104,7 +2104,7 @@ def mutable_bottom_attributes(bottom: Bottom[MutableAny]) -> None:
 ```
 
 The class object of a materialized protocol preserves its instance type when called directly or
-passed through a generic callable:
+passed through a generic callable.
 
 ```py
 from typing import Callable
@@ -2128,7 +2128,7 @@ def annotated_constructors(top: type[Top[MutableAny]], bottom: type[Bottom[Mutab
 
 A protocol's constructor can explicitly return a value that is not an instance of the protocol.
 Materializing the protocol must preserve that return type, including when its class object is
-converted to a callable:
+converted to a callable.
 
 ```py
 class IntConstructor(Protocol):
@@ -2212,7 +2212,7 @@ def annotated_class_instance_attributes(top: type[Top[MutableAny]], bottom: type
 
 ### Writable properties
 
-A property setter is already a write, so its parameter is mapped only once:
+A property setter is already a write, so its parameter is mapped only once.
 
 ```py
 from typing import Any, Protocol
@@ -2236,7 +2236,7 @@ def writable_bottom_property(bottom: Bottom[WritableAny]) -> None:
 ### Protocol relations
 
 `MutableAny` and `Top[MutableAny]` refer to the same protocol class, but they do not have the same
-read and write requirements. Subtyping and union simplification must use those requirements:
+read and write requirements. Subtyping and union simplification must use those requirements.
 
 ```py
 from typing import Any, Protocol
@@ -2264,7 +2264,7 @@ def union_order(
 ```
 
 Inheriting from a protocol must not bypass its materialized write requirement. A nominal subclass
-and a structurally identical class therefore have the same result here:
+and a structurally identical class therefore have the same result here.
 
 ```py
 class MutableAnySubclass(MutableAny):
@@ -2278,7 +2278,7 @@ static_assert(not is_subtype_of(StructuralMutableAny, Bottom[MutableAny]))
 ```
 
 An inherited `Any` member is materialized along with members declared directly on the protocol, so
-it cannot satisfy a more specific inherited protocol:
+it cannot satisfy a more specific inherited protocol.
 
 ```py
 class GenericBase[T](Protocol):
@@ -2294,7 +2294,7 @@ def _(top: Top[InheritedAny]) -> None:
 
 Materializing an unrelated member does not erase explicit protocol inheritance, even when an
 override is structurally incompatible with the base protocol. Materializing the fully static base
-also preserves the nominal relationship:
+also preserves the nominal relationship.
 
 ```py
 class BaseProtocol(Protocol):
@@ -2314,7 +2314,7 @@ static_assert(is_subtype_of(ChildProtocol, Bottom[BaseProtocol]))
 
 A covariant `Awaitable[int]` satisfies the top-materialized `Awaitable[object]` protocol. Narrowing
 to that protocol must therefore preserve `Awaitable[int]` without retaining a redundant
-intersection:
+intersection.
 
 ```py
 from typing import Awaitable
@@ -2334,7 +2334,7 @@ def narrow_awaitable(value: Awaitable[int]) -> None:
 
 Class variables have separate read and write types. `Top` reads `object` and writes `Never`, while
 `Bottom` reads `Never` and writes `object`. These requirements are preserved on both inferred and
-explicitly annotated class objects:
+explicitly annotated class objects.
 
 ```py
 from typing import Any, ClassVar, Protocol
@@ -2365,7 +2365,7 @@ def annotated_class_reads(top: type[Top[ClassVarAny]], bottom: type[Bottom[Class
 
 Structural protocol checks use the mapped read and write types as well. `ClassVarInt` satisfies the
 top-materialized protocol, but not the bottom-materialized one; a class missing the class variable
-does not satisfy the top-materialized protocol:
+does not satisfy the top-materialized protocol.
 
 ```py
 class ClassVarInt:
@@ -2384,7 +2384,7 @@ def materialized_bottom_class(bottom: Bottom[ClassVarAny]) -> None:
     reveal_type(valid_bottom_class)  # revealed: type[Bottom[ClassVarAny]]
 ```
 
-Union simplification preserves the materialized class variable regardless of operand order:
+Union simplification preserves the materialized class variable regardless of operand order.
 
 ```py
 def class_union_order(
@@ -2401,7 +2401,7 @@ def class_union_order(
 ### Methods through the class object
 
 Ordinary, static, and class methods use their materialized signatures when accessed through the
-class object. Ordinary methods remain unbound:
+class object. Ordinary methods remain unbound.
 
 ```py
 from typing import Any, Protocol
@@ -2453,7 +2453,7 @@ def invalid(source: Top[Source]) -> Bottom[Target]:
 ### Members outside the protocol interface
 
 `__init__` is not a protocol requirement, but accessing it on a materialized value still uses the
-declaration on the protocol class:
+declaration on the protocol class.
 
 ```py
 from typing import Any, Protocol
@@ -2470,7 +2470,7 @@ def constructor(top: Top[ProtocolWithInit]) -> None:
 
 ### Read-only property deletion
 
-Materializing a read-only property must not make it deletable:
+Materializing a read-only property must not make it deletable.
 
 ```py
 from typing import Any, Protocol
@@ -2496,7 +2496,7 @@ def property_deletion(
 ### Descriptor-decorated properties
 
 A descriptor can expose separate read and write types. `Top` maps an `Any` read to `object` and an
-`Any` write to `Never`; `Bottom` maps them in the opposite direction:
+`Any` write to `Never`; `Bottom` maps them in the opposite direction.
 
 ```py
 from typing import Any, Callable, Never, Protocol
@@ -2555,7 +2555,7 @@ def narrowed_descriptor_write(value: object) -> None:
 ### Property accessor types
 
 Materializing a property with fully static exposed types is a no-op. The accessor's implicit
-receiver and the setter's return type do not contribute to the property requirement:
+receiver and the setter's return type do not contribute to the property requirement.
 
 ```py
 from typing import Any, Protocol
@@ -2608,7 +2608,7 @@ def materialized_property_assignment_narrowing(
 Generic inference uses a member's materialized type, not its original `Any`. This applies both to
 inherited members and to the finite requirements of independently declared structural protocols.
 Bounds, constraints, and invariant requirements must still reject an incompatible materialized
-member instead of accepting an invalid call or selecting the wrong overload:
+member instead of accepting an invalid call or selecting the wrong overload.
 
 ```py
 from typing import Any, Literal, Protocol, TypeVar, overload
@@ -3030,7 +3030,7 @@ static_assert(is_subtype_of(RecursiveValue[str], Top[RecursiveValue[object]]))
 ### Generator delegation
 
 `yield from` uses the same materialized yield and return types as direct generator methods. Applying
-another materialization must not change a result that no longer contains `Any`:
+another materialization must not change a result that no longer contains `Any`.
 
 ```py
 from collections.abc import Generator
@@ -3052,7 +3052,7 @@ def generator_delegation(
 ```
 
 The send type is contravariant. A top-materialized generator cannot accept values sent by a
-`Generator[object, object, object]`, while a bottom-materialized generator can:
+`Generator[object, object, object]`, while a bottom-materialized generator can.
 
 ```py
 def top_generator_send(
@@ -3071,7 +3071,7 @@ def bottom_generator_send(
 ### `Self` binding
 
 `Self` may appear in `Top[GenericProtocol[Self]]` even when the protocol member itself is `Any`. It
-must still bind to the class through which the attribute is accessed:
+must still bind to the class through which the attribute is accessed.
 
 ```py
 from typing import Any, Protocol, Self
@@ -3091,7 +3091,7 @@ reveal_type(SelfContainerChild().member)  # revealed: Top[GenericProtocol[SelfCo
 
 ### Legacy type variables
 
-A legacy type variable in the protocol's type arguments still makes the enclosing function generic:
+A legacy type variable in the protocol's type arguments still makes the enclosing function generic.
 
 ```py
 from typing import Any, Protocol, TypeVar
@@ -3109,7 +3109,7 @@ reveal_type(accepts_legacy)  # revealed: def accepts_legacy[T](value: Top[Legacy
 
 ### Generic aliases
 
-Expanding a generic alias preserves the materialized write type:
+Expanding a generic alias preserves the materialized write type.
 
 ```py
 from typing import Any, Protocol
@@ -3141,7 +3141,7 @@ def annotated_generic_protocol_classes(
 
 Materializing the enclosing `Box[Any]` affects the protocol's specialization separately from its
 explicit `Top` or `Bottom` annotation. Matching specializations do not make these argument types
-compatible:
+compatible.
 
 ```py
 class Box[T]:
@@ -3199,7 +3199,7 @@ def compare_legacy(top: Top[LegacyBox[Any]], bottom: Bottom[LegacyBox[Any]]) -> 
 ### Nested generic protocols
 
 A protocol nested inside another generic type preserves its separate read and write requirements
-after materialization:
+after materialization.
 
 ```py
 from typing import Any, Protocol
@@ -3230,7 +3230,7 @@ def nested_specialization(
 
 An ordinary specialization of a class-backed protocol only maps its class specialization. It must
 not inspect the protocol interface, because the specialization can occur while that same interface
-is being constructed:
+is being constructed.
 
 ```py
 from __future__ import annotations
@@ -3336,7 +3336,7 @@ static_assert(is_subtype_of(Top[Tree], Tree))
 static_assert(is_subtype_of(Tree, Bottom[Tree]))
 ```
 
-The same holds for mutually recursive protocols, including a forward reference:
+The same holds for mutually recursive protocols, including a forward reference.
 
 ```py
 class First(Protocol):
@@ -3385,7 +3385,7 @@ static_assert(not is_subtype_of(Bottom[LegacyReader[int]], LegacyReader[str]))
 ```
 
 With a gradual type argument, `value()` returns `Any` or `Unknown`, so materialization changes the
-protocol's requirements:
+protocol's requirements.
 
 ```py
 from typing import Any
@@ -3435,7 +3435,7 @@ static_assert(not is_equivalent_to(Top[LegacyNode[int]], LegacyNode[str]))
 ```
 
 Properties with setters also remain unchanged under materialization when recursive specializations
-grow. Different specializations still need to satisfy each other's setter requirements:
+grow. Different specializations still need to satisfy each other's setter requirements.
 
 ```py
 class TypedSetter[T](Protocol):
@@ -3502,7 +3502,7 @@ static_assert(not is_assignable_to(Bottom[LegacyValuedStream[int]], LegacyValued
 
 Materialization leaves a fully static protocol unchanged, including its receiver restrictions.
 `WrappedReceiver[str]` and `WrappedReceiver[int]` also have matching structures and the same
-restriction on `read`:
+restriction on `read`.
 
 ```py
 class WrappedReceiver[T](Protocol):
@@ -3589,7 +3589,7 @@ static_assert(not is_equivalent_to(UnknownTree, Top[UnknownTree]))
 static_assert(not is_equivalent_to(UnknownTree, Bottom[UnknownTree]))
 ```
 
-An overload retains its gradual requirements even when another overload is fully static:
+An overload retains its gradual requirements even when another overload is fully static.
 
 ```py
 class OverloadedTree(Protocol):
@@ -3656,7 +3656,7 @@ static_assert(not is_subtype_of(LegacyMasked[object], Bottom[LegacyMasked[object
 
 ### Recursive protocols capturing a gradual type variable
 
-An enclosing type variable can introduce a gradual type in a recursive specialization:
+An enclosing type variable can introduce a gradual type in a recursive specialization.
 
 ```py
 from __future__ import annotations
@@ -3732,7 +3732,7 @@ def inspect_legacy(node: LegacyNode[int]) -> None:
     reveal_type(node.value())  # revealed: Any | int
 ```
 
-An interface can also be provisional when recursive specializations are compared:
+An interface can also be provisional when recursive specializations are compared.
 
 ```py
 class FallbackNode[T, U](Protocol):
@@ -3837,7 +3837,7 @@ def write(top: Top[Tree], bottom: Bottom[Tree]) -> None:
     bottom.value = object()  # no diagnostic
 ```
 
-The getter can be gradual even when the setter is fully static:
+The getter can be gradual even when the setter is fully static.
 
 ```py
 class GradualGetter(Protocol):
@@ -3851,7 +3851,7 @@ static_assert(not is_equivalent_to(GradualGetter, Top[GradualGetter]))
 static_assert(not is_equivalent_to(GradualGetter, Bottom[GradualGetter]))
 ```
 
-An invalid setter with no value parameter does not establish matching writable requirements:
+An invalid setter with no value parameter does not establish matching writable requirements.
 
 ```py
 from ty_extensions._internal import is_subtype_of
@@ -3898,7 +3898,7 @@ def read(top: Top[Tree], bottom: Bottom[Tree]) -> None:
     reveal_type(bottom.value)  # revealed: Never
 ```
 
-A descriptor can also have a static read type and a gradual write type:
+A descriptor can also have a static read type and a gradual write type.
 
 ```py
 class WriteDescriptor:
@@ -3988,7 +3988,7 @@ static_assert(is_assignable_to(Top[LegacyStable[object, str | int]], Bottom[Lega
 static_assert(is_assignable_to(Top[LegacyStable[object, str]], LegacyStable[object, str | int]))
 ```
 
-Fully static specializations remain unchanged under materialization even when their children grow:
+Fully static specializations remain unchanged under materialization even when their children grow.
 
 ```py
 static_assert(is_equivalent_to(Stable[str, str], Top[Stable[str, str]]))
@@ -4100,7 +4100,7 @@ static_assert(not is_assignable_to(Top[Growing[str | int]], Growing[str]))
 
 ### Display
 
-Materialized protocols display `Top` and `Bottom` around the protocol class:
+Materialized protocols display `Top` and `Bottom` around the protocol class.
 
 ```py
 from typing import Any, Protocol

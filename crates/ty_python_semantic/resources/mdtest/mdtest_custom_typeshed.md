@@ -10,7 +10,7 @@ entries enabling all specified `<typeshed-root>/stdlib` files for all supported 
 
 ## Basic example (auto-generated `VERSIONS` file)
 
-First, we specify `/typeshed` as the custom typeshed directory:
+First, we specify `/typeshed` as the custom typeshed directory.
 
 ```toml
 [environment]
@@ -35,7 +35,7 @@ builtin_symbol: BuiltinClass
 version = "my custom Python"
 ```
 
-And finally write a normal Python code block that makes use of the custom stubs:
+And finally write a normal Python code block that makes use of the custom stubs.
 
 ```py
 b: BuiltinClass = builtin_symbol
@@ -52,7 +52,7 @@ import sys
 
 If we want to specify a custom `VERSIONS` file, we can do so by creating a fenced code block with
 language `text`. In the following test, we set the Python version to `3.10` and then make sure that
-we can *not* import `new_module` with a version requirement of `3.11-`:
+we can *not* import `new_module` with a version requirement of `3.11-`.
 
 ```toml
 [environment]
@@ -91,7 +91,7 @@ from new_module import NewClass
 When providing a custom typeshed directory, basic things like `reveal_type` will stop working
 because we rely on being able to import it from `typing_extensions`. The actual definition of
 `reveal_type` in typeshed is slightly involved (depends on generics, `TypeVar`, etc.), but a very
-simple untyped definition is enough to make `reveal_type` work in tests:
+simple untyped definition is enough to make `reveal_type` work in tests.
 
 ```toml
 [environment]

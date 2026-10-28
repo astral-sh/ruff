@@ -1,7 +1,7 @@
 # Narrowing using `hasattr()`
 
 The builtin function `hasattr()` can be used to narrow nominal and structural types. This is
-accomplished using an intersection with a synthesized protocol:
+accomplished using an intersection with a synthesized protocol.
 
 ```py
 from typing import final
@@ -26,7 +26,7 @@ def _(obj: NonFinalClass):
 ```
 
 For a final class, we recognize that there is no way that an object of `FinalClass` could ever have
-a `spam` attribute, so the type is narrowed to `Never`:
+a `spam` attribute, so the type is narrowed to `Never`.
 
 ```py
 @final
@@ -45,7 +45,7 @@ def _(obj: FinalClass):
 
 When the corresponding attribute is already defined on the class, `hasattr` narrowing does not
 change the type. `<Protocol with members 'spam'>` is a supertype of `WithSpam`, and so
-`WithSpam & <Protocol …>` simplifies to `WithSpam`:
+`WithSpam & <Protocol …>` simplifies to `WithSpam`.
 
 ```py
 class WithSpam:
@@ -60,7 +60,7 @@ def _(obj: WithSpam):
 ```
 
 When a class may or may not have a `spam` attribute, `hasattr` narrowing can provide evidence that
-the attribute exists. Here, no `possibly-missing-attribute` error is emitted in the `if` branch:
+the attribute exists. Here, no `possibly-missing-attribute` error is emitted in the `if` branch.
 
 ```py
 def returns_bool() -> bool:
@@ -86,7 +86,7 @@ def _(obj: MaybeWithSpam):
 ```
 
 All attribute available on `object` are still available on these synthesized protocols, but
-attributes that are not present on `object` are not available:
+attributes that are not present on `object` are not available.
 
 ```py
 def f(x: object):

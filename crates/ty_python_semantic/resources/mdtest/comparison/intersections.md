@@ -3,7 +3,7 @@
 ## Positive contributions
 
 If we have an intersection type `A & B` and we get a definitive true/false answer for one of the
-types, we can infer that the result for the intersection type is also true/false:
+types, we can infer that the result for the intersection type is also true/false.
 
 ```py
 from typing import Literal
@@ -512,7 +512,7 @@ def compare(value: First):
 ### Unsupported operators for positive contributions
 
 Raise an error if the given operator is unsupported for all positive contributions to the
-intersection type:
+intersection type.
 
 ```py
 class NonContainer1: ...
@@ -539,7 +539,7 @@ error[unsupported-operator]: Unsupported `in` operation
 ```
 
 Do not raise an error if at least one of the positive contributions to the intersection type support
-the operator:
+the operator.
 
 ```py
 class Container:
@@ -555,7 +555,7 @@ def _(x: object):
 ```
 
 Do also raise an error if the intersection has no positive contributions at all, unless the operator
-is supported on `object`:
+is supported on `object`.
 
 ```py
 def _(x: object):
@@ -584,7 +584,7 @@ error[unsupported-operator]: Unsupported `in` operation
 ### Unsupported operators for negative contributions
 
 Do *not* raise an error if any of the negative contributions to the intersection type are
-unsupported for the given operator:
+unsupported for the given operator.
 
 ```py
 class Container:

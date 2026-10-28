@@ -40,7 +40,7 @@ e = 1  # ty: ignore
 
 Suppression-related diagnostics are checked before `blanket-ignore-comment`. A blanket ignore that
 suppresses an `ignore-comment-unknown-rule` or `invalid-ignore-comment` diagnostic therefore counts
-as used:
+as used.
 
 ```py
 # The nested ignore contains an unknown rule.
@@ -54,7 +54,7 @@ b = 1  # ty: ignore # ty: ignore[*]
 
 ## File-level ignores
 
-The rule also detects file-level blanket ignores:
+The rule also detects file-level blanket ignores.
 
 ```py
 # error: [blanket-ignore-comment]
@@ -65,7 +65,7 @@ a = unresolved
 
 ## Suppressing the rule
 
-A blanket ignore can be suppressed by a code-specific ignore:
+A blanket ignore can be suppressed by a code-specific ignore.
 
 ```py
 a = unresolved  # ty: ignore # ty: ignore[blanket-ignore-comment]

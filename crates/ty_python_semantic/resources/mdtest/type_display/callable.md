@@ -4,7 +4,7 @@
 
 ### Simple
 
-We parenthesize callable types when they appear inside more complex types, to disambiguate:
+We parenthesize callable types when they appear inside more complex types, to disambiguate.
 
 ```py
 from typing import Callable
@@ -16,7 +16,7 @@ def f(x: Callable[[], str] | Callable[[int], str]):
 ### Overloaded
 
 We don't parenthesize display of an overloaded callable, since it is already wrapped in
-`Overload[...]`:
+`Overload[...]`.
 
 ```py
 from typing import Callable, Literal, overload
@@ -34,7 +34,7 @@ def _(x: RegularCallableTypeOf[f] | Literal[True]):
 ```
 
 When a union would otherwise display two distinct overloaded callables identically, we include their
-names to avoid implying that the union contains duplicate elements:
+names to avoid implying that the union contains duplicate elements.
 
 ```py
 def f(flag: bool):
@@ -45,7 +45,7 @@ def f(flag: bool):
 
 ### Top
 
-And we don't parenthesize the top callable, since it is wrapped in `Top[...]`:
+And we don't parenthesize the top callable, since it is wrapped in `Top[...]`.
 
 ```py
 from typing import Callable
@@ -65,7 +65,7 @@ python-version = "3.12"
 strict-generic-narrowing = true
 ```
 
-We wrap the signature of a top ParamSpec with `Top[...]`:
+We wrap the signature of a top ParamSpec with `Top[...]`.
 
 ```py
 from typing import Callable

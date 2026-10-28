@@ -149,7 +149,7 @@ def __getattr__(name: str) -> str:
 ## Precedence: submodules vs `__getattr__`
 
 If a package's `__init__.py` (e.g. `mod/__init__.py`) defines a `__getattr__` function, and there is
-also a submodule file present (e.g. `mod/sub.py`), then:
+also a submodule file present (e.g. `mod/sub.py`), then.
 
 `mod/__init__.py`:
 

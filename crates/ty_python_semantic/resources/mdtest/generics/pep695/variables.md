@@ -61,7 +61,7 @@ reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
 class Invalid[S = T]: ...
 ```
 
-Traditional type variables cannot be used as defaults for functions with PEP 695 type parameters:
+Traditional type variables cannot be used as defaults for functions with PEP 695 type parameters.
 
 ```py
 from typing import ParamSpec, TypeVar
@@ -94,7 +94,7 @@ class Holder[T: int, B = Box[T]]: ...
 reveal_type(Holder[bool]())  # revealed: Holder[bool, Box[bool]]
 ```
 
-The same substitution applies to defaults on generic type aliases:
+The same substitution applies to defaults on generic type aliases.
 
 ```py
 type Alias[T: int, B = Box[T]] = tuple[T, B]
@@ -103,7 +103,7 @@ def alias(value: Alias[bool]):
     reveal_type(value)  # revealed: tuple[bool, Box[bool]]
 ```
 
-The referenced type variable can also appear inside the nested generic's type argument:
+The referenced type variable can also appear inside the nested generic's type argument.
 
 ```py
 class TupleBox[T: tuple[int, ...]]: ...
@@ -112,7 +112,7 @@ class NestedHolder[T: int, B = TupleBox[tuple[T, ...]]]: ...
 reveal_type(NestedHolder[bool]())  # revealed: NestedHolder[bool, TupleBox[tuple[bool, ...]]]
 ```
 
-We reject a nested type argument whose upper bound is incompatible with the generic's bound:
+We reject a nested type argument whose upper bound is incompatible with the generic's bound.
 
 ```py
 # error: [invalid-type-arguments]
@@ -142,7 +142,7 @@ reveal_type(Holder[str]())  # revealed: Holder[str, Box[str]]
 ```
 
 We reject a nested type argument if one of its constraints is incompatible with the generic's
-constraints:
+constraints.
 
 ```py
 # error: [invalid-type-arguments]
@@ -155,7 +155,7 @@ A TypeVar default must be compatible with its bound or constraints.
 
 #### Concrete default with a bound
 
-The default must be assignable to the bound:
+The default must be assignable to the bound.
 
 ```py
 # error: [invalid-type-variable-default] "TypeVar default is not assignable to the TypeVar's upper bound"
@@ -165,7 +165,7 @@ def g[T: float = int](): ...
 
 #### Concrete default with constraints
 
-The default must be one of the constrained types, even if it is a subtype of one of them:
+The default must be one of the constrained types, even if it is a subtype of one of them.
 
 ```py
 from typing import Any
@@ -184,7 +184,7 @@ def i[T: (int, str) = Any](): ...
 
 #### Default TypeVar's bound must be assignable to the outer bound
 
-When the default is a TypeVar, its upper bound must be assignable to the outer TypeVar's bound:
+When the default is a TypeVar, its upper bound must be assignable to the outer TypeVar's bound.
 
 ```py
 # OK: `float` in a type expression means `int | float`,
@@ -199,7 +199,7 @@ def g[T3: str, U: float = T3](): ...
 #### An unbounded default TypeVar has an implicit `object` bound
 
 An unbounded TypeVar has an implicit upper bound of `object`, which is not assignable to a more
-restrictive bound:
+restrictive bound.
 
 ```py
 # error: [invalid-type-variable-default] "Default `T1` of TypeVar `S` is not assignable to upper bound `int` of `S` because its upper bound `object` is not assignable to `int`"
@@ -208,7 +208,7 @@ def f[T1, S: int = T1](): ...
 
 #### A constrained default TypeVar's constraints must all be assignable to the outer bound
 
-When the default TypeVar has constraints, every constraint must be assignable to the outer bound:
+When the default TypeVar has constraints, every constraint must be assignable to the outer bound.
 
 ```py
 # OK: `T1`'s constraints are `int` and `str`,
@@ -226,7 +226,7 @@ def h[T2: (int, bool), V: int = T2](): ...
 
 #### Local type-parameter defaults
 
-PEP 695 type parameters from the same scope can be used as defaults:
+PEP 695 type parameters from the same scope can be used as defaults.
 
 ```py
 # OK: `T` has bound `int`, which is assignable to `int`
@@ -247,7 +247,7 @@ def i[T: (int, str), U: (bool, complex) = T](): ...
 #### A constrained default TypeVar's constraints must be a subset of the outer constraints
 
 When the default TypeVar has constraints, they must all appear in the outer TypeVar's constraint
-list:
+list.
 
 ```py
 # OK: `T1`'s constraints ({int, str}) are a subset
@@ -262,7 +262,7 @@ def g[T1: (int, str), U: (bool, complex) = T1](): ...
 #### Invalid constraints with default (no cascading diagnostic)
 
 When a TypeVar has fewer than two constraints (already invalid), we should not also emit
-`invalid-type-variable-default`:
+`invalid-type-variable-default`.
 
 ```py
 # error: [invalid-type-variable-constraints]
@@ -272,7 +272,7 @@ def f[T: (int,) = str](): ...
 #### A non-constrained default TypeVar is incompatible with a constrained outer TypeVar
 
 A bounded or unbounded TypeVar (one without constraints) cannot be used as the default for a
-constrained TypeVar, because there is no guarantee it will satisfy any of the constraints:
+constrained TypeVar, because there is no guarantee it will satisfy any of the constraints.
 
 ```py
 # `T1` has a bound but no constraints
@@ -480,7 +480,7 @@ def two_final_bounded[T: FinalClass, U: FinalClass](t: T, u: U) -> None:
     static_assert(not is_subtype_of(U, T))
 ```
 
-A typevar bounded by a union is a subtype of that union, but not of either member individually:
+A typevar bounded by a union is a subtype of that union, but not of either member individually.
 
 ```py
 def _[T: int | str](t: T) -> None:
@@ -566,7 +566,7 @@ def constrained_by_gradual[T: (Base, Any)](t: T) -> None:
 ```
 
 A bounded typevar is a subtype of a constrained typevar if its bound is a subtype of every target
-constraint:
+constraint.
 
 ```py
 def _[S: Intersection[Base, Unrelated], T: (Base, Unrelated)](s: S, t: T) -> None:
@@ -602,7 +602,7 @@ def two_final_constrained[T: (FinalClass, AnotherFinalClass), U: (FinalClass, An
     static_assert(not is_subtype_of(U, T))
 ```
 
-A bound or constrained typevar is a subtype of itself in a union:
+A bound or constrained typevar is a subtype of itself in a union.
 
 ```py
 def union[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
@@ -613,7 +613,7 @@ def union[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
     static_assert(is_subtype_of(U, U | None))
 ```
 
-A bound or constrained typevar in a union with a dynamic type is assignable to the typevar:
+A bound or constrained typevar in a union with a dynamic type is assignable to the typevar.
 
 ```py
 def union_with_dynamic[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
@@ -624,7 +624,7 @@ def union_with_dynamic[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
     static_assert(not is_subtype_of(U | Any, U))
 ```
 
-And an intersection of a typevar with another type is always a subtype of the TypeVar:
+And an intersection of a typevar with another type is always a subtype of the TypeVar.
 
 ```py
 from ty_extensions import Intersection, Not
@@ -938,7 +938,7 @@ def intersection_is_assignable[T](t: T) -> None:
     static_assert(is_subtype_of(Intersection[T, Not[None]], T))
 ```
 
-A fully static typevar `T` is assignable to `T & Any`:
+A fully static typevar `T` is assignable to `T & Any`.
 
 ```py
 def _[T, U](t: T) -> None:
@@ -957,7 +957,7 @@ def _[T: (int, str), U: (int, str)](t: T) -> None:
     static_assert(not is_assignable_to(T, Intersection[U, Any]))
 ```
 
-The same relation holds when the intersection is nested within a union:
+The same relation holds when the intersection is nested within a union.
 
 ```py
 def _[T: object, U: object](t: T, u: U) -> None:
@@ -990,7 +990,7 @@ def _[T: (int, str)](t: T) -> None:
     static_assert(not is_subtype_of(T, Intersection[T, Not[int]]))
 ```
 
-A gradually bounded typevar is not assignable to its own negation:
+A gradually bounded typevar is not assignable to its own negation.
 
 ```py
 def _[T: Any](t: T) -> None:
@@ -1082,7 +1082,7 @@ class SomeClass[T: (int, str)]:
 
 ## Narrowing
 
-We can use narrowing expressions to eliminate some of the possibilities of a constrained typevar:
+We can use narrowing expressions to eliminate some of the possibilities of a constrained typevar.
 
 ```py
 class P: ...
@@ -1128,7 +1128,7 @@ def g[T: (P, Q, R)](t: T) -> None:
         reveal_type(t)  # revealed: Never
 ```
 
-If the constraints are disjoint, simplification does eliminate the redundant negative:
+If the constraints are disjoint, simplification does eliminate the redundant negative.
 
 ```py
 def h[T: (P, None)](t: T) -> None:
@@ -1142,7 +1142,7 @@ def h[T: (P, None)](t: T) -> None:
 
 ## Callability
 
-A typevar bound to a Callable type is callable:
+A typevar bound to a Callable type is callable.
 
 ```py
 from typing import Callable
@@ -1152,7 +1152,7 @@ def bound[T: Callable[[], int]](f: T):
     reveal_type(f())  # revealed: int
 ```
 
-Same with a constrained typevar, as long as all constraints are callable:
+Same with a constrained typevar, as long as all constraints are callable.
 
 ```py
 def constrained[T: (Callable[[], int], Callable[[], str])](f: T):
@@ -1436,7 +1436,7 @@ def union_bound[T: Frozen | Mutable](obj: T):
 ## Static method assignments through type variables
 
 An instance assignment shadows a static method with its underlying function. This also works when
-the instance has a bounded or constrained type variable as its type:
+the instance has a bounded or constrained type variable as its type.
 
 ```py
 class C:
@@ -1456,7 +1456,7 @@ def constrained[T: (C, D)](obj: T):
 ```
 
 A class assignment replaces the static method descriptor itself. We reject assigning the unwrapped
-function through a generic class object:
+function through a generic class object.
 
 ```py
 def bounded_class[T: C](cls: type[T]):
@@ -1488,7 +1488,7 @@ class Writable(Protocol):
 ```
 
 For a constrained type variable, the assignment must be valid for every constraint. These class
-objects also cannot satisfy a protocol that requires a writable enum member:
+objects also cannot satisfy a protocol that requires a writable enum member.
 
 ```py
 def constrained[T: (A, B)](cls: type[T]):
@@ -1497,7 +1497,7 @@ def constrained[T: (A, B)](cls: type[T]):
     cls.label = "label"
 ```
 
-The same applies to a union bound, including one defined through a type alias:
+The same applies to a union bound, including one defined through a type alias.
 
 ```py
 type Both = A | B
@@ -1509,7 +1509,7 @@ def union_bound[T: Both](cls: type[T]):
 ```
 
 One enum alternative is enough to reject the write, even if another class allows assignment to the
-attribute:
+attribute.
 
 ```py
 class Plain:
@@ -1526,7 +1526,7 @@ def mixed_bound[T: A | Plain](cls: type[T]):
 
 ### Bounds and constraints
 
-A typevar's bounds and constraints cannot be generic, cyclic or otherwise:
+A typevar's bounds and constraints cannot be generic, cyclic or otherwise.
 
 ```py
 from typing import Any
@@ -1576,7 +1576,7 @@ class F[T: (list[T], str)]:
 reveal_type(F[list[Any]]().x)  # revealed: list[Any]
 ```
 
-However, they are lazily evaluated and can cyclically refer to their own type:
+However, they are lazily evaluated and can cyclically refer to their own type.
 
 ```py
 class G[T: list[G]]:  # error: [missing-type-argument]
@@ -1586,7 +1586,7 @@ class G[T: list[G]]:  # error: [missing-type-argument]
 reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
 ```
 
-An invalid specialization in a recursive bound doesn't cause a panic:
+An invalid specialization in a recursive bound doesn't cause a panic.
 
 ```py
 # error: [invalid-type-arguments]
@@ -1600,7 +1600,7 @@ def _(n: Node[str]):
 
 ### Defaults
 
-Defaults can be generic, but can only refer to earlier typevars:
+Defaults can be generic, but can only refer to earlier typevars.
 
 ```py
 class C[T, U = T]:

@@ -11,7 +11,7 @@ and called works slightly different from regular methods. Dunder methods are not
 directly, but rather on `type(obj)`. But in many ways, they still *act* as if they were called on
 `obj` directly. If the `__getitem__` member of `type(obj)` is a descriptor, it is called with `obj`
 as the `instance` argument to `__get__`. A desugared version of `obj[key]` is roughly equivalent to
-`getitem_desugared(obj, key)` as defined below:
+`getitem_desugared(obj, key)` as defined below.
 
 ```py
 from typing import Any
@@ -33,7 +33,7 @@ In the following tests, we demonstrate that we implement this behavior correctly
 ## Operating on class objects
 
 If we invoke a dunder method on a class, it is looked up on the *meta* class, since any class is an
-instance of its metaclass:
+instance of its metaclass.
 
 ```py
 class Meta(type):
@@ -46,7 +46,7 @@ class DunderOnMetaclass(metaclass=Meta):
 reveal_type(DunderOnMetaclass[0])  # revealed: str
 ```
 
-If the dunder method is only present on the class itself, it will not be called:
+If the dunder method is only present on the class itself, it will not be called.
 
 ```py
 class ClassWithNormalDunder:
@@ -61,7 +61,7 @@ ClassWithNormalDunder[0]
 
 ### Attaching dunder methods to instances in methods
 
-When invoking a dunder method on an instance of a class, it is looked up on the class:
+When invoking a dunder method on an instance of a class, it is looked up on the class.
 
 ```py
 class ClassWithNormalDunder:
@@ -73,7 +73,7 @@ class_with_normal_dunder = ClassWithNormalDunder()
 reveal_type(class_with_normal_dunder[0])  # revealed: str
 ```
 
-Which can be demonstrated by trying to attach a dunder method to an instance, which will not work:
+Which can be demonstrated by trying to attach a dunder method to an instance, which will not work.
 
 ```py
 def external_getitem(instance, key: int) -> str:
@@ -89,13 +89,13 @@ this_fails = ThisFails()
 reveal_type(this_fails[0])  # revealed: Unknown
 ```
 
-However, the attached dunder method *can* be called if accessed directly:
+However, the attached dunder method *can* be called if accessed directly.
 
 ```py
 reveal_type(this_fails.__getitem__(this_fails, 0))  # revealed: str
 ```
 
-The instance-level method is also not called when the class-level method is present:
+The instance-level method is also not called when the class-level method is present.
 
 ```py
 def external_getitem1(instance, key) -> str:
@@ -125,7 +125,7 @@ def _(flag: bool):
 
 ### Dunder methods as class-level annotations with no value
 
-Class-level annotations with no value assigned are considered to be accessible on the class:
+Class-level annotations with no value assigned are considered to be accessible on the class.
 
 ```py
 from typing import Callable
@@ -139,7 +139,7 @@ _: Callable[..., None] = C()
 ```
 
 The dunder-name heuristic also does not apply to a callable parameterized by a `ParamSpec`, even
-after the `ParamSpec` is specialized:
+after the `ParamSpec` is specialized.
 
 ```py
 from collections.abc import Callable
@@ -168,7 +168,7 @@ def check_self(value: Child) -> None:
     result: Child = value[0]
 ```
 
-And of course the same is true if we have only an implicit assignment inside a method:
+And of course the same is true if we have only an implicit assignment inside a method.
 
 ```py
 from typing import Callable
@@ -186,7 +186,7 @@ _: Callable[..., None] = C()
 
 ## When the dunder is not a method
 
-A dunder can also be a non-method callable:
+A dunder can also be a non-method callable.
 
 ```py
 class SomeCallable:
@@ -204,7 +204,7 @@ reveal_type(class_with_callable_dunder[0])  # revealed: str
 ## Dunders are looked up using the descriptor protocol
 
 Here, we demonstrate that the descriptor protocol is invoked when looking up a dunder method. Note
-that the `instance` argument is on object of type `ClassWithDescriptorDunder`:
+that the `instance` argument is on object of type `ClassWithDescriptorDunder`.
 
 ```py
 from __future__ import annotations
@@ -228,7 +228,7 @@ reveal_type(class_with_descriptor_dunder[0])  # revealed: str
 ## Dunders cannot be overwritten on instances
 
 If we attempt to overwrite a dunder method on an instance, it does not affect the behavior of
-implicit dunder calls:
+implicit dunder calls.
 
 ```py
 class C:

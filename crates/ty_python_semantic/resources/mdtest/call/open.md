@@ -3,7 +3,7 @@
 ## `builtins.open`
 
 We do not fully understand typeshed's overloads for `open()` yet, due to missing support for PEP-613
-type aliases. However, we also do not emit false-positive diagnostics on common calls to `open()`:
+type aliases. However, we also do not emit false-positive diagnostics on common calls to `open()`.
 
 ```py
 import pickle
@@ -21,7 +21,7 @@ def _(mode: str):
 
 ## `os.fdopen`
 
-The same is true for `os.fdopen()`:
+The same is true for `os.fdopen()`.
 
 ```py
 import pickle

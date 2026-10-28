@@ -7,7 +7,7 @@ getters, setters, and deleters.
 
 `property` is typically used as a decorator on a getter method. It turns the method into a property
 object. When accessing the property on an instance, the descriptor protocol is invoked, which calls
-the getter method:
+the getter method.
 
 ```py
 class C:
@@ -19,7 +19,7 @@ reveal_type(C().my_property)  # revealed: int
 ```
 
 When a property is accessed on the class directly, the descriptor protocol is also invoked, but
-`property.__get__` simply returns itself in this case (when `instance` is `None`):
+`property.__get__` simply returns itself in this case (when `instance` is `None`).
 
 ```py
 reveal_type(C.my_property)  # revealed: property
@@ -256,7 +256,7 @@ reveal_type(bool(FalsyProperty()))  # revealed: Literal[False]
 
 ## Properties returning `Self`
 
-A property that returns `Self` refers to an instance of the class:
+A property that returns `Self` refers to an instance of the class.
 
 ```py
 from typing_extensions import Self
@@ -269,7 +269,7 @@ class Path:
 reveal_type(Path().parent)  # revealed: Path
 ```
 
-This also works when a setter is defined:
+This also works when a setter is defined.
 
 ```py
 class Node:
@@ -291,7 +291,7 @@ reveal_type(child.parent)  # revealed: Node
 ## `property.getter`
 
 `property.getter` can be used to overwrite the getter method of a property. This does not overwrite
-the existing setter:
+the existing setter.
 
 ```py
 class C:
@@ -317,7 +317,7 @@ c.my_property = "b"
 
 ## `property.deleter`
 
-We support `property.deleter`, and it preserves the getter and setter:
+We support `property.deleter`, and it preserves the getter and setter.
 
 ```py
 class C:
@@ -342,7 +342,7 @@ c.my_property = "a"
 ```
 
 Direct `property.__set__` and `property.__delete__` calls return `None` for ordinary accessors, but
-preserve `Never`/`NoReturn` for typed non-returning accessors:
+preserve `Never`/`NoReturn` for typed non-returning accessors.
 
 ```py
 from typing import Any, NoReturn, cast
@@ -390,7 +390,7 @@ def direct_delete_unbound() -> None:
 ## Conditional redefinition in class body
 
 Distinct property definitions in statically unknown class-body branches should remain distinct, the
-same way methods do:
+same way methods do.
 
 ```py
 from random import random
@@ -421,7 +421,7 @@ reveal_type(baz.method())  # revealed: int | str
 
 ### Attempting to write to a read-only property
 
-When attempting to write to a read-only property, we emit an error:
+When attempting to write to a read-only property, we emit an error.
 
 ```py
 class C:
@@ -437,7 +437,7 @@ c.attr = 2
 
 ### Attempting to read a write-only property
 
-When attempting to read a write-only property, we emit an error:
+When attempting to read a write-only property, we emit an error.
 
 ```py
 class C:
@@ -546,7 +546,7 @@ error[invalid-assignment]: Cannot delete read-only property `attr` on object of 
 
 ### Manually constructed property
 
-Properties can also be constructed manually using the `property` class. We support this:
+Properties can also be constructed manually using the `property` class. We support this.
 
 ```py
 class C:
@@ -575,7 +575,7 @@ reveal_type(c.attr)  # revealed: Unknown
 ### Attempting to write to a read-only manually constructed property
 
 We should emit an error when trying to set an attribute that was created using a manually
-constructed property with `fset=None`, just like we do for decorator-based read-only properties:
+constructed property with `fset=None`, just like we do for decorator-based read-only properties.
 
 ```py
 class Foo:
@@ -598,7 +598,7 @@ b.myprop = 42
 ## Behind the scenes
 
 In this section, we trace through some of the steps that make properties work. We start with a
-simple class `C` and a property `attr`:
+simple class `C` and a property `attr`.
 
 ```py
 class C:
@@ -615,7 +615,7 @@ class C:
 ```
 
 Next, we create an instance of `C`. As we have seen above, accessing `attr` on the instance will
-return an `int`:
+return an `int`.
 
 ```py
 c = C()
@@ -625,7 +625,7 @@ reveal_type(c.attr)  # revealed: int
 
 Behind the scenes, when we write `c.attr`, the first thing that happens is that we statically look
 up the symbol `attr` on the meta-type of `c`, i.e. the class `C`. We can emulate this static lookup
-using `inspect.getattr_static`, to see that `attr` is actually an instance of the `property` class:
+using `inspect.getattr_static`, to see that `attr` is actually an instance of the `property` class.
 
 ```py
 from inspect import getattr_static
@@ -645,14 +645,14 @@ reveal_type(type(attr_property).__set__)  # revealed: <wrapper-descriptor '__set
 
 When we access `c.attr`, the `__get__` method of the `property` class is called, passing the
 property object itself as the first argument, and the class instance `c` as the second argument. The
-third argument is the "owner" which can be set to `None` or to `C` in this case:
+third argument is the "owner" which can be set to `None` or to `C` in this case.
 
 ```py
 reveal_type(type(attr_property).__get__(attr_property, c, C))  # revealed: int
 reveal_type(type(attr_property).__get__(attr_property, c, None))  # revealed: int
 ```
 
-Alternatively, the above can also be written as a method call:
+Alternatively, the above can also be written as a method call.
 
 ```py
 reveal_type(attr_property.__get__(c, C))  # revealed: int
@@ -719,7 +719,7 @@ attr_property.fset(c, 1)
 ```
 
 At runtime, `attr_property.__get__` and `attr_property.__set__` are both instances of
-`types.MethodWrapperType`:
+`types.MethodWrapperType`.
 
 ```py
 import types
@@ -740,7 +740,7 @@ Property equivalence and disjointness are structural over the getter and setter 
 standalone property objects here so `TypeOf[...]` sees the raw property type rather than the
 `Unknown | ...` that can arise from class-attribute lookup. For the subtype cases, we construct
 properties through helper functions with `Callable`-typed parameters so the slot types are
-structural rather than exact function literals:
+structural rather than exact function literals.
 
 ```py
 from typing import Callable

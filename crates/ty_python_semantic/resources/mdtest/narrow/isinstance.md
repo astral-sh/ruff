@@ -23,7 +23,7 @@ def _(x: Literal[1, "a"]):
 ## `classinfo` is a tuple of types
 
 Note: `isinstance(x, (int, str))` should not be confused with `isinstance(x, tuple[(int, str)])`.
-The former is equivalent to `isinstance(x, int | str)`:
+The former is equivalent to `isinstance(x, int | str)`.
 
 ```py
 from typing import Literal
@@ -143,7 +143,7 @@ def final_classes(value: object, classes: FinalClasses, explicit_classes: Explic
         reveal_type(value)  # revealed: object
 ```
 
-A tuple tree with no class objects can only make the check fail:
+A tuple tree with no class objects can only make the check fail.
 
 ```py
 OnlyTuples = tuple["OnlyTuples", ...]
@@ -286,7 +286,7 @@ def _(x: int | str | bytes | memoryview | range):
 ```
 
 Although `isinstance()` usually only works if all elements in the `UnionType` are class objects, at
-runtime a special exception is made for `None` so that `isinstance(x, int | None)` can work:
+runtime a special exception is made for `None` so that `isinstance(x, int | None)` can work.
 
 ```py
 def _(x: int | str | bytes | range | None):
@@ -300,7 +300,7 @@ def _(x: int | str | bytes | range | None):
 
 Except for the `None` special case mentioned above, narrowing can only take place if all elements in
 the PEP-604 union are class literals. If any elements are generic aliases or other types, the
-`isinstance()` call may fail at runtime, so no narrowing can take place:
+`isinstance()` call may fail at runtime, so no narrowing can take place.
 
 ```toml
 [environment]
@@ -371,7 +371,7 @@ info: Element `<special-form 'typing.Any'>` in the union, and 2 more elements, a
         reveal_type(x)  # revealed: int | list[int] | bytes
 ```
 
-The same validation also applies when an invalid `UnionType` is nested inside a tuple:
+The same validation also applies when an invalid `UnionType` is nested inside a tuple.
 
 ```py
 def _(x: int | list[int] | bytes):
@@ -442,7 +442,7 @@ info: Element `<class 'list[int]'>` in the union `list[int] | bytes` is not a cl
 
 ## `classinfo` is a `types.UnionType`
 
-Python 3.10 added the ability to use `Union[int, str]` as the second argument to `isinstance()`:
+Python 3.10 added the ability to use `Union[int, str]` as the second argument to `isinstance()`.
 
 ```py
 from typing import Union
@@ -494,7 +494,7 @@ def _(x: int | str | None):
 ## `classinfo` is a `typing.py` special form
 
 Certain special forms in `typing.py` are aliases to classes elsewhere in the standard library; these
-can be used in `isinstance()` and `issubclass()` checks. We support narrowing using them:
+can be used in `isinstance()` and `issubclass()` checks. We support narrowing using them.
 
 ```py
 import typing as t
@@ -638,7 +638,7 @@ def _(x: Literal[1, "a"]):
 
 ## Splatted calls with invalid `classinfo`
 
-Diagnostics are still emitted for invalid `classinfo` types when the arguments are splatted:
+Diagnostics are still emitted for invalid `classinfo` types when the arguments are splatted.
 
 ```py
 args = (object(), int | list[str])
@@ -647,7 +647,7 @@ isinstance(*args)  # error: [invalid-argument-type]
 
 ## Generic aliases are not supported as second argument
 
-The `classinfo` argument cannot be a generic alias:
+The `classinfo` argument cannot be a generic alias.
 
 ```py
 def _(x: list[str] | list[int] | list[bytes]):
@@ -670,7 +670,7 @@ def _(x: object, y: type[int]):
         reveal_type(x)  # revealed: int
 ```
 
-Negative narrowing is not sound in this case, because `type[A]` includes subclasses of `A`:
+Negative narrowing is not sound in this case, because `type[A]` includes subclasses of `A`.
 
 ```py
 class A: ...
@@ -723,7 +723,7 @@ def f(
 ## Narrowing if an object of type `Any` or `Unknown` is used as the second argument
 
 In order to preserve the gradual guarantee, we intersect with the type of the second argument if the
-type of the second argument is a dynamic type:
+type of the second argument is a dynamic type.
 
 ```py
 from typing import Any
@@ -743,7 +743,7 @@ def f(a: Foo, b: Any):
 
 If an intersection with only positive members is used as the second argument, and all positive
 members of the intersection are valid arguments for the second argument to `isinstance()`, we
-intersect with each positive member of the intersection:
+intersect with each positive member of the intersection.
 
 ```toml
 [environment]
@@ -820,7 +820,7 @@ def i[T: Intersection[type[Bar], type[Baz | Spam]], U: (type[Eggs], type[Ham])](
 If some (but not all) positive members of the intersection are not valid `isinstance()` targets --
 for example a parametrized generic alias such as `type[list[int]]`, which raises `TypeError` at
 runtime -- we skip those members and narrow using the remaining valid ones, rather than declining to
-narrow at all:
+narrow at all.
 
 ```py
 from ty_extensions import Intersection
@@ -847,7 +847,7 @@ strict-generic-narrowing = true
 
 In strict mode, narrowing to a generic class using `isinstance()` uses the top materialization of
 the generic. With a covariant generic, this is equivalent to using the upper bound of the type
-parameter (by default, `object`):
+parameter (by default, `object`).
 
 ```py
 from typing import Self
@@ -862,7 +862,7 @@ def _(x: object):
         reveal_type(x.get())  # revealed: object
 ```
 
-A bounded covariant generic uses its declared upper bound rather than `object`:
+A bounded covariant generic uses its declared upper bound rather than `object`.
 
 ```py
 class BoundedCovariant[T: int]:
@@ -904,7 +904,7 @@ def excludes_bounded_generic_tuple(
 ```
 
 Constrained type parameters preserve the materialization of the generic class while making the union
-of valid constraints available when reading a covariant attribute:
+of valid constraints available when reading a covariant attribute.
 
 ```py
 class ConstrainedCovariant[T: (int, str)]:
@@ -944,7 +944,7 @@ def excludes_paramspec_generic(value: ParamSpecBox[[int]] | int) -> int:
     return value
 ```
 
-Similarly, contravariant type parameters use their lower bound of `Never`:
+Similarly, contravariant type parameters use their lower bound of `Never`.
 
 ```py
 class Contravariant[T]:
@@ -957,7 +957,7 @@ def _(x: object):
         x.push(42)
 ```
 
-The same applies when the contravariant type parameter appears inside `type[T]`:
+The same applies when the contravariant type parameter appears inside `type[T]`.
 
 ```py
 from typing import Generic, TypeVar
@@ -1122,7 +1122,7 @@ def _(x: object):
         reveal_type(x)  # revealed: ~Covariant[object]
 ```
 
-For contravariant generics, we similarly intersect with the `Unknown` specialization:
+For contravariant generics, we similarly intersect with the `Unknown` specialization.
 
 ```py
 class Contravariant[T]:
@@ -1138,7 +1138,7 @@ def _(x: object):
 ```
 
 Similarly, for invariant generics we intersect with the `Unknown` specialization. Reading produces
-`Unknown`, while writing accepts arguments of any type:
+`Unknown`, while writing accepts arguments of any type.
 
 ```py
 class Invariant[T]:
@@ -1158,7 +1158,7 @@ def _(x: object):
         reveal_type(x)  # revealed: ~Top[Invariant[Unknown]]
 ```
 
-Narrowing already specialized generics preserves their concrete type arguments:
+Narrowing already specialized generics preserves their concrete type arguments.
 
 ```py
 class P: ...
@@ -1173,7 +1173,7 @@ def _(x: Covariant[P], y: Contravariant[P], z: Invariant[P]):
 ```
 
 Specialized base classes also determine the type arguments of matching subclasses, including
-subclasses with a stricter variance:
+subclasses with a stricter variance.
 
 ```py
 class SubOfCovariant[T](Covariant[T]): ...
@@ -1205,7 +1205,7 @@ def narrow_generic_subclasses(covariant: Covariant[P], contravariant: Contravari
 ```
 
 Narrowing unions and intersections preserves unrelated types when they can overlap with the checked
-class, while excluding unrelated final classes:
+class, while excluding unrelated final classes.
 
 ```py
 from typing import Sequence, final
@@ -1228,7 +1228,7 @@ def _(
 ```
 
 When an intersection contains multiple specialized bases, each base contributes its known type
-arguments to a matching subclass:
+arguments to a matching subclass.
 
 ```py
 class Left[L]: ...
@@ -1246,7 +1246,7 @@ def _(value: Intersection[Left[int], Right[str]]) -> None:
 ```
 
 Subclass type arguments are inferred through their actual inheritance relationship, so this also
-works correctly if type parameters change position:
+works correctly if type parameters change position.
 
 ```py
 class Base[A, B]: ...
@@ -1257,7 +1257,7 @@ def _(value: Base[int, str]) -> None:
         reveal_type(value)  # revealed: Child[str, int]
 ```
 
-A subclass type parameter that cannot be inferred from its base remains `Unknown`:
+A subclass type parameter that cannot be inferred from its base remains `Unknown`.
 
 ```py
 class PartiallyInferredChild[Extra1, T, Extra2](Sequence[T]): ...
@@ -1267,7 +1267,7 @@ def _(value: Sequence[int]) -> None:
         reveal_type(value)  # revealed: PartiallyInferredChild[Unknown, int, Unknown]
 ```
 
-If we're "narrowing" in the opposite direction, we retain the existing subclass specialization:
+If we're "narrowing" in the opposite direction, we retain the existing subclass specialization.
 
 ```py
 def _(covariant: SubOfCovariant[P], contravariant: SubOfContravariant[P], invariant: SubOfInvariant[P]) -> None:
@@ -1281,7 +1281,7 @@ def _(covariant: SubOfCovariant[P], contravariant: SubOfContravariant[P], invari
         reveal_type(invariant)  # revealed: SubOfInvariant[P]
 ```
 
-This also works for runtime-checkable protocols:
+This also works for runtime-checkable protocols.
 
 ```py
 from typing import Protocol, runtime_checkable
@@ -1304,7 +1304,7 @@ def _(value: Concrete[int]) -> None:
 
 Negative narrowing excludes every materialization of a protocol, including when its members are
 gradual. `IntReader` is a subtype of the fully materialized `Reader` protocol, so the negative
-branch retains only `None`:
+branch retains only `None`.
 
 ```py
 from typing import Any, Protocol, runtime_checkable
@@ -1333,7 +1333,7 @@ strict-generic-narrowing = true
 
 Narrowing an `Iterable[T]` to an `Iterator`, or to a container type, retains its element type. See
 `generics/set_theoretic.md` for more details on the assumptions behind this, and for an explanation
-of the behavior of invariant containers:
+of the behavior of invariant containers.
 
 ```py
 from typing import Iterable, Iterator
@@ -1725,7 +1725,7 @@ def narrow_mutual(value: object) -> None:
 
 When a type parameter has a bare `Any` default, narrowing still materializes the substituted
 typevar. The default isn't used during `isinstance` narrowing (the type parameter gets `Unknown`
-instead), so the default value is irrelevant here:
+instead), so the default value is irrelevant here.
 
 ```toml
 [environment]
@@ -1746,7 +1746,7 @@ def _(x: object):
         reveal_type(x.y)  # revealed: tuple[Any, object]
 ```
 
-Type alias defaults substituted into type parameters still need to be materialized when narrowing:
+Type alias defaults substituted into type parameters still need to be materialized when narrowing.
 
 ```py
 from typing import Any

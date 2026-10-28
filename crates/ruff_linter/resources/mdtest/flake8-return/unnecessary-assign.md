@@ -22,7 +22,7 @@ def f():
         log(out)
 ```
 
-A closure captured in `finally` reads the name from another scope:
+A closure captured in `finally` reads the name from another scope.
 
 ```py
 def f():
@@ -35,7 +35,7 @@ def f():
         _cleanup()
 ```
 
-Outer `finally` reads the name across a nested `try`:
+Outer `finally` reads the name across a nested `try`.
 
 ```py
 def f():
@@ -50,7 +50,7 @@ def f():
         log(x)
 ```
 
-The outer `finally` runs after a `return` in an inner `finally`:
+The outer `finally` runs after a `return` in an inner `finally`.
 
 ```py
 def f():
@@ -65,7 +65,7 @@ def f():
         log(x)
 ```
 
-The `finally` also runs after a `return` in the `else` clause:
+The `finally` also runs after a `return` in the `else` clause.
 
 ```py
 def f():
@@ -93,7 +93,7 @@ def f():
         log(x)
 ```
 
-The assignment may also come from a `with` body inside the `try`:
+The assignment may also come from a `with` body inside the `try`.
 
 ```py
 def f():
@@ -128,7 +128,7 @@ def f():
 
 ## `del` of the name in `finally`
 
-Removing the assignment would leave the name unbound, so `del x` would raise `UnboundLocalError`:
+Removing the assignment would leave the name unbound, so `del x` would raise `UnboundLocalError`.
 
 ```py
 def f():
@@ -269,7 +269,7 @@ def f(cond):
         return x  # error: [unnecessary-assign]
 ```
 
-The same holds when the branches are `try` arms without a `finally`:
+The same holds when the branches are `try` arms without a `finally`.
 
 ```py
 def f():

@@ -37,7 +37,7 @@ bob4 = Person(name="Bob", age=None)
 ```
 
 The signature of the `__init__` method is generated based on the classes attributes. The following
-calls are not valid:
+calls are not valid.
 
 ```py
 # error: [missing-argument]
@@ -72,7 +72,7 @@ class D:
 reveal_type(D.__init__)  # revealed: (self: D, x: int, y: str = "default", z: int | None = 3) -> None
 ```
 
-This also works if the declaration and binding are split:
+This also works if the declaration and binding are split.
 
 ```py
 @dataclass
@@ -83,7 +83,7 @@ class D:
 reveal_type(D.__init__)  # revealed: (self: D, x: int | None = None) -> None
 ```
 
-Non-fully static types are handled correctly:
+Non-fully static types are handled correctly.
 
 ```py
 from typing import Any
@@ -98,7 +98,7 @@ class C:
 reveal_type(C.__init__)  # revealed: (self: C, w: type[Any], x: Any, y: int | Any, z: tuple[int, Any]) -> None
 ```
 
-Variables without annotations are ignored:
+Variables without annotations are ignored.
 
 ```py
 @dataclass
@@ -110,7 +110,7 @@ reveal_type(D.__init__)  # revealed: (self: D, x: int) -> None
 ```
 
 If attributes without default values are declared after attributes with default values, a
-`TypeError` will be raised at runtime. We emit a diagnostic in that case:
+`TypeError` will be raised at runtime. We emit a diagnostic in that case.
 
 ```py
 from dataclasses import field
@@ -139,7 +139,7 @@ class F:
 ```
 
 Fields with `init=False` do not participate in the ordering check since they don't appear in
-`__init__`:
+`__init__`.
 
 ```py
 @dataclass
@@ -156,7 +156,7 @@ class BadWithInitFalse:
     z: float
 ```
 
-Class-level `init=False` suppresses the ordering check because no constructor is generated:
+Class-level `init=False` suppresses the ordering check because no constructor is generated.
 
 ```py
 @dataclass(init=False)
@@ -174,7 +174,7 @@ class BadWithReenabledInit(GoodWithClassInitFalse):  # error: [dataclass-field-o
     pass
 ```
 
-Keyword-only fields (using `kw_only=True`) also don't participate in the positional ordering check:
+Keyword-only fields (using `kw_only=True`) also don't participate in the positional ordering check.
 
 ```toml
 [environment]
@@ -201,7 +201,7 @@ class BadWithKwOnly:
     z: float
 ```
 
-Fields after a `KW_ONLY` sentinel are also keyword-only and don't participate in ordering checks:
+Fields after a `KW_ONLY` sentinel are also keyword-only and don't participate in ordering checks.
 
 ```py
 from dataclasses import KW_ONLY
@@ -222,7 +222,7 @@ class BadWithKwOnlySentinel:
     z: float
 ```
 
-Pure class attributes (`ClassVar`) are not included in the signature of `__init__`:
+Pure class attributes (`ClassVar`) are not included in the signature of `__init__`.
 
 ```py
 from typing import ClassVar
@@ -241,7 +241,7 @@ reveal_type(d.y)  # revealed: str
 reveal_type(d.z)  # revealed: bool
 ```
 
-Function declarations do not affect the signature of `__init__`:
+Function declarations do not affect the signature of `__init__`.
 
 ```py
 @dataclass
@@ -254,7 +254,7 @@ class D:
 reveal_type(D.__init__)  # revealed: (self: D, x: int) -> None
 ```
 
-And neither do nested class declarations:
+And neither do nested class declarations.
 
 ```py
 @dataclass
@@ -268,7 +268,7 @@ reveal_type(D.__init__)  # revealed: (self: D, x: int) -> None
 ```
 
 But if there is a variable annotation with a function or class literal type, the signature of
-`__init__` will include this field:
+`__init__` will include this field.
 
 ```py
 from ty_extensions._internal import TypeOf
@@ -287,7 +287,7 @@ class D:
 reveal_type(D.__init__)
 ```
 
-More realistically, dataclasses can have `Callable` attributes:
+More realistically, dataclasses can have `Callable` attributes.
 
 ```py
 from typing import Callable
@@ -299,7 +299,7 @@ class D:
 reveal_type(D.__init__)  # revealed: (self: D, c: (int, /) -> str) -> None
 ```
 
-Implicit instance attributes do not affect the signature of `__init__`:
+Implicit instance attributes do not affect the signature of `__init__`.
 
 ```py
 @dataclass
@@ -315,7 +315,7 @@ reveal_type(D.__init__)  # revealed: (self: D, x: int) -> None
 ```
 
 Annotating expressions does not lead to an entry in `__annotations__` at runtime, and so it wouldn't
-be included in the signature of `__init__`. This is a case that we currently don't detect:
+be included in the signature of `__init__`. This is a case that we currently don't detect.
 
 ```py
 @dataclass
@@ -331,7 +331,7 @@ reveal_type(D.__init__)  # revealed:(self: D, x: int = 1) -> None
 
 The `@dataclass` decorator can take several arguments to customize the existence of the generated
 methods. The following test makes sure that we still treat the class as a dataclass if (the default)
-arguments are passed in:
+arguments are passed in.
 
 ```py
 from dataclasses import dataclass
@@ -346,7 +346,7 @@ reveal_type(repr(alice))  # revealed: str
 reveal_type(alice == alice)  # revealed: bool
 ```
 
-A class is still treated as a dataclass when arguments are unpacked into the decorator:
+A class is still treated as a dataclass when arguments are unpacked into the decorator.
 
 ```py
 from dataclasses import dataclass
@@ -362,7 +362,7 @@ reveal_type(C.__slots__)  # revealed: tuple[Literal["x"]]
 C(1)
 ```
 
-If `init` is set to `False`, no `__init__` method is generated:
+If `init` is set to `False`, no `__init__` method is generated.
 
 ```py
 from dataclasses import dataclass
@@ -386,7 +386,7 @@ C() == C()
 ### `repr`
 
 A custom `__repr__` method is generated by default. It can be disabled by passing `repr=False`, but
-in that case `__repr__` is still available via `object.__repr__`:
+in that case `__repr__` is still available via `object.__repr__`.
 
 ```py
 from dataclasses import dataclass
@@ -401,7 +401,7 @@ reveal_type(WithoutRepr(1).__repr__)  # revealed: bound method WithoutRepr.__rep
 ### `eq`
 
 The same is true for `__eq__`. Setting `eq=False` disables the generated `__eq__` method, but
-`__eq__` is still available via `object.__eq__`:
+`__eq__` is still available via `object.__eq__`.
 
 ```py
 from dataclasses import dataclass
@@ -421,7 +421,7 @@ python-version = "3.12"
 ```
 
 `order` is set to `False` by default. If `order=True`, `__lt__`, `__le__`, `__gt__`, and `__ge__`
-methods will be generated:
+methods will be generated.
 
 ```py
 from dataclasses import dataclass
@@ -445,7 +445,7 @@ WithOrder(1) > WithOrder(2)
 WithOrder(1) >= WithOrder(2)
 ```
 
-`order=True` requires `eq=True`:
+`order=True` requires `eq=True`.
 
 ```py
 from dataclasses import dataclass
@@ -461,7 +461,7 @@ class InvalidStackedOrder: ...
 class InvalidArguments: ...
 ```
 
-Comparisons are only allowed for `WithOrder` instances:
+Comparisons are only allowed for `WithOrder` instances.
 
 ```py
 WithOrder(1) < 2  # error: [unsupported-operator]
@@ -470,7 +470,7 @@ WithOrder(1) > 2  # error: [unsupported-operator]
 WithOrder(1) >= 2  # error: [unsupported-operator]
 ```
 
-This also works for generic dataclasses:
+This also works for generic dataclasses.
 
 ```py
 from dataclasses import dataclass
@@ -486,7 +486,7 @@ GenericWithOrder[int](1) < GenericWithOrder[str]("a")  # error: [unsupported-ope
 
 Subclassing a dataclass with `order=True` is problematic because comparing instances of different
 classes in the inheritance hierarchy will raise a `TypeError` at runtime. The design of the stdlib
-feature therefore violates the Liskov Substitution Principle:
+feature therefore violates the Liskov Substitution Principle.
 
 ```py
 from dataclasses import dataclass
@@ -504,7 +504,7 @@ class Child(Parent):  # error: [subclass-of-dataclass-with-order]
 #   Child(42) < Parent(42)  # TypeError!
 ```
 
-This also applies when the child class is also a dataclass:
+This also applies when the child class is also a dataclass.
 
 ```py
 @dataclass
@@ -513,7 +513,7 @@ class DataclassChild(Parent):  # error: [subclass-of-dataclass-with-order]
 ```
 
 If the child class also has `order=True`, a diagnostic is still emitted because cross-class
-comparisons with the parent class still raise `TypeError` at runtime:
+comparisons with the parent class still raise `TypeError` at runtime.
 
 ```py
 @dataclass(order=True)
@@ -521,7 +521,7 @@ class OrderedChild(Parent):  # error: [subclass-of-dataclass-with-order]
     y: str
 ```
 
-If the child class manually overrides all comparison methods, the diagnostic is suppressed:
+If the child class manually overrides all comparison methods, the diagnostic is suppressed.
 
 ```py
 class ManualChild(Parent):  # No warning - all comparison methods overridden
@@ -538,7 +538,7 @@ class ManualChild(Parent):  # No warning - all comparison methods overridden
         return True
 ```
 
-Descendants of an ordered dataclass child are warned as well:
+Descendants of an ordered dataclass child are warned as well.
 
 ```py
 class Grandchild(OrderedChild):  # error: [subclass-of-dataclass-with-order]
@@ -549,14 +549,14 @@ class OrderedGrandchild(OrderedChild):  # error: [subclass-of-dataclass-with-ord
     z: float
 ```
 
-This also applies if the intermediate subclass is not itself a dataclass:
+This also applies if the intermediate subclass is not itself a dataclass.
 
 ```py
 class IndirectGrandchild(Child):  # error: [subclass-of-dataclass-with-order]
     pass
 ```
 
-If the parent dataclass does not have `order=True`, no warning is emitted:
+If the parent dataclass does not have `order=True`, no warning is emitted.
 
 ```py
 @dataclass
@@ -591,7 +591,7 @@ class InvalidCustomOrderDunderOverrides:
 
 ### `__hash__` and `unsafe_hash`
 
-If `eq` and `frozen` are both `True`, a `__hash__` method is generated by default:
+If `eq` and `frozen` are both `True`, a `__hash__` method is generated by default.
 
 ```py
 from dataclasses import dataclass
@@ -604,7 +604,7 @@ reveal_type(WithHash.__hash__)  # revealed: (self: WithHash) -> int
 ```
 
 If `eq` is set to `True` and `frozen` is set to `False`, `__hash__` will be set to `None`, to mark
-is unhashable (because it is mutable):
+is unhashable (because it is mutable).
 
 ```py
 from dataclasses import dataclass
@@ -643,7 +643,7 @@ reveal_type(InheritHash.__hash__)  # revealed: def __hash__(self: Any) -> int
 ```
 
 If `unsafe_hash` is set to `True`, a `__hash__` method will be generated even if the dataclass is
-mutable:
+mutable.
 
 ```py
 from dataclasses import dataclass
@@ -691,7 +691,7 @@ class MyFrozenClass:
     def __delattr__(self, name: str) -> None: ...
 ```
 
-This also works for generic dataclasses:
+This also works for generic dataclasses.
 
 ```toml
 [environment]
@@ -722,7 +722,7 @@ frozen.x = 2  # error: [invalid-assignment] "Cannot assign to unresolved attribu
 ```
 
 A diagnostic is also emitted if a frozen dataclass is inherited, and an attempt is made to mutate an
-attribute in the child class:
+attribute in the child class.
 
 ```py
 from dataclasses import dataclass
@@ -741,7 +741,7 @@ grandchild = MyFrozenGrandchildClass()
 grandchild.x = 2  # error: [invalid-assignment]
 ```
 
-Non-field attributes on a non-dataclass subclass of a frozen dataclass are still assignable:
+Non-field attributes on a non-dataclass subclass of a frozen dataclass are still assignable.
 
 ```py
 from dataclasses import dataclass
@@ -767,7 +767,7 @@ grandchild.unknown = 2
 ```
 
 The synthesized `__setattr__` is exposed as a member on non-dataclass subclasses of frozen
-dataclasses:
+dataclasses.
 
 ```py
 from dataclasses import dataclass
@@ -783,7 +783,7 @@ reveal_type(child.__setattr__)  # revealed: Overload[(name: Literal["x"], value)
 ```
 
 An explicit `__setattr__` on an intermediate subclass overrides the inherited frozen dataclass
-setter:
+setter.
 
 ```py
 from dataclasses import dataclass
@@ -814,7 +814,7 @@ grandchild.unknown = 2
 ```
 
 When another base class rejects assignment, a frozen dataclass must not hide its `__setattr__`
-method:
+method.
 
 ```py
 from dataclasses import dataclass
@@ -837,7 +837,7 @@ ChildWithRejectingAssignmentBase().y = 2
 ```
 
 A later base class can customize assignment to an ordinary attribute. The value must satisfy both
-the later `__setattr__` and the attribute declaration:
+the later `__setattr__` and the attribute declaration.
 
 ```py
 class AllowsAssignment:
@@ -854,7 +854,7 @@ allowed.y = 2
 allowed.y = "invalid"
 ```
 
-A later `__setattr__` can forward to `object.__setattr__`, which still invokes data descriptors:
+A later `__setattr__` can forward to `object.__setattr__`, which still invokes data descriptors.
 
 ```py
 class ForwardsAssignment:
@@ -862,7 +862,7 @@ class ForwardsAssignment:
         super().__setattr__(name, value)
 ```
 
-A read-only property therefore remains read-only:
+A read-only property therefore remains read-only.
 
 ```py
 class ReadOnlyPropertyBase(ForwardsAssignment):
@@ -876,7 +876,7 @@ class ChildWithReadOnlyProperty(Frozen, ReadOnlyPropertyBase): ...
 ChildWithReadOnlyProperty().y = 2
 ```
 
-The property's setter still determines which values it accepts:
+The property's setter still determines which values it accepts.
 
 ```py
 class TypedPropertyBase(ForwardsAssignment):
@@ -893,7 +893,7 @@ class ChildWithTypedProperty(Frozen, TypedPropertyBase): ...
 ChildWithTypedProperty().y = "invalid"
 ```
 
-A property setter that never returns prevents assignment:
+A property setter that never returns prevents assignment.
 
 ```py
 class TerminalPropertyBase(ForwardsAssignment):
@@ -911,7 +911,7 @@ class ChildWithTerminalProperty(Frozen, TerminalPropertyBase): ...
 ChildWithTerminalProperty().y = 2
 ```
 
-The same rule applies to a custom descriptor whose setter never returns:
+The same rule applies to a custom descriptor whose setter never returns.
 
 ```py
 class TerminalDescriptor:
@@ -930,7 +930,7 @@ class ChildWithTerminalDescriptor(Frozen, TerminalDescriptorBase): ...
 ChildWithTerminalDescriptor().y = 2
 ```
 
-A later `__setattr__` does not make the declared type of an ordinary attribute disappear:
+A later `__setattr__` does not make the declared type of an ordinary attribute disappear.
 
 ```py
 class AllowsUntypedAssignment:
@@ -944,7 +944,7 @@ class ChildWithUntypedAssignmentBase(Frozen, AllowsUntypedAssignment): ...
 ChildWithUntypedAssignmentBase().y = "invalid"
 ```
 
-A specialized `Generic[T]` frozen base must also preserve the next `__setattr__` in the MRO:
+A specialized `Generic[T]` frozen base must also preserve the next `__setattr__` in the MRO.
 
 ```py
 from typing import Generic, TypeVar
@@ -961,7 +961,7 @@ class RejectingGenericAssignmentChild(GenericFrozen[int], RejectsAssignment): ..
 RejectingGenericAssignmentChild(1).y = 2
 ```
 
-The same behavior applies to Python 3.12 type-parameter syntax:
+The same behavior applies to Python 3.12 type-parameter syntax.
 
 ```py
 @dataclass(frozen=True)
@@ -974,7 +974,7 @@ class RejectingTypeParameterAssignmentChild(TypeParameterFrozen[int], RejectsAss
 RejectingTypeParameterAssignmentChild(1).y = 2
 ```
 
-When a subclass inherits from two frozen dataclasses, fields from both bases remain frozen:
+When a subclass inherits from two frozen dataclasses, fields from both bases remain frozen.
 
 ```py
 @dataclass(frozen=True)
@@ -998,7 +998,7 @@ del multiple.second  # error: [invalid-assignment]
 ```
 
 An `InitVar` is a constructor argument, not a frozen field. A subclass can assign and delete an
-attribute with the same name:
+attribute with the same name.
 
 ```py
 from dataclasses import InitVar
@@ -1015,7 +1015,7 @@ init_var_child.temporary = 4
 del init_var_child.temporary
 ```
 
-The same rule applies when the `InitVar` belongs to a second frozen base:
+The same rule applies when the `InitVar` belongs to a second frozen base.
 
 ```py
 class ChildWithSecondBaseInitVar(Frozen, FrozenWithInitVar):
@@ -1060,7 +1060,7 @@ grandchild.z = 2  # error: [invalid-assignment]
 grandchild.unknown = 2  # error: [invalid-assignment]
 ```
 
-A frozen dataclass also prevents an ordinary subclass from deleting an inherited field:
+A frozen dataclass also prevents an ordinary subclass from deleting an inherited field.
 
 ```py
 from dataclasses import dataclass
@@ -1079,7 +1079,7 @@ reveal_type(frozen.__delattr__)
 del frozen.x  # error: [invalid-assignment]
 ```
 
-A frozen dataclass does not make a subclass's read-only property safe to delete:
+A frozen dataclass does not make a subclass's read-only property safe to delete.
 
 ```py
 from dataclasses import dataclass
@@ -1097,7 +1097,7 @@ class ReadOnlyChild(Frozen):
 del ReadOnlyChild().y
 ```
 
-Deleting a property is also invalid when its deleter never returns:
+Deleting a property is also invalid when its deleter never returns.
 
 ```py
 from typing import NoReturn
@@ -1116,7 +1116,7 @@ del RejectingPropertyChild().y
 ```
 
 When another base class rejects deletion, the frozen dataclass must not hide its `__delattr__`
-method:
+method.
 
 ```py
 class RejectsDeletion:
@@ -1131,7 +1131,7 @@ class ChildWithRejectingBase(Frozen, RejectsDeletion): ...
 del ChildWithRejectingBase().y
 ```
 
-A second base class can customize deletion of an ordinary attribute:
+A second base class can customize deletion of an ordinary attribute.
 
 ```py
 class AllowsDeletion:
@@ -1144,7 +1144,7 @@ class ChildWithAllowingBase(Frozen, AllowsDeletion): ...
 del ChildWithAllowingBase().y
 ```
 
-A later `__delattr__` can forward to `object.__delattr__`, which still invokes data descriptors:
+A later `__delattr__` can forward to `object.__delattr__`, which still invokes data descriptors.
 
 ```py
 class ForwardsDeletion:
@@ -1152,7 +1152,7 @@ class ForwardsDeletion:
         super().__delattr__(name)
 ```
 
-A read-only property therefore remains read-only:
+A read-only property therefore remains read-only.
 
 ```py
 class ReadOnlyDeletionBase(ForwardsDeletion):
@@ -1166,7 +1166,7 @@ class ChildWithReadOnlyDeletion(Frozen, ReadOnlyDeletionBase): ...
 del ChildWithReadOnlyDeletion().y
 ```
 
-A property deleter that never returns also prevents deletion:
+A property deleter that never returns also prevents deletion.
 
 ```py
 class TerminalDeletionBase(ForwardsDeletion):
@@ -1184,7 +1184,7 @@ class ChildWithTerminalDeletion(Frozen, TerminalDeletionBase): ...
 del ChildWithTerminalDeletion().y
 ```
 
-The same rule applies to a custom descriptor whose deleter never returns:
+The same rule applies to a custom descriptor whose deleter never returns.
 
 ```py
 class TerminalDeleteDescriptor:
@@ -1203,7 +1203,7 @@ class ChildWithTerminalDescriptorDeletion(Frozen, TerminalDescriptorDeletionBase
 del ChildWithTerminalDescriptorDeletion().y
 ```
 
-An ordinary attribute defined on a subclass can also be deleted:
+An ordinary attribute defined on a subclass can also be deleted.
 
 ```py
 class ChildWithOwnAttribute(Frozen):
@@ -1216,7 +1216,7 @@ del deletable.y
 
 A subclass can replace the inherited `__delattr__`, but a method that returns `None` is an invalid
 override of the frozen base's method, which returns `Never`. The overriding method still controls
-deletion on both that subclass and its subclasses:
+deletion on both that subclass and its subclasses.
 
 ```py
 class ChildWithDeletionOverride(Frozen):
@@ -1229,7 +1229,7 @@ del ChildWithDeletionOverride().x
 del GrandchildWithDeletionOverride().x
 ```
 
-A read-only property remains protected when the frozen base is a specialized `Generic[T]` dataclass:
+A read-only property remains protected when the frozen base is a specialized `Generic[T]` dataclass.
 
 ```py
 class ReadOnlyGenericChild(GenericFrozen[int]):
@@ -1242,7 +1242,7 @@ del ReadOnlyGenericChild(1).y
 ```
 
 The Python 3.12 type-parameter syntax must also preserve a `__delattr__` method defined by another
-base class:
+base class.
 
 ```py
 class RejectingTypeParameterChild(TypeParameterFrozen[int], RejectsDeletion): ...
@@ -1254,7 +1254,7 @@ del RejectingTypeParameterChild(1).y
 ### frozen/non-frozen inheritance
 
 If a non-frozen dataclass inherits from a frozen dataclass, an exception is raised at runtime. We
-catch this error:
+catch this error.
 
 `foo.py`:
 
@@ -1290,7 +1290,7 @@ info: Base class definition
   |       ^^^^^^^^^^ `FrozenBase` definition
 ```
 
-Frozen dataclasses inheriting from non-frozen dataclasses are also illegal:
+Frozen dataclasses inheriting from non-frozen dataclasses are also illegal.
 
 `bar.py`:
 
@@ -1372,7 +1372,7 @@ class Empty: ...
 reveal_type(Empty.__match_args__)  # revealed: tuple[()]
 ```
 
-When `match_args` is explicitly set to `False`, the `__match_args__` attribute is not available:
+When `match_args` is explicitly set to `False`, the `__match_args__` attribute is not available.
 
 ```py
 @dataclass(match_args=False)
@@ -1495,7 +1495,7 @@ class A:
 ```
 
 The field-level argument is also ignored, so fields remain positional and still participate in
-constructor ordering:
+constructor ordering.
 
 ```py
 from dataclasses import dataclass, field
@@ -1596,7 +1596,7 @@ Outer(inner=0, outer=5)  # Also OK
 Outer(0, 5)
 ```
 
-This also works when the parent class uses the `KW_ONLY` sentinel:
+This also works when the parent class uses the `KW_ONLY` sentinel.
 
 ```py
 from dataclasses import dataclass, KW_ONLY
@@ -1646,7 +1646,7 @@ Derived(1, "hello", b"world")
 ```
 
 The reverse case also works: when a parent has `kw_only=True` but the child doesn't, the parent's
-fields stay keyword-only while the child's fields are positional:
+fields stay keyword-only while the child's fields are positional.
 
 ```py
 from dataclasses import dataclass
@@ -1784,7 +1784,7 @@ class Child(C):
 reveal_type(Child.__slots__)  # revealed: tuple[Literal["y"]]
 ```
 
-`weakref_slot=True` requires `slots=True`:
+`weakref_slot=True` requires `slots=True`.
 
 ```py
 from dataclasses import dataclass
@@ -1794,7 +1794,7 @@ class InvalidWeakrefSlot: ...
 ```
 
 When `slots` is a non-literal `bool`, the combination might be valid at runtime, so we don't report
-an error:
+an error.
 
 ```py
 from dataclasses import dataclass
@@ -1805,7 +1805,7 @@ def dynamic_slots(slots: bool):
 ```
 
 An invalid combination is reported when the decorator factory is called, even if the decorator is
-applied later:
+applied later.
 
 ```py
 from dataclasses import dataclass
@@ -1818,7 +1818,7 @@ invalid_weakref_slot(AppliedWeakrefSlotLater)
 ```
 
 The `__weakref__` attribute is correctly not modeled as existing on instances of slotted dataclasses
-where the class definition was not marked with `weakref=True`:
+where the class definition was not marked with `weakref=True`.
 
 ```py
 from dataclasses import dataclass
@@ -1833,7 +1833,7 @@ reveal_type(C().__weakref__)  # revealed: Unknown
 ### New features are not available on old Python versions
 
 Certain parameters to `@dataclass` were added on newer Python versions; we do not infer them as
-having any effect on older Python versions:
+having any effect on older Python versions.
 
 ```toml
 [environment]
@@ -2306,7 +2306,7 @@ reveal_type(C.__init__)  # revealed:(self: C, x: int = 15, y: int = 0, z: int = 
 ### Statically known conditions
 
 Fields that are defined in always-reachable branches are always present in the synthesized
-`__init__` method. Fields that are defined in never-reachable branches are not present:
+`__init__` method. Fields that are defined in never-reachable branches are not present.
 
 ```py
 from dataclasses import dataclass
@@ -2327,7 +2327,7 @@ reveal_type(C.__init__)  # revealed: (self: C, normal: int, always_present: str)
 ### Dynamic conditions
 
 If a field is conditionally defined, we currently assume that it is always present. A more complex
-alternative here would be to synthesized a union of all possible `__init__` signatures:
+alternative here would be to synthesized a union of all possible `__init__` signatures.
 
 ```py
 from dataclasses import dataclass
@@ -2439,7 +2439,7 @@ reveal_type(result_str)  # revealed: ChildOfParentDataclass[str]
 
 For the following descriptor, the return type of `__get__` and the type of the `value` parameter in
 `__set__` are the same. The generated `__init__` method takes an argument of this type (instead of
-the type of the descriptor), and the default value is also of this type:
+the type of the descriptor), and the default value is also of this type.
 
 ```py
 from typing import overload
@@ -2522,7 +2522,7 @@ C("a", "b")
 ### With overloaded `__set__` method
 
 If the `__set__` method is overloaded, we determine the type for the `__init__` parameter as the
-union of all possible `value` parameter types:
+union of all possible `value` parameter types.
 
 ```py
 from typing import overload
@@ -2589,7 +2589,7 @@ To do
 
 Dataclasses have a special `__dataclass_fields__` class variable member. The `DataclassInstance`
 protocol checks for the presence of this attribute. It is used in the `dataclasses.fields` and
-`dataclasses.asdict` functions, for example:
+`dataclasses.asdict` functions, for example.
 
 ```py
 from dataclasses import dataclass, fields, asdict
@@ -2606,20 +2606,20 @@ reveal_type(fields(Foo))  # revealed: tuple[Field[Any], ...]
 reveal_type(asdict(foo))  # revealed: dict[str, Any]
 ```
 
-The class objects themselves also have a `__dataclass_fields__` attribute:
+The class objects themselves also have a `__dataclass_fields__` attribute.
 
 ```py
 reveal_type(Foo.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
 ```
 
 They can be passed into `fields` as well, because it also accepts `type[DataclassInstance]`
-arguments:
+arguments.
 
 ```py
 reveal_type(fields(Foo))  # revealed: tuple[Field[Any], ...]
 ```
 
-But calling `asdict` on the class object is not allowed:
+But calling `asdict` on the class object is not allowed.
 
 ```py
 # error: [invalid-argument-type] "Argument to function `asdict` is incorrect: Expected `DataclassInstance`, found `<class 'Foo'>`"
@@ -2629,7 +2629,7 @@ asdict(Foo)
 ## `dataclasses.is_dataclass`
 
 `is_dataclass` recognizes both dataclass instances and dataclass classes. A concrete dataclass
-instance always satisfies the `DataclassInstance` protocol:
+instance always satisfies the `DataclassInstance` protocol.
 
 ```py
 from dataclasses import dataclass, is_dataclass
@@ -2643,7 +2643,7 @@ def check(event: Event) -> None:
         reveal_type(event)  # revealed: Never
 ```
 
-This also works for class objects:
+This also works for class objects.
 
 ```py
 def check_class(event_type: type[Event]) -> None:
@@ -2697,7 +2697,7 @@ error[too-many-positional-arguments]: Too many positional arguments: expected 1,
 ```
 
 Declaration order still controls `KW_ONLY` when a later field name was already referenced by an
-earlier annotation:
+earlier annotation.
 
 ```py
 @dataclass
@@ -2710,7 +2710,7 @@ reveal_type(ShadowedOrder.__init__)  # revealed: (self: ShadowedOrder, x: int, *
 ```
 
 Using `KW_ONLY` to annotate more than one field in a dataclass causes a `TypeError` to be raised at
-runtime:
+runtime.
 
 ```py
 @dataclass
@@ -2724,7 +2724,7 @@ class Fails:  # error: [duplicate-kw-only]
 reveal_type(Fails.__init__)  # revealed: (self: Fails, a: int, *, c: str, e: bytes) -> None
 ```
 
-This also works if `KW_ONLY` is used in a conditional branch:
+This also works if `KW_ONLY` is used in a conditional branch.
 
 ```py
 def flag() -> bool:
@@ -2742,7 +2742,7 @@ class D:  # error: [duplicate-kw-only]
 ```
 
 `KW_ONLY` should only affect fields declared after it within the same class, not fields in
-subclasses:
+subclasses.
 
 ```py
 from dataclasses import dataclass, KW_ONLY
@@ -2767,7 +2767,7 @@ reveal_type(E.__init__)  # revealed: (self: E, x: int, z: bytes, *, y: str) -> N
 
 ### `dataclasses.dataclass`
 
-We also understand dataclasses if they are decorated with the fully qualified name:
+We also understand dataclasses if they are decorated with the fully qualified name.
 
 ```py
 import dataclasses
@@ -2799,7 +2799,7 @@ C(1)  # OK
 C("a")
 ```
 
-Similarly, if we set `init=False`, we still recognize the custom `__init__` method:
+Similarly, if we set `init=False`, we still recognize the custom `__init__` method.
 
 ```py
 @dataclass(init=False)
@@ -2814,7 +2814,7 @@ D()  # error: [missing-argument]
 ### Return type of `dataclass(...)`
 
 A call like `dataclass(order=True)` returns a callable itself, which is then used as the decorator.
-We can store the callable in a variable and later use it as a decorator:
+We can store the callable in a variable and later use it as a decorator.
 
 ```py
 from dataclasses import dataclass
@@ -2837,7 +2837,7 @@ class IndirectDecorator: ...
 
 ### Using `dataclass` as a function
 
-Calling `dataclass` with a class returns a class with a generated constructor:
+Calling `dataclass` with a class returns a class with a generated constructor.
 
 ```py
 from dataclasses import dataclass
@@ -2851,7 +2851,7 @@ dataclass(Point)("one")  # error: [invalid-argument-type]
 reveal_type(dataclass(Point)(1).x)  # revealed: int
 ```
 
-Options can be passed in the same call:
+Options can be passed in the same call.
 
 ```py
 class Ordered:
@@ -2867,7 +2867,7 @@ class InvalidDirectApplication: ...
 dataclass(InvalidDirectApplication, order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
 ```
 
-Passing `None` explicitly returns a decorator that uses the supplied options:
+Passing `None` explicitly returns a decorator that uses the supplied options.
 
 ```py
 class Item:
@@ -2882,7 +2882,7 @@ ordered_item(1) < ordered_item(2)
 ## Internals
 
 The `dataclass` decorator returns the class itself. This means that the type of `Person` is `type`,
-and attributes like the MRO are unchanged:
+and attributes like the MRO are unchanged.
 
 ```py
 from dataclasses import dataclass
@@ -2898,7 +2898,7 @@ reveal_type(Person.__mro__)  # revealed: tuple[type, ...]
 reveal_mro(Person)  # revealed: (<class 'Person'>, <class 'object'>)
 ```
 
-The generated methods have the following signatures:
+The generated methods have the following signatures.
 
 ```py
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int | None = None) -> None
@@ -2959,7 +2959,7 @@ static_assert(is_equivalent_to(EquivalentFunctionLikeCallableType, DunderInitTyp
 static_assert(is_subtype_of(DunderInitType, FunctionType))
 ```
 
-It should be possible to mock out synthesized methods:
+It should be possible to mock out synthesized methods.
 
 ```py
 from unittest.mock import Mock
@@ -2973,7 +2973,7 @@ def test_c():
 
 While we do not currently recognize the special behaviour of `dataclasses.dataclass` if it is called
 imperatively, we recognize that it can be called imperatively and do not emit any false-positive
-diagnostics on such calls:
+diagnostics on such calls.
 
 ```py
 from dataclasses import dataclass
@@ -3023,7 +3023,7 @@ reveal_type(ordered_foo() < ordered_foo())  # revealed: bool
 
 ## Dynamic class literals
 
-Dynamic classes created with `type()` can be wrapped with `dataclass()` as a function:
+Dynamic classes created with `type()` can be wrapped with `dataclass()` as a function.
 
 ```py
 from dataclasses import dataclass
@@ -3040,7 +3040,7 @@ instance = DynamicFoo()
 reveal_type(instance)  # revealed: DynamicFoo
 ```
 
-Dynamic classes that inherit from a dataclass base also work:
+Dynamic classes that inherit from a dataclass base also work.
 
 ```py
 from dataclasses import dataclass
@@ -3061,7 +3061,7 @@ reveal_type(DynamicChild.__dataclass_fields__)  # revealed: dict[str, Field[Any]
 ### NamedTuple classes (functional form)
 
 Applying `@dataclass` to a `namedtuple` class created via the functional form is problematic because
-the namedtuple machinery conflicts with dataclass semantics:
+the namedtuple machinery conflicts with dataclass semantics.
 
 ```py
 from collections import namedtuple
@@ -3082,7 +3082,7 @@ dataclass(namedtuple("Inline1", "a b"))
 dataclass()(namedtuple("Inline2", "a b"))
 ```
 
-The same applies to `typing.NamedTuple` used in functional form:
+The same applies to `typing.NamedTuple` used in functional form.
 
 ```py
 from dataclasses import dataclass
@@ -3105,7 +3105,7 @@ dataclass()(NamedTuple("Inline2", [("a", str)]))
 
 ### Enum classes (functional form)
 
-Applying `@dataclass` to a functional `Enum` class should also be detected:
+Applying `@dataclass` to a functional `Enum` class should also be detected.
 
 ```py
 from dataclasses import dataclass
@@ -3128,7 +3128,7 @@ dataclass()(Enum("Inline2", "X Y"))
 
 ### TypedDict classes (functional form)
 
-Applying `@dataclass` to a functional `TypedDict` class should also be detected:
+Applying `@dataclass` to a functional `TypedDict` class should also be detected.
 
 ```py
 from dataclasses import dataclass
@@ -3152,7 +3152,7 @@ dataclass()(TypedDict("Inline2", {"a": str}))
 ### Enum classes
 
 Applying `@dataclass` to an enum class is
-[explicitly not supported](https://docs.python.org/3/howto/enum.html#dataclass-support):
+[explicitly not supported](https://docs.python.org/3/howto/enum.html#dataclass-support).
 
 ```py
 from dataclasses import dataclass
@@ -3166,7 +3166,7 @@ class Color(Enum):
     BLUE = 3
 ```
 
-This also applies to classes that inherit from an enum class:
+This also applies to classes that inherit from an enum class.
 
 ```py
 from dataclasses import dataclass
@@ -3187,7 +3187,7 @@ class Color(BaseColor):
 ### Protocol classes
 
 Applying `@dataclass` to a protocol class is invalid because protocols define abstract interfaces
-and cannot be instantiated:
+and cannot be instantiated.
 
 ```py
 from dataclasses import dataclass
@@ -3199,7 +3199,7 @@ class Greeter(Protocol):
     def greet(self) -> str: ...
 ```
 
-This also applies to classes that extend a protocol while remaining a protocol themselves:
+This also applies to classes that extend a protocol while remaining a protocol themselves.
 
 ```py
 from dataclasses import dataclass
@@ -3215,7 +3215,7 @@ class ExtendedProtocol(BaseProtocol, Protocol):
 ```
 
 However, concrete classes that implement a protocol (without inheriting from `Protocol` directly)
-can be decorated with `@dataclass`:
+can be decorated with `@dataclass`.
 
 ```py
 from dataclasses import dataclass
@@ -3236,7 +3236,7 @@ reveal_type(Person)  # revealed: <class 'Person'>
 
 ### Using `dataclass()` as a function
 
-The same restrictions apply when using `dataclass()` as a function call instead of a decorator:
+The same restrictions apply when using `dataclass()` as a function call instead of a decorator.
 
 ```py
 from dataclasses import dataclass

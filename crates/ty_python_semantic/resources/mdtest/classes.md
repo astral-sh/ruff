@@ -29,7 +29,7 @@ reveal_mro(cls=C)  # revealed: (<class 'C'>, <class 'int'>, <class 'G[bytes]'>, 
 
 ## Starred bases
 
-Fixed-length tuples are unpacked when used as starred base classes:
+Fixed-length tuples are unpacked when used as starred base classes.
 
 ```py
 from ty_extensions._internal import reveal_mro
@@ -46,7 +46,7 @@ class Foo(*bases): ...
 reveal_mro(Foo)
 ```
 
-Variable-length tuples cannot be unpacked, so they fall back to `Unknown`:
+Variable-length tuples cannot be unpacked, so they fall back to `Unknown`.
 
 ```py
 from ty_extensions._internal import reveal_mro

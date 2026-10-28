@@ -22,7 +22,7 @@ several checks for a type checker to perform when it checks a subclass `B` of a 
 
 ## Method return types
 
-It is fine for a subclass method to return a subtype of the return type of the method it overrides:
+It is fine for a subclass method to return a subtype of the return type of the method it overrides.
 
 ```pyi
 class Super:
@@ -35,7 +35,7 @@ class Sub2(Super):
     def method(self) -> bool: ...  # fine: `bool` is a subtype of `int`
 ```
 
-However, returning a supertype leads to an error:
+However, returning a supertype leads to an error.
 
 ```pyi
 class Sub3(Super):
@@ -57,7 +57,7 @@ info: incompatible return types: `object` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 ```
 
-Returning a completely unrelated type also leads to an error:
+Returning a completely unrelated type also leads to an error.
 
 ```pyi
 class Sub4(Super):
@@ -173,7 +173,7 @@ class Sub11(Super):
 In the following cases, some calls permitted by the superclass are no longer allowed, so we emit an
 error.
 
-This method can no longer be passed arguments:
+This method can no longer be passed arguments.
 
 ```pyi
 class Sub12(Super):
@@ -195,7 +195,7 @@ info: parameter `x` is missing
 info: This violates the Liskov Substitution Principle
 ```
 
-This method can no longer be passed exactly one argument:
+This method can no longer be passed exactly one argument.
 
 ```pyi
 class Sub13(Super):
@@ -218,7 +218,7 @@ help: Parameter `y` must have a default value
 info: This violates the Liskov Substitution Principle
 ```
 
-Here, `x` can no longer be passed positionally:
+Here, `x` can no longer be passed positionally.
 
 ```pyi
 class Sub14(Super):
@@ -262,7 +262,7 @@ info: parameter `x` has an incompatible type: `int` is not assignable to `bool`
 info: This violates the Liskov Substitution Principle
 ```
 
-In this case, `x` can no longer be passed as a keyword argument:
+In this case, `x` can no longer be passed as a keyword argument.
 
 ```pyi
 class Super2:
@@ -286,7 +286,7 @@ info: parameter `x` is positional-only but must also accept keyword arguments
 info: This violates the Liskov Substitution Principle
 ```
 
-In this case, `x` can no longer be passed as a positional argument:
+In this case, `x` can no longer be passed as a positional argument.
 
 ```pyi
 class Sub17(Super2):
@@ -309,7 +309,7 @@ info: parameter `x` is keyword-only but must also accept positional arguments
 info: This violates the Liskov Substitution Principle
 ```
 
-The reverse is fine:
+The reverse is fine.
 
 ```pyi
 class Super3:
@@ -319,7 +319,7 @@ class Sub18(Super3):
     def method3(self, x): ...  # fine: `x` can still be used as a keyword argument
 ```
 
-This is an error because `x` can no longer be passed as a keyword argument:
+This is an error because `x` can no longer be passed as a keyword argument.
 
 ```pyi
 class Sub19(Super3):
@@ -342,7 +342,7 @@ info: parameter `x` is positional-only but must also accept keyword arguments
 info: This violates the Liskov Substitution Principle
 ```
 
-Accepting a wider type for `*args` and `**kwargs` is fine:
+Accepting a wider type for `*args` and `**kwargs` is fine.
 
 ```pyi
 class Super4:
@@ -352,7 +352,7 @@ class Sub20(Super4):
     def method(self, *args: object, **kwargs: object): ...  # fine
 ```
 
-Omitting `**kwargs` is an error:
+Omitting `**kwargs` is an error.
 
 ```pyi
 class Sub21(Super4):
@@ -375,7 +375,7 @@ info: the signature must accept arbitrary keyword arguments
 info: This violates the Liskov Substitution Principle
 ```
 
-Similarly, omitting `*args` is also an error:
+Similarly, omitting `*args` is also an error.
 
 ```pyi
 class Sub22(Super4):
@@ -523,7 +523,7 @@ info: parameter `child_value` must have a default value
 info: This violates the Liskov Substitution Principle
 ```
 
-The same rule applies when the optional parameter is positional-or-keyword:
+The same rule applies when the optional parameter is positional-or-keyword.
 
 ```pyi
 class ParentPositionalOrKeyword:
@@ -573,7 +573,7 @@ info: This violates the Liskov Substitution Principle
 
 ## Subclass overrides may not add additional positional-only parameters without default values
 
-This is true if the new parameter is positional-only:
+This is true if the new parameter is positional-only.
 
 ```pyi
 class PositionalOnlyParent:
@@ -684,7 +684,7 @@ cannot override an inherited pure class variable.
 An annotation without `ClassVar` declares an instance variable, even if the declaration also has a
 class-level default value. An explicit `ClassVar` declaration is a pure class variable. Overriding
 one with the other changes the places where the attribute is valid, so it violates Liskov
-substitution:
+substitution.
 
 ```py
 from typing import ClassVar
@@ -716,7 +716,7 @@ An unannotated class-body assignment is an instance variable with a class-level 
 it can replace another inherited instance-variable default. If it overrides an inherited `ClassVar`,
 it inherits that declaration and remains a class variable. However, an explicit `ClassVar` cannot
 override an inherited unannotated class-body assignment, because code using the base class can still
-write that attribute through an instance:
+write that attribute through an instance.
 
 ```py
 from typing import ClassVar
@@ -758,7 +758,7 @@ class ClassDefaultSubclass(ClassDefaultBase):
 
 Method definitions create descriptors in the class body. They are not instance variable
 declarations, so the class-variable vs. instance-variable override check does not apply to them.
-They can still restrict the values a class variable accepts or expose an incompatible read type:
+They can still restrict the values a class variable accepts or expose an incompatible read type.
 
 ```py
 from collections.abc import Callable
@@ -800,7 +800,7 @@ class PropertySubclass(PropertyBase):
 
 If a parent class already made an invalid change from class variable to instance variable, a child
 that keeps the parent's kind should not receive a duplicate diagnostic. The same applies in the
-other direction:
+other direction.
 
 ```py
 from typing import ClassVar
@@ -830,7 +830,7 @@ class ChildClassVar(ParentClassVar):
 
 A descriptor can define different behavior when accessed on an instance. Because descriptor lookup
 is neither a pure class variable nor a normal instance variable, overriding it with an instance
-attribute is accepted:
+attribute is accepted.
 
 ```py
 from typing import ClassVar
@@ -876,7 +876,7 @@ class MultipleInheritanceSubclass(InstanceBase, ClassVarBase):
 ### Dataclasses
 
 Dataclass fields are instance variables, even though they are usually declared in the class body.
-`ClassVar` fields remain pure class variables and are excluded from dataclass instance fields:
+`ClassVar` fields remain pure class variables and are excluded from dataclass instance fields.
 
 ```py
 from dataclasses import dataclass
@@ -1860,7 +1860,7 @@ class B4(A4):
 ## Overrides with `Self` return types
 
 An inherited `Self` return type refers to the subclass on which the method is called. An override
-can preserve that return type regardless of whether either method explicitly annotates `self`:
+can preserve that return type regardless of whether either method explicitly annotates `self`.
 
 ```pyi
 from typing_extensions import Self
@@ -1879,7 +1879,7 @@ class ChangesReceiverAnnotation(Base):
 ```
 
 Returning the superclass is incompatible: it does not satisfy the inherited promise to return an
-instance of the subclass. Adding or omitting `self: Self` does not change this:
+instance of the subclass. Adding or omitting `self: Self` does not change this.
 
 ```pyi
 class ReturnsBase(Base):
@@ -1906,7 +1906,7 @@ info: incompatible return types: `Base` is not assignable to `ReturnsBase`
 info: This violates the Liskov Substitution Principle
 ```
 
-Repeating an already invalid override does not produce another diagnostic on a subclass:
+Repeating an already invalid override does not produce another diagnostic on a subclass.
 
 ```pyi
 class RepeatsInvalidOverride(ReturnsBase):
@@ -1921,7 +1921,7 @@ subclass. A call through a base-class reference can pass a base-class instance t
 does not accept. We currently miss this violation for both implicit and explicit receiver
 annotations. This is a known limitation tracked in
 [#2255](https://github.com/astral-sh/ty/issues/2255), related to the broader
-[generic override limitation](https://github.com/astral-sh/ty/issues/4133):
+[generic override limitation](https://github.com/astral-sh/ty/issues/4133).
 
 ```pyi
 from typing_extensions import Self
@@ -1943,7 +1943,7 @@ class ChangesReceiverAnnotation(Base):
     def explicit(self, other: Self) -> None: ...
 ```
 
-An override cannot replace the `Self` parameter with an unrelated type:
+An override cannot replace the `Self` parameter with an unrelated type.
 
 ```pyi
 class Incompatible(Base):
@@ -1952,7 +1952,7 @@ class Incompatible(Base):
 ```
 
 For generic superclasses, we use the inherited specialization of the class's type parameters, but
-still miss the narrowing of `other: Self`:
+still miss the narrowing of `other: Self`.
 
 ```toml
 [environment]
@@ -1974,7 +1974,7 @@ class IncompatibleSpecialization(GenericBase[int]):
 ## Protocol annotations on mixin receivers
 
 A mixin can annotate `self` with a protocol that the mixin itself does not implement. An override
-can keep that annotation or omit it:
+can keep that annotation or omit it.
 
 ```pyi
 from typing import Protocol, overload
@@ -1992,7 +1992,7 @@ class ImplicitReceiver(Mixin):
     def method(self, argument: int) -> None: ...
 ```
 
-A subclass that provides the required protocol member can call the annotated method normally:
+A subclass that provides the required protocol member can call the annotated method normally.
 
 ```pyi
 class ImplementsProtocol(Mixin):
@@ -2004,7 +2004,7 @@ ImplementsProtocol().method(1)
 ```
 
 An override cannot require an unrelated protocol or change the type of an argument accepted by the
-mixin:
+mixin.
 
 ```pyi
 class HasOtherValue(Protocol):
@@ -2033,7 +2033,7 @@ info: parameter `argument` has an incompatible type: `int` is not assignable to 
 info: This violates the Liskov Substitution Principle
 ```
 
-The receiver annotation can also accept more than one protocol:
+The receiver annotation can also accept more than one protocol.
 
 ```pyi
 class UnionMixin:
@@ -2043,7 +2043,7 @@ class SameUnionReceiver(UnionMixin):
     def method(self: HasValue | HasOtherValue, argument: int) -> None: ...
 ```
 
-Overloaded mixin methods need the same treatment for every receiver-specific overload:
+Overloaded mixin methods need the same treatment for every receiver-specific overload.
 
 ```pyi
 # TODO: We should emit an `invalid-method-override` diagnostic on the second
@@ -2064,7 +2064,7 @@ class InvalidOverloadedReceiver(OverloadedMixin):
 ```
 
 The protocol may include the overridden method itself. This must not cause a valid implementation to
-be rejected while checking the override:
+be rejected while checking the override.
 
 ```pyi
 class Container(Protocol):
@@ -2085,7 +2085,7 @@ ImplementsContainer().method()
 ## Generic instance-method receivers
 
 An instance method can relate its receiver and return type using a bounded type variable. An
-override can express the same relationship with `Self`:
+override can express the same relationship with `Self`.
 
 ```pyi
 from typing import TypeVar
@@ -2171,7 +2171,7 @@ info: This violates the Liskov Substitution Principle
 ## Excluded methods
 
 Certain special constructor methods are excluded from Liskov checks. None of the following classes
-cause us to emit any errors, therefore:
+cause us to emit any errors, therefore.
 
 ```toml
 # This is so that the dataclasses machinery will generate `__replace__` methods for us
@@ -2365,7 +2365,7 @@ class Unhashable:
 ## Restoring hashability
 
 A subclass can replace a narrower hash signature, disable hashing, or restore it. Inherited
-annotations do not constrain the replacement or its inferred type:
+annotations do not constrain the replacement or its inferred type.
 
 ```pyi
 from typing import Callable, ClassVar
@@ -2385,7 +2385,7 @@ class Restored(Unhashable):
     def __hash__(self) -> int: ...  # no diagnostic
 ```
 
-The inherited `ClassVar` still prevents assignment through an instance:
+The inherited `ClassVar` still prevents assignment through an instance.
 
 ```pyi
 Assigned().__hash__ = object.__hash__  # error: [invalid-attribute-access]
@@ -2394,7 +2394,7 @@ Assigned().__hash__ = object.__hash__  # error: [invalid-attribute-access]
 ## Restoring hashability with callable objects
 
 A callable object assigned to `__hash__` keeps its own calling convention. Its `__call__` method
-receives the callable object, with no additional argument for the object being hashed:
+receives the callable object, with no additional argument for the object being hashed.
 
 ```py
 from typing import ClassVar
@@ -2410,7 +2410,7 @@ class Restored(Unhashable):
     __hash__ = HashCallable()  # no diagnostic
 ```
 
-An incompatible return type makes the replacement invalid:
+An incompatible return type makes the replacement invalid.
 
 ```py
 class StringHashCallable:
@@ -2424,7 +2424,7 @@ class InvalidReturn(Unhashable):
 ## Optional hash methods
 
 A class can declare that hashing is either disabled or provided by a compatible callable. The
-callable alternative must still return an `int`:
+callable alternative must still return an `int`.
 
 ```py
 from typing import Callable, ClassVar
@@ -2439,7 +2439,7 @@ class InvalidOptionalHash:
 ## Final hash definitions
 
 Finality still prevents subclasses from replacing a hash definition, including when changing whether
-hashing is enabled:
+hashing is enabled.
 
 ```pyi
 from typing import Final, final
@@ -2581,7 +2581,7 @@ class GoodChild2(Parent):
     def static_method(x: object) -> bool: ...
 ```
 
-When the types are incompatible, we report an error:
+When the types are incompatible, we report an error.
 
 ```pyi
 class BadTypesA(Parent):
@@ -2655,7 +2655,7 @@ class GoodChild3F(Parent):
     def static_method(cls, x: int) -> int: ...
 ```
 
-However, if the signature does not match, we emit a useful error message:
+However, if the signature does not match, we emit a useful error message.
 
 ```pyi
 class BadSignature1(Parent):
@@ -2683,7 +2683,7 @@ info: This violates the Liskov Substitution Principle
 
 An explicitly annotated `cls` can specialize the class receiver and return type. A subclass can also
 replace a bounded type variable on the class receiver with `Self` while preserving compatible
-arguments:
+arguments.
 
 ```pyi
 from typing import Any, TypeVar
@@ -2716,7 +2716,7 @@ class DynamicItem(Item):
     def from_component(cls: type[Self], component: object) -> Self: ...
 ```
 
-The override can also specialize a gradual parameter or accept additional keyword arguments:
+The override can also specialize a gradual parameter or accept additional keyword arguments.
 
 ```pyi
 ModelT = TypeVar("ModelT", bound="BaseModel")
@@ -2739,7 +2739,7 @@ class FrameModel(BaseModel):
 ```
 
 Narrowing a non-gradual argument accepted by the superclass remains an invalid override for both
-generic and concrete class receivers:
+generic and concrete class receivers.
 
 ```pyi
 class InvalidDynamicItem(Item):
@@ -2758,7 +2758,7 @@ class InvalidSwapEvent(Event):
 In a class method, `Self` refers to an instance, while `cls` is a class object. A caller with a
 `type[Base]` reference can pass a `Base` instance as `other`, so narrowing that parameter to the
 subclass's `Self` is invalid. We currently miss this violation with or without an explicit
-`cls: type[Self]` annotation:
+`cls: type[Self]` annotation.
 
 ```pyi
 from typing_extensions import Self
@@ -2780,7 +2780,7 @@ class ExplicitReceiver(Base):
     def compare(cls: type[Self], other: Self) -> None: ...
 ```
 
-An override that returns the superclass does not satisfy the inherited `Self` return type:
+An override that returns the superclass does not satisfy the inherited `Self` return type.
 
 ```pyi
 class ReturnsBase(Base):
@@ -2817,7 +2817,7 @@ class BadChild(Base):
 ## Definitely bound members with no reachable definitions(!)
 
 We don't emit a Liskov-violation diagnostic here, but if you're writing code like this, you probably
-have bigger problems:
+have bigger problems.
 
 ```py
 from __future__ import annotations

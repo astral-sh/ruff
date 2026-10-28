@@ -157,7 +157,7 @@ static_assert(is_equivalent_to(type[bool] & type[str], Never))
 static_assert(is_equivalent_to(type[bool & str], type[bool] & type[str]))
 ```
 
-This also implies that `type[Never]` is equivalent to `Never`:
+This also implies that `type[Never]` is equivalent to `Never`.
 
 ```pyi
 static_assert(is_equivalent_to(type[Never], Never))
@@ -209,7 +209,7 @@ class Foo: ...
 class Bar: ...
 ```
 
-Illegal stringified annotations lead to a diagnostic:
+Illegal stringified annotations lead to a diagnostic.
 
 ```py
 # error: [invalid-syntax-in-forward-annotation]
@@ -237,7 +237,7 @@ class Bar: ...
 
 ### Unions of strings, Python 3.13 with `from __future__ import annotations`
 
-On Python 3.13 with `from __future__ import annotations`, there is no error:
+On Python 3.13 with `from __future__ import annotations`, there is no error.
 
 ```toml
 [environment]
@@ -256,7 +256,7 @@ class Bar: ...
 
 ### Unions of strings, Python 3.14
 
-On Python 3.14 and higher, this is also fine:
+On Python 3.14 and higher, this is also fine.
 
 ```toml
 [environment]
@@ -305,7 +305,7 @@ def f(
 ```
 
 A callable signature is also invalid when it appears inside a union, an intersection or an alias
-used as the argument to `type[...]`:
+used as the argument to `type[...]`.
 
 ```py
 from ty_extensions import Intersection
@@ -348,7 +348,7 @@ reveal_mro(Foo)  # revealed: (<class 'Foo'>, <class 'type'>, <class 'object'>)
 
 `type[]` types are eagerly converted to class-literal types if a class decorated with `@final` is
 used as the type argument. This applies to standard-library classes and user-defined classes. The
-same also applies to enum classes with members, which are implicitly final:
+same also applies to enum classes with members, which are implicitly final.
 
 ```toml
 [environment]
@@ -568,7 +568,7 @@ static_assert(is_subtype_of(type[Bar], type[Foo]))
 
 leading to an embarrassing intransivity of subtyping, and failing property tests.
 
-`type[]` types *are* callable, however, so they are always subtypes of `Top[Callable[..., object]]`:
+`type[]` types *are* callable, however, so they are always subtypes of `Top[Callable[..., object]]`.
 
 ```py
 static_assert(is_subtype_of(type[Foo], Top[Callable[..., object]]))
@@ -583,7 +583,7 @@ static_assert(is_subtype_of(TypeOf[Foo], Top[Callable[..., Foo]]))
 
 And class-literal types cannot be unsoundly subtyped in the same way as `type[]` types, so they can
 still be considered subtypes of (and redundant with) the `Callable` types describing their
-constructor signatures:
+constructor signatures.
 
 ```py
 static_assert(is_subtype_of(TypeOf[Foo], Callable[[], Foo]))

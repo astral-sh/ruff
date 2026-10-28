@@ -54,7 +54,7 @@ suppressed = 1  # ruff:ignore[W292]
 ## Block suppression boundaries
 
 A block suppression should not apply to a diagnostic that starts inside the disabled range but ends
-after the matching `ruff:enable` comment:
+after the matching `ruff:enable` comment.
 
 ```toml
 [lint]
@@ -73,7 +73,7 @@ not_suppressed = [
 This isn't _strictly_ a problem because the formatter will indent and invalidate the `ruff:enable`
 comment here, raising `RUF103`, but it seems better for this not to work regardless of formatting.
 
-This is how the comments should look instead:
+This is how the comments should look instead.
 
 ```py
 # ruff:disable[RUF015]
@@ -107,7 +107,7 @@ preview = true
 select = [ "E" ]
 ```
 
-This should be suppressed:
+This should be suppressed.
 
 ```py
 # ruff:ignore[E262]
@@ -115,7 +115,7 @@ x = 1  #bad
 ```
 
 An ignore comment inside a multi-line statement only covers the next physical line, including its
-trailing comment:
+trailing comment.
 
 ```py
 values = [
@@ -126,7 +126,7 @@ values = [
 ]
 ```
 
-An own-line ignore does not extend to a comment on the following line:
+An own-line ignore does not extend to a comment on the following line.
 
 ```py
 # ruff:ignore[E265]
@@ -135,7 +135,7 @@ x = 1
 #bad
 ```
 
-An own-line ignore above a multi-line statement covers a trailing comment on its final line:
+An own-line ignore above a multi-line statement covers a trailing comment on its final line.
 
 ```py
 # ruff:ignore[E262]
@@ -181,7 +181,7 @@ from math import ( # noqa: F401
 )
 ```
 
-`ruff:ignore` should behave in the same way:
+`ruff:ignore` should behave in the same way.
 
 ```py
 from sys import ( # ruff:ignore[F401]
@@ -223,7 +223,7 @@ select = ["E501", "F401", "RUF100", "RUF103", "RUF104"]
 
 An intervening `ruff:ignore` directive shouldn't cause a `disable`/`enable` pair to be reported as
 unmatched. Instead, the range suppression should take precedence, and the inner `ruff:ignore` should
-be unused, just like a `noqa` comment:
+be unused, just like a `noqa` comment.
 
 ```py
 # ruff:disable[F401]
@@ -237,7 +237,7 @@ import sys  # noqa: F401
 # ruff:enable[F401]
 ```
 
-This applies to own-line comments and nested comments too:
+This applies to own-line comments and nested comments too.
 
 ```py
 # ruff:disable[F401]
@@ -280,7 +280,7 @@ message = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 # ruff:enable[E501]
 ```
 
-This should also work for `ruff:ignore` comments on the same line as the `disable` comment:
+This should also work for `ruff:ignore` comments on the same line as the `disable` comment.
 
 ```py
 def f():
@@ -297,7 +297,7 @@ def f():
 select = ["F401", "RUF100", "RUF104"]
 ```
 
-A `file-ignore` within a range suppression takes precedence and marks the `disable` as unused:
+A `file-ignore` within a range suppression takes precedence and marks the `disable` as unused.
 
 ```py
 # error: [unused-noqa]
@@ -316,7 +316,7 @@ preview = false
 select = ["F401", "RUF102"]
 ```
 
-With preview disabled, this should continue to emit `F401`, as well as `RUF102`:
+With preview disabled, this should continue to emit `F401`, as well as `RUF102`.
 
 ```py
 # snapshot: invalid-rule-code
@@ -348,7 +348,7 @@ help: Remove the suppression comment
   |
 ```
 
-Emit both (non-fix-title) help messages when rule names and unknown codes are present:
+Emit both (non-fix-title) help messages when rule names and unknown codes are present.
 
 ```py
 # snapshot: invalid-rule-code
@@ -381,7 +381,7 @@ help: Remove the suppression comment
 
 ## Allow human-readable names in preview
 
-Enable preview, `unused-import` and several `RUF` rules to check for valid suppression comments:
+Enable preview, `unused-import` and several `RUF` rules to check for valid suppression comments.
 
 ```toml
 [lint]
@@ -391,7 +391,7 @@ select = ["F401", "RUF100", "RUF102", "RUF103", "RUF104"]
 
 ### `ruff:ignore`
 
-This comment should suppress the `F401` diagnostic and not emit any other errors:
+This comment should suppress the `F401` diagnostic and not emit any other errors.
 
 ```py
 # ruff:ignore[unused-import]
@@ -400,7 +400,7 @@ import math
 
 ### `ruff:file-ignore`
 
-File-level ignores should also work:
+File-level ignores should also work.
 
 ```py
 # ruff:file-ignore[unused-import]
@@ -425,7 +425,7 @@ import traceback  # error: [unused-import]
 ```
 
 The `disable` and `enable` comments must match textually, even when a rule code and name identify
-the same rule:
+the same rule.
 
 ```py
 # error: [unmatched-suppression-comment]
@@ -466,7 +466,7 @@ import math  # noqa: F401
 
 ### `invalid-rule-code`
 
-Unknown rule names should emit `RUF102`, while preserving valid names in the same suppression:
+Unknown rule names should emit `RUF102`, while preserving valid names in the same suppression.
 
 ```py
 # snapshot: invalid-rule-code
@@ -491,7 +491,7 @@ help: Remove the rule code `not-a-rule`
 
 ### `unused-noqa`
 
-Unused suppressions with rule codes should still emit `RUF100` with an appropriate error message:
+Unused suppressions with rule codes should still emit `RUF100` with an appropriate error message.
 
 ```py
 # error: [unused-noqa]
@@ -522,7 +522,7 @@ help: Remove unused suppression
 ```
 
 A rule code and human-readable name for the same rule are treated as separate suppressions. The
-second suppression is therefore unused rather than duplicated:
+second suppression is therefore unused rather than duplicated.
 
 ```py
 # snapshot: unused-noqa
@@ -552,13 +552,13 @@ help: Remove unused suppression
 select = ["F401", "RUF103", "RUF104"]
 ```
 
-`ruff:ignore` comments nested within other comments should still work:
+`ruff:ignore` comments nested within other comments should still work.
 
 ```py
 import math  # some comment # ruff:ignore[F401] # another comment
 ```
 
-Invalid suppressions should only delete the suppression part:
+Invalid suppressions should only delete the suppression part.
 
 ```py
 # snapshot: invalid-suppression-comment
@@ -601,7 +601,7 @@ select = ["F401", "RUF103", "RUF104"]
 ```
 
 Nested `disable` and `file-ignore` comments are also invalid and don't suppress diagnostics on the
-following line:
+following line.
 
 ```py
 # snapshot: invalid-suppression-comment
@@ -631,7 +631,7 @@ help: Remove suppression comment
 note: This is an unsafe fix and may change runtime behavior
 ```
 
-Similarly, a nested `enable` is invalid and doesn't re-enable a disabled rule:
+Similarly, a nested `enable` is invalid and doesn't re-enable a disabled rule.
 
 ```py
 # error: [unmatched-suppression-comment]
@@ -649,7 +649,7 @@ select = ["F401", "RUF100", "FIX002"]
 ```
 
 Nested suppression comments on a comment-only line are treated as trailing on the comment itself and
-don't suppress diagnostics on the following line:
+don't suppress diagnostics on the following line.
 
 ```py
 # error: [unused-noqa]
@@ -664,7 +664,7 @@ def foo():
     import pathlib
 ```
 
-This can still be useful if the comment itself has a diagnostic:
+This can still be useful if the comment itself has a diagnostic.
 
 ```py
 # TODO this comment has a todo # noqa: FIX002
@@ -681,7 +681,7 @@ select = ["E501", "F821", "RUF100", "RUF103"]
 
 `RUF100` should have an unsafe fix when deleting a leading suppression would change the placement
 semantics of a later suppression. The `file-ignore` is initially invalid here, but removing the
-unused `ignore` would make it valid, so the fix is unsafe:
+unused `ignore` would make it valid, so the fix is unsafe.
 
 ```py
 # snapshot: unused-noqa
@@ -710,7 +710,7 @@ note: This is an unsafe fix and may change runtime behavior
 A later valid suppression also needs to be considered because removing the preceding comment can
 change its semantics. In this case, removing the `disable` comment would transform the `ignore` from
 a trailing comment on the `disable` comment to an own-line `ignore` comment, which would start
-suppressing the `F821` diagnostic:
+suppressing the `F821` diagnostic.
 
 ```py
 # snapshot: unused-noqa
@@ -750,7 +750,7 @@ note: This is an unsafe fix and may change runtime behavior
 select = ["E501", "RUF100", "FIX002"]
 ```
 
-Deleting either half of a `disable`/`enable` pair should make the fix unsafe if in a nested context:
+Deleting either half of a `disable`/`enable` pair should make the fix unsafe if in a nested context.
 
 ```py
 # snapshot: unused-noqa
@@ -787,7 +787,7 @@ select = ["E501", "F401", "F821", "RUF100", "RUF103"]
 ```
 
 Removing a code from a multi-code suppression doesn't promote the later suppression, so the fix is
-still safe:
+still safe.
 
 ```py
 # snapshot: unused-noqa
@@ -818,7 +818,7 @@ help: Remove unused suppression
 select = ["F821", "RUF102", "RUF103"]
 ```
 
-The `RUF102` fix should also be unsafe when it would promote a later suppression:
+The `RUF102` fix should also be unsafe when it would promote a later suppression.
 
 ```py
 # snapshot: invalid-rule-code
@@ -851,7 +851,7 @@ note: This is an unsafe fix and may change runtime behavior
 select = ["F401", "F821", "RUF100", "RUF103"]
 ```
 
-The same applies to fixes for invalid suppression placement:
+The same applies to fixes for invalid suppression placement.
 
 ```py
 def f():
@@ -911,7 +911,7 @@ note: This is an unsafe fix and may change runtime behavior
 select = ["RUF103"]
 ```
 
-Parse errors should only highlight and delete the nested suppression:
+Parse errors should only highlight and delete the nested suppression.
 
 ```py
 # snapshot: invalid-suppression-comment
@@ -957,7 +957,7 @@ note: This is an unsafe fix and may change runtime behavior
 select = ["F401", "RUF103"]
 ```
 
-A malformed nested suppression should not prevent a later valid suppression from being parsed:
+A malformed nested suppression should not prevent a later valid suppression from being parsed.
 
 ```py
 # error: [invalid-suppression-comment]
@@ -971,7 +971,7 @@ import os  # before # ruff:ignore # ruff:ignore[F401] # after
 select = ["RUF100"]
 ```
 
-Fixes for unused nested suppressions should preserve the surrounding comment fragments:
+Fixes for unused nested suppressions should preserve the surrounding comment fragments.
 
 ```py
 # snapshot: unused-noqa

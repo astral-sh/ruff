@@ -106,7 +106,7 @@ If a variable is declared in the class body but not bound anywhere, we consider 
 on instances and the class itself. It would be more consistent to treat this as a pure instance
 variable (and require the attribute to be annotated with `ClassVar` if it should be accessible on
 the class as well), but other type checkers allow this as well. This is also heavily relied on in
-the Python ecosystem:
+the Python ecosystem.
 
 ```py
 class C:
@@ -895,7 +895,7 @@ reveal_type(C().a)  # revealed: int
 #### Conditionally declared / bound attributes
 
 We currently treat implicit instance attributes to be bound, even if they are only conditionally
-defined:
+defined.
 
 ```py
 def flag() -> bool:
@@ -980,7 +980,7 @@ reveal_type(D.x)  # revealed: Unknown
 reveal_type(D().x)  # revealed: Unknown
 ```
 
-If `staticmethod` is something else, that should not influence the behavior:
+If `staticmethod` is something else, that should not influence the behavior.
 
 ```py
 from typing import TypeVar
@@ -998,7 +998,7 @@ class C:
 reveal_type(C().x)  # revealed: int
 ```
 
-And if `staticmethod` is fully qualified, that should also be recognized:
+And if `staticmethod` is fully qualified, that should also be recognized.
 
 ```py
 import builtins
@@ -1172,7 +1172,7 @@ reveal_type(Subclass.pure_class_variable1)  # revealed: str
 ```
 
 If a class variable is additionally qualified as `Final`, we do not union with `Unknown` for bare
-`ClassVar`s:
+`ClassVar`s.
 
 ```py
 from typing import Final
@@ -1709,7 +1709,7 @@ def replace(c: C) -> None:
 ## Accessing attributes on class objects
 
 When accessing attributes on class objects, they are always looked up on the type of the class
-object first, i.e. on the metaclass:
+object first, i.e. on the metaclass.
 
 ```py
 from typing import Literal
@@ -1725,7 +1725,7 @@ reveal_type(C1.attr)  # revealed: Literal["metaclass value"]
 A dynamically-created metaclass can define methods with the same names as methods in the class it
 creates. These methods can have different roles; in particular, the metaclass's `__new__` creates
 the class object and its `__call__` creates instances, while the class's methods create and operate
-on instances of that class:
+on instances of that class.
 
 ```py
 class DynamicallyConstructed(
@@ -1749,7 +1749,7 @@ DynamicallyConstructed()(1)
 
 Assignments in instance methods of a metaclass are also attributes on its class-object instances. In
 particular, a metaclass `__init__` assignment happens after the initial class namespace has been
-converted into a class object, so it shadows an attribute from that namespace:
+converted into a class object, so it shadows an attribute from that namespace.
 
 ```py
 class InitializingMeta(type):
@@ -1966,7 +1966,7 @@ reveal_type(OptionallyInstalledClassAttribute.installed)  # revealed: int
 
 An attribute declared in a metaclass with an annotation but no value describes an attribute of every
 class created with that metaclass. The attribute is therefore available through instances of those
-classes:
+classes.
 
 ```py
 from typing import TypeVar
@@ -1990,7 +1990,7 @@ def read_generated(value: TGenerated) -> None:
     reveal_type(value.generated)  # revealed: int
 ```
 
-This also lets a generic metaclass method rely on a protocol describing the classes it accepts:
+This also lets a generic metaclass method rely on a protocol describing the classes it accepts.
 
 ```py
 from typing import Iterator, Protocol, TypeVar
@@ -2022,7 +2022,7 @@ for member in EnumValue:
 ```
 
 Because the metaclass stores the declared attribute directly on the new class, it takes precedence
-over an attribute inherited from a base class:
+over an attribute inherited from a base class.
 
 ```py
 class GeneratedBase:
@@ -2035,7 +2035,7 @@ reveal_type(StoresGenerated().generated)  # revealed: int
 
 As with ordinary instance lookup, an instance assignment does not completely shadow a regular class
 attribute because the assignment may not have run. This applies whether the assignment is defined
-directly or inherited from a base class:
+directly or inherited from a base class.
 
 ```py
 class InitializesGenerated(metaclass=StoringMeta):
@@ -2054,7 +2054,7 @@ reveal_type(InheritsGenerated().generated)  # revealed: int | str
 ```
 
 A function is a descriptor when stored on a class, but not when stored directly on an instance. The
-instance attribute is therefore returned without descriptor binding:
+instance attribute is therefore returned without descriptor binding.
 
 ```py
 from typing import Callable
@@ -2075,7 +2075,7 @@ reveal_type(StoresInstanceCallable().generated_callable(1))  # revealed: str
 
 A dynamic base may provide an instance attribute of any type, so a regular attribute stored by the
 metaclass does not remove that uncertainty. This remains true when an earlier static base provides a
-class attribute with the same name:
+class attribute with the same name.
 
 ```py
 from typing import Any
@@ -2095,7 +2095,7 @@ reveal_type(InheritsStaticThenDynamicGenerated().generated)  # revealed: Any
 ```
 
 Implicit special method lookup ignores attributes stored on an instance. It therefore uses the
-method supplied by a metaclass declaration even if the initializer assigns the same name:
+method supplied by a metaclass declaration even if the initializer assigns the same name.
 
 ```py
 class IteratingMeta(type):
@@ -2116,7 +2116,7 @@ reveal_type(iter(StoresInstanceIter()))  # revealed: Iterator[int]
 ```
 
 Splitting the class MRO around a generated attribute preserves the usual treatment of dunder
-`Callable` attributes as bound-method descriptors:
+`Callable` attributes as bound-method descriptors.
 
 ```py
 def pow_impl(value: object, exponent: int) -> object:
@@ -2134,7 +2134,7 @@ reveal_type(Tensor() ** 2)  # revealed: object
 An annotation-only `ClassVar` on the constructed class is a class-namespace contract and takes
 precedence over the metaclass-generated attribute. An inherited `ClassVar` does not describe an
 instance attribute on the constructed class, but an inherited dataclass field adds an instance
-fallback:
+fallback.
 
 ```py
 from dataclasses import dataclass
@@ -2163,7 +2163,7 @@ reveal_type(InheritsDataclassGenerated().generated)  # revealed: int | str
 ```
 
 The attribute stored by the metaclass also shadows a descriptor inherited from a base class. Both
-that non-data class attribute and an instance assignment remain possible:
+that non-data class attribute and an instance assignment remain possible.
 
 ```py
 class InheritedGeneratedProperty:
@@ -2190,7 +2190,7 @@ reveal_type(ShadowsInheritedGeneratedProperty().generated)  # revealed: str | by
 ```
 
 If the metaclass instead stores a data descriptor on the new class, the descriptor takes precedence
-over an instance assignment:
+over an instance assignment.
 
 ```py
 from typing import Literal
@@ -2257,7 +2257,7 @@ reveal_type(UsesMaybeAugmentedDescriptor().descriptor_value)  # revealed: Unknow
 ```
 
 When a metaclass declaration uses a union, only the data descriptors in that union take precedence
-over an instance attribute. A non-descriptor member and the instance attribute both remain possible:
+over an instance attribute. A non-descriptor member and the instance attribute both remain possible.
 
 ```py
 class MaybeDescriptorMeta(type):
@@ -2274,7 +2274,7 @@ class UsesMaybeGeneratedDescriptorWithBytes(metaclass=MaybeDescriptorMeta):
 reveal_type(UsesMaybeGeneratedDescriptorWithBytes().generated_descriptor)  # revealed: Literal["descriptor"] | int | bytes
 ```
 
-A dynamic base likewise supplies the fallback for the non-descriptor members of a union:
+A dynamic base likewise supplies the fallback for the non-descriptor members of a union.
 
 ```py
 class UsesMaybeGeneratedDescriptorWithDynamicBase(DynamicGeneratedBase, metaclass=MaybeDescriptorMeta): ...
@@ -2283,7 +2283,7 @@ reveal_type(UsesMaybeGeneratedDescriptorWithDynamicBase().generated_descriptor) 
 ```
 
 A union alias must not hide a non-descriptor member: the same dynamic fallback remains possible
-after expanding it:
+after expanding it.
 
 ```py
 from typing_extensions import TypeAliasType
@@ -2298,7 +2298,7 @@ class UsesAliasedDescriptorWithDynamicBase(DynamicGeneratedBase, metaclass=Alias
 reveal_type(UsesAliasedDescriptorWithDynamicBase().generated_descriptor)  # revealed: Literal["descriptor"] | Any
 ```
 
-Dynamic bases are ignored when descriptor detection requires a concrete `__get__` method:
+Dynamic bases are ignored when descriptor detection requires a concrete `__get__` method.
 
 ```py
 class GeneratedGetMeta(type):
@@ -2320,7 +2320,7 @@ reveal_type(UsesGeneratedGetDescriptor().generated)  # revealed: str
 ```
 
 If the declaration can also be `Any`, the class attribute is not known to always be a data
-descriptor. The `Any` result subsumes the instance attribute type:
+descriptor. The `Any` result subsumes the instance attribute type.
 
 ```py
 class MaybeDynamicDescriptorMeta(type):
@@ -2341,7 +2341,7 @@ reveal_type(UsesMaybeDynamicDescriptor().generated_descriptor)  # revealed: Lite
 
 An instance attribute annotation without a value does not store anything in the class namespace, so
 it cannot shadow a data descriptor. The annotation and non-descriptor members of the metaclass
-declaration all remain possible:
+declaration all remain possible.
 
 ```py
 class DeclaresGeneratedDescriptor(metaclass=DescriptorMeta):
@@ -2356,7 +2356,7 @@ reveal_type(DeclaresMaybeGeneratedDescriptor().generated_descriptor)  # revealed
 ```
 
 Assigning an attribute through the first parameter of a static method does not describe an instance
-of the class:
+of the class.
 
 ```py
 class StaticMethodAssignment(metaclass=StoringMeta):
@@ -2370,7 +2370,7 @@ reveal_type(StaticMethodAssignment().generated)  # revealed: int
 An own class-body binding takes precedence when it exists, while the metaclass member supplies the
 attribute before inherited class members on other paths. An unreachable binding does not suppress
 that fallback. An assignment inside a conditionally defined method is only a possible instance
-member, so the metaclass declaration remains as a fallback:
+member, so the metaclass declaration remains as a fallback.
 
 ```py
 def returns_bool() -> bool:
@@ -2418,7 +2418,7 @@ reveal_type(ConditionalMethodAssignment().generated)  # revealed: int | str
 ```
 
 An attribute assigned in the metaclass body is available on classes that use the metaclass, but not
-on their instances:
+on their instances.
 
 ```py
 class MetaclassAttributeOnly(type):
@@ -2434,7 +2434,7 @@ reveal_type(DoesNotInheritMetaclassAttribute().metaclass_only)  # revealed: Unkn
 
 By contrast, an assignment through `cls` in a metaclass instance method writes to the constructed
 class namespace and is available through its instances. These inferred attributes are also inherited
-from base metaclasses:
+from base metaclasses.
 
 ```py
 class AssignmentOnlyMeta(type):
@@ -2479,7 +2479,7 @@ reveal_type(Initialized.initialized)  # revealed: int
 reveal_type(Initialized().initialized)  # revealed: int | str
 ```
 
-A conditional assignment in the metaclass `__init__` necessarily retains the inherited alternative:
+A conditional assignment in the metaclass `__init__` necessarily retains the inherited alternative.
 
 ```py
 def metaclass_condition() -> bool:
@@ -2499,7 +2499,7 @@ reveal_type(ConditionallyInitialized().initialized)  # revealed: int | str
 ```
 
 An assignment in an arbitrary metaclass method likewise retains the inherited alternative because
-the method may not have run:
+the method may not have run.
 
 ```py
 class InstallingMeta(type):
@@ -2518,7 +2518,7 @@ reveal_type(OptionallyInstalled().installed)  # revealed: int | str
 
 However, the metaclass attribute only takes precedence over a class-level attribute if it is a data
 descriptor. If it is a non-data descriptor or a normal attribute, the class-level attribute is used
-instead (see the [descriptor protocol tests] for data/non-data descriptor attributes):
+instead (see the [descriptor protocol tests] for data/non-data descriptor attributes).
 
 ```py
 from typing import Literal
@@ -2533,7 +2533,7 @@ reveal_type(C2.attr)  # revealed: Literal["class value"]
 ```
 
 If the class-level attribute is only partially defined, we union the metaclass attribute with the
-class-level attribute:
+class-level attribute.
 
 ```py
 def _(flag: bool):
@@ -2552,7 +2552,7 @@ def _(flag: bool):
 ```
 
 If the *metaclass* attribute is only partially defined, we emit a `possibly-missing-attribute`
-diagnostic:
+diagnostic.
 
 ```py
 def _(flag: bool):
@@ -2566,7 +2566,7 @@ def _(flag: bool):
 ```
 
 Finally, if both the metaclass attribute and the class-level attribute are only partially defined,
-we union them and emit a `possibly-missing-attribute` diagnostic:
+we union them and emit a `possibly-missing-attribute` diagnostic.
 
 ```py
 def _(flag1: bool, flag2: bool):
@@ -2672,7 +2672,7 @@ class Foo:
 ```
 
 We also don't suggest anything if the method is (invalidly) decorated with both `@classmethod` and
-`@staticmethod`:
+`@staticmethod`.
 
 ```py
 class Foo:
@@ -2714,7 +2714,7 @@ class Foo:
 ```
 
 We don't suggest anything if an instance method or a classmethod only has variadic arguments, or if
-the first parameter is keyword-only:
+the first parameter is keyword-only.
 
 ```py
 from typing import ClassVar
@@ -2735,7 +2735,7 @@ class Foo:
 ## Unions of attributes
 
 If the (meta)class is a union type or if the attribute on the (meta) class has a union type, we
-infer those union types accordingly:
+infer those union types accordingly.
 
 ```py
 def _(flag: bool):
@@ -2816,7 +2816,7 @@ def _(flag: bool):
 
 ### Definite boundness within a class
 
-In this example, the `x` attribute is not defined in the `C2` element of the union:
+In this example, the `x` attribute is not defined in the `C2` element of the union.
 
 ```py
 def _(flag1: bool, flag2: bool):
@@ -2846,7 +2846,7 @@ def _(flag1: bool, flag2: bool):
 ### Possibly-unbound within a class
 
 We raise the same diagnostic if the attribute is possibly-unbound in at least one element of the
-union:
+union.
 
 ```py
 def _(flag: bool, flag1: bool, flag2: bool):
@@ -2997,7 +2997,7 @@ def _(flag: bool):
 
 ### Unions with all paths unbound
 
-If the symbol is unbound in all elements of the union, we detect that:
+If the symbol is unbound in all elements of the union, we detect that.
 
 ```py
 def _(flag: bool):
@@ -3016,7 +3016,7 @@ def _(flag: bool):
 
 ## Unions with some paths unbound
 
-If the symbol is unbound in some elements of the union, that's also an error:
+If the symbol is unbound in some elements of the union, that's also an error.
 
 ```py
 def f(x: list[int], y: list[int] | None, z: None):
@@ -3028,7 +3028,7 @@ def f(x: list[int], y: list[int] | None, z: None):
 ```
 
 This is also true of type aliases of unions, special-case `NewType`s that have a union as a base
-type, and type variables with union upper bounds:
+type, and type variables with union upper bounds.
 
 ```toml
 [environment]
@@ -3250,14 +3250,14 @@ def check(child: Child) -> None:
     child.value = 1
 ```
 
-An incompatible default is rejected:
+An incompatible default is rejected.
 
 ```py
 class Invalid(Any, Base):
     value = []  # error: [invalid-assignment]
 ```
 
-The concrete base's annotation is also retained when it comes before `Any`:
+The concrete base's annotation is also retained when it comes before `Any`.
 
 ```py
 class DynamicLast(Base, Any):
@@ -3289,7 +3289,7 @@ class Invalid(DynamicBase, Base):
     value = []  # error: [invalid-assignment]
 ```
 
-The same applies when the base expression has an unknown type:
+The same applies when the base expression has an unknown type.
 
 ```py
 def unknown_base(base):
@@ -3335,7 +3335,7 @@ class Child(Any, Inferred, Annotated):
 reveal_type(Child.value)  # revealed: str
 ```
 
-If no concrete base declares the attribute, the subclass default uses its inferred type:
+If no concrete base declares the attribute, the subclass default uses its inferred type.
 
 ```py
 class NoAnnotation(Any):
@@ -3600,7 +3600,7 @@ def _(a_and_b: Intersection[A, B], b_and_a: Intersection[B, A]):
 ### Negation types
 
 Make sure that attributes accessible on `object` are also accessible on a negation type like `~P`,
-which is equivalent to `object & ~P`:
+which is equivalent to `object & ~P`.
 
 ```py
 class P: ...
@@ -3736,7 +3736,7 @@ reveal_type(Foo.bar)  # revealed: Any
 reveal_type(Foo.__repr__)  # revealed: (def __repr__(self) -> str) & Any
 ```
 
-Similar principles apply if `Any` appears in the middle of an inheritance hierarchy:
+Similar principles apply if `Any` appears in the middle of an inheritance hierarchy.
 
 ```py
 from typing import ClassVar, Literal
@@ -3757,7 +3757,7 @@ reveal_type(C.x)  # revealed: Literal[1] & Any
 ### Basic
 
 If a type provides a custom `__getattr__` method, we use the return type of that method as the type
-for unknown attributes. Consider the following `CustomGetAttr` class:
+for unknown attributes. Consider the following `CustomGetAttr` class.
 
 ```py
 from typing import Literal
@@ -3781,7 +3781,7 @@ class CustomGetAttr:
 ```
 
 We can access arbitrary attributes on instances of this class, and the type of the attribute will be
-`GetAttrReturnType`:
+`GetAttrReturnType`.
 
 ```py
 c = CustomGetAttr()
@@ -3789,20 +3789,20 @@ c = CustomGetAttr()
 reveal_type(c.whatever)  # revealed: GetAttrReturnType
 ```
 
-If an attribute is defined on the class, it takes precedence over the `__getattr__` method:
+If an attribute is defined on the class, it takes precedence over the `__getattr__` method.
 
 ```py
 reveal_type(c.class_attr)  # revealed: int
 ```
 
 If the class attribute is possibly missing, we union the type of the attribute with the fallback
-type of the `__getattr__` method:
+type of the `__getattr__` method.
 
 ```py
 reveal_type(c.possibly_unbound)  # revealed: bytes | GetAttrReturnType
 ```
 
-Instance attributes also take precedence over the `__getattr__` method:
+Instance attributes also take precedence over the `__getattr__` method.
 
 ```py
 # Note: we could attempt to union with the fallback type of `__getattr__` here, as we currently do not
@@ -3812,7 +3812,7 @@ reveal_type(c.instance_attr)  # revealed: str
 ```
 
 Importantly, `__getattr__` is only called if attributes are accessed on instances, not if they are
-accessed on the class itself:
+accessed on the class itself.
 
 ```py
 # error: [unresolved-attribute]
@@ -3867,7 +3867,7 @@ reveal_type(InvalidNameType().missing)  # revealed: bytes
 ### Type of the `name` parameter
 
 If the `name` parameter of the `__getattr__` method is annotated with a (union of) literal type(s),
-we only consider the attribute access to be valid if the accessed attribute is one of them:
+we only consider the attribute access to be valid if the accessed attribute is one of them.
 
 ```py
 from typing import Literal
@@ -3888,7 +3888,7 @@ reveal_type(date.century)  # revealed: int
 
 ### `argparse.Namespace`
 
-A standard library example of a class with a custom `__getattr__` method is `argparse.Namespace`:
+A standard library example of a class with a custom `__getattr__` method is `argparse.Namespace`.
 
 ```py
 import argparse
@@ -3919,7 +3919,7 @@ reveal_type(Foo().x)  # revealed: str
 reveal_type(Foo().y)  # revealed: Any
 ```
 
-A standard library example for a class with a custom `__getattribute__` method is `SimpleNamespace`:
+A standard library example for a class with a custom `__getattribute__` method is `SimpleNamespace`.
 
 ```py
 from types import SimpleNamespace
@@ -3929,7 +3929,7 @@ sn = SimpleNamespace(a="a")
 reveal_type(sn.a)  # revealed: Any
 ```
 
-`__getattribute__` takes precedence over `__getattr__`:
+`__getattribute__` takes precedence over `__getattr__`.
 
 ```py
 class C:
@@ -3944,7 +3944,7 @@ c = C()
 reveal_type(c.x)  # revealed: int
 ```
 
-Like all dunder methods, `__getattribute__` is not looked up on instances:
+Like all dunder methods, `__getattribute__` is not looked up on instances.
 
 ```py
 def external_getattribute(name) -> int:
@@ -4102,7 +4102,7 @@ reveal_type(Foo.missing)  # revealed: int
 
 ### Class attributes take precedence
 
-If the class defines the attribute directly, it takes precedence over the metaclass `__getattr__`:
+If the class defines the attribute directly, it takes precedence over the metaclass `__getattr__`.
 
 ```py
 class Meta(type):
@@ -4119,7 +4119,7 @@ reveal_type(Foo.unknown)  # revealed: int
 ### Instance `__getattr__` is separate
 
 A `__getattr__` defined on the class itself applies to instance attribute access, not class
-attribute access. A `__getattr__` on the metaclass applies to class attribute access:
+attribute access. A `__getattr__` on the metaclass applies to class attribute access.
 
 ```py
 class Meta(type):
@@ -4140,7 +4140,7 @@ reveal_type(Foo().unknown)  # revealed: str
 ### Possibly unbound class attributes
 
 If a class attribute is possibly unbound, the type is unioned with the metaclass `__getattr__`
-return type:
+return type.
 
 ```py
 def flag() -> bool:
@@ -4159,7 +4159,7 @@ reveal_type(Foo.maybe)  # revealed: str | int
 
 ### Inherited from a base metaclass
 
-`__getattr__` defined on a base metaclass is found via the metaclass MRO:
+`__getattr__` defined on a base metaclass is found via the metaclass MRO.
 
 ```py
 class BaseMeta(type):
@@ -4268,7 +4268,7 @@ reveal_type(Foo.x)  # revealed: int
 ### Basic
 
 If a type provides a custom `__setattr__` method, we use the parameter type of that method as the
-type to validate attribute assignments. Consider the following `CustomSetAttr` class:
+type to validate attribute assignments. Consider the following `CustomSetAttr` class.
 
 ```py
 class CustomSetAttr:
@@ -4276,7 +4276,7 @@ class CustomSetAttr:
         pass
 ```
 
-We can set arbitrary attributes on instances of this class:
+We can set arbitrary attributes on instances of this class.
 
 ```py
 c = CustomSetAttr()
@@ -4286,7 +4286,7 @@ c.whatever = 42
 
 ### Contextual inference
 
-The `__setattr__` value parameter provides the expected type when inferring the assigned value:
+The `__setattr__` value parameter provides the expected type when inferring the assigned value.
 
 ```py
 from typing import Callable, TypedDict
@@ -4373,7 +4373,7 @@ info: Overload implementation defined here
 ### Type of the `name` parameter
 
 If the `name` parameter of the `__setattr__` method is annotated with a (union of) literal type(s),
-we only consider the attribute assignment to be valid if the assigned attribute is one of them:
+we only consider the attribute assignment to be valid if the assigned attribute is one of them.
 
 ```py
 from typing import Literal
@@ -4440,7 +4440,7 @@ info: Method defined here
 ### Return type of `__setattr__`
 
 If the return type of the `__setattr__` method is `Never`, we do not allow any attribute assignments
-on instances of that class:
+on instances of that class.
 
 ```py
 from typing_extensions import Never
@@ -4469,7 +4469,7 @@ obj.non_existing = 1  # error: [unresolved-attribute]
 ### Setting attributes on `Never` / `Any`
 
 Setting attributes on `Never` itself should be allowed (even though it has a `__setattr__` attribute
-of type `Never`):
+of type `Never`).
 
 ```py
 from typing_extensions import Never, Any
@@ -4494,7 +4494,7 @@ def _(a: Any):
 
 ### Possibly unbound `__setattr__` method
 
-If a `__setattr__` method is only partially bound, the behavior is still the same:
+If a `__setattr__` method is only partially bound, the behavior is still the same.
 
 ```py
 from typing_extensions import Never
@@ -4514,7 +4514,7 @@ instance.existing = 2  # error: [invalid-assignment]
 
 ### `argparse.Namespace`
 
-A standard library example of a class with a custom `__setattr__` method is `argparse.Namespace`:
+A standard library example of a class with a custom `__setattr__` method is `argparse.Namespace`.
 
 ```py
 import argparse
@@ -4584,7 +4584,7 @@ def _(obj: Immutable) -> None:
 ## Metaclasses with custom `__setattr__` methods
 
 A class is an instance of its metaclass. If an attribute is not defined on the class, the
-metaclass's `__setattr__` method determines which values can be assigned:
+metaclass's `__setattr__` method determines which values can be assigned.
 
 ```py
 class Meta(type):
@@ -4597,7 +4597,7 @@ Foo.whatever = "invalid"  # error: [invalid-assignment]
 ```
 
 If both the metaclass and class define `__setattr__`, class-object assignments use the metaclass
-method and instance assignments use the class method:
+method and instance assignments use the class method.
 
 ```py
 class WithSetAttr(metaclass=Meta):
@@ -4611,7 +4611,7 @@ instance.instance_attribute = "valid"
 instance.instance_attribute = 42  # error: [invalid-assignment]
 ```
 
-The same applies when the class object is annotated as `type[Foo]`:
+The same applies when the class object is annotated as `type[Foo]`.
 
 ```py
 def set_on_subclass(cls: type[Foo]) -> None:
@@ -4619,7 +4619,7 @@ def set_on_subclass(cls: type[Foo]) -> None:
     cls.whatever = "invalid"  # error: [invalid-assignment]
 ```
 
-The setter also provides the expected type when inferring the assigned value:
+The setter also provides the expected type when inferring the assigned value.
 
 ```py
 from typing import Callable, TypedDict
@@ -4639,7 +4639,7 @@ ContextClass.callback = lambda number: (
 ContextClass.payload = {"value": 1}
 ```
 
-Name-specific overloads select the expected type based on the assigned attribute:
+Name-specific overloads select the expected type based on the assigned attribute.
 
 ```py
 from typing import Any, Literal, overload
@@ -4663,7 +4663,7 @@ OverloadedClass.payload = {"value": 1}
 OverloadedClass.callback = {"value": 1}  # error: [invalid-assignment]
 ```
 
-A metaclass `__setattr__` method returning `Never` prevents writes to undefined attributes:
+A metaclass `__setattr__` method returning `Never` prevents writes to undefined attributes.
 
 ```py
 from typing_extensions import Never
@@ -4681,7 +4681,7 @@ Frozen.new = 1  # error: [invalid-assignment] "Cannot assign to unresolved attri
 Frozen.existing = 2
 ```
 
-A class without a custom metaclass still produces an error for an unknown attribute:
+A class without a custom metaclass still produces an error for an unknown attribute.
 
 ```py
 class Regular: ...
@@ -4857,7 +4857,7 @@ def _(flag: bool):
 ### Function-literal attributes
 
 Most attribute accesses on function-literal types are delegated to `types.FunctionType`, since all
-functions are instances of that class:
+functions are instances of that class.
 
 ```py
 def f(): ...
@@ -4866,7 +4866,7 @@ reveal_type(f.__defaults__)  # revealed: tuple[Any, ...] | None
 reveal_type(f.__kwdefaults__)  # revealed: dict[str, Any] | None
 ```
 
-Some attributes are special-cased, however:
+Some attributes are special-cased, however.
 
 ```py
 import types
@@ -4882,14 +4882,14 @@ static_assert(is_subtype_of(TypeOf[f.__call__], types.MethodWrapperType))
 ### Int-literal attributes
 
 Most attribute accesses on int-literal types are delegated to `builtins.int`, since all literal
-integers are instances of that class:
+integers are instances of that class.
 
 ```py
 reveal_type((2).bit_length)  # revealed: bound method Literal[2].bit_length() -> int
 reveal_type((2).denominator)  # revealed: Literal[1]
 ```
 
-Some attributes are special-cased, however:
+Some attributes are special-cased, however.
 
 ```py
 reveal_type((2).numerator)  # revealed: Literal[2]
@@ -4899,7 +4899,7 @@ reveal_type((2).real)  # revealed: Literal[2]
 ### Bool-literal attributes
 
 Most attribute accesses on bool-literal types are delegated to `builtins.bool`, since all literal
-bools are instances of that class:
+bools are instances of that class.
 
 ```py
 # revealed: Overload[(value: bool, /) -> bool, (value: int, /) -> int]
@@ -4908,7 +4908,7 @@ reveal_type(True.__and__)
 reveal_type(False.__or__)
 ```
 
-Some attributes are special-cased, however:
+Some attributes are special-cased, however.
 
 ```py
 reveal_type(True.numerator)  # revealed: Literal[1]
@@ -4917,7 +4917,7 @@ reveal_type(False.real)  # revealed: Literal[0]
 
 ### Bytes-literal attributes
 
-All attribute access on literal `bytes` types is currently delegated to `builtins.bytes`:
+All attribute access on literal `bytes` types is currently delegated to `builtins.bytes`.
 
 ```py
 # revealed: bound method Literal[b"foo"].join(iterable_of_bytes: Iterable[Buffer], /) -> bytes
@@ -5053,7 +5053,7 @@ class C:
 
 ### Accessing attributes on `Never`
 
-Arbitrary attributes can be accessed on `Never` without emitting any errors:
+Arbitrary attributes can be accessed on `Never` without emitting any errors.
 
 ```py
 from typing_extensions import Never
@@ -5067,7 +5067,7 @@ def f(never: Never):
 
 ### Cyclic implicit attributes
 
-Inferring types for undeclared implicit attributes can be cyclic:
+Inferring types for undeclared implicit attributes can be cyclic.
 
 ```py
 class C:
@@ -5080,7 +5080,7 @@ class C:
 reveal_type(C().x)  # revealed: int
 ```
 
-If the only assignment to a name is cyclic, we infer `Divergent` for that attribute:
+If the only assignment to a name is cyclic, we infer `Divergent` for that attribute.
 
 ```py
 class D:
@@ -5091,7 +5091,7 @@ reveal_type(D().x)  # revealed: Divergent
 ```
 
 If there is an annotation for a name, we don't try to infer any type from the RHS of assignments to
-that name, so these cases don't trigger any cycle:
+that name, so these cases don't trigger any cycle.
 
 ```py
 class E:
@@ -5119,7 +5119,7 @@ class G:
 reveal_type(G().x)  # revealed: int
 ```
 
-We can even handle cycles involving multiple classes:
+We can even handle cycles involving multiple classes.
 
 ```py
 class A:
@@ -5237,7 +5237,7 @@ class ManyCycles2:
         self.x3 = self.x1 + self.x2
 ```
 
-This case additionally tests our union/intersection simplification logic:
+This case additionally tests our union/intersection simplification logic.
 
 ```py
 class H:
@@ -5249,7 +5249,7 @@ class H:
 ```
 
 An attribute definition can be guarded by a condition involving that attribute. This is a regression
-test for <https://github.com/astral-sh/ty/issues/692>:
+test for <https://github.com/astral-sh/ty/issues/692>.
 
 ```py
 from typing import Literal
@@ -5283,7 +5283,7 @@ class Counter:
 reveal_type(Counter().count)  # revealed: int
 ```
 
-We also handle infinitely nested generics:
+We also handle infinitely nested generics.
 
 ```py
 class NestedLists:
@@ -5324,7 +5324,7 @@ reveal_type(NestedLists2().x)  # revealed: list[Divergent]
 
 During fixpoint iteration, overloads may become ambiguous, introducing `Unknown` into their return
 types. Even in this case, `Divergent` is propagated, guaranteeing the convergence of type inference.
-Here is the regression test for this scenario (<https://github.com/astral-sh/ty/issues/3614>):
+Here is the regression test for this scenario (<https://github.com/astral-sh/ty/issues/3614>).
 
 ```py
 from typing import Any
@@ -5383,7 +5383,7 @@ reveal_type(C.a_none)  # revealed: None
 We also detect implicit instance attributes on methods that are themselves generic. We have an extra
 test for this because generic functions have an extra type-params scope in between the function body
 scope and the outer scope, so we need to make sure that our implementation can still recognize `f`
-as a method of `C` here:
+as a method of `C` here.
 
 ```toml
 [environment]
@@ -5503,7 +5503,7 @@ reveal_type(C().x)  # revealed: tuple[Divergent, int]
 reveal_type(C().x[0])  # revealed: Divergent
 ```
 
-This also works if the tuple is not constructed directly:
+This also works if the tuple is not constructed directly.
 
 ```py
 from typing import TypeVar, Literal
@@ -5520,7 +5520,7 @@ class D:
 reveal_type(D().x)  # revealed: tuple[Divergent, Literal[1]]
 ```
 
-The tuple type may also expand exponentially "in breadth":
+The tuple type may also expand exponentially "in breadth".
 
 ```py
 def duplicate(x: T) -> tuple[T, T]:
@@ -5533,7 +5533,7 @@ class E:
 reveal_type(E().x)  # revealed: tuple[Divergent, Divergent]
 ```
 
-And it also works for homogeneous tuples:
+And it also works for homogeneous tuples.
 
 ```py
 def make_homogeneous_tuple(x: T) -> tuple[T, ...]:
@@ -5547,7 +5547,7 @@ reveal_type(F().x)  # revealed: tuple[Divergent, ...]
 ```
 
 A homogeneous tuple of `Divergent` has gradual length, so it is assignable to a fixed-length tuple.
-This allows a recursively inferred instance attribute to retain an empty tuple as its class default:
+This allows a recursively inferred instance attribute to retain an empty tuple as its class default.
 
 ```py
 class G:
@@ -5587,7 +5587,7 @@ info: The member may be available on other Python versions or platforms
 info: Python 3.10 was assumed when resolving the `UTC` attribute because it was specified on the command line
 ```
 
-If an attribute doesn't exist at all, we still give the same error as before:
+If an attribute doesn't exist at all, we still give the same error as before.
 
 `wrong.py`:
 
@@ -5608,7 +5608,7 @@ error[unresolved-attribute]: Module `datetime` has no member `fakenotreal`
 
 ## Unimported submodule incorrectly accessed as attribute
 
-We give special diagnostics for this common case too:
+We give special diagnostics for this common case too.
 
 `foo/__init__.py`:
 

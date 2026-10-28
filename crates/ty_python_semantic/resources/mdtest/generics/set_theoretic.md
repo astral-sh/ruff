@@ -20,7 +20,7 @@ from ty_extensions._internal import is_equivalent_to, is_subtype_of
 ```
 
 Throughout the document, we use the following classes as canonical examples for covariant,
-contravariant, and invariant generic classes:
+contravariant, and invariant generic classes.
 
 ```pyi
 class Co[T]:
@@ -35,7 +35,7 @@ class Invariant[T](Co[T], Contra[T]): ...
 
 Further, we use `P` and `Q` as placeholders for arbitrary fully-static (non-generic types) that are
 not related in any way and not disjoint. Further, we use `Base` and `Sub` as examples for types that
-are in a subtyping relationship `Sub <: Base`:
+are in a subtyping relationship `Sub <: Base`.
 
 ```pyi
 # Two unrelated placeholder types:
@@ -47,7 +47,7 @@ class Base: ...
 class Sub(Base): ...
 ```
 
-We start by demonstrating that `Co`, `Contra`, and `Invariant` are indeed what they claim to be:
+We start by demonstrating that `Co`, `Contra`, and `Invariant` are indeed what they claim to be.
 
 ```pyi
 static_assert(is_subtype_of(Co[Sub], Co[Base]))
@@ -62,7 +62,7 @@ static_assert(not is_subtype_of(Invariant[Base], Invariant[Sub]))
 
 We now want to look at the interplay between unions and intersections on the one hand, and the
 different kinds of generic classes on the other hand. The following relations follow immediately
-from the subtyping behavior of the respective "lifted" subtyping relations of `Co` and `Contra`:
+from the subtyping behavior of the respective "lifted" subtyping relations of `Co` and `Contra`.
 
 ```ignore
 Co[Base] | Co[Sub] = Co[Base]
@@ -72,7 +72,7 @@ Contra[Base] | Contra[Sub] = Contra[Sub]
 Contra[Base] & Contra[Sub] = Contra[Base]
 ```
 
-We can encode these in ty assertions:
+We can encode these in ty assertions.
 
 ```pyi
 static_assert(is_equivalent_to(Co[Base] | Co[Sub], Co[Base]))
@@ -82,7 +82,7 @@ static_assert(is_equivalent_to(Contra[Base] | Contra[Sub], Contra[Sub]))
 static_assert(is_equivalent_to(Contra[Base] & Contra[Sub], Contra[Base]))
 ```
 
-For invariant generics, neither of those relations are true:
+For invariant generics, neither of those relations are true.
 
 ```pyi
 static_assert(not is_equivalent_to(Invariant[Base] | Invariant[Sub], Invariant[Base]))
@@ -96,7 +96,7 @@ When there is no subtyping relationship between the specializations of these gen
 generally don't have equality relations, but we can still derive the following inequalities by
 observing that both `Co[P]` and `Co[Q]` are subtypes of `Co[P | Q]`, and so their union is also
 subtype of `Co[P | Q]`. Similarly, since both `Co[P]` and `Co[Q]` are supertypes of `Co[P & Q]`,
-then so is their intersection:
+then so is their intersection.
 
 ```ignore
 Co[P] | Co[Q] <: Co[P | Q]    (1a)
@@ -114,14 +114,14 @@ static_assert(not is_equivalent_to(Co[P & Q], Co[P] & Co[Q]))
 ```
 
 In a similar way, we can see that the following relations hold for *contravariant* generic types.
-Note that on the right hand side, unions have turned into intersections, and vice versa:
+Note that on the right hand side, unions have turned into intersections, and vice versa.
 
 ```ignore
 Contra[P] | Contra[Q] <: Contra[P & Q]    (2a)
 Contra[P] & Contra[Q] :> Contra[P | Q]    (2b)
 ```
 
-And again, we can verify those in ty:
+And again, we can verify those in ty.
 
 ```pyi
 static_assert(is_subtype_of(Contra[P] | Contra[Q], Contra[P & Q]))
@@ -142,7 +142,7 @@ Contra[Any] = Contra[object] | Contra[Never] & Any    (3b)
 ```
 
 These representations lead to interesting simplifications in unions and intersections. For example,
-we can transform `Co[P] | Co[Any]` in the following way:
+we can transform `Co[P] | Co[Any]` in the following way.
 
 ```ignore
 Co[P] | Co[Any] = Co[P] | Co[Never] | Co[object] & Any
@@ -161,7 +161,7 @@ materialization `Co[P | object] = Co[object]`. See
 [this discussion](https://github.com/astral-sh/ruff/pull/26054/changes#r3429787797) for more
 details.
 
-For intersections, we need to do slightly more work to arrive at a structurally similar result:
+For intersections, we need to do slightly more work to arrive at a structurally similar result.
 
 ```ignore
 Co[P] & Co[Any] = Co[P] & (Co[Never] | Co[object] & Any)
@@ -171,7 +171,7 @@ Co[P] & Co[Any] = Co[P] & (Co[Never] | Co[object] & Any)
                 = Co[P & Any]
 ```
 
-For contravariant types, we get similar relations, where unions and intersections swap places again:
+For contravariant types, we get similar relations, where unions and intersections swap places again.
 
 ```ignore
 Contra[P] | Contra[Any] = Contra[P] | Contra[object] | Contra[Never] & Any
@@ -196,7 +196,7 @@ Contra[P] | Contra[Any] = Contra[P & Any]    (5a)
 Contra[P] & Contra[Any] = Contra[P | Any]    (5b)
 ```
 
-We can encode all of these in ty assertions:
+We can encode all of these in ty assertions.
 
 ```pyi
 # TODO: both should pass
@@ -214,7 +214,7 @@ static_assert(is_equivalent_to(Contra[P] & Contra[Any], Contra[P | Any]))
 static_assert(is_equivalent_to(Contra[Any] & Contra[P], Contra[P | Any]))
 ```
 
-What about invariance? We can naively write `Invariant[Any]` in its interval representation:
+What about invariance? We can naively write `Invariant[Any]` in its interval representation.
 
 ```ignore
 Invariant[Any] = Bottom[Invariant[Any]] | Top[Invariant[Any]] & Any
@@ -233,7 +233,7 @@ still represents the essence of what it means to be an instance of `Invariant`, 
 itself wouldn't have any inhabitants. That, however, poses the question if
 `Invariant[P] & Invariant[Q]` should also resolve to that special bottom type. In any case, we
 certainly have `Bottom[Invariant[Any]] <: Invariant[P]` and `Invariant[P] <: Top[Invariant[Any]]`,
-and so we can simplify the following union:
+and so we can simplify the following union.
 
 ```ignore
 Invariant[P] | Invariant[Any]
@@ -284,7 +284,7 @@ materializations to the gradual interval from `Bottom[Invariant[P]]` to `Invaria
 
 If we compare this to the covariant and contravariant versions (4b) and (5b), we see that
 "combining" `P & Any` (the interval from `Never` to `P`) and `P | Any` (the interval from `P` to
-`object`) only leaves `P` in the invariant version:
+`object`) only leaves `P` in the invariant version.
 
 ```ignore
     Co[P] & Co[Any]     =     Co[P & Any]
@@ -293,7 +293,7 @@ Contra[P] & Contra[Any] = Contra[P | Any]
 
 Interestingly, the same is not true for unions. The difference is that there *are* non-trivial
 supertypes of `Invariant[P]`, like `Invariant[P] | Invariant[Q]`, which are possible
-materializations of the gradual type `Invariant[P] | Invariant[Any]`. So we encode two findings:
+materializations of the gradual type `Invariant[P] | Invariant[Any]`. So we encode two findings.
 
 ```pyi
 static_assert(is_equivalent_to(Invariant[P] & Invariant[Any], Invariant[P]))
@@ -303,13 +303,13 @@ static_assert(not is_equivalent_to(Invariant[P] | Invariant[Any], Invariant[P]))
 
 In strict-mode `isinstance` narrowing, we intersect with the top-materialization of generic classes.
 Suppose `Sub[T]` is a subtype of `Base[T]`. There are two directions to consider, depending on which
-class is top-materialized. The first simplifies immediately:
+class is top-materialized. The first simplifies immediately.
 
 ```ignore
 Sub[P] & Top[Base[Any]] = Sub[P]
 ```
 
-This relation holds regardless of the variance of `Base` and `Sub`:
+This relation holds regardless of the variance of `Base` and `Sub`.
 
 ```pyi
 from ty_extensions import Top
@@ -342,7 +342,7 @@ subtypes):
 - `Base` is contravariant and `Sub` is invariant
 - `Base` is invariant and `Sub` is invariant
 
-We look at the covariant `Base` case first (first two items):
+We look at the covariant `Base` case first (first two items).
 
 ```ignore
 class CoBase[T]: ...  # covariant
@@ -355,13 +355,13 @@ therefore instances of `Sub[P']` which cannot further (multiply) inherit from a 
 specialization that is not `CoBase[P']`. Since these inhabitants further need to be a subtype of
 `CoBase[P]`, covariance requires `P' <: P`. Therefore the intersection consists of the possible
 `Sub` specializations whose type argument is upper-bounded by `P`. This type can be succinctly
-expressed as `Top[Sub[P & Any]]`:
+expressed as `Top[Sub[P & Any]]`.
 
 ```ignore
 CoBase[P] & Top[Sub[Any]] = Top[Sub[P & Any]]    (7a)
 ```
 
-If `Sub` is covariant, this relation further simplifies:
+If `Sub` is covariant, this relation further simplifies.
 
 ```ignore
 CoBase[P] & Top[CoSub[Any]] = CoSub[P & object] = CoSub[P]    (7b)
@@ -383,7 +383,7 @@ append any elements to that list. This is expected, since we could be dealing wi
 a `list[bool]`, or a `list[Literal[False]]`, and so on. So whatever we want to append needs to be
 compatible with all of those types, which is impossible.
 
-We can encode these relations in ty assertions:
+We can encode these relations in ty assertions.
 
 ```pyi
 class InvariantSubOfCoBase[T](CoBase[T]):
@@ -402,7 +402,7 @@ static_assert(is_equivalent_to(Sequence[int] & Top[list[Any]], Top[list[int & An
 Next, we look at the contravariant `Base` case (items 3 and 4). The reasoning is similar: subtypes
 of `ContraBase[P] & Top[Sub[Any]]` must be of the form `Sub[P']`, but now, `P'` needs to be a
 *supertype* of `P`. The intersection therefore consists of all `Sub` specializations whose type
-argument is lower-bounded by `P`:
+argument is lower-bounded by `P`.
 
 ```ignore
 ContraBase[P] & Top[Sub[Any]] = Top[Sub[P | Any]]    (8a)
@@ -427,7 +427,7 @@ Message[str, str] & Top[EmailMessage[str, Any]] = EmailMessage[str, str]
 
 where both `Message` and `EmailMessage` are contravariant in their second type parameter.
 
-Again, we can encode the results in ty assertions:
+Again, we can encode the results in ty assertions.
 
 ```pyi
 class InvariantSubOfContraBase[T](ContraBase[T]):
@@ -492,7 +492,7 @@ static_assert(is_subtype_of(CounterExample, BaseProtocol[P] & SubProtocol[object
 static_assert(not is_subtype_of(CounterExample, SubProtocol[P]))
 ```
 
-This proves that `BaseProtocol[P] & SubProtocol[object]` is not equivalent to `SubProtocol[P]`:
+This proves that `BaseProtocol[P] & SubProtocol[object]` is not equivalent to `SubProtocol[P]`.
 
 ```pyi
 static_assert(not is_equivalent_to(BaseProtocol[P] & SubProtocol[object], SubProtocol[P]))
@@ -511,7 +511,7 @@ def f(xs: Iterable[P]) -> None:
             x  # we would like this to be of type `P`
 ```
 
-Let's look at the (simplified) definitions of `Iterable` and `frozenset`:
+Let's look at the (simplified) definitions of `Iterable` and `frozenset`.
 
 ```ignore
 class Iterable[T_co](Protocol):
@@ -523,7 +523,7 @@ class frozenset[T_co](AbstractSet[T_co]):
 
 Just like in the counterexample above, we could construct a class that is a (nominal) subtype of
 `frozenset[object]` and a (structural) subtype of `Iterable[P]` (and therefore a subtype of the
-intersection `Iterable[P] & frozenset[object]`), but not a subtype of `frozenset[P]`:
+intersection `Iterable[P] & frozenset[object]`), but not a subtype of `frozenset[P]`.
 
 ```pyi
 from typing import Iterable, Iterator
@@ -537,7 +537,7 @@ However, the returned iterator would only yield values of type `P` while the und
 may contain other values. Here, we assume that subclasses of built-in containers preserve their
 usual iteration behavior instead: iteration over a `frozenset` exposes its stored elements. Under
 this assumption, knowing the iteration element type also constrains the stored element type. This
-behavioral assumption is not enforced by the type system, so the simplification is unsound:
+behavioral assumption is not enforced by the type system, so the simplification is unsound.
 
 ```pyi
 static_assert(is_equivalent_to(Iterable[P] & tuple[object, ...], tuple[P, ...]))
@@ -549,7 +549,7 @@ static_assert(is_equivalent_to(Iterable[P] & Top[set[Any]], Top[set[P & Any]]))
 A similar justification applies to the following case. `Iterator`s are supposed to follow a
 [behavioral contract](https://docs.python.org/3/library/stdtypes.html#iterator-types): an iterator's
 `__iter__()` returns the iterator itself. Iteration and direct calls to `next()` therefore yield the
-same values. This supports simplifying `Iterable[P] & Iterator[object]` to `Iterator[P]`:
+same values. This supports simplifying `Iterable[P] & Iterator[object]` to `Iterator[P]`.
 
 ```pyi
 static_assert(is_equivalent_to(Iterable[P] & Iterator[object], Iterator[P]))
@@ -560,7 +560,7 @@ static_assert(is_equivalent_to(Iterable[P] & Iterator[object], Iterator[P]))
 ### Multi-parameter and mixed-variance generics
 
 The same-class intersection relations (4b), (5b), and (6) can apply simultaneously to the covariant,
-contravariant, and invariant type parameters of a multi-parameter generic class:
+contravariant, and invariant type parameters of a multi-parameter generic class.
 
 ```pyi
 from typing import Any, Generic, TypeVar
@@ -583,7 +583,7 @@ static_assert(is_equivalent_to(Mixed[P, Q, R] & Mixed[Any, Any, Any], Mixed[P & 
 ### Unrelated subclass type parameters
 
 Intersecting with a specialized base preserves gradual subclass arguments that do not specialize
-that base. Here, `U` is covariant, `V` is contravariant, and `W` is invariant:
+that base. Here, `U` is covariant, `V` is contravariant, and `W` is invariant.
 
 ```pyi
 from typing import Any
@@ -601,7 +601,7 @@ class Child[T, U, V, W](Base[T]):
 static_assert(is_equivalent_to(Base[int] & Child[object, Any, Any, Any], Child[int, Any, Any, Any]))
 ```
 
-If the subclass is already top-materialized, the result retains that materialization:
+If the subclass is already top-materialized, the result retains that materialization.
 
 ```pyi
 static_assert(is_equivalent_to(Base[int] & Top[Child[Any, Any, Any, Any]], Top[Child[int, Any, Any, Any]]))
@@ -610,7 +610,7 @@ static_assert(is_equivalent_to(Base[int] & Top[Child[Any, Any, Any, Any]], Top[C
 ### Tuples
 
 Tuple types are covariant in every type parameter, so the results derived for `Co[T]` above apply to
-`tuple` at every position:
+`tuple` at every position.
 
 ```pyi
 from typing import Any, Sequence, reveal_type
@@ -637,7 +637,7 @@ static_assert(is_equivalent_to(tuple[Any, Any] & tuple[P, Q], tuple[P & Any, Q &
 
 Intersecting a `Sequence` with a variable-length tuple retains its required prefix or suffix. These
 intersections currently remain unsimplified. The variable-length elements could be narrowed to
-`int`, but the required `bool` element must be preserved:
+`int`, but the required `bool` element must be preserved.
 
 ```pyi
 type Prefix = tuple[bool, *tuple[object, ...]]
@@ -650,7 +650,7 @@ def _(prefix: Sequence[int] & Prefix, suffix: Sequence[int] & Suffix):
     reveal_type(suffix)  # revealed: Sequence[int] & tuple[*tuple[object, ...], bool]
 ```
 
-Required positions also preserve the minimum length, even when every element type is `object`:
+Required positions also preserve the minimum length, even when every element type is `object`.
 
 ```pyi
 static_assert(not is_subtype_of(tuple[()], Sequence[int] & tuple[object, *tuple[object, ...]]))
@@ -674,7 +674,7 @@ static_assert(is_equivalent_to(type[Any] & type[P], type[P & Any]))
 
 ### Type var bounds and `NewTypes`
 
-The simplification preserves the identities of type variables and `NewType` instances:
+The simplification preserves the identities of type variables and `NewType` instances.
 
 ```pyi
 from typing import Any, NewType
@@ -699,7 +699,7 @@ def preserve_newtype(value: CoId & Co[Any]) -> CoId:
 
 ### Specializations with type variables
 
-Relations like (7b) also hold if they involve specializations using (non inferable) type variables:
+Relations like (7b) also hold if they involve specializations using (non inferable) type variables.
 
 ```pyi
 from ty_extensions import static_assert
@@ -718,7 +718,7 @@ def generic[T]() -> None:
 ### Specializations with indirect gradual types
 
 A type alias can introduce a gradual argument indirectly. Intersecting with a top-materialized
-subclass must not discard the base's gradual member types:
+subclass must not discard the base's gradual member types.
 
 ```pyi
 from typing import Any, reveal_type
@@ -741,7 +741,7 @@ def alias(value: Co[Dynamic] & Top[Child[Any]]) -> str:
 ### Nested specializations of nonrecursive protocols
 
 A protocol can appear inside its own type argument without a recursive declaration. These finite
-nested specializations still allow intersection simplification:
+nested specializations still allow intersection simplification.
 
 ```pyi
 from typing import Protocol, reveal_type
@@ -762,7 +762,7 @@ def _(value: Co[Value[Value[int]]] & Child[object]):
 ### Specializations with recursive types
 
 Fully static recursive types still allow simplification. Evaluating protocol attributes and
-`TypedDict` fields can itself require simplifying intersections that refer back to those types:
+`TypedDict` fields can itself require simplifying intersections that refer back to those types.
 
 ```pyi
 from typing import Protocol, TypedDict, reveal_type
@@ -791,7 +791,7 @@ def _(
 ```
 
 A generic protocol method that returns the same specialization also permits simplification. Its
-recursive return type does not introduce new type arguments:
+recursive return type does not introduce new type arguments.
 
 ```pyi
 class RecursiveMethods[T](Protocol):
@@ -804,7 +804,7 @@ def _(value: Co[RecursiveMethods[int]] & Child[object]):
 
 Recursive generic specializations can grow on each step, so we conservatively leave these
 intersections unsimplified. Checking only for repeated specializations does not prevent infinite
-expansion:
+expansion.
 
 ```pyi
 type GrowingAlias[T] = T | list[Co[GrowingAlias[list[T]]] & Child[object]]
@@ -823,7 +823,7 @@ def _(
 ### Inherited properties with recursive protocol bounds
 
 Reading an inherited generic property preserves its type parameter, even when the parameter's bound
-contains a method with an expanding recursive return type:
+contains a method with an expanding recursive return type.
 
 ```toml
 [environment]
@@ -852,7 +852,7 @@ class Child[T: Recursive[int]](Base[T]):
 ### Recursive protocols with gradual members
 
 An `Any` member does not remove an expanding recursive method from a protocol. Intersections with
-these protocols remain unsimplified regardless of member order:
+these protocols remain unsimplified regardless of member order.
 
 ```pyi
 from typing import Any, Protocol, reveal_type

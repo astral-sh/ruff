@@ -25,7 +25,7 @@ error[unnecessary-regular-expression-compile]: Compiled regular expression is us
 help: Replace with `re.match()` or store the compiled pattern
 ```
 
-All of the equivalent methods are recognised, with and without flags:
+All of the equivalent methods are recognised, with and without flags.
 
 ```py
 import re
@@ -39,7 +39,7 @@ re.compile(r"a").fullmatch("world")  # error: [unnecessary-regular-expression-co
 re.compile(r"a").split("world")  # error: [unnecessary-regular-expression-compile]
 ```
 
-The aliased `from re import compile as ...` form is also recognised:
+The aliased `from re import compile as ...` form is also recognised.
 
 ```py
 from re import compile as rec
@@ -48,7 +48,7 @@ rec(r"hello").match("world")  # error: [unnecessary-regular-expression-compile]
 rec("hello world").search("world")  # error: [unnecessary-regular-expression-compile]
 ```
 
-The method must actually be called; accessing it without calling is not flagged:
+The method must actually be called; accessing it without calling is not flagged.
 
 ```py
 import re
@@ -59,7 +59,7 @@ re.compile("hello world").search
 
 `search`, `match`, `fullmatch`, `findall`, and `finditer` accept `pos`/`endpos` arguments that the
 top-level `re` functions do not (whose trailing argument is `flags`), so they are only flagged when
-called with the single `string` argument:
+called with the single `string` argument.
 
 ```py
 import re
@@ -69,7 +69,7 @@ re.compile(r"hello").match("world", pos=2)
 re.compile(r"hello").finditer("world", 0, 4)
 ```
 
-`sub`, `subn`, and `split` take no `pos`/`endpos`, so their extra arguments still map:
+`sub`, `subn`, and `split` take no `pos`/`endpos`, so their extra arguments still map.
 
 ```py
 import re
@@ -79,7 +79,7 @@ re.compile(r"\s").split("world", 1)  # error: [unnecessary-regular-expression-co
 ```
 
 An unpacked (`*`/`**`) argument can expand into any number of real arguments, including ones the
-top-level functions reject, so it is never flagged:
+top-level functions reject, so it is never flagged.
 
 ```py
 import re
@@ -94,7 +94,7 @@ def double_starred(kwargs):
 ```
 
 Arguments with side effects are still flagged. Because the compiled pattern is used inline, the
-arguments are evaluated exactly once in both the original and the replacement:
+arguments are evaluated exactly once in both the original and the replacement.
 
 ```py
 import re

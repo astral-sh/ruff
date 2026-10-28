@@ -282,7 +282,7 @@ def _[T]() -> None:
 ## Constraints from bound methods
 
 A bound method's captured receiver and specialized signature both constrain generic target types.
-Their combined evidence retains the receiver's concrete specialization:
+Their combined evidence retains the receiver's concrete specialization.
 
 ```py
 from ty_extensions._internal import TypeOf, is_constraint_set_assignable_to

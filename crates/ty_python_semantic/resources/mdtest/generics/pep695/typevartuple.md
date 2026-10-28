@@ -718,7 +718,7 @@ def protocol_targets[*Ts](prefix: tuple[int, *Ts], suffix: tuple[*Ts, int]) -> N
     hash_suffix: tuple[*tuple[Any, ...], SupportsHash] = prefix  # error: [invalid-assignment]
 ```
 
-The standard-library `Hashable` protocol follows the same rule, including through an alias:
+The standard-library `Hashable` protocol follows the same rule, including through an alias.
 
 ```py
 from collections.abc import Hashable
@@ -741,7 +741,7 @@ error[invalid-assignment]: Object of type `tuple[*Ts@hashable_targets, int]` is 
 ```
 
 Fixed `object` endpoints retain their ordinary assignability to `Hashable`, which permits uses such
-as `object()` sentinels. This does not imply that arbitrary pack elements are hashable:
+as `object()` sentinels. This does not imply that arbitrary pack elements are hashable.
 
 ```py
 def fixed_objects[*Ts](source: tuple[object, *Ts, object]) -> None:
@@ -749,7 +749,7 @@ def fixed_objects[*Ts](source: tuple[object, *Ts, object]) -> None:
     suffix: tuple[*tuple[Any, ...], Hashable] = source
 ```
 
-When a fixed source endpoint is unhashable, the diagnostic identifies that endpoint's type:
+When a fixed source endpoint is unhashable, the diagnostic identifies that endpoint's type.
 
 ```py
 def fixed_unhashable[*Ts](source: tuple[list[int], *Ts]) -> None:

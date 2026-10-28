@@ -2,7 +2,7 @@
 
 ## Annotation
 
-`typing.Type` can be used interchangeably with `type`:
+`typing.Type` can be used interchangeably with `type`.
 
 ```py
 from typing import Type

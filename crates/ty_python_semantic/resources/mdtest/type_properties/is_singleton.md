@@ -111,7 +111,7 @@ static_assert(is_singleton(Ellipsis.__class__))
 ### Python 3.10+
 
 On Python 3.10+, the standard library exposes the type of `...` as `types.EllipsisType`, and we also
-recognize this as a singleton type when it is referenced directly:
+recognize this as a singleton type when it is referenced directly.
 
 ```toml
 [environment]
@@ -149,7 +149,7 @@ static_assert(is_singleton(NotImplemented.__class__))
 
 On Python 3.10+, the standard library exposes the type of `NotImplemented` as
 `types.NotImplementedType`. We also recognize this as a singleton type when it is referenced
-directly:
+directly.
 
 ```toml
 [environment]

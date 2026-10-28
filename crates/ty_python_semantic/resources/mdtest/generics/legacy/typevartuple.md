@@ -33,7 +33,7 @@ reveal_type(Ts)  # revealed: TypeVarTuple
 reveal_type(Ts.__name__)  # revealed: Literal["Ts"]
 ```
 
-The `TypeVarTuple` name can also be provided as a keyword argument:
+The `TypeVarTuple` name can also be provided as a keyword argument.
 
 ```py
 from typing import TypeVarTuple

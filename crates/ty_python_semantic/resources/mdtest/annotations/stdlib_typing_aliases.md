@@ -5,7 +5,7 @@ still need to be supported by a type checker.
 
 ## Correspondence
 
-All of the following symbols can be mapped one-to-one with the actual type:
+All of the following symbols can be mapped one-to-one with the actual type.
 
 ```py
 import typing

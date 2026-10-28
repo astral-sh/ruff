@@ -151,7 +151,7 @@ def _(list_of_int: MyList[int], list_or_set_of_str: ListOrSet[str]):
 ### Default specialization on the right-hand side
 
 An unsubscripted generic alias on the right-hand side is specialized with its defaults. Passing a
-type variable explicitly instead creates another generic alias:
+type variable explicitly instead creates another generic alias.
 
 ```py
 from typing_extensions import TypeAlias, TypeVar
@@ -171,7 +171,7 @@ def invalid(value: DefaultItems[int]): ...  # error: [not-subscriptable]
 ```
 
 A bare generic class in a PEP 613 alias is also default-specialized. Assigning that alias to another
-name preserves the specialization:
+name preserves the specialization.
 
 ```py
 DeclaredList: TypeAlias = list  # error: [missing-type-argument]
@@ -187,7 +187,7 @@ def invalid(
 ): ...
 ```
 
-The alias still refers to the generic class object in value expressions:
+The alias still refers to the generic class object in value expressions.
 
 ```py
 reveal_type(DeclaredList[int])  # revealed: <class 'list[int]'>
@@ -195,7 +195,7 @@ reveal_type(DeclaredList([1]))  # revealed: list[int]
 ```
 
 A PEP 613 alias also default-specializes bare `Callable`. An implicit alias preserves the special
-form and can still supply its parameter and return types:
+form and can still supply its parameter and return types.
 
 ```py
 from typing import Callable
@@ -213,7 +213,7 @@ def invalid(value: DeclaredCallable[[int], str]): ...  # error: [not-subscriptab
 ### Forwarding PEP 695 aliases
 
 A PEP 613 alias applies the defaults of a PEP 695 alias on its right-hand side. Assigning the result
-to another name preserves that specialization:
+to another name preserves that specialization.
 
 ```toml
 [environment]
@@ -240,7 +240,7 @@ def invalid(
 ### Imported generic aliases
 
 A PEP 613 alias also applies the defaults of an imported generic legacy alias, whether the imported
-alias is implicit or declared with `TypeAlias`:
+alias is implicit or declared with `TypeAlias`.
 
 `aliases.py`:
 
@@ -279,7 +279,7 @@ def invalid(
 
 A PEP 613 alias in a stub can refer to an alias or class defined later in the file. An unsubscripted
 generic reference applies the default specialization, using `Unknown` for a type variable with no
-default:
+default.
 
 `aliases.pyi`:
 
@@ -412,7 +412,7 @@ def _(x: MyAlias):
 ## Typevar-specialized dynamic types
 
 We still recognize type aliases as being generic if a symbol of a dynamic type is explicitly
-specialized with a type variable:
+specialized with a type variable.
 
 ```py
 from typing import TypeVar, TypeAlias
@@ -427,7 +427,7 @@ def _(a: MyAlias1[int]):
     reveal_type(a)  # revealed: Unknown | None
 ```
 
-This also works with multiple type arguments:
+This also works with multiple type arguments.
 
 ```py
 U = TypeVar("U")
@@ -439,7 +439,7 @@ def _(a: MyAlias2[int, str, bytes]):
     reveal_type(a)  # revealed: Unknown | int
 ```
 
-If we specialize with fewer or more type arguments than expected, we emit an error:
+If we specialize with fewer or more type arguments than expected, we emit an error.
 
 ```py
 def _(
@@ -450,7 +450,7 @@ def _(
 ): ...
 ```
 
-We can also reference these type aliases from other type aliases:
+We can also reference these type aliases from other type aliases.
 
 ```py
 MyAlias3: TypeAlias = MyAlias1[str] | MyAlias2[int, str, bytes]
@@ -459,7 +459,7 @@ def _(c: MyAlias3):
     reveal_type(c)  # revealed: Unknown | None | int
 ```
 
-Here, we test some other cases that might involve `@Todo` types, which also need special handling:
+Here, we test some other cases that might involve `@Todo` types, which also need special handling.
 
 ```py
 from typing_extensions import Callable, Concatenate, TypeAliasType
@@ -968,7 +968,7 @@ def _(x: MyAlias):
 ## PEP-613 aliases in stubs are deferred
 
 Although the right-hand side of a PEP-613 alias is a value expression, inference of this value is
-deferred in a stub file, allowing for forward references:
+deferred in a stub file, allowing for forward references.
 
 `stub.pyi`:
 
@@ -1077,7 +1077,7 @@ BadTuple: TypeAlias = tuple[int, ..., *tuple[str, ...], *tuple[bytes, ...]]
 
 The right-hand side of a type alias definition is a [type expression], not an annotation expression.
 Type qualifiers like `ClassVar` and `Final` are only valid in annotation expressions, so they cannot
-appear in type alias definitions:
+appear in type alias definitions.
 
 ```py
 from typing_extensions import ClassVar, Final, Required, NotRequired, ReadOnly, TypeAlias, Unpack
@@ -1144,7 +1144,7 @@ def second(value: Node.Tree): ...
 
 ## Disabled `invalid-type-form` `Self` fallback
 
-Invalid uses of `Self` recover as `Unknown` even when the diagnostic is disabled:
+Invalid uses of `Self` recover as `Unknown` even when the diagnostic is disabled.
 
 ```toml
 [rules]
@@ -1178,7 +1178,7 @@ C().takes(1)
 ## Forwarding generic recursive aliases
 
 A forwarded PEP 613 alias preserves type arguments throughout the recursive type when its right-hand
-side passes a type variable explicitly:
+side passes a type variable explicitly.
 
 ```py
 from typing_extensions import TypeAlias, TypeVar
@@ -1197,7 +1197,7 @@ def invalid() -> Forwarded[int]:
     return (1, ("bad", None))  # error: [invalid-return-type]
 ```
 
-An unsubscripted reference fixes the default throughout the recursive type:
+An unsubscripted reference fixes the default throughout the recursive type.
 
 ```py
 DefaultNode: TypeAlias = Node

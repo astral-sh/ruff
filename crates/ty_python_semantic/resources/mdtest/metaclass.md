@@ -681,7 +681,7 @@ reveal_type(C.value)  # revealed: Unknown
 reveal_type(Reversed.value)  # revealed: Unknown
 ```
 
-The metaclass and its attributes are also unknown on subclasses of `C`:
+The metaclass and its attributes are also unknown on subclasses of `C`.
 
 ```py
 def check_subclass(cls: type[C]):
@@ -691,7 +691,7 @@ def check_subclass(cls: type[C]):
 ```
 
 Even with an unknown metaclass, `C` is a class object. It can be assigned to a metaclass instance
-type, but not to `None`. Overload resolution preserves this distinction:
+type, but not to `None`. Overload resolution preserves this distinction.
 
 ```py
 from typing import overload
@@ -712,7 +712,7 @@ def check_assignability(cls: type[C]):
     reveal_type(select(cls))  # revealed: int
 ```
 
-The same applies to classes created with `type()`:
+The same applies to classes created with `type()`.
 
 ```py
 Dynamic = type("Dynamic", (A, B), {})  # error: [conflicting-metaclass]
@@ -746,7 +746,7 @@ reveal_type(B.value)  # revealed: str
 reveal_type(B.declared)  # revealed: int
 ```
 
-Descendants also inherit the recovered metaclass:
+Descendants also inherit the recovered metaclass.
 
 ```py
 class Child(B): ...
@@ -816,7 +816,7 @@ def check_union(cls: Classes):
     reveal_type(cls.value)  # revealed: Unknown | int
 ```
 
-Narrowing the invalid class to an intersection does not make its metaclass known:
+Narrowing the invalid class to an intersection does not make its metaclass known.
 
 ```py
 def check_intersection(other: Any):
@@ -878,7 +878,7 @@ runtime. Its typeshed definition therefore does not establish that the class has
 its metaclass.
 
 When no custom metaclass is selected, ty uses `ABCMeta` instead of `type` for class attribute
-lookup. This fallback makes ABC methods such as `register` available:
+lookup. This fallback makes ABC methods such as `register` available.
 
 ```py
 from collections.abc import Iterable
@@ -1522,7 +1522,7 @@ reveal_type(A.__class__)  # revealed: <class 'M'>
 
 ### Fully specialized
 
-A generic metaclass fully specialized with concrete types is fine:
+A generic metaclass fully specialized with concrete types is fine.
 
 ```toml
 [environment]
@@ -1540,7 +1540,7 @@ reveal_type(Bar.__class__)  # revealed: <class 'Foo[int]'>
 
 ### Parameterized by type variables (legacy)
 
-A generic metaclass parameterized by type variables is not supported:
+A generic metaclass parameterized by type variables is not supported.
 
 ```py
 from typing import TypeVar, Generic
@@ -1555,7 +1555,7 @@ class GenericMetaInstance(metaclass=GenericMeta[T]): ...
 
 ### Parameterized by type variables (PEP 695)
 
-The same applies using PEP 695 syntax:
+The same applies using PEP 695 syntax.
 
 ```toml
 [environment]

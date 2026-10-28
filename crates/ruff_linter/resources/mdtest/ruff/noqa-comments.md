@@ -115,7 +115,7 @@ help: Use `ruff: file-ignore` instead
 ### Unknown codes still receive a diagnostic
 
 In case the unknown code is a typo rather than an intentionally external code, we emit both
-`invalid-rule-code` and `noqa-comments`:
+`invalid-rule-code` and `noqa-comments`.
 
 ```toml
 [lint]
@@ -152,7 +152,7 @@ select = ["noqa-comments", "unused-noqa", "invalid-rule-code", "F401"]
 external = ["EXT"]
 ```
 
-If all of the codes are marked `external`, no diagnostic is emitted:
+If all of the codes are marked `external`, no diagnostic is emitted.
 
 ```py
 # error: [unused-import]
@@ -272,7 +272,7 @@ help: Use `ruff: ignore` instead
 ### Inline
 
 For inline comments, `RUF105` flags blanket comments and offers a fix containing the codes that are
-actually suppressed:
+actually suppressed.
 
 ```py
 # snapshot: noqa-comments
@@ -294,7 +294,7 @@ help: Use `ruff: ignore` instead
   |
 ```
 
-Multiple diagnostics on the same line don't cause duplicate codes in the final comment:
+Multiple diagnostics on the same line don't cause duplicate codes in the final comment.
 
 ```py
 # snapshot: noqa-comments
@@ -317,7 +317,7 @@ help: Use `ruff: ignore` instead
 
 ### File-level
 
-For file-level comments, only a diagnostic is emitted, without a fix:
+For file-level comments, only a diagnostic is emitted, without a fix.
 
 ```py
 # snapshot: noqa-comments
@@ -342,13 +342,13 @@ preview = true
 select = ["noqa-comments", "unused-noqa", "F401"]
 ```
 
-It should be possible to suppress `RUF105` with a `noqa` comment:
+It should be possible to suppress `RUF105` with a `noqa` comment.
 
 ```py
 value = 1  # noqa: RUF105
 ```
 
-But a suppression for `RUF100` should not prevent the rule from firing:
+But a suppression for `RUF100` should not prevent the rule from firing.
 
 ```py
 # error: [noqa-comments]

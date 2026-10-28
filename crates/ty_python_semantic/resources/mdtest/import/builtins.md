@@ -2,7 +2,7 @@
 
 ## Importing builtin module
 
-Builtin symbols can be explicitly imported:
+Builtin symbols can be explicitly imported.
 
 ```py
 import builtins
@@ -225,7 +225,7 @@ _IncompleteInputError
 ## Builtin symbol from custom typeshed
 
 If we specify a custom typeshed, we can use the builtin symbol from it, and no longer access the
-builtins from the "actual" vendored typeshed:
+builtins from the "actual" vendored typeshed.
 
 ```toml
 [environment]
@@ -257,7 +257,7 @@ reveal_type(str)  # revealed: Unknown
 ## Unknown builtin (later defined)
 
 `foo` has a type of `Unknown` in this example, as it relies on `bar` which has not been defined at
-that point:
+that point.
 
 ```toml
 [environment]

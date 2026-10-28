@@ -5,7 +5,7 @@
 ## Using `from` with an unresolvable module
 
 This example demonstrates the diagnostic when a `from` style import is used with a module that could
-not be found:
+not be found.
 
 ```py
 from does_not_exist import add  # error: [unresolved-import]

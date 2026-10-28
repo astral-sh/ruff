@@ -205,7 +205,7 @@ of `value and False` tests `value`, gets `False`, and short-circuits, meaning th
 necessarily assume we get `False` again.
 
 For code which saves the `and` expression to a variable, this is correct, and we do model this
-possibility:
+possibility.
 
 ```py
 def saved_condition(value: object):
@@ -223,7 +223,7 @@ But if the condition is tested directly, it works differently (at least in CPyth
 within a branch condition doesn't just short-circuit to an evaluation of the expression; it
 short-circuits directly to a control-flow decision, bypassing a final evaluation of the entire
 condition expression, and avoiding the need for a second `__bool__` check. We model this
-distinction:
+distinction.
 
 ```py
 def conditions(value: object):

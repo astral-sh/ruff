@@ -28,7 +28,7 @@ The empty `tuple` is *not* equivalent to `Never`!
 static_assert(not is_equivalent_to(Never, tuple[()]))
 ```
 
-`NoReturn` is just a different spelling of `Never`, so these tuple types also retain their shape:
+`NoReturn` is just a different spelling of `Never`, so these tuple types also retain their shape.
 
 ```py
 static_assert(not is_equivalent_to(NoReturn, tuple[NoReturn]))

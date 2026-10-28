@@ -15,7 +15,7 @@ of this concept.
 ### Fully static
 
 Fully static types participate in subtyping. If a type `S` is a subtype of `T`, `S` will also be
-assignable to `T`. Two equivalent types are subtypes of each other:
+assignable to `T`. Two equivalent types are subtypes of each other.
 
 ```py
 from ty_extensions import static_assert
@@ -60,7 +60,7 @@ static_assert(is_assignable_to(Literal[1], Any))
 ### Boolean literals
 
 `Literal[True]` and `Literal[False]` are both subtypes of (and therefore assignable to) `bool`,
-which is in turn a subtype of `int`:
+which is in turn a subtype of `int`.
 
 ```py
 from ty_extensions import static_assert
@@ -93,7 +93,7 @@ static_assert(not is_assignable_to(Literal[1], str))
 ### String literals and `LiteralString`
 
 All string-literal types are subtypes of (and therefore assignable to) `LiteralString`, which is in
-turn a subtype of `str`:
+turn a subtype of `str`.
 
 ```py
 from ty_extensions import static_assert
@@ -314,7 +314,7 @@ static_assert(not is_assignable_to(type[Any], None))
 ### Class-literal types
 
 Class-literal types with a dynamically typed base are assignable to any type `T` where `T` is
-assignable to `type`:
+assignable to `type`.
 
 ```py
 from typing import Any
@@ -468,7 +468,7 @@ python-version = "3.12"
 
 While a homogeneous tuple type is not assignable to any heterogeneous tuple types, a heterogeneous
 tuple type can be assignable to a homogeneous tuple type, and homogeneous tuple types can be
-assignable to `Sequence`:
+assignable to `Sequence`.
 
 ```pyi
 from typing import Literal, Any, Sequence
@@ -1103,7 +1103,7 @@ See also: our property tests in `property_tests.rs`.
 
 ### Everything is assignable to `object`
 
-`object` is Python's top type; the set of all possible objects at runtime:
+`object` is Python's top type; the set of all possible objects at runtime.
 
 ```py
 from ty_extensions import static_assert
@@ -1124,7 +1124,7 @@ static_assert(is_assignable_to(type[Any], object))
 ### Every type is assignable to `Any` / `Unknown`
 
 `Any` and `Unknown` are gradual types. They could materialize to any given type at runtime, and so
-any type is assignable to them:
+any type is assignable to them.
 
 ```py
 from ty_extensions import static_assert
@@ -1929,7 +1929,7 @@ static_assert(
 ```
 
 A constraint-producing comparison must keep an enclosing class variable symbolic while solving the
-surrounding callable's return variable:
+surrounding callable's return variable.
 
 ```py
 class OuterCarrier[A_outer]:
@@ -2066,7 +2066,7 @@ static_assert(not is_assignable_to(TypeIs[Any], str))
 ## `TypeIs` with gradual types
 
 `TypeIs` is invariant in its declared type. But gradual types are assignable to and from any type,
-so `TypeIs` annotations that differ only by `Any` are still compatible:
+so `TypeIs` annotations that differ only by `Any` are still compatible.
 
 ```py
 from collections.abc import Sequence
@@ -2082,7 +2082,7 @@ static_assert(not is_assignable_to(TypeIs[Sequence[int]], TypeIs[Sequence[object
 ## `callable` as a `TypeIs` predicate
 
 The runtime predicate type and the declared `TypeIs` type are related but distinct. The builtin
-`callable` predicate can be used where a predicate for `Callable[..., Any]` is expected:
+`callable` predicate can be used where a predicate for `Callable[..., Any]` is expected.
 
 ```py
 from collections.abc import Callable

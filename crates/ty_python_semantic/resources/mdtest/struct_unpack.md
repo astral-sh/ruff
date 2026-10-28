@@ -35,7 +35,7 @@ def _(buf: bytes):
     reveal_type(unpack("@P4x", buf))  # revealed: tuple[int]
 ```
 
-Support for format characters for complex numbers was added in Python 3.14:
+Support for format characters for complex numbers was added in Python 3.14.
 
 ```toml
 [environment]

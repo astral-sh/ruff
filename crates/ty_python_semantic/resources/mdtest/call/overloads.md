@@ -64,7 +64,7 @@ def f(x: bytes) -> bytes: ...
 ```
 
 Here, all of the calls below pass the arity check for all overloads, so we proceed to type checking
-which filters out all but the matching overload:
+which filters out all but the matching overload.
 
 ```py
 from overloaded import f
@@ -620,7 +620,7 @@ def _(x: SomeEnum, y: Literal[SomeEnum.A, SomeEnum.C]):
 #### Enum with single member
 
 This pattern appears in typeshed. Here, it is used to represent two optional, mutually exclusive
-keyword parameters:
+keyword parameters.
 
 `overloaded.pyi`:
 
@@ -669,7 +669,7 @@ def _(missing: Literal[Missing.Value], missing_or_present: Literal[Missing.Value
 
 #### Enum subclass without members
 
-An `Enum` subclass without members should _not_ be expanded:
+An `Enum` subclass without members should _not_ be expanded.
 
 `overloaded.pyi`:
 
@@ -717,7 +717,7 @@ def _(actual_enum: ActualEnum, my_enum_instance: MyEnumSubclass):
 
 #### Enum complement inside union
 
-A narrowed enum complement inside a union should be expanded to the remaining enum literals:
+A narrowed enum complement inside a union should be expanded to the remaining enum literals.
 
 `overloaded.pyi`:
 
@@ -759,7 +759,7 @@ def _(x: Color | None):
 #### Enum complement as a bound overload receiver
 
 A narrowed enum complement should also preserve literal alternatives during member lookup, so
-bound-method overload resolution can still discriminate on the receiver:
+bound-method overload resolution can still discriminate on the receiver.
 
 `overloaded.pyi`:
 
@@ -1384,7 +1384,7 @@ def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
 
 ### Retry from parameter matching with type context
 
-When retrying, arguments are inferred with the correct type context:
+When retrying, arguments are inferred with the correct type context.
 
 ```py
 from typing import Callable, overload
@@ -1554,7 +1554,7 @@ def f(x: list[Any]) -> int: ...
 def f(x: Any) -> str: ...
 ```
 
-For the above definition, anything other than `list` should match the last overload:
+For the above definition, anything other than `list` should match the last overload.
 
 ```py
 from typing import Any
@@ -1578,7 +1578,7 @@ def _(list_int: list[int], list_any: list[Any]):
 Here `Callable[P, R]` in the first overload is an equivalent type to `Callable[P, R]` in the second
 overload, despite the fact that `P` and `R` are scoped to different overload-literals. Evaluation of
 the result of the call is therefore unambiguous: it must evaluate to a `Callable` type rather
-`Unknown`/`Any`:
+`Unknown`/`Any`.
 
 ```toml
 [environment]
@@ -1895,7 +1895,7 @@ def _(int_str: tuple[int, str], int_any: tuple[int, Any], any_any: tuple[Any, An
 
 ### `Unknown` passed into an overloaded function annotated with protocols
 
-`Foo.join()` here has similar annotations to `str.join()` in typeshed:
+`Foo.join()` here has similar annotations to `str.join()` in typeshed.
 
 `module.pyi`:
 
@@ -2202,7 +2202,7 @@ def _(args: tuple[int, ...]):
 ### Required tuple elements before a later positional argument
 
 The tuple's required final `bytes` element selects the second overload. Its variable-length part
-must be empty to leave room for `1.0`:
+must be empty to leave room for `1.0`.
 
 `overloaded.pyi`:
 
@@ -2591,7 +2591,7 @@ f([{"y": 1}], int_or_str())
 ```
 
 An expected return type can specialize a generic overload and provide context for its arguments.
-Overload filtering should preserve that context:
+Overload filtering should preserve that context.
 
 ```py
 from typing import Any, overload
@@ -2605,7 +2605,7 @@ def f(value: Any) -> Any: ...
 values: list[int] = reveal_type(f([]))  # revealed: list[int]
 ```
 
-Non-matching overloads do not produce diagnostics:
+Non-matching overloads do not produce diagnostics.
 
 ```py
 from typing import TypedDict, overload
@@ -2624,7 +2624,7 @@ x = f({"y": 1}, "a")
 reveal_type(x)  # revealed: str
 ```
 
-Only the types and diagnostics produced by inference against matching overloads are preserved:
+Only the types and diagnostics produced by inference against matching overloads are preserved.
 
 ```py
 from collections.abc import Callable

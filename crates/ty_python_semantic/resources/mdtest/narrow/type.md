@@ -287,7 +287,7 @@ def _(x: A | B):
 
 ## No narrowing for multiple arguments
 
-Narrowing does not occur in the same way if `type` is used to dynamically create a class:
+Narrowing does not occur in the same way if `type` is used to dynamically create a class.
 
 ```py
 def _(x: str | int):
@@ -306,7 +306,7 @@ def _(x: str | int):
 
 ## No narrowing for keyword arguments
 
-`type` can't be used with a keyword argument:
+`type` can't be used with a keyword argument.
 
 ```py
 def _(x: str | int):
@@ -354,7 +354,7 @@ def _[T](x: A | B):
 
 ## Narrowing for tuple
 
-An early version of <https://github.com/astral-sh/ruff/pull/19920> caused us to crash on this:
+An early version of <https://github.com/astral-sh/ruff/pull/19920> caused us to crash on this.
 
 ```py
 def _(val):

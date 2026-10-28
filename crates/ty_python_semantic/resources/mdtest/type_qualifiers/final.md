@@ -8,7 +8,7 @@ any scope. Final names declared in class scopes cannot be overridden in subclass
 ### `Final` with type
 
 Declared symbols that are additionally qualified with `Final` use the declared type when accessed
-from another scope. Local uses of the symbol will use the inferred type, which may be more specific:
+from another scope. Local uses of the symbol will use the inferred type, which may be more specific.
 
 `mod.py`:
 
@@ -52,7 +52,7 @@ reveal_type(FINAL_F)  # revealed: int
 
 When a symbol is qualified with `Final` but no type is specified, the type is inferred from the
 right-hand side of the assignment. We do not union the inferred type with `Unknown`, because the
-symbol cannot be modified:
+symbol cannot be modified.
 
 `mod.py`:
 
@@ -142,7 +142,7 @@ def build_classes(n: int):
 ### Names
 
 Symbols qualified with `Final` cannot be reassigned, and attempting to do so will result in an
-error:
+error.
 
 `mod.py`:
 
@@ -611,7 +611,7 @@ value = 2
 ### Reassignment after conditional assignment
 
 If a `Final` symbol is conditionally assigned, a subsequent unconditional assignment is still a
-reassignment error, because the symbol may have already been bound:
+reassignment error, because the symbol may have already been bound.
 
 ```py
 from typing import Final
@@ -627,7 +627,7 @@ if cond():
 ABC = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `ABC` is not allowed"
 ```
 
-Assigning in both branches of an `if/else` is fine — each branch is a first assignment:
+Assigning in both branches of an `if/else` is fine — each branch is a first assignment.
 
 ```py
 from typing import Final
@@ -643,7 +643,7 @@ else:
     X = 2
 ```
 
-But assigning in both branches and then again unconditionally is an error:
+But assigning in both branches and then again unconditionally is an error.
 
 ```py
 from typing import Final
@@ -662,7 +662,7 @@ Y = 3  # error: [invalid-assignment] "Reassignment of `Final` symbol `Y` is not 
 ```
 
 Multiple conditional blocks don't help — the second `if` body sees that the first may have already
-bound the symbol:
+bound the symbol.
 
 ```py
 from typing import Final
@@ -681,7 +681,7 @@ if cond():
 
 ### Attributes
 
-Assignments to attributes qualified with `Final` are also not allowed:
+Assignments to attributes qualified with `Final` are also not allowed.
 
 ```py
 from typing import Final
@@ -738,7 +738,7 @@ c.INSTANCE_FINAL_A += 1
 ### Attributes via indirections
 
 `Final` attribute assignments are also detected through type aliases, `NewType`s, and type
-variables:
+variables.
 
 ```toml
 [environment]
@@ -769,7 +769,7 @@ def g(x: TA):
 ### Attributes on unions and intersections
 
 When the object type is a union, we still detect `Final` attribute assignments for elements that
-declare the attribute as `Final`:
+declare the attribute as `Final`.
 
 ```py
 from typing import Final
@@ -791,7 +791,7 @@ def union_augmented(arg: HasFinal | NotFinal):
     arg.x += 1
 ```
 
-Intersections also detect `Final` attribute assignments:
+Intersections also detect `Final` attribute assignments.
 
 ```py
 from typing import Final
@@ -864,7 +864,7 @@ def assign(fixed: Fixed, either: Fixed | Mutable, both: Fixed | AlsoFixed, mutab
         mutable.value = 2  # no diagnostic
 ```
 
-The same restriction applies to deletion, even when a protocol component permits it:
+The same restriction applies to deletion, even when a protocol component permits it.
 
 ```py
 def delete(fixed: Fixed, either: Fixed | Mutable, both: Fixed | AlsoFixed, mutable: Mutable) -> None:
@@ -879,7 +879,7 @@ def delete(fixed: Fixed, either: Fixed | Mutable, both: Fixed | AlsoFixed, mutab
         del mutable.value  # no diagnostic
 ```
 
-Narrowing `self` still allows initialization. That exemption does not apply to another parameter:
+Narrowing `self` still allows initialization. That exemption does not apply to another parameter.
 
 ```py
 class Initialized:
@@ -891,7 +891,7 @@ class Initialized:
             other.value = 2  # error: [invalid-assignment]
 ```
 
-Diagnostics point to the nominal class that declares the attribute:
+Diagnostics point to the nominal class that declares the attribute.
 
 ```py
 class Declared:
@@ -929,7 +929,7 @@ def assign_aliased(value: FixedAlias | Mutable) -> None:
 ## Mutability
 
 Objects qualified with `Final` *can be modified*. `Final` represents a constant reference to an
-object, but that object itself may still be mutable:
+object, but that object itself may still be mutable.
 
 ```py
 from typing import Final
@@ -969,7 +969,7 @@ class Derived(Base):
 
 ### Transitive override through MRO
 
-Overriding a `Final` variable is also detected transitively through the MRO:
+Overriding a `Final` variable is also detected transitively through the MRO.
 
 ```py
 from typing import Final
@@ -985,7 +985,7 @@ class Child(Parent):
 
 ### Non-`Final` variables are unaffected
 
-Non-`Final` class variables can still be overridden without issue:
+Non-`Final` class variables can still be overridden without issue.
 
 ```py
 from typing import Final
@@ -1002,7 +1002,7 @@ class Derived(Base):
 ### Diamond inheritance
 
 When a `Final` variable is inherited through a diamond, only one error should be reported,
-attributing it to the first class in the MRO that defines the `Final` variable:
+attributing it to the first class in the MRO that defines the `Final` variable.
 
 ```py
 from typing import Final
@@ -1041,7 +1041,7 @@ class Child(Base1, Base2):
 
 ### Override with a method definition
 
-A method definition in a subclass that shadows a `Final` class variable should also be detected:
+A method definition in a subclass that shadows a `Final` class variable should also be detected.
 
 ```py
 from typing import Final
@@ -1060,7 +1060,7 @@ class Derived(Base):
 When a subclass uses `@override` on a method that shadows a `Final` variable from a superclass, the
 `override-of-final-variable` diagnostic should still be emitted (because the superclass variable is
 `Final`), and no `invalid-explicit-override` error should be raised (because the member does exist
-in the superclass). Note that `@override` can only be applied to methods, not variable assignments:
+in the superclass). Note that `@override` can only be applied to methods, not variable assignments.
 
 ```py
 from typing import Final
@@ -1083,7 +1083,7 @@ class Derived(Base):
 
 When multiple levels of subclasses override the same `Final` variable, each override should be
 reported individually. The error always attributes the violation to the *first* class in the MRO
-that declares the variable as `Final`:
+that declares the variable as `Final`.
 
 ```py
 from typing import Final
@@ -1100,7 +1100,7 @@ class C(B):
 
 ### `ClassVar[Final[...]]` and `Annotated[Final[...]]`
 
-`Final` combined with `ClassVar` or `Annotated` should still prevent overrides:
+`Final` combined with `ClassVar` or `Annotated` should still prevent overrides.
 
 ```py
 from typing import Final, ClassVar, Annotated
@@ -1173,7 +1173,7 @@ info: `module_a.Foo.X` is declared as `Final`, forbidding overrides
 
 ### `Final` declaration without a value
 
-A bare `Final` declaration without an assigned value should still prevent overrides:
+A bare `Final` declaration without an assigned value should still prevent overrides.
 
 ```py
 from typing import Final
@@ -1187,7 +1187,7 @@ class Derived(Base):
 
 ### Instance `Final` declared in `__init__`
 
-Instance attributes declared as `Final` in `__init__` should also prevent overrides in subclasses:
+Instance attributes declared as `Final` in `__init__` should also prevent overrides in subclasses.
 
 ```py
 from typing import Final
@@ -1204,7 +1204,7 @@ class Derived(Base):
 
 ### Private (name-mangled) members are not checked
 
-Name-mangled private members use different underlying names per class, so overrides are allowed:
+Name-mangled private members use different underlying names per class, so overrides are allowed.
 
 ```py
 from typing import Final
@@ -1301,7 +1301,7 @@ class C:
 ### `__post_init__`
 
 `__post_init__` is a dunder that runs as part of instance initialization, so `Final` instance
-attributes may be declared and assigned in it, regardless of whether the class is a dataclass:
+attributes may be declared and assigned in it, regardless of whether the class is a dataclass.
 
 ```py
 from dataclasses import dataclass
@@ -1328,7 +1328,7 @@ class NonDataclass:
 ```
 
 Assigning to a `Final` attribute via the class literal on a dataclass-like class mentions
-`__post_init__` in the diagnostic:
+`__post_init__` in the diagnostic.
 
 ```py
 from dataclasses import dataclass
@@ -1343,7 +1343,7 @@ E.x = 2
 ```
 
 Redeclaring an existing dataclass field as `Final` in `__post_init__` should ideally be an error,
-since the field is not actually `Final`:
+since the field is not actually `Final`.
 
 ```py
 from dataclasses import dataclass
@@ -1660,7 +1660,7 @@ class C:
 ### Reachable `Final` declaration wins for diagnostics
 
 If an earlier `Final` declaration is statically unreachable, diagnostics should be attached to the
-later declaration that remains visible:
+later declaration that remains visible.
 
 ```py
 from typing import Final
@@ -1858,7 +1858,7 @@ class E:
 
 ## Cross-module final attribute assignment
 
-Assigning to an inherited `Final` attribute where the base class is in a different module:
+Assigning to an inherited `Final` attribute where the base class is in a different module.
 
 `base.py`:
 
@@ -1976,7 +1976,7 @@ class Child(Base):
         self.x = 2  # error: [invalid-assignment]
 ```
 
-Method-local `Final` annotation should not point at non-`Final` class annotation:
+Method-local `Final` annotation should not point at non-`Final` class annotation.
 
 ```py
 from typing import Final

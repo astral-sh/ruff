@@ -58,7 +58,7 @@ def f1():
 ### Statically known branches
 
 In the following examples, the `print` statements are also unreachable, but it requires type
-inference to determine that:
+inference to determine that.
 
 ```py
 def f1():
@@ -248,7 +248,7 @@ unreachable code, simply due to the fact that we infer `Never` for most of the s
 
 ### Use of variables in unreachable code
 
-We should not emit any diagnostics for uses of symbols in unreachable code:
+We should not emit any diagnostics for uses of symbols in unreachable code.
 
 ```py
 def f():
@@ -302,7 +302,7 @@ syntactically different cases. To test this, we use `ExceptionGroup`, which is o
 Python 3.11 and later. We have set the Python version to 3.10 for this whole section, to have
 `match` statements available, but not `ExceptionGroup`.
 
-To start, we make sure that we do not emit a diagnostic in this simple case:
+To start, we make sure that we do not emit a diagnostic in this simple case.
 
 ```py
 import sys
@@ -311,7 +311,7 @@ if sys.version_info >= (3, 11):
     ExceptionGroup  # no error here
 ```
 
-Similarly, if we negate the logic, we also emit no error:
+Similarly, if we negate the logic, we also emit no error.
 
 ```py
 if sys.version_info < (3, 11):
@@ -320,7 +320,7 @@ else:
     ExceptionGroup  # no error here
 ```
 
-This also works for more complex `if`-`elif`-`else` chains:
+This also works for more complex `if`-`elif`-`else` chains.
 
 ```py
 if sys.version_info >= (3, 13):
@@ -352,7 +352,7 @@ def _(flag: bool):
             ExceptionGroup  # no error here
 ```
 
-The same works for ternary expressions:
+The same works for ternary expressions.
 
 ```py
 class ExceptionGroupPolyfill: ...
@@ -361,7 +361,7 @@ MyExceptionGroup1 = ExceptionGroup if sys.version_info >= (3, 11) else Exception
 MyExceptionGroup1 = ExceptionGroupPolyfill if sys.version_info < (3, 11) else ExceptionGroup
 ```
 
-Due to short-circuiting, this also works for Boolean operators:
+Due to short-circuiting, this also works for Boolean operators.
 
 ```py
 sys.version_info >= (3, 11) and ExceptionGroup
@@ -384,7 +384,7 @@ match sys.version_info.minor:
         pass
 ```
 
-Terminal statements can also lead to unreachable code:
+Terminal statements can also lead to unreachable code.
 
 ```py
 def f():
@@ -394,7 +394,7 @@ def f():
     ExceptionGroup
 ```
 
-Similarly, assertions with statically-known falsy conditions can lead to unreachable code:
+Similarly, assertions with statically-known falsy conditions can lead to unreachable code.
 
 ```py
 def f():
@@ -403,7 +403,7 @@ def f():
     ExceptionGroup
 ```
 
-Finally, not that anyone would ever use it, but it also works for `while` loops:
+Finally, not that anyone would ever use it, but it also works for `while` loops.
 
 ```py
 while sys.version_info >= (3, 11):
@@ -412,7 +412,7 @@ while sys.version_info >= (3, 11):
 
 ### Infinite loops
 
-We also do not emit diagnostics in unreachable code after an infinite loop:
+We also do not emit diagnostics in unreachable code after an infinite loop.
 
 ```py
 def f():
@@ -439,7 +439,7 @@ def f():
 ### Attributes
 
 When attribute expressions appear in unreachable code, we should not emit `unresolved-attribute`
-diagnostics:
+diagnostics.
 
 ```py
 import sys
@@ -452,7 +452,7 @@ if sys.version_info >= (3, 11):
 ### Imports
 
 When import statements appear in unreachable code, we should not emit `unresolved-import`
-diagnostics:
+diagnostics.
 
 ```py
 import sys
@@ -471,7 +471,7 @@ if sys.version_info >= (3, 11):
 
 ### Nested scopes
 
-When we have nested scopes inside the unreachable section, we should not emit diagnostics either:
+When we have nested scopes inside the unreachable section, we should not emit diagnostics either.
 
 ```py
 if False:
@@ -510,7 +510,7 @@ if False:
 
 ### Type annotations
 
-Silencing of diagnostics also works for type annotations, even if they are stringified:
+Silencing of diagnostics also works for type annotations, even if they are stringified.
 
 ```py
 import sys
@@ -555,7 +555,7 @@ def _():
 ### No diagnostics for unreachable statements
 
 Our current strategy is to silence diagnostics unconditionally, even if the expression itself is
-obviously wrong in isolation:
+obviously wrong in isolation.
 
 ```py
 if False:
@@ -570,7 +570,7 @@ def f():
 ### Conflicting type information
 
 We also support cases where type information for symbols conflicts between mutually exclusive
-branches:
+branches.
 
 ```py
 import sys
@@ -586,7 +586,7 @@ else:
     other: str = x
 ```
 
-This is also supported for function calls, attribute accesses, etc.:
+This is also supported for function calls, attribute accesses, etc.
 
 ```py
 from typing import Literal
@@ -630,7 +630,7 @@ if False:
 
 We offer a helpful subdiagnostic if a variable in a type expression is inferred as having type
 `Never`, since this almost certainly resulted in the definition of the type being inferred by ty as
-being unreachable:
+being unreachable.
 
 ```toml
 [environment]

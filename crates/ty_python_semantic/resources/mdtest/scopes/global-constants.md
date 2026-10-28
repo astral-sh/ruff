@@ -2,7 +2,7 @@
 
 ## `__debug__` constant
 
-The [`__debug__` constant] should be globally available:
+The [`__debug__` constant] should be globally available.
 
 ```py
 reveal_type(__debug__)  # revealed: bool

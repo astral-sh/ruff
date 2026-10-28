@@ -39,7 +39,7 @@ def f():
             reveal_type(x)  # revealed: Literal[1]
 ```
 
-A `nonlocal` write also doesn't affect the inferred type of a class-scoped symbol:
+A `nonlocal` write also doesn't affect the inferred type of a class-scoped symbol.
 
 ```py
 def f():
@@ -77,7 +77,7 @@ def f():
 
 _Unlike_ variables that are explicitly declared `nonlocal` (below), implicitly nonlocal ("free")
 reads can come from a variable that's declared `global` in an enclosing scope. It doesn't matter
-whether the variable is bound in that scope:
+whether the variable is bound in that scope.
 
 ```py
 x: int = 1
@@ -94,7 +94,7 @@ def f():
 ## The `nonlocal` keyword
 
 Without the `nonlocal` keyword, bindings in an inner scope shadow variables of the same name in
-enclosing scopes. This example isn't a type error, because the inner `x` shadows the outer one:
+enclosing scopes. This example isn't a type error, because the inner `x` shadows the outer one.
 
 ```py
 def f():
@@ -103,7 +103,7 @@ def f():
         x = "hello"  # allowed
 ```
 
-With `nonlocal` it is a type error, because `x` refers to the same place in both scopes:
+With `nonlocal` it is a type error, because `x` refers to the same place in both scopes.
 
 ```py
 def f():
@@ -116,7 +116,7 @@ def f():
 ## Nested function after conditional nonlocal rebinding
 
 An inner function should still resolve a name through an enclosing `nonlocal` declaration, even if
-that enclosing scope also conditionally rebinds the name:
+that enclosing scope also conditionally rebinds the name.
 
 ```py
 def outer(flag: bool) -> None:
@@ -136,7 +136,7 @@ def outer(flag: bool) -> None:
 ## Generator expression after nonlocal rebinding
 
 A nested eager scope such as a generator expression should see the rebound type of a `nonlocal`
-symbol:
+symbol.
 
 ```py
 from typing import Optional
@@ -158,7 +158,7 @@ def outer(x: Optional[C]) -> None:
 
 Without a type declaration, we union the bindings in enclosing scopes to infer a type. But name
 resolution stops at the closest binding that isn't declared `nonlocal`, and we ignore bindings
-outside of that one:
+outside of that one.
 
 ```py
 def a():
@@ -189,7 +189,7 @@ def a():
 ## Local variable bindings "look ahead" to any assignment in the current scope
 
 The binding `x = 2` in `g` causes the earlier read of `x` to refer to `g`'s not-yet-initialized
-binding, rather than to `x = 1` in `f`'s scope:
+binding, rather than to `x = 1` in `f`'s scope.
 
 ```py
 def f():
@@ -200,7 +200,7 @@ def f():
 ```
 
 The `nonlocal` keyword makes this example legal (and makes the assignment `x = 2` affect the outer
-scope):
+scope).
 
 ```py
 def f():
@@ -212,7 +212,7 @@ def f():
 ```
 
 For the same reason, using the `+=` operator in an inner scope is an error without `nonlocal`
-(unless you shadow the outer variable first):
+(unless you shadow the outer variable first).
 
 ```py
 def f():
@@ -235,7 +235,7 @@ def f():
 
 ## `nonlocal` declarations must match an outer binding
 
-`nonlocal x` isn't allowed when there's no binding for `x` in an enclosing scope:
+`nonlocal x` isn't allowed when there's no binding for `x` in an enclosing scope.
 
 ```py
 def f():
@@ -248,7 +248,7 @@ def f():
         nonlocal x, y  # error: [invalid-syntax] "no binding for nonlocal `y` found"
 ```
 
-A global `x` doesn't work. The target must be in a function-like scope:
+A global `x` doesn't work. The target must be in a function-like scope.
 
 ```py
 x = 1
@@ -269,7 +269,7 @@ def f():
         nonlocal x  # error: [invalid-syntax] "no binding for nonlocal `x` found"
 ```
 
-A class-scoped `x` also doesn't work:
+A class-scoped `x` also doesn't work.
 
 ```py
 class Foo:
@@ -279,7 +279,7 @@ class Foo:
         nonlocal x  # error: [invalid-syntax] "no binding for nonlocal `x` found"
 ```
 
-However, class-scoped bindings don't break the `nonlocal` chain the way `global` declarations do:
+However, class-scoped bindings don't break the `nonlocal` chain the way `global` declarations do.
 
 ```py
 def f():
@@ -326,7 +326,7 @@ def f():
 
 ## `nonlocal` "chaining"
 
-Multiple `nonlocal` statements can "chain" through nested scopes:
+Multiple `nonlocal` statements can "chain" through nested scopes.
 
 ```py
 def f():
@@ -338,7 +338,7 @@ def f():
             reveal_type(x)  # revealed: Literal[1]
 ```
 
-And the `nonlocal` chain can skip over a scope that doesn't bind the variable:
+And the `nonlocal` chain can skip over a scope that doesn't bind the variable.
 
 ```py
 def f1():
@@ -352,7 +352,7 @@ def f1():
                 reveal_type(x)  # revealed: Literal[1]
 ```
 
-But a `global` statement breaks the chain:
+But a `global` statement breaks the chain.
 
 ```py
 x = 1
@@ -428,7 +428,7 @@ def f():
 
 ## Use before `nonlocal`
 
-Using a name prior to its `nonlocal` declaration in the same scope is a syntax error:
+Using a name prior to its `nonlocal` declaration in the same scope is a syntax error.
 
 ```py
 def f():
@@ -439,7 +439,7 @@ def f():
 ```
 
 This is true even if there are multiple `nonlocal` declarations of the same variable, as long as any
-of them come after the usage:
+of them come after the usage.
 
 ```py
 def f():
@@ -459,7 +459,7 @@ def f():
 
 ## `nonlocal` before outer initialization
 
-`nonlocal x` works even if `x` isn't bound in the enclosing scope until afterwards:
+`nonlocal x` works even if `x` isn't bound in the enclosing scope until afterwards.
 
 ```py
 def f():
@@ -505,7 +505,7 @@ def _(maybe_float: float | None, certain_int: int, flag: bool) -> None:
 
 A `nonlocal` write from an inner scope can affect the target variable's inferred type in it's
 defining scope. For the same reason, reads in a nested function can also see later bindings in their
-own scope:
+own scope.
 
 ```py
 def f():
@@ -527,7 +527,7 @@ though in this case we can actually see that it's never called. A "sufficiently 
 could've narrowed that to `Literal[1]`, but we don't/can't track what functions are called when, so
 we're being conservative. On the other hand, the reveal of `Literal[2]` after the binding in `g` is
 the opposite, an aggressive assumption that's not generally sound. Consider this counterexample
-where `g` and `h` are siblings that both assign to `x`:
+where `g` and `h` are siblings that both assign to `x`.
 
 ```py
 def f():
@@ -556,7 +556,7 @@ bindings from outer or sibling scopes, but we conservatively include bindings fr
 within the current one, once we've encountered them (i.e. in a top-to-bottom reading of the code).
 This second behavior is _also_ unsound, because nested functions can "escape" the scope where
 they're defined and affect reads on lines above their definition. But again these are the behaviors
-that users expect. Here's the shadowing behavior in more detail:
+that users expect. Here's the shadowing behavior in more detail.
 
 ```py
 def foo():
@@ -587,7 +587,7 @@ def foo():
 
 Using `+=` in a loop usually triggers fixpoint analysis, where after the list of `Literal` values
 reaches an upper limit we widen the type to `int`. The same applies to `nonlocal` augmented
-assignments, since the inner function body could run any number of times:
+assignments, since the inner function body could run any number of times.
 
 ```py
 def f():
@@ -635,7 +635,7 @@ def _():
 ## Conditional `nonlocal` bindings leave parent scope bindings visible
 
 Normal branching and merging rules apply to the shadowing behavior described in the previous
-section:
+section.
 
 ```py
 def flag() -> bool:
@@ -661,7 +661,7 @@ def foo():
 We don't need to think about this ordering in normal execution, since the body of a function doesn't
 get to cause any side effects until the function is called. But we do need to think about it in
 inference, because of the (generally unsound) rule mentioned above about considering nested bindings
-visible after we encounter them. That can matter in unusual situations like this one:
+visible after we encounter them. That can matter in unusual situations like this one.
 
 ```py
 def f():
@@ -676,7 +676,7 @@ def f():
 
 Class bodies are evaluated eagerly, so nonlocal bindings in a class scope should behave more like
 normal assignments. Currently we treat them like lazy nested bindings from function scopes, which
-results in types that are wider than they should be:
+results in types that are wider than they should be.
 
 ```py
 def f():
@@ -693,7 +693,7 @@ def f():
     reveal_type(x)  # revealed: Literal[2, 3]
 ```
 
-However, nested bindings in function scopes within a class are still lazy:
+However, nested bindings in function scopes within a class are still lazy.
 
 ```py
 def f():
@@ -710,7 +710,7 @@ def f():
 ```
 
 Similarly, class bodies within a function scope also behave lazily from the perspective of callers
-of that function:
+of that function.
 
 ```py
 def f():
@@ -729,7 +729,7 @@ def f():
 ## Large reachability constraint graphs fall back to `Unknown`
 
 We have an "excessive complexity" cutoff beyond which we stop considering nested bindings
-definitions for performance reasons, similar to how we handle loop header definitions:
+definitions for performance reasons, similar to how we handle loop header definitions.
 
 ```py
 def f(flag: bool):

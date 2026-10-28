@@ -471,7 +471,7 @@ def f(cond: bool) -> int:
 
 `NotImplemented` is only special-cased for return types (mirroring the way the interpreter applies
 special casing for the symbol at runtime). It is not generally considered assignable to every other
-type:
+type.
 
 ```py
 # Other type checkers do not emit an error here,
@@ -601,7 +601,7 @@ async def k() -> typing.AsyncGenerator[int]:
 
 <!-- snapshot-diagnostics -->
 
-We emit a nice subdiagnostic in this situation explaining the probable error here:
+We emit a nice subdiagnostic in this situation explaining the probable error here.
 
 ```py
 from typing_extensions import Protocol
@@ -630,7 +630,7 @@ def f(func: Any) -> Never:  # error: [invalid-return-type]
 
 In addition to `invalid-return-type`, we also offer a disabled-by-default stricter rule
 `unsound-return-statement`. This rule forbids `return` statements that return an instance of a type
-`A` unless `A` is a *subtype* of the annotated return type:
+`A` unless `A` is a *subtype* of the annotated return type.
 
 ```toml
 [rules]
@@ -687,7 +687,7 @@ info: └── the second tuple element is not compatible: `Any` is not a subty
 help: Consider using an `assert` to narrow the type prior to the `return` statement
 ```
 
-The rule is also applied to generator functions:
+The rule is also applied to generator functions.
 
 ```py
 from typing import Generator
@@ -712,7 +712,7 @@ info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type prior to the `return` statement
 ```
 
-Aliases of `Any` are also dynamic return annotations and must not trigger the rule:
+Aliases of `Any` are also dynamic return annotations and must not trigger the rule.
 
 ```py
 from typing_extensions import TypeAliasType
@@ -723,7 +723,7 @@ def returns_any_alias() -> AnyAlias:
     return "foo"
 ```
 
-The same applies when an alias of `Any` is the return type of a generator:
+The same applies when an alias of `Any` is the return type of a generator.
 
 ```py
 def generator_returns_any_alias() -> Generator[None, None, AnyAlias]:
@@ -732,7 +732,7 @@ def generator_returns_any_alias() -> Generator[None, None, AnyAlias]:
 ```
 
 The rule in fact will not trigger if `Any` appears anywhere in your return type, either implicitly
-or explicitly:
+or explicitly.
 
 ```py
 from typing import Any
@@ -749,7 +749,7 @@ def returns_tuple_of_any() -> tuple[Any, Any]:
 ```
 
 Edge case: for `TypeIs`-annotated functions, we want the error message to say "not a subtype of
-`bool`" rather than "not a subtype of `TypeIs`":
+`bool`" rather than "not a subtype of `TypeIs`".
 
 ```py
 from typing_extensions import TypeIs
@@ -772,7 +772,7 @@ info: `Any` is assignable to `bool`, but not a subtype of `bool`
 help: Consider using an `assert` to narrow the type prior to the `return` statement
 ```
 
-Aliases of `TypeIs` still return `bool`, so diagnostics must mention `bool` rather than the alias:
+Aliases of `TypeIs` still return `bool`, so diagnostics must mention `bool` rather than the alias.
 
 ```py
 TypeIsAlias = TypeAliasType("TypeIsAlias", TypeIs[int])
@@ -783,7 +783,7 @@ def returns_type_is_alias(value: object) -> TypeIsAlias:
 ```
 
 Detailed error context for aliases of `TypeIs` must also compare each union member against `bool`,
-rather than against the original `TypeIs` annotation:
+rather than against the original `TypeIs` annotation.
 
 ```py
 def returns_type_is_alias_union(value: object, result: bool | Any) -> TypeIsAlias:
@@ -805,7 +805,7 @@ info: element `Any` of union `bool | Any` is not a subtype of `bool`
 help: Consider using an `assert` to narrow the type prior to the `return` statement
 ```
 
-A `Never` return annotation is still a typed boundary, so returning `Any` must trigger the rule:
+A `Never` return annotation is still a typed boundary, so returning `Any` must trigger the rule.
 
 ```py
 from typing_extensions import Never
@@ -814,7 +814,7 @@ def never_returns() -> Never:
     return returns_any()  # error: [unsound-return-statement]
 ```
 
-The same applies when `Never` is the return type of a generator:
+The same applies when `Never` is the return type of a generator.
 
 ```py
 def generator_never_returns() -> Generator[None, None, Never]:
@@ -829,7 +829,7 @@ containing an `Any` value is inferred as `list[int]` rather than `list[Any]`. Th
 does not emit a diagnostic for the following unsound return statement. Mypy's `--warn-return-any`
 option has the same limitation. In fact, mypy only rejects return expressions whose entire type is
 `Any`, whereas this rule also rejects an independently inferred `list[Any]` when the annotated
-return type is `list[int]`:
+return type is `list[int]`.
 
 ```py
 def returns_list_containing_any() -> list[int]:
@@ -841,7 +841,7 @@ def returns_list_containing_any() -> list[int]:
 A specialized generic type is fully static if it has been specialized with fully static types, even
 if the type parameter(s) it is generic over have non-fully-static bounds, constraints, or defaults.
 A previous version of the rule incorrectly considered these specialized generic types as being
-non-fully-static, leading to false negatives in the below examples:
+non-fully-static, leading to false negatives in the below examples.
 
 ```toml
 [environment]
@@ -900,7 +900,7 @@ def generator_returns_bounded(value: Any) -> Generator[None, None, Bounded[int]]
 ```
 
 A specialized generic type is nonetheless considered to be non-fully-static if it is specialized
-with non-fully-static types:
+with non-fully-static types.
 
 ```py
 def returns_gradual_bounded(value: Any) -> Bounded[Any]:
@@ -933,7 +933,7 @@ python-version = "3.11"
 unsound-return-statement = "error"
 ```
 
-A tuple class with fully static elements forms a fully static return boundary:
+A tuple class with fully static elements forms a fully static return boundary.
 
 ```py
 from typing import Any
@@ -943,14 +943,14 @@ def returns_static_tuple_class(value: Any) -> type[tuple[int, object]]:
 ```
 
 A tuple class with an `Any` element remains gradual even though the union `object | Any` simplifies
-to `object`:
+to `object`.
 
 ```py
 def returns_gradual_tuple_class(value: Any) -> type[tuple[object, Any]]:
     return value
 ```
 
-An unpacked gradual tuple likewise makes the entire tuple class gradual:
+An unpacked gradual tuple likewise makes the entire tuple class gradual.
 
 ```py
 def returns_gradual_variadic_tuple_class(value: Any) -> type[tuple[object, *tuple[Any, ...]]]:
@@ -965,7 +965,7 @@ optimisation as of 06 August 2026, `Phantom[str]` is not currently considered "i
 with `Phantom[int]` (we do not simplify the union `Phantom[str] | Phantom[int]`). But the two
 protocols are considered equivalent, are considered mutual subtypes of each other, and are
 considered mutually redundant, meaning that no `unsound-return-statement` error is reported on this
-snippet:
+snippet.
 
 ```toml
 [rules]
@@ -992,7 +992,7 @@ def generator_returns_protocol(value: Phantom[int]) -> Generator[None, None, Pha
 
 A `TypedDict` with a field or explicit extra items of type `Any` is not fully static, even when the
 dictionary is defined as a class or inherits its fields from another `TypedDict`. The rule is not
-applied to `TypedDict`s like this that are not fully static:
+applied to `TypedDict`s like this that are not fully static.
 
 ```toml
 [rules]
@@ -1040,7 +1040,7 @@ def returns_static_typed_dict(value: Any) -> StaticPayload:
 Recursively specializing a protocol can produce infinitely many distinct types. Checking whether
 such a return annotation is fully static must recognize the recurring protocol definition and
 terminate instead of expanding the recursive member indefinitely, which would lead to a stack
-overflow:
+overflow.
 
 ```toml
 [rules]

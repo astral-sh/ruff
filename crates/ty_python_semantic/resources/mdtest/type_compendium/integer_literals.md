@@ -21,7 +21,7 @@ In practice, on CPython 3.13.0, this program prints `True` when executed as a sc
 when executed in the REPL.
 
 Since this is an implementation detail of the Python runtime, we model all integer literals as
-non-singleton types:
+non-singleton types.
 
 ```py
 from ty_extensions import static_assert
@@ -52,7 +52,7 @@ def f(x: int):
 
 ## Equality narrowing for integer `Literal`s
 
-Integer literals can narrow types in equality comparisons:
+Integer literals can narrow types in equality comparisons.
 
 ```py
 def f(x: int):
@@ -69,7 +69,7 @@ def f(x: int):
 
 ### Subtypes of `int`
 
-All integer literals are subtypes of `int`:
+All integer literals are subtypes of `int`.
 
 ```py
 from ty_extensions import static_assert
@@ -83,7 +83,7 @@ static_assert(is_subtype_of(Literal[54165], int))
 
 It is tempting to think that `int` is equivalent to the union of all integer literals,
 `… | Literal[-1] | Literal[0] | Literal[1] | …`, but this is not the case. `True` and `False` are
-also inhabitants of the `int` type, but they are not inhabitants of any integer literal type:
+also inhabitants of the `int` type, but they are not inhabitants of any integer literal type.
 
 ```py
 static_assert(is_subtype_of(Literal[True], int))
@@ -93,7 +93,7 @@ static_assert(not is_subtype_of(Literal[True], Literal[1]))
 static_assert(not is_subtype_of(Literal[False], Literal[0]))
 ```
 
-Also, `int` can be subclassed, and instances of that subclass are also subtypes of `int`:
+Also, `int` can be subclassed, and instances of that subclass are also subtypes of `int`.
 
 ```py
 class CustomInt(int):
@@ -125,7 +125,7 @@ static_assert(not is_subtype_of(Literal[1], JustFloat) and not is_subtype_of(Lit
 static_assert(not is_subtype_of(Literal[54165], JustFloat) and not is_subtype_of(Literal[54165], JustComplex))
 ```
 
-The typing system special case can be seen in the following example:
+The typing system special case can be seen in the following example.
 
 ```py
 a: JustFloat = 1  # error: [invalid-assignment]
@@ -137,7 +137,7 @@ y: complex = 1
 
 ### Subtypes of integer `Literal`s?
 
-The only subtypes of an integer literal type _that can be named_ are the type itself and `Never`:
+The only subtypes of an integer literal type _that can be named_ are the type itself and `Never`.
 
 ```py
 from ty_extensions import static_assert
@@ -150,7 +150,7 @@ static_assert(is_subtype_of(Never, Literal[54165]))
 
 ## Disjointness of integer `Literal`s
 
-Two integer literal types `Literal[a]` and `Literal[b]` are disjoint if `a != b`:
+Two integer literal types `Literal[a]` and `Literal[b]` are disjoint if `a != b`.
 
 ```py
 from ty_extensions import static_assert
@@ -172,7 +172,7 @@ python-version = "3.12"
 ```
 
 We support a whole range of arithmetic operations on integer literal types. For example, we can
-statically verify that (3, 4, 5) is a Pythagorean triple:
+statically verify that (3, 4, 5) is a Pythagorean triple.
 
 ```py
 from ty_extensions import static_assert
@@ -181,7 +181,7 @@ static_assert(3**2 + 4**2 == 5**2)
 ```
 
 Using unions of integer literals, we can even use this to solve equations over a finite domain
-(determine whether there is a solution or not):
+(determine whether there is a solution or not).
 
 ```py
 from typing import Literal, assert_type
@@ -199,7 +199,7 @@ def fermats_last_theorem(a: Nat, b: Nat, c: Nat):
 
 ## Truthiness
 
-Integer literals are always-truthy, except for `0`, which is always-falsy:
+Integer literals are always-truthy, except for `0`, which is always-falsy.
 
 ```py
 from ty_extensions import static_assert
@@ -211,7 +211,7 @@ static_assert(1)
 static_assert(54165)
 ```
 
-This can be used for type-narrowing:
+This can be used for type-narrowing.
 
 ```py
 from typing_extensions import Literal, assert_type

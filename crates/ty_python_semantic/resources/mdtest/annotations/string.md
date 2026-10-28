@@ -57,7 +57,7 @@ def f(v: "Foo"):
 ### Python less than 3.14
 
 "Partially stringified" PEP-604 unions can raise `TypeError` on Python \<3.14; we try to detect this
-common runtime error:
+common runtime error.
 
 <!-- snapshot-diagnostics -->
 
@@ -176,7 +176,7 @@ def g(x: Custom | "Custom"): ...
 
 ### Python less than 3.14 in a stub file
 
-This error is never emitted on stub files, because they are never executed at runtime:
+This error is never emitted on stub files, because they are never executed at runtime.
 
 ```toml
 [environment]
@@ -191,7 +191,7 @@ def f(x: "int" | None): ...
 ### Python less than 3.14 with `__future__` annotations
 
 The errors can be avoided in type-annotation contexts by using `__future__` annotations on Python
-\<3.14:
+\<3.14.
 
 ```toml
 [environment]
@@ -219,7 +219,7 @@ X = list["int" | None]
 ### Python >=3.14
 
 Runtime errors are also less common for partially stringified annotations if the Python version
-being used is >=3.14:
+being used is >=3.14.
 
 ```toml
 [environment]

@@ -9,7 +9,7 @@ python-version = "3.14"
 
 This test suite covers certain properties of intersection types and makes sure that we can apply
 various simplification strategies. We use `&` and `~` to construct intersection types (note that we
-display negative contributions at the end; the order does not matter):
+display negative contributions at the end; the order does not matter).
 
 ```py
 class P: ...
@@ -34,7 +34,7 @@ classes.
 
 ### Non-disjoint types
 
-We use `P`, `Q`, `R`, … to denote types that are non-disjoint:
+We use `P`, `Q`, `R`, … to denote types that are non-disjoint.
 
 ```py
 from ty_extensions import static_assert
@@ -56,7 +56,7 @@ multiple inheritance. An instance of `S` would be a member of the `P` type _and_
 ### Disjoint types
 
 We use `Literal[1]`, `Literal[2]`, … as examples of pairwise-disjoint types, and `int` as a joint
-supertype of these:
+supertype of these.
 
 ```py
 from ty_extensions import static_assert
@@ -74,7 +74,7 @@ static_assert(is_subtype_of(Literal[3], int))
 
 ### Subtypes
 
-Finally, we use `A <: B <: C` and `A <: B1`, `A <: B2` to denote hierarchies of (proper) subtypes:
+Finally, we use `A <: B <: C` and `A <: B1`, `A <: B2` to denote hierarchies of (proper) subtypes.
 
 ```py
 from ty_extensions import static_assert
@@ -179,7 +179,7 @@ def nested(
 ### Union of intersections
 
 We always normalize our representation to a _union of intersections_, so when we add a _union to an
-intersection_, we distribute the union over the respective elements:
+intersection_, we distribute the union over the respective elements.
 
 ```py
 class P: ...
@@ -230,7 +230,7 @@ def simplifications_for_same_elements(
 
 When two intersections have the same positive elements and disjoint sets of differing exclusions,
 their union is just the common part. Every value in the common part must satisfy at least one of the
-two sets of exclusions. This also preserves shared exclusions and gradual types:
+two sets of exclusions. This also preserves shared exclusions and gradual types.
 
 ```py
 from typing import Any, Literal
@@ -247,7 +247,7 @@ def disjoint(
 ```
 
 Each side can exclude several values, and the two sets need not have the same size. Only shared
-exclusions remain after merging:
+exclusions remain after merging.
 
 ```py
 def groups(
@@ -261,7 +261,7 @@ def groups(
 ```
 
 If the exclusions might overlap, a value in both excluded types is still absent from the union, so
-we keep the exclusions:
+we keep the exclusions.
 
 ```py
 class P: ...
@@ -292,7 +292,7 @@ static_assert(is_equivalent_to(Q | (P & ~SubQ), Q | P))
 ```
 
 Other exclusions remain in place. Removing an exclusion can also make an earlier union element
-redundant, regardless of the order of the elements:
+redundant, regardless of the order of the elements.
 
 ```pyi
 static_assert(is_equivalent_to((P & ~Q & ~R) | Q, (P & ~R) | Q))
@@ -305,7 +305,7 @@ def unrelated(value: (P & ~Q) | R):
 ```
 
 The covering type must contain every materialization of the exclusion. Repeating a gradual type does
-not guarantee this, but a fully static supertype can cover a gradual exclusion:
+not guarantee this, but a fully static supertype can cover a gradual exclusion.
 
 ```pyi
 from typing import Any
@@ -336,7 +336,7 @@ hashable_first(Unhashable())  # error: [invalid-argument-type]
 ```
 
 The same simplification applies to literal union members, including unions that restore only some of
-the excluded literals:
+the excluded literals.
 
 ```pyi
 from enum import Enum
@@ -365,7 +365,7 @@ def literals(
 ### Negation distributes over union
 
 Distribution also applies to a negation operation. This is a manifestation of one of
-[De Morgan's laws], namely `~(P | Q) = ~P & ~Q`:
+[De Morgan's laws], namely `~(P | Q) = ~P & ~Q`.
 
 ```py
 from typing import Literal
@@ -384,7 +384,7 @@ def example_literals(i: ~Literal[1, 2]) -> None:
 
 ### Negation of intersections
 
-The other of [De Morgan's laws], `~(P & Q) = ~P | ~Q`, also holds:
+The other of [De Morgan's laws], `~(P & Q) = ~P | ~Q`, also holds.
 
 ```py
 class P: ...
@@ -435,7 +435,7 @@ static_assert(is_equivalent_to(object & ~P, ~P))
 ### Intersection of a type and its negation
 
 Continuing with more [complement laws], if we see both `P` and `~P` in an intersection, we can
-simplify to `Never`, even in the presence of other types:
+simplify to `Never`, even in the presence of other types.
 
 ```py
 from typing import Any, Generic, TypeVar
@@ -502,7 +502,7 @@ def _(
 
 ### Negation is an involution
 
-The final of the [complement laws] states that negating twice is equivalent to not negating at all:
+The final of the [complement laws] states that negating twice is equivalent to not negating at all.
 
 ```py
 class P: ...
@@ -527,7 +527,7 @@ representation.
 ### `Never` in intersections
 
 If we intersect with `Never`, we can simplify the whole intersection to `Never`, even if there are
-dynamic types involved:
+dynamic types involved.
 
 ```py
 from typing_extensions import Never, Any
@@ -551,7 +551,7 @@ def _(
 
 #### Positive contributions
 
-If we intersect disjoint types, we can simplify to `Never`, even in the presence of other types:
+If we intersect disjoint types, we can simplify to `Never`, even in the presence of other types.
 
 ```py
 from typing import Literal, Any
@@ -609,7 +609,7 @@ def newtype_intersections(
 #### Positive and negative contributions
 
 If we intersect a type `X` with the negation `~Y` of a disjoint type `Y`, we can remove the negative
-contribution `~Y`, as `~Y` must fully contain the positive contribution `X` as a subtype:
+contribution `~Y`, as `~Y` must fully contain the positive contribution `X` as a subtype.
 
 ```py
 from typing import Literal
@@ -641,7 +641,7 @@ def example_none(
 #### Positive type and positive subtype
 
 Subtypes are contained within their supertypes, so we can simplify intersections by removing
-superfluous supertypes:
+superfluous supertypes.
 
 ```py
 from typing import Any
@@ -699,7 +699,7 @@ def _(
 
 #### Negative type and negative subtype
 
-For negative contributions, this property is reversed. Here we can remove superfluous _subtypes_:
+For negative contributions, this property is reversed. Here we can remove superfluous _subtypes_.
 
 ```py
 from typing import Any
@@ -757,7 +757,7 @@ def _(
 
 #### Negative type and multiple negative subtypes
 
-If there are multiple negative subtypes, all of them can be removed:
+If there are multiple negative subtypes, all of them can be removed.
 
 ```py
 class A: ...
@@ -783,7 +783,7 @@ def _(
 #### Negative type and positive subtype
 
 When `A` is a supertype of `B`, its negation `~A` is disjoint from `B`, so we can simplify the
-intersection to `Never`:
+intersection to `Never`.
 
 ```py
 from typing import Any
@@ -881,7 +881,7 @@ def _(x: bool & Any | Literal[True] | Literal[False]):
 
 Similarly, intersections between `LiteralString`, `AlwaysTruthy` and `AlwaysFalsy` can be
 simplified, due to the fact that a `LiteralString` inhabitant is known to have `__class__` set to
-exactly `str` (and not a subclass of `str`):
+exactly `str` (and not a subclass of `str`).
 
 ```py
 from ty_extensions import AlwaysTruthy, AlwaysFalsy
@@ -1079,7 +1079,7 @@ def unknown(
 ### Collapsing of multiple `Any`/`Unknown` contributions
 
 The intersection of an unknown set of runtime values with (another) unknown set of runtime values is
-still an unknown set of runtime values:
+still an unknown set of runtime values.
 
 ```py
 from ty_extensions._internal import Unknown
@@ -1113,7 +1113,7 @@ def unknown(
 ### No self-cancellation
 
 Dynamic types do not cancel each other out. Intersecting an unknown set of values with the negation
-of another unknown set of values is not necessarily empty, so we keep the positive contribution:
+of another unknown set of values is not necessarily empty, so we keep the positive contribution.
 
 ```py
 from typing import Any
@@ -1136,7 +1136,7 @@ def unknown(
 
 ### Mixed dynamic types
 
-Gradually-equivalent types can be simplified out of intersections:
+Gradually-equivalent types can be simplified out of intersections.
 
 ```py
 from typing import Any
@@ -1180,7 +1180,7 @@ def _(
 ### Partial success in intersection calls
 
 If one element accepts the call but another rejects it (e.g., due to incompatible arguments), the
-call still succeeds using only the element that accepts:
+call still succeeds using only the element that accepts.
 
 ```py
 from typing import Callable
@@ -1199,7 +1199,7 @@ def _(
 ### All intersection elements reject the call
 
 If all elements are callable but all reject the specific call (e.g., incompatible arguments), we
-show errors for each failing element:
+show errors for each failing element.
 
 ```py
 from typing import Callable
@@ -1260,7 +1260,7 @@ When intersection elements fail with different error types, we use a priority hi
 which errors to show. More specific errors (like `invalid-argument-type`) take precedence over less
 specific ones (like `call-top-callable` or `call-non-callable`).
 
-A specific argument error takes priority over a top-callable error:
+A specific argument error takes priority over a top-callable error.
 
 ```py
 from ty_extensions import Top
@@ -1278,7 +1278,7 @@ def _(
 
 ### Error priority: binding error over not-callable
 
-A specific argument error takes priority over a not-callable error:
+A specific argument error takes priority over a not-callable error.
 
 ```py
 from typing import Callable
@@ -1297,7 +1297,7 @@ def _(
 
 ### Error priority: top-callable over not-callable
 
-A top-callable error takes priority over a not-callable error:
+A top-callable error takes priority over a not-callable error.
 
 ```py
 from ty_extensions import Top
@@ -1336,7 +1336,7 @@ def _(x: Foo & Bar) -> None:
 ### Three or more elements with partial success
 
 When an intersection has three or more callable elements, some of which accept the call and some of
-which reject it, the failing elements are discarded:
+which reject it, the failing elements are discarded.
 
 ```py
 class RetA: ...
@@ -1372,7 +1372,7 @@ def _(x: type[A] & type[B]) -> None:
 ### Intersection with `Any`
 
 When one intersection element is `Any`, both elements are called. `Any` is callable and returns
-`Any`:
+`Any`.
 
 ```py
 from typing import Any
@@ -1385,7 +1385,7 @@ def _(x: type[Foo] & Any) -> None:
 
 ### Element returning `Never`
 
-When one element returns `Never`, the intersection of return types simplifies to `Never`:
+When one element returns `Never`, the intersection of return types simplifies to `Never`.
 
 ```py
 from typing import Callable, NoReturn
@@ -1398,7 +1398,7 @@ def _(x: Callable[[bool], NoReturn] & Callable[[int], str]) -> None:
 ### Variadic arguments
 
 When one intersection element accepts variadic arguments, it can succeed alongside more specific
-elements:
+elements.
 
 ```py
 class RetA: ...
@@ -1419,7 +1419,7 @@ def _(x: AcceptsAnything & SpecificArgs) -> None:
 
 ### No callable elements
 
-If no positive element is callable, the intersection is not callable:
+If no positive element is callable, the intersection is not callable.
 
 ```py
 class A: ...
@@ -1436,7 +1436,7 @@ def _(x: A & B) -> None:
 
 When a union contains intersection elements, we properly handle each union element. If an
 intersection element succeeds, it contributes to the result. If all elements within an intersection
-fail, the priority hierarchy is used for diagnostics:
+fail, the priority hierarchy is used for diagnostics.
 
 ```py
 from ty_extensions import Top
@@ -1463,7 +1463,7 @@ def _(
 ### All union elements succeed
 
 When all union elements succeed, the return type is the union of each element's return type. For
-intersection elements, the return type is itself an intersection of the successful bindings:
+intersection elements, the return type is itself an intersection of the successful bindings.
 
 ```py
 from typing import Callable
@@ -1488,7 +1488,7 @@ def _(
 
 ### All union elements fail
 
-When all union elements fail (including intersection elements), errors are reported for each:
+When all union elements fail (including intersection elements), errors are reported for each.
 
 ```py
 from ty_extensions import Top
@@ -1789,7 +1789,7 @@ def _(
     reveal_type(i2)  # revealed: list[Any]
 ```
 
-Intersections with typevars and NewTypes are not affected by this:
+Intersections with typevars and NewTypes are not affected by this.
 
 ```py
 from typing import Any, NewType, TypeVar

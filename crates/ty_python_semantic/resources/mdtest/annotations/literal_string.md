@@ -9,7 +9,7 @@ Parts of the testcases defined here were adapted from [the specification's examp
 
 ### Valid places
 
-It can be used anywhere a type is accepted:
+It can be used anywhere a type is accepted.
 
 ```py
 from typing_extensions import LiteralString
@@ -20,7 +20,7 @@ def _(x: LiteralString):
 
 ### Within `Literal`
 
-`LiteralString` cannot be used within `Literal`:
+`LiteralString` cannot be used within `Literal`.
 
 ```py
 from typing_extensions import Literal, LiteralString
@@ -408,7 +408,7 @@ if "" < lorem == "ipsum":
 
 ## `typing.LiteralString`
 
-`typing.LiteralString` is only available in Python 3.11 and later:
+`typing.LiteralString` is only available in Python 3.11 and later.
 
 ```toml
 [environment]

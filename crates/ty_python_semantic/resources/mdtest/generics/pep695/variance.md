@@ -884,7 +884,7 @@ static_assert(is_subtype_of(E[B], E[A]))
 static_assert(not is_subtype_of(E[A], E[B]))
 ```
 
-This also works for dataclass-transformers:
+This also works for dataclass-transformers.
 
 ```py
 from typing import dataclass_transform
@@ -934,7 +934,7 @@ static_assert(not is_subtype_of(D[B], D[A]))
 static_assert(not is_subtype_of(D[A], D[B]))
 ```
 
-The same holds for dataclass-transformers:
+The same holds for dataclass-transformers.
 
 ```py
 from typing import dataclass_transform
@@ -974,7 +974,7 @@ static_assert(is_subtype_of(E[B], E[A]))
 static_assert(not is_subtype_of(E[A], E[B]))
 ```
 
-A subclass of a `NamedTuple` can still be covariant:
+A subclass of a `NamedTuple` can still be covariant.
 
 ```py
 class D[T](E[T]):
@@ -985,7 +985,7 @@ static_assert(not is_subtype_of(D[A], D[B]))
 ```
 
 But adding a new generic attribute on the subclass makes it invariant (the added attribute is not a
-`NamedTuple` field, and thus not immutable):
+`NamedTuple` field, and thus not immutable).
 
 ```py
 class C[T](E[T]):
@@ -1144,7 +1144,7 @@ static_assert(not is_subtype_of(Unresolved[object], Unresolved[int]))
 
 ### Properties
 
-Properties constrain to covariance if they are get-only and invariant if they are get-set:
+Properties constrain to covariance if they are get-only and invariant if they are get-set.
 
 ```py
 from ty_extensions import static_assert
@@ -1276,7 +1276,7 @@ static_assert(not is_subtype_of(C[A], C[B]))
 This example would otherwise be bivariant because it doesn't use `T` outside of the two exempted
 methods, so we fall back to covariance.
 
-This holds likewise for dataclasses with synthesized `__init__`:
+This holds likewise for dataclasses with synthesized `__init__`.
 
 ```py
 from dataclasses import dataclass
@@ -1405,7 +1405,7 @@ static_assert(not is_subtype_of(VariadicConsumer[bool], VariadicConsumer[int]))
 
 ## Tuple subclasses
 
-The same principle applies to classes that refer to tuple-subclass instances:
+The same principle applies to classes that refer to tuple-subclass instances.
 
 ```py
 from ty_extensions import static_assert

@@ -35,7 +35,7 @@ def unbounded[T](x: type[T]) -> T:
 ```
 
 An explicit `object` upper bound has the same constructor signature as an implicit `object` bound,
-including for legacy type variables:
+including for legacy type variables.
 
 ```py
 from typing import TypeVar
@@ -54,7 +54,7 @@ def legacy_object_bound(x: type[LegacyObjectT]) -> LegacyObjectT:
 ```
 
 Aliases of `object` have the same constructor and callable signature as a direct `object` bound,
-even when the bound contains more than one alias:
+even when the bound contains more than one alias.
 
 ```py
 from collections.abc import Callable
@@ -99,7 +99,7 @@ reveal_type(upper_bound(B))  # revealed: B
 upper_bound(C)
 ```
 
-`type[T]` with a constraints `T: (A, B)` represents exactly the class object `A`, or exactly `B`:
+`type[T]` with a constraints `T: (A, B)` represents exactly the class object `A`, or exactly `B`.
 
 ```py
 def constrained[T: (int, str)](x: type[T]) -> T:
@@ -120,7 +120,7 @@ constrained(A)
 `T` can be solved to any subtype of `A` or any subtype of `B`. It behaves similarly to a type
 variable that can be solved to any subclass of `A` or any subclass of `B`. Since all classes are
 instances of `type`, attributes on instances of `type` like `__name__` and `__qualname__` should
-still be accessible:
+still be accessible.
 
 ```py
 class Replace: ...
@@ -176,7 +176,7 @@ def narrow_a[B: A](a: A, b: B):
 ```
 
 Narrowing through `type[T]` or `Type[T]` should preserve the type variable identity, so the narrowed
-value remains assignable to `T`:
+value remains assignable to `T`.
 
 ```py
 from typing import Type, TypeVar
@@ -192,7 +192,7 @@ def pep695_typevar_narrowing[T: (int, str)](x: int | str, t: type[T]) -> T:
     return x
 ```
 
-Narrowing a union of `type[T]` and a callable factory must preserve the `type[T]` alternative:
+Narrowing a union of `type[T]` and a callable factory must preserve the `type[T]` alternative.
 
 ```py
 from typing import Callable, Generic, TypeVar
@@ -210,7 +210,7 @@ class Holder(Generic[T]):
 ## Narrowing constructor calls
 
 Narrowing a class object with `issubclass` uses the narrowed class's constructor without losing its
-original type variable:
+original type variable.
 
 ```py
 class IntConstructor:
@@ -224,7 +224,7 @@ def narrowed_subclass[T](cls: type[T]) -> T:
 ```
 
 Invalid positional and keyword arguments each produce only the narrowed subclass constructor's
-diagnostic:
+diagnostic.
 
 ```py
 def narrowed_invalid[T](cls: type[T]) -> None:
@@ -236,7 +236,7 @@ def narrowed_invalid[T](cls: type[T]) -> None:
         cls(value="wrong")
 ```
 
-Checking a class object's identity preserves the original type variable in the same way:
+Checking a class object's identity preserves the original type variable in the same way.
 
 ```py
 def narrowed_identity[T](cls: type[T]) -> T:
@@ -413,7 +413,7 @@ def lossy_class_object_projections(base: BoundBase, items: BoundList, user_id: B
 
 ## Type aliases in final upper bounds
 
-A type variable whose upper bound resolves to a final class has only one possible class object:
+A type variable whose upper bound resolves to a final class has only one possible class object.
 
 ```toml
 [environment]
@@ -579,7 +579,7 @@ var: type[C[int]] = C[int]
 var: type[C[int]] = D[int]  # error: [invalid-assignment] "Object of type `<class 'D[int]'>` is not assignable to `type[C[int]]`"
 ```
 
-Generic protocol meta-types preserve their specialization and use structural assignability:
+Generic protocol meta-types preserve their specialization and use structural assignability.
 
 ```py
 from typing import Protocol
@@ -633,7 +633,7 @@ def _(bare: type[P]):  # error: [missing-type-argument]
 ```
 
 The same principles apply when typevar defaults are used, but the results are a bit different
-because the default-specialization is no longer a forgiving `Unknown` type:
+because the default-specialization is no longer a forgiving `Unknown` type.
 
 ```py
 @final
@@ -666,7 +666,7 @@ def _(bare: type[Q]):
     expects_type_q_of_str(Q[int])  # error: [invalid-argument-type]
 ```
 
-This also works with `ParamSpec`:
+This also works with `ParamSpec`.
 
 ```py
 @final

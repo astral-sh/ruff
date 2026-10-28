@@ -26,7 +26,7 @@ class Table:
 
 ## Invalid comprehension filters
 
-A filter in any comprehension form must support boolean conversion:
+A filter in any comprehension form must support boolean conversion.
 
 ```py
 class NotBoolable:
@@ -38,7 +38,7 @@ class NotBoolable:
 (x for x in range(3) if NotBoolable())  # error: [unsupported-bool-conversion]
 ```
 
-Every filter is checked, including filters on subsequent `for` clauses:
+Every filter is checked, including filters on subsequent `for` clauses.
 
 ```py
 [
@@ -57,13 +57,13 @@ Every filter is checked, including filters on subsequent `for` clauses:
 ]
 ```
 
-The final operand of a boolean expression is converted when it becomes the filter condition:
+The final operand of a boolean expression is converted when it becomes the filter condition.
 
 ```py
 [x for x in range(3) if True and NotBoolable()]  # error: [unsupported-bool-conversion]
 ```
 
-Filter validation also rejects a `__bool__` method with an invalid return type:
+Filter validation also rejects a `__bool__` method with an invalid return type.
 
 ```py
 class InvalidBoolReturn:
@@ -91,7 +91,7 @@ consumed immediately.
 ### Basic forms
 
 Assignment expressions can appear in the element of a list comprehension and in the key or value of
-a dictionary comprehension:
+a dictionary comprehension.
 
 ```py
 [(list_value := item) for item in [1]]
@@ -105,7 +105,7 @@ reveal_type(dict_value)  # revealed: int
 ### Generator expressions
 
 The target also binds in the containing scope when the assignment is in a generator expression. PEP
-572 uses this `any` pattern as a motivating example:
+572 uses this `any` pattern as a motivating example.
 
 ```py
 def find_comment(lines: list[str]):
@@ -116,7 +116,7 @@ def find_comment(lines: list[str]):
 ### Assignment order
 
 If an iteration assigns the same target more than once, the last assignment determines its value
-after the comprehension:
+after the comprehension.
 
 ```py
 [(ordered := item, ordered := "") for item in [1]]
@@ -126,7 +126,7 @@ reveal_type(ordered)  # revealed: str
 ### Branches that do not assign
 
 A target in a branch known not to run remains unbound, while the other target is available after the
-comprehension:
+comprehension.
 
 ```py
 [(dead := 1) if False else (live := 2) for _ in [0]]
@@ -137,7 +137,7 @@ reveal_type(live)  # revealed: int
 
 ### Assignments on only some paths
 
-When the assignment only runs on one possible path, an earlier value remains possible:
+When the assignment only runs on one possible path, an earlier value remains possible.
 
 ```py
 def conditional_with_previous_value(flag: bool):
@@ -146,7 +146,7 @@ def conditional_with_previous_value(flag: bool):
     reveal_type(value)  # revealed: Literal["old"] | int
 ```
 
-Without an earlier value, the target may be unbound:
+Without an earlier value, the target may be unbound.
 
 ```py
 def conditional_without_previous_value(flag: bool):
@@ -157,7 +157,7 @@ def conditional_without_previous_value(flag: bool):
 
 ty conservatively keeps the type of an assignment that is unreachable on the first iteration, since
 a later iteration may take a different branch. Even though `0 == 1` is always false, the target is
-therefore possibly unbound, and checking must continue after the read:
+therefore possibly unbound, and checking must continue after the read.
 
 ```py
 def statically_false_condition():
@@ -170,14 +170,14 @@ def statically_false_condition():
 ### Comprehension filters
 
 A false filter skips the element, but an assignment made while evaluating that filter still takes
-effect:
+effect.
 
 ```py
 [value for value in [True, False] if (last_value := value)]
 reveal_type(last_value)  # revealed: bool
 ```
 
-If short-circuit evaluation skips the assignment, the target may be unbound:
+If short-circuit evaluation skips the assignment, the target may be unbound.
 
 ```py
 def conditional_filter(flag: bool):
@@ -186,7 +186,7 @@ def conditional_filter(flag: bool):
     reveal_type(value)  # revealed: int
 ```
 
-An assignment in the element only runs when every preceding filter succeeds:
+An assignment in the element only runs when every preceding filter succeeds.
 
 ```py
 def assignment_after_filter(flag: bool):
@@ -198,7 +198,7 @@ def assignment_after_filter(flag: bool):
 ### Assignments that depend on earlier iterations
 
 An assignment can read the value left by an earlier iteration. In this example, the final value is
-`3`, so retaining only the first iteration's literal values would be incorrect:
+`3`, so retaining only the first iteration's literal values would be incorrect.
 
 ```py
 def partial_sum():
@@ -208,7 +208,7 @@ def partial_sum():
 ```
 
 ty does not yet account for a type that changes between iterations. The second iteration below
-assigns `int`, so the final type should be `str | int` and `value.upper()` should report an error:
+assigns `int`, so the final type should be `str | int` and `value.upper()` should report an error.
 
 ```py
 def type_changes_across_iterations():
@@ -218,7 +218,7 @@ def type_changes_across_iterations():
     value.upper()
 ```
 
-The same applies when two targets depend on values from earlier iterations:
+The same applies when two targets depend on values from earlier iterations.
 
 ```py
 def two_dependent_targets():
@@ -230,7 +230,7 @@ def two_dependent_targets():
 ```
 
 A guard can also depend on a value changed by a later assignment in the same iteration. The first
-iteration below sets `flag`, so the second iteration assigns `value`:
+iteration below sets `flag`, so the second iteration assigns `value`.
 
 ```py
 def loop_carried_guard():
@@ -243,7 +243,7 @@ def loop_carried_guard():
 ### Function-local targets
 
 An assignment in a branch known not to run still makes its target local to the containing function.
-A read must not fall back to a global variable with the same name:
+A read must not fall back to a global variable with the same name.
 
 ```py
 local_target = "global"
@@ -255,7 +255,7 @@ def read_local_target():
 
 A walrus also makes its target local before the first iteration. Its first assignment must not read
 a global with the same name. Explicit `global` and `nonlocal` declarations still refer to the
-existing outer variable:
+existing outer variable.
 
 ```py
 total = 0
@@ -280,7 +280,7 @@ def sums_nonlocal(values: list[int]) -> list[int]:
 ### Nested comprehensions
 
 An assignment in an inner comprehension still binds outside the outermost comprehension. A later
-assignment in the outer comprehension replaces the inner value:
+assignment in the outer comprehension replaces the inner value.
 
 ```py
 [([nested_order := 1 for _ in [0]], (nested_order := "")) for _ in [0]]
@@ -288,7 +288,7 @@ reveal_type(nested_order)  # revealed: str
 ```
 
 These are controls for an inner comprehension that is never evaluated. It must not replace an
-earlier value:
+earlier value.
 
 ```py
 def unreachable_nested_assignment_with_previous_value():
@@ -297,7 +297,7 @@ def unreachable_nested_assignment_with_previous_value():
     reveal_type(value)  # revealed: Literal["old"]
 ```
 
-Nor should it create a new value:
+Nor should it create a new value.
 
 ```py
 def unreachable_nested_assignment_without_previous_value():
@@ -322,7 +322,7 @@ class Table:
 
 ## Comprehension with unbound iterable
 
-Iterating over an unbound iterable yields `Unknown`:
+Iterating over an unbound iterable yields `Unknown`.
 
 ```py
 # error: [unresolved-reference] "Name `x` used when not defined"
@@ -398,7 +398,7 @@ async def _():
 
 ### Invalid async comprehension filters
 
-Filters in asynchronous comprehensions also require valid boolean conversion:
+Filters in asynchronous comprehensions also require valid boolean conversion.
 
 ```py
 from collections.abc import AsyncIterator
@@ -419,7 +419,7 @@ async def invalid_filters() -> None:
 ## Comprehension value type
 
 The type of the expression being iterated over is immutable, and so should not be widened with
-`Unknown` or through literal promotion:
+`Unknown` or through literal promotion.
 
 ```py
 x = [
@@ -430,7 +430,7 @@ x = [
 
 ## Comprehension expression types
 
-The type of the comprehension expression itself should reflect the inferred element type:
+The type of the comprehension expression itself should reflect the inferred element type.
 
 ```py
 from typing import TypedDict, Literal
@@ -458,7 +458,7 @@ reveal_type(squares)  # revealed: list[int | None]
 python-version = "3.15"
 ```
 
-Unpacking comprehensions flatten the unpacked element type:
+Unpacking comprehensions flatten the unpacked element type.
 
 ```py
 list_of_lists: list[list[int]] = [[1], [2, 3]]
@@ -477,7 +477,7 @@ reveal_type({**d for d in dicts})  # revealed: dict[str, int]
 
 ## Inference for comprehensions takes context
 
-Inference for comprehensions takes the type context into account:
+Inference for comprehensions takes the type context into account.
 
 ```py
 from typing import Literal, Sequence, TypedDict
@@ -502,7 +502,7 @@ x4: set[int] = {x for x in [1, 2, 3]}
 reveal_type(x4)  # revealed: set[int]
 ```
 
-This also works for nested comprehensions:
+This also works for nested comprehensions.
 
 ```py
 table = [[(x, y) for x in range(3)] for y in range(3)]
@@ -512,7 +512,7 @@ table_with_content: list[list[tuple[int, int, str | None]]] = [[(x, y, None) for
 reveal_type(table_with_content)  # revealed: list[list[tuple[int, int, str | None]]]
 ```
 
-The type context is propagated down into the comprehension:
+The type context is propagated down into the comprehension.
 
 ```py
 y1: list[list[int]] = [[n] for n in [1, 2, 3]]
@@ -533,7 +533,7 @@ reveal_type(y3)  # revealed: list[Person]
 y4: list[Person] = [{"misspelled": n} for n in ["Alice", "Bob"]]
 ```
 
-We promote literals to avoid overly-precise types in invariant positions:
+We promote literals to avoid overly-precise types in invariant positions.
 
 ```py
 reveal_type([x for x in ("a", "b", "c")])  # revealed: list[str]
@@ -541,7 +541,7 @@ reveal_type({x for x in (1, 2, 3)})  # revealed: set[int]
 reveal_type({k: 0 for k in ("a", "b", "c")})  # revealed: dict[str, int]
 ```
 
-Type context can prevent this promotion from happening:
+Type context can prevent this promotion from happening.
 
 ```py
 list_of_literals: list[Literal["a", "b", "c"]] = [x for x in ("a", "b", "c")]

@@ -2,7 +2,7 @@
 
 ## Cannot subclass a class decorated with `@final`
 
-Don't do this:
+Don't do this.
 
 ```py
 import typing_extensions
@@ -950,7 +950,7 @@ class HasAbstract10Sub(HasAbstract10): ...  # error: [abstract-method-in-final-c
 
 Methods in stub files are generally allowed to have stub bodies, so methods on `Protocol` classes in
 stub files are only inferred as being abstract if they are explicitly decorated with
-`@abstractmethod`:
+`@abstractmethod`.
 
 `stub.pyi`:
 
@@ -984,7 +984,7 @@ class Fine(NotAbstract): ...
 We allow `@final` `Protocol` classes to have unimplemented abstract methods. Unlike non-`Protocol`
 classes, it is possible to subtype a `Protocol` class without explicitly subclassing it, so an
 `@final` `Protocol` class with unimplemented abstract methods is not inherently broken in the same
-way as an `@final` non-`Protocol` class:
+way as an `@final` non-`Protocol` class.
 
 ```py
 from typing import final, Protocol
@@ -1196,7 +1196,7 @@ class Bad(Base):  # error: [abstract-method-in-final-class]
     pass
 ```
 
-A property with an abstract setter (but concrete getter) is also abstract:
+A property with an abstract setter (but concrete getter) is also abstract.
 
 ```py
 from abc import ABC, abstractmethod
@@ -1222,7 +1222,7 @@ class Bad(Base):  # error: [abstract-method-in-final-class]
     pass
 ```
 
-Similarly, a property with an abstract deleter (but concrete getter and setter) is also abstract:
+Similarly, a property with an abstract deleter (but concrete getter and setter) is also abstract.
 
 ```py
 from abc import ABC, abstractmethod
@@ -1317,7 +1317,7 @@ help: Either assign a value or add `ClassVar` to this declaration
    |     ------ Instance-attribute declaration
 ```
 
-The same applies to abstract properties:
+The same applies to abstract properties.
 
 ```py
 from abc import ABC, abstractmethod
@@ -1355,7 +1355,7 @@ help: Either assign a value or add `ClassVar` to this declaration
 ```
 
 But we make an exception here for `ClassVar` annotations: we assume in this case that the user will
-dynamically patch the attribute onto the class (e.g., using a metaclass):
+dynamically patch the attribute onto the class (e.g., using a metaclass).
 
 ```py
 from typing import ClassVar
@@ -1451,7 +1451,7 @@ class Bad(Base):
 <!-- snapshot-diagnostics -->
 
 If the class has many unimplemented abstract methods, we do not list them all unless the user has
-specified `--verbose`:
+specified `--verbose`.
 
 ```toml
 verbose = false
@@ -1491,7 +1491,7 @@ class Abstract(ABC):
 <!-- snapshot-diagnostics -->
 
 If the class has many unimplemented abstract methods, we still list them all if the user has
-specified `--verbose`:
+specified `--verbose`.
 
 ```toml
 verbose = true

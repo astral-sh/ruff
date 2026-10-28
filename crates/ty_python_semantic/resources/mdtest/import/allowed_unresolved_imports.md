@@ -19,7 +19,7 @@ reveal_type(bar)  # revealed: Unknown
 ```
 
 A literal pattern only matches the exact module name. ty continues to emit a diagnostic for
-unresolved submodule imports:
+unresolved submodule imports.
 
 ```py
 from foo.sub import bar  # error: [unresolved-import]
@@ -48,7 +48,7 @@ import foo.baz
 ```
 
 But it doesn't match a module that only contains a component named `foo`, if that module's *first*
-component is not `foo`:
+component is not `foo`.
 
 ```py
 from bar import foo  # error: [unresolved-import]
@@ -72,7 +72,7 @@ import bar.foo
 ```
 
 But it doesn't match a module that only contains a component named `foo`, if that module's *last*
-component is not `foo`:
+component is not `foo`.
 
 `main.py`:
 
@@ -120,7 +120,7 @@ import test.ing.foo  # error: [unresolved-import]
 
 ### First component ends with `*`
 
-This pattern matches "any module where the first component starts with `aws`":
+This pattern matches "any module where the first component starts with `aws`".
 
 ```toml
 [analysis]
@@ -150,7 +150,7 @@ reveal_type(caws)  # revealed: Unknown
 
 ### First component has multiple `*`s
 
-This pattern matches "any module where the first component contains the string `aws`":
+This pattern matches "any module where the first component contains the string `aws`".
 
 ```toml
 [analysis]
@@ -189,7 +189,7 @@ negated, ty's usual `unresolved-import` diagnostics will be emitted for the impo
 
 ### Negative pattern after positive pattern
 
-This pattern excludes all modules where the first component is `test`, *except* `test.foo`:
+This pattern excludes all modules where the first component is `test`, *except* `test.foo`.
 
 ```toml
 [analysis]
@@ -209,7 +209,7 @@ modules specifically.
 ### Positive pattern after negative pattern
 
 This configuration indicates that only the `test.foo` import should be allowed to be unresolved
-without ty emitting a diagnostic:
+without ty emitting a diagnostic.
 
 ```toml
 [analysis]
@@ -225,7 +225,7 @@ from test.foo import bar
 
 When importing a member from a module that exists but doesn't have that member, ty would normally
 emit "Module `X` has no member `Y`". Setting `allow-unresolved-imports` can suppress this diagnostic
-also:
+also.
 
 ```toml
 [analysis]

@@ -178,7 +178,7 @@ reveal_type("a" in ["a"] < LargerThanList())  # revealed: Literal[True]
 
 ## Implements `__contains__`
 
-Classes can support membership tests by implementing the `__contains__` method:
+Classes can support membership tests by implementing the `__contains__` method.
 
 ```py
 class A:
@@ -196,7 +196,7 @@ reveal_type(42 not in A())  # revealed: bool
 ## Implements `__iter__`
 
 Classes that don't implement `__contains__`, but do implement `__iter__`, also support containment
-checks; the needle will be sought in their iterated items:
+checks; the needle will be sought in their iterated items.
 
 ```py
 class StringIterator:
@@ -234,7 +234,7 @@ reveal_type(42 not in A())  # revealed: bool
 ## `__contains__` implemented via descriptor
 
 If `__contains__` is implemented as a descriptor (e.g., a class with `__get__` that returns a
-callable), the descriptor protocol should be properly invoked:
+callable), the descriptor protocol should be properly invoked.
 
 ```py
 class Target:
@@ -255,7 +255,7 @@ reveal_type("hello" not in Container())  # revealed: bool
 ## Wrong Return Type
 
 Python coerces the results of containment checks to `bool`, even if `__contains__` returns a
-non-bool:
+non-bool.
 
 ```py
 class A:
@@ -396,7 +396,7 @@ def functional_membership(closed: Closed) -> None:
 ## No Fallback for `__contains__`
 
 If `__contains__` is implemented, checking membership of a type it doesn't accept is an error; it
-doesn't result in a fallback to `__iter__` or `__getitem__`:
+doesn't result in a fallback to `__iter__` or `__getitem__`.
 
 ```py
 class CheckContains: ...

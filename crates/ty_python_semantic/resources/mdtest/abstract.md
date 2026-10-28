@@ -3,7 +3,7 @@
 ## Instantiation is forbidden
 
 Classes with unimplemented abstract methods cannot be instantiated. Type checkers are expected to
-detect possible attempts to instantiate abstract classes:
+detect possible attempts to instantiate abstract classes.
 
 ```py
 import abc
@@ -86,7 +86,7 @@ info: `AbstractBase3.bar` is implicitly abstract because `AbstractBase3` is a `P
 help: Change the body of `bar` to `return` or `return None` if it was not intended to be abstract
 ```
 
-Abstract methods can be concretely overridden by synthesized methods:
+Abstract methods can be concretely overridden by synthesized methods.
 
 ```py
 from abc import ABC, abstractmethod
@@ -116,7 +116,7 @@ AlsoConcreteOrdered()
 
 We also allow abstract methods or properties to be "overridden" by a `ClassVar` annotation, even if
 it is not accompanied by a binding in the class body: we assume that a class like this will have the
-override added dynamically (e.g., by a metaclass):
+override added dynamically (e.g., by a metaclass).
 
 ```py
 from typing import ClassVar, Callable
@@ -135,7 +135,7 @@ class ConcreteDynamic(AbstractDynamic):
 ConcreteDynamic()  # no diagnostic
 ```
 
-But if the annotation does not use `ClassVar`, we do not see that as overriding the abstract method:
+But if the annotation does not use `ClassVar`, we do not see that as overriding the abstract method.
 
 ```py
 class StillAbstractDynamic(AbstractDynamic):
@@ -166,7 +166,7 @@ help: Either assign a value or add `ClassVar` to this declaration
 ```
 
 Abstract methods can be overridden by mixin classes, but the concrete override on the mixin must
-come earlier in the MRO:
+come earlier in the MRO.
 
 ```py
 class AbstractMixin(ABC):

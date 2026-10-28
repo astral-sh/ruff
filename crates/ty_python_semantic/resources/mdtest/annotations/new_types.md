@@ -2,7 +2,7 @@
 
 ## Basic usage
 
-`NewType` can be used to create distinct types that are based on existing types:
+`NewType` can be used to create distinct types that are based on existing types.
 
 ```py
 from typing_extensions import NewType
@@ -107,7 +107,7 @@ reveal_type(baz.foo_member)  # revealed: str
 reveal_type(baz.foo_method())  # revealed: int
 ```
 
-We also infer member access on the `NewType` pseudo-type itself correctly:
+We also infer member access on the `NewType` pseudo-type itself correctly.
 
 ```py
 reveal_type(Bar.__supertype__)  # revealed: type | NewType
@@ -184,7 +184,7 @@ def _(name: str) -> None:
     _ = NewType(name, int)  # error: [invalid-newtype] "The first argument to `NewType` must be a string literal"
 ```
 
-However, the literal doesn't necessarily need to be inline, as long as we infer it:
+However, the literal doesn't necessarily need to be inline, as long as we infer it.
 
 ```py
 name = "Foo"
@@ -242,7 +242,7 @@ Foo = NewType("Foo", int | str)
 We don't emit the "invalid base" diagnostic for `Unknown`, because that typically results from other
 errors that already have a diagnostic, and there's no need to pile on. For example, this mistake
 gives you an "Int literals are not allowed" error, and we'd rather not see an "invalid base" error
-on top of that:
+on top of that.
 
 ```py
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
@@ -251,7 +251,7 @@ Foo = NewType("Foo", 42)
 
 ## `NewType`s in arithmetic and comparison expressions might or might not act as their base
 
-These expressions are valid because `Foo` acts as its base type, `int`:
+These expressions are valid because `Foo` acts as its base type, `int`.
 
 ```py
 from typing import NewType
@@ -267,7 +267,7 @@ reveal_type(Foo(42) == Foo(42))  # revealed: bool
 ```
 
 However, we can't always substitute `int` for `Foo` to evaluate expressions like these. In the
-following cases, only `Foo` itself is valid:
+following cases, only `Foo` itself is valid.
 
 ```py
 class Bar:
@@ -345,7 +345,7 @@ static_assert(is_assignable_to(Bar, int | float | complex | None))
 static_assert(is_assignable_to(Bar, Bar | None))
 ```
 
-`NewType`s can be arbitrarily deeply nested. Check the same properties on a doubly nested example:
+`NewType`s can be arbitrarily deeply nested. Check the same properties on a doubly nested example.
 
 ```py
 FooFoo = NewType("FooFoo", Foo)
@@ -361,7 +361,7 @@ static_assert(is_assignable_to(FooFoo, Foo | None))
 
 We don't currently try to distinguish between an implicit union (e.g. `float`) and the equivalent
 explicit union (e.g. `int | float`), so these two explicit unions are also allowed. But again, most
-unions are not allowed:
+unions are not allowed.
 
 ```py
 Baz = NewType("Baz", int | float)
@@ -370,7 +370,7 @@ Baz = NewType("Baz", int | str)  # error: [invalid-newtype] "invalid base for `t
 ```
 
 Similarly, a `NewType` of `float` or `complex` is valid as a `Callable` of the corresponding union
-type:
+type.
 
 ```py
 from collections.abc import Callable
@@ -388,7 +388,7 @@ The arithmetic and comparison test cases in the previous section used a `NewType
 `NewType`s of `float` and `complex` are more complicated, because their base type is a union, and
 that union needs special handling in binary expressions. In these examples, we we need to lower
 `Foo` to `int | float` and then check each member of that union _individually_, as we would with an
-explicit `Union` on the left side:
+explicit `Union` on the left side.
 
 ```py
 reveal_type(Foo(3.14) < Foo(42))  # revealed: bool
@@ -402,7 +402,7 @@ reveal_type(FooFoo(Foo(3.14)) / FooFoo(Foo(42)))  # revealed: float
 ```
 
 But again as above, we can't _always_ lower `Foo` to `int | float`, because there are also binary
-expressions where only `Foo` itself is valid:
+expressions where only `Foo` itself is valid.
 
 ```py
 class Bing:
@@ -448,7 +448,7 @@ reveal_type(MyFloat(1.0) * unknown)  # revealed: Unknown
 reveal_type(unknown * MyFloat(1.0))  # revealed: Unknown
 ```
 
-Unary operations take a different codepath and need their own test cases:
+Unary operations take a different codepath and need their own test cases.
 
 ```py
 reveal_type(-Foo(3.14))  # revealed: float
@@ -481,7 +481,7 @@ reveal_type(not UnaryNT(Unary()))  # revealed: bool
 ```
 
 Make sure we handle the case where a `NewType` of `float` or `complex` participates in a larger
-union:
+union.
 
 ```py
 def _(x: Foo | float, y: Bar | complex):
@@ -497,7 +497,7 @@ def _(x: Foo | float, y: Bar | complex):
 ```
 
 Intersections with `NewType`s solve to `Never` if the intersection with the `NewType`'s concrete
-base type would also solve to `Never`:
+base type would also solve to `Never`.
 
 ```py
 TFloat = NewType("TFloat", float)
@@ -614,7 +614,7 @@ def f(x: N):
     reveal_type(isinstance(x, int))  # revealed: Literal[True]
 ```
 
-However, a `NewType` isn't a real class, so it isn't a valid second argument to `isinstance`:
+However, a `NewType` isn't a real class, so it isn't a valid second argument to `isinstance`.
 
 ```py
 def f(x: N):
@@ -622,7 +622,7 @@ def f(x: N):
     reveal_type(isinstance(x, N))  # revealed: bool
 ```
 
-Because of that, we don't generate any narrowing constraints for it:
+Because of that, we don't generate any narrowing constraints for it.
 
 ```py
 def f(x: N | str):
@@ -745,7 +745,7 @@ F = NewType("F", D)
 ## Forward references in stub files
 
 Stubs natively support forward references, so patterns that would raise `NameError` at runtime are
-allowed in stub files:
+allowed in stub files.
 
 `stub.pyi`:
 
@@ -791,7 +791,7 @@ reveal_type(x.copy())  # revealed: NT
 ## TypeVar solving for `NewType`s in combination with generic `Protocol`s
 
 In an early version of <https://github.com/astral-sh/ruff/pull/24109>, we revealed `F[Baz]` on the
-final line here, rather than `F[N]`:
+final line here, rather than `F[N]`.
 
 ```toml
 [environment]

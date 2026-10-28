@@ -204,7 +204,7 @@ class Foo3[**P]:
     ) -> None: ...
 ```
 
-Error messages for `invalid-paramspec` also use the actual parameter names:
+Error messages for `invalid-paramspec` also use the actual parameter names.
 
 ```py
 def bar[**P](c: Callable[P, int]) -> None:
@@ -221,7 +221,7 @@ def bar[**P](c: Callable[P, int]) -> None:
     def f4(*a: P.args, x: int, **kw: P.kwargs) -> None: ...
 ```
 
-It isn't allowed to annotate an instance attribute either:
+It isn't allowed to annotate an instance attribute either.
 
 ```py
 class Foo4[**P]:
@@ -1048,7 +1048,7 @@ f2(1)
 f2("a", "b")
 ```
 
-The `converter` function act as a decorator here:
+The `converter` function act as a decorator here.
 
 ```py
 @converter
@@ -1091,7 +1091,7 @@ wrapped()  # error: [missing-argument]
 ### Prefer the declared parameter list
 
 We prefer the declared parameter list of a `ParamSpec` when it is compatible with the callback's
-inferred parameter list:
+inferred parameter list.
 
 ```py
 from typing import Callable
@@ -1109,7 +1109,7 @@ reveal_type(x2)  # revealed: Callback[(int, /)]
 ```
 
 If the parameter lists are incompatible, we ignore the declared type in the invalid assignment
-diagnostic:
+diagnostic.
 
 ```py
 def no_args() -> None: ...
@@ -1119,7 +1119,7 @@ x3: Callback[[int]] = Callback(no_args)
 reveal_type(x3)  # revealed: Callback[(int, /)]
 ```
 
-When no argument constrains the `ParamSpec`, the declared type supplies its parameter list:
+When no argument constrains the `ParamSpec`, the declared type supplies its parameter list.
 
 ```py
 def make[**P]() -> Callback[P]:
@@ -1134,7 +1134,7 @@ reveal_type(x4)  # revealed: Callback[(int, str, /)]
 ### Preserve callback parameters in nested calls
 
 The outer call checks forwarded arguments against the inferred parameter list of the wrapped
-callback:
+callback.
 
 ```py
 from typing import Callable
@@ -1151,7 +1151,7 @@ accept(wrap(no_args))  # ok
 accept(wrap(no_args), 1)  # error: [too-many-positional-arguments]
 ```
 
-Keyword-only parameters are also preserved:
+Keyword-only parameters are also preserved.
 
 ```py
 def keyword_only(*, value: int) -> None: ...
@@ -1340,7 +1340,7 @@ reveal_type(c.f)  # revealed: (x: int, y: str) -> int
 ### Generic constructors with bounded return types
 
 A class object can be passed as a callable that constructs instances. `Factory` takes no constructor
-arguments, but its instances have a generic, writable `value` attribute:
+arguments, but its instances have a generic, writable `value` attribute.
 
 ```py
 class Factory[T]:
@@ -1349,7 +1349,7 @@ class Factory[T]:
 
 The `construct` helper captures a callable's parameters in `P`, forwards its arguments, and returns
 the resulting instance. The bound on `R` requires that instance to be assignable to
-`Factory[object]`:
+`Factory[object]`.
 
 ```py
 from typing import Callable
@@ -1596,7 +1596,7 @@ to_thread_like(
 )
 ```
 
-This also applies when the parameter type is a bare type variable:
+This also applies when the parameter type is a bare type variable.
 
 ```py
 from ty_extensions._internal import Unknown
@@ -1618,7 +1618,7 @@ def _(payload: Payload, unknown: Unknown):
 ```
 
 We use a type-variable default as type context when the forwarded arguments do not otherwise
-constrain it:
+constrain it.
 
 ```py
 def default[T = Callable[[int], int]](callback: T) -> None: ...
@@ -1645,7 +1645,7 @@ forward(target, "a", ["a"])
 ### Forwarded arguments with type-variable constraints
 
 A constrained generic callback can receive an argument matching any of its constraints. Capturing
-its parameters in a `ParamSpec` does not restrict the callback to its first constraint:
+its parameters in a `ParamSpec` does not restrict the callback to its first constraint.
 
 ```py
 from collections.abc import Callable
@@ -1673,7 +1673,7 @@ forward(target, "name", lambda value: reveal_type(value))  # revealed: int
 forward(target, name="name", callback=lambda value: reveal_type(value))  # revealed: int
 ```
 
-Gradual parameter types are also preserved alongside concrete parameter types:
+Gradual parameter types are also preserved alongside concrete parameter types.
 
 ```py
 def gradual(name: str, callback: Callable[[Any, int], Any]): ...
@@ -1681,7 +1681,7 @@ def gradual(name: str, callback: Callable[[Any, int], Any]): ...
 forward(gradual, "name", lambda value, count: reveal_type((value, count)))  # revealed: tuple[Any, int]
 ```
 
-A gradual parameter list gives each callback parameter the type `Any`:
+A gradual parameter list gives each callback parameter the type `Any`.
 
 ```py
 def gradual_list(name: str, callback: Callable[..., Any]): ...
@@ -1690,7 +1690,7 @@ gradual_list("name", lambda first, second: reveal_type((first, second)))  # reve
 forward(gradual_list, "name", lambda first, second: reveal_type((first, second)))  # revealed: tuple[Any, Any]
 ```
 
-Concrete parameter types also provide context when a callback's return type is unknown:
+Concrete parameter types also provide context when a callback's return type is unknown.
 
 ```py
 from ty_extensions._internal import Unknown
@@ -1714,7 +1714,7 @@ def target[T](name: str, callback: Callable[[int], T]): ...
 forward(target, "name", lambda value: reveal_type(value))  # revealed: int
 ```
 
-An unsolved callback parameter remains unknown when the other arguments do not constrain it:
+An unsolved callback parameter remains unknown when the other arguments do not constrain it.
 
 ```py
 def unsolved[T](name: str, callback: Callable[[T], Any]): ...
@@ -1760,7 +1760,7 @@ def baz[**P](fn: Callable[P, None], foo: Foo[P]) -> None:
     fn(*foo.args, **foo.kwargs)
 ```
 
-The `Unknown` can be eliminated by using annotating these attributes with `Final`:
+The `Unknown` can be eliminated by using annotating these attributes with `Final`.
 
 ```py
 from typing import Final
@@ -1806,7 +1806,7 @@ def _(callback: Callback[[object, int]] | Callback[[str, object]]) -> None:
     f.call("value", "value")  # error: [invalid-argument-type]
 ```
 
-This also applies when returning a `Callable` type:
+This also applies when returning a `Callable` type.
 
 ```py
 from typing import Callable
@@ -1826,7 +1826,7 @@ def _(callback: Callback[[object, int]] | Callback[[str, object]]) -> None:
     f("value", "value")  # error: [invalid-argument-type]
 ```
 
-The parameter lists should remain correlated when `P` appears in nested return types:
+The parameter lists should remain correlated when `P` appears in nested return types.
 
 ```py
 type Inner[**P, R] = Callable[P, R]
@@ -2806,7 +2806,7 @@ reveal_type(c.generic_method([1, 2, 3]))  # revealed: list[int]
 ### Callables inferred against gradual return types
 
 A decorator accepting `Callable[P, Any]` preserves any type variables scoped to the callable,
-instead of eagerly specializing them to `Any`:
+instead of eagerly specializing them to `Any`.
 
 ```py
 from collections.abc import Callable
@@ -2827,7 +2827,7 @@ reveal_type(identity)  # revealed: Wrapper[(value: T@identity)]
 reveal_type(identity(1))  # revealed: Any
 ```
 
-This also applies to type variables from an enclosing scope:
+This also applies to type variables from an enclosing scope.
 
 ```py
 def _[T](callback: Callable[[T], T], value: T) -> None:
@@ -2836,7 +2836,7 @@ def _[T](callback: Callable[[T], T], value: T) -> None:
     reveal_type(f(value))  # revealed: Any
 ```
 
-The same applies when the return type is an alias for `Any`:
+The same applies when the return type is an alias for `Any`.
 
 ```py
 type Anything = Any
@@ -2848,7 +2848,7 @@ def _[T](callback: Callable[[T], T]) -> None:
     reveal_type(decorate_alias(callback))  # revealed: Wrapper[(T@_, /)]
 ```
 
-Type variables shared by multiple overloads are preserved as well:
+Type variables shared by multiple overloads are preserved as well.
 
 ```py
 def _[T](value: T) -> None:
@@ -2864,7 +2864,7 @@ def _[T](value: T) -> None:
 ```
 
 A local return type variable is inferred from the argument, even when it appears in a nested
-callable with a `ParamSpec`:
+callable with a `ParamSpec`.
 
 ```py
 def make[**P, R](consume: Callable[[Callable[P, R]], None]) -> Callable[P, R]:
@@ -2874,7 +2874,7 @@ def _[**P](consume: Callable[[Callable[P, Any]], None]) -> None:
     reveal_type(make(consume))  # revealed: (**P@_) -> Any
 ```
 
-The inferred return type also takes precedence over a type parameter default:
+The inferred return type also takes precedence over a type parameter default.
 
 ```py
 def make_with_default[**P, R = bytes](consume: Callable[[Callable[P, R]], None]) -> Callable[P, R]:
@@ -2922,7 +2922,7 @@ create(MyType, x=1)
 create(MyType, "wrong type")
 ```
 
-A class with no required constructor parameters should work without additional arguments:
+A class with no required constructor parameters should work without additional arguments.
 
 ```py
 class NoArgs(ParentClass):
@@ -3007,7 +3007,7 @@ create(PositionalOnly, x=1)
 ```
 
 The protocol requires the return type to be `ParentClass`, so passing a class that doesn't inherit
-from `ParentClass` should produce an error:
+from `ParentClass` should produce an error.
 
 ```py
 class Unrelated:
@@ -3019,7 +3019,7 @@ create(Unrelated, 1)
 ```
 
 When the protocol has parameters before the `ParamSpec` (i.e., `Concatenate`-style signatures), the
-callable should still match correctly and `P` should be inferred as empty:
+callable should still match correctly and `P` should be inferred as empty.
 
 ```py
 def my_factory(arg: str) -> int:

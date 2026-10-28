@@ -92,7 +92,7 @@ def _():
     x = 2
 ```
 
-But that does lead to incorrect results when the generator expression isn't run immediately:
+But that does lead to incorrect results when the generator expression isn't run immediately.
 
 ```py
 def evaluated_later():
@@ -109,7 +109,7 @@ def evaluated_later():
 ```
 
 Though note that “the iterable expression in the leftmost `for` clause is immediately evaluated”
-\[[spec][generators]\]:
+\[[spec][generators]\].
 
 ```py
 def iterable_evaluated_eagerly():

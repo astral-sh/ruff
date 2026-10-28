@@ -20,7 +20,7 @@ def f(a: MyEnum, b: MyTypedDict): ...
 ## No false positives for subscripting a class generic over a `TypeVarTuple`
 
 We don't support `TypeVarTuple` yet, but we also try to avoid emitting false positives when you
-subscript classes generic over a `TypeVarTuple`:
+subscript classes generic over a `TypeVarTuple`.
 
 ```toml
 [environment]
@@ -45,7 +45,7 @@ class Baz[*Ts]: ...
 z: Baz[int, str, bytes]
 ```
 
-And we also provide some basic validation in some cases:
+And we also provide some basic validation in some cases.
 
 ```py
 # error: [invalid-generic-class] "`TypeVarTuple` must be unpacked with `*` or `Unpack[]` when used as an argument to `Generic`"

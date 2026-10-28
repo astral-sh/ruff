@@ -3,7 +3,7 @@
 ## Explicit selection of `all` platforms
 
 When `python-platform="all"` is specified, we fall back to the type of `sys.platform` declared in
-typeshed:
+typeshed.
 
 ```toml
 [environment]
@@ -48,7 +48,7 @@ reveal_type(sys.platform == "linux")  # revealed: Literal[False]
 ### Substring comparison
 
 It is [recommended](https://docs.python.org/3/library/sys.html#sys.platform) to use
-`sys.platform.startswith(...)` for platform checks:
+`sys.platform.startswith(...)` for platform checks.
 
 ```py
 import sys

@@ -69,7 +69,7 @@ c.a = 2  # error: [invalid-attribute-access]
 ## Conflicting type qualifiers
 
 We currently ignore conflicting qualifiers and simply union them, which is more conservative than
-intersecting them. This means that we consider `a` to be a `ClassVar` here:
+intersecting them. This means that we consider `a` to be a `ClassVar` here.
 
 ```py
 from typing import ClassVar
@@ -120,7 +120,7 @@ reveal_type(C.x)  # revealed: Unknown
 ```
 
 This also applies when the trailing comma is inside the brackets (see
-[ty#1768](https://github.com/astral-sh/ty/issues/1768)):
+[ty#1768](https://github.com/astral-sh/ty/issues/1768)).
 
 ```py
 from typing import ClassVar
@@ -269,7 +269,7 @@ reveal_type(Box[int].count)  # revealed: int
 
 An attribute on a class body that is annotated as `Final` is implicitly treated as a class variable.
 The error message is different, but these attributes cannot be written to from instances of the
-class:
+class.
 
 ```py
 from typing import Final
@@ -283,7 +283,7 @@ c = C()
 c.a = 2  # error: [invalid-assignment] "Cannot assign to final attribute `a` on type `C`"
 ```
 
-In this sense, it is redundant to combine `ClassVar` and `Final`. We issue a warning in these cases:
+In this sense, it is redundant to combine `ClassVar` and `Final`. We issue a warning in these cases.
 
 ```py
 from typing import Annotated, ClassVar
@@ -327,7 +327,7 @@ d.f = 2  # error: [invalid-attribute-access] "Cannot assign to ClassVar `f` from
 
 In dataclasses, `ClassVar[Final[int]]` has a distinct meaning from `Final[int]`. The former is a
 final class variable, the latter is a final instance attribute. The warning is therefore not emitted
-when combining `ClassVar[Final[...]]` in dataclasses:
+when combining `ClassVar[Final[...]]` in dataclasses.
 
 ```py
 from dataclasses import dataclass
@@ -341,7 +341,7 @@ class D:
     instance_attr: Final[int] = 1
 ```
 
-Note that `class_attr` does not appear in the signature of `__init__`:
+Note that `class_attr` does not appear in the signature of `__init__`.
 
 ```py
 # revealed: (self: D, instance_attr: int = 1) -> None
@@ -358,7 +358,7 @@ def _(d: D):
 
 The reverse direction `Final[ClassVar[...]]` is not recognized by the runtime implementation of
 dataclasses. We could consider emitting a warning in these cases, but for now, we treat is just like
-`ClassVar[Final[...]]` and allow it in dataclasses:
+`ClassVar[Final[...]]` and allow it in dataclasses.
 
 ```py
 from dataclasses import dataclass

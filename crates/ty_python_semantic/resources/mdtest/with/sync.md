@@ -21,7 +21,7 @@ with Manager() as f:
 ## Exception-suppressing context managers
 
 When a context manager suppresses an exception during an assignment, the previous binding remains
-visible after the `with` statement:
+visible after the `with` statement.
 
 ```py
 from contextlib import suppress
@@ -36,7 +36,7 @@ with suppress(ValueError):
 reveal_type(result)  # revealed: None | str
 ```
 
-A new name may remain undefined when an exception interrupts its assignment:
+A new name may remain undefined when an exception interrupts its assignment.
 
 ```py
 with suppress(ValueError):
@@ -46,7 +46,7 @@ with suppress(ValueError):
 reveal_type(value)  # revealed: str
 ```
 
-A deleted binding is not restored if a later exception is suppressed:
+A deleted binding is not restored if a later exception is suppressed.
 
 ```py
 deleted = 1
@@ -57,7 +57,7 @@ with suppress(ValueError):
 deleted  # error: [unresolved-reference]
 ```
 
-An assignment that cannot raise is not affected by exception suppression:
+An assignment that cannot raise is not affected by exception suppression.
 
 ```py
 with suppress(ValueError):
@@ -69,7 +69,7 @@ reveal_type(safe_value)  # revealed: Literal[1]
 ## Assigning a context manager target can raise
 
 Unpacking the result of `__enter__` can raise after the context manager has entered. Suppressing
-that exception preserves an earlier binding, while a new target may remain undefined:
+that exception preserves an earlier binding, while a new target may remain undefined.
 
 ```py
 class EmptyIterableManager:
@@ -91,7 +91,7 @@ reveal_type(missing)  # revealed: int
 ## Earlier context managers can suppress later entry failures
 
 If an earlier context manager suppresses an exception while a later manager enters, the later
-manager's target may never be assigned:
+manager's target may never be assigned.
 
 ```py
 from contextlib import suppress
@@ -112,7 +112,7 @@ reveal_type(target)  # revealed: str
 ## Loop exits inside multiple context managers
 
 A context manager cannot suppress a `break`, but it can suppress an exception while the next manager
-enters. An assignment after the managers is therefore only possibly reached:
+enters. An assignment after the managers is therefore only possibly reached.
 
 ```py
 from contextlib import nullcontext, suppress
@@ -125,7 +125,7 @@ for _ in [1]:
 after_break  # error: [possibly-unresolved-reference]
 ```
 
-It cannot suppress a `continue` either:
+It cannot suppress a `continue` either.
 
 ```py
 for _ in [1]:
@@ -136,7 +136,7 @@ for _ in [1]:
 after_continue  # error: [possibly-unresolved-reference]
 ```
 
-An exception inside one manager can likewise be suppressed before a `break`:
+An exception inside one manager can likewise be suppressed before a `break`.
 
 ```py
 for _ in [1]:
@@ -151,7 +151,7 @@ after_exception  # error: [possibly-unresolved-reference]
 ## Loop exits inside nested context managers
 
 Nested context managers cannot suppress a `break`, but the outer manager can suppress an exception
-while the inner manager enters:
+while the inner manager enters.
 
 ```py
 from contextlib import nullcontext, suppress
@@ -165,7 +165,7 @@ for _ in [1]:
 after_break  # error: [possibly-unresolved-reference]
 ```
 
-They cannot suppress a `continue` either:
+They cannot suppress a `continue` either.
 
 ```py
 for _ in [1]:
@@ -179,7 +179,7 @@ after_continue  # error: [possibly-unresolved-reference]
 
 ## Returning from an exception-suppressing context manager
 
-A context manager cannot suppress a return statement:
+A context manager cannot suppress a return statement.
 
 ```py
 from contextlib import suppress
@@ -190,7 +190,7 @@ def bare_return() -> int:
 ```
 
 It can suppress an exception raised while evaluating the return expression, allowing the function to
-continue without returning a value:
+continue without returning a value.
 
 ```py
 def may_raise() -> int:
@@ -204,7 +204,7 @@ def interrupted_return() -> int:
 
 ## Exception handlers inside a suppressing context manager
 
-A bare `except:` catches an exception before it can reach the surrounding context manager:
+A bare `except:` catches an exception before it can reach the surrounding context manager.
 
 ```py
 from contextlib import suppress
@@ -220,7 +220,7 @@ def caught_before_suppression() -> int:
 ## A terminal `finally` prevents exception suppression
 
 A `return` in a `finally` block replaces the exception before it can reach an enclosing context
-manager:
+manager.
 
 ```py
 from contextlib import suppress
@@ -236,7 +236,7 @@ def always_returns() -> int:
 ## Cleanup runs before an enclosing context manager suppresses an exception
 
 Assignments in a `finally` block are visible after an enclosing context manager suppresses the
-exception:
+exception.
 
 ```py
 from contextlib import suppress
@@ -254,7 +254,7 @@ def cleanup_before_suppression() -> None:
 ## Eager expressions inside a suppressing context manager
 
 A list comprehension evaluates its body eagerly, so a context manager can suppress an exception
-raised inside it:
+raised inside it.
 
 ```py
 from contextlib import suppress
@@ -269,7 +269,7 @@ def eager_comprehension() -> int:
         return 1
 ```
 
-Generator expressions are also assumed to run eagerly, so their exceptions can be suppressed:
+Generator expressions are also assumed to run eagerly, so their exceptions can be suppressed.
 
 ```py
 # error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `int`"
@@ -281,7 +281,7 @@ def eager_generator() -> int:
 
 ## Context manager exit return types
 
-The typing specification treats an `__exit__` return type of `bool` as potentially suppressing:
+The typing specification treats an `__exit__` return type of `bool` as potentially suppressing.
 
 ```py
 from typing import Any, Literal
@@ -302,7 +302,7 @@ with ReturnsBool():
 reveal_type(bool_result)  # revealed: None | str
 ```
 
-An `__exit__` return type of `Literal[True]` can also suppress exceptions:
+An `__exit__` return type of `Literal[True]` can also suppress exceptions.
 
 ```py
 class ReturnsTrue(Manager):
@@ -315,7 +315,7 @@ with ReturnsTrue():
 reveal_type(true_result)  # revealed: None | str
 ```
 
-An `__exit__` return type of `Literal[False]` cannot suppress exceptions:
+An `__exit__` return type of `Literal[False]` cannot suppress exceptions.
 
 ```py
 class ReturnsFalse(Manager):
@@ -328,7 +328,7 @@ with ReturnsFalse():
 reveal_type(false_result)  # revealed: str
 ```
 
-An `__exit__` return type of `None` cannot suppress exceptions:
+An `__exit__` return type of `None` cannot suppress exceptions.
 
 ```py
 class ReturnsNone(Manager):
@@ -342,7 +342,7 @@ reveal_type(none_result)  # revealed: str
 
 [The typing specification](https://typing.python.org/en/latest/spec/exceptions.html#context-managers)
 classifies `bool | None` as non-suppressing for compatibility with common non-suppressing context
-managers, even though a truthy return value can suppress an exception at runtime:
+managers, even though a truthy return value can suppress an exception at runtime.
 
 ```py
 class ReturnsOptionalBool(Manager):
@@ -355,7 +355,7 @@ with ReturnsOptionalBool():
 reveal_type(optional_result)  # revealed: str
 ```
 
-This convention also treats `Literal[True] | None` as non-suppressing:
+This convention also treats `Literal[True] | None` as non-suppressing.
 
 ```py
 class ReturnsOptionalTrue(Manager):
@@ -368,7 +368,7 @@ with ReturnsOptionalTrue():
 reveal_type(optional_true_result)  # revealed: str
 ```
 
-An `__exit__` return type of `Literal[False] | None` cannot suppress exceptions either:
+An `__exit__` return type of `Literal[False] | None` cannot suppress exceptions either.
 
 ```py
 class ReturnsOptionalFalse(Manager):
@@ -381,7 +381,7 @@ with ReturnsOptionalFalse():
 reveal_type(optional_false_result)  # revealed: str
 ```
 
-An `__exit__` return type of `Any` does not indicate exception suppression either:
+An `__exit__` return type of `Any` does not indicate exception suppression either.
 
 ```py
 class ReturnsAny(Manager):
@@ -397,7 +397,7 @@ reveal_type(any_result)  # revealed: str
 ## Context managers with union and aliased union types
 
 A context manager with a union type may suppress an exception if any member can suppress it, even
-when another member cannot:
+when another member cannot.
 
 ```toml
 [environment]
@@ -426,7 +426,7 @@ def possibly_suppressing(manager: Suppresses | Propagates) -> None:
     reveal_type(result)  # revealed: None | str
 ```
 
-A PEP 695 alias does not prevent a suppressing union member from preserving an earlier binding:
+A PEP 695 alias does not prevent a suppressing union member from preserving an earlier binding.
 
 ```py
 type Managers = Suppresses | Propagates
@@ -438,7 +438,7 @@ def preserved_binding(manager: Managers) -> None:
     reveal_type(result)  # revealed: None | str
 ```
 
-A suppressed exception can also leave a new binding undefined:
+A suppressed exception can also leave a new binding undefined.
 
 ```py
 def missing_binding(manager: Managers) -> None:
@@ -450,7 +450,7 @@ def missing_binding(manager: Managers) -> None:
 
 ## Non-suppressing context managers preserve narrowing
 
-A non-suppressing manager does not change narrowing after an exception propagates:
+A non-suppressing manager does not change narrowing after an exception propagates.
 
 ```py
 class Manager:
@@ -464,7 +464,7 @@ def propagating_exception(value: int | str) -> None:
     reveal_type(value)  # revealed: str
 ```
 
-Narrowing established after an earlier operation that may raise is preserved too:
+Narrowing established after an earlier operation that may raise is preserved too.
 
 ```py
 def narrowing_after_possible_exception(value: int | str) -> None:
@@ -476,7 +476,7 @@ def narrowing_after_possible_exception(value: int | str) -> None:
 ```
 
 Type guard narrowing on one exception path is preserved when another path introduces a new binding
-inside a non-suppressing context manager:
+inside a non-suppressing context manager.
 
 ```py
 from typing import TypeGuard
@@ -502,7 +502,7 @@ def type_guard_across_exception_handler() -> None:
 ```
 
 Ordinary `isinstance` narrowing follows the same rule: an excluded `None` does not reappear when the
-exception-handler assignment is merged:
+exception-handler assignment is merged.
 
 ```py
 def isinstance_across_exception_handler(source: str | None) -> None:
@@ -521,7 +521,7 @@ def isinstance_across_exception_handler(source: str | None) -> None:
 
 Whether an overloaded exit method can suppress an exception depends on the overload used when an
 exception occurs, not the overload used when its suite exits without an exception. In the latter
-case, Python calls `__exit__(None, None, None)`:
+case, Python calls `__exit__(None, None, None)`.
 
 ```py
 from typing import Literal, overload
@@ -534,7 +534,7 @@ def may_raise() -> str:
     raise ValueError
 ```
 
-A manager that returns `True` only during normal exit cannot suppress exceptions:
+A manager that returns `True` only during normal exit cannot suppress exceptions.
 
 ```py
 class NormalOnly(Manager):
@@ -551,7 +551,7 @@ with NormalOnly():
 reveal_type(normal_value)  # revealed: str
 ```
 
-An exceptional overload cannot suppress an exception if either exception argument is uninhabited:
+An exceptional overload cannot suppress an exception if either exception argument is uninhabited.
 
 ```py
 class ImpossibleExceptionalExit(Manager):
@@ -572,7 +572,7 @@ with ImpossibleExceptionalExit():
 reveal_type(impossible_exception_value)  # revealed: str
 ```
 
-An exceptional overload can suppress its exception even if another exceptional overload cannot:
+An exceptional overload can suppress its exception even if another exceptional overload cannot.
 
 ```py
 class SuppressesValueError(Manager):
@@ -863,7 +863,7 @@ info: Consider using `async with` here
 ## Incorrect signatures
 
 The sub-diagnostic is also provided if the signatures of `__aenter__` and `__aexit__` do not match
-the expected signatures for a context manager:
+the expected signatures for a context manager.
 
 ```py
 class Manager:
@@ -877,7 +877,7 @@ with Manager():
 
 ## Incorrect number of arguments
 
-Similarly, we also show the hint if the functions have the wrong number of arguments:
+Similarly, we also show the hint if the functions have the wrong number of arguments.
 
 ```py
 class Manager:

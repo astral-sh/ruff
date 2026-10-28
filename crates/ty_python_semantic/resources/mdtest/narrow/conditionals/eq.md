@@ -24,7 +24,7 @@ def _(x: None | Literal[1]):
         reveal_type(x)  # revealed: None
 ```
 
-This also works for `==` with reversed operands:
+This also works for `==` with reversed operands.
 
 ```py
 from typing import Literal
@@ -122,7 +122,7 @@ def enum_complement_rhs(x: Color, y: Intersection[Color, Not[Literal[Color.RED]]
 ```
 
 When both operands are restricted to members of the same enum, equality narrows each operand to the
-members allowed by both. If the restrictions do not overlap, the comparison is always false:
+members allowed by both. If the restrictions do not overlap, the comparison is always false.
 
 ```py
 from enum import Enum, IntEnum, StrEnum
@@ -170,7 +170,7 @@ def compare_non_overlapping_literal_unions(
     reveal_type(left == right)  # revealed: Literal[False]
 ```
 
-Adding `None` to either side must not change which enum values can match:
+Adding `None` to either side must not change which enum values can match.
 
 ```py
 def compare_optional_left(left: Choice | None, right: Choice):
@@ -185,7 +185,7 @@ def compare_optional_right(left: Choice, right: Choice | None):
 ```
 
 With ty's default builtin-equality assumptions, neither an integer nor `None` matches a
-string-valued enum member:
+string-valued enum member.
 
 ```py
 def compare_enum_with_integer(left: Choice | int | None, right: Choice):
@@ -196,7 +196,7 @@ def compare_enum_with_integer(left: Choice | int | None, right: Choice):
 ```
 
 Members with the same known value are aliases, even when one value comes from a function call.
-Comparisons between their canonical members are always true:
+Comparisons between their canonical members are always true.
 
 ```py
 def make_value() -> Literal["value"]:
@@ -219,7 +219,7 @@ reveal_type(RuntimeIntAlias.FIRST == RuntimeIntAlias.SECOND)  # revealed: Litera
 ```
 
 An enum with a `str` data type constructs its values before checking for aliases. Here, `str`
-converts `1` to `"1"`, so the two members are aliases:
+converts `1` to `"1"`, so the two members are aliases.
 
 ```py
 class CoercingAlias(str, Enum):
@@ -231,7 +231,7 @@ reveal_type(CoercingAlias.SECOND == "1")  # revealed: Literal[True]
 ```
 
 When alias detection is inconclusive, equality between different declarations is also unknown. The
-two declarations below are aliases at runtime:
+two declarations below are aliases at runtime.
 
 ```py
 class Behavior:
@@ -245,7 +245,7 @@ reveal_type(OpaqueAliases.FIRST == OpaqueAliases.SECOND)  # revealed: bool
 ```
 
 Equality can transfer restrictions on enum members, but other intersection elements must stay on the
-operand where they originated:
+operand where they originated.
 
 ```py
 from enum import StrEnum
@@ -274,7 +274,7 @@ def compare_newtype(left: Response, right: Intersection[Response, Tag]):
 ```
 
 `Flag` and `IntFlag` values can include zero and unnamed combinations, so their named members do not
-cover every possible value:
+cover every possible value.
 
 ```py
 from enum import Flag, IntFlag
@@ -313,7 +313,7 @@ def compare_functional_flags(left: FunctionalPermission, right: FunctionalPermis
 ```
 
 A custom `_missing_` method does not change the enum's static member set, so an enum with one
-declared member remains a singleton:
+declared member remains a singleton.
 
 ```py
 from enum import Enum
@@ -333,7 +333,7 @@ def compare_custom_missing_enums(left: MissingValueEnum, right: MissingValueEnum
 ```
 
 A custom enum metaclass can add members that do not appear in the class body. Two values of a
-one-member class therefore need not be equal:
+one-member class therefore need not be equal.
 
 ```py
 from enum import Enum, EnumMeta
@@ -350,7 +350,7 @@ def compare_transformed_enums(left: TransformedEnum, right: TransformedEnum):
     reveal_type(left == right)  # revealed: bool
 ```
 
-A custom comparison method determines the result even when both operands have the same enum type:
+A custom comparison method determines the result even when both operands have the same enum type.
 
 ```py
 from enum import Enum
@@ -372,7 +372,7 @@ def compare_custom(left: NeverEqual, right: NeverEqual):
     reveal_type(left == right)  # revealed: Literal[False]
 ```
 
-When member values are not known statically, two different members may still compare equal:
+When member values are not known statically, two different members may still compare equal.
 
 ```py
 from enum import StrEnum
@@ -394,7 +394,7 @@ def compare_unknown_values(
 
 Unlike plain `Enum` members, `IntEnum` members inherit integer equality. Members of different
 `IntEnum` classes therefore compare equal when they have the same integer value, so both equality
-and inequality narrowing must account for matching members from every class in the union:
+and inequality narrowing must account for matching members from every class in the union.
 
 ```py
 from enum import IntEnum
@@ -423,7 +423,7 @@ def _(value: Foo | Bar):
 
 `StrEnum` domains from different classes are compared by their string values. Equality retains the
 members whose values occur in both domains; inequality against a singleton excludes the matching
-member. Exact member comparisons are true or false when both values are known:
+member. Exact member comparisons are true or false when both values are known.
 
 ```py
 from enum import StrEnum
@@ -474,7 +474,7 @@ def compare_subsets(
         reveal_type(right)  # revealed: Literal[Right.SHARED]
 ```
 
-When only one side can be `None`, equality still narrows both enums to their shared value:
+When only one side can be `None`, equality still narrows both enums to their shared value.
 
 ```py
 def compare_optional_cross_enum_left(left: Left | None, right: Right):
@@ -488,7 +488,7 @@ def compare_optional_cross_enum_right(left: Left, right: Right | None):
         reveal_type(right)  # revealed: Literal[Right.SHARED]
 ```
 
-When both sides can be `None`, equality can match `None` or the shared string:
+When both sides can be `None`, equality can match `None` or the shared string.
 
 ```py
 def compare_both_optional_cross_enums(left: Left | None, right: Right | None):
@@ -498,7 +498,7 @@ def compare_both_optional_cross_enums(left: Left | None, right: Right | None):
 ```
 
 Under the same assumptions, an unrelated integer does not change which enum members match, whether
-the condition uses `==` or `!=`:
+the condition uses `==` or `!=`.
 
 ```py
 def compare_cross_enums_with_integer(left: Left | None, right: Right | int):
@@ -515,7 +515,7 @@ def compare_cross_enums_with_integer(left: Left | None, right: Right | int):
 ```
 
 A plain string can also match a member of the other enum. The string and every matching enum member
-must remain possible:
+must remain possible.
 
 ```py
 def compare_left_string_against_enum_members(left: Left | Literal["b"], right: Right):
@@ -530,7 +530,7 @@ def compare_right_string_against_enum_members(left: Left, right: Right | Literal
 ```
 
 A `dict[str, Any]` is treated as having dictionary equality, so it cannot match a string-valued enum
-member:
+member.
 
 ```py
 def compare_cross_enum_with_dictionary(left: Left | dict[str, Any], right: Right | None):
@@ -539,7 +539,7 @@ def compare_cross_enum_with_dictionary(left: Left | dict[str, Any], right: Right
         reveal_type(right)  # revealed: Literal[Right.SHARED]
 ```
 
-By contrast, `Any` can match any enum member. It must not exclude `None` from the other side:
+By contrast, `Any` can match any enum member. It must not exclude `None` from the other side.
 
 ```py
 def compare_optional_enum_against_any(left: Left | None, right: Right | Any):
@@ -554,7 +554,7 @@ def compare_any_against_optional_enum(left: Left | Any, right: Right | None):
 ```
 
 If the two sides have no matching values, `==` is always false and `!=` is always true. A shared
-`None` makes `==` uncertain:
+`None` makes `==` uncertain.
 
 ```py
 def compare_disjoint_cross_enum_alternatives(
@@ -567,7 +567,7 @@ def compare_disjoint_cross_enum_alternatives(
     reveal_type(left == overlapping)  # revealed: bool
 ```
 
-When all possible values match, `==` is always true:
+When all possible values match, `==` is always true.
 
 ```py
 def compare_matching_cross_enum_alternatives(
@@ -580,7 +580,7 @@ def compare_matching_cross_enum_alternatives(
 
 The same comparison-key projection applies when each operand spans several enum classes. This
 example represents 18 possible values on each side, which would otherwise require 324 pairwise
-comparisons:
+comparisons.
 
 ```py
 from enum import IntEnum
@@ -640,7 +640,7 @@ def compare_mixed_domains(
 ```
 
 Treating `str` as having builtin equality, adding `None` or `str` does not prevent matches between
-integer-valued enum classes:
+integer-valued enum classes.
 
 ```py
 def compare_multiple_integer_enums_with_other_values(
@@ -653,7 +653,7 @@ def compare_multiple_integer_enums_with_other_values(
 ```
 
 Python considers `False` equal to `0`, so a `False` alternative can match an integer-valued enum
-member even when the other enum has no matching members:
+member even when the other enum has no matching members.
 
 ```py
 def compare_false_to_integer_enum(left: MixedLeft1 | Literal[False], right: MixedRight0):
@@ -663,7 +663,7 @@ def compare_false_to_integer_enum(left: MixedLeft1 | Literal[False], right: Mixe
 ```
 
 An identity-comparing enum with a custom `_missing_` method remains equivalent to the union of its
-declared members:
+declared members.
 
 ```py
 from enum import Enum
@@ -704,7 +704,7 @@ def compare_open_identity(
         reveal_type(left)  # revealed: Literal[OpenIdentity.A, OpenIdentity.B]
 ```
 
-Integer comparison keys normalize booleans in the same way as Python equality:
+Integer comparison keys normalize booleans in the same way as Python equality.
 
 ```py
 from enum import Enum, IntEnum
@@ -726,7 +726,7 @@ reveal_type(IntegerAliases.ZERO == IntegerAliases.FALSE)  # revealed: Literal[Tr
 
 Plain enum members from different classes use identity comparison, even when their declared values
 are equal. Custom comparison methods remain ambiguous, while scalar enums can compare across enum
-classes:
+classes.
 
 ```py
 from enum import Enum, StrEnum
@@ -776,7 +776,7 @@ def compare_custom_missing(left: CustomMissingLeft, right: CustomRight):
 ```
 
 A metaclass can add undeclared scalar members, so cross-enum comparison must retain the full open
-enum:
+enum.
 
 ```py
 class OpenLeft(StrEnum, metaclass=InjectingEnumMeta):
@@ -787,7 +787,7 @@ def compare_open(left: OpenLeft, right: CustomRight):
         reveal_type(left)  # revealed: OpenLeft
 ```
 
-A custom equality method must still determine the result when the enum is combined with `None`:
+A custom equality method must still determine the result when the enum is combined with `None`.
 
 ```py
 def compare_optional_custom(left: CustomLeft | None, right: CustomRight):
@@ -796,7 +796,7 @@ def compare_optional_custom(left: CustomLeft | None, right: CustomRight):
 ```
 
 A custom `_missing_` method does not affect comparison narrowing, including when the enum is
-combined with `None`:
+combined with `None`.
 
 ```py
 def compare_optional_custom_missing(left: CustomMissingLeft | None, right: CustomRight):
@@ -805,7 +805,7 @@ def compare_optional_custom_missing(left: CustomMissingLeft | None, right: Custo
 ```
 
 Undeclared members of a genuinely open scalar enum must survive cross-enum comparison even when the
-enum is combined with `None`:
+enum is combined with `None`.
 
 ```py
 def compare_optional_open(left: OpenLeft | None, right: CustomRight):
@@ -815,7 +815,7 @@ def compare_optional_open(left: OpenLeft | None, right: CustomRight):
 
 The same narrowing applies when comparing enum members directly with their inherited integer or
 string values. The negative constraint excludes both the builtin literal and every enum member known
-to compare equal to it:
+to compare equal to it.
 
 ```py
 from enum import Enum, IntEnum, StrEnum
@@ -889,7 +889,7 @@ def compare_int_enums(value: IntEnum):
 
 A custom `__new__` can replace the value declared in an `IntEnum` class body. We can still narrow
 the members of `Foo`, whose runtime values are known, but must preserve all of `Shifted` because its
-members' runtime values cannot be determined statically:
+members' runtime values cannot be determined statically.
 
 ```py
 from enum import IntEnum
@@ -915,7 +915,7 @@ def _(value: Foo | Shifted):
 ```
 
 An explicit `_value_` annotation controls the public `.value` type without erasing a concrete
-comparison payload:
+comparison payload.
 
 ```py
 from enum import IntEnum
@@ -929,7 +929,7 @@ reveal_type(AnnotatedInteger.ONE == 1)  # revealed: Literal[True]
 ```
 
 When a custom constructor transforms the member, however, the annotation does not describe the
-scalar payload used by inherited comparison methods:
+scalar payload used by inherited comparison methods.
 
 ```py
 from enum import IntEnum
@@ -967,7 +967,7 @@ reveal_type(AnnotatedInitialized.MEMBER == Other.MEMBER)  # revealed: bool
 ```
 
 A scalar data-type mixin can also transform a declared value before it becomes the enum member's
-comparison payload. Such a value is not a safe comparison key:
+comparison payload. Such a value is not a safe comparison key.
 
 ```py
 from enum import Enum, IntEnum
@@ -991,7 +991,7 @@ if MixinShifted.MEMBER == Normal.MEMBER:
 The return value of `_generate_next_value_` is not necessarily the final value of an `IntEnum`
 member. Here, the inherited `int.__new__` converts the generated string `"1"` to the integer `1`.
 Because the generated value's exact conversion is not modeled, we cannot use it to decide whether
-members of `Generated` and `Other` compare equal:
+members of `Generated` and `Other` compare equal.
 
 ```py
 from enum import IntEnum, auto
@@ -1016,7 +1016,7 @@ def _(value: Generated | Other):
 ```
 
 An assignment to `__new__`, `__init__`, or other methods can replace the value declared in the class
-body. In that case, we cannot compare an enum member with its declared value statically:
+body. In that case, we cannot compare an enum member with its declared value statically.
 
 ```toml
 [environment]
@@ -1064,7 +1064,7 @@ def _(new: Any, init: Any, prepare: Any):
 ```
 
 An opaque `_generate_next_value_` affects `auto()` members, but explicit members still have their
-declared values:
+declared values.
 
 ```py
 from enum import StrEnum, auto
@@ -1094,7 +1094,7 @@ def _(generate_next_value: Any):
             reveal_type(value)  # revealed: Literal["other"]
 ```
 
-This narrowing behavior is only safe if the enum has no custom `__eq__`/`__ne__` method:
+This narrowing behavior is only safe if the enum has no custom `__eq__`/`__ne__` method.
 
 ```py
 from enum import Enum
@@ -1135,7 +1135,7 @@ def _(answer: AmbiguousEnum):
 
 `==` and `!=` must use the semantics of their respective dunder methods. In particular, a custom
 `__ne__` method does not affect narrowing based on `__eq__`. Conversely, a custom `__eq__` method
-affects narrowing based on both operators because the default `__ne__` delegates to `__eq__`:
+affects narrowing based on both operators because the default `__ne__` delegates to `__eq__`.
 
 ```py
 from enum import Enum
@@ -1290,7 +1290,7 @@ def narrow_recursive_mapping_value(value: RecursiveMappingValue) -> None:
 
 `bool`, `LiteralString`, `TypedDict`, and final classes that inherit `object.__eq__` have known
 built-in equality behavior. Comparing two values with the same known behavior can therefore
-eliminate disjoint union elements:
+eliminate disjoint union elements.
 
 ```py
 from typing import TypedDict, final
@@ -1338,7 +1338,7 @@ def narrow_final_object_equality(value: A | B, other: A):
         reveal_type(value)  # revealed: A
 ```
 
-Final classes with different inherited built-in equality implementations cannot compare equal:
+Final classes with different inherited built-in equality implementations cannot compare equal.
 
 ```py
 from typing import final
@@ -1356,7 +1356,7 @@ def narrow_different_equality_implementations(value: FinalObject | FinalInt, oth
 
 ## Sentinels
 
-Sentinels always compare equal to themselves, since they are singletons:
+Sentinels always compare equal to themselves, since they are singletons.
 
 ```py
 from typing_extensions import Sentinel
@@ -1375,7 +1375,7 @@ these may not be the same runtime object and may not compare equal. There's also
 for precisely inferring equality comparisons between these objects.
 
 For most special-cased typing APIs, therefore, we simply fallback to the nominal instance that the
-typing symbol is known to be an instance of:
+typing symbol is known to be an instance of.
 
 ```toml
 [environment]
@@ -1408,7 +1408,7 @@ reveal_type(NamedTuple != ExtensionsNamedTuple)  # revealed: bool
 ```
 
 Repeated construction of `dataclasses.Field` and `typing_extensions.deprecated` produces distinct
-objects that will compare unequal, even when their inferred payloads are identical:
+objects that will compare unequal, even when their inferred payloads are identical.
 
 ```py
 from dataclasses import dataclass, field
@@ -1429,7 +1429,7 @@ reveal_type(deprecated("gone") != deprecated("gone"))  # revealed: bool
 
 Runtime-significant metadata, spelling, and origin can be erased from the types that ty records for
 many of these APIs. Just because ty infers two of these objects as being of the same type does not
-therefore mean that they are equal:
+therefore mean that they are equal.
 
 ```py
 import builtins
@@ -1452,7 +1452,7 @@ reveal_type(Type[int] == type[int])  # revealed: bool
 ## Constrained type variables
 
 Equality analysis expands the constraints of a constrained type variable in either operand position.
-The resulting constraint is intersected with the type variable, preserving its identity:
+The resulting constraint is intersected with the type variable, preserving its identity.
 
 ```py
 from enum import Enum
@@ -1548,7 +1548,7 @@ def compare(other: LiteralString):
 ## `LiteralString` and string-valued enums
 
 `LiteralString` can be narrowed by comparison with a string-valued enum member that inherits `str`'s
-equality implementation:
+equality implementation.
 
 ```toml
 [environment]
@@ -1586,7 +1586,7 @@ def compare_member(other: LiteralString):
 
 ## Module literals
 
-Modules compare equal only to the same module object:
+Modules compare equal only to the same module object.
 
 ```py
 import sys
@@ -1609,7 +1609,7 @@ def narrow_module_literal(flag: bool):
 ## Comparisons with user-defined methods
 
 Arbitrary user-defined comparison methods are not used to narrow their operands. In particular, we
-don't inspect the bodies of user-defined `__eq__` or `__ne__` methods to predict their results:
+don't inspect the bodies of user-defined `__eq__` or `__ne__` methods to predict their results.
 
 ```py
 class Left:
@@ -1628,7 +1628,7 @@ def _(value: Right | None):
 ```
 
 Custom comparison methods also remain visible when an `isinstance` check intersects a builtin type
-with a mixin. Ignoring the mixin would incorrectly treat the builtin comparison as authoritative:
+with a mixin. Ignoring the mixin would incorrectly treat the builtin comparison as authoritative.
 
 ```py
 from typing import Literal
@@ -1659,7 +1659,7 @@ def custom_intersection_equality(value: Literal["x", 1], other: str):
 ## Narrowing unions and inferring comparisons against broad types
 
 When comparing against a broad type, we assume that its subclasses do not override equality. This
-allows union members with incompatible builtin comparison semantics to be removed:
+allows union members with incompatible builtin comparison semantics to be removed.
 
 ```py
 class Foo: ...
@@ -1722,7 +1722,7 @@ def custom_equality(value: AlwaysEqual | None, other: AlwaysEqual):
 ## Narrowing builtin types to literals
 
 Equality with a literal narrows broad `str`, `int`, and `bytes` types to that literal. By default,
-integer literals do not introduce the boolean values that compare equal to `0` or `1`:
+integer literals do not introduce the boolean values that compare equal to `0` or `1`.
 
 ```py
 def narrow_string(value: str):
@@ -1763,7 +1763,7 @@ def narrow_inequality_else(value: str):
 ```
 
 The narrowing only treats the broad builtin types optimistically. Explicit subclass and custom
-comparison arms are preserved:
+comparison arms are preserved.
 
 ```py
 class StringSubclass(str): ...
@@ -1891,7 +1891,7 @@ def _(x: Literal[1, 2], y: Y):
 
 ## `!=` for broad types
 
-A broad right-hand type cannot narrow `x`:
+A broad right-hand type cannot narrow `x`.
 
 ```py
 def _(x: int | None, y: int):
@@ -2098,7 +2098,7 @@ def _(x: Any):
         reveal_type(x)  # revealed: Any
 ```
 
-`Any` must stay `Any` when compared with an enum, on either side of the comparison:
+`Any` must stay `Any` when compared with an enum, on either side of the comparison.
 
 ```py
 def enum_against_any(value: Color, other: Any):
@@ -2110,7 +2110,7 @@ def any_against_enum(value: Any, other: Color):
         reveal_type(value)  # revealed: Any
 ```
 
-`Any` must also stay `Any` when the enum can be `None`:
+`Any` must also stay `Any` when the enum can be `None`.
 
 ```py
 def optional_enum_against_any(value: Color | None, other: Any):
@@ -2122,7 +2122,7 @@ def any_against_optional_enum(value: Any, other: Color | None):
         reveal_type(value)  # revealed: Any
 ```
 
-`Any` must also stay `Any` when compared with `bool | None`:
+`Any` must also stay `Any` when compared with `bool | None`.
 
 ```py
 def optional_bool_against_any(value: bool | None, other: Any):
@@ -2130,7 +2130,7 @@ def optional_bool_against_any(value: bool | None, other: Any):
         reveal_type(other)  # revealed: Any
 ```
 
-Comparing `Color | Any` with `Color | None` must keep both `Color` and `Any`:
+Comparing `Color | Any` with `Color | None` must keep both `Color` and `Any`.
 
 ```py
 def gradual_enum_union(value: Color | Any, other: Color | None):
@@ -2139,7 +2139,7 @@ def gradual_enum_union(value: Color | Any, other: Color | None):
 ```
 
 `Color | Any` must stay unchanged when the other value can be an enum member or `None`. This applies
-to `!=` and the false branch of `==`:
+to `!=` and the false branch of `==`.
 
 ```py
 def any_union_against_optional_enum_member(value: Color | Any, other: Literal[Color.RED] | None):
@@ -2153,7 +2153,7 @@ def any_union_against_optional_enum_member_equality_else(value: Color | Any, oth
     reveal_type(value)  # revealed: Color | Any
 ```
 
-An alias for `Any` must preserve the same result:
+An alias for `Any` must preserve the same result.
 
 ```py
 AnyAlias: TypeAlias = Any
@@ -2163,7 +2163,7 @@ def any_alias_union_against_optional_enum_member(value: Color | AnyAlias, other:
         reveal_type(value)  # revealed: Color | Any
 ```
 
-The same comparisons also preserve `Unknown`:
+The same comparisons also preserve `Unknown`.
 
 ```py
 def unknown_union_against_optional_enum_member(value: Color | Unknown, other: Literal[Color.RED] | None):
@@ -2178,7 +2178,7 @@ def unknown_union_against_optional_enum_member_equality_else(value: Color | Unkn
 ```
 
 When an enum check and a comparison are combined with `and`, either condition can be false. The
-original union must therefore be preserved:
+original union must therefore be preserved.
 
 ```py
 def any_union_after_enum_check(value: Color | Any, other: Color | Any):
@@ -2194,7 +2194,7 @@ def unknown_union_after_enum_check(value: Color | Unknown, other: Color | Unknow
     assert_type(value, Color | Unknown)
 ```
 
-The second comparison can fail even when the first one matches, so both possible types must remain:
+The second comparison can fail even when the first one matches, so both possible types must remain.
 
 ```py
 def any_union_after_failed_comparisons(value: Color | Any, other: OtherColor | None):
@@ -2211,7 +2211,7 @@ def unknown_union_after_failed_comparisons(value: Color | Unknown, other: OtherC
 ```
 
 These `Enum` classes compare by identity, so their members are not equal even when their underlying
-values match. Comparing with `OtherColor.RED` must therefore exclude every `Color` member:
+values match. Comparing with `OtherColor.RED` must therefore exclude every `Color` member.
 
 ```py
 def any_comparison_with_other_enum(value: Color | OtherColor | Any):
@@ -2227,7 +2227,7 @@ def unknown_comparison_with_other_enum(value: Color | OtherColor | Unknown):
             assert_never(value)
 ```
 
-`Color | Any` must also stay unchanged after either `==` or `!=`:
+`Color | Any` must also stay unchanged after either `==` or `!=`.
 
 ```py
 def gradual_enum_union_against_enum(value: Color | Any, other: Color):
@@ -2244,7 +2244,7 @@ def gradual_enum_union_inequality(value: Color | Any, other: Color):
 The enum class can be one of two unrelated classes, so each comparison can fail even if `item` is
 one of the two members being compared. Successive failed comparisons add no exclusions to the
 unknown type; the earlier `str` exclusion still applies. In particular, the number of alternatives
-does not grow with each branch:
+does not grow with each branch.
 
 ```py
 from enum import Enum
@@ -2306,7 +2306,7 @@ def describe(item, choice: bool):
 ```
 
 The true branch of `!=` keeps the same type. Comparing with one known member, however, still
-excludes that specific member:
+excludes that specific member.
 
 ```py
 def exclusions(item, choice: bool):
@@ -2324,7 +2324,7 @@ def exclusions(item, choice: bool):
 ## Unions of gradual string literals
 
 Comparing a union of string literals intersected with `Any` keeps the matching alternative for
-equality and removes it for inequality:
+equality and removes it for inequality.
 
 ```py
 from typing import Any, Literal
@@ -2343,7 +2343,7 @@ def equality(value: Intersection[Any, Literal["a"]] | Intersection[Any, Literal[
 ```
 
 Larger unions must narrow without expanding the complement of every rejected alternative, which
-would make memory use grow exponentially:
+would make memory use grow exponentially.
 
 ```py
 def larger_union(
@@ -2559,7 +2559,7 @@ def inequality_else(value: str | tuple[str | None, str | None, str] | None) -> N
 ```
 
 Fixed-length tuples compare corresponding elements using identity before equality, so distinct
-inferred element types can still make the result definite. Different lengths cannot compare equal:
+inferred element types can still make the result definite. Different lengths cannot compare equal.
 
 ```py
 from enum import Enum
@@ -2604,7 +2604,7 @@ def tuple_with_erased_element_identity(value: NeverEqualTupleElement) -> None:
 ## Comparing sequences with tuples
 
 A `Sequence[object]` can be an empty tuple, so the equality branch remains reachable and we report
-errors inside it:
+errors inside it.
 
 ```py
 from collections.abc import Sequence
@@ -2618,7 +2618,7 @@ def _(value: Sequence[object]):
 ## Comparing truthy sequences with literals
 
 A truthy sequence can still be a string or bytes object. Comparing a literal on the left with such a
-sequence does not make the equality branch unreachable:
+sequence does not make the equality branch unreachable.
 
 ```py
 from collections.abc import Sequence
@@ -2639,7 +2639,7 @@ def _(text: Sequence[str], data: Sequence[int]):
 
 A `NewType` constructor returns its argument unchanged at runtime. A `WrappedIdentityEnum` value can
 therefore be either `IdentityEnum.A` or `IdentityEnum.B`, so comparing it with `IdentityEnum.A` has
-an unknown result:
+an unknown result.
 
 ```py
 from enum import Enum
@@ -2727,7 +2727,7 @@ def branded_custom_equality(value: BrandedNeverEqual, other: NeverEqualEnum) -> 
 ## Narrowing with enums that have custom `__eq__` methods
 
 Custom enum comparison methods with definite return types determine equality and inequality
-independently:
+independently.
 
 ```py
 from enum import Enum
@@ -2897,7 +2897,7 @@ def protocol_union_multiple_tags(value: TaggedA | TaggedC1):
         reveal_type(value.field_c1)  # revealed: str
 ```
 
-Enum literals are also supported as attribute tags:
+Enum literals are also supported as attribute tags.
 
 ```py
 from enum import Enum
@@ -2921,7 +2921,7 @@ def _(x: A | B):
 ```
 
 A broad `str` tag can match the comparison value or a different string, so its containing object
-remains possible in both branches:
+remains possible in both branches.
 
 ```py
 from typing import Literal
@@ -2942,7 +2942,7 @@ def _(x: A | B | C):
         reveal_type(x)  # revealed: B | C
 ```
 
-This also works for `NamedTuple` classes:
+This also works for `NamedTuple` classes.
 
 ```py
 from typing import Literal, NamedTuple
@@ -2969,7 +2969,7 @@ def _(x: A | B):
 
 ## Attribute tags with non-literal comparators
 
-A boolean comparison value can match a boolean tag, but cannot match either of these other tags:
+A boolean comparison value can match a boolean tag, but cannot match either of these other tags.
 
 ```py
 from typing import Literal
@@ -2991,7 +2991,7 @@ def boolean_comparator(value: BooleanTag | StringTag | NumberTag, other: bool):
 ```
 
 A union comparison value can match tags of different types. Neither `True` nor `"text"` equals `2`,
-so `NumberTag` is excluded from the equality branch:
+so `NumberTag` is excluded from the equality branch.
 
 ```py
 def union_comparator(value: BooleanTag | StringTag | NumberTag, other: Literal[True, "text"]):
@@ -3005,7 +3005,7 @@ def union_comparator(value: BooleanTag | StringTag | NumberTag, other: Literal[T
 
 An `int` tag can contain a subclass with custom equality. This remains true when the tag is a
 non-final subclass that inherits `int.__eq__`. Both tag types stay possible when compared with a
-string, while the unrelated literal tag is excluded:
+string, while the unrelated literal tag is excluded.
 
 ```py
 from typing import Literal
@@ -3032,7 +3032,7 @@ def integer_tags(value: IntegerTag | SubclassTag | A | B):
 ```
 
 The comparison value can also have a subclass with custom equality. A `str` value might therefore
-match an integer tag, so neither containing object can be excluded:
+match an integer tag, so neither containing object can be excluded.
 
 ```py
 class One:
@@ -3053,7 +3053,7 @@ python-version = "3.11"
 ```
 
 An `IntEnum` member compares equal to its integer value, so both `EnumTag` and `IntegerTag` match
-`1`. `EnumTag` also permits a different tag, leaving it possible in both branches:
+`1`. `EnumTag` also permits a different tag, leaving it possible in both branches.
 
 ```py
 from enum import Enum, IntEnum, StrEnum
@@ -3085,7 +3085,7 @@ def equal_integer_tags(value: EnumTag | IntegerTag | OtherTag):
 ```
 
 The enum can also be the comparison value. An integer literal can match the enum member without
-having the same literal type:
+having the same literal type.
 
 ```py
 def enum_comparator(value: EnumTag | IntegerTag | OtherTag):
@@ -3095,7 +3095,7 @@ def enum_comparator(value: EnumTag | IntegerTag | OtherTag):
         reveal_type(value)  # revealed: EnumTag | OtherTag
 ```
 
-`StrEnum` members likewise compare equal to strings with the same value:
+`StrEnum` members likewise compare equal to strings with the same value.
 
 ```py
 class Word(StrEnum):
@@ -3119,7 +3119,7 @@ def equal_string_tags(value: EnumStringTag | StringTag | OtherStringTag):
 ```
 
 Custom equality methods can make an enum member compare equal to unrelated values. An ambiguous
-comparison keeps the alternative containing that member in both branches:
+comparison keeps the alternative containing that member in both branches.
 
 ```py
 class Custom(Enum):
@@ -3140,7 +3140,7 @@ def custom_equality(value: CustomTag | StringTag):
 ```
 
 An enum can customize `__ne__` independently of `__eq__`. An ambiguous inequality keeps the
-alternative with that enum tag in both branches, including the branch where the inequality is false:
+alternative with that enum tag in both branches, including the branch where the inequality is false.
 
 ```py
 class NeverUnequal(Enum):

@@ -40,7 +40,7 @@ def noreturn(u1: int | NoReturn, u2: int | NoReturn | str) -> None:
 
 ## `object` subsumes everything
 
-Unions with `object` can be simplified to `object`:
+Unions with `object` can be simplified to `object`.
 
 ```py
 from typing_extensions import Never, Any
@@ -80,7 +80,7 @@ def _(
 
 ## Simplification using subtyping
 
-The type `S | T` can be simplified to `T` if `S` is a subtype of `T`:
+The type `S | T` can be simplified to `T` if `S` is a subtype of `T`.
 
 ```py
 from typing_extensions import Literal, LiteralString
@@ -96,7 +96,7 @@ def _(
 
 ## Boolean literals
 
-The union `Literal[True] | Literal[False]` is exactly equivalent to `bool`:
+The union `Literal[True] | Literal[False]` is exactly equivalent to `bool`.
 
 ```py
 from typing import Literal
@@ -163,7 +163,7 @@ def _(u1: Unknown | str, u2: str | Unknown) -> None:
 ## Collapse multiple `Unknown`s
 
 Since `Unknown` is a gradual type, it is not a subtype of anything, but multiple `Unknown`s in a
-union are still redundant:
+union are still redundant.
 
 ```py
 from ty_extensions._internal import Unknown
@@ -187,7 +187,7 @@ def _(u1: int | Unknown | bool) -> None:
 
 ## Union of intersections
 
-We can simplify unions of intersections:
+We can simplify unions of intersections.
 
 ```py
 from ty_extensions import Intersection, Not
@@ -353,7 +353,7 @@ def f(
 
 A tuple alternative is redundant when its element type is covered by another alternative, including
 when that element is a built-in type narrowed by an exclusion. The `float` annotation includes
-`int`, so it also covers `int & ~bool`:
+`int`, so it also covers `int & ~bool`.
 
 ```py
 from ty_extensions import Intersection, Not
@@ -366,7 +366,7 @@ def numeric(value: tuple[Intersection[int, Not[bool]]] | tuple[float]):
 
 Matching the positive class is not enough to establish redundancy: its exclusions also matter. For
 example, a subclass of both `Marker` and `str` can inhabit the first tuple alternative below, but
-neither branch of the second:
+neither branch of the second.
 
 ```py
 from ty_extensions import Intersection, Not

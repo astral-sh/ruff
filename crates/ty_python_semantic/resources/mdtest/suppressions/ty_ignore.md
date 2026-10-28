@@ -11,7 +11,7 @@ blanket-ignore-comment = "ignore"
 
 ## Simple `ty: ignore`
 
-A suppression can appear at the end of the affected line:
+A suppression can appear at the end of the affected line.
 
 ```py
 a = 4 + test  # ty: ignore
@@ -277,7 +277,7 @@ def test(a: f"f-string type annotation", b: unresolved_ref): ...  # ty: ignore[i
 
 ## Nested comments
 
-An own-line suppression can be nested after another pragma comment:
+An own-line suppression can be nested after another pragma comment.
 
 ```py
 seen_code = True
@@ -288,7 +288,7 @@ value = 1 / 0
 ```
 
 Removing an unused nested suppression is safe when another pragma precedes it, but unsafe when
-removal would promote a following pragma to an own-line comment:
+removal would promote a following pragma to an own-line comment.
 
 ```py
 seen_code = True
@@ -377,7 +377,7 @@ a = 10 / 0  #ty:ignore[division-by-zero]
 
 ## Trailing codes comma
 
-Trailing commas in the codes section are allowed:
+Trailing commas in the codes section are allowed.
 
 ```py
 a = 10 / 0  # ty: ignore[division-by-zero,]
@@ -444,7 +444,7 @@ b = a + c  # error: [unresolved-reference]
 
 ## File-level suppression nested after another pragma
 
-File-level suppressions can be nested after another pragma comment:
+File-level suppressions can be nested after another pragma comment.
 
 ```py
 # fmt: off # ty: ignore[division-by-zero]
@@ -483,7 +483,7 @@ users might expect to work.
 
 ### Invalid assignment
 
-An invalid assignment can be suppressed in the following ways:
+An invalid assignment can be suppressed in the following ways.
 
 ```py
 # fmt: off
@@ -501,7 +501,7 @@ x4: str = (
 
 It can *not* be suppressed by putting the `# ty: ignore` on the inner expression. The range targeted
 by the suppression comment needs to overlap with one of the boundaries of the value range (the outer
-parentheses in this case):
+parentheses in this case).
 
 ```py
 # fmt: off

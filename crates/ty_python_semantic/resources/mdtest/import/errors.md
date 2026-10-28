@@ -40,7 +40,7 @@ reveal_type(foo)  # revealed: Unknown
 ```
 
 Importing the unresolved import into a second file should not trigger an additional "unresolved
-import" violation:
+import" violation.
 
 ```py
 from a import foo

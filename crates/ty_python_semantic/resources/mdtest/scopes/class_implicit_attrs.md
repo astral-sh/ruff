@@ -44,7 +44,7 @@ class Foo:
 
 ## Nested classes
 
-These implicit attributes are also available in nested classes, and refer to the nested class:
+These implicit attributes are also available in nested classes, and refer to the nested class.
 
 ```py
 class Outer:
@@ -56,7 +56,7 @@ class Outer:
 ## Class body implicit attributes have priority over globals
 
 If a global variable with the same name exists, the class body implicit attribute takes priority
-within the class body:
+within the class body.
 
 ```py
 __qualname__ = 42
@@ -72,7 +72,7 @@ reveal_type(__qualname__)  # revealed: Literal[42]
 reveal_type(__module__)  # revealed: Literal[42]
 ```
 
-They also take priority over a possibly-bound snapshot from an enclosing `global` declaration:
+They also take priority over a possibly-bound snapshot from an enclosing `global` declaration.
 
 ```py
 def enclosing(flag: bool) -> None:
@@ -86,7 +86,7 @@ def enclosing(flag: bool) -> None:
 
 ## `__firstlineno__` has priority over globals (Python 3.13+)
 
-The same applies to `__firstlineno__` on Python 3.13+:
+The same applies to `__firstlineno__` on Python 3.13+.
 
 ```toml
 [environment]
@@ -105,7 +105,7 @@ reveal_type(__firstlineno__)  # revealed: Literal["not an int"]
 ## Class body implicit attributes are not visible in methods
 
 The implicit class body attributes are only available directly in the class body, not in nested
-function scopes (methods):
+function scopes (methods).
 
 ```py
 class Foo:
@@ -121,7 +121,7 @@ class Foo:
 
 ## Real-world use case: logging
 
-A common use case is defining a logger with the class name:
+A common use case is defining a logger with the class name.
 
 ```py
 import logging

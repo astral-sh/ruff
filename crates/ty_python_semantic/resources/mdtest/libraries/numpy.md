@@ -52,7 +52,7 @@ DTypeLike: TypeAlias = _DTypeLike[Any] | str | None
 Now we can make sure that a function which accepts `DTypeLike | None` works as expected. A generic
 function accepting `_DTypeLike[_ScalarT]` should also infer the scalar type from a scalar class. The
 protocol union element describes instances with a `dtype` property, not the class object whose class
-access exposes that property descriptor:
+access exposes that property descriptor.
 
 ```py
 from typing import TypeVar

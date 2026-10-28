@@ -863,7 +863,7 @@ x = funcmod(1)
 
 ## Re-export Nameclash Problems In Functions
 
-`from` imports in an `__init__.py` at file scope should be visible to functions defined in the file:
+`from` imports in an `__init__.py` at file scope should be visible to functions defined in the file.
 
 `mypackage/__init__.py`:
 
@@ -916,7 +916,7 @@ def funcmod(x: int) -> int:
 ## Re-export Nameclash Problems In Try-Blocks
 
 `from` imports in an `__init__.py` at file scope in a `try` block should be visible to functions
-defined in the `try` block (regression test for a bug):
+defined in the `try` block (regression test for a bug).
 
 `mypackage/__init__.py`:
 

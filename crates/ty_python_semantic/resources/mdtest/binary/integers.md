@@ -63,7 +63,7 @@ def variable(x: int):
 ```
 
 If the second argument is \<0, a `float` is returned at runtime. If the first argument is \<0 but
-the second argument is >=0, an `int` is still returned:
+the second argument is >=0, an `int` is still returned.
 
 ```py
 reveal_type(1**0)  # revealed: Literal[1]
@@ -78,7 +78,7 @@ reveal_type((-1) ** (-1))  # revealed: float*
 
 Division works differently in Python than in Rust. If the result is negative and there is a
 remainder, the division rounds down (instead of towards zero). The remainder needs to be adjusted to
-compensate so that `(lhs // rhs) * rhs + (lhs % rhs) == lhs`:
+compensate so that `(lhs // rhs) * rhs + (lhs % rhs) == lhs`.
 
 ```py
 reveal_type(256 % 129)  # revealed: Literal[127]
@@ -146,7 +146,7 @@ reveal_type(MyInt(3) / 0)  # revealed: float
 
 ## Bit-shifting
 
-Literal arithmetic is supported for bit-shifting operations on `int`s:
+Literal arithmetic is supported for bit-shifting operations on `int`s.
 
 ```py
 reveal_type(42 << 3)  # revealed: Literal[336]
@@ -163,7 +163,7 @@ reveal_type(-1 >> 5000000000)  # revealed: Literal[-1]
 If the result of a left shift overflows the `int` literal type, it becomes `int`. This includes
 cases where a bit is shifted into the sign bit position, since Python integers have arbitrary
 precision and `1 << 63` is a large positive number, not a negative one. Right shifts do not
-overflow:
+overflow.
 
 ```py
 # For `0` specifically, we know that any right-shift
@@ -193,7 +193,7 @@ reveal_type(-100 << 57)  # revealed: int
 ```
 
 Shifting by a negative amount is a `ValueError` at runtime. We don't emit a diagnostic for this
-currently; we simply infer `int` as the result type:
+currently; we simply infer `int` as the result type.
 
 ```py
 reveal_type(42 << -3)  # revealed: int

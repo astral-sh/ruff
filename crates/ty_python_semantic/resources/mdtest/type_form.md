@@ -93,7 +93,7 @@ invalid_union_forms = (bytes | Literal | str,)
 type_forms: tuple[TypeForm[object], ...] = invalid_union_forms  # error: [invalid-assignment]
 ```
 
-`TypeForm` is covariant in its type argument:
+`TypeForm` is covariant in its type argument.
 
 ```py
 from typing_extensions import TypeForm
@@ -113,7 +113,7 @@ invalid: TypeForm[str] = int  # error: [invalid-assignment]
 ```
 
 `TypeForm` covariance composes with the variance of nested generic type arguments. `list` is
-invariant, while callable parameter types are contravariant:
+invariant, while callable parameter types are contravariant.
 
 ```py
 from typing import Callable

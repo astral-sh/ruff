@@ -24,7 +24,7 @@ reveal_type(Color.RED in Color)  # revealed: bool
 
 For standard-library enum classes, we preserve literal `.value` types when we can model how the data
 type constructs each value. The inherited `_value_` annotation remains the fallback when we cannot,
-or when accessing `.value` on the enum class as a whole:
+or when accessing `.value` on the enum class as a whole.
 
 ```py
 from enum import IntEnum, auto
@@ -171,7 +171,7 @@ reveal_type(enum_members(ColorInt))
 ### Annotated assignments with values are still members
 
 If an enum attribute has both an annotation and a value, it is still an enum member at runtime, even
-though the annotation is invalid:
+though the annotation is invalid.
 
 ```py
 from enum import Enum
@@ -189,7 +189,7 @@ reveal_type(Answer.annotated_member)  # revealed: Literal[Answer.annotated_membe
 reveal_type(Answer.YES.annotated_member)  # revealed: Literal[Answer.annotated_member]
 ```
 
-Enum members are allowed to be marked `Final` (without a type), even if unnecessary:
+Enum members are allowed to be marked `Final` (without a type), even if unnecessary.
 
 ```py
 from enum import Enum
@@ -225,7 +225,7 @@ class Pet(Enum):
     BIRD: str = "bird"  # error: [invalid-enum-member-annotation]
 ```
 
-Bare `Final` annotations are allowed (they don't specify a type):
+Bare `Final` annotations are allowed (they don't specify a type).
 
 ```py
 class Pet2(Enum):
@@ -233,7 +233,7 @@ class Pet2(Enum):
     DOG: Final = 2  # OK
 ```
 
-But `Final` with a type argument is not allowed:
+But `Final` with a type argument is not allowed.
 
 ```py
 class Pet3(Enum):
@@ -241,14 +241,14 @@ class Pet3(Enum):
     DOG: Final[str] = "woof"  # error: [invalid-enum-member-annotation]
 ```
 
-`enum.member` used as value wrapper is the standard way to declare members explicitly:
+`enum.member` used as value wrapper is the standard way to declare members explicitly.
 
 ```py
 class Pet4(Enum):
     CAT = member(1)  # OK
 ```
 
-Dunder and private names are not enum members, so they don't trigger the diagnostic:
+Dunder and private names are not enum members, so they don't trigger the diagnostic.
 
 ```py
 class Pet5(Enum):
@@ -257,7 +257,7 @@ class Pet5(Enum):
     __module__: str = "my_module"  # OK
 ```
 
-Pure declarations (annotations without values) are non-members and are fine:
+Pure declarations (annotations without values) are non-members and are fine.
 
 ```py
 class Pet6(Enum):
@@ -270,7 +270,7 @@ reveal_type(Pet6.CAT.species)  # revealed: str
 
 ### Pure declarations in stubs
 
-In stubs, these should still be treated as non-member attributes rather than enum members:
+In stubs, these should still be treated as non-member attributes rather than enum members.
 
 ```pyi
 from enum import Enum
@@ -286,7 +286,7 @@ reveal_type(Pet6Stub.species)  # revealed: str
 
 ### Callable values and subclasses
 
-Callable values are never enum members at runtime, so annotating them is fine:
+Callable values are never enum members at runtime, so annotating them is fine.
 
 ```toml
 [environment]
@@ -305,7 +305,7 @@ class Pet7(Enum):
     declared_callable: Callable[[int], int] = identity  # OK: callables are never members
 ```
 
-The check also works for subclasses of `Enum`:
+The check also works for subclasses of `Enum`.
 
 ```py
 class Status(IntEnum):
@@ -317,7 +317,7 @@ class Color(StrEnum):
     GREEN = "green"  # OK
 ```
 
-Special sunder names like `_value_` and `_ignore_` are not flagged:
+Special sunder names like `_value_` and `_ignore_` are not flagged.
 
 ```py
 class Pet8(Enum):
@@ -326,7 +326,7 @@ class Pet8(Enum):
     CAT = 1
 ```
 
-Names listed in `_ignore_` are not members, so annotating them is fine:
+Names listed in `_ignore_` are not members, so annotating them is fine.
 
 ```py
 class Pet9(Enum):
@@ -339,7 +339,7 @@ class Pet9(Enum):
 ### Unreachable declarations do not change membership
 
 Statically unreachable declarations should be ignored when deciding whether a name is an enum
-member:
+member.
 
 ```py
 from enum import Enum
@@ -361,7 +361,7 @@ reveal_type(Pet10.DOG)  # revealed: Literal[Pet10.DOG]
 ### Declared `_value_` annotation
 
 If a `_value_` annotation is defined on an `Enum` class, all enum member values must be compatible
-with the declared type:
+with the declared type.
 
 ```pyi
 from enum import Enum
@@ -376,7 +376,7 @@ class Color(Enum):
 ```
 
 When `_value_` is annotated, `.value` and `._value_` are inferred as the declared type on both enum
-members and method receivers:
+members and method receivers.
 
 ```py
 from enum import Enum
@@ -404,7 +404,7 @@ class WantsInt(Enum):
 ### `_value_` annotation with `__init__`
 
 When `__init__` is defined, member values are validated by synthesizing a call to `__init__`. The
-`_value_` annotation still constrains assignments to `self._value_` inside `__init__`:
+`_value_` annotation still constrains assignments to `self._value_` inside `__init__`.
 
 ```py
 from enum import Enum
@@ -422,7 +422,7 @@ reveal_type(Planet.MERCURY.value)  # revealed: int
 reveal_type(Planet.MERCURY._value_)  # revealed: int
 ```
 
-`Final`-annotated members are also validated against `__init__`:
+`Final`-annotated members are also validated against `__init__`.
 
 ```py
 from enum import Enum
@@ -439,7 +439,7 @@ class Planet(Enum):
 
 ### `_value_` annotation incompatible with `__init__`
 
-When `_value_` and `__init__` disagree, the assignment inside `__init__` is flagged:
+When `_value_` and `__init__` disagree, the assignment inside `__init__` is flagged.
 
 ```py
 from enum import Enum
@@ -460,7 +460,7 @@ reveal_type(Planet.MERCURY._value_)  # revealed: str
 ### `__init__` without `_value_` annotation
 
 When `__init__` is defined but no explicit `_value_` annotation exists, member values are validated
-against the `__init__` signature. Values that are incompatible with `__init__` are flagged:
+against the `__init__` signature. Values that are incompatible with `__init__` are flagged.
 
 ```py
 from enum import Enum
@@ -482,7 +482,7 @@ reveal_type(Planet2.MERCURY._value_)  # revealed: Any
 
 An opaque `__init__` shadows a function with the same name, so we can't validate members against it
 (although a separate `__new__` still validates the member arguments). Without an explicit `_value_`
-annotation, `.value` becomes `Any`:
+annotation, `.value` becomes `Any`.
 
 ```py
 from enum import Enum
@@ -527,7 +527,7 @@ def assigned_init_instance(value: AssignedInitChild) -> None:
 
 When `__new__` is defined but no explicit `_value_` annotation exists, member RHS values are passed
 to `__new__`, but the method can assign `_value_` independently. In this case, `.value` falls back
-to `Any`:
+to `Any`.
 
 ```py
 from enum import Enum
@@ -547,7 +547,7 @@ reveal_type(Connector.GITHUB.value)  # revealed: Any
 reveal_type(Connector.GITHUB._value_)  # revealed: Any
 ```
 
-An explicit `_value_` annotation still takes precedence:
+An explicit `_value_` annotation still takes precedence.
 
 ```py
 from enum import Enum
@@ -569,7 +569,7 @@ reveal_type(AnnotatedConnector.GITHUB._value_)  # revealed: str
 ```
 
 Even when a custom `__new__` means that aliases cannot be determined, we assume that an enum
-member's declaration name is canonical when inferring `.name`:
+member's declaration name is canonical when inferring `.name`.
 
 ```py
 from enum import IntEnum
@@ -589,7 +589,7 @@ reveal_type(CustomInteger.ALIAS.name)  # revealed: Literal["ALIAS"]
 ### Inherited `_value_` annotation
 
 A `_value_` annotation on a parent enum is inherited by subclasses. Member values are validated
-against the inherited annotation, and `.value` uses the declared type:
+against the inherited annotation, and `.value` uses the declared type.
 
 ```py
 from enum import Enum
@@ -605,7 +605,7 @@ reveal_type(Child.A.value)  # revealed: int
 ```
 
 This also works through multiple levels of inheritance, where `_value_` is declared on an
-intermediate class:
+intermediate class.
 
 ```py
 from enum import Enum
@@ -626,7 +626,7 @@ reveal_type(Child.A.value)  # revealed: int
 ### Inherited `__init__`
 
 A custom `__init__` on a parent enum is inherited by subclasses. Member values are validated against
-the inherited `__init__` signature:
+the inherited `__init__` signature.
 
 ```py
 from enum import Enum
@@ -642,7 +642,7 @@ class Child(Base):
 reveal_type(Child.A.value)  # revealed: Any
 ```
 
-This also works through multiple levels of inheritance:
+This also works through multiple levels of inheritance.
 
 ```py
 from enum import Enum
@@ -664,7 +664,7 @@ reveal_type(Child.A.value)  # revealed: Any
 ### Inherited `__new__`
 
 A custom `__new__` on a parent enum is inherited by subclasses. Without an explicit `_value_`
-annotation, subclass member values remain dynamic:
+annotation, subclass member values remain dynamic.
 
 ```py
 from enum import Enum
@@ -685,7 +685,7 @@ reveal_type(Child.GITHUB.value)  # revealed: Any
 reveal_type(Child.GITHUB._value_)  # revealed: Any
 ```
 
-An explicit `_value_` annotation on the subclass still takes precedence:
+An explicit `_value_` annotation on the subclass still takes precedence.
 
 ```py
 from enum import Enum
@@ -709,7 +709,7 @@ reveal_type(Child.GITHUB._value_)  # revealed: str
 ```
 
 Member values are still validated against the inherited `__new__` signature, even when `_value_` is
-explicitly annotated:
+explicitly annotated.
 
 ```py
 from enum import Enum
@@ -732,7 +732,7 @@ class Child(Base):
 ### Inherited `__new_member__`
 
 An inherited `__new_member__` takes precedence over the default enum constructor and can replace the
-member value:
+member value.
 
 ```py
 from enum import Enum
@@ -750,7 +750,7 @@ reveal_type(Child.VALUE.value)  # revealed: Any
 ```
 
 `EnumType` saves an enum's user-defined `__new__` as that class's `__new_member__`. The immediate
-parent's `__new__` therefore takes precedence over an explicit `__new_member__` in a grandparent:
+parent's `__new__` therefore takes precedence over an explicit `__new_member__` in a grandparent.
 
 ```py
 from enum import Enum
@@ -778,7 +778,7 @@ reveal_type(Child.VALID.value)  # revealed: Any
 
 A user-defined `__new__` on a data-type mixin constructs the scalar payload and can transform the
 declared member value. Members are validated against its signature, and their `.value` types remain
-dynamic when we cannot model the transformation:
+dynamic when we cannot model the transformation.
 
 ```py
 from enum import Enum
@@ -815,7 +815,7 @@ reveal_type(enum_members(InheritedWeirdEnum))  # revealed: Unknown
 
 A data-type mixin may be generic. When an enum lists a specialized alias of that mixin as a base,
 members are validated against the specialized `__new__` signature, not against one whose typevars
-are still free. Here `T` is `str`, so a `str` member is accepted and an `int` member is not:
+are still free. Here `T` is `str`, so a `str` member is accepted and an `int` member is not.
 
 ```toml
 [environment]
@@ -836,7 +836,7 @@ class Specialized(GenericMixin[str], Enum):
 ```
 
 The specialization is applied through intermediate generic bases, too. `Middle[int]` binds
-`GenericMixin`'s `T` to `int` one step further up the MRO:
+`GenericMixin`'s `T` to `int` one step further up the MRO.
 
 ```py
 class Middle[T](GenericMixin[T]): ...
@@ -847,7 +847,7 @@ class Inherited(Middle[int], Enum):
 ```
 
 A mixin with several type parameters is specialized the same way, and each element of a member's
-tuple payload is checked against the corresponding specialized parameter:
+tuple payload is checked against the corresponding specialized parameter.
 
 ```py
 class Pair[T, U]:
@@ -861,7 +861,7 @@ class Unpacked(Pair[str, int], Enum):
 
 A mixin whose `__new__` does not mention its type parameters at all is accepted as well. Before the
 specialization was applied, the free typevar made the synthesized `cls` argument fail to match, so
-even a fully permissive signature rejected every member:
+even a fully permissive signature rejected every member.
 
 ```py
 class Ignored[T]:
@@ -875,7 +875,7 @@ class Permissive(Ignored[str], Enum):
 ### Built-in data types
 
 An enum with an `int` or `str` data type stores the value produced by that type's constructor.
-Aliases are determined from the constructed values rather than the original assignments:
+Aliases are determined from the constructed values rather than the original assignments.
 
 ```py
 from enum import Enum
@@ -919,7 +919,7 @@ reveal_type(InheritedValues.FALSE.value)  # revealed: Literal[0]
 reveal_type(enum_members(InheritedValues))
 ```
 
-Non-member declarations do not make alias detection inconclusive:
+Non-member declarations do not make alias detection inconclusive.
 
 ```py
 from enum import Enum
@@ -937,7 +937,7 @@ class ValuesWithHelper(int, Enum):
 reveal_type(enum_members(ValuesWithHelper))
 ```
 
-When a built-in conversion cannot be modeled precisely, its aliases remain unknown:
+When a built-in conversion cannot be modeled precisely, its aliases remain unknown.
 
 ```py
 from enum import Enum
@@ -953,7 +953,7 @@ reveal_type(ParsedIntegerValues.SECOND.name)  # revealed: Literal["SECOND"]
 reveal_type(enum_members(ParsedIntegerValues))  # revealed: Unknown
 ```
 
-Other built-in data types retain exact assigned values when no coercion is needed:
+Other built-in data types retain exact assigned values when no coercion is needed.
 
 ```py
 from enum import Enum
@@ -968,7 +968,7 @@ reveal_type(ByteValues.VALUE.value)  # revealed: Literal[b"value"]
 reveal_type(enum_members(ByteValues))
 ```
 
-If the data type would coerce the assigned value, its value and aliases remain unknown:
+If the data type would coerce the assigned value, its value and aliases remain unknown.
 
 ```py
 from enum import Enum
@@ -987,7 +987,7 @@ reveal_type(enum_members(CoercingByteValues))  # revealed: Unknown
 
 User-defined data types remain opaque even when they inherit from `int` or `str` without overriding
 any methods. Their construction, attribute access, equality, and hashing can all differ from the
-built-in type:
+built-in type.
 
 ```py
 from enum import Enum
@@ -1007,7 +1007,7 @@ reveal_type(enum_members(CustomValues))  # revealed: Unknown
 ```
 
 A user-defined behavior base can still affect member construction and attribute access, so it keeps
-the enum's values opaque even when a separate base selects a built-in data type:
+the enum's values opaque even when a separate base selects a built-in data type.
 
 ```py
 class Behavior:
@@ -1024,7 +1024,7 @@ reveal_type(ValuesWithBehavior.FALSE.value)  # revealed: Any
 
 Assigning to `__new__` can prevent us from validating members against its signature or inferring
 `.value` from the member right-hand side. Even if we can't analyze `__new__`, though, we still
-respect an explicit `_value_` annotation, and `__init__` can still validate the member arguments:
+respect an explicit `_value_` annotation, and `__init__` can still validate the member arguments.
 
 ```py
 from enum import Enum
@@ -1057,7 +1057,7 @@ class AssignedNewWithFunctionInit(Enum):
 ```
 
 An assigned hook also shadows same-name function hooks from classes later in the MRO. We should not
-validate members against the shadowed method:
+validate members against the shadowed method.
 
 ```py
 class FunctionNewBase(Enum):
@@ -1076,7 +1076,7 @@ reveal_type(AssignedNewChild.A.value)  # revealed: Any
 
 A custom `EnumMeta` metaclass can rewrite member values before the stdlib enum constructor validates
 and forwards them to `__new__` / `__init__`. We therefore avoid validating the raw right-hand side
-of member declarations in this case:
+of member declarations in this case.
 
 ```py
 from enum import EnumMeta, IntEnum
@@ -1095,7 +1095,7 @@ reveal_type(MyModelChoices.GOOD.name)  # revealed: Literal["GOOD"]
 ```
 
 An explicit `_value_` annotation on the transformed enum class still takes precedence, even when the
-annotation is inherited from a user-defined enum base:
+annotation is inherited from a user-defined enum base.
 
 ```py
 from enum import EnumMeta, IntEnum
@@ -1114,7 +1114,7 @@ reveal_type(AnnotatedChoices.GOOD._value_)  # revealed: int
 ```
 
 The metaclass can also transform assignments through `__prepare__` or through an assigned `__new__`
-hook:
+hook.
 
 ```py
 from enum import EnumMeta, IntEnum
@@ -1143,7 +1143,7 @@ reveal_type(AssignedChoices.GOOD.value)  # revealed: Any
 ### Non-member attributes with disallowed type
 
 Methods, callables, descriptors (including properties), and nested classes that are defined in the
-class are not treated as enum members:
+class are not treated as enum members.
 
 ```py
 from enum import Enum
@@ -1185,7 +1185,7 @@ reveal_type(enum_members(Answer))
 
 ### `enum.property`
 
-Enum attributes that are defined using `enum.property` are not considered members:
+Enum attributes that are defined using `enum.property` are not considered members.
 
 ```toml
 [environment]
@@ -1310,7 +1310,7 @@ Choice.A.value = 1  # error: [invalid-assignment]
 
 ### `types.DynamicClassAttribute`
 
-Attributes defined using `types.DynamicClassAttribute` are not considered members:
+Attributes defined using `types.DynamicClassAttribute` are not considered members.
 
 ```py
 from enum import Enum
@@ -1333,7 +1333,7 @@ reveal_type(enum_members(Answer))
 
 Stubs can optionally use `...` for the actual value. They should use `cast()` to declare the type of
 the enum member's value in cases where the value type cannot be unambiguously expressed as a static
-assignment without a type annotation:
+assignment without a type annotation.
 
 ```pyi
 from enum import Enum
@@ -1351,7 +1351,7 @@ reveal_type(enum_members(Color))
 
 ### Aliases
 
-Enum members can have aliases, which are not considered separate members:
+Enum members can have aliases, which are not considered separate members.
 
 ```py
 from enum import Enum
@@ -1369,7 +1369,7 @@ reveal_type(enum_members(Answer))
 reveal_type(Answer.DEFINITELY)  # revealed: Literal[Answer.YES]
 ```
 
-If a value is duplicated, we also treat that as an alias:
+If a value is duplicated, we also treat that as an alias.
 
 ```py
 from enum import Enum
@@ -1389,7 +1389,7 @@ reveal_type(Color.red)
 ```
 
 Literal metadata does not affect aliasing at runtime. A value returned from a function is therefore
-still an alias of the same literal written directly in the class body:
+still an alias of the same literal written directly in the class body.
 
 ```py
 from enum import Enum
@@ -1409,7 +1409,7 @@ reveal_type(RuntimeAlias.SECOND)  # revealed: RuntimeAlias
 ```
 
 Multiple aliases to the same member are also supported. This is a regression test for
-<https://github.com/astral-sh/ty/issues/1293>:
+<https://github.com/astral-sh/ty/issues/1293>.
 
 ```py
 from ty_extensions._internal import enum_members
@@ -1443,7 +1443,7 @@ reveal_type(ManyAliases.alias3.value)  # revealed: Literal["real_member"]
 reveal_type(ManyAliases.alias3.name)  # revealed: Literal["real_member"]
 ```
 
-`auto()` still uses the preceding concrete value even when `1` and `True` compare equal:
+`auto()` still uses the preceding concrete value even when `1` and `True` compare equal.
 
 ```py
 from enum import Enum, auto
@@ -1460,7 +1460,7 @@ reveal_type(enum_members(IntThenTrue))
 reveal_type(IntThenTrue.C.value)  # revealed: Literal[2]
 ```
 
-Functional enums also detect duplicate-value aliases in both dict and list-of-tuples forms:
+Functional enums also detect duplicate-value aliases in both dict and list-of-tuples forms.
 
 ```py
 from enum import Enum
@@ -1511,7 +1511,7 @@ class SingleMember(Enum):
 reveal_type(SingleMember.SINGLE.value)  # revealed: Literal[1]
 ```
 
-Usages of `auto()` can be combined with manual value assignments:
+Usages of `auto()` can be combined with manual value assignments.
 
 ```py
 class Mixed(Enum):
@@ -1527,7 +1527,7 @@ reveal_type(Mixed.AUTO_2.value)  # revealed: Literal[2]
 ```
 
 If `auto()` follows a non-literal value, the generated value widens to `int` since the previous
-value isn't known at type-check time:
+value isn't known at type-check time.
 
 ```py
 def f(n: int):
@@ -1544,7 +1544,7 @@ def f(n: int):
     reveal_type(Dynamic.B.value)  # revealed: int
 ```
 
-Bool literals are still concrete predecessors for `auto()`:
+Bool literals are still concrete predecessors for `auto()`.
 
 ```py
 class AfterFalse(Enum):
@@ -1560,7 +1560,7 @@ class AfterTrue(Enum):
 reveal_type(AfterTrue.B.value)  # revealed: Literal[2]
 ```
 
-When using `auto()` with `StrEnum`, the value is the lowercase name of the member:
+When using `auto()` with `StrEnum`, the value is the lowercase name of the member.
 
 ```py
 from enum import StrEnum, auto
@@ -1578,7 +1578,7 @@ class SingleMember(StrEnum):
 reveal_type(SingleMember.SINGLE.value)  # revealed: Literal["single"]
 ```
 
-Using `auto()` with `IntEnum` also produces precise literal values:
+Using `auto()` with `IntEnum` also produces precise literal values.
 
 ```py
 from enum import IntEnum, auto
@@ -1607,7 +1607,7 @@ reveal_type(Answer.NO.value)  # revealed: Literal[2]
 For an enum with a `str` data type, the generated value is still normalized to `str`. The result of
 using `auto()` with other non-integer data types is
 [hard to predict](https://github.com/astral-sh/ruff/pull/20541#discussion_r2381878613), so we use
-typeshed's `Any` annotation for `.value` in those cases:
+typeshed's `Any` annotation for `.value` in those cases.
 
 ```python
 from enum import Enum, auto
@@ -1655,7 +1655,7 @@ reveal_type(enum_members(Answer))
 ```
 
 `auto()` values are computed at runtime by the enum metaclass, so we skip validation against both
-`_value_` annotations and custom `__init__` signatures:
+`_value_` annotations and custom `__init__` signatures.
 
 ```py
 from enum import Enum, auto
@@ -1679,7 +1679,7 @@ reveal_type(WithInit.MERCURY.value)  # revealed: Any
 ```
 
 When `_generate_next_value_` is overridden, its return type is used for `auto()` value types, unless
-overridden by an explicit `_value_` annotation or a custom construction hook:
+overridden by an explicit `_value_` annotation or a custom construction hook.
 
 ```py
 from enum import StrEnum, IntEnum, auto
@@ -1749,7 +1749,7 @@ reveal_type(CustomNextValueInt.A.value)
 
 Assigning to `_generate_next_value_` can prevent us from inspecting its return type, in which case,
 `auto()` values become `Any` while explicit member values remain precise. We also avoid inferring
-aliases between generated values:
+aliases between generated values.
 
 ```py
 from enum import Enum, auto
@@ -1775,7 +1775,7 @@ reveal_type(ReassignedGenerator.EXPLICIT.value)  # revealed: Literal[1]
 reveal_type(enum_members(ReassignedGenerator))
 ```
 
-An assigned generator also shadows a function generator from a class later in the MRO:
+An assigned generator also shadows a function generator from a class later in the MRO.
 
 ```py
 class FunctionGeneratorBase(Enum):
@@ -1795,7 +1795,7 @@ reveal_type(AssignedGeneratorChild.A.value)  # revealed: Any
 When an enum defines both `_generate_next_value_` and a construction hook (`__new__`, `__init__`, or
 a custom enum metaclass `__new__`), the hook can rewrite `_value_` to a different type than the
 value returned by `_generate_next_value_`. The hook-based `Any` fallback should therefore take
-precedence:
+precedence.
 
 ```py
 from enum import Enum, EnumMeta, IntEnum, auto
@@ -1903,7 +1903,7 @@ reveal_type(enum_members(IntEnumDuplicateAutoAliases))
 ```
 
 For non-`auto()` members in a mixed enum, `_generate_next_value_` does not apply at all, and the
-inferred value type should be used (subject to the same hook-based `Any` fallback):
+inferred value type should be used (subject to the same hook-based `Any` fallback).
 
 ```py
 from enum import Enum, auto
@@ -1951,7 +1951,7 @@ def _inherited_mixed_instance(x: InheritedCustomNextValueChild):
 
 Even when a declaration becomes an alias, its original value is included in the `last_values` passed
 to `_generate_next_value_`. Here, `TRUE` is an alias of `ONE`, but `AFTER` still receives the value
-`2`:
+`2`.
 
 ```py
 from enum import Enum, auto
@@ -1991,7 +1991,7 @@ reveal_type(enum_members(Answer))
 reveal_type(Answer.OTHER)
 ```
 
-`member` can also be used as a decorator:
+`member` can also be used as a decorator.
 
 ```py
 from enum import Enum, member
@@ -2013,7 +2013,7 @@ reveal_type(enum_members(Answer))
 
 An attribute with a name beginning with a double underscore is treated as a non-member. This
 includes both [class-private names] (not ending in `__`) and dunder names (ending in `__`).
-CPython's enum metaclass excludes all such names from membership:
+CPython's enum metaclass excludes all such names from membership.
 
 ```py
 from enum import Enum, IntEnum
@@ -2031,7 +2031,7 @@ reveal_type(enum_members(Answer))
 ```
 
 Setting `__module__` (a common pattern to control `repr()` and `pickle` behavior) does not make it
-an enum member, even when the value type differs from the enum's value type:
+an enum member, even when the value type differs from the enum's value type.
 
 ```py
 class ExitCode(IntEnum):
@@ -2047,7 +2047,7 @@ reveal_type(enum_members(ExitCode))
 ### Ignored names
 
 An enum class can define a class symbol named `_ignore_`. This can be a string containing a
-whitespace-delimited list of names:
+whitespace-delimited list of names.
 
 ```py
 from enum import Enum
@@ -2067,7 +2067,7 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 ```
 
-`_ignore_` can also be a list of names:
+`_ignore_` can also be a list of names.
 
 ```py
 class Answer2(Enum):
@@ -2087,7 +2087,7 @@ reveal_type(enum_members(Answer2))
 ### Special names
 
 Make sure that special names like `name` and `value` can be used for enum members (without
-conflicting with `Enum.name` and `Enum.value`):
+conflicting with `Enum.name` and `Enum.value`).
 
 ```py
 from enum import Enum
@@ -2165,7 +2165,7 @@ reveal_type(list(Color))  # revealed: list[Color]
 
 ## Methods / non-member attributes
 
-Methods and non-member attributes defined in the enum class can be accessed on enum members:
+Methods and non-member attributes defined in the enum class can be accessed on enum members.
 
 ```py
 from enum import Enum
@@ -2250,7 +2250,7 @@ Answer.ALIAS = 0  # error: [invalid-assignment]
 Answer.SAME_VALUE = 0  # error: [invalid-assignment]
 ```
 
-The assigned expression is still checked when the target is read-only:
+The assigned expression is still checked when the target is read-only.
 
 ```py
 # error: [invalid-assignment]
@@ -2259,7 +2259,7 @@ Answer.YES = missing
 ```
 
 The same restriction applies through a `type[Answer]` receiver and to enums created with the
-functional syntax:
+functional syntax.
 
 ```py
 def reassign(cls: type[Answer]):
@@ -2320,7 +2320,7 @@ class Settings:
 Settings.default = Answer.YES
 ```
 
-An enum's non-member attribute can also hold a member of another enum:
+An enum's non-member attribute can also hold a member of another enum.
 
 ```py
 class Other(Enum):
@@ -2540,7 +2540,7 @@ def f(color: Color):
         reveal_type(color)  # revealed: Never
 ```
 
-An `Enum` subclass without any defined members can be subclassed:
+An `Enum` subclass without any defined members can be subclassed.
 
 ```py
 from enum import Enum
@@ -2675,7 +2675,7 @@ def _(x: EnumWithSubclassOfEnumMetaMetaclass):
     reveal_type(x._name_)  # revealed: Literal["NO", "YES"]
 ```
 
-Open `EnumMeta`-based classes still reject ordinary calls until they are finalized with members:
+Open `EnumMeta`-based classes still reject ordinary calls until they are finalized with members.
 
 ```py
 from enum import EnumMeta
@@ -2697,7 +2697,7 @@ python-version = "3.11"
 ```
 
 On Python 3.11+, open `EnumMeta`-based classes also accept the functional-enum calling convention,
-though the inferred result is still imprecise:
+though the inferred result is still imprecise.
 
 ```py
 from enum import EnumMeta
@@ -2782,7 +2782,7 @@ reveal_type(enum_members(Color))
 
 ### Name mismatch diagnostics
 
-The name passed to `Enum` must match the variable it is assigned to:
+The name passed to `Enum` must match the variable it is assigned to.
 
 ```py
 from enum import Enum
@@ -2793,7 +2793,7 @@ name = "GoodMatch2"
 GoodMatch2 = Enum(name, "A B")  # also fine
 ```
 
-If there is a mismatch, we emit the following diagnostic:
+If there is a mismatch, we emit the following diagnostic.
 
 ```py
 # snapshot: mismatched-type-name
@@ -2808,7 +2808,7 @@ warning[mismatched-type-name]: The name passed to `Enum` must match the variable
   |                 ^^^^^^^^^^^ Expected "Mismatch", got "WrongName"
 ```
 
-If the name is not a string literal, we also emit a diagnostic:
+If the name is not a string literal, we also emit a diagnostic.
 
 ```py
 def f(name: str) -> None:
@@ -2886,7 +2886,7 @@ reveal_type(Color.BLUE.value)  # revealed: Literal[3]
 ```
 
 When mixing explicit values with `auto()` in a dict, the auto value is derived from the previous
-member's value, not from `start + index`:
+member's value, not from `start + index`.
 
 ```py
 from enum import Enum, auto
@@ -2902,7 +2902,7 @@ reveal_type(Mixed.B.value)  # revealed: Literal[11]
 reveal_type(Mixed.C.value)  # revealed: Literal[12]
 ```
 
-This also applies when the previous value is a bool literal:
+This also applies when the previous value is a bool literal.
 
 ```py
 from enum import Enum, auto
@@ -2916,7 +2916,7 @@ reveal_type(AfterTrue.B.value)  # revealed: Literal[2]
 
 ### `auto()` in tuple/list entries
 
-`auto()` should also expand in tuple/list entry forms of the functional syntax:
+`auto()` should also expand in tuple/list entry forms of the functional syntax.
 
 ```py
 from enum import Enum, Flag, auto
@@ -2932,7 +2932,7 @@ reveal_type(Perm.READ.value)  # revealed: Literal[1]
 reveal_type(Perm.WRITE.value)  # revealed: Literal[2]
 ```
 
-Explicit-value forms should ignore `start`, just like static enums do:
+Explicit-value forms should ignore `start`, just like static enums do.
 
 ```py
 from enum import Enum, Flag, auto
@@ -3029,7 +3029,7 @@ reveal_type(enum_members(Color))  # revealed: Unknown
 ### Duplicate positional and keyword arguments
 
 Passing the same functional-enum parameter both positionally and by keyword should still report the
-usual duplicate-argument diagnostic:
+usual duplicate-argument diagnostic.
 
 ```py
 from enum import Enum
@@ -3125,7 +3125,7 @@ Color = Enum("Color", "RED GREEN BLUE", bad_kwarg=True)
 
 ### Definitely invalid `names` arguments
 
-Functional enums should still reject obviously invalid `names` values:
+Functional enums should still reject obviously invalid `names` values.
 
 ```py
 from enum import Enum
@@ -3137,7 +3137,7 @@ Color = Enum("Color", 123)
 reveal_type(enum_members(Color))  # revealed: Unknown
 ```
 
-Empty functional enums are valid, even though they have no members:
+Empty functional enums are valid, even though they have no members.
 
 ```py
 from enum import Enum
@@ -3158,7 +3158,7 @@ class ExtendedEmpty(EmptyFromString):
 reveal_type(enum_members(ExtendedEmpty))
 ```
 
-Literal list/tuple/dict inputs that use unpacking are rejected:
+Literal list/tuple/dict inputs that use unpacking are rejected.
 
 ```py
 from enum import Enum
@@ -3183,7 +3183,7 @@ Enum("BadDoubleStar", {**bad_keys})
 
 ### Keyword argument type validation
 
-Functional enum construction should still preserve overload-based argument validation:
+Functional enum construction should still preserve overload-based argument validation.
 
 ```py
 from enum import Enum
@@ -3263,7 +3263,7 @@ reveal_type(Perm.EXECUTE.value)  # revealed: Literal[8]
 ```
 
 Non-literal integer `start` values should widen member values to `int` rather than pretending the
-default `start=1` was used:
+default `start=1` was used.
 
 ```py
 from enum import Enum, Flag
@@ -3330,7 +3330,7 @@ reveal_type(enum_members(Custom))  # revealed: Unknown
 ```
 
 Functional enums should still validate `type=` arguments eagerly, both for obvious non-types and for
-bases that are structurally invalid to combine with `Enum`:
+bases that are structurally invalid to combine with `Enum`.
 
 ```py
 from enum import Enum
@@ -3352,7 +3352,7 @@ reveal_mro(BadBase)  # revealed: (<class 'BadBase'>, <class 'Enum'>, <class 'obj
 ```
 
 Mixins that are incompatible with the enum base should still report an error and avoid exposing a
-precise member set:
+precise member set.
 
 ```py
 from enum import IntEnum, IntFlag
@@ -3369,7 +3369,7 @@ reveal_type(enum_members(BadIntFlag))  # revealed: Unknown
 ```
 
 Functional enums with a `type=` mixin should also have the same MRO as the equivalent static enum
-class:
+class.
 
 ```py
 from enum import Enum
@@ -3504,7 +3504,7 @@ def _(answer: type[Answer]) -> None:
 
 ### Implicitly final
 
-Functional enums with members should also be implicitly final:
+Functional enums with members should also be implicitly final.
 
 ```py
 from enum import Enum
@@ -3823,7 +3823,7 @@ def color_name_misses_one_variant(color: Color) -> str:
 ```
 
 A functional enum inherits `object.__eq__`, so comparing members with `==` and `!=` narrows just as
-`is` does:
+`is` does.
 
 ```py
 def equality(color: Color) -> None:
@@ -3843,7 +3843,7 @@ def inequality(color: Color) -> None:
 
 Value patterns narrow members of a functional enum exactly as they do for an enum declared with
 class syntax. A `match` that covers every member is exhaustive, so the wildcard case is unreachable
-and `assert_never` holds:
+and `assert_never` holds.
 
 ```toml
 [environment]
@@ -3869,7 +3869,7 @@ def color_name(color: Color) -> str:
             assert_never(color)
 ```
 
-When a member is left uncovered, the wildcard case receives exactly that member:
+When a member is left uncovered, the wildcard case receives exactly that member.
 
 ```py
 def color_name_misses_one_variant(color: Color) -> str:
@@ -3934,7 +3934,7 @@ will result in a `TypeError` at runtime.
 
 ### PEP 695 syntax
 
-Using PEP 695 type parameters on an enum is invalid:
+Using PEP 695 type parameters on an enum is invalid.
 
 ```toml
 [environment]
@@ -3952,7 +3952,7 @@ class E[T](Enum):
 
 ### Legacy `Generic` base class
 
-Inheriting from both `Enum` and `Generic[T]` is also invalid:
+Inheriting from both `Enum` and `Generic[T]` is also invalid.
 
 ```py
 from enum import Enum
@@ -3968,7 +3968,7 @@ class F(Enum, Generic[T]):
 
 ### Swapped order (`Generic` first)
 
-The order of bases doesn't matter; it's still invalid:
+The order of bases doesn't matter; it's still invalid.
 
 ```py
 from enum import Enum
@@ -3984,7 +3984,7 @@ class G(Generic[T], Enum):
 
 ### Enum subclasses
 
-Subclasses of enum base classes also cannot be generic:
+Subclasses of enum base classes also cannot be generic.
 
 ```toml
 [environment]
@@ -4008,7 +4008,7 @@ class MyFlagEnum(IntEnum, Generic[T]):
 
 ### Custom enum base class
 
-Even with custom enum subclasses that don't have members, they cannot be made generic:
+Even with custom enum subclasses that don't have members, they cannot be made generic.
 
 ```toml
 [environment]
@@ -4037,7 +4037,7 @@ python-version = "3.11"
 ```
 
 The constructor of an enum takes a single `value` argument and returns the enum member corresponding
-to that value:
+to that value.
 
 ```py
 from enum import Enum, IntEnum, StrEnum
@@ -4066,7 +4066,7 @@ reveal_type(into_regular_callable(Answer))
 ```
 
 The signature of `Enum`, `IntEnum`, and `StrEnum` is defined by `EnumMeta.__call__`, which allows
-dynamic construction of enums using the functional syntax:
+dynamic construction of enums using the functional syntax.
 
 ```py
 from enum import Enum, IntEnum, StrEnum

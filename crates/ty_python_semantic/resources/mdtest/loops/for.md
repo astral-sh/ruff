@@ -105,7 +105,7 @@ class Example:
     reveal_type(value)  # revealed: int
 ```
 
-The emptiness refinement is independent of the order in which range values are assigned:
+The emptiness refinement is independent of the order in which range values are assigned.
 
 ```py
 def empty_first(flag: bool) -> None:
@@ -317,7 +317,7 @@ def non_empty_break() -> None:
 ```
 
 Starred elements and dictionary unpacking make emptiness ambiguous unless the literal also contains
-a required element:
+a required element.
 
 ```py
 def _(items: list[int], mapping: dict[str, int]):
@@ -382,21 +382,21 @@ for key, value in {"a": 1, "b": 2}.items():
     reveal_type(value)  # revealed: Literal[1, 2]
 ```
 
-Storing the view in a variable retains these types:
+Storing the view in a variable retains these types.
 
 ```py
 values = {"a": 1, "b": 2}.values()
 reveal_type(values)  # revealed: dict_values[Literal["a", "b"], Literal[1, 2]]
 ```
 
-Comprehensions use the same precise types for their iteration targets:
+Comprehensions use the same precise types for their iteration targets.
 
 ```py
 [reveal_type(key) for key in {"a": 1, "b": 2}]  # revealed: Literal["a", "b"]
 [reveal_type(value) for value in {1: "a", 2: "b"}.values()]  # revealed: Literal["a", "b"]
 ```
 
-This also applies when the target is an attribute or a tuple of names:
+This also applies when the target is an attribute or a tuple of names.
 
 ```py
 from typing import Literal
@@ -413,7 +413,7 @@ for number, letter in {(1, "a"): 0, (2, "b"): 0}:
     reveal_type(letter)  # revealed: Literal["a", "b"]
 ```
 
-Nested mutable containers still permit mutation:
+Nested mutable containers still permit mutation.
 
 ```py
 for values in {"a": [1]}.values():
@@ -438,7 +438,7 @@ def _(mapping: dict[str, int]):
 ```
 
 Repeated keys do not imply a fixed iteration length. Values from overwritten entries may still be
-included in the inferred union:
+included in the inferred union.
 
 ```py
 for value in {**{1: "a"}, 1: "b"}.values():
@@ -613,7 +613,7 @@ def f(x: IntIterator | StrIterator):
         reveal_type(a)  # revealed: int | str
 ```
 
-Most real-world iterable types use `Iterator` as the return annotation of their `__iter__` methods:
+Most real-world iterable types use `Iterator` as the return annotation of their `__iter__` methods.
 
 ```py
 def g(
@@ -631,7 +631,7 @@ def g(
 
 If all elements in a union can be iterated over, we "union together" their "tuple specs" and are
 able to infer the iterable element precisely when iterating over the union, in the same way that we
-infer a precise type for the iterable element when iterating over a `Literal` string or bytes type:
+infer a precise type for the iterable element when iterating over a `Literal` string or bytes type.
 
 ```py
 from typing import Literal
@@ -645,7 +645,7 @@ def f(x: Literal["foo", b"bar"], y: Literal["foo"] | range):
 
 ## Attribute errors from iterated aliased unions
 
-We should still report missing attributes when a loop variable comes from an aliased union element:
+We should still report missing attributes when a loop variable comes from an aliased union element.
 
 ```toml
 [environment]
@@ -792,7 +792,7 @@ for x in Test():
 ## Intersection type via isinstance narrowing
 
 When we have an intersection type via `isinstance` narrowing, we should be able to infer the
-iterable element type precisely:
+iterable element type precisely.
 
 ```py
 from typing import Sequence
@@ -1154,7 +1154,7 @@ This snippet tests that we infer the element type correctly in the following edg
 - `__getitem__` is set to a non-callable type
 
 It's important that we emit a diagnostic here, but it's also important that we still use the return
-type of the iterator's `__next__` method as the inferred type of `x` in the `for` loop:
+type of the iterator's `__next__` method as the inferred type of `x` in the `for` loop.
 
 ```py
 def _(flag: bool):
@@ -1306,7 +1306,7 @@ info: `__getitem__` must be at least as permissive as `def __getitem__(self, key
 ## Possibly missing `__iter__` but definitely bound `__getitem__`
 
 Here, we should not emit a diagnostic: if `__iter__` is unbound, we should fallback to
-`__getitem__`:
+`__getitem__`.
 
 ```py
 class Iterator:
@@ -1608,7 +1608,7 @@ for char in b"abcde":
 
 A class literal can be iterated over if it has `Any` or `Unknown` in its MRO, since the
 `Any`/`Unknown` element in the MRO could materialize to a class with a custom metaclass that defines
-`__iter__` for all instances of the metaclass:
+`__iter__` for all instances of the metaclass.
 
 ```py
 from unresolved_module import SomethingUnknown  # error: [unresolved-import]
@@ -1806,7 +1806,7 @@ reveal_type(my_dict["x"])  # revealed: int
 
 ### `del` prevents bindings from reaching the loopback
 
-This `x` cannot reach the use at the top of the loop:
+This `x` cannot reach the use at the top of the loop.
 
 ```py
 for _ in range(1_000_000):
@@ -1816,7 +1816,7 @@ for _ in range(1_000_000):
 ```
 
 On the other hand, if `x` is defined before the loop, the `del` makes it a
-`[possibly-unresolved-reference]`:
+`[possibly-unresolved-reference]`.
 
 ```py
 def iterable() -> list[int]:
@@ -2142,7 +2142,7 @@ def _():
             y = 99
 ```
 
-On the other hand, we don't want to shadow true positives:
+On the other hand, we don't want to shadow true positives.
 
 ```py
 x = 0

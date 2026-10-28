@@ -3,7 +3,7 @@
 ## Basic
 
 Within a function scope, the declared type of each parameter is its annotated type (or Unknown if
-not annotated). The initial inferred type is the annotated type of the parameter, if any:
+not annotated). The initial inferred type is the annotated type of the parameter, if any.
 
 ```py
 def f(declared: int, unannotated):
@@ -12,7 +12,7 @@ def f(declared: int, unannotated):
 ```
 
 The variadic parameter is a variadic tuple of its annotated type; the variadic-keywords parameter is
-a dictionary from strings to its annotated type:
+a dictionary from strings to its annotated type.
 
 ```py
 def g(*args: int, **kwargs: int):
@@ -23,7 +23,7 @@ def g(*args: int, **kwargs: int):
 ## Unannotated parameters with defaults
 
 If there is no annotation but there is a default value, the inferred parameter type is the union of
-the inferred type of the default value and `Unknown`:
+the inferred type of the default value and `Unknown`.
 
 ```py
 def f(a="foo", b=0, c=True, d=None):
@@ -34,7 +34,7 @@ def f(a="foo", b=0, c=True, d=None):
 ```
 
 This means that the code in the function body needs to handle the case where the parameter is set to
-the default value:
+the default value.
 
 ```py
 def g(x=0):
@@ -44,7 +44,7 @@ def g(x=0):
     x + "foo"
 ```
 
-But it still allows callers to pass in arguments of a wider type:
+But it still allows callers to pass in arguments of a wider type.
 
 ```py
 g(1.5)  # fine
@@ -184,7 +184,7 @@ def x(y: int | None = None) -> str | None: ...
 ### In `if TYPE_CHECKING` blocks
 
 We generally view code in `if TYPE_CHECKING` blocks as having the same semantics and exemptions to
-code in stub files:
+code in stub files.
 
 ```py
 from typing import TYPE_CHECKING

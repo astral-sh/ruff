@@ -178,7 +178,7 @@ def _(val: int | None):
 ```
 
 Narrowing from the terminal branch is also preserved when deciding whether a later overloaded call
-returns:
+returns.
 
 ```py
 from typing import Literal, overload
@@ -202,7 +202,7 @@ def _(value: Literal[0, 1]) -> None:
     return "unreachable"
 ```
 
-This also works when the `NoReturn` function is called in the else branch:
+This also works when the `NoReturn` function is called in the else branch.
 
 ```py
 import sys
@@ -215,7 +215,7 @@ def _(val: int | None):
     reveal_type(val)  # revealed: int
 ```
 
-Narrowing that occurs after the `NoReturn` call must also be discarded with the unreachable branch:
+Narrowing that occurs after the `NoReturn` call must also be discarded with the unreachable branch.
 
 ```py
 from typing_extensions import Never
@@ -235,7 +235,7 @@ def _(x: int | None, flag: bool):
     reveal_type(x)  # revealed: int
 ```
 
-Call constraints that precede a nested merge must still gate narrowing later in the outer branch:
+Call constraints that precede a nested merge must still gate narrowing later in the outer branch.
 
 ```py
 from typing_extensions import Never
@@ -261,7 +261,7 @@ def _(x: int | None, outer: bool, inner: bool) -> None:
     reveal_type(x)  # revealed: int
 ```
 
-Call constraints introduced inside the nested branches are still discarded at that merge:
+Call constraints introduced inside the nested branches are still discarded at that merge.
 
 ```py
 def _(x: int | None, outer: bool, inner: bool) -> None:
@@ -280,7 +280,7 @@ def _(x: int | None, outer: bool, inner: bool) -> None:
     reveal_type(x)  # revealed: None | int
 ```
 
-If every nested branch contains a call, their combined call constraint must be preserved:
+If every nested branch contains a call, their combined call constraint must be preserved.
 
 ```py
 def _(x: int | None, outer: bool, inner: bool) -> None:
@@ -384,7 +384,7 @@ def _(x: int | None):
     reveal_type(x)  # revealed: int
 ```
 
-This also works when the always-true condition is nested inside a narrowing branch:
+This also works when the always-true condition is nested inside a narrowing branch.
 
 ```py
 from typing import Literal

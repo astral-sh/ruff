@@ -10,7 +10,7 @@ external = ["EXT"]
 ## `ruff:ignore`
 
 Each Ruff rule code receives a separate diagnostic. Rule names and external or unknown codes are
-preserved:
+preserved.
 
 ```py
 # snapshot: rule-codes-in-suppression-comments
@@ -48,7 +48,7 @@ help: Replace rule code with name
   |
 ```
 
-Valid human-readable names are unaffected:
+Valid human-readable names are unaffected.
 
 ```py
 # snapshot: rule-codes-in-suppression-comments
@@ -123,7 +123,7 @@ help: Replace rule code with name
 
 ## Matched `ruff:disable` and `ruff:enable`
 
-Matching comments are reported and fixed together:
+Matching comments are reported and fixed together.
 
 ```py
 # snapshot: rule-codes-in-suppression-comments
@@ -175,7 +175,7 @@ help: Replace rule code with name
 ## Unmatched `ruff:disable`
 
 An unmatched disable comment is still an effective suppression through the end of its indentation
-level:
+level.
 
 ```py
 # snapshot: rule-codes-in-suppression-comments
@@ -198,7 +198,7 @@ help: Replace rule code with name
 
 ## Unmatched `ruff:enable`
 
-An unmatched enable comment is invalid and is left to `invalid-suppression-comment`:
+An unmatched enable comment is invalid and is left to `invalid-suppression-comment`.
 
 ```py
 # ruff:enable[F401]
@@ -206,7 +206,7 @@ An unmatched enable comment is invalid and is left to `invalid-suppression-comme
 
 ## Redirected codes
 
-Redirected codes are replaced with the name of their canonical rule:
+Redirected codes are replaced with the name of their canonical rule.
 
 ```py
 # snapshot: rule-codes-in-suppression-comments
@@ -231,7 +231,7 @@ help: Replace rule code with name
 
 ## Nested suppression comments
 
-Only the rule codes within a nested suppression comment are replaced:
+Only the rule codes within a nested suppression comment are replaced.
 
 ```py
 # snapshot: rule-codes-in-suppression-comments
@@ -268,7 +268,7 @@ help: Replace rule code with name
 
 ## Comments without Ruff rule codes
 
-Comments containing only names and external or unknown codes are unchanged:
+Comments containing only names and external or unknown codes are unchanged.
 
 ```py
 # ruff:ignore[unused-import, EXT001, UNKNOWN]
@@ -277,7 +277,7 @@ value = 1
 
 ## Self-suppression
 
-The rule can be suppressed by its code or name:
+The rule can be suppressed by its code or name.
 
 ```py
 # ruff:ignore[F401, RUF106]
@@ -289,7 +289,7 @@ value = 1
 value = 1
 ```
 
-The diagnostic can also be suppressed with a `noqa` comment:
+The diagnostic can also be suppressed with a `noqa` comment.
 
 ```py
 value = 1  # ruff:ignore[F401]  # noqa: RUF106

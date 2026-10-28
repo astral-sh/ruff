@@ -27,7 +27,7 @@ def _(x: bytes):
         reveal_type(x)  # revealed: Literal[b"a", b"b"]
 ```
 
-Membership in a container with literal elements narrows a broad builtin type to those literals:
+Membership in a container with literal elements narrows a broad builtin type to those literals.
 
 ```py
 from typing import Literal
@@ -48,7 +48,7 @@ def from_dict(value: str, valid_values: dict[MyType, int]) -> int | None:
 ```
 
 Explicitly annotated literals remain unpromotable through membership narrowing and inferred instance
-attributes:
+attributes.
 
 ```py
 from typing import Literal
@@ -232,7 +232,7 @@ def _(x: Foo):
 
 With strict equality narrowing enabled, a broad union arm and a broad element type are preserved
 when a membership test succeeds, while literal arms are still narrowed safely. Tuple elements are
-also preserved because their subclasses can override equality:
+also preserved because their subclasses can override equality.
 
 ```toml
 [environment]
@@ -430,7 +430,7 @@ def empty_bytes(x: bytes):
 ## Byte containment
 
 `bytes` and `bytearray` accept byte subsequences and objects implementing `__index__`, not only the
-integers described by their iteration type. We therefore leave the subject unchanged:
+integers described by their iteration type. We therefore leave the subject unchanged.
 
 ```py
 from typing import Literal, final
@@ -674,7 +674,7 @@ def mutable_global_rhs(x: str | None, unavailable: set[str | None]) -> None:
 ## Combining `not in` conditions
 
 When either of two membership exclusions can hold, only the values excluded by both conditions
-remain excluded. The earlier `bytes` exclusion is preserved:
+remain excluded. The earlier `bytes` exclusion is preserved.
 
 ```py
 def disjoint_groups(value):
@@ -691,7 +691,7 @@ def overlapping_groups(value):
 ```
 
 Conjoining several disjoint groups still retains only the original `bytes` exclusion, without
-multiplying the redundant alternatives at each condition:
+multiplying the redundant alternatives at each condition.
 
 ```py
 def repeated_groups(value):
@@ -737,7 +737,7 @@ types such as `int` and classes with custom equality when they might still match
 A non-final element type is assumed not to have a subclass that overrides equality, so membership
 can remove `None` just as an equality check does. Different classes can still compare equal by
 identity, however, if one inherits from the other or they share a subclass through multiple
-inheritance. Membership must preserve these overlapping class types:
+inheritance. Membership must preserve these overlapping class types.
 
 ```py
 class Foo: ...
@@ -833,7 +833,7 @@ def incompatible_tuple_key(
 ### Classes that define `__contains__`
 
 When a class defines `__contains__`, membership need not check the values produced by iteration. The
-iterator's element type therefore cannot narrow the value being tested:
+iterator's element type therefore cannot narrow the value being tested.
 
 ```py
 from collections.abc import Iterator
@@ -858,7 +858,7 @@ def custom_contains(
 
 A subclass can add `__contains__`, so an `__iter__` annotation on a non-final class is not enough to
 narrow a membership test. A final class cannot gain a new `__contains__` method through subclassing;
-if it only defines `__iter__`, membership is known to check the iterated values:
+if it only defines `__iter__`, membership is known to check the iterated values.
 
 ```py
 from collections.abc import Iterator
@@ -1031,7 +1031,7 @@ def custom_tuple_not_in(x: Literal[1] | None, values: ContainsNothingTuple):
 
 ## Assignment expression on the right-hand side
 
-A named expression around a tuple literal is still known to use tuple membership:
+A named expression around a tuple literal is still known to use tuple membership.
 
 ```py
 from typing import Literal, final
@@ -1283,7 +1283,7 @@ def custom_containment_component_prevents_narrowing(
 
 ## Range membership
 
-A `range` contains integers, so a string literal can be removed from the type of the tested value:
+A `range` contains integers, so a string literal can be removed from the type of the tested value.
 
 ```py
 from typing import Literal
@@ -1296,7 +1296,7 @@ def range_membership(value: Literal["x", 1], values: range) -> None:
 ## `TypedDict` key membership
 
 Membership in a closed `TypedDict` checks its finite set of literal string keys, so the tested value
-can be narrowed to a possible key. An open `TypedDict` can contain arbitrary additional string keys:
+can be narrowed to a possible key. An open `TypedDict` can contain arbitrary additional string keys.
 
 ```py
 from typing import Literal
@@ -1426,7 +1426,7 @@ def inline_enum_set(x: Color):
 
 When the container's element type is a union of enum literals, membership narrows to that union.
 Without the annotation, the tuple's elements are widened to `Color`, so the comprehension remains
-`list[Color]`:
+`list[Color]`.
 
 ```py
 SelectedColor = Literal[Color.RED, Color.GREEN]

@@ -9,7 +9,7 @@ method. They are not otherwise used by dataclasses.
 
 ## Basic
 
-Consider the following dataclass example where the `db` attribute is annotated with `InitVar`:
+Consider the following dataclass example where the `db` attribute is annotated with `InitVar`.
 
 ```py
 from dataclasses import InitVar, dataclass
@@ -24,13 +24,13 @@ class Person:
     age: int
 ```
 
-We can see in the signature of `__init__` that `db` is included as an argument:
+We can see in the signature of `__init__` that `db` is included as an argument.
 
 ```py
 reveal_type(Person.__init__)  # revealed: (self: Person, db: Database, name: str, age: int) -> None
 ```
 
-However, when we create an instance of this dataclass, the `db` attribute is not accessible:
+However, when we create an instance of this dataclass, the `db` attribute is not accessible.
 
 ```py
 db = Database()
@@ -39,13 +39,13 @@ alice = Person(db, "Alice", 30)
 alice.db  # error: [unresolved-attribute]
 ```
 
-The `db` attribute is also not accessible on the class itself:
+The `db` attribute is also not accessible on the class itself.
 
 ```py
 Person.db  # error: [unresolved-attribute]
 ```
 
-Other fields can still be accessed normally:
+Other fields can still be accessed normally.
 
 ```py
 reveal_type(alice.name)  # revealed: str
@@ -55,7 +55,7 @@ reveal_type(alice.age)  # revealed: int
 ## `InitVar` with default value
 
 An `InitVar` can also have a default value. In this case, the attribute *is* accessible on the class
-and on instances:
+and on instances.
 
 ```py
 from dataclasses import InitVar, dataclass
@@ -78,7 +78,7 @@ reveal_type(Person.metadata)  # revealed: str
 ```
 
 Field synthesis still follows declaration order even when an `InitVar` field name shadows a type
-name referenced by an earlier annotation:
+name referenced by an earlier annotation.
 
 ```py
 from dataclasses import InitVar, dataclass
@@ -119,7 +119,7 @@ def fn():
 ## Overwritten `InitVar`
 
 We do not emit an error if an `InitVar` attribute is later overwritten on the instance. In that
-case, we also allow the attribute to be accessed:
+case, we also allow the attribute to be accessed.
 
 ```py
 from dataclasses import InitVar, dataclass
@@ -141,7 +141,7 @@ reveal_type(alice.metadata)  # revealed: str
 
 ### Syntax
 
-`InitVar` can only be used with a single argument:
+`InitVar` can only be used with a single argument.
 
 ```py
 from dataclasses import InitVar, dataclass
@@ -170,7 +170,7 @@ reveal_type(AlsoWrong.__init__)
 reveal_type(AlsoWrong(42).x)  # revealed: Unknown
 ```
 
-A bare `InitVar` is not allowed according to the [type annotation grammar]:
+A bare `InitVar` is not allowed according to the [type annotation grammar].
 
 ```py
 @dataclass
@@ -180,7 +180,7 @@ class AlsoWrong:
 
 ### Outside of dataclasses
 
-`InitVar` annotations are not allowed outside of dataclass attribute annotations:
+`InitVar` annotations are not allowed outside of dataclass attribute annotations.
 
 ```py
 from typing import TypedDict

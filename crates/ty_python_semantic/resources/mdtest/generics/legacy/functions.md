@@ -3,7 +3,7 @@
 ## Typevar must be used at least twice
 
 If you're only using a typevar for a single parameter, you don't need the typevar — just use
-`object` (or the typevar's upper bound):
+`object` (or the typevar's upper bound).
 
 ```py
 from typing import TypeVar
@@ -36,7 +36,7 @@ def return_value(x: T) -> T:
     return x
 ```
 
-Each typevar must also appear _somewhere_ in the parameter list:
+Each typevar must also appear _somewhere_ in the parameter list.
 
 ```py
 def absurd() -> T:
@@ -941,7 +941,7 @@ reveal_type(constrained(identity))  # revealed: Unknown
 
 All arguments of a generic call must be assignable to the chosen bound of a constrained type
 variable. If call inference falls back to a union that violates the constraints of a given type
-variable, the failure diagnostic will still be reported:
+variable, the failure diagnostic will still be reported.
 
 ```py
 from typing import TypeVar
@@ -973,7 +973,7 @@ info: Type variable defined here
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
-The same applies when the type variable is inferred through a covariant wrapper:
+The same applies when the type variable is inferred through a covariant wrapper.
 
 ```py
 from typing import Generic
@@ -1006,7 +1006,7 @@ def _(box: Covariant[int], value: str) -> None:
 ```
 
 If arguments disagree on the constraints of multiple type variables, a diagnostic for each
-unsatisfied constraint will be reported:
+unsatisfied constraint will be reported.
 
 ```py
 U = TypeVar("U", bytes, float)
@@ -1020,7 +1020,7 @@ def _(x: int, y: str, z: bytes, w: float) -> None:
     g(x, y, z, w)
 ```
 
-Note that a gradual type is compatible with any declared constraint:
+Note that a gradual type is compatible with any declared constraint.
 
 ```py
 from typing import Any
@@ -1033,7 +1033,7 @@ def _(value: Any, text: str) -> None:
 
 If conflicting invariant arguments create an unsatisfiable set of constraints for a given
 constrained type variable, a diagnostic should still be reported for the unsatisfied declared
-constraint:
+constraint.
 
 ```py
 from typing import TypeVar
@@ -1051,7 +1051,7 @@ def _(x: list[int], y: list[str]) -> None:
 ```
 
 Similarly, the unsatisfiable constraints of a given type variable should not suppress diagnostics
-from an unrelated type variable whose declared constraints are not satisfied:
+from an unrelated type variable whose declared constraints are not satisfied.
 
 ```py
 U = TypeVar("U")
@@ -1069,7 +1069,7 @@ def _(x: int, y: str, a: list[int], b: list[str]) -> None:
 ## Diagnostic recovery with outer typevars
 
 If a failed argument relation involves an outer bounded type variable, we report the incompatible
-argument without reporting the outer type variable as unsatisfiable:
+argument without reporting the outer type variable as unsatisfiable.
 
 ```py
 from typing import Callable, TypeAlias, TypeVar
@@ -1089,7 +1089,7 @@ def outer(value: list[U], callback: Callable[[Nested[U]], None]) -> None:
 ## Overload selection with conflicting constrained arguments
 
 An overload arm which does not satisfy the bounds of a constrained type variable should not be
-chosen through a recovery specialization:
+chosen through a recovery specialization.
 
 ```py
 from typing import Literal, TypeVar, overload
@@ -1113,7 +1113,7 @@ reveal_type(f("a", 1))  # revealed: Literal[False]
 ## Conflicting overloads against a constrained typevar
 
 If every overload conflicts with the bounds of a constrained type variable, we report the diagnostic
-from a single failing alternative:
+from a single failing alternative.
 
 ```py
 from typing import Callable, TypeVar, overload
@@ -1139,7 +1139,7 @@ def _(value: str) -> None:
 ```
 
 If the overloads fail due to the constraints of different type variables, we report a single failure
-for each type variable:
+for each type variable.
 
 ```py
 U = TypeVar("U", int, str)
@@ -1192,7 +1192,7 @@ def bad_return(x: T) -> T:
 ## Using float as an upper bound
 
 An upper bound of `float` is internally treated as if the bound would be `float | int`. Normal
-arithmetic operations are available on that type:
+arithmetic operations are available on that type.
 
 ```py
 from typing_extensions import TypeVar
@@ -1234,7 +1234,7 @@ def same_types(cond: bool, t1: T, t2: T) -> T:
 ## All occurrences of the same constrained typevar have the same type
 
 The above is true even when the typevars are constrained. Here, both `int` and `str` have `__add__`
-methods that are compatible with the return type, so the `return` expression is always well-typed:
+methods that are compatible with the return type, so the `return` expression is always well-typed.
 
 ```py
 from typing import TypeVar
@@ -1263,7 +1263,7 @@ def positive_typevar(t: S) -> S:
 ```
 
 Narrowing should preserve the constrained typevar identity so the narrowed value remains assignable
-to the function's return type:
+to the function's return type.
 
 ```py
 from typing import TypeVar
@@ -1279,7 +1279,7 @@ def return_narrowed_typevar(x: NarrowedT) -> NarrowedT:
     return x
 ```
 
-Unary operations that are not supported by all constraints should error:
+Unary operations that are not supported by all constraints should error.
 
 ```py
 from typing import TypeVar
@@ -1293,7 +1293,7 @@ def invert_typevar(t: U) -> int:
 
 This is _not_ the same as a union type, because of this additional constraint that the two
 occurrences have the same type. In `unions_are_different`, `t1` and `t2` might have different types,
-and an `int` and a `str` cannot be added together:
+and an `int` and a `str` cannot be added together.
 
 ```py
 def unions_are_different(t1: int | str, t2: int | str) -> int | str:
@@ -1304,7 +1304,7 @@ def unions_are_different(t1: int | str, t2: int | str) -> int | str:
 ## Equality with constrained typevars
 
 `False` compares equal to `0` without belonging to `Literal[0]`. Comparing it with a constrained
-type variable therefore does not imply that it has the same type as that variable:
+type variable therefore does not imply that it has the same type as that variable.
 
 ```py
 from typing import Literal, TypedDict, TypeVar
@@ -1317,7 +1317,7 @@ def equal_values(value: Literal[False, 2], other: T):
 ```
 
 Both tuple tags can match one of the type variable's constraints, so equality preserves both tuples.
-The same applies when an inequality comparison is false:
+The same applies when an inequality comparison is false.
 
 ```py
 def equal_tuple_tags(value: tuple[Literal[False], str] | tuple[Literal[2], int], other: T):
@@ -1331,7 +1331,7 @@ def equal_tuple_tags(value: tuple[Literal[False], str] | tuple[Literal[2], int],
 ```
 
 Equality likewise preserves both `TypedDict` variants. Since `FalseTag` can match when `other` is
-`0`, the comparison does not make a field exclusive to `TwoTag` available:
+`0`, the comparison does not make a field exclusive to `TwoTag` available.
 
 ```py
 class FalseTag(TypedDict):
@@ -1583,7 +1583,7 @@ reveal_type(union_and_nonunion_params(3, 1))  # revealed: Literal[1]
 reveal_type(union_and_nonunion_params("a", 1))  # revealed: Literal["a", 1]
 ```
 
-This also works if the typevar has a bound:
+This also works if the typevar has a bound.
 
 ```py
 T_str = TypeVar("T_str", bound=str)
@@ -1618,7 +1618,7 @@ def _(list_ofstr: list[str], list_of_int: list[int]):
     reveal_type(accepts_t_or_list_of_t(list_of_int))  # revealed: Unknown
 ```
 
-A union argument must not widen a bounded type variable with an incompatible union element:
+A union argument must not widen a bounded type variable with an incompatible union element.
 
 ```py
 class MyClass: ...
@@ -1637,7 +1637,7 @@ def _(x: int | None, valid: MyClass | int) -> MyClass:
 ```
 
 Here, we make sure that `S` is solved as `Literal[1]` instead of a union of the two literals, which
-would also be a valid solution:
+would also be a valid solution.
 
 ```py
 S = TypeVar("S")
@@ -1743,14 +1743,14 @@ reveal_type(extract_t(P[int]()))  # revealed: int
 reveal_type(extract_t(Q[str]()))  # revealed: str
 ```
 
-Passing anything else results in an error:
+Passing anything else results in an error.
 
 ```py
 # error: [invalid-argument-type]
 reveal_type(extract_t([1, 2]))  # revealed: Unknown
 ```
 
-This also works when different union elements have different typevars:
+This also works when different union elements have different typevars.
 
 ```py
 S = TypeVar("S")
@@ -1780,7 +1780,7 @@ reveal_type(extract_both(SubQ[str]()))  # revealed: tuple[Unknown, str]
 
 When a type is a subclass of both `P` and `Q` with different specializations, we cannot infer a
 single type for `T` in `extract_t`, because `P` and `Q` are invariant. However, we can still infer
-both types in a call to `extract_both`:
+both types in a call to `extract_both`.
 
 ```py
 class PandQ(P[int], Q[str]):
@@ -1794,7 +1794,7 @@ reveal_type(extract_both(PandQ()))  # revealed: tuple[int, str]
 ```
 
 When non-generic types are part of the union, we can still infer typevars for the remaining generic
-types:
+types.
 
 ```py
 def extract_optional_t(x: None | P[T]) -> T:
@@ -1804,7 +1804,7 @@ reveal_type(extract_optional_t(None))  # revealed: Unknown
 reveal_type(extract_optional_t(P[int]()))  # revealed: int
 ```
 
-Passing anything else results in an error:
+Passing anything else results in an error.
 
 ```py
 # error: [invalid-argument-type]
@@ -1812,7 +1812,7 @@ reveal_type(extract_optional_t(Q[str]()))  # revealed: Unknown
 ```
 
 If the union contains contains parent and child of a generic class, we ideally pick the union
-element that is more precise:
+element that is more precise.
 
 ```py
 class Base(Generic[T]):
@@ -1829,7 +1829,7 @@ reveal_type(f(Sub[str | None]()))  # revealed: str | None
 ```
 
 If we have a case like the following, where only one of the union elements matches due to the
-typevar bound, we do not emit a specialization error:
+typevar bound, we do not emit a specialization error.
 
 ```py
 from typing import TypeVar
@@ -1847,7 +1847,7 @@ reveal_type(f(P[int]()))  # revealed: tuple[int, Unknown]
 reveal_type(f(P[str]()))  # revealed: tuple[Unknown, str]
 ```
 
-However, if we pass something that does not match _any_ union element, we do emit an error:
+However, if we pass something that does not match _any_ union element, we do emit an error.
 
 ```py
 # error: [invalid-argument-type]
@@ -2009,7 +2009,7 @@ def read(value: T) -> list[str]:
 ## Assignment narrowing of dynamic attributes
 
 An upper bound can provide an attribute through `__getattr__`. Assigning to that attribute does not
-change the type of later reads:
+change the type of later reads.
 
 ```py
 from typing import TypeVar
@@ -2028,7 +2028,7 @@ def update_bound(obj: Bound) -> None:
 ```
 
 A constrained type variable may also refer to a class that uses `__getattr__`. Assignment cannot
-narrow the attribute even if another permitted class declares it:
+narrow the attribute even if another permitted class declares it.
 
 ```py
 class Declared:
@@ -2064,7 +2064,7 @@ def g(b: B[T]):
 
 This is a regression test for an issue that surfaced in the primer report of an early version of
 <https://github.com/astral-sh/ruff/pull/19811>, where we failed to solve the `TypeVar` here due to
-the fact that it only appears in the function's type annotations as part of a union:
+the fact that it only appears in the function's type annotations as part of a union.
 
 ```py
 from typing import TypeVar
@@ -2129,7 +2129,7 @@ reveal_type(any_result)  # revealed: Any
 ```
 
 Other arguments must still satisfy the type variable's declared constraints. Gradual evidence from a
-callback does not make an incompatible argument valid:
+callback does not make an incompatible argument valid.
 
 ```py
 def consume(callback: Callable[[], Box[T]], other: T) -> None: ...
@@ -2215,7 +2215,7 @@ def outer(t: T) -> None:
 ## Unpacking a TypeVar
 
 We can infer precise heterogeneous types from the result of an unpacking operation applied to a type
-variable if the type variable's upper bound is a type with a precise tuple spec:
+variable if the type variable's upper bound is a type with a precise tuple spec.
 
 ```py
 from dataclasses import dataclass
@@ -2477,7 +2477,7 @@ def list_caller(value: list[Any]) -> None:
     reveal_type(choose(value, [1]))  # revealed: int | list[int]
 ```
 
-The `Unknown` returned by a lambda without declared parameter types is also gradual evidence:
+The `Unknown` returned by a lambda without declared parameter types is also gradual evidence.
 
 ```py
 lambda_identity = lambda value: value
@@ -2628,7 +2628,7 @@ TODO: After #29236 lands, simplify these tests to use direct union annotations i
 types, which are currently needed to exercise the full constraints.
 
 A caller's type variable contributes to the inferred return type even when the callee's type also
-accepts a concrete union member:
+accepts a concrete union member.
 
 ```py
 from collections.abc import Callable
@@ -2645,7 +2645,7 @@ def outer(value: Callable[[], U | str]) -> None:
 ```
 
 A disjoint bound also preserves the caller's variable. When the variable's entire bound fits the
-concrete `int` member, only the remaining `str` member contributes to inference:
+concrete `int` member, only the remaining `str` member contributes to inference.
 
 ```py
 Disjoint = TypeVar("Disjoint", bound=bytes)
@@ -2658,7 +2658,7 @@ def covered(value: Callable[[], Covered | str]) -> None:
     reveal_type(helper(value))  # revealed: str
 ```
 
-The caller's variable also supplies inference evidence without a separate union member:
+The caller's variable also supplies inference evidence without a separate union member.
 
 ```py
 OnlyOuter = TypeVar("OnlyOuter", bound=str)
@@ -2668,7 +2668,7 @@ def only_outer(value: Callable[[], OnlyOuter]) -> None:
     reveal_type(helper(value))  # revealed: OnlyOuter@only_outer
 ```
 
-A literal union member excludes only that literal from the caller's contribution:
+A literal union member excludes only that literal from the caller's contribution.
 
 ```py
 from typing import Literal
@@ -2708,7 +2708,7 @@ def covered(value: Callable[[], Covered]):
 ## Invariant arguments with unions
 
 When a union annotation contains two inferred variables (e.g. `T | V`), invariant arguments can
-determine which variable accepts each union member:
+determine which variable accepts each union member.
 
 ```py
 from collections.abc import Callable
@@ -2752,7 +2752,7 @@ def invalid(value: Callable[[], list[U] | list[U | str] | int]) -> None:
 
 In a union annotation like `T | int`, the concrete part (`int` here) can accept part of the caller's
 type variable. The remaining part must satisfy the callee's bound or constraints; requiring the
-entire caller variable to satisfy them would reject these valid calls:
+entire caller variable to satisfy them would reject these valid calls.
 
 ```py
 from collections.abc import Callable
@@ -2775,7 +2775,7 @@ def split_constraints(value: Callable[[], Constraints | str]) -> None:
 ```
 
 Without a separate `str` member, the inferred bound preserves the caller's variable while excluding
-its `int` part. A constrained callee instead selects the compatible declared constraint:
+its `int` part. A constrained callee instead selects the compatible declared constraint.
 
 ```py
 def only_bound(value: Callable[[], UnionBound]) -> None:
@@ -2784,7 +2784,7 @@ def only_bound(value: Callable[[], UnionBound]) -> None:
 ```
 
 The caller's variable remains fixed. An unrestricted variable, or one permitting an incompatible
-type, cannot be specialized just to make the call succeed:
+type, cannot be specialized just to make the call succeed.
 
 ```py
 Unrestricted = TypeVar("Unrestricted")
@@ -2927,7 +2927,7 @@ reveal_type(caller(1))  # revealed: int
 reveal_type(caller("hello"))  # revealed: str
 ```
 
-A constrained TypeVar with a subset of constraints is also compatible:
+A constrained TypeVar with a subset of constraints is also compatible.
 
 ```py
 from typing import TypeVar
@@ -2946,7 +2946,7 @@ reveal_type(narrow("hello"))  # revealed: str
 ```
 
 Equivalent constraints also match when their union members appear in a different order. The caller's
-type variable is preserved through the call:
+type variable is preserved through the call.
 
 ```py
 UnionT = TypeVar("UnionT", int | str, bytes)
@@ -2982,7 +2982,7 @@ def check(marker: S, value: Any) -> None:
 ## Inferring a constrained typevar from a bounded typevar
 
 If the constraints of the caller's type variable are a subset of the callee's, we preserve it
-through the generic call:
+through the generic call.
 
 ```py
 from typing import TypeVar
@@ -3016,7 +3016,7 @@ def same_bound(value: V) -> None:
     reveal_type(double(value))  # revealed: int
 ```
 
-This also applies when the caller's type variable is nested in a wrapper type:
+This also applies when the caller's type variable is nested in a wrapper type.
 
 ```py
 def first(values: tuple[T]) -> T:
@@ -3028,7 +3028,7 @@ def nested(values: tuple[U]) -> None:
 
 A bounded type variable may represent any subtype of its bound. In an invariant or contravariant
 position, matching it to a constrained type variable could require accepting a value outside that
-subtype, even if the bound matches one of the declared constraints:
+subtype, even if the bound matches one of the declared constraints.
 
 ```py
 from collections.abc import Callable
@@ -3062,7 +3062,7 @@ def gradual_bound(value: Gradual) -> None:
     reveal_type(first((value,)))  # revealed: Gradual@gradual_bound
 ```
 
-This also applies with a nested gradual type:
+This also applies with a nested gradual type.
 
 ```py
 ConstrainedList = TypeVar("ConstrainedList", list[int], list[str])
@@ -3077,7 +3077,7 @@ def gradual_list_bound(value: GradualList) -> None:
 ```
 
 If a type variable with a gradual upper bound matches a single constraint, however, we solve to that
-constraint instead of the gradual type:
+constraint instead of the gradual type.
 
 ```py
 SingleConstraint = TypeVar("SingleConstraint", list[int], str)
@@ -3091,7 +3091,7 @@ def single_matching_constraint(value: GradualList) -> None:
 
 ## Selecting constraints for narrowed caller type variables
 
-Caller type variables are not inferable when selecting a constraint for a callee's type variable:
+Caller type variables are not inferable when selecting a constraint for a callee's type variable.
 
 ```py
 from typing import TypeVar
@@ -3112,7 +3112,7 @@ def narrowed(value: S) -> None:
         reveal_type(reversed_constraints(value))  # revealed: str
 ```
 
-The caller's variable also remains fixed when the narrowed value is nested in a tuple:
+The caller's variable also remains fixed when the narrowed value is nested in a tuple.
 
 ```py
 def constrained_tuple(value: tuple[T]) -> T:
@@ -3192,7 +3192,7 @@ def forward_nominal_reversed(specific: Callable[[SNominal], None], redundant: Ca
 
 ## Incompatible constraint sets
 
-But a constrained TypeVar with constraints not satisfied by the formal TypeVar should still error:
+But a constrained TypeVar with constraints not satisfied by the formal TypeVar should still error.
 
 ```py
 from typing import TypeVar
@@ -3212,7 +3212,7 @@ def source(x: U) -> U:
 We require equivalence rather than mere assignability when matching constraints. Constrained
 TypeVars allow narrowing via `isinstance` checks in the function body, so a constraint that is a
 strict subtype would be unsound. For example, a function constrained to `(int, str)` may narrow `T`
-to `int` and return `int(x)`, which would violate a caller's `bool` constraint:
+to `int` and return `int(x)`, which would violate a caller's `bool` constraint.
 
 ```py
 from typing import TypeVar
@@ -3322,7 +3322,7 @@ def first(x: Sequence[T]) -> T:
     return x[0]
 ```
 
-Both positive elements satisfy the bound, so both specializations contribute to the return type:
+Both positive elements satisfy the bound, so both specializations contribute to the return type.
 
 ```py
 def _(x: Intersection[Sequence[Sub1], Sequence[Sub2]]) -> None:
@@ -3330,7 +3330,7 @@ def _(x: Intersection[Sequence[Sub1], Sequence[Sub2]]) -> None:
 ```
 
 Elements that do not satisfy the bound are ignored. Every valid specialization still contributes to
-the return type:
+the return type.
 
 ```py
 def _(x: Intersection[Sequence[Sub1], Sequence[Unrelated1]]) -> None:
@@ -3341,7 +3341,7 @@ def _(x: Intersection[Sequence[Sub1], Sequence[Sub2], Sequence[Unrelated1]]) -> 
 ```
 
 If neither positive element produces a valid specialization, both rejected alternatives contribute
-to the bound violation:
+to the bound violation.
 
 ```py
 def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
@@ -3353,7 +3353,7 @@ def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
 
 Because `Sink` is contravariant, passing a `Sink[A]` to a `Sink[T]` parameter requires `T` to be
 assignable to `A`. The intersection offers two alternative constraints: `T` is assignable to `A` or
-to `B`. The value argument selects the compatible alternative, regardless of argument order:
+to `B`. The value argument selects the compatible alternative, regardless of argument order.
 
 ```py
 from typing import Generic, TypeVar
@@ -3380,7 +3380,7 @@ def _(sink: Intersection[Sink[A], Sink[B]], value: A) -> None:
     reveal_type(choose_reversed(value, sink))  # revealed: A
 ```
 
-An unrelated value is incompatible with both alternatives:
+An unrelated value is incompatible with both alternatives.
 
 ```py
 def _(sink: Intersection[Sink[A], Sink[B]], value: C) -> None:
@@ -3391,7 +3391,7 @@ def _(sink: Intersection[Sink[A], Sink[B]], value: C) -> None:
 ```
 
 With no second argument, both alternatives are valid. Each specialization accepts the sink, and
-their return types are intersected:
+their return types are intersected.
 
 ```py
 def element(sink: Sink[T]) -> T:
@@ -3403,7 +3403,7 @@ def _(sink: Intersection[Sink[A], Sink[B]]) -> None:
 
 Assignments to different type variables remain correlated within an alternative: the choices here
 are `(T = A, U = B)` and `(T = B, U = C)`. The contravariant `Sink[A]` selects the first pair, so
-the result is `B`:
+the result is `B`.
 
 ```py
 U = TypeVar("U")
@@ -3424,7 +3424,7 @@ def _(source: Intersection[Pair[A, B], Pair[B, C]], sink: Sink[A]) -> None:
 ## Nested variance in intersection inference
 
 A covariant source nested inside a contravariant sink reverses the direction of the constraint. The
-value must satisfy both source element types:
+value must satisfy both source element types.
 
 ```py
 from typing import Generic, TypeVar
@@ -3458,7 +3458,7 @@ def _(both: C, only_a: A, sink: Sink[Intersection[Source[A], Source[B]]]) -> Non
 
 Only alternatives satisfying a declared bound or constraint contribute to inference. Each accepted
 specialization contributes its return type to the intersection. A constrained type variable is
-solved to one declared constraint in each specialization, not to the intersection itself:
+solved to one declared constraint in each specialization, not to the intersection itself.
 
 ```py
 from typing import Generic, TypeVar
@@ -3495,7 +3495,7 @@ def _(both: Intersection[Source[A], Source[B]], mixed: Intersection[Source[A], S
 ```
 
 If no covariant source alternative satisfies an upper bound, the diagnostic intersects their
-rejected lower bounds. For declared constraints, it reports the first rejected alternative:
+rejected lower bounds. For declared constraints, it reports the first rejected alternative.
 
 ```py
 def _(source: Intersection[Source[C], Source[D]]) -> None:
@@ -3507,7 +3507,7 @@ def _(source: Intersection[Source[C], Source[D]]) -> None:
 
 For a contravariant sink, the declared constraint must be a subtype of the sink's element type. A
 sink accepting only a strict subclass of `A` cannot select `A`; neither unrelated sink can select
-any declared constraint:
+any declared constraint.
 
 ```py
 class Sink(Generic[T_contra]):
@@ -3526,7 +3526,7 @@ def _(narrow: Intersection[Sink[SubA], Marker], unrelated: Intersection[Sink[C],
     reveal_type(constrained_sink(unrelated))  # revealed: Unknown
 ```
 
-Each valid sink specialization contributes its return type:
+Each valid sink specialization contributes its return type.
 
 ```py
 def _(sink: Intersection[Sink[A], Sink[B]]) -> None:
@@ -3537,7 +3537,7 @@ def _(sink: Intersection[Sink[A], Sink[B]]) -> None:
 
 A caller's type variable must satisfy the callee's declaration for every type the caller permits. An
 unrelated intersection member cannot make an unrestricted type variable satisfy a bound or make
-incompatible declared constraints compatible:
+incompatible declared constraints compatible.
 
 ```py
 from typing import Generic, TypeVar
@@ -3575,7 +3575,7 @@ def incompatible(source: Intersection[Source[S_constrained], Marker]) -> None:
 ```
 
 A compatible outer variable keeps its identity. A separate valid intersection member can satisfy the
-parameter independently of the outer variable:
+parameter independently of the outer variable.
 
 ```py
 S_bounded = TypeVar("S_bounded", bound=str)
@@ -3593,7 +3593,7 @@ def independent(source: Intersection[Source[S], Source[str]]) -> None:
 ```
 
 An unrestricted parameter accepts both the caller's type variable and a separate string element.
-Both specializations contribute to the intersection of return types:
+Both specializations contribute to the intersection of return types.
 
 ```py
 def unbounded(value: Source[S]) -> S:
@@ -3607,7 +3607,7 @@ def intersected_outer(value: Intersection[Source[S], Source[str]]) -> None:
 
 Narrowing a gradual argument to a source retains the source's known element type during inference.
 The result currently loses its gradual component, but cannot discard the string contribution and
-claim that the returned value supports integer-only methods:
+claim that the returned value supports integer-only methods.
 
 ```py
 from typing import Any, Generic, TypeVar
@@ -3638,7 +3638,7 @@ def _(unknown, any_: Any) -> None:
 ```
 
 Gradual specializations inherited through concrete subclasses can satisfy bounds and constraints
-even when another intersection member has an incompatible static specialization:
+even when another intersection member has an incompatible static specialization.
 
 ```py
 from ty_extensions import Intersection
@@ -3667,7 +3667,7 @@ def _(any_: Intersection[AnySource, StrSource], unknown: Intersection[UnknownSou
 ## Inherited specializations in intersection arguments
 
 Inference finds and combines generic specializations through the MRO of intersected concrete
-subclasses:
+subclasses.
 
 ```py
 from typing import Generic, TypeVar
@@ -3769,7 +3769,7 @@ specialized return types rather than their type arguments.
 Here, an object usable as both `F[A]` and `F[B]` can call its callback with an `A` or a `B`,
 respectively. It cannot safely accept a callback that only handles values that are both `A` and `B`,
 as `F[A & B]` would allow. Thus `F` is not meet-preserving, and inferring `F[A & B]` from
-`F[A] & F[B]` would be unsound:
+`F[A] & F[B]` would be unsound.
 
 ```py
 from typing import Callable, Generic, TypeVar
@@ -3800,7 +3800,7 @@ def _(x: Intersection[F[A], F[B]]) -> None:
 ## Correlated inference from multiple intersection arguments
 
 Constraints from every argument are solved together. Both sources in this function must supply
-values compatible with the same `ElementT`:
+values compatible with the same `ElementT`.
 
 ```py
 from typing import Generic, TypeVar
@@ -3828,7 +3828,7 @@ specializations: `A | B`, `A | D`, `B`, and `B | D`. Intersecting these return t
 
 This also describes a result obtained from either source: a value from `x` satisfies `A & B`, while
 a value from `y` satisfies `B & D`. Either result satisfies `B`, but need not satisfy both `A` and
-`D`:
+`D`.
 
 ```py
 def _(
@@ -3839,7 +3839,7 @@ def _(
 ```
 
 An invariant `Box` requires the same element type from both arguments. When both intersections
-contain `Box[A]`, inference selects `ElementT = A`:
+contain `Box[A]`, inference selects `ElementT = A`.
 
 ```py
 InvariantT = TypeVar("InvariantT")
@@ -3862,7 +3862,7 @@ def _(
 The first argument below requires `ElementT = A`, while the second requires `ElementT = B`. The
 unrelated `Marker` and `D` intersection elements do not resolve that conflict, so no specialization
 accepts both arguments. For error recovery, inference merges `A` and `B`; neither argument matches
-the resulting `Box[A | B]` parameter type:
+the resulting `Box[A | B]` parameter type.
 
 ```py
 def _(
@@ -3878,7 +3878,7 @@ def _(
 ## Overlapping overloads in generic callbacks
 
 Overlapping overloads do not promise all of their return types simultaneously. A generic wrapper
-should infer the return type of the first applicable overload, just like a direct call:
+should infer the return type of the first applicable overload, just like a direct call.
 
 ```py
 from typing import Callable, TypeVar, overload
@@ -3908,7 +3908,7 @@ def _(value: Both) -> None:
 ```
 
 In contrast, an explicit intersection of callable types does promise both results for the same
-input. Its return types can still be intersected:
+input. Its return types can still be intersected.
 
 ```py
 def _(callback: Intersection[Callable[[object], A], Callable[[object], B]]) -> None:
@@ -3916,7 +3916,7 @@ def _(callback: Intersection[Callable[[object], A], Callable[[object], B]]) -> N
 ```
 
 Overloaded protocol methods have the same limitation. This also affects `operator.mul` with a
-`Fraction` argument ([ty#4593](https://github.com/astral-sh/ty/issues/4593)):
+`Fraction` argument ([ty#4593](https://github.com/astral-sh/ty/issues/4593)).
 
 ```py
 from fractions import Fraction
@@ -3935,7 +3935,7 @@ def right(value: Fraction) -> None:
 
 Homogeneous unpacked tuple annotations on starred parameters can be validated for each
 specialization, just like `*args: ElementT`. Both direct and unpacked arguments contribute to the
-inferred return type:
+inferred return type.
 
 ```py
 from typing import Generic, TypeVar
@@ -3963,7 +3963,7 @@ def _(x: Intersection[Source[A], Source[B]], value: D, values: tuple[D, ...]) ->
 
 ## Gradual intersection arguments
 
-A gradually narrowed source contributes its known element types to inference:
+A gradually narrowed source contributes its known element types to inference.
 
 ```py
 from typing import Any, Generic, TypeVar
@@ -3991,7 +3991,7 @@ def _(x: Any) -> None:
     reveal_type(element(x))  # revealed: A | B
 ```
 
-Its known element type also contributes when another argument supplies static alternatives:
+Its known element type also contributes when another argument supplies static alternatives.
 
 ```py
 class D: ...
@@ -4006,7 +4006,7 @@ def _(x: Intersection[Source[A], Source[B]], other: Any) -> None:
     reveal_type(correlated(x, other))  # revealed: (A & B) | D
 ```
 
-A gradual component in the return annotation is preserved in both specialized return types:
+A gradual component in the return annotation is preserved in both specialized return types.
 
 ```py
 def element_with_other(x: Source[ElementT], other: object) -> tuple[ElementT, Any]:
@@ -4047,7 +4047,7 @@ def _(source: Intersection[Source[A], Source[B]]) -> None:
 ```
 
 An invalid union member still makes an argument incompatible, even when its other member provides a
-type-variable assignment. Neither choice for `T` makes `None` a valid `list[U]` argument:
+type-variable assignment. Neither choice for `T` makes `None` a valid `list[U]` argument.
 
 ```py
 def with_list(source: Source[T], values: list[U]) -> tuple[T, U]:
@@ -4095,7 +4095,7 @@ def _(source: Intersection[Source[A], Source[B]]) -> None:
     reveal_type(make_list(source))  # revealed: list[A | B]
 ```
 
-The same applies when an alias hides the mutable result:
+The same applies when an alias hides the mutable result.
 
 ```py
 from typing_extensions import TypeAliasType
@@ -4110,7 +4110,7 @@ def _(source: Intersection[Source[A], Source[B]]) -> None:
 ```
 
 An invariant parameter that has the same inferred type in every specialization does not prevent the
-independent, covariant part of the return type from being intersected:
+independent, covariant part of the return type from being intersected.
 
 ```py
 U = TypeVar("U")
@@ -4125,7 +4125,7 @@ def _(source: Intersection[Source[A], Source[B]], value: str) -> None:
 ### Defaulted return type variables
 
 A fixed default gives the same type in every specialization. Even an invariant `list[int]` default
-therefore allows the independently inferred `T` to be refined:
+therefore allows the independently inferred `T` to be refined.
 
 ```py
 from typing import Generic
@@ -4153,7 +4153,7 @@ def _(value: Intersection[Source[A], Source[B]]) -> None:
 
 A default that depends on an inferred variable can produce varying invariant types. Applying
 `DefaultU = list[T]` separately produces incompatible `list[A]` and `list[B]` specializations, so
-inference retains the merged `list[A | B]` result instead of intersecting them to `Never`:
+inference retains the merged `list[A | B]` result instead of intersecting them to `Never`.
 
 ```py
 DefaultU = TypeVar("DefaultU", default=list[T])
@@ -4169,7 +4169,7 @@ def _(value: Intersection[Source[A], Source[B]]) -> None:
 
 Each sink accepts one of the two possible element types. Both complete specializations can return a
 mutable list, but merging their element types does not produce a specialization accepted by either
-sink. The call retains the union of the separately specialized list types:
+sink. The call retains the union of the separately specialized list types.
 
 ```py
 from typing import Generic, TypeVar
@@ -4194,7 +4194,7 @@ def _(sink: Intersection[ASink, BSink]) -> None:
 ```
 
 Evidence from another argument can leave only one valid specialization. A supplied value of type `A`
-selects the `A` specialization:
+selects the `A` specialization.
 
 ```py
 def with_value(sink: Sink[T], value: T) -> list[T]:
@@ -4208,7 +4208,7 @@ def _(sink: Intersection[ASink, BSink], value: A) -> None:
 
 Invariant components also matter when the return annotation is just a type variable. Inferring
 `R = list[A]` and `R = list[B]` from callback signatures does not make those returns safe to
-intersect. Inference retains `list[A] | list[B]`:
+intersect. Inference retains `list[A] | list[B]`.
 
 ```py
 from collections.abc import Callable
@@ -4228,7 +4228,7 @@ def _(callback: Intersection[Callable[[object], list[A]], Callable[[object], lis
 ```
 
 An inferred tuple can still be refined when its mutable component has the same type in both
-alternatives:
+alternatives.
 
 ```py
 def _(
@@ -4237,7 +4237,7 @@ def _(
     reveal_type(invoke(callback, object()))  # revealed: tuple[A, list[int]] & tuple[B, list[int]]
 ```
 
-The same applies to unions whose mutable members agree:
+The same applies to unions whose mutable members agree.
 
 ```py
 def _(callback: Intersection[Callable[[object], list[int] | A], Callable[[object], list[int] | B]]) -> None:
@@ -4245,7 +4245,7 @@ def _(callback: Intersection[Callable[[object], list[int] | A], Callable[[object
 ```
 
 The order of the callable types should not affect whether their returns can be intersected,
-including when one return alternative is a union:
+including when one return alternative is a union.
 
 ```py
 class C: ...
@@ -4276,7 +4276,7 @@ def _(
 
 The call to `invoke_all` below can infer three different types for `R`, one from each callback
 signature. Each choice gives a possible return type for the call. Inference selects `list[B]`
-because it is a subtype of both other return types, `list[A] | list[B]` and `list[B] | list[C]`:
+because it is a subtype of both other return types, `list[A] | list[B]` and `list[B] | list[C]`.
 
 ```py
 def _(
@@ -4291,7 +4291,7 @@ def _(
 
 Being a subtype of just one other return type is insufficient. Here `list[A]` and `list[B]` are both
 subtypes of `list[A] | list[B]`, but neither is a subtype of the other. Inference retains
-`list[A] | list[B]`:
+`list[A] | list[B]`.
 
 ```py
 def _(
@@ -4306,7 +4306,7 @@ def _(
 
 For generic classes with both covariant and invariant parameters, refinement depends on which
 parameters vary. `Wrapper` only produces `T`, while its writable `value` attribute makes `U`
-invariant:
+invariant.
 
 ```py
 from typing import Generic
@@ -4322,7 +4322,7 @@ class Wrapper(Generic[T, U]):
 ```
 
 When the signatures agree on `U = int`, their return types can be intersected. If `U` varies between
-`int` and `str`, inference retains the union:
+`int` and `str`, inference retains the union.
 
 ```py
 def _(
@@ -4337,7 +4337,7 @@ def _(
 
 Inference finds two valid specializations for the call to `first_value` below, returning `V@forward`
 and `V@forward | Invariant[V@forward]`. The first return type is a subtype of the second, so
-inference selects `V@forward`:
+inference selects `V@forward`.
 
 ```py
 from typing import Callable, Generic, TypeVar
@@ -4367,7 +4367,7 @@ the other, because lists are invariant, so inference keeps the merged result bel
 
 For `make_sink`, a callable accepting `V | Invariant[V]` is a subtype of one accepting only `V`: it
 accepts every input the latter accepts. The wider parameter type therefore produces the narrower
-callable type, which inference selects:
+callable type, which inference selects.
 
 ```py
 def make_list(mapping: Callable[[], V | Invariant[V] | Covariant[V]]) -> list[V]:
@@ -4386,7 +4386,7 @@ def wrapped_returns(mapping: V | Invariant[V] | Covariant[V]) -> None:
 
 Writable `TypedDict` fields are invariant even when the dictionaries have no type parameters. A
 fresh `{}` can be typed as either dictionary below because their fields are optional. Inference
-retains the union of these return types rather than their disjoint intersection, `Never`:
+retains the union of these return types rather than their disjoint intersection, `Never`.
 
 ```py
 from typing import Callable, TypedDict, TypeVar
@@ -4410,7 +4410,7 @@ def _(callback: Intersection[Callable[[], IntDict], Callable[[], StrDict]]) -> N
 ### Inferred protocol return alternatives
 
 Even without type parameters, protocol returns can contain incompatible invariant members. Inference
-retains the union when the callback signatures expose different mutable list types:
+retains the union when the callback signatures expose different mutable list types.
 
 ```py
 from typing import Callable, Protocol, TypeVar
@@ -4440,7 +4440,7 @@ def _(callback: Intersection[Callable[[A], IntList], Callable[[B], StrList]]) ->
 
 A returned callable can capture mutable state. Giving the same callable both signatures could allow
 an `A` to be stored and later returned as a `B`. Inference retains separate callable return
-alternatives instead of exposing both signatures through the same potentially stateful result:
+alternatives instead of exposing both signatures through the same potentially stateful result.
 
 ```py
 from typing import Callable, TypeVar
@@ -4466,7 +4466,7 @@ def _(
     reveal_type(result(Both()))  # revealed: A | B
 ```
 
-The same behavior applies when a generic callback protocol describes the returned callable:
+The same behavior applies when a generic callback protocol describes the returned callable.
 
 ```py
 from typing import Protocol
@@ -4493,7 +4493,7 @@ def _(
 Separate input and output type variables do not make a stateful callable safe to specialize
 independently for each call. The closure below can return a value produced by an earlier call, so
 its return type includes both `A` and `B` even when its latest argument is a `B`. The callback
-explicitly accepts `A | B` as well as each narrower input, so the merged specialization is valid:
+explicitly accepts `A | B` as well as each narrower input, so the merged specialization is valid.
 
 ```py
 U = TypeVar("U")
@@ -4517,7 +4517,7 @@ def _(
 ```
 
 In contrast, a deferred call exposes only its output type. Capturing an argument accepted by both
-narrower callable contracts lets the returned callable produce a value satisfying both return types:
+narrower callable contracts lets the returned callable produce a value satisfying both return types.
 
 ```py
 def defer(convert: Callable[[T], U], value: T) -> Callable[[], U]:
@@ -4534,7 +4534,7 @@ def _(
 
 A callable returned through `ParamSpec` can also retain values from earlier calls. We conservatively
 keep the first parameter list and combine the possible return types, rather than promise a separate
-return type for each input type:
+return type for each input type.
 
 ```py
 from typing import Callable, Concatenate, ParamSpec, TypeVar, overload

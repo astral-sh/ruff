@@ -20,7 +20,7 @@ async def test():
 
 ## Exception-suppressing async context managers and union aliases
 
-An asynchronous context manager can suppress exceptions if its `__aexit__` method returns `bool`:
+An asynchronous context manager can suppress exceptions if its `__aexit__` method returns `bool`.
 
 ```toml
 [environment]
@@ -45,7 +45,7 @@ async def preserved_binding() -> None:
     reveal_type(result)  # revealed: None | str
 ```
 
-If an exception interrupts an assignment to a new name, that name may remain undefined:
+If an exception interrupts an assignment to a new name, that name may remain undefined.
 
 ```py
 async def missing_binding() -> None:
@@ -55,7 +55,7 @@ async def missing_binding() -> None:
     reveal_type(value)  # revealed: str
 ```
 
-An `__aexit__` return type of `None` does not suppress exceptions:
+An `__aexit__` return type of `None` does not suppress exceptions.
 
 ```py
 class Propagates:
@@ -71,7 +71,7 @@ async def propagating_exit() -> None:
 
 [The typing specification](https://typing.python.org/en/latest/spec/exceptions.html#context-managers)
 treats an awaited `Literal[True] | None` return type as non-suppressing, even though a truthy return
-value would suppress an exception at runtime:
+value would suppress an exception at runtime.
 
 ```py
 class OptionalTrueExit:
@@ -86,7 +86,7 @@ async def optional_true_exit() -> None:
     reveal_type(result)  # revealed: str
 ```
 
-A PEP 695 alias does not prevent a suppressing union member from preserving an earlier binding:
+A PEP 695 alias does not prevent a suppressing union member from preserving an earlier binding.
 
 ```py
 type Managers = Suppresses | Propagates
@@ -98,7 +98,7 @@ async def preserved_union_binding(manager: Managers) -> None:
     reveal_type(result)  # revealed: None | str
 ```
 
-A suppressed exception can also leave a new binding undefined:
+A suppressed exception can also leave a new binding undefined.
 
 ```py
 async def missing_union_binding(manager: Managers) -> None:
@@ -111,7 +111,7 @@ async def missing_union_binding(manager: Managers) -> None:
 ## Earlier async context managers can suppress later entry failures
 
 If an earlier async context manager suppresses an exception while a later manager enters, the later
-manager's target may never be assigned:
+manager's target may never be assigned.
 
 ```py
 class Suppresses:
@@ -134,7 +134,7 @@ async def later_entry_fails() -> None:
 
 ## Returning from an exception-suppressing async context manager
 
-A context manager cannot suppress a return statement:
+A context manager cannot suppress a return statement.
 
 ```py
 class Suppresses:
@@ -147,7 +147,7 @@ async def bare_return() -> str:
         return "finished"
 ```
 
-An exception raised while evaluating an awaited return expression can be suppressed instead:
+An exception raised while evaluating an awaited return expression can be suppressed instead.
 
 ```py
 async def may_raise() -> str:
@@ -160,7 +160,7 @@ async def interrupted_return() -> str:  # error: [invalid-return-type]
 
 ## Overloaded async context manager exit methods
 
-An overloaded async exit method can distinguish normal exits from exceptions:
+An overloaded async exit method can distinguish normal exits from exceptions.
 
 ```py
 from typing import Awaitable, Literal, overload
@@ -170,7 +170,7 @@ async def may_raise() -> str:
     raise ValueError
 ```
 
-An overload returning `True` only on a normal exit cannot suppress an exception:
+An overload returning `True` only on a normal exit cannot suppress an exception.
 
 ```py
 class NormalExitOnly:
@@ -191,7 +191,7 @@ async def normal_exit_only() -> None:
 
 Of the following three overloads, the second applies when an exception is raised, and the third
 applies when the suite exits without an exception. The first overload never applies because its
-exception argument is `Never`:
+exception argument is `Never`.
 
 ```py
 class NeverExit:
@@ -212,7 +212,7 @@ async def impossible_exit() -> None:
     reveal_type(result)  # revealed: str
 ```
 
-An exceptional overload can suppress its exception even if another exceptional overload cannot:
+An exceptional overload can suppress its exception even if another exceptional overload cannot.
 
 ```py
 class SuppressesValueError:
@@ -234,7 +234,7 @@ async def mixed_exceptional_exits() -> None:
 ```
 
 An exceptional overload that returns a non-awaitable does not prevent a later awaitable overload
-from suppressing a different exception:
+from suppressing a different exception.
 
 ```py
 class SuppressesAfterNonAwaitable:
@@ -455,7 +455,7 @@ info: Consider using `with` here
 ## Incorrect signatures
 
 The sub-diagnostic is also provided if the signatures of `__enter__` and `__exit__` do not match the
-expected signatures for a context manager:
+expected signatures for a context manager.
 
 ```py
 class Manager:
@@ -470,7 +470,7 @@ async def main():
 
 ## Incorrect number of arguments
 
-Similarly, we also show the hint if the functions have the wrong number of arguments:
+Similarly, we also show the hint if the functions have the wrong number of arguments.
 
 ```py
 class Manager:
@@ -532,7 +532,7 @@ async def main():
 
 ## Non-awaitable `__aenter__` with missing `__aexit__`
 
-A missing exit method does not excuse an entry method that returns a non-awaitable:
+A missing exit method does not excuse an entry method that returns a non-awaitable.
 
 ```py
 class Manager:
@@ -557,7 +557,7 @@ info: Consider declaring the method with `async def`
 
 ## Missing `__aenter__` with non-awaitable `__aexit__`
 
-An exit method must return an awaitable even when the entry method is missing:
+An exit method must return an awaitable even when the entry method is missing.
 
 ```py
 class Manager:
@@ -582,7 +582,7 @@ info: Consider declaring the method with `async def`
 
 ## Non-awaitable `__aenter__` and `__aexit__`
 
-When neither method returns an awaitable, both are named in a single diagnostic:
+When neither method returns an awaitable, both are named in a single diagnostic.
 
 ```py
 class Manager:
@@ -733,7 +733,7 @@ async def main():
         reveal_type(session)  # revealed: Session
 ```
 
-An `AsyncIterator` return annotation is deprecated for `@asynccontextmanager` but remains supported:
+An `AsyncIterator` return annotation is deprecated for `@asynccontextmanager` but remains supported.
 
 ```py
 from typing import AsyncIterator
@@ -825,7 +825,7 @@ reveal_type(open_stream)  # revealed: (value: Stream[int]) -> _AsyncGeneratorCon
 ```
 
 The yielded protocol can also be nested in an invariant container, with a bound on its type
-parameter. Checking the decorator still terminates when the receiver's type argument grows:
+parameter. Checking the decorator still terminates when the receiver's type argument grows.
 
 ```py
 class Node[T: object](Protocol):

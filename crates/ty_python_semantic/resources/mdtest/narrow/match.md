@@ -841,7 +841,7 @@ def test_ordered_or_alias_excludes_cross_type_equal_values(
 
 Alternatives are tried from left to right. We assume the declaration of `Values.x` means that every
 `Values` instance has an `x` attribute. This makes the protocol pattern exhaustive, so the later
-sequence alternative cannot contribute to the binding:
+sequence alternative cannot contribute to the binding.
 
 ```py
 from typing import Protocol, runtime_checkable
@@ -859,7 +859,7 @@ def test_or_binding_omits_values_consumed_by_a_class_pattern(value: Values) -> N
             reveal_type(item)  # revealed: Values
 ```
 
-Class and mapping child bindings combine with bindings from other alternatives:
+Class and mapping child bindings combine with bindings from other alternatives.
 
 ```py
 from typing import final
@@ -885,7 +885,7 @@ def mapping_or_singleton_binding(value: StringMapping | None) -> None:
 
 The first two alternatives bind an `int`. A list that does not contain exactly one element reaches
 the final capture instead. If that list is later changed to contain one element, the same sequence
-pattern must be able to match it:
+pattern must be able to match it.
 
 ```py
 @final
@@ -947,7 +947,7 @@ def test_compatible_declared_alias(subject: object) -> None:
             reveal_type(item)  # revealed: int
 ```
 
-Pattern captures also respect declarations in global, enclosing function, and class scopes:
+Pattern captures also respect declarations in global, enclosing function, and class scopes.
 
 ```py
 global_capture: str
@@ -1033,7 +1033,7 @@ def test_mutable_sequence_alias_does_not_keep_index_types(
 ```
 
 Information from a failed sequence pattern must also be discarded before a mutable sequence is
-changed and matched again:
+changed and matched again.
 
 ```py
 def mutable_sequence_alias_does_not_keep_previous_shape_constraints(
@@ -1255,7 +1255,7 @@ def test_incompatible_declared_class_capture(value: PatternBox[int]) -> None:
 ## Class patterns over unions
 
 An attribute can have different types in different subclasses. A class pattern that checks the
-attribute narrows the subject to the subclass whose attribute can match:
+attribute narrows the subject to the subclass whose attribute can match.
 
 ```py
 class Holder:
@@ -1281,7 +1281,7 @@ def filter_holders(holder: IntHolder | StrHolder) -> None:
 
 ## Class patterns with multiple attributes
 
-Each attribute is narrowed by its own pattern, even when the attributes have the same type:
+Each attribute is narrowed by its own pattern, even when the attributes have the same type.
 
 ```py
 class Pair:
@@ -1296,7 +1296,7 @@ def match_pair(value: Pair) -> None:
 
 ## Nested class captures over recursive unions
 
-The `child` attribute is itself a `Node`, so a nested capture can be either a `Branch` or a `Leaf`:
+The `child` attribute is itself a `Node`, so a nested capture can be either a `Branch` or a `Leaf`.
 
 ```py
 from __future__ import annotations
@@ -1317,7 +1317,7 @@ def visit(node: Node) -> None:
 
 ## Nested sequence captures over recursive unions
 
-Both tuple variants have a first element of type `Node`, so the nested capture has that type:
+Both tuple variants have a first element of type `Node`, so the nested capture has that type.
 
 ```py
 from __future__ import annotations
@@ -1334,7 +1334,7 @@ def visit(value: Node) -> None:
 ## Nested alternative captures over recursive unions
 
 Each alternative captures a nested `child`, while the `as` pattern binds the value matched by the
-whole pattern:
+whole pattern.
 
 ```py
 from __future__ import annotations
@@ -1749,7 +1749,7 @@ def test_recursive_alias_capture(value: AliasPatternBase[RecursiveItem]) -> None
 ## Class pattern captures from intersections
 
 In strict mode, a captured attribute retains the constraints from every part of the subject's
-intersection, just like direct attribute access:
+intersection, just like direct attribute access.
 
 ```toml
 [environment]
@@ -1784,7 +1784,7 @@ def keyword(value: Intersection[Co[A], Co[B]]) -> None:
             item.b()
 ```
 
-Positional captures also retain both constraints when the intersection order is reversed:
+Positional captures also retain both constraints when the intersection order is reversed.
 
 ```pyi
 def positional(value: Intersection[Co[B], Co[A]]) -> None:
@@ -1853,7 +1853,7 @@ def test_match_class_capture_filters_union_members(
 
 A name is bound only when the complete class pattern succeeds. If a later subpattern cannot match,
 an earlier capture has type `Never`. A missing attribute rejects a final-class alternative, while a
-non-final class remains possible because a subclass can provide the attribute:
+non-final class remains possible because a subclass can provide the attribute.
 
 ```py
 from typing import final
@@ -1902,7 +1902,7 @@ def test_match_class_or_pattern_filters_union_members(
 ## Ordered class pattern alternatives
 
 `OrderedBase.member` is definitely bound on `OrderedChild`, so the first alternative consumes the
-complete subject and the later alternative cannot contribute to the binding:
+complete subject and the later alternative cannot contribute to the binding.
 
 ```py
 class OrderedBase:
@@ -1921,7 +1921,7 @@ def test_match_ordered_class_alternatives_remove_later_bindings(
 An argumentless class pattern cannot fail after its class check. If it matches the entire subject
 type, a later alternative cannot contribute to the binding. When the argumentless pattern comes
 second, an earlier class pattern can still contribute if the subject class is not final because a
-subclass could match both classes. A final subject class rules out that overlap:
+subclass could match both classes. A final subject class rules out that overlap.
 
 ```py
 from typing import final
@@ -1957,7 +1957,7 @@ def test_later_final_class_alternative_removes_earlier_bindings(
 ## Positional patterns for built-in classes
 
 For Python's built-in scalar and container classes, the single positional pattern receives the
-entire subject instead of reading an attribute:
+entire subject instead of reading an attribute.
 
 ```py
 from typing import Literal, TypeVar
@@ -2266,7 +2266,7 @@ def test_match_mapping_key_keeps_union_members(
 ```
 
 Mapping values are passed to nested patterns. If any nested pattern cannot match, the mapping
-pattern binds no names:
+pattern binds no names.
 
 ```py
 def test_match_mapping_nested_sequence(
@@ -2287,7 +2287,7 @@ def test_later_mapping_pattern_failure_rejects_bindings(
 ```
 
 Even a dictionary whose declared key type is `Never` may be a subclass with a custom `get` method.
-The annotation therefore does not prove that a keyed pattern is impossible:
+The annotation therefore does not prove that a keyed pattern is impossible.
 
 ```py
 from typing_extensions import Never
@@ -2544,7 +2544,7 @@ def nested_mapping_narrows_sequence_subject(
 
 Python defines a fixed set of built-in classes whose single positional subpattern receives the
 entire subject. The `float` element also handles `int`, which is assignable to `float` but is not a
-`float` instance at runtime:
+`float` instance at runtime.
 
 ```py
 def builtin_positional_patterns_are_exhaustive(
@@ -2583,7 +2583,7 @@ def builtin_positional_patterns_are_exhaustive(
 
 A `TypedDict` value is a dictionary at runtime, so argumentless `dict` and `Mapping` patterns always
 match it. The positional `dict` pattern does as well. This also applies when the subject is a
-truthiness-narrowed intersection or a type variable bounded by or constrained to `TypedDict`s:
+truthiness-narrowed intersection or a type variable bounded by or constrained to `TypedDict`s.
 
 ```py
 from collections.abc import Mapping
@@ -2719,7 +2719,7 @@ def non_string_key_is_not_exhaustive(
 ```
 
 A nested mapping pattern can match every value of one union member without matching every value of
-another. The later case retains the member whose field is a string:
+another. The later case retains the member whose field is a string.
 
 ```py
 class IntValue(TypedDict):
@@ -2746,7 +2746,7 @@ def distinguish_subjects(value: IntWrapper | StrWrapper) -> None:
 
 The two `TypedDict`s have different tags but share the same recursive `child` type. Matching nested
 `child` fields retains that type. If the first `child` is `None`, the nested pattern fails and the
-next case can still match:
+next case can still match.
 
 ```py
 from __future__ import annotations
@@ -2772,7 +2772,7 @@ def visit(value: Node) -> None:
 
 ## `NamedTuple` positional patterns
 
-A `NamedTuple` provides a generated `__match_args__` tuple containing all of its fields:
+A `NamedTuple` provides a generated `__match_args__` tuple containing all of its fields.
 
 ```py
 from typing import NamedTuple
@@ -2790,7 +2790,7 @@ def named_tuple_positional_pattern_is_exhaustive(value: NamedPoint) -> int:
 ## Positional patterns for built-in subclasses
 
 Subclasses inherit this positional behavior. The positional subpattern still needs to match the
-entire value, so a literal subpattern is not exhaustive:
+entire value, so a literal subpattern is not exhaustive.
 
 ```py
 class MyInt(int): ...
@@ -2813,7 +2813,7 @@ def builtin_positional_literal_is_not_exhaustive(
 
 For other positional class patterns, Python reads `__match_args__` from the pattern class. A fixed
 tuple of attribute names makes the corresponding positional patterns exhaustive when every selected
-attribute is present on the subject:
+attribute is present on the subject.
 
 ```py
 class KnownAttributes:
@@ -2840,7 +2840,7 @@ def metaclass_match_args_is_exhaustive(value: WithMetaclassMatchArgs) -> int:
 
 The pattern is not exhaustive when a selected attribute is missing, an explicit annotation widens
 the tuple type, or a conditional definition can override a built-in class's usual positional
-behavior. A metaclass can also provide `__match_args__` that selects a missing attribute:
+behavior. A metaclass can also provide `__match_args__` that selects a missing attribute.
 
 ```py
 class IntWithMissingMatchArg(int):
@@ -2900,7 +2900,7 @@ def conditional_match_args_disables_builtin_behavior(
 ## Properties and declared attributes
 
 Properties and declared attributes count as present when checking exhaustiveness, even though
-descriptor access can raise `AttributeError` and an annotated attribute can be absent at runtime:
+descriptor access can raise `AttributeError` and an annotated attribute can be absent at runtime.
 
 ```py
 from typing import Literal
@@ -2929,7 +2929,7 @@ def declared_literal_attribute_is_exhaustive(
 ## Runtime-checkable protocol patterns
 
 Runtime-checkable protocols use the same rule. The subject below is known to provide `x`, so the
-pattern is exhaustive even though the subject class is not final:
+pattern is exhaustive even though the subject class is not final.
 
 ```py
 from typing import Protocol, runtime_checkable
@@ -2950,7 +2950,7 @@ def runtime_protocol_pattern_is_exhaustive(value: RuntimeProtocolImplementer) ->
 ## Negative narrowing for protocols with gradual members
 
 The fallback case excludes the fully materialized protocol. `IntReader` is a subtype of the fully
-materialized `Reader` protocol, so the fallback case retains only `None`:
+materialized `Reader` protocol, so the fallback case retains only `None`.
 
 ```py
 from typing import Any, Protocol, runtime_checkable
@@ -2975,7 +2975,7 @@ def f(reader: IntReader | None):
 
 A keyword pattern reads the attribute from the matched value. The subject type can therefore provide
 an attribute that is not declared by the class named in the pattern. This also applies when the
-subject class is not final:
+subject class is not final.
 
 ```py
 class BaseWithoutX: ...
@@ -2992,7 +2992,7 @@ def subclass_member_is_exhaustive(value: ChildWithX) -> int:
 ## Positional behavior comes from the pattern class
 
 Only the class named in the pattern determines what a positional subpattern receives. Although
-`IntPlainChild` also inherits from `int`, `PlainBase(_)` does not receive the whole value:
+`IntPlainChild` also inherits from `int`, `PlainBase(_)` does not receive the whole value.
 
 ```py
 class PlainBase: ...
@@ -3029,7 +3029,7 @@ def nested_class_subpattern_is_exhaustive(value: tuple[Outer]) -> int:
 
 A class pattern can fail after its `isinstance` check if a requested attribute is missing or only
 conditionally defined. This applies to both keyword and positional attributes, including inside a
-sequence. The failed branch therefore keeps the original subject type:
+sequence. The failed branch therefore keeps the original subject type.
 
 ```py
 from typing import final
@@ -3086,7 +3086,7 @@ must eliminate all of them; otherwise, a contradictory type such as
 python-version = "3.12"
 ```
 
-The order of the first two cases below reproduces issue #3904:
+The order of the first two cases below reproduces issue #3904.
 
 ```py
 from collections.abc import Mapping
@@ -3102,7 +3102,7 @@ def mapping_with_any_is_exhaustive(value: Mapping[str, Any] | int) -> None:
             assert_never(value)
 ```
 
-Class patterns over generic classes follow the same rule:
+Class patterns over generic classes follow the same rule.
 
 ```py
 class Box[T]:
@@ -3119,7 +3119,7 @@ def generic_class_with_any_is_exhaustive(value: Box[Any] | int) -> None:
 ```
 
 A nested pattern can be exhaustive for only part of a union. Here the first case removes
-`Box[Mapping[str, Any]]` but must leave `Box[int]` in the final case:
+`Box[Mapping[str, Any]]` but must leave `Box[int]` in the final case.
 
 ```py
 def nested_pattern_keeps_unmatched_box(
@@ -3132,7 +3132,7 @@ def nested_pattern_keeps_unmatched_box(
             reveal_type(value)  # revealed: Box[int]
 ```
 
-The same check applies to a class pattern nested inside a sequence pattern:
+The same check applies to a class pattern nested inside a sequence pattern.
 
 ```py
 def nested_sequence_pattern_is_exhaustive(
@@ -3225,7 +3225,7 @@ def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
 ```
 
 Narrowing with a sequence pattern must not bring back a type removed by an earlier case. After the
-first two cases below, only `str` remains:
+first two cases below, only `str` remains.
 
 ```py
 def sequence_pattern_preserves_earlier_case(
@@ -3242,7 +3242,7 @@ def sequence_pattern_preserves_earlier_case(
 
 Named tuples are statically known tuple subclasses, rather than exact `tuple[...]` instances.
 Sequence-pattern fallthrough therefore preserves the named class instead of rebuilding its type from
-the element patterns:
+the element patterns.
 
 ```py
 class Pair(NamedTuple):
@@ -3788,7 +3788,7 @@ of broad builtin types described below, successfully matching one only gives us 
 know how the subject type implements equality.
 
 Broad builtin types are treated as if they use the builtin equality implementation, so literal
-patterns narrow `str`, `int`, and `bytes`:
+patterns narrow `str`, `int`, and `bytes`.
 
 ```py
 def string_pattern(value: str):
@@ -3812,7 +3812,7 @@ def bytes_pattern(value: bytes):
             reveal_type(value)  # revealed: Literal[b"a"]
 ```
 
-Explicit subclass and custom comparison arms are still preserved:
+Explicit subclass and custom comparison arms are still preserved.
 
 ```py
 class StringSubclass(str): ...
@@ -3833,7 +3833,7 @@ def custom_comparison_pattern(value: str | AlwaysEqual):
 ```
 
 Classes that inherit identity-based equality can still compare equal when one is a subclass of the
-other, or when they can share a subclass through multiple inheritance:
+other, or when they can share a subclass through multiple inheritance.
 
 ```py
 class Base: ...
@@ -3877,7 +3877,7 @@ equal to `"foo"`. In the second, neither arm can compare equal to `"bar"`. Enabl
 `strict-equality-semantics` disables this optimistic treatment of broad builtin types.
 
 A final subclass with inherited builtin equality can compare equal to a literal despite being
-disjoint from the literal's type. This applies both to literal patterns and dotted value patterns:
+disjoint from the literal's type. This applies both to literal patterns and dotted value patterns.
 
 ```py
 from typing import Final, final
@@ -4040,7 +4040,7 @@ def trusted_value_is_excluded(value: Intersection[LiteralString, Not[Literal["he
 Enum value patterns use the enum class's actual `__eq__` implementation. Members of an enum whose
 `__eq__` resolves to `object.__eq__` compare by identity and cannot equal `None`. `StrEnum` members
 compare equal to string literals with the same value. Matching a member against itself is exhaustive
-whenever its comparison behavior is known, even if its underlying value is not:
+whenever its comparison behavior is known, even if its underlying value is not.
 
 ```toml
 [environment]
@@ -4586,7 +4586,7 @@ reveal_type(x)  # revealed: object
 When performing narrowing on `self` inside methods on enums, we take into account that `Self` might
 refer to a subtype of the enum class, like `Literal[Answer.YES]`. This is why we do not simplify
 `Self & ~Literal[Answer.YES]` to `Literal[Answer.NO, Answer.MAYBE]`. Otherwise, we wouldn't be able
-to return `self` in the `assert_yes` method below:
+to return `self` in the `assert_yes` method below.
 
 ```py
 from enum import Enum
@@ -4682,7 +4682,7 @@ def _(x: A | B | C):
     reveal_type(x)  # revealed: B | A
 ```
 
-Reassignment in non-terminal branches is also preserved when the default branch is terminal:
+Reassignment in non-terminal branches is also preserved when the default branch is terminal.
 
 ```py
 def _(number_of_periods: int | None, interval: str):
@@ -4701,7 +4701,7 @@ def _(number_of_periods: int | None, interval: str):
 
 ## Narrowing tagged unions of tuples
 
-Narrow unions of tuples based on literal tag elements in `match` statements:
+Narrow unions of tuples based on literal tag elements in `match` statements.
 
 ```py
 from typing import Literal
@@ -4754,7 +4754,7 @@ def _(x: tuple[A, Literal["tag1"]] | tuple[B, Literal["tag2"]]):
 ```
 
 A tuple with several literal tags can match more than one case. Failing one of those tags leaves the
-tuple available to later cases:
+tuple available to later cases.
 
 ```py
 def multiple_tags(x: tuple[Literal["a"], int] | tuple[Literal["b", "c"], str]):
@@ -4767,7 +4767,7 @@ def multiple_tags(x: tuple[Literal["a"], int] | tuple[Literal["b", "c"], str]):
             reveal_type(x)  # revealed: tuple[Literal["b", "c"], str]
 ```
 
-Integer patterns also match `IntEnum` members with the same value:
+Integer patterns also match `IntEnum` members with the same value.
 
 ```py
 from enum import IntEnum
@@ -4787,7 +4787,7 @@ def enum_tag_equal_to_integer(
 ```
 
 A broad tag keeps its tuple possible in both branches, while other tuples can still be excluded
-based on their literal tags:
+based on their literal tags.
 
 ```py
 def _(x: tuple[Literal["tag1"], A] | tuple[str, B] | tuple[Literal["tag2"], C]):
@@ -4799,7 +4799,7 @@ def _(x: tuple[Literal["tag1"], A] | tuple[str, B] | tuple[Literal["tag2"], C]):
 ```
 
 A broad value pattern can match either tag, so another alternative in the same OR pattern does not
-rule out either tuple:
+rule out either tuple.
 
 ```py
 class Config:
@@ -4843,7 +4843,7 @@ def _(x: A | B):
             reveal_type(x)  # revealed: Never
 ```
 
-A class can also have several literal tags. A pattern outside that set of tags rules out the class:
+A class can also have several literal tags. A pattern outside that set of tags rules out the class.
 
 ```py
 class MultipleTags:
@@ -4857,7 +4857,7 @@ def multiple_tags(x: A | MultipleTags):
             reveal_type(x)  # revealed: MultipleTags
 ```
 
-Non-literal tag arms are preserved during positive narrowing:
+Non-literal tag arms are preserved during positive narrowing.
 
 ```py
 from typing import Literal
@@ -4880,7 +4880,7 @@ def _(x: A | B | C):
 ```
 
 An `IntEnum` value pattern can match both an enum tag and an equal integer tag. Neither alternative
-remains in the default branch:
+remains in the default branch.
 
 ```py
 from enum import Enum, IntEnum
@@ -4907,7 +4907,7 @@ def integer_tag_equal_to_enum(x: IntegerTag | EnumTag | OtherTag):
 ```
 
 A failed value pattern uses the negation of equality, not `__ne__`. An enum member whose custom
-`__ne__` always returns false can still fail to match the pattern:
+`__ne__` always returns false can still fail to match the pattern.
 
 ```py
 class NeverUnequal(Enum):

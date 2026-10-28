@@ -1,7 +1,7 @@
 # Binary operations on union types
 
 Binary operations on union types are only available if they are supported for all possible
-combinations of types:
+combinations of types.
 
 ```py
 def f1(i: int, u: int | None):
@@ -12,7 +12,7 @@ def f1(i: int, u: int | None):
 ```
 
 `int` can be added to `int`, and `str` can be added to `str`, but expressions of type `int | str`
-cannot be added, because that would require addition of `int` and `str` or vice versa:
+cannot be added, because that would require addition of `int` and `str` or vice versa.
 
 ```py
 def f2(i: int, s: str, int_or_str: int | str):
@@ -23,7 +23,7 @@ def f2(i: int, s: str, int_or_str: int | str):
 ```
 
 However, if an operation is supported for all possible combinations, the result will be a union of
-the possible outcomes:
+the possible outcomes.
 
 ```py
 from typing import Literal
@@ -38,7 +38,7 @@ def f3(two_or_three: Literal[2, 3], a_or_b: Literal["a", "b"]):
 ```
 
 We treat a type annotation of `float` as a union of `int` and `float`, so union handling is relevant
-here:
+here.
 
 ```py
 def f4(x: float, y: float):
@@ -50,7 +50,7 @@ def f4(x: float, y: float):
     reveal_type(x % y)  # revealed: float
 ```
 
-If any of the union elements leads to a division by zero, we will report an error:
+If any of the union elements leads to a division by zero, we will report an error.
 
 ```py
 def f5(m: int, n: Literal[-1, 0, 1]):
@@ -60,7 +60,7 @@ def f5(m: int, n: Literal[-1, 0, 1]):
 
 Binary-operator diagnostics share state across union alternatives, so several combinations that
 divide by zero produce only one warning per expression. Each expression has its own state, so
-repeating the operation still produces a warning:
+repeating the operation still produces a warning.
 
 ```py
 def f6(m: Literal[1, 2], n: Literal[0, 1]):

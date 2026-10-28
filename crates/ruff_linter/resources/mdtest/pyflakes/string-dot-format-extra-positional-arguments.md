@@ -9,7 +9,7 @@ select = ["F523"]
 
 These should both trigger the rule, but their fixes should not remove the `format` call. In the
 first case, `format` will handle escaping `{{` to `{`, while in the second case, removing the
-`format` call would suppress a `KeyError`:
+`format` call would suppress a `KeyError`.
 
 ```py
 print("{{".format("!"))  # snapshot: string-dot-format-extra-positional-arguments

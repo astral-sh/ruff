@@ -89,7 +89,7 @@ Keying the repeat-guard by the constrained typevar (which stays stable across th
 substitution shape to at most one application per BDD path, preventing unbounded growth.
 
 This pattern shows up in real code via `itertools.accumulate` combined with a builtin like `min`,
-whose overloaded signature provides the cross-typevar constraints that drive the chain:
+whose overloaded signature provides the cross-typevar constraints that drive the chain.
 
 ```py
 from itertools import accumulate

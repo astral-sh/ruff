@@ -209,7 +209,7 @@ if not isinstance(DoesNotExist, type):
 ## Inheritance from `type[Any]` and `type[Unknown]`
 
 Using `type[T]` for a non-dynamic `T` as a base keeps the class analyzable, even though the exact
-MRO cannot be determined:
+MRO cannot be determined.
 
 ```py
 from ty_extensions._internal import reveal_mro
@@ -223,7 +223,7 @@ def f(x: type[Base]):
 ```
 
 Inheritance from `type[Any]` and `type[Unknown]` is also permitted, in keeping with the gradual
-guarantee:
+guarantee.
 
 ```py
 from typing import Any
@@ -241,7 +241,7 @@ def f(x: type[Any], y: Intersection[Unknown, type[Any]]):
 ## `__bases__` lists that cause errors at runtime
 
 If the class's `__bases__` cause an exception to be raised at runtime and therefore the class
-creation to fail, we infer the class's `__mro__` as being `[<class>, Unknown, object]`:
+creation to fail, we infer the class's `__mro__` as being `[<class>, Unknown, object]`.
 
 ```py
 from ty_extensions._internal import reveal_mro
@@ -353,7 +353,7 @@ def f():
 
 ## `UnionType` instances are now allowed as a base
 
-This is not legal:
+This is not legal.
 
 ```py
 class A: ...
@@ -468,7 +468,7 @@ class Foo(2): ...  # error: [invalid-base]
 ```
 
 A base that is not an instance of `type` but does have an `__mro_entries__` method will not raise an
-exception at runtime, so we issue `unsupported-base` rather than `invalid-base`:
+exception at runtime, so we issue `unsupported-base` rather than `invalid-base`.
 
 ```py
 class Foo:
@@ -479,7 +479,7 @@ class Bar(Foo()): ...  # error: [unsupported-base]
 ```
 
 But for objects that have badly defined `__mro_entries__`, `invalid-base` is emitted rather than
-`unsupported-base`:
+`unsupported-base`.
 
 ```py
 class Bad1:
@@ -495,7 +495,7 @@ class BadSub2(Bad2()): ...  # error: [invalid-base]
 ```
 
 For a union base where one member lacks `__mro_entries__`, `invalid-base` should be emitted with a
-sub-diagnostic identifying the problematic union member:
+sub-diagnostic identifying the problematic union member.
 
 ```py
 class HasMroEntries:
@@ -565,7 +565,7 @@ class VeryEggyOmelette(
 ```
 
 A `type: ignore` comment can only suppress `duplicate-bases` errors if it is on the same line as the
-class name:
+class name.
 
 ```py
 # fmt: off
@@ -613,7 +613,7 @@ reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 
 However, if there are duplicate class elements, we do emit an error, even if there are also multiple
 dynamic members. The following class definition will definitely fail, no matter what the dynamic
-bases materialize to:
+bases materialize to.
 
 ```py
 # error: [duplicate-base] "Duplicate base class `Foo`"
@@ -623,7 +623,7 @@ reveal_mro(Bar)  # revealed: (<class 'Bar'>, Unknown, <class 'object'>)
 ```
 
 Starred bases that expand to fixed-length tuples still report diagnostics for the unpacked base
-entries:
+entries.
 
 ```py
 from ty_extensions._internal import reveal_mro
@@ -644,7 +644,7 @@ reveal_mro(NameDuplicateBases)  # revealed: (<class 'NameDuplicateBases'>, Unkno
 class StarredInvalidBases(*invalid_bases): ...
 ```
 
-Per-base lint checks also see the unpacked entries:
+Per-base lint checks also see the unpacked entries.
 
 ```py
 from typing import Generic, NamedTuple, Protocol
@@ -831,7 +831,7 @@ reveal_mro(Boz)  # revealed: (<class 'Boz'>, Unknown, <class 'object'>)
 
 ## Classes with indirect cycles in their MROs
 
-These are similarly unlikely, but we still shouldn't crash:
+These are similarly unlikely, but we still shouldn't crash.
 
 ```pyi
 from ty_extensions._internal import reveal_mro

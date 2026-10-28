@@ -7,7 +7,7 @@ python-version = "3.12"
 
 ## Callables can be generic
 
-Many items that are callable can also be generic. Generic functions are the most obvious example:
+Many items that are callable can also be generic. Generic functions are the most obvious example.
 
 ```py
 from typing import Callable
@@ -37,7 +37,7 @@ class CallableInstance:
 reveal_type(identity2(CallableInstance()))
 ```
 
-Generic classes are another example, since you invoke the class to instantiate it:
+Generic classes are another example, since you invoke the class to instantiate it.
 
 ```py
 class C[T]:
@@ -51,7 +51,7 @@ reveal_type(generic_context(C))
 reveal_type(C(1))
 ```
 
-Explicit generic receiver annotations constrain a bound method's callable type:
+Explicit generic receiver annotations constrain a bound method's callable type.
 
 ```py
 from typing import Callable
@@ -68,7 +68,7 @@ accepts_object: Callable[[object], object] = receiver.method
 accepts_int: Callable[[int], int] = receiver.method  # error: [invalid-assignment]
 ```
 
-The receiver must also satisfy a method type variable's declared bound or constraints:
+The receiver must also satisfy a method type variable's declared bound or constraints.
 
 ```py
 from typing import Callable
@@ -109,7 +109,7 @@ invalid_nested_bound: Callable[[], None] = InvalidNestedBoundedReceiver().method
 invalid_union_constraints: Callable[[], None] = InvalidUnionConstrainedReceiver().method  # TODO: error: [invalid-assignment]
 ```
 
-When we coerce a generic callable into a `Callable` type, it remembers that it is generic:
+When we coerce a generic callable into a `Callable` type, it remembers that it is generic.
 
 ```py
 from ty_extensions._internal import into_regular_callable
@@ -192,7 +192,7 @@ reveal_type(iter(integers()))  # revealed: Iterator[int]
 
 ## Naming a generic `Callable`: type aliases
 
-The easiest way to refer to a generic `Callable` type directly is via a type alias:
+The easiest way to refer to a generic `Callable` type directly is via a type alias.
 
 ```py
 from typing import Callable
@@ -291,7 +291,7 @@ reveal_type(decorator_factory()(1))
 ```
 
 If the typevar also appears in a parameter, it is the function that is generic, and the returned
-`Callable` is not:
+`Callable` is not.
 
 ```py
 def outside_callable[T](t: T) -> Callable[[T], T]:
@@ -342,7 +342,7 @@ reveal_type(decorator_factory()(identity)(1))
 ```
 
 If the typevar also appears in a parameter, it is the function that is generic, and the returned
-`Callable` is not:
+`Callable` is not.
 
 ```py
 def outside_callable[**P, T](func: Callable[P, T]) -> Callable[P, T]:
@@ -363,7 +363,7 @@ outside_callable(int_identity)("string")
 ```
 
 The function's type parameters are still in scope inside the body, even if they only appear in a
-return-position `Callable` and are scoped to the returned callable:
+return-position `Callable` and are scoped to the returned callable.
 
 ```py
 from typing import Callable, cast
@@ -518,7 +518,7 @@ def consume(value: A | B | C | D | E) -> None: ...
 reveal_type(infer_from_consumer(consume))  # revealed: A | B | C | D | E
 ```
 
-The same union remains precise when it is defined through nested type aliases:
+The same union remains precise when it is defined through nested type aliases.
 
 ```py
 type FirstTwo = A | B
@@ -574,7 +574,7 @@ def consume_right(value: A | B | F | G | H) -> None: ...
 reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: A | B
 ```
 
-Aliases for these unions also preserve the precise intersection in either argument order:
+Aliases for these unions also preserve the precise intersection in either argument order.
 
 ```py
 type Left = A | B | C | D | E
@@ -621,7 +621,7 @@ def consume_third(value: Third) -> None: ...
 reveal_type(infer_from_consumers(consume_first, consume_second, consume_third))  # revealed: Unknown
 ```
 
-The same budget applies when an explicit union is intersected with aliased unions:
+The same budget applies when an explicit union is intersected with aliased unions.
 
 ```py
 def consume_explicit(value: E | F) -> None: ...
@@ -836,7 +836,7 @@ reveal_type(infer_str(consume_int_or_str))
 ```
 
 A gradual declared bound restricts which specializations are valid without becoming part of a
-concrete specialization that already satisfies it:
+concrete specialization that already satisfies it.
 
 ```py
 class GenericBase[T]: ...
@@ -871,7 +871,7 @@ def takes_closed(cls: type[Closed]) -> None: ...
 reveal_type(solve(takes_closed))  # revealed: Closed
 ```
 
-For a final generic class, the inferred instance type includes the class's type arguments:
+For a final generic class, the inferred instance type includes the class's type arguments.
 
 ```py
 @final
@@ -885,7 +885,7 @@ reveal_type(solve(takes_generic_closed))  # revealed: GenericClosed[int]
 ## Decorating classmethods of final classes
 
 This decorator accepts a method whose first argument is a class object and leaves the remaining
-parameters unchanged:
+parameters unchanged.
 
 ```py
 from typing import Callable, Concatenate, final
@@ -925,7 +925,7 @@ def _(f: Callable[[type[Any]], int], g: Callable[[type[Unknown]], str]):
     reveal_type(invoke(g))  # revealed: str
 ```
 
-A gradual class argument can also satisfy a callback's metaclass parameter:
+A gradual class argument can also satisfy a callback's metaclass parameter.
 
 ```py
 class Meta(type): ...
@@ -1008,7 +1008,7 @@ def _(
     reveal_type(infer_pair(suffix))  # revealed: tuple[Any, str]
 ```
 
-A concrete homogeneous tuple does not guarantee the required length:
+A concrete homogeneous tuple does not guarantee the required length.
 
 ```py
 def _(callback: Callable[[], tuple[int, ...]]):
@@ -1136,7 +1136,7 @@ def _() -> None:
 ```
 
 An additional argument of type `T` supplies the return value and constrains the valid
-specializations. A `str | bytes` value is accepted because the overload set covers both cases:
+specializations. A `str | bytes` value is accepted because the overload set covers both cases.
 
 ```py
 def accepts_callable_and_value[T](converter: Callable[[T], None], value: T) -> T:
@@ -1150,7 +1150,7 @@ def _(string: str, data: bytes, either: str | bytes) -> None:
 ```
 
 A `str | int` value is rejected because neither overload of the consumer accepts its `int`
-alternative:
+alternative.
 
 ```py
 def _(value: str | int) -> None:
@@ -1161,7 +1161,7 @@ def _(value: str | int) -> None:
 
 Type variables inferred from the same overload remain correlated. Here, the valid assignments are
 `T = int, U = str` and `T = str, U = int`; inference does not mix the input type from one overload
-with the return type from the other:
+with the return type from the other.
 
 ```py
 class Result[T]:
@@ -1252,7 +1252,7 @@ wrapped(A())  # no diagnostic
 
 The generic overload of `sum` accepts iterables of arbitrary integers, even though its first
 overload only accepts iterables of booleans and certain integer literals. Wrapping it preserves this
-behavior:
+behavior.
 
 ```py
 def wrap_sum[T](fn: Callable[[T], int]) -> Callable[[T], int]:
@@ -1263,7 +1263,7 @@ stage: Callable[[list[int]], int] = wrap_sum(sum)  # no diagnostic
 
 ## Inference from a bounded callable type variable
 
-The upper bound of a bounded type variable is used to infer the signature of a callable type:
+The upper bound of a bounded type variable is used to infer the signature of a callable type.
 
 ```py
 from typing import Callable
@@ -1275,7 +1275,7 @@ def _[F: Callable[[int], str]](callback: F):
     reveal_type(apply(callback))  # revealed: str
 ```
 
-If the upper bound is a class type, the signature of the class's `__call__` method is used:
+If the upper bound is a class type, the signature of the class's `__call__` method is used.
 
 ```py
 class Printer:
@@ -1289,7 +1289,7 @@ def _[F: Printer](callback: F):
     x2: Callable[[int], int] = callback  # error: [invalid-assignment]
 ```
 
-If `__call__` returns `Self`, the type variable is preserved as the inferred return type:
+If `__call__` returns `Self`, the type variable is preserved as the inferred return type.
 
 ```py
 from typing import Self
@@ -1303,7 +1303,7 @@ def _[F: Clone](callback: F) -> F:
     return apply(callback)
 ```
 
-The type variable is also preserved for class methods that return `Self`:
+The type variable is also preserved for class methods that return `Self`.
 
 ```py
 class ClassClone:
@@ -1318,7 +1318,7 @@ def _[F: ClassClone](callback: F) -> F:
 
 ## Explicit receivers in callable bounds
 
-An explicit receiver annotation restricts which specializations are callable:
+An explicit receiver annotation restricts which specializations are callable.
 
 ```py
 from typing import Callable
@@ -1337,7 +1337,7 @@ def _[F: Restricted[str]](callback: F):
     x: Callable[[int], str] = callback  # error: [invalid-assignment]
 ```
 
-The upper bound of a type variable satisfies an explicit receiver annotation with the same type:
+The upper bound of a type variable satisfies an explicit receiver annotation with the same type.
 
 ```py
 def _(callback: Restricted[int]):
@@ -1350,7 +1350,7 @@ def _[F: Restricted[int]](callback: F):
     x: Callable[[int], str] = callback  # error: [invalid-assignment]
 ```
 
-Note that a compatible receiver bound does not satisfy an incompatible return type:
+Note that a compatible receiver bound does not satisfy an incompatible return type.
 
 ```py
 def _[F: Restricted[int]](callback: F):
@@ -1360,7 +1360,7 @@ def _[F: Restricted[int]](callback: F):
 ## Constructor bounds in callable inference
 
 The signature of a class constructor can be inferred from a type variable with an upper bound of
-`type[C]` during callable inference:
+`type[C]` during callable inference.
 
 ```py
 from typing import Callable
@@ -1381,7 +1381,7 @@ def _[F: type[C]](callback: F):
 
 ## Recursive callable types
 
-Callable inference falls back to an error when a `__call__` signature involves unbounded recursion:
+Callable inference falls back to an error when a `__call__` signature involves unbounded recursion.
 
 ```py
 from typing import Callable
@@ -1398,7 +1398,7 @@ def _[F: Recursive](callback: F):
     x2: RegularCallableTypeOf[callback]  # error: [invalid-type-form]
 ```
 
-Concrete nested specializations of the same generic class do not trigger the fallback:
+Concrete nested specializations of the same generic class do not trigger the fallback.
 
 ```py
 class Wrapper[T]:
@@ -1449,14 +1449,14 @@ reveal_type(method(Sub(), ""))  # revealed: C
 ## Dependent return types from generic callbacks
 
 A generic identity callback can be used as either `Callable[[A], A]` or `Callable[[B], B]`: it
-returns its argument unchanged:
+returns its argument unchanged.
 
 ```py
 def identity[T](value: T) -> T:
     return value
 ```
 
-This overloaded "consumer" can accept either an `A` or a `B`:
+This overloaded "consumer" can accept either an `A` or a `B`.
 
 ```py
 from typing import Callable, overload
@@ -1482,7 +1482,7 @@ reveal_type(infer_result(identity, consume))  # revealed: A & B
 ```
 
 If we additionally supply a value, that selects the specific consumer overload that accepts it. The
-identity callback's result type follows that selected argument type:
+identity callback's result type follows that selected argument type.
 
 ```py
 def infer_result_with_value[T, R](callback: Callable[[T], R], consumer: Callable[[T], None], value: T) -> R:

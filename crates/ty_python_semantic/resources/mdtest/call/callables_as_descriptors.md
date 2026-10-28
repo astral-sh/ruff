@@ -10,7 +10,7 @@ python-version = "3.14"
 Some common callable objects (all functions, including lambdas) are also bound-method descriptors.
 That is, they have a `__get__` method which returns a bound-method object that binds the receiver
 instance to the first argument. The bound-method object therefore has a different signature, lacking
-the first argument:
+the first argument.
 
 ```py
 from ty_extensions._internal import RegularCallableTypeOf
@@ -30,7 +30,7 @@ def _(
 
 Other callable objects (`staticmethod` objects, instances of classes with a `__call__` method but no
 dedicated `__get__` method) are *not* bound-method descriptors. If accessed as class attributes via
-an instance, they are simply themselves:
+an instance, they are simply themselves.
 
 ```py
 class NonDescriptorCallable2:
@@ -48,7 +48,7 @@ def _(
     reveal_type(accessed_on_instance)  # revealed: (c2: C2, x: int) -> str
 ```
 
-Both kinds of objects can inhabit the same `Callable` type:
+Both kinds of objects can inhabit the same `Callable` type.
 
 ```py
 class NonDescriptorCallable3:
@@ -64,7 +64,7 @@ class C3:
     callable_n: Callable[[C3, int], str] = non_descriptor_callable
 ```
 
-However, when they are accessed on instances of `C3`, they have different signatures:
+However, when they are accessed on instances of `C3`, they have different signatures.
 
 ```py
 def _(
@@ -78,7 +78,7 @@ def _(
 This leaves the question how the `callable_m` and `callable_n` attributes should be treated when
 accessed on instances of `C3`. If we treat `Callable` as being equivalent to a protocol that defines
 a `__call__` method (and no `__get__` method), then they should show no bound-method behavior. This
-is what we currently do:
+is what we currently do.
 
 ```py
 reveal_type(C3().callable_m)  # revealed: (C3, int, /) -> str
@@ -86,7 +86,7 @@ reveal_type(C3().callable_n)  # revealed: (C3, int, /) -> str
 ```
 
 However, this leads to unsoundness: `C3().callable_m` is actually `C3.method` which *is* a
-bound-method descriptor. We currently allow the following call, which will fail at runtime:
+bound-method descriptor. We currently allow the following call, which will fail at runtime.
 
 ```py
 C3().callable_m(C3(), 1)  # runtime error! ("takes 2 positional arguments but 3 were given")
@@ -108,7 +108,7 @@ certain use cases (at the cost of purity and simplicity).
 
 A commonly used pattern in the ecosystem is to use a `Callable`-typed decorator on a method with the
 intention that it shouldn't influence the method's descriptor behavior. For example, we treat
-`method_decorated` below as a bound method, even though its type is `Callable[[C1, int], str]`:
+`method_decorated` below as a bound method, even though its type is `Callable[[C1, int], str]`.
 
 ```py
 from typing import Any, Callable
@@ -129,7 +129,7 @@ C1().method(1)
 C1().method_decorated(1)
 ```
 
-This also works with an argumentless `Callable` annotation:
+This also works with an argumentless `Callable` annotation.
 
 ```py
 def memoize2(f: Callable[..., Any]) -> Callable[..., Any]:
@@ -144,7 +144,7 @@ C2().method_decorated(1)
 ```
 
 A generic decorator must preserve a type variable bound by the method's enclosing class, even when
-the decorator uses an ellipsis instead of a `ParamSpec`:
+the decorator uses an ellipsis instead of a `ParamSpec`.
 
 ```py
 def preserve_return[R](function: Callable[..., R]) -> Callable[..., R]:
@@ -163,7 +163,7 @@ reveal_type(DecoratedBox[int]().value())  # revealed: int
 reveal_type(DecoratedBox[int]().values())  # revealed: list[int]
 ```
 
-The same behavior applies to decorators and classes using legacy type variables:
+The same behavior applies to decorators and classes using legacy type variables.
 
 ```py
 from typing import Generic, TypeVar
@@ -183,7 +183,7 @@ reveal_type(LegacyDecoratedBox[int]().value())  # revealed: int
 ```
 
 And if the callable-typed decorator leaves some generic parameters unconstrained, we should keep
-those parameters unspecialized rather than collapsing them to `Never`:
+those parameters unspecialized rather than collapsing them to `Never`.
 
 ```py
 def passthrough[T, R](f: Callable[[T], R]) -> Callable[[T], R]:
@@ -213,7 +213,7 @@ class C3:
 reveal_type(C3().method_decorated(1))  # revealed: int | str
 ```
 
-Transparent decorators are also treated consistently when spelled as an equivalent assignment:
+Transparent decorators are also treated consistently when spelled as an equivalent assignment.
 
 ```py
 class C4:
@@ -226,7 +226,7 @@ C4().method_decorated(1)
 
 For non-transparent decorators, avoid resolving the decorated function's signature before the
 decorator itself has been rejected. Doing so can introduce a cycle when the signature refers back to
-the decorated name:
+the decorated name.
 
 ```py
 decorated = lambda: decorated
@@ -246,7 +246,7 @@ def decorated(argument: lambda: decorated, /):  # error: [invalid-type-form]
 In general, a function call might however return a `Callable` that is unrelated to the argument
 passed in. And here, it seems more reasonable and safe to treat the `Callable` as a non-descriptor.
 This allows correct programs like the following to pass type checking (that are currently rejected
-by pyright and mypy with a heuristic that apparently applies in a wider range of situations):
+by pyright and mypy with a heuristic that apparently applies in a wider range of situations).
 
 ```py
 class SquareCalculator:
@@ -367,7 +367,7 @@ def check(path: Path) -> None:
 
 pytorch defines a `__pow__` dunder attribute on [`TensorBase`] in a similar way to the following
 example. We generally treat dunder attributes as bound-method descriptors since they all take a
-`self` argument. This allows us to type-check the following code correctly:
+`self` argument. This allows us to type-check the following code correctly.
 
 ```py
 from typing import Callable
@@ -383,7 +383,7 @@ Tensor() ** 2
 
 The following example is also taken from a real world project. Here, the `__lt__` dunder attribute
 is not declared. The attribute type is inferred as `Callable[…]`, but we still treat it as a
-bound-method descriptor:
+bound-method descriptor.
 
 ```py
 def make_comparison_operator(name: str) -> Callable[[Matrix, Matrix], bool]:
@@ -396,7 +396,7 @@ Matrix() < Matrix()
 ```
 
 The dunder-name heuristic does not apply when the callable takes no arguments, because it cannot
-accept a receiver:
+accept a receiver.
 
 ```py
 class Thunk:
@@ -409,7 +409,7 @@ reveal_type(Thunk().__value_thunk__)  # revealed: () -> int
 ```
 
 For other concrete signatures, the heuristic does not check whether the first parameter can accept
-the instance:
+the instance.
 
 ```py
 def descriptor_candidate(value: str) -> int:
@@ -422,7 +422,7 @@ reveal_type(DescriptorCandidate().__value__)  # revealed: () -> int
 ```
 
 A gradual callable signature might accept the receiver, so we preserve the function-descriptor
-heuristic. This also preserves function attributes on class access:
+heuristic. This also preserves function attributes on class access.
 
 ```py
 from typing import Any
@@ -436,7 +436,7 @@ Method.__call__.__code__
 ## `self`-binding behaviour of function-like `Callable`s
 
 Binding the `self` parameter of a function-like `Callable` creates a new `Callable` that is also
-function-like:
+function-like.
 
 `main.py`:
 
@@ -987,7 +987,7 @@ Base().foo()
 Derived().foo()
 ```
 
-The same applies to methods accessed via `super()` directly:
+The same applies to methods accessed via `super()` directly.
 
 ```py
 from typing import Any

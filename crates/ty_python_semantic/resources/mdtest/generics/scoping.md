@@ -294,7 +294,7 @@ reveal_type(legacy.m(1, "string"))  # revealed: Literal["string"]
 ```
 
 The class typevar in the method signature does not bind a _new_ instance of the typevar; it was
-already solved and specialized when the class was specialized:
+already solved and specialized when the class was specialized.
 
 ```py
 from ty_extensions._internal import generic_context
@@ -307,7 +307,7 @@ reveal_type(generic_context(Legacy))
 reveal_type(generic_context(legacy.m))
 ```
 
-With PEP 695 syntax, it is clearer that the method uses a separate typevar:
+With PEP 695 syntax, it is clearer that the method uses a separate typevar.
 
 ```py
 class C[T]:
@@ -323,7 +323,7 @@ reveal_type(c.m(1, "string"))  # revealed: Literal["string"]
 > Unbound type variables should not appear in the bodies of generic functions, or in the class
 > bodies apart from method definitions.
 
-This is true with the legacy syntax:
+This is true with the legacy syntax.
 
 ```py
 from typing import TypeVar, Generic
@@ -346,7 +346,7 @@ class C(Generic[T]):
 ```
 
 This is true with PEP 695 syntax, as well, though we must use the legacy syntax to define the
-unbound typevars:
+unbound typevars.
 
 `pep695.py`:
 
@@ -518,7 +518,7 @@ class Outer[T]:
 ```
 
 But it is still an error to directly reference the enclosing scope's type variable in the base class
-list:
+list.
 
 ```py
 class Outer[T]:

@@ -50,7 +50,7 @@ reveal_type(x)
 reveal_type(y)
 ```
 
-Importing an annotated name prefers the declared type over the inferred type:
+Importing an annotated name prefers the declared type over the inferred type.
 
 ```py
 # error: [possibly-missing-import] "Member `y` of module `maybe_unbound_annotated` may be missing"
@@ -62,7 +62,7 @@ reveal_type(y)  # revealed: int
 
 ## Maybe undeclared
 
-Importing a possibly undeclared name still gives us its declared type:
+Importing a possibly undeclared name still gives us its declared type.
 
 `maybe_undeclared.py`:
 
@@ -110,7 +110,7 @@ reveal_type(f)  # revealed: (def f() -> Unknown) | (def f() -> Unknown)
 ## Reimport with stub declaration
 
 When we have a declared type in one path and only an inferred-from-definition type in the other, we
-should still be able to unify those:
+should still be able to unify those.
 
 `c.pyi`:
 

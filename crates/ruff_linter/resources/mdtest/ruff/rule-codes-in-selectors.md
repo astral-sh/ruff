@@ -80,7 +80,7 @@ help: Replace rule code with `late-future-import`
 ## Invalid rule codes
 
 Invalid rule codes are not flagged, including nested quoting issues like `"'F401'"`, but valid codes
-in the same selector are still analyzed:
+in the same selector are still analyzed.
 
 `ruff.toml`:
 
@@ -107,7 +107,7 @@ help: Replace rule code with `import-shadowed-by-loop-var`
 ## Invalid selector shapes
 
 Just in case these ever make it past our actual config deserialization, the rule skips over
-malformed selectors (e.g. table for `select`, non-table for `per-file-ignores`):
+malformed selectors (e.g. table for `select`, non-table for `per-file-ignores`).
 
 `ruff.toml`:
 
@@ -119,7 +119,7 @@ per-file-ignores = ["F401"]
 
 ## Prefixes and names
 
-Prefixes and rule names are also left alone:
+Prefixes and rule names are also left alone.
 
 `ruff.toml`:
 
@@ -130,7 +130,7 @@ select = ["F", "unused-import"]
 
 ## All selectors
 
-Test that we flag all selectors both in the `lint` table and in the deprecated top-level settings:
+Test that we flag all selectors both in the `lint` table and in the deprecated top-level settings.
 
 `ruff.toml`:
 
@@ -178,7 +178,7 @@ select = ["F402"]  # error: [rule-codes-in-selectors]
 ## `unfixable`
 
 Test that `rule-codes-in-selectors` and other TOML-specific lints respect the user's `unfixable`
-settings:
+settings.
 
 ```toml
 [lint]

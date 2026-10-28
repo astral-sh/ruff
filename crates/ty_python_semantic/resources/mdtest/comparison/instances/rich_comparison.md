@@ -11,7 +11,7 @@ For references, see:
 ## Rich Comparison Dunder Implementations For Same Class
 
 Classes can support rich comparison by implementing dunder methods like `__eq__`, `__ne__`, etc. The
-most common case involves implementing these methods for the same type:
+most common case involves implementing these methods for the same type.
 
 ```py
 from __future__ import annotations
@@ -53,7 +53,7 @@ reveal_type(A() >= A())  # revealed: GeReturnType
 ## Rich Comparison Dunder Implementations for Other Class
 
 In some cases, classes may implement rich comparison dunder methods for comparisons with a different
-type:
+type.
 
 ```py
 from __future__ import annotations
@@ -410,7 +410,7 @@ reveal_type(A() > A())  # revealed: Literal[True]
 
 ## Diagnostics where classes have the same name
 
-We use the fully qualified names of classes to disambiguate them where necessary:
+We use the fully qualified names of classes to disambiguate them where necessary.
 
 `a.py`:
 
@@ -441,7 +441,7 @@ TypeVars with bounds support comparison operations if the bound type supports th
 ### TypeVar with `float` bound
 
 Since `float` is treated as `int | float` in type annotations, TypeVars bounded by `float` should
-support all comparison operations that both `int` and `float` support:
+support all comparison operations that both `int` and `float` support.
 
 ```py
 from typing import TypeVar, Generic
@@ -468,7 +468,7 @@ def compare_with_literal(a: T) -> bool:
 
 ### TypeVar with `int` bound
 
-TypeVars bounded by `int` should support comparison operations:
+TypeVars bounded by `int` should support comparison operations.
 
 ```py
 from typing import TypeVar
@@ -481,7 +481,7 @@ def compare_int_bound(a: U, b: U) -> bool:
 
 ### TypeVar with `str` bound
 
-TypeVars bounded by `str` should support comparison operations:
+TypeVars bounded by `str` should support comparison operations.
 
 ```py
 from typing import TypeVar
@@ -494,7 +494,7 @@ def compare_str_bound(a: V, b: V) -> bool:
 
 ### Constrained TypeVar comparisons
 
-Constrained TypeVars support comparisons if all constraints support the operation:
+Constrained TypeVars support comparisons if all constraints support the operation.
 
 ```py
 from typing import TypeVar
@@ -515,7 +515,7 @@ def compare_constrained_lt(a: X, b: X) -> bool:
 ### TypeVar with `complex` bound
 
 `complex` is treated as `int | float | complex`. Since `complex` doesn't support ordering
-comparisons like `<` and `<=`, only equality comparisons should work:
+comparisons like `<` and `<=`, only equality comparisons should work.
 
 ```py
 from typing import TypeVar
@@ -561,7 +561,7 @@ def check_int_fails(x: int, m: Money):
 
 Reflected operators for integer literals (literal on left, instance on right). For `100 > t`, Python
 tries `int.__gt__(100, t)` first (returns NotImplemented), then falls back to
-`Threshold.__lt__(t, 100)`:
+`Threshold.__lt__(t, 100)`.
 
 ```py
 from typing import Literal
@@ -676,7 +676,7 @@ def check_bytes_reflected_fails(data: bytes, m: Magic):
 
 ### Union Types with Literals
 
-Union types containing literals should also work:
+Union types containing literals should also work.
 
 ```py
 from typing import Literal, Union

@@ -51,7 +51,7 @@ reveal_type("\U0001d167")  # revealed: Literal["\U0001d167"]
 ```
 
 Unicode's grapheme rules treat the Myanmar vowel sign `ါ` as separate from a preceding quote, so ty
-can display it without an escape:
+can display it without an escape.
 
 ```py
 reveal_type("\u102b")  # revealed: Literal["ါ"]
@@ -73,7 +73,7 @@ reveal_type("\u0d4e")  # revealed: Literal["\u0d4e"]
 reveal_type("ൎക")  # revealed: Literal["ൎക"]
 ```
 
-An escape sequence also has to stay separate from a preceding Malayalam dot reph:
+An escape sequence also has to stay separate from a preceding Malayalam dot reph.
 
 ```py
 reveal_type("\u0d4e\u200b")  # revealed: Literal["\u0d4e\u200b"]
@@ -81,7 +81,7 @@ reveal_type("\u0d4e\u200b")  # revealed: Literal["\u0d4e\u200b"]
 
 The Angstrom sign `\u212b` normalizes to `Å` in NFC, so ty displays it as an escape to keep the two
 values distinct. A dot reph before that escape would attach to it, so ty escapes it too. A preceding
-dot reph would then attach to this new escape and is escaped as well:
+dot reph would then attach to this new escape and is escaped as well.
 
 ```py
 reveal_type("\u0d4e\u0d4e\u212b")  # revealed: Literal["\u0d4e\u0d4e\u212b"]
@@ -114,7 +114,7 @@ def equivalent_literals(value: Literal["é", "e\u0301"]):
     reveal_type(value)  # revealed: Literal["é", "e\u0301"]
 ```
 
-Characters elsewhere in the string can remain visible when another character needs an escape:
+Characters elsewhere in the string can remain visible when another character needs an escape.
 
 ```py
 reveal_type("é⏱\u212b")  # revealed: Literal["é⏱\u212b"]
@@ -139,7 +139,7 @@ def variants(value: Literal["a", "a\u034f"]):
 ```
 
 A combining mark following an escaped default-ignorable character is also escaped, preventing it
-from attaching to the escape sequence:
+from attaching to the escape sequence.
 
 ```py
 reveal_type("a\u034f\u0301")  # revealed: Literal["a\u034f\u0301"]
@@ -147,7 +147,7 @@ reveal_type("a\u034f\u0301")  # revealed: Literal["a\u034f\u0301"]
 
 ## Braille blank
 
-The braille blank can look like an ordinary space, so ty displays it as an escape:
+The braille blank can look like an ordinary space, so ty displays it as an escape.
 
 ```py
 reveal_type(" ")  # revealed: Literal[" "]

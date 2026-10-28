@@ -325,7 +325,7 @@ def _(n: int):
 ```
 
 Membership in a fixed-length tuple compares each element with the needle, regardless of whether the
-needle is itself a tuple:
+needle is itself a tuple.
 
 ```py
 from typing import Literal
@@ -345,7 +345,7 @@ def empty_tuple(value: object, values: tuple[()]):
 ```
 
 A variable-length tuple might be empty, even if all its possible elements would compare equal to the
-needle:
+needle.
 
 ```py
 from typing import Literal
@@ -363,7 +363,7 @@ def variable_length(
 
 Tuple membership checks whether the needle is the same object as an element before comparing the
 objects for equality. A non-reflexive equality method therefore cannot establish that membership is
-always false:
+always false.
 
 ```py
 from typing import Literal
@@ -546,7 +546,7 @@ def _(
 ## Equality with sequences
 
 A `Sequence[object]` can be an empty or nonempty tuple. Both equality and inequality comparisons
-therefore have unknown results:
+therefore have unknown results.
 
 ```py
 from collections.abc import Sequence
@@ -562,7 +562,7 @@ def _(value: Sequence[object]):
 
 The operand types can overlap without either being a subtype of the other. For example, `(1,)`
 inhabits both `Sequence[int]` and `tuple[int | str]`, so these comparisons also have unknown
-results:
+results.
 
 ```py
 def _(value: Sequence[int], other: tuple[int | str]):
@@ -573,7 +573,7 @@ def _(value: Sequence[int], other: tuple[int | str]):
 ## Equality with tuple subclasses
 
 A `Base` value can be a `Child` instance, so comparing them has an unknown result despite their
-different inherited equality methods:
+different inherited equality methods.
 
 ```py
 class Base: ...
@@ -585,7 +585,7 @@ def _(value: Base, child: Child):
 ```
 
 For unrelated operand classes, the default equality semantics still ignore possible subclasses with
-different equality methods:
+different equality methods.
 
 ```py
 def _(value: Base, other: tuple[int, ...]):
@@ -595,7 +595,7 @@ def _(value: Base, other: tuple[int, ...]):
 ## Comparisons with truthy strings
 
 A nonempty string cannot compare equal to an integer. Truthiness narrowing preserves this result
-when equality is used for tuple comparisons or membership tests:
+when equality is used for tuple comparisons or membership tests.
 
 ```py
 def _(text: str):
@@ -614,7 +614,7 @@ For an operation `A() < A()` to succeed at runtime, the `A.__lt__` method does n
 to return an object that is convertible to a `bool`. However, the return type _does_ need to be
 convertible to a `bool` for the operation `A() < A() < A()` (a _chained_ comparison) to succeed.
 This is because `A() < A() < A()` desugars to something like this, which involves several implicit
-conversions to `bool`:
+conversions to `bool`.
 
 ```ignore
 def compute_chained_comparison():
@@ -650,7 +650,7 @@ a < b  # fine
 
 Python does not generally attempt to coerce the result of `==` and `!=` operations between two
 arbitrary objects to a `bool`, but a comparison of tuples will fail if the result of comparing any
-pair of elements at equivalent positions cannot be converted to a `bool`:
+pair of elements at equivalent positions cannot be converted to a `bool`.
 
 ```py
 class NotBoolable:
@@ -670,7 +670,7 @@ reveal_type((A(),) != (A(), 0))  # revealed: Literal[True]
 ```
 
 Tuple identity comparisons do not compare elements and therefore do not coerce their equality
-results to `bool`:
+results to `bool`.
 
 ```py
 def tuple_identity(left: tuple[A], right: tuple[A]) -> None:

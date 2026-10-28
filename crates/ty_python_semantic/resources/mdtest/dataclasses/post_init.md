@@ -3,7 +3,7 @@
 At runtime, if a dataclass has a `__post_init__` method then all `InitVar`-annotated fields will be
 passed as positional arguments to that method as the final statement in the dataclass's generated
 `__init__` method. The `__post_init__` signature must therefore be compatible with the fields of the
-dataclass:
+dataclass.
 
 ```py
 from dataclasses import dataclass, InitVar

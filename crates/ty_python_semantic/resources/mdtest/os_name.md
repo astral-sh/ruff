@@ -3,7 +3,7 @@
 ## Explicit selection of `all` platforms
 
 When `python-platform="all"` is specified, we fall back to the type of `os.name` declared in
-typeshed:
+typeshed.
 
 ```toml
 [environment]

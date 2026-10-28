@@ -59,7 +59,7 @@ reveal_type(list[int] is not list[int])  # revealed: bool
 ## Function identity after passing through a generic identity function
 
 Passing a function through a generic identity function preserves the function object, so
-`identity(f) is f` is correctly inferred as `Literal[True]` in the examples below:
+`identity(f) is f` is correctly inferred as `Literal[True]` in the examples below.
 
 ```py
 from typing import TypeVar
@@ -91,7 +91,7 @@ reveal_type(g is not identity(f))  # revealed: Literal[True]
 ## Identity comparisons between function specializations
 
 Different specializations of the same unbound method have disjoint static types but refer to the
-same function object at runtime:
+same function object at runtime.
 
 ```toml
 [environment]
@@ -113,7 +113,7 @@ reveal_type(int_method is not str_method)  # revealed: Literal[False]
 
 Accessing a method on a class instance creates a new bound method object. Since multiple different
 instances can usually inhabit any given nominal-instance type, two variables with the same
-bound-method type do not necessarily occupy the same memory address at runtime:
+bound-method type do not necessarily occupy the same memory address at runtime.
 
 ```py
 from typing import final
@@ -131,7 +131,7 @@ reveal_type(saved_method is saved_method)  # revealed: bool
 
 A generic identity function and `functools.partial` both retain the bound-method object passed to
 them. The method's signature may be specialized by those calls, but that does not make an identity
-comparison with the saved method always false:
+comparison with the saved method always false.
 
 ```py
 from functools import partial
@@ -283,7 +283,7 @@ reveal_type(C[int].method_getter is C[int].method_caller)  # revealed: Literal[F
 ## Identity comparisons with NewTypes
 
 Two variables cannot share the same memory address if they have disjoint nominal-instance backing
-types:
+types.
 
 ```py
 def f(x: str, y: int):
@@ -315,7 +315,7 @@ def f(x: B, y: C):
 ```
 
 Nonetheless, if the NewType's nominal backing type is disjoint from another type, `Literal` boolean
-types can still be inferred as a result:
+types can still be inferred as a result.
 
 ```py
 from typing import NewType, Literal

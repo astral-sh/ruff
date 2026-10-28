@@ -2,7 +2,7 @@
 
 ## Invalid types are rejected
 
-Many types are illegal in the context of a type expression:
+Many types are illegal in the context of a type expression.
 
 ```py
 import typing
@@ -175,7 +175,7 @@ def invalid_binary_operators(
 
 Upon encountering an invalid-in-type-expression AST node, we try to avoid cascading diagnostics. For
 example, in this snippet, we only report the the outer list literal is invalid, and ignore the fact
-that there is also an invalid list literal inside the outer list literal node:
+that there is also an invalid list literal inside the outer list literal node.
 
 ```py
 # error: [invalid-type-form]
@@ -183,7 +183,7 @@ x: [[int]]
 ```
 
 However, runtime errors inside invalid AST nodes are still reported -- these errors are more serious
-than just "typing spec pedantry":
+than just "typing spec pedantry".
 
 ```py
 # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
@@ -195,7 +195,7 @@ But we avoid false-positive diagnostics regarding unresolved references inside s
 we detect that the string annotation is an invalid type form. These diagnostics would just add
 noise, since stringized annotations are never executed at runtime. The following snippet causes us
 to emit `invalid-type-form`, but we ignore that `foo` is an "unresolved reference" inside the string
-annotation:
+annotation.
 
 ```py
 # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
@@ -221,7 +221,7 @@ b: "(lambda value=(name := int): None)[int]"
 c: "TypedDict('T', {}, extra_items=missing)[int]"
 ```
 
-The same error-recovery behavior applies to annotations in stub files:
+The same error-recovery behavior applies to annotations in stub files.
 
 `stub.pyi`:
 
@@ -383,7 +383,7 @@ def invalid_typevartuple_ellipsis(
 ```
 
 Multiple misplaced ellipses in an alias produce separate diagnostics, each highlighting only the
-offending ellipsis:
+offending ellipsis.
 
 ```py
 # snapshot: invalid-type-form
@@ -409,7 +409,7 @@ error[invalid-type-form]: Invalid `tuple` specialization
 
 ## Invalid AST nodes in string annotations
 
-Invalid AST nodes should also be rejected when they appear in string annotations:
+Invalid AST nodes should also be rejected when they appear in string annotations.
 
 ```py
 def bar() -> None:
@@ -506,7 +506,7 @@ class name_4[name_1: [{}]]:
 
 It's pretty common in Python to accidentally use a module-literal type in a type expression when you
 *meant* to use a class by the same name that comes from that module. We emit a nice subdiagnostic
-for this case:
+for this case.
 
 `foo.py`:
 
@@ -1559,7 +1559,7 @@ note: This is an unsafe fix and may change runtime behavior
 #### Preserving literal syntax
 
 The fix preserves numeric spelling, bytes escapes, and string delimiters. It also works inside
-forward annotations:
+forward annotations.
 
 ```py
 def bad(
@@ -1714,7 +1714,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 #### Shadowed import names
 
-When `Literal` is shadowed, the fix uses a qualified import:
+When `Literal` is shadowed, the fix uses a qualified import.
 
 ```py
 def qualified(Literal: int):
@@ -1742,7 +1742,7 @@ help: Wrap in `Literal[...]`
 note: This is an unsafe fix and may change runtime behavior
 ```
 
-If both names are occupied, no fix is offered:
+If both names are occupied, no fix is offered.
 
 ```py
 def unavailable(Literal: int, typing: int):
@@ -1764,7 +1764,7 @@ info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotat
 
 `Literal` is unavailable in `typing` on Python 3.7. The presence of `typing_extensions` stubs in our
 vendored typeshed stubs for the stdlib do not, on their own, justify an autofix that would add an
-import from `typing_extensions` -- the package may not be available at runtime:
+import from `typing_extensions` -- the package may not be available at runtime.
 
 ```toml
 [environment]
@@ -1809,7 +1809,7 @@ typing_extensions = ["extensions"]
 
 ##### Available runtime export
 
-The installed version of `typing_extensions` provides `Literal`, so the fix can import it:
+The installed version of `typing_extensions` provides `Literal`, so the fix can import it.
 
 `/.venv/<path-to-site-packages>/typing_extensions.py`:
 
@@ -1845,7 +1845,7 @@ note: This is an unsafe fix and may change runtime behavior
 ##### Missing runtime export
 
 If the installed version of `typing_extensions` does not expose `Literal`, we don't offer the
-autofix even if `Literal` exists in typeshed's stdlib stub for `typing_extensions`:
+autofix even if `Literal` exists in typeshed's stdlib stub for `typing_extensions`.
 
 `/.venv/<path-to-site-packages>/typing_extensions.py`:
 
@@ -1872,7 +1872,7 @@ info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotat
 ##### Missing runtime module
 
 `typing_extensions` must be present in `site-packages` as well as declared as a direct dependency
-for the autofix to be offered:
+for the autofix to be offered.
 
 `/.venv/<path-to-site-packages>/unrelated.py`:
 

@@ -42,7 +42,7 @@ reveal_type(f"{string!r}")  # revealed: str
 
 ## Debug Specifier
 
-The `=` specifier causes the expression text and value to be included in the output:
+The `=` specifier causes the expression text and value to be included in the output.
 
 ```py
 # f"{1=}" evaluates to "1=1", but we fall back to `str` for now

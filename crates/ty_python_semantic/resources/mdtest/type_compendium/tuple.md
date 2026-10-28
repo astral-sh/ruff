@@ -79,7 +79,7 @@ def g(x: tuple[int, str] | tuple[bytes, bool], y: tuple[int, str] | tuple[bytes,
 
 ## Instantiating tuple subclasses
 
-Tuple subclasses inherit the special-cased constructors from their tuple superclasses:
+Tuple subclasses inherit the special-cased constructors from their tuple superclasses.
 
 ```toml
 [environment]
@@ -159,7 +159,7 @@ def f(x: tuple[int, ...], y: tuple[str, str], z: tuple[int, *tuple[str, ...], by
 ## Subtyping relationships
 
 The type `tuple[S1, S2]` is a subtype of `tuple[T1, T2]` if and only if `S1` is a subtype of `T1`
-and `S2` is a subtype of `T2`, and similar for other lengths of tuples:
+and `S2` is a subtype of `T2`, and similar for other lengths of tuples.
 
 ```py
 from ty_extensions import static_assert
@@ -178,7 +178,7 @@ static_assert(not is_subtype_of(tuple[T1, S2], tuple[S1, T2]))
 static_assert(not is_subtype_of(tuple[S1, T2], tuple[T1, S2]))
 ```
 
-Different-length tuples are not related via subtyping:
+Different-length tuples are not related via subtyping.
 
 ```py
 static_assert(not is_subtype_of(tuple[S1], tuple[T1, T2]))
@@ -190,7 +190,7 @@ The type of the empty tuple `()` is spelled `tuple[()]`. It is [not a singleton 
 different instances of `()` are not guaranteed to be the same object (even if this is the case in
 CPython at the time of writing).
 
-The empty tuple can also be subclassed (further clarifying that it is not a singleton type):
+The empty tuple can also be subclassed (further clarifying that it is not a singleton type).
 
 ```py
 from ty_extensions import static_assert
@@ -209,7 +209,7 @@ static_assert(is_assignable_to(AnotherEmptyTuple, tuple[()]))
 ## Non-empty tuples
 
 For the same reason as above (two instances of a tuple with the same elements might not be the same
-object), non-empty tuples are also not singleton types — even if all their elements are singletons:
+object), non-empty tuples are also not singleton types — even if all their elements are singletons.
 
 ```py
 from ty_extensions import static_assert
@@ -418,7 +418,7 @@ class CommonSubtype(tuple[int, str], C): ...
 
 However, we model heterogeneous tuples to be disjoint from other heterogeneous tuples. To reconcile
 these two things, we explicitly ban two differently specialized heterogeneous tuples from coexisting
-in the same MRO:
+in the same MRO.
 
 ```py
 class I1(tuple[F1, F2]): ...
@@ -499,7 +499,7 @@ static_assert(is_assignable_to(tuple[int, *tuple[Literal[True], ...], int], Alwa
 ```
 
 Both of these results are conflicting with the fact that tuples can be subclassed, and that we
-currently allow subclasses of `tuple` to overwrite `__bool__` (or `__len__`):
+currently allow subclasses of `tuple` to overwrite `__bool__` (or `__len__`).
 
 ```py
 class NotAlwaysTruthyTuple(tuple[int]):
@@ -532,7 +532,7 @@ def f(x: tuple, y: tuple[Unknown, ...]):  # error: [missing-type-argument]
 ## Converting a `tuple` to another `Sequence` type
 
 For covariant types, such as `frozenset`, the ideal behaviour would be to not promote `Literal`
-types to their instance supertypes: doing so causes more false positives than it fixes:
+types to their instance supertypes: doing so causes more false positives than it fixes.
 
 ```py
 reveal_type(frozenset((1, 2, 3)))  # revealed: frozenset[Literal[1, 2, 3]]
@@ -540,7 +540,7 @@ reveal_type(frozenset(((1, 2, 3),)))  # revealed: frozenset[tuple[Literal[1], Li
 ```
 
 Literals are always promoted for invariant containers such as `list`, however, even though this can
-in some cases cause false positives:
+in some cases cause false positives.
 
 ```py
 from typing import Literal
@@ -684,7 +684,7 @@ reveal_type(final_tuple_with_65)
 # fmt: on
 ```
 
-Literal promotion can always be avoided by providing explicit type annotations:
+Literal promotion can always be avoided by providing explicit type annotations.
 
 ```py
 # fmt: off

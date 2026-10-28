@@ -147,7 +147,7 @@ class Record(NamedTuple):
     optional: str = ...
 ```
 
-The generated constructor requires the first field but permits omitting the second:
+The generated constructor requires the first field but permits omitting the second.
 
 ```py
 from records import Record
@@ -163,7 +163,7 @@ Record()  # error: [missing-argument]
 
 <!-- snapshot-diagnostics -->
 
-The assigned variable name should match the `typename` argument:
+The assigned variable name should match the `typename` argument.
 
 ```py
 from typing import NamedTuple
@@ -177,7 +177,7 @@ reveal_type(is_subtype_of(Mismatch, tuple[int]))  # revealed: ConstraintSet[Lite
 
 ### Functional syntax with string annotations
 
-String annotations (forward references) are properly evaluated to types:
+String annotations (forward references) are properly evaluated to types.
 
 ```py
 from typing import NamedTuple
@@ -189,7 +189,7 @@ reveal_type(p.x)  # revealed: int
 reveal_type(p.y)  # revealed: int
 ```
 
-Recursive references in functional syntax are supported:
+Recursive references in functional syntax are supported.
 
 ```py
 from typing import NamedTuple
@@ -226,7 +226,7 @@ A(x=C(x=A(x=None)))
 ### Functional syntax as base class (dangling call)
 
 When `NamedTuple` is used directly as a base class without being assigned to a variable first, it's
-a "dangling call". The types are still properly inferred:
+a "dangling call". The types are still properly inferred.
 
 ```py
 from typing import NamedTuple
@@ -242,7 +242,7 @@ reveal_type(p.magnitude())  # revealed: float
 ```
 
 String annotations in dangling calls work correctly for forward references to classes defined in the
-same scope. This allows recursive types:
+same scope. This allows recursive types.
 
 ```py
 from typing import NamedTuple
@@ -269,7 +269,7 @@ A(x=C(x=A(x=None)))
 ```
 
 Note that the string annotation must reference a name that exists in scope. References to the
-internal NamedTuple name (if different from the class name) won't work:
+internal NamedTuple name (if different from the class name) won't work.
 
 ```py
 from typing import NamedTuple
@@ -286,7 +286,7 @@ reveal_type(n.value)  # revealed: int
 reveal_type(n.next)  # revealed: Unknown | None
 ```
 
-Dangling calls cannot contain other dangling calls; that's an invalid type form:
+Dangling calls cannot contain other dangling calls; that's an invalid type form.
 
 ```py
 from ty_extensions._internal import reveal_mro
@@ -301,7 +301,7 @@ reveal_mro(A)
 
 ### Functional syntax with variable name
 
-When the typename is passed via a variable, we can extract it from the inferred literal string type:
+When the typename is passed via a variable, we can extract it from the inferred literal string type.
 
 ```py
 from typing import NamedTuple
@@ -314,7 +314,7 @@ reveal_type(p.id)  # revealed: int
 reveal_type(p.name)  # revealed: str
 ```
 
-Non-literal `str` names should not be treated as proven mismatches:
+Non-literal `str` names should not be treated as proven mismatches.
 
 ```py
 from typing import NamedTuple
@@ -326,7 +326,7 @@ def f(name: str) -> None:
 ### Functional syntax with tuple variable fields
 
 When fields are passed via a tuple variable, we cannot extract the literal field names and types
-from the inferred tuple type. We instead emit a diagnostic:
+from the inferred tuple type. We instead emit a diagnostic.
 
 ```py
 from typing import NamedTuple
@@ -375,7 +375,7 @@ reveal_type(url[2])  # revealed: Unknown
 
 ### Functional syntax with Final variable field names
 
-When field names are `Final` variables, they resolve to their literal string values:
+When field names are `Final` variables, they resolve to their literal string values.
 
 ```py
 from typing import Final, NamedTuple
@@ -395,7 +395,7 @@ N(x="", y="")
 ### Functional syntax with variadic tuple fields
 
 When fields are passed as a variadic tuple (e.g., `tuple[..., *tuple[T, ...]]`), we cannot determine
-the exact field count statically. In this case, we fall back to unknown fields:
+the exact field count statically. In this case, we fall back to unknown fields.
 
 ```toml
 [environment]
@@ -443,7 +443,7 @@ reveal_type(NT(1, 2).x)  # revealed: Any
 ### Class inheriting from functional NamedTuple
 
 Classes can inherit from functional namedtuples. The constructor parameters and field types are
-properly inherited:
+properly inherited.
 
 ```py
 from typing import NamedTuple
@@ -471,7 +471,7 @@ Url("example.com")
 Url("example.com", "/path", "extra")
 ```
 
-Subclasses can add methods that use inherited fields:
+Subclasses can add methods that use inherited fields.
 
 ```py
 from typing import NamedTuple
@@ -496,7 +496,7 @@ class Foo(_Foo):  # Regular class, not a namedtuple
     ...
 ```
 
-Because the outer class is not itself a namedtuple, it can use `super()` and override `__new__`:
+Because the outer class is not itself a namedtuple, it can use `super()` and override `__new__`.
 
 ```py
 from collections import namedtuple
@@ -529,7 +529,7 @@ reveal_type(url)  # revealed: Url
 ### Functional syntax with list variable fields
 
 When fields are passed via a list variable (not a literal), the field names cannot be determined
-statically. Attribute access returns `Any` and the constructor accepts any arguments:
+statically. Attribute access returns `Any` and the constructor accepts any arguments.
 
 ```py
 from typing import NamedTuple
@@ -548,7 +548,7 @@ class Url(NamedTuple("Url", fields)):
 ```
 
 When constructing a namedtuple directly with dynamically-defined fields, keyword arguments are
-accepted because the constructor uses a gradual signature:
+accepted because the constructor uses a gradual signature.
 
 ```py
 import collections
@@ -573,7 +573,7 @@ reveal_type(config[100])  # revealed: Unknown
 
 ### Functional syntax signature validation
 
-The `collections.namedtuple` function accepts `str | Iterable[str]` for `field_names`:
+The `collections.namedtuple` function accepts `str | Iterable[str]` for `field_names`.
 
 ```py
 import collections
@@ -621,7 +621,7 @@ TooMany = collections.namedtuple("TooMany", "x", "y", "z")
 reveal_type(TooMany)  # revealed: <class 'TooMany'>
 ```
 
-The `typing.NamedTuple` function accepts `Iterable[tuple[str, Any]]` for `fields`:
+The `typing.NamedTuple` function accepts `Iterable[tuple[str, Any]]` for `fields`.
 
 ```py
 from typing import NamedTuple
@@ -647,7 +647,7 @@ reveal_type(TooMany)  # revealed: <class 'TooMany'>
 ### Keyword arguments for `collections.namedtuple`
 
 The `collections.namedtuple` function accepts `typename` and `field_names` as keyword arguments, as
-well as `rename`, `defaults`, and `module`:
+well as `rename`, `defaults`, and `module`.
 
 ```py
 import collections
@@ -812,7 +812,7 @@ reveal_type(Bad5)  # revealed: <class 'Bad5'>
 ### Keyword arguments for `typing.NamedTuple`
 
 Unlike `collections.namedtuple`, the `typing.NamedTuple` function does not accept `typename` or
-`fields` as keyword arguments. It also does not accept `rename`, `defaults`, or `module`:
+`fields` as keyword arguments. It also does not accept `rename`, `defaults`, or `module`.
 
 ```py
 from typing import NamedTuple
@@ -893,7 +893,7 @@ Bad4(42, 56, 79)  # no error
 ### Starred and double-starred arguments
 
 For `collections.namedtuple`, starred (`*args`) or double-starred (`**kwargs`) arguments cause us to
-fall back to `NamedTupleFallback` since we can't statically determine the arguments:
+fall back to `NamedTupleFallback` since we can't statically determine the arguments.
 
 ```py
 import collections
@@ -914,7 +914,7 @@ Point3 = collections.namedtuple(*args, **kwargs)
 reveal_type(Point3)  # revealed: type[tuple[Unknown, ...]] & type[NamedTupleLike] & Unknown
 ```
 
-For `typing.NamedTuple`, variadic arguments are not supported and result in an error:
+For `typing.NamedTuple`, variadic arguments are not supported and result in an error.
 
 ```py
 from typing import NamedTuple
@@ -975,7 +975,7 @@ class VeryStrangeLocation(NamedTuple):
 
 <!-- snapshot-diagnostics -->
 
-Multiple inheritance is not supported for `NamedTuple` classes except with `Generic`:
+Multiple inheritance is not supported for `NamedTuple` classes except with `Generic`.
 
 ```py
 from typing import NamedTuple, Protocol
@@ -998,7 +998,7 @@ class E(NamedTuple, Protocol): ...
 ```
 
 However, as explained above, for `class Foo(namedtuple("Foo", ...)): ...` the outer class is not
-itself a namedtuple—it just inherits from one. So it can use multiple inheritance freely:
+itself a namedtuple—it just inherits from one. So it can use multiple inheritance freely.
 
 ```py
 from abc import ABC
@@ -1046,7 +1046,7 @@ reveal_type(alice.index(30))  # revealed: int
 ```
 
 The `@total_ordering` decorator should not emit a diagnostic, since the required `__lt__` method is
-already present:
+already present.
 
 ```py
 from collections import namedtuple
@@ -1078,7 +1078,7 @@ reveal_type(alice >= bob)  # revealed: bool
 ### Inheriting from a `NamedTuple`
 
 Inheriting from a `NamedTuple` is supported, but new fields on the subclass will not be part of the
-synthesized `__new__` signature:
+synthesized `__new__` signature.
 
 ```py
 from typing import NamedTuple
@@ -1147,7 +1147,7 @@ james.nickname = "Bob"
 ```
 
 Even though we reject the override, normal attribute lookup still follows the subclass member while
-tuple indexing preserves the inherited field view:
+tuple indexing preserves the inherited field view.
 
 ```py
 from typing import NamedTuple
@@ -1163,7 +1163,7 @@ reveal_type(Child(age=None)[0])  # revealed: int | None
 reveal_type(Child(age=None).age)  # revealed: int
 ```
 
-The same conflict check applies when the inherited `NamedTuple` comes from the functional forms:
+The same conflict check applies when the inherited `NamedTuple` comes from the functional forms.
 
 ```py
 from typing import NamedTuple
@@ -1178,7 +1178,7 @@ reveal_type(TypingChild(age=None)[0])  # revealed: int | None
 reveal_type(TypingChild(age=None).age)  # revealed: int
 ```
 
-The same check applies through deeper inheritance chains:
+The same check applies through deeper inheritance chains.
 
 ```py
 from typing import NamedTuple
@@ -1194,7 +1194,7 @@ class Sub(Intermediate):
     name: int
 ```
 
-Later subclasses still get their own conflict if an earlier base has already overridden the name:
+Later subclasses still get their own conflict if an earlier base has already overridden the name.
 
 ```py
 from typing import NamedTuple
@@ -1276,7 +1276,7 @@ reveal_type(Child._make((1,)))  # revealed: Child[int]
 ### Functional syntax with generics
 
 Generic namedtuples can also be defined using the functional syntax with type variables in the field
-types. We don't currently support this, but mypy does:
+types. We don't currently support this, but mypy does.
 
 ```py
 from typing import NamedTuple, TypeVar
@@ -1354,7 +1354,7 @@ person._replace(invalid=42)
 ```
 
 When accessing them on child classes of generic `NamedTuple`s, the return type is specialized
-accordingly:
+accordingly.
 
 ```py
 from typing import NamedTuple, Generic, TypeVar
@@ -1374,7 +1374,7 @@ reveal_type(IntBox(1)._replace(content=42))  # revealed: IntBox
 
 The `_replace` methods of different named tuples retain different return types even when their
 fields match. A union of these methods cannot promise to return only one of the classes, regardless
-of branch order:
+of branch order.
 
 ```py
 from typing import Callable, NamedTuple
@@ -1397,7 +1397,7 @@ def either_class(flag: bool) -> Callable[..., A | B]:
     return A._replace if flag else B._replace  # no diagnostic
 ```
 
-The same distinction applies to named tuples created with the functional syntax:
+The same distinction applies to named tuples created with the functional syntax.
 
 ```py
 DynamicA = NamedTuple("DynamicA", [("x", int)])
@@ -1422,7 +1422,7 @@ reveal_type(Person.__slots__)  # revealed: tuple[()]
 ```
 
 Regression test for <https://github.com/astral-sh/ty/issues/3184>: the first parameter of `__new__`
-at runtime for a namedtuple class is `_cls`, meaning that `cls` can be used as a field name:
+at runtime for a namedtuple class is `_cls`, meaning that `cls` can be used as a field name.
 
 ```py
 from collections import namedtuple
@@ -1442,7 +1442,7 @@ reveal_type(StaticInfo(inst=None, cls=str))  # revealed: StaticInfo
 
 When field names are passed via a tuple variable, we can extract the literal field names from the
 inferred tuple type. The class is properly synthesized (not a fallback), but field types are `Any`
-since `collections.namedtuple` doesn't include type annotations:
+since `collections.namedtuple` doesn't include type annotations.
 
 ```py
 from collections import namedtuple
@@ -1462,7 +1462,7 @@ reveal_type(alice.age)  # revealed: Any
 
 When field names are passed via a list variable (not a literal), we fall back to
 `NamedTupleFallback` which allows any attribute access. This is a regression test for accessing
-`Self` attributes in methods of classes that inherit from namedtuples with dynamic fields:
+`Self` attributes in methods of classes that inherit from namedtuples with dynamic fields.
 
 ```py
 from collections import namedtuple
@@ -1483,7 +1483,7 @@ reveal_type(Url.__match_args__)  # revealed: tuple[str, ...]
 
 ## `collections.namedtuple` attributes
 
-Functional namedtuples have synthesized attributes similar to class-based namedtuples:
+Functional namedtuples have synthesized attributes similar to class-based namedtuples.
 
 ```py
 from collections import namedtuple
@@ -1510,7 +1510,7 @@ reveal_type(person._replace(name="Bob"))  # revealed: Person
 
 ## The symbol `NamedTuple` itself
 
-At runtime, `NamedTuple` is a function, and we understand this:
+At runtime, `NamedTuple` is a function, and we understand this.
 
 ```py
 import types
@@ -1522,7 +1522,7 @@ expects_functiontype(typing.NamedTuple)
 ```
 
 This means we also understand that all attributes on function objects are available on the symbol
-`typing.NamedTuple`:
+`typing.NamedTuple`.
 
 ```py
 reveal_type(typing.NamedTuple.__name__)  # revealed: str
@@ -1538,7 +1538,7 @@ there is no object at runtime that is an "instance of `NamedTuple`", nor is ther
 runtime that is a "subclass of `NamedTuple`" -- these are both impossible, since `NamedTuple` is a
 function and not a class. However, for compatibility with other type checkers, we allow `NamedTuple`
 in type expressions and understand it as describing an interface that all `NamedTuple` classes would
-satisfy:
+satisfy.
 
 ```py
 def expects_named_tuple(x: typing.NamedTuple):
@@ -1561,7 +1561,7 @@ def _(z: typing.NamedTuple[int]): ...
 
 NamedTuples are assignable to `NamedTupleLike`. The `NamedTupleLike._replace` method is typed with
 `(*args, **kwargs)`, which type checkers treat as equivalent to `...` (per the typing spec), making
-all NamedTuple implementations automatically compatible:
+all NamedTuple implementations automatically compatible.
 
 ```py
 from typing import NamedTuple, Protocol, Iterable, Any
@@ -1588,7 +1588,7 @@ expects_named_tuple((1, 2))
 ```
 
 The type described by `NamedTuple` in type expressions is understood as being assignable to
-`tuple[object, ...]` and `tuple[Any, ...]`:
+`tuple[object, ...]` and `tuple[Any, ...]`.
 
 ```py
 static_assert(is_assignable_to(NamedTuple, tuple))  # error: [missing-type-argument]
@@ -1659,7 +1659,7 @@ class F(NamedTuple):
 ```
 
 However, classes that **inherit from** a `NamedTuple` class (but don't directly inherit from
-`NamedTuple`) can use `super()` normally:
+`NamedTuple`) can use `super()` normally.
 
 ```py
 from typing import NamedTuple
@@ -1672,7 +1672,7 @@ class Child(Base):
         super()
 ```
 
-And regular classes that don't inherit from `NamedTuple` at all can use `super()` as normal:
+And regular classes that don't inherit from `NamedTuple` at all can use `super()` as normal.
 
 ```py
 class Regular:
@@ -1680,7 +1680,7 @@ class Regular:
         super()  # fine
 ```
 
-Using `super()` on a `NamedTuple` class also works fine if it occurs outside the class:
+Using `super()` on a `NamedTuple` class also works fine if it occurs outside the class.
 
 ```py
 from typing import NamedTuple
@@ -1709,7 +1709,7 @@ class Baz(Bar):
     _whatever: str  # `Baz` is not a NamedTuple class, so this is fine
 ```
 
-The same validation applies to the functional `typing.NamedTuple` syntax:
+The same validation applies to the functional `typing.NamedTuple` syntax.
 
 ```py
 from typing import NamedTuple
@@ -1751,7 +1751,7 @@ class Foo(NamedTuple):
     c: ClassVar[Final[int]]
 ```
 
-An unsubscripted qualifier is rejected for the same reason:
+An unsubscripted qualifier is rejected for the same reason.
 
 ```py
 from typing import ClassVar, NamedTuple
@@ -1762,7 +1762,7 @@ class Bare(NamedTuple):
 ```
 
 A class that inherits from a `NamedTuple` class is an ordinary class at runtime, so it may use both
-qualifiers freely:
+qualifiers freely.
 
 ```py
 from typing import ClassVar, Final, NamedTuple
@@ -1775,7 +1775,7 @@ class Sub(Base):
     z: Final[str] = "z"
 ```
 
-The full diagnostic points at the offending field:
+The full diagnostic points at the offending field.
 
 ```py
 from typing import ClassVar, NamedTuple
@@ -1826,7 +1826,7 @@ class Conditional(NamedTuple):
         y: Final[int]
 ```
 
-Statically unreachable qualified declarations are ignored:
+Statically unreachable qualified declarations are ignored.
 
 ```py
 class Unreachable(NamedTuple):
@@ -1861,7 +1861,7 @@ error[invalid-named-tuple]: Type qualifier `Final` is not allowed in a NamedTupl
 
 ## NamedTuple qualifiers in quoted and wrapped annotations
 
-Explicitly quoted and `Annotated` field annotations are rejected for the same static reason:
+Explicitly quoted and `Annotated` field annotations are rejected for the same static reason.
 
 ```py
 from typing import Annotated, Final, NamedTuple
@@ -1911,7 +1911,7 @@ class F(NamedTuple):
     __getnewargs__ = None
 ```
 
-However, other attributes (including those starting with underscores) can be assigned without error:
+However, other attributes (including those starting with underscores) can be assigned without error.
 
 ```py
 from typing import NamedTuple
@@ -1927,7 +1927,7 @@ class G(NamedTuple):
 
 Note that type-annotated attributes become NamedTuple fields, not attribute overrides. They are not
 flagged as prohibited attribute overrides (though field names starting with `_` are caught by the
-underscore field name check):
+underscore field name check).
 
 ```py
 from typing import NamedTuple
@@ -1940,7 +1940,7 @@ class H(NamedTuple):
     _asdict: int = 0
 ```
 
-The check also applies to assignments within conditional blocks:
+The check also applies to assignments within conditional blocks.
 
 ```py
 from typing import NamedTuple
@@ -1953,7 +1953,7 @@ class I(NamedTuple):
         _asdict = 42
 ```
 
-Method definitions with prohibited names are also flagged:
+Method definitions with prohibited names are also flagged.
 
 ```py
 from typing import NamedTuple
@@ -1972,7 +1972,7 @@ class J(NamedTuple):
 ```
 
 Classes that inherit from a `NamedTuple` class (but don't directly inherit from `NamedTuple`) are
-not subject to these restrictions:
+not subject to these restrictions.
 
 ```py
 from typing import NamedTuple
@@ -1988,7 +1988,7 @@ class Child(Base):
 ## `NamedTuple` with `@dataclass` decorator
 
 Applying `@dataclass` to a `NamedTuple` class is invalid. An exception will be raised when
-instantiating the class at runtime:
+instantiating the class at runtime.
 
 ```py
 from dataclasses import dataclass
@@ -2001,7 +2001,7 @@ class Foo(NamedTuple):
     y: str
 ```
 
-The same error occurs with `dataclasses.dataclass` used with parentheses:
+The same error occurs with `dataclasses.dataclass` used with parentheses.
 
 ```py
 from dataclasses import dataclass
@@ -2013,7 +2013,7 @@ class Bar(NamedTuple):
     x: int
 ```
 
-It also applies when using `frozen=True` or other dataclass parameters:
+It also applies when using `frozen=True` or other dataclass parameters.
 
 ```py
 from dataclasses import dataclass
@@ -2025,7 +2025,7 @@ class Baz(NamedTuple):
     x: int
 ```
 
-Classes that inherit from a `NamedTuple` class also cannot be decorated with `@dataclass`:
+Classes that inherit from a `NamedTuple` class also cannot be decorated with `@dataclass`.
 
 ```py
 from dataclasses import dataclass
@@ -2040,7 +2040,7 @@ class Child(Base):
     y: str
 ```
 
-The same restriction applies to classes inheriting from functional namedtuples:
+The same restriction applies to classes inheriting from functional namedtuples.
 
 ```py
 from dataclasses import dataclass
@@ -2058,7 +2058,7 @@ class Bar(NamedTuple("Bar", [("x", int), ("y", str)])):
     pass
 ```
 
-The same applies when using `dataclass` as a function on a functional `NamedTuple`:
+The same applies when using `dataclass` as a function on a functional `NamedTuple`.
 
 ```py
 from dataclasses import dataclass

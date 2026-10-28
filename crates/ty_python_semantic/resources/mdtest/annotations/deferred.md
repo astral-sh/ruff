@@ -131,7 +131,7 @@ class C:
 ```
 
 The built-in `type` is an instance of itself, so assigning it to an attribute with this cyclic
-annotation is valid:
+annotation is valid.
 
 ```py
 class C:

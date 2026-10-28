@@ -125,7 +125,7 @@ is equal to `2`, even if `subject` is not an instance of `int`. By default, we a
 subclasses of `C` do not override equality, so the `case` branch cannot be taken when the type `C`
 is disjoint from the type `Literal[2]`.
 
-This leads us to infer `Literal[1]` as the type of `y` after the `match` statement:
+This leads us to infer `Literal[1]` as the type of `y` after the `match` statement.
 
 ```py
 class C: ...
@@ -249,7 +249,7 @@ def tuple_subclass(value: TupleSubclass) -> int:  # no diagnostic
             return 42
 ```
 
-A guard or a refutable attribute pattern can still leave values unmatched:
+A guard or a refutable attribute pattern can still leave values unmatched.
 
 ```py
 def guarded(value: Point, flag: bool) -> int:  # error: [invalid-return-type] "can implicitly return `None`"
@@ -634,7 +634,7 @@ def _(target: int | str):
 ### Enabling strict equality narrowing
 
 With strict equality narrowing enabled, broad builtin types are preserved both in the capture and
-when narrowing the subject for later cases:
+when narrowing the subject for later cases.
 
 ```toml
 [analysis]
@@ -797,7 +797,7 @@ def enum_with_ambiguous_guard(value: Literal[Color.RED, Color.BLUE], flag: bool)
     reveal_type(result)  # revealed: Literal[1, 2, 3]
 ```
 
-The type of a name captured by the pattern can make the guard always true:
+The type of a name captured by the pattern can make the guard always true.
 
 ```py
 def enum_with_capture_dependent_guard(value: Literal[Color.RED, Color.BLUE]) -> None:
@@ -867,7 +867,7 @@ def _(answer: Answer | None):
 For class patterns, the runtime first checks that the match pattern is an instance of `type`, and
 then uses `isinstance` to check the match.
 
-If the match pattern is not an instance of `type`, we raise a diagnostic:
+If the match pattern is not an instance of `type`, we raise a diagnostic.
 
 ```py
 from typing import Any
@@ -896,7 +896,7 @@ def _(val, Valid1: type | Any, Valid2: Intersection[type, Any], Valid3: type[Any
             pass
 ```
 
-We also raise a diagnostic if the class cannot be used with `isinstance`:
+We also raise a diagnostic if the class cannot be used with `isinstance`.
 
 ```py
 from typing import Any, TypedDict
@@ -916,7 +916,7 @@ def _(val):
         case Invalid4(): ...
 ```
 
-We do not raise a diagnostic for dynamic types:
+We do not raise a diagnostic for dynamic types.
 
 ```py
 def _(val, UnknownSymbol):
@@ -926,7 +926,7 @@ def _(val, UnknownSymbol):
         case UnknownSymbol(): ...
 ```
 
-We also do not raise a diagnostic if the match pattern is a non-statically known instance of `type`:
+We also do not raise a diagnostic if the match pattern is a non-statically known instance of `type`.
 
 ```py
 def _(val, IntOrStr: type[int | str]):

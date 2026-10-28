@@ -23,7 +23,7 @@ reveal_type(xs)  # revealed: ndarray[tuple[Any, ...], dtype[float64]]
 ```
 
 Explicit dtypes remain distinct when checking an array against a parameter annotation. This is a
-regression test for <https://github.com/astral-sh/ty/issues/3199>:
+regression test for <https://github.com/astral-sh/ty/issues/3199>.
 
 ```py
 def takes_float16(values: np.ndarray[tuple[int, ...], np.dtype[np.float16]]) -> None: ...
@@ -39,7 +39,7 @@ takes_float16(float16_values)
 ```
 
 An explicit integer dtype is also preserved through `array`, allowing `interp` to select its array
-overload. This is a regression test for <https://github.com/astral-sh/ty/issues/1429>:
+overload. This is a regression test for <https://github.com/astral-sh/ty/issues/1429>.
 
 ```py
 values = np.array([0, 1, 2], dtype=np.int64)

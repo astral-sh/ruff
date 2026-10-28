@@ -12,7 +12,7 @@ truthiness but are nonetheless highly suspicious, and probably indicative of bug
 
 ## Callable values
 
-Testing a `Callable` does not invoke it. We suggest a call when the value takes no arguments:
+Testing a `Callable` does not invoke it. We suggest a call when the value takes no arguments.
 
 ```py
 from typing import Callable
@@ -42,7 +42,7 @@ help: Replace with `predicate()`
 note: This is an unsafe fix and may change runtime behavior
 ```
 
-When arguments are required, the suggested call leaves them for the user to supply:
+When arguments are required, the suggested call leaves them for the user to supply.
 
 ```py
 def check_with_argument(predicate: Callable[[int], bool]):
@@ -71,7 +71,7 @@ note: This suggestion may be incorrect or produce invalid syntax. It requires ma
 ## Unions of callable values
 
 A union of callables still represents callable objects. A union containing `None` may instead be
-testing whether the value is present:
+testing whether the value is present.
 
 ```py
 from typing import Callable
@@ -164,7 +164,7 @@ note: This suggestion may be incorrect or produce invalid syntax. It requires ma
 ## Unions with functions and bound methods
 
 A union of a `Callable` type and a function-literal function is still suspicious in a boolean test.
-The function is always truthy, and testing the selected value does not call it:
+The function is always truthy, and testing the selected value does not call it.
 
 ```py
 from typing import Callable
@@ -180,7 +180,7 @@ def check(callback: Callable[[], bool], flag: bool):
 ```
 
 Bound methods are also always truthy. The suggested call does not need an argument for `self`, since
-the method is already bound to its instance:
+the method is already bound to its instance.
 
 ```py
 class Handler:
@@ -216,7 +216,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 An always-truthy instance remains suspicious when its `__call__` attribute has several possible
 signatures. If any signature requires an argument, the suggested call leaves it for the user to
-supply:
+supply.
 
 ```py
 from typing import final, Callable
@@ -252,7 +252,7 @@ note: This suggestion may be incorrect or produce invalid syntax. It requires ma
 
 Type aliases do not change whether a callable's truthiness test is suspicious. Both legacy aliases
 and PEP 695 aliases receive the same warning as their underlying callable types, including aliases
-of unions and aliases used within unions:
+of unions and aliases used within unions.
 
 ```toml
 [environment]
@@ -283,7 +283,7 @@ def check(
         pass
 ```
 
-An alias that includes `None` can still be tested to check whether a callback is present:
+An alias that includes `None` can still be tested to check whether a callback is present.
 
 ```py
 type OptionalCallback = Callback | None
@@ -298,7 +298,7 @@ def check_optional(callback: OptionalCallback):
 Calling a callable that returns a coroutine turns the boolean test from a suspicious one into one
 that tests an always-truthy value. That's also probably not what the user intended, so, in an
 asynchronous function, we suggest additionally awaiting the result of the call where it's
-appropriate:
+appropriate.
 
 ```py
 from typing import Any, Callable, Coroutine
@@ -329,7 +329,7 @@ note: This is an unsafe fix and may change runtime behavior
 ## Iterable values
 
 Testing an `Iterable` for truthiness is a common footgun, since a variable typed as an `Iterable`
-could be a generator, in which case it would be truthy even if it were empty:
+could be a generator, in which case it would be truthy even if it were empty.
 
 ```py
 from typing import Iterable
@@ -368,7 +368,7 @@ note: This is an unsafe fix and may change runtime behavior
 ```
 
 A `Collection`-typed variable, on the other hand, cannot be a generator, and the `Collection`
-protocol can only be inhabited by objects that define `__len__`, so we emit no diagnostic here:
+protocol can only be inhabited by objects that define `__len__`, so we emit no diagnostic here.
 
 ```py
 from typing import Collection
@@ -552,7 +552,7 @@ def check_unions(x: Iterable[int] | Mapping[str, str], y: Intersection[Generator
 
 An attribute's annotation can explain its inferred type, just as a parameter annotation can. In the
 below example, we offer a suggestion that points to the annotated assignment that declares the
-attribute:
+attribute.
 
 ```py
 from collections.abc import Iterable
@@ -594,7 +594,7 @@ note: This is an unsafe fix and may change runtime behavior
 ## Collection fixes preserve element annotations
 
 Changing `Iterable` to `Collection` preserves the spelling of the element type. An imported type can
-be available only under an alias, and the iterable itself can also be imported under an alias:
+be available only under an alias, and the iterable itself can also be imported under an alias.
 
 ```py
 from collections.abc import Iterable as I
@@ -629,7 +629,7 @@ help: Alternatively, test the length of the iterable instead of its truthiness
 note: This is an unsafe fix and may change runtime behavior
 ```
 
-Qualified names are preserved too, so the fix does not require new imports for the element type:
+Qualified names are preserved too, so the fix does not require new imports for the element type.
 
 ```py
 import datetime
@@ -668,7 +668,7 @@ note: This is an unsafe fix and may change runtime behavior
 ## Collection fixes preserve forward references
 
 A quoted annotation remains quoted when its iterable type is replaced. Removing the quotes would
-evaluate the reference to `Later` before the class is defined:
+evaluate the reference to `Later` before the class is defined.
 
 ```toml
 [environment]
@@ -708,7 +708,7 @@ help: Alternatively, test the length of the iterable instead of its truthiness
 note: This is an unsafe fix and may change runtime behavior
 ```
 
-The element annotation can also be quoted on its own. The fix preserves these quotes as well:
+The element annotation can also be quoted on its own. The fix preserves these quotes as well.
 
 ```py
 def check_element(items: Iterable["Another"]):
@@ -746,7 +746,7 @@ note: This is an unsafe fix and may change runtime behavior
 ## Collection fixes use the annotation's scope
 
 An import that is visible where an attribute is tested can be shadowed in the class containing its
-annotation. The fix uses a qualified name when the class shadows `Collection`:
+annotation. The fix uses a qualified name when the class shadows `Collection`.
 
 ```py
 from collections.abc import Collection, Iterable
@@ -788,7 +788,7 @@ note: This is an unsafe fix and may change runtime behavior
 ```
 
 A method's parameter annotations are also evaluated in the class scope, even though the condition is
-evaluated in the method's scope:
+evaluated in the method's scope.
 
 ```py
 class Checker:
@@ -827,7 +827,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 Replacing the outer name in an `Annotated` annotation would discard its metadata and produce an
 invalid `Collection` specialization. For these annotations, we suggest reworking the annotation
-without offering an annotation edit:
+without offering an annotation edit.
 
 ```py
 from collections.abc import Iterable
@@ -862,7 +862,7 @@ note: This suggestion may be incorrect or produce invalid syntax. It requires ma
 ## Collection fixes before Python 3.9
 
 Before Python 3.9, `collections.abc.Collection` cannot be subscripted at runtime. For an eagerly
-evaluated annotation, the fix imports `Collection` from `typing`:
+evaluated annotation, the fix imports `Collection` from `typing`.
 
 ```toml
 [environment]
@@ -901,7 +901,7 @@ note: This is an unsafe fix and may change runtime behavior
 ```
 
 The fix also preserves legacy spellings of nested types. Using `list[int]` or `int | str` in an
-eagerly evaluated annotation would fail at runtime on Python 3.8:
+eagerly evaluated annotation would fail at runtime on Python 3.8.
 
 ```py
 from typing import List, Union
@@ -967,7 +967,7 @@ note: This is an unsafe fix and may change runtime behavior
 ## Iterable annotations in other first-party files
 
 When an imported variable's annotation comes from another first-party file, the diagnostic points to
-that annotation and includes its relative path and line number in the suggestion:
+that annotation and includes its relative path and line number in the suggestion.
 
 `items.py`:
 
@@ -1013,7 +1013,7 @@ note: This suggestion may be incorrect or produce invalid syntax. It requires ma
 ## Iterable annotations in dependencies
 
 An annotation in a third-party library also explains the inferred type. The diagnostic suggests
-changing the truthiness test, but does not ask the user to edit the library's annotation:
+changing the truthiness test, but does not ask the user to edit the library's annotation.
 
 ```toml
 [environment]
@@ -1062,7 +1062,7 @@ note: This suggestion may be incorrect or produce invalid syntax. It requires ma
 ## Iterable values without variable annotations
 
 A function call can produce an iterable without an annotated variable at the use site. We still
-explain why the truthiness test is suspicious and suggest testing its length:
+explain why the truthiness test is suspicious and suggest testing its length.
 
 ```py
 from collections.abc import Iterable
@@ -1094,7 +1094,7 @@ note: This suggestion may be incorrect or produce invalid syntax. It requires ma
 ## Nested boolean tests
 
 Each tested operand receives the appropriate diagnostic, even when the whole condition remains
-ambiguous:
+ambiguous.
 
 ```py
 from collections.abc import Callable, Iterable
@@ -1149,7 +1149,7 @@ note: This is an unsafe fix and may change runtime behavior
 ```
 
 When both operands are suspicious, we report each tested operand without also warning on the
-complete `or` expression:
+complete `or` expression.
 
 ```py
 def check_two_predicates(first: Callable[[], bool], second: Callable[[], bool]):
@@ -1200,7 +1200,7 @@ help: Replace with `second()`
 note: This is an unsafe fix and may change runtime behavior
 ```
 
-When a condition tests a callable and an iterable, both rules report their respective operands:
+When a condition tests a callable and an iterable, both rules report their respective operands.
 
 ```py
 def check_mixed(predicate: Callable[[], bool], items: Iterable[int]):
@@ -1259,7 +1259,7 @@ note: This is an unsafe fix and may change runtime behavior
 A `Callable` or `Iterable` expression has ambiguous truthiness, but nesting such an expression
 inside `and False` means the outer expression will always be falsy. The operand's suspicious type
 and the fixed truthiness of the complete condition are reported as separate findings. The diagnostic
-on the complete condition also explains why the body is unreachable:
+on the complete condition also explains why the body is unreachable.
 
 ```toml
 [rules]
@@ -1309,7 +1309,7 @@ note: This is an unsafe fix and may change runtime behavior
 ```
 
 The suspicious operand can also be nested inside an expression whose own truthiness is ambiguous.
-The outer `and False` still has a fixed outcome:
+The outer `and False` still has a fixed outcome.
 
 ```py
 def check_nested_fixed(predicate: Callable[[], bool]):
@@ -1320,7 +1320,7 @@ def check_nested_fixed(predicate: Callable[[], bool]):
 ```
 
 A truthiness test inside a tuple will be independent of the test of the tuple itself, so both the
-suspicious operand and the always-truthy tuple can be reported:
+suspicious operand and the always-truthy tuple can be reported.
 
 ```py
 def check_tuple(predicate: Callable[[], bool]):
@@ -1338,7 +1338,7 @@ conflate `None` with other falsy values.
 ### Basic idea
 
 Consider the following problematic `take` function where a limit of `0` would be treated as if it
-were `None`, which is probably not the intended behavior:
+were `None`, which is probably not the intended behavior.
 
 ```py
 def take(items: list[str], limit: int | None = None) -> list[str]:
@@ -1358,7 +1358,7 @@ help: Use `is None` or `is not None` to check for presence of the value
 help: Use `bool(...)` if testing truthiness is intentional
 ```
 
-Explicit `bool()` calls indicate an intentional truthiness test:
+Explicit `bool()` calls indicate an intentional truthiness test.
 
 ```py
 def take_explicit(items: list[str], limit: int | None = None) -> list[str]:
@@ -1369,7 +1369,7 @@ def take_explicit(items: list[str], limit: int | None = None) -> list[str]:
 
 ### Covered types
 
-This rule triggers on unions with `None` and other types that have falsy values:
+This rule triggers on unions with `None` and other types that have falsy values.
 
 ```py
 from typing import Any, Literal
@@ -1429,7 +1429,7 @@ def check(mapping: dict[str, int] | None):
         pass
 ```
 
-It also triggers if multiple other types could be falsy:
+It also triggers if multiple other types could be falsy.
 
 ```py
 def check(value: int | str | None):
@@ -1439,7 +1439,7 @@ def check(value: int | str | None):
         pass
 ```
 
-It also triggers if there are (additional) types in the union that are always truthy:
+It also triggers if there are (additional) types in the union that are always truthy.
 
 ```py
 def check(value: str | Literal[True] | None):
@@ -1450,7 +1450,7 @@ def check(value: str | Literal[True] | None):
 ```
 
 The rule does *not* trigger on unions with `None` where the other types are always truthy, such as
-`Match[str]`:
+`Match[str]`.
 
 ```py
 import re
@@ -1467,7 +1467,7 @@ def check(match: re.Match[str] | None):
 
 The rule does *not* trigger on unions with `None` whose other elements are all dynamic types. A
 dynamic type can materialize to an always-truthy type, so to respect the gradual guarantee, the rule
-does not trigger here:
+does not trigger here.
 
 ```py
 def check(value: Any | None):
@@ -1478,7 +1478,7 @@ def check(value: Any | None):
 ```
 
 The rule does trigger, however, if the union includes dynamic types in addition to two types that
-can be falsy:
+can be falsy.
 
 ```py
 def check(value: int | Any | None):
@@ -1502,7 +1502,7 @@ help: Use `bool(...)` if testing truthiness is intentional
 A custom class without any specific evidence that it could be falsy is currently excluded from this
 rule. In principle, a subclass could introduce falsy behavior, but considering this possibility
 leads to many false positives in the ecosystem, since most classes are not final. So the rule does
-not apply here:
+not apply here.
 
 ```py
 from typing import final
@@ -1515,7 +1515,7 @@ def check(value: Custom | None):
 ```
 
 However, if the class (or a base class) defines a `__bool__` or `__len__` method, we consider it
-potentially falsy and do apply the rule:
+potentially falsy and do apply the rule.
 
 ```py
 class AmbiguousTruthiness:
@@ -1574,7 +1574,7 @@ to help users identify the problem.
 
 Note: for a type like `int | None`, the falsy values that could be confused are not just `None` and
 `0`. `False` and instances of custom subclasses of `int` could also be falsy, but it would be too
-verbose to mention that in the diagnostic hint, so we just list `None` and `0` here:
+verbose to mention that in the diagnostic hint, so we just list `None` and `0` here.
 
 ```py
 def check(integer: int | None):
@@ -1709,7 +1709,7 @@ help: Use `is None` or `is not None` to check for presence of the value
 help: Use `bool(...)` if testing truthiness is intentional
 ```
 
-Other unions with `None` fall back to a general explanation:
+Other unions with `None` fall back to a general explanation.
 
 ```py
 def check(value: str | int | None):
@@ -1755,7 +1755,7 @@ help: Use `bool(...)` if testing truthiness is intentional
 
 ### Boolean contexts
 
-The rule triggers in all of these Boolean contexts:
+The rule triggers in all of these Boolean contexts.
 
 ```py
 def check(limit: int | None, items: list[int | None]):
@@ -1802,7 +1802,7 @@ def check(items: list[int] | None, flag: bool, other: bool):
     value = items and flag
 ```
 
-When the whole expression is used as a condition, each operand is checked:
+When the whole expression is used as a condition, each operand is checked.
 
 ```py
     if items and flag:  # error: [truthiness-test-of-none-union]

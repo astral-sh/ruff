@@ -135,7 +135,7 @@ info: `Never` and `Unknown` are not equivalent types
 
 ### Return type of `assert_never`
 
-The return type of `assert_never` is always `Never`, despite the type of the argument:
+The return type of `assert_never` is always `Never`, despite the type of the argument.
 
 ```py
 from typing_extensions import Never, assert_never

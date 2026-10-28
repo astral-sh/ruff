@@ -77,7 +77,7 @@ def _(x: X):
 
 ## Walrus Member Access
 
-We can narrow on an attribute expression, even when its base is a named expression:
+We can narrow on an attribute expression, even when its base is a named expression.
 
 ```py
 class Foo:
@@ -87,7 +87,7 @@ if (foo := Foo()).val:
     reveal_type(foo.val)  # revealed: int & ~AlwaysFalsy
 ```
 
-But we don't pick up stale narrowings from before the assignment in the named expression:
+But we don't pick up stale narrowings from before the assignment in the named expression.
 
 ```py
 foo1 = Foo()
@@ -225,7 +225,7 @@ Some custom classes can have a boolean value that is consistently determined as 
 `False`, regardless of the instance's state. This is achieved by defining a `__bool__` method that
 always returns a fixed value.
 
-These types can always be fully narrowed in boolean contexts, as shown below:
+These types can always be fully narrowed in boolean contexts, as shown below.
 
 ```py
 from typing import Literal
@@ -524,7 +524,7 @@ def f():
 
 ## Narrowing the value of a named expression
 
-The value expression on the right-hand side of the walrus operator should also be narrowed:
+The value expression on the right-hand side of the walrus operator should also be narrowed.
 
 ```py
 def foo(value: int | None):
@@ -577,7 +577,7 @@ def f(arg1: Empty | None, arg2: NonEmpty | None, arg3: HasNotRequired1 | None, a
 ```
 
 When using a guard clause pattern (`if not p: raise`), the type should be narrowed in the
-continuation:
+continuation.
 
 ```py
 from typing import TypedDict

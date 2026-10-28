@@ -2,7 +2,7 @@
 
 ## `is not None`
 
-The type guard removes `None` from the union type:
+The type guard removes `None` from the union type.
 
 ```py
 from typing import Literal
@@ -30,7 +30,7 @@ def _(x: None | Literal[1]):
     reveal_type(x)  # revealed: None | Literal[1]
 ```
 
-This also works for other singleton types with reversed operands:
+This also works for other singleton types with reversed operands.
 
 ```py
 def _(x: bool):

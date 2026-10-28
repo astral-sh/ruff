@@ -520,7 +520,7 @@ statement in an `importer.py` module. The tests in this section elaborate on the
 
 Global-scope names starting with underscores are not imported from a `*` import (unless the
 exporting module has an `__all__` symbol in its global scope, and the underscore-prefixed symbols
-are included in `__all__`):
+are included in `__all__`).
 
 `exporter.py`:
 
@@ -836,7 +836,7 @@ reveal_type(B)  # revealed: bool
 
 ## Relative `*` imports
 
-Relative `*` imports are also supported by Python:
+Relative `*` imports are also supported by Python.
 
 `a/__init__.py`:
 
@@ -1162,7 +1162,7 @@ reveal_type(E)  # revealed: Unknown
 ### `__all__` with subtractions later on in the global scope
 
 Whereas there are many ways of adding to `__all__` that type checkers must support, there is only
-one way of subtracting from `__all__` that type checkers are required to support:
+one way of subtracting from `__all__` that type checkers are required to support.
 
 `exporter.py`:
 
@@ -1281,7 +1281,7 @@ reveal_type(Z)  # revealed: Unknown
 
 ### `__all__` conditionally defined in a statically known branch (2)
 
-The same example again, but with a different `python-version` set:
+The same example again, but with a different `python-version` set.
 
 ```toml
 [environment]
@@ -1354,7 +1354,7 @@ reveal_type(Z)  # revealed: Unknown
 
 ### `__all__` conditionally mutated in a statically known branch (2)
 
-The same example again, but with a different `python-version` set:
+The same example again, but with a different `python-version` set.
 
 ```toml
 [environment]
@@ -1394,7 +1394,7 @@ reveal_type(Z)  # revealed: bool
 ### Empty `__all__`
 
 An empty `__all__` is valid, but a `*` import from a module with an empty `__all__` results in 0
-bindings being added from the import:
+bindings being added from the import.
 
 `a.py`:
 
@@ -1428,7 +1428,7 @@ reveal_type(Y)  # revealed: Unknown
 ### `__all__` in a stub file
 
 If a name is included in `__all__` in a stub file, it is considered re-exported even if it was only
-defined using an import without the explicit `from foo import X as X` syntax:
+defined using an import without the explicit `from foo import X as X` syntax.
 
 `a.pyi`:
 
@@ -1475,7 +1475,7 @@ reveal_type(Nope)  # revealed: Unknown
 
 Python allows `global` statements in function bodies to add new variables to the global scope, but
 we require a matching global binding or declaration. We lint on unresolved `global` statements, and
-we don't include the symbols they might define in `*` imports:
+we don't include the symbols they might define in `*` imports.
 
 `a.py`:
 
@@ -1512,7 +1512,7 @@ reveal_type(h)  # revealed: Unknown
 If a star-import pulls in a symbol that was previously defined in the importing module (e.g. `obj`),
 it can affect the state of associated member expressions (e.g. `obj.attr` or `obj[0]`). In the test
 below, note how the types of the corresponding attribute expressions change after the star import
-affects the object:
+affects the object.
 
 `common.py`:
 
@@ -1616,7 +1616,7 @@ reveal_type(collections.abc.Set)  # revealed: <class 'AbstractSet'>
 
 ### Unresolved module
 
-If the module is unresolved, we emit a diagnostic just like for any other unresolved import:
+If the module is unresolved, we emit a diagnostic just like for any other unresolved import.
 
 ```py
 # TODO: not a great error message
@@ -1625,7 +1625,7 @@ from foo import *  # error: [unresolved-import] "Cannot resolve imported module 
 
 ### Nested scope
 
-A `*` import in a nested scope are always a syntax error. Ty does not infer any bindings from them:
+A `*` import in a nested scope are always a syntax error. Ty does not infer any bindings from them.
 
 `exporter.py`:
 
@@ -1669,7 +1669,7 @@ reveal_type(_Y)  # revealed: bool
 ```
 
 These tests are more to assert that we don't panic on these various kinds of invalid syntax than
-anything else:
+anything else.
 
 `c.py`:
 

@@ -289,7 +289,7 @@ type_variable_bound_to_type(list[int])
 
 Certain special forms in the typing module are not instances of `type`, so are strictly-speaking
 disallowed as the second argument to `isinstance()` according to typeshed's annotations. However, at
-runtime they work fine as the second argument, and we implement that special case in ty:
+runtime they work fine as the second argument, and we implement that special case in ty.
 
 ```py
 import typing as t
@@ -318,7 +318,7 @@ isinstance("", (int, t.Callable))
 issubclass(list, (int, t.Any))
 ```
 
-But for other special forms that are not permitted as the second argument, we still emit an error:
+But for other special forms that are not permitted as the second argument, we still emit an error.
 
 ```py
 isinstance("", t.TypeGuard)  # error: [invalid-argument-type]

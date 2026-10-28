@@ -11,7 +11,7 @@ dependencies = ["pydantic==2.13.4", "pydantic-settings==2.14.2"]
 
 ## Basic model
 
-A basic Pydantic model looks and acts similar to a dataclass:
+A basic Pydantic model looks and acts similar to a dataclass.
 
 ```py
 from pydantic import BaseModel
@@ -33,7 +33,7 @@ invalid_user = User(id=2)
 ## Usage of `Field`
 
 `Field` is a field-specifier function. In the following example, `tags` has a default value, and
-`internal_price_cent` can be set through its alias `price_cent`:
+`internal_price_cent` can be set through its alias `price_cent`.
 
 ```py
 from pydantic import BaseModel, Field
@@ -49,7 +49,7 @@ reveal_type(Product.__init__)
 product = Product(name="Laptop", price_cent=999_00)
 ```
 
-The fields have the expected types:
+The fields have the expected types.
 
 ```py
 reveal_type(product.name)  # revealed: str
@@ -57,7 +57,7 @@ reveal_type(product.tags)  # revealed: list[str]
 reveal_type(product.internal_price_cent)  # revealed: int
 ```
 
-Omitting the `name` or the `price_cent` is not allowed:
+Omitting the `name` or the `price_cent` is not allowed.
 
 ```py
 # error: [missing-argument] "No argument provided for required parameter `name`"
@@ -67,14 +67,14 @@ Product(name="Phone")
 ```
 
 Using the internal field name is not possible (the argument will be accepted, but `price_cent` is
-missing):
+missing).
 
 ```py
 # error: [missing-argument]
 Product(name="Laptop", internal_price_cent=999_00)
 ```
 
-Conversely, accessing a field through the alias is also not allowed:
+Conversely, accessing a field through the alias is also not allowed.
 
 ```py
 product.price_cent  # error: [unresolved-attribute]
@@ -83,7 +83,7 @@ product.price_cent  # error: [unresolved-attribute]
 ## Usage of ellipsis in `Field`
 
 A positional argument of `...` to the `Field` function indicates that the field *has no default and
-is required*:
+is required*.
 
 ```py
 from pydantic import BaseModel, Field
@@ -103,7 +103,7 @@ in ty so that static analysis supports the runtime validation behavior when poss
 
 ### Using the model config to enable strict mode
 
-Strict mode can be activated for a whole model:
+Strict mode can be activated for a whole model.
 
 ```py
 from pydantic import BaseModel, ConfigDict
@@ -120,7 +120,7 @@ Person(name="Alice", age="20")  # error: [invalid-argument-type]
 
 ### Lax mode is the default
 
-When no configuration is given, or when `strict=False`, lax mode is used:
+When no configuration is given, or when `strict=False`, lax mode is used.
 
 ```py
 from pydantic import BaseModel, ConfigDict
@@ -146,7 +146,7 @@ Person2(name="Alice", age="20")  # okay
 Person2(name="Alice", age=None)  # error, cannot be coerced
 ```
 
-Scalar types follow the Python-input conversions in Pydantic's [conversion table]:
+Scalar types follow the Python-input conversions in Pydantic's [conversion table].
 
 ```py
 import re
@@ -389,7 +389,7 @@ LaxNone(value=None)
 LaxNone(value=1)  # error: [invalid-argument-type]
 ```
 
-Aliasing a scalar type does not affect lax input conversion:
+Aliasing a scalar type does not affect lax input conversion.
 
 ```py
 from datetime import datetime as AliasedDatetime
@@ -463,7 +463,7 @@ def _(map_str_str: Mapping[str, str]):
     LaxDictStrInt(value=map_str_str)
 ```
 
-This also works for nested collections:
+This also works for nested collections.
 
 ```py
 class Nested(BaseModel):
@@ -474,7 +474,7 @@ Nested(value=[{"a": 1}, {"b": None}])  # error: [invalid-argument-type]
 ```
 
 In lax mode, fields that refer to an ordinary Pydantic model accept either an instance of that model
-or a mapping:
+or a mapping.
 
 ```py
 class Child(BaseModel):
@@ -502,7 +502,7 @@ Parent(child={"value": 1}, children=[2])  # error: [invalid-argument-type]
 ```
 
 "before" and "plain" field validators can accept input of a different type, so for now, we widen the
-input types of affected fields to `Any`:
+input types of affected fields to `Any`.
 
 ```py
 from pydantic import field_validator
@@ -525,7 +525,7 @@ BeforeValidatedParent(child=1, untouched_child={"value": "2"})
 BeforeValidatedParent(child=1, untouched_child=1)  # error: [invalid-argument-type]
 ```
 
-"before" field validators are inherited:
+"before" field validators are inherited.
 
 ```py
 class BeforeValidatorBase(BaseModel):
@@ -543,7 +543,7 @@ class InheritedBeforeValidatedParent(BeforeValidatorBase):
 reveal_type(InheritedBeforeValidatedParent.__init__)
 ```
 
-A wildcard "before" validator applies to every field:
+A wildcard "before" validator applies to every field.
 
 ```py
 class WildcardBeforeValidatedParent(BaseModel):
@@ -562,7 +562,7 @@ reveal_type(WildcardBeforeValidatedParent.__init__)
 WildcardBeforeValidatedParent(child=1)
 ```
 
-A "plain" field validator also bypasses Pydantic's validation against the field's declared type:
+A "plain" field validator also bypasses Pydantic's validation against the field's declared type.
 
 ```py
 class PlainValidatedParent(BaseModel):
@@ -581,7 +581,7 @@ PlainValidatedParent(child=1, untouched_child={"value": "2"})
 PlainValidatedParent(child=1, untouched_child=1)  # error: [invalid-argument-type]
 ```
 
-An "after" field validator does not change the raw input accepted by the field:
+An "after" field validator does not change the raw input accepted by the field.
 
 ```py
 class AfterValidatedParent(BaseModel):
@@ -599,7 +599,7 @@ AfterValidatedParent(child=1)  # error: [invalid-argument-type]
 ```
 
 For fields that refer to generic models, we widen to a gradual specialization, since Pydantic
-revalidates same-origin generic model instances against the target specialization:
+revalidates same-origin generic model instances against the target specialization.
 
 ```py
 class Box[T](BaseModel):
@@ -620,7 +620,7 @@ HasBox(box=Box(value=None))
 ```
 
 Models configured to validate from attributes can accept arbitrary objects, so their field
-parameters remain `Any`:
+parameters remain `Any`.
 
 ```py
 class AttributeChild(BaseModel):
@@ -663,7 +663,7 @@ LaxColor(value="red")
 LaxColor(value=None)
 ```
 
-`Literal` types are not widened, even in lax mode:
+`Literal` types are not widened, even in lax mode.
 
 ```py
 from typing import Literal
@@ -679,7 +679,7 @@ LaxLiterals(value="b")  # error: [invalid-argument-type]
 LaxLiterals(value=False)  # error: [invalid-argument-type]
 ```
 
-Unions are converted element-wise:
+Unions are converted element-wise.
 
 ```py
 class LaxUnion(BaseModel):
@@ -698,7 +698,7 @@ def _(union: int | list[str] | None):
     LaxUnion(value=union)
 ```
 
-Rewriting also works through type aliases:
+Rewriting also works through type aliases.
 
 ```py
 type NestedList = list[int | NestedList]
@@ -740,7 +740,7 @@ LaxGrowing(value=[[1]])
 LaxGrowing(value=object())  # error: [invalid-argument-type]
 ```
 
-We support validation of `JsonValue` fields in lax mode:
+We support validation of `JsonValue` fields in lax mode.
 
 ```py
 from pydantic import JsonValue
@@ -864,7 +864,7 @@ LaxFieldModel(value=IntegerEnum.VALUE)
 
 ### Changing a specific field
 
-Strict mode can also be activated for a specific field only:
+Strict mode can also be activated for a specific field only.
 
 ```py
 from pydantic import BaseModel, ConfigDict, Field
@@ -874,14 +874,14 @@ class Person1(BaseModel):
     age: int = Field(strict=True)
 ```
 
-Here, validation is lax for the `name` field (`bytes` is converted to `str`):
+Here, validation is lax for the `name` field (`bytes` is converted to `str`).
 
 ```py
 Person1(name="Alice", age=20)
 Person1(name=b"Alice", age=20)
 ```
 
-But `age` is validated in `strict` mode, so the conversion from `str` to `int` is not allowed here:
+But `age` is validated in `strict` mode, so the conversion from `str` to `int` is not allowed here.
 
 ```py
 Person1(name="Alice", age=20)
@@ -889,7 +889,7 @@ Person1(name="Alice", age="20")  # error: [invalid-argument-type]
 ```
 
 The opposite is also possible. A whole model can be in "strict" mode, and a single field can opt
-out:
+out.
 
 ```py
 class Person2(BaseModel):
@@ -905,7 +905,7 @@ Person2(name="Alice", age=20)
 Person2(name="Alice", age="20")  # error: [invalid-argument-type]
 ```
 
-An explicit `None` does not override the model's strict setting:
+An explicit `None` does not override the model's strict setting.
 
 ```py
 class Person3(BaseModel):
@@ -918,7 +918,7 @@ Person3(age="20")  # error: [invalid-argument-type]
 ```
 
 Pydantic's strict aliases and `Strict()` metadata also enable strict validation for individual
-fields:
+fields.
 
 ```py
 from typing import Annotated
@@ -940,7 +940,7 @@ StrictMetadataOrder(field_then_lax="1", lax_then_field=1)
 StrictMetadataOrder(field_then_lax=1, lax_then_field="1")  # error: [invalid-argument-type]
 ```
 
-A field with `Strict(False)` can opt out of strict validation, even in a model with `strict=True`:
+A field with `Strict(False)` can opt out of strict validation, even in a model with `strict=True`.
 
 ```py
 class LaxFieldInStrictModel(BaseModel):
@@ -956,7 +956,7 @@ LaxFieldInStrictModel(strict_int="1", lax_int=1)  # error: [invalid-argument-typ
 
 ## `validate_by_name`, `validate_by_alias`
 
-By default, Pydantic only allows a field to be initialized by its alias name, not by its field name:
+By default, Pydantic only allows a field to be initialized by its alias name, not by its field name.
 
 ```py
 from pydantic import BaseModel, ConfigDict, Field
@@ -969,7 +969,7 @@ DefaultOnlyAlias(alias=1)
 DefaultOnlyAlias(name=1)
 ```
 
-When `validate_by_name=True`, a field can also be initialized using its internal name:
+When `validate_by_name=True`, a field can also be initialized using its internal name.
 
 ```py
 class AliasAndName(BaseModel):
@@ -982,7 +982,7 @@ AliasAndName(name=1)
 AliasAndName(name=None)  # error: [invalid-argument-type]
 ```
 
-The older `populate_by_name=True` setting has the same behavior:
+The older `populate_by_name=True` setting has the same behavior.
 
 ```py
 class PopulatedByName(BaseModel):
@@ -996,14 +996,14 @@ PopulatedByName(alias=None)  # error: [invalid-argument-type]
 PopulatedByName(name=None)  # error: [invalid-argument-type]
 ```
 
-Passing none of these should be an error:
+Passing none of these should be an error.
 
 ```py
 # This is a known limitation, it should ideally be an error.
 AliasAndName()
 ```
 
-Conversely, when `validate_by_alias=False`, validation by alias can be disallowed:
+Conversely, when `validate_by_alias=False`, validation by alias can be disallowed.
 
 ```py
 class OnlyName(BaseModel):
@@ -1016,7 +1016,7 @@ OnlyName(name=1)
 ```
 
 If `validate_by_alias=False` is set without specifying `validate_by_name`, Pydantic implicitly
-enables validation by name:
+enables validation by name.
 
 ```py
 class ImplicitlyOnlyName(BaseModel):
@@ -1029,7 +1029,7 @@ ImplicitlyOnlyName(name=1)
 ```
 
 Pydantic models can also specify a `validation_alias` for a field, which takes precedence over
-`alias` when `validate_by_alias=True`:
+`alias` when `validate_by_alias=True`.
 
 ```py
 class ValidationAlias(BaseModel):
@@ -1046,7 +1046,7 @@ ValidationAlias(alias=1)  # error: [missing-argument]
 ## Extra fields
 
 By default, Pydantic allows arbitrary extra data which is simply ignored. This often indicates a
-mistake though, so ty emits a warning by default:
+mistake though, so ty emits a warning by default.
 
 ```py
 from pydantic import BaseModel, ConfigDict
@@ -1057,7 +1057,7 @@ class Person(BaseModel):
 Person(name="Alice", something_else=7)  # error: [pydantic-discarded-extra-argument]
 ```
 
-The same thing happens when explicitly setting `extra="ignore"`:
+The same thing happens when explicitly setting `extra="ignore"`.
 
 ```py
 class PersonIgnoringExtras(BaseModel):
@@ -1069,7 +1069,7 @@ PersonIgnoringExtras(name="Alice", something_else=7)  # error: [pydantic-discard
 ```
 
 When `extra="allow"` is set, extra arguments are explicitly allowed (and stored in the model at
-runtime), so we do not emit a warning in this case:
+runtime), so we do not emit a warning in this case.
 
 ```py
 class PersonAllowingExtras(BaseModel):
@@ -1081,7 +1081,7 @@ PersonAllowingExtras(name="Alice", something_else=7)
 ```
 
 Conversely, when setting `extra="forbid"`, a hard `unknown-argument` error is emitted, since the
-construction would fail at runtime:
+construction would fail at runtime.
 
 ```py
 class PersonWithoutExtras(BaseModel):
@@ -1097,7 +1097,7 @@ PersonWithoutExtras(name="Alice", something_else=7)  # error: [unknown-argument]
 ## Custom initializers and extra fields
 
 A custom initializer that accepts arbitrary keyword arguments does not prevent a subclass from
-accepting extra data:
+accepting extra data.
 
 ```py
 from typing import Any
@@ -1115,7 +1115,7 @@ reveal_type(User.__init__)  # revealed: (self: User, *, name: LaxStr, **extra: A
 User(name="Alice", city="Berlin")
 ```
 
-A fixed custom initializer continues to control the accepted arguments:
+A fixed custom initializer continues to control the accepted arguments.
 
 ```py
 class RestrictiveBase(BaseModel):
@@ -1135,7 +1135,7 @@ RestrictiveUser(name="Alice", city="Berlin")  # error: [unknown-argument]
 ## Field named `extra`
 
 The variadic keyword parameter uses a collision-free name when the model already has a field named
-`extra`:
+`extra`.
 
 ```py
 from pydantic import BaseModel, ConfigDict
@@ -1153,7 +1153,7 @@ PersonWithExtraField(extra=1, something_else=2)
 ## Private attributes
 
 Underscore-prefixed attributes are considered private. They remain instance attributes but do not
-become model fields or constructor parameters:
+become model fields or constructor parameters.
 
 ```py
 from pydantic import BaseModel, PrivateAttr
@@ -1175,7 +1175,7 @@ reveal_type(person._explicit_private)  # revealed: int
 
 ## Using `Annotated` to specify field metadata
 
-`Annotated[T, Field(...)]` can be used to specify field metadata:
+`Annotated[T, Field(...)]` can be used to specify field metadata.
 
 ```py
 from pydantic import BaseModel, Field, ConfigDict
@@ -1195,7 +1195,7 @@ Person(name=None, id=1)  # error: [invalid-argument-type]
 Person(id=1)  # error: [missing-argument]
 ```
 
-Multiple `Field(...)` calls in `Annotated[...]` are merged:
+Multiple `Field(...)` calls in `Annotated[...]` are merged.
 
 ```py
 class MultipleAnnotatedFields(BaseModel):
@@ -1208,7 +1208,7 @@ MultipleAnnotatedFields(strict_then_default="1")  # error: [invalid-argument-typ
 MultipleAnnotatedFields(default_then_strict="1")  # error: [invalid-argument-type]
 ```
 
-Field metadata in the annotation and on the right hand side is also merged:
+Field metadata in the annotation and on the right hand side is also merged.
 
 ```py
 class AnnotatedAndAssignedFields(BaseModel):
@@ -1221,7 +1221,7 @@ AnnotatedAndAssignedFields(strict_then_default="1")  # error: [invalid-argument-
 AnnotatedAndAssignedFields(default_then_strict="1")  # error: [invalid-argument-type]
 ```
 
-Field metadata is also collected through aliases:
+Field metadata is also collected through aliases.
 
 ```py
 AliasField = Annotated[int, Field(default=0)]
@@ -1233,7 +1233,7 @@ ModelWithAliasField()
 ```
 
 Field metadata is also collected through a generic alias, where the `Field(...)` default is carried
-on a type variable that is only specialized at the use site:
+on a type variable that is only specialized at the use site.
 
 ```py
 from typing import TypeVar
@@ -1252,7 +1252,7 @@ ModelWithGenericAliasField(value=1)
 ## Frozen models and fields
 
 There are various ways to make a field immutable. A model can be globally frozen using a class
-parameter:
+parameter.
 
 ```py
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
@@ -1264,7 +1264,7 @@ person = PersonFrozenName1(name="Alice")
 person.name = "Bob"  # error: [invalid-assignment]
 ```
 
-It can also be globally frozen using the model config:
+It can also be globally frozen using the model config.
 
 ```py
 class PersonFrozenName2(BaseModel):
@@ -1276,7 +1276,7 @@ person = PersonFrozenName2(name="Alice")
 person.name = "Bob"  # error: [invalid-assignment]
 ```
 
-Finally, individual fields can also be made immutable on a non-frozen model:
+Finally, individual fields can also be made immutable on a non-frozen model.
 
 ```py
 class PersonFrozenName3(BaseModel):
@@ -1297,7 +1297,7 @@ error[invalid-assignment]: Property `name` defined in `PersonFrozenName3` is rea
    | ^^^^^^^^^^^
 ```
 
-No error is raised when a frozen model is subclassed. The child model is also frozen:
+No error is raised when a frozen model is subclassed. The child model is also frozen.
 
 ```py
 class Base(BaseModel, frozen=True):
@@ -1312,7 +1312,7 @@ derived.value = 2  # error: [invalid-assignment]
 
 Pydantic allows a frozen model to be subclassed and then made mutable again. This is generally
 unsound (a violation of the Liskov substitution principle), but we currently support it without
-emitting any errors:
+emitting any errors.
 
 ```py
 class MutableChildOfFrozenBase(Base):
@@ -1322,7 +1322,7 @@ mutable = MutableChildOfFrozenBase(value=1)
 mutable.value = 2
 ```
 
-Subclasses of the mutable child (with unspecified `frozen`) are also mutable:
+Subclasses of the mutable child (with unspecified `frozen`) are also mutable.
 
 ```py
 class GrandChild(MutableChildOfFrozenBase):
@@ -1333,7 +1333,7 @@ grandchild.value = 2
 grandchild.text = "after"
 ```
 
-Freezing the model again makes both fields read-only:
+Freezing the model again makes both fields read-only.
 
 ```py
 class FrozenAgain(GrandChild):
@@ -1345,7 +1345,7 @@ frozen_again.text = "after"  # error: [invalid-assignment]
 ```
 
 If there is a custom `__setattr__` method on a frozen model, we allow mutation, unless that
-`__setattr__` return `Never`:
+`__setattr__` return `Never`.
 
 ```py
 from typing_extensions import Never
@@ -1373,7 +1373,7 @@ frozen_custom_never = FrozenWithCustomSetattrNever(value=1)
 frozen_custom_never.value = 2  # error: [invalid-assignment]
 ```
 
-Private attributes on models with `frozen=True` can be mutated:
+Private attributes on models with `frozen=True` can be mutated.
 
 ```py
 class FrozenPerson(BaseModel):
@@ -1393,7 +1393,7 @@ person._explicit_private = 2
 A field can also be frozen using `Field(...)` in an `Annotated` annotation. A `Field(...)` on the
 right-hand side takes precedence over one in the annotation, and a later `Field(...)` in the
 annotation takes precedence over an earlier one. Pydantic treats an explicit `frozen=None` as a
-mutable setting that also overrides an earlier `frozen=True`:
+mutable setting that also overrides an earlier `frozen=True`.
 
 ```py
 from typing import Annotated
@@ -1413,7 +1413,7 @@ fields.unfrozen_by_none_assignment = 1  # no diagnostic
 fields.unfrozen_by_none_annotation = 1  # no diagnostic
 ```
 
-This also works through a type alias:
+This also works through a type alias.
 
 ```py
 FrozenInt = Annotated[int, Field(frozen=True)]
@@ -1425,7 +1425,7 @@ AliasFrozenField().value = 1  # error: [invalid-assignment]
 ```
 
 `Field(frozen=False)` and `Field(frozen=None)` leave a field mutable. We also allow assignments if
-the `frozen` argument cannot be resolved statically:
+the `frozen` argument cannot be resolved statically.
 
 ```py
 import os
@@ -1442,7 +1442,7 @@ fields.unknown = 1  # no diagnostic
 ```
 
 Pydantic checks whether the model is frozen before checking the field, so `Field(frozen=False)` does
-not make a field of a frozen model mutable:
+not make a field of a frozen model mutable.
 
 ```py
 class FrozenModelWithMutableField(BaseModel, frozen=True):
@@ -1451,7 +1451,7 @@ class FrozenModelWithMutableField(BaseModel, frozen=True):
 FrozenModelWithMutableField(value=1).value = 2  # error: [invalid-assignment]
 ```
 
-A frozen field remains frozen in subclasses, unless the subclass declares the field again:
+A frozen field remains frozen in subclasses, unless the subclass declares the field again.
 
 ```py
 class FrozenFieldBase(BaseModel):
@@ -1467,7 +1467,7 @@ InheritsFrozenField(value=1).value = 2  # error: [invalid-assignment]
 RedeclaresFrozenField(value=1).value = 2  # no diagnostic
 ```
 
-Frozen fields are also supported on generic models:
+Frozen fields are also supported on generic models.
 
 ```py
 class GenericFrozenField[T](BaseModel):
@@ -1476,7 +1476,7 @@ class GenericFrozenField[T](BaseModel):
 GenericFrozenField[int](value=1).value = 2  # error: [invalid-assignment]
 ```
 
-Like a frozen model, a frozen field can be mutated if the model has a custom `__setattr__` method:
+Like a frozen model, a frozen field can be mutated if the model has a custom `__setattr__` method.
 
 ```py
 class FrozenFieldWithCustomSetattr(BaseModel):
@@ -1491,7 +1491,7 @@ FrozenFieldWithCustomSetattr(value=1).value = 2  # no diagnostic
 ## Frozen models and protocols
 
 Frozen models cannot satisfy a protocol that requires a writable field, but can satisfy one that
-only requires reading it:
+only requires reading it.
 
 ```py
 from typing import Protocol
@@ -1522,7 +1522,7 @@ read(Frozen(value=1))
 read(Mutable(value=1))
 ```
 
-The same applies to models with an individual frozen field:
+The same applies to models with an individual frozen field.
 
 ```py
 from pydantic import Field
@@ -1539,7 +1539,7 @@ read(FrozenField(value=1))  # no diagnostic
 At runtime, default values are *not* validated against the field type annotation, unless
 `validate_default=True` is set. In static analysis, we still need to verify the default values
 against the type annotation. Not doing so would be unsound. We do this unconditionally, even if
-`validate_default=False` (which is also the default):
+`validate_default=False` (which is also the default).
 
 ```py
 from pydantic import BaseModel, ConfigDict, Field
@@ -1585,7 +1585,7 @@ class PersonUntypedField(BaseModel):
 ## BaseSettings
 
 A model derived from `BaseSettings` can use environment variables, so we assume that it is okay not
-to provide their values:
+to provide their values.
 
 ```py
 from pydantic import Field
@@ -1618,7 +1618,7 @@ AliasedSettings(_env_file=1)  # error: [invalid-argument-type]
 Settings(host="localhost", port=8000, something_else=7)  # error: [unknown-argument]
 ```
 
-A custom initializer continues to control the accepted arguments:
+A custom initializer continues to control the accepted arguments.
 
 ```py
 from pydantic_settings import BaseSettings
@@ -1638,7 +1638,7 @@ DerivedSettings(1, _secrets_dir="./secrets")  # error: [unknown-argument]
 ## Root models
 
 Unlike fields on ordinary Pydantic models, a root model's `root` field can be passed either
-positionally or by keyword:
+positionally or by keyword.
 
 ```py
 from pydantic import RootModel, BaseModel
@@ -1654,7 +1654,7 @@ IntList(["1", "2", "3"])
 IntList(1)  # error: [invalid-argument-type]
 ```
 
-When a root model field is included in a normal model, it can be set using the `root` type directly:
+When a root model field is included in a normal model, it can be set using the `root` type directly.
 
 ```py
 class Model(BaseModel):
@@ -1667,7 +1667,7 @@ Model(int_list=["1", "2", "3"])
 Model(int_list=1)  # error: [invalid-argument-type]
 ```
 
-Generic root models can accept root models with a different specialization:
+Generic root models can accept root models with a different specialization.
 
 ```py
 class GenericRoot[T](RootModel[T]): ...
@@ -1747,7 +1747,7 @@ KeepsInheritedExtraSetting(name="Alice", something_else=7)  # error: [unknown-ar
 ```
 
 Pydantic merges configs from multiple bases from left to right, so the rightmost base takes
-precedence:
+precedence.
 
 ```py
 class AllowExtras(BaseModel):
@@ -1764,7 +1764,7 @@ class RightmostAllows(ForbidExtras, AllowExtras):
 RightmostAllows(name="Alice", something_else=7)
 ```
 
-Mixins (classes that do not inherit from `BaseModel`) can also change the configuration:
+Mixins (classes that do not inherit from `BaseModel`) can also change the configuration.
 
 ```py
 class AllowExtrasMixin:
@@ -1776,7 +1776,7 @@ class ConfigMixinOverridesForbid(ForbidExtras, AllowExtrasMixin):
 ConfigMixinOverridesForbid(name="Alice", something_else=7)
 ```
 
-Config values passed as class keywords take precedence over inherited `model_config`s:
+Config values passed as class keywords take precedence over inherited `model_config`s.
 
 ```py
 class KeywordForbidsExtras(BaseModel, extra="forbid"):
@@ -1790,7 +1790,7 @@ class KeywordOverridesForbid(ForbidExtras, extra="allow"):
 KeywordOverridesForbid(name="Alice", something_else=7)
 ```
 
-The `ConfigDict` class is recognized by identity, including through an import alias:
+The `ConfigDict` class is recognized by identity, including through an import alias.
 
 ```py
 from pydantic import ConfigDict as ModelConfig
@@ -1803,7 +1803,7 @@ class AliasedConfigDict(BaseModel):
 AliasedConfigDict(name="Alice", something_else=7)  # error: [unknown-argument]
 ```
 
-Pydantic also accepts a plain dictionary as `model_config`:
+Pydantic also accepts a plain dictionary as `model_config`.
 
 ```py
 class PlainDictConfig(BaseModel):
@@ -1824,7 +1824,7 @@ DictCallConfig(name="Alice", something_else=7)  # error: [unknown-argument]
 ## Mixins
 
 Annotated attributes on mixin-classes that do not inherit from `BaseModel` also become fields on the
-model:
+model.
 
 ```py
 from pydantic import BaseModel
@@ -1920,7 +1920,7 @@ Pydantic uses `@dataclass_transform(...)` on its `ModelMetaclass` to help type c
 that models derived from classes like `BaseModel` (which have `ModelMetaclass` as their metaclass)
 are similar to dataclasses. However, there are some crucial differences.
 
-Pydantic models allow a required field after one with a default:
+Pydantic models allow a required field after one with a default.
 
 ```py
 from pydantic import BaseModel
@@ -1934,7 +1934,7 @@ reveal_type(RequiredAfterDefault.__init__)
 RequiredAfterDefault(required=1)
 ```
 
-Pydantic models do not expose some of the special attributes of dataclasses:
+Pydantic models do not expose some of the special attributes of dataclasses.
 
 ```py
 RequiredAfterDefault.__dataclass_fields__  # error: [unresolved-attribute]
@@ -1948,7 +1948,7 @@ They do, however, expose various Pydantic-specific fields (inherited from `BaseM
 reveal_type(RequiredAfterDefault.__pydantic_fields__)  # revealed: dict[str, FieldInfo]
 ```
 
-Invalid type qualifiers are diagnosed as Pydantic model fields rather than dataclass fields:
+Invalid type qualifiers are diagnosed as Pydantic model fields rather than dataclass fields.
 
 ```py
 from typing_extensions import NotRequired, ReadOnly, Required
@@ -2145,7 +2145,7 @@ model.__replace__(_secrets_dir=".")  # error: [unknown-argument]
 
 ## Pydantic dataclasses
 
-Pydantic's dataclasses are similar to the standard library dataclasses:
+Pydantic's dataclasses are similar to the standard library dataclasses.
 
 ```py
 from pydantic import Field

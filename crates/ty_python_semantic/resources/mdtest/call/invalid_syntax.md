@@ -17,7 +17,7 @@ reveal_type(f(1, x=2))  # revealed: int
 ## Positional after non-positional
 
 When parameter kinds are given in an invalid order, we emit a diagnostic and implicitly reorder them
-to the valid order:
+to the valid order.
 
 ```py
 # error: [invalid-syntax] "Parameter cannot follow var-keyword parameter"

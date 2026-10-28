@@ -9,7 +9,7 @@ The `object` type represents the set of all Python objects.
 
 ## `object` is a supertype of all types
 
-It is the top type in Python's type system, i.e., it is a supertype of all other types:
+It is the top type in Python's type system, i.e., it is a supertype of all other types.
 
 ```py
 from ty_extensions import static_assert
@@ -24,7 +24,7 @@ static_assert(is_subtype_of(object, object))
 ## Every type is assignable to `object`
 
 Everything can be assigned to the type `object`. This fact can be used to create heterogeneous
-collections of objects (but also erases more specific type information):
+collections of objects (but also erases more specific type information).
 
 ```py
 from ty_extensions import static_assert
@@ -43,7 +43,7 @@ x: list[object] = [1, "a", ()]
 
 ## `object` overlaps with all types
 
-There is no type that is disjoint from `object` except for `Never`:
+There is no type that is disjoint from `object` except for `Never`.
 
 ```py
 from ty_extensions import static_assert
@@ -60,7 +60,7 @@ static_assert(is_disjoint_from(Never, object))
 
 ## Unions with `object`
 
-Unions with `object` are equivalent to `object`:
+Unions with `object` are equivalent to `object`.
 
 ```py
 from ty_extensions import static_assert
@@ -71,7 +71,7 @@ static_assert(is_equivalent_to(int | object | None, object))
 
 ## Intersections with `object`
 
-Intersecting with `object` is equivalent to the original type:
+Intersecting with `object` is equivalent to the original type.
 
 ```pyi
 from ty_extensions import static_assert

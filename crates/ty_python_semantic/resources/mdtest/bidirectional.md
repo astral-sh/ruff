@@ -15,7 +15,7 @@ python-version = "3.13"
 
 ## Type context sources
 
-Type context is sourced from various places, including annotated assignments:
+Type context is sourced from various places, including annotated assignments.
 
 ```py
 from typing import Literal
@@ -672,7 +672,7 @@ async def invalid_async_generator_content() -> None:
 ## Generic call inference
 
 The declared type of a generic call expression is used to infer a more assignable specialization for
-the callable:
+the callable.
 
 ```py
 from typing import Literal
@@ -771,7 +771,7 @@ def forwarded[T](x: T, cond: bool) -> T | list[T]:
 
 ## Upper-bound type context
 
-The declared upper bound of a type variable provides type context for a nested generic call:
+The declared upper bound of a type variable provides type context for a nested generic call.
 
 ```py
 def singleton[T](value: T) -> list[T]:
@@ -784,7 +784,7 @@ reveal_type(singleton(True))  # revealed: list[bool]
 reveal_type(bounded(singleton(True)))  # revealed: list[int]
 ```
 
-Declared upper bounds also restrict the range of an inferred gradual solution:
+Declared upper bounds also restrict the range of an inferred gradual solution.
 
 ```py
 from collections.abc import Callable, Sequence
@@ -810,7 +810,7 @@ def _(value: Any):
     reveal_type(bounded_consumer(consumer(value)))  # revealed: (Any | int, /) -> None
 ```
 
-The argument of a callable is narrowed based on outer type context:
+The argument of a callable is narrowed based on outer type context.
 
 ```py
 def from_callback[T](f: Callable[[T], None]) -> list[T]:
@@ -821,7 +821,7 @@ def _(f: Callable[[object], None]):
     reveal_type(bounded(from_callback(f)))  # revealed: list[int]
 ```
 
-Upper bounds also provide context for `TypedDict` and lambda parameters:
+Upper bounds also provide context for `TypedDict` and lambda parameters.
 
 ```py
 from typing import TypedDict
@@ -850,7 +850,7 @@ def _(value: Any):
 ## Upper-bound context without inference evidence
 
 If there are no inferred or declared constraints for a given type variable, it remains unsolved,
-despite lower and upper validity bounds:
+despite lower and upper validity bounds.
 
 ```py
 def empty[T]() -> T:
@@ -870,7 +870,7 @@ def bounded_list[T: list[int]](value: T) -> T:
 reveal_type(bounded_list(empty_list()))  # revealed: list[Unknown]
 ```
 
-The type variable remains unsolved when the upper-bound context passes through another generic call:
+The type variable remains unsolved when the upper-bound context passes through another generic call.
 
 ```py
 def identity[T](value: T) -> T:
@@ -879,7 +879,7 @@ def identity[T](value: T) -> T:
 reveal_type(bounded_list(identity(empty_list())))  # revealed: list[Unknown]
 ```
 
-If an explicit default is provided, it is instead used as the fallback value:
+If an explicit default is provided, it is instead used as the fallback value.
 
 ```py
 def empty_with_default[T = bool]() -> T:
@@ -890,7 +890,7 @@ reveal_type(bounded(empty_with_default()))  # revealed: bool
 
 ## Upper-bound context with constrained type variables
 
-The solution to a constrained type variable is chosen to satisfy outer validity constraints:
+The solution to a constrained type variable is chosen to satisfy outer validity constraints.
 
 ```py
 def make[T: (int, str)]() -> T:
@@ -902,7 +902,7 @@ def number[U: int](value: U) -> U:
 reveal_type(number(make()))  # revealed: int
 ```
 
-A default is only used when the type variable remains unsolved:
+A default is only used when the type variable remains unsolved.
 
 ```py
 def make_with_default[T: (int, str) = str]() -> T:
@@ -914,7 +914,7 @@ reveal_type(number(make_with_default()))  # revealed: int
 
 ## Generic constructors
 
-The same applies to constructors of generic classes:
+The same applies to constructors of generic classes.
 
 ```py
 from typing import Any
@@ -972,7 +972,7 @@ z2: Z[Any] = Z(1)
 reveal_type(z2)  # revealed: Z[Any]
 ```
 
-The return type should preserve the independent key and value types of a generic `dict` constructor:
+The return type should preserve the independent key and value types of a generic `dict` constructor.
 
 ```py
 from collections.abc import Iterable, Mapping
@@ -1132,7 +1132,7 @@ def build_iter_view(matches: Iterable[CT] | Callable[[], Iterable[CT]]) -> Itera
 
 ## Generic call argument inference
 
-A function's arguments are also inferred using the type context:
+A function's arguments are also inferred using the type context.
 
 ```py
 from typing import Callable, TypedDict
@@ -1216,7 +1216,7 @@ def _(x: int, z: list[int]):
     x2: Sequence[int | str] = as_sequence(x, [x], z)  # error: [invalid-argument-type]
 ```
 
-Partially specialized type context is not ignored:
+Partially specialized type context is not ignored.
 
 ```py
 from typing import TypeVar
@@ -1290,7 +1290,7 @@ def _():
 When inferring a generic call, we only use the declared type as type context if it is in
 non-covariant position. Unused type parameters are inferred as covariant. The final annotated
 assignment binding still uses the declared type if the inferred and declared types are mutually
-assignable:
+assignable.
 
 ```py
 from typing import Any
@@ -1352,7 +1352,7 @@ reveal_type(x11)  # revealed: Contravariant[Any]
 reveal_type(x12)  # revealed: Invariant[Any]
 ```
 
-This behavior also applies to invariant collection types:
+This behavior also applies to invariant collection types.
 
 ```py
 from typing import Any
@@ -1400,7 +1400,7 @@ x1: X[int | None] = X()
 reveal_type(x1)  # revealed: X[None]
 ```
 
-We also prefer the declared type of `Callable` parameters, which are in contravariant position:
+We also prefer the declared type of `Callable` parameters, which are in contravariant position.
 
 ```py
 from typing import Callable
@@ -1435,7 +1435,7 @@ reveal_type(x5)  # revealed: ((Any, /) -> bool) | None
 ## Declared type preference sees through subtyping
 
 Additionally, if the inferred type is a subtype of the declared type, we prefer declared type
-assignments that are in non-covariant position. This behavior applies to collection literals:
+assignments that are in non-covariant position. This behavior applies to collection literals.
 
 ```py
 import builtins
@@ -1518,7 +1518,7 @@ x19: dict[int, dict[str, int]] = defaultdict(dict)
 reveal_type(x19)  # revealed: defaultdict[int, dict[str, int]]
 ```
 
-Complex subtyping relationships are solved correctly:
+Complex subtyping relationships are solved correctly.
 
 ```py
 from typing import Hashable
@@ -1569,7 +1569,7 @@ recursive: RecursiveMapping = {}
 
 ## Implicit generic class specialization
 
-Callable type context is also used to inform the implicit specialization of a generic class:
+Callable type context is also used to inform the implicit specialization of a generic class.
 
 ```py
 import builtins
@@ -1654,7 +1654,7 @@ reveal_type(explicit_factory())  # revealed: list[ExplicitFactory]
 ## Narrow union declared type for generic calls
 
 When a generic call is checked against a union declared type, the union is narrowed to the first
-compatible element:
+compatible element.
 
 ```py
 from typing import reveal_type, Any, Callable, TypedDict
@@ -1777,7 +1777,7 @@ def _(a: int, b: str, c: int | str):
 ```
 
 This applies to built-in collection constructors as well, mirroring the behavior of collection
-literals:
+literals.
 
 ```py
 from typing import Mapping, Sequence
@@ -1812,7 +1812,7 @@ reveal_type(x8)  # revealed: list[int | str]
 ## Literal union context for generic calls
 
 Narrowing a small literal union preserves the precise result of a nested generic call, including
-when the return type also contains `Any`:
+when the return type also contains `Any`.
 
 ```py
 from typing import Any, Literal, assert_type
@@ -1833,7 +1833,7 @@ gradual: Literal["a", "b"] = reveal_type(first_gradual(singleton("a")))  # revea
 ```
 
 A result can contain several literal alternatives without including every member of the declared
-union. The surrounding optional type does not add `None` to this result:
+union. The surrounding optional type does not add `None` to this result.
 
 ```py
 def literal_union(value: Literal["a", "b"]) -> None:
@@ -1842,7 +1842,7 @@ def literal_union(value: Literal["a", "b"]) -> None:
 ```
 
 A generic collection alternative still provides context when it follows literal alternatives. The
-empty list is inferred as `list[str]`:
+empty list is inferred as `list[str]`.
 
 ```py
 type Values = Literal[0, 1, 2]
@@ -1854,7 +1854,7 @@ collection: Values | list[str] | None = identity([])
 assert_type(collection, list[str])
 ```
 
-The result also stays precise when the matching literal is the last member of the declared union:
+The result also stays precise when the matching literal is the last member of the declared union.
 
 ```py
 late: Values = first(singleton(2))
@@ -1864,7 +1864,7 @@ assert_type(late, Literal[2])
 ## Assignability diagnostics ignore declared type
 
 The type displayed in an invalid assignment diagnostic should account for the type context, e.g., to
-avoid literal promotion:
+avoid literal promotion.
 
 ```py
 from typing import Literal, TypedDict
@@ -1882,7 +1882,7 @@ class A(TypedDict):
 x2: list[A | bool] = [{"bar": 1}, 1]
 ```
 
-However, the declared type should be ignored if the specialization is not solvable:
+However, the declared type should be ignored if the specialization is not solvable.
 
 ```py
 from typing import Any, Callable
@@ -1907,7 +1907,7 @@ def _(a: int | None):
 
 ## Instance attributes
 
-Both meta and class/instance attribute annotations are used as type context:
+Both meta and class/instance attribute annotations are used as type context.
 
 ```py
 from typing import Literal, Any
@@ -1933,7 +1933,7 @@ def _(flag: bool):
         C.x = reveal_type([1])  # revealed: list[Literal[1]]
 ```
 
-For union targets, each element of the union is considered as a separate type context:
+For union targets, each element of the union is considered as a separate type context.
 
 ```py
 from typing import Literal
@@ -1949,7 +1949,7 @@ def _(xy: X | Y):
 ```
 
 Unannotated lambda parameters do not prevent the inferred attribute type from providing context to
-the dictionary literals:
+the dictionary literals.
 
 ```py
 class Callbacks:
@@ -1960,7 +1960,7 @@ class Callbacks:
 
 ## Overload evaluation
 
-The type context of all matching overloads are considered during argument inference:
+The type context of all matching overloads are considered during argument inference.
 
 ```py
 from concurrent.futures import Future
@@ -2075,7 +2075,7 @@ def f9(func: Callable[[], Union[Awaitable[T2], T2]]) -> Future[T2]:
 ## Class constructor parameters
 
 The parameters of both `__init__` and `__new__` are used as type context sources for constructor
-calls:
+calls.
 
 ```py
 def f[T](x: T) -> list[T]:
@@ -2095,7 +2095,7 @@ A(f([]))
 
 ## Conditional expressions
 
-The type context is propagated through both branches of conditional expressions:
+The type context is propagated through both branches of conditional expressions.
 
 ```py
 def f[T](x: T) -> list[T]:
@@ -2112,7 +2112,7 @@ def _(flag: bool):
 ## Collection literals in boolean and conditional expressions
 
 When a boolean or conditional expression combines a fresh collection literal with another operand,
-the other operand can provide type context for the literal:
+the other operand can provide type context for the literal.
 
 ```py
 from collections.abc import Mapping
@@ -2216,7 +2216,7 @@ use_sort(sort)
 ```
 
 An unspecialized collection parameter is not useful type context for a collection literal. The other
-operand of a conditional or boolean expression can supply it instead:
+operand of a conditional or boolean expression can supply it instead.
 
 ```py
 def f[T](values: list[T]) -> list[T]:
@@ -2229,7 +2229,7 @@ def _(values: list[object], flag: bool):
     reveal_type(f(values and [1]))  # revealed: list[object]
 ```
 
-The same applies to set literals:
+The same applies to set literals.
 
 ```py
 def g[T](values: set[T]) -> set[T]:
@@ -2250,7 +2250,7 @@ def _(values: dict[str | None, object], flag: bool):
     reveal_type(dict(values or {None: None}))  # revealed: dict[str | None, object]
 ```
 
-Explicit gradual element types remain preferred over the other operand's specialization:
+Explicit gradual element types remain preferred over the other operand's specialization.
 
 ```py
 from typing import Any
@@ -2263,7 +2263,7 @@ def _(values: list[int], flag: bool):
 ## Lambda expressions
 
 If a lambda expression is annotated as a `Callable` type, the body of the lambda is inferred with
-the annotated return type as type context, and the annotated parameter types are respected:
+the annotated return type as type context, and the annotated parameter types are respected.
 
 ```py
 from typing import Callable, TypedDict
@@ -2347,7 +2347,7 @@ def _(x: bool):
     f = signatures.get("", reveal_type(lambda x: x))
 ```
 
-We do not currently account for type annotations present later in the scope:
+We do not currently account for type annotations present later in the scope.
 
 ```py
 f12 = lambda: [1]
@@ -2359,7 +2359,7 @@ reveal_type(f12)  # revealed: () -> list[int]
 ## Lambda contextual inference through type aliases
 
 A lambda parameter is inferred from a callable behind a type alias, including aliases that resolve
-to unions and aliases used as elements of another union:
+to unions and aliases used as elements of another union.
 
 ```py
 from typing import Callable
@@ -2388,7 +2388,7 @@ python-version = "3.11"
 ```
 
 On Python 3.11, `typing_extensions.TypeAliasType` provides the same alias semantics without the
-`type` statement:
+`type` statement.
 
 ```py
 from typing import Callable
@@ -2712,7 +2712,7 @@ def _(seed: int):
     reveal_type(x)  # revealed: int
 ```
 
-Only diagnostics from the final round of iteration are preserved:
+Only diagnostics from the final round of iteration are preserved.
 
 ```py
 def diagnostic_pair[T](value: T, values: list[T]) -> T:
@@ -2732,7 +2732,7 @@ diagnostic_pair(non_generic(suppressed_argument), [1])  # ty: ignore[unresolved-
 
 ## Dynamic type context
 
-A lambda parameter can use type context containing `Any`:
+A lambda parameter can use type context containing `Any`.
 
 ```py
 from typing import Any, Callable
@@ -2745,7 +2745,7 @@ def _(values: list[list[Any]]):
     callable_pair((lambda value: len(reveal_type(value)), values))  # revealed: list[Any]
 ```
 
-List literals widen based on dynamic type context contributed from a sibling argument:
+List literals widen based on dynamic type context contributed from a sibling argument.
 
 ```py
 def append[T](items: list[T], value: T) -> None:
@@ -2755,7 +2755,7 @@ def example(value: str | Any) -> None:
     append([1], value)
 ```
 
-This also applies when a generic base class contributes gradual type context:
+This also applies when a generic base class contributes gradual type context.
 
 ```py
 class GenericBase[T]: ...
@@ -2770,7 +2770,7 @@ reveal_type(g([1], Mixed()))  # revealed: list[int | str | Any]
 ```
 
 Dynamic arguments also participate when inferring the specialization for a nested collection
-literal:
+literal.
 
 ```py
 from ty_extensions._internal import Unknown
@@ -2792,7 +2792,7 @@ def _(dynamic: Any):
 ## Lambda parameter cycles
 
 The return context can determine the types of mutually dependent identity callbacks. Unresolved
-parameter types do not contribute `Unknown` to the inferred return type:
+parameter types do not contribute `Unknown` to the inferred return type.
 
 ```toml
 [environment]
@@ -2812,7 +2812,7 @@ def _[T](key: Callable[[T], str]) -> list[T]:
     return f(key=key, extract=lambda x: x, store=lambda x: x)
 ```
 
-Gradual types from arguments still propagate through an identity lambda:
+Gradual types from arguments still propagate through an identity lambda.
 
 ```py
 from typing import Any
@@ -2831,7 +2831,7 @@ def _(value: Unknown):
 ## Type-variable defaults as type context
 
 An explicit type-variable default can provide fallback context when arguments do not determine a
-type:
+type.
 
 ```py
 from collections.abc import Callable
@@ -2849,7 +2849,7 @@ reveal_type(x1)  # revealed: Container[Child[str]]
 reveal_type(Container(Child))  # revealed: Container[Child[str]]
 ```
 
-An inferred argument type takes precedence over the default:
+An inferred argument type takes precedence over the default.
 
 ```py
 reveal_type(Container(Child[int]))  # revealed: Container[Child[int]]
@@ -2863,7 +2863,7 @@ def _(value: Child[int]):
 
 ## Dunder Calls
 
-The key and value parameters types are used as type context for `__setitem__` dunder calls:
+The key and value parameters types are used as type context for `__setitem__` dunder calls.
 
 ```py
 from typing import TypedDict
@@ -2886,7 +2886,7 @@ def _(x: X):
 ```
 
 If the target is a union or intersection type, the key and value expressions may be inferred
-multiple times for each applicable type context:
+multiple times for each applicable type context.
 
 ```py
 from ty_extensions import Intersection
@@ -2906,7 +2906,7 @@ def _(x: Intersection[X, Y]):
     x[reveal_type({"bar": [1, None]})] = reveal_type({"bar": [2, None]})  # revealed: Baz
 ```
 
-Similarly, the declared type of a `TypedDict` key is used as type context:
+Similarly, the declared type of a `TypedDict` key is used as type context.
 
 ```py
 from typing import Literal
@@ -2957,7 +2957,7 @@ def _(x: Intersection[X, Y]):
 
 ## `await` expressions
 
-Type context is also propagated through `await` expressions:
+Type context is also propagated through `await` expressions.
 
 ```py
 from typing import Literal
@@ -2979,7 +2979,7 @@ async def _():
 ## Container inference
 
 Empty, unannotated container literals are inferred based on future uses that extend throughout the
-entire scope:
+entire scope.
 
 ```py
 x1 = []
@@ -2996,7 +2996,7 @@ reveal_type(x1_sorted)  # revealed: list[str]
 ```
 
 Bare empty `list()`, `set()`, and `dict()` calls also participate in full-scope inference. Calls
-through aliases and shadowed names are deliberately not refined:
+through aliases and shadowed names are deliberately not refined.
 
 ```py
 list_result = list()
@@ -3112,7 +3112,7 @@ def _() -> int:
 ```
 
 A return annotation can provide a union of fixed-length tuple element types. Inferring an empty list
-from this context doesn't wrongly widen the type of `result` to a list of variable-length tuples:
+from this context doesn't wrongly widen the type of `result` to a list of variable-length tuples.
 
 ```py
 def tuples() -> list[tuple[()] | tuple[int]]:
@@ -3174,7 +3174,7 @@ reveal_type(x15)  # revealed: list[Divergent]
 ```
 
 Collection-use constraints must converge when multiple collection literals are used in a container
-literal. This is a regression test for <https://github.com/astral-sh/ty/issues/3778>:
+literal. This is a regression test for <https://github.com/astral-sh/ty/issues/3778>.
 
 ```py
 from typing import Any
@@ -3299,7 +3299,7 @@ def _():
     reveal_type(values)  # revealed: dict[str, int]
 ```
 
-An empty collection remains unknown until another use supplies an element type:
+An empty collection remains unknown until another use supplies an element type.
 
 ```py
 def _():
@@ -3324,7 +3324,7 @@ def _(unknown):
 ```
 
 An upper bound on the element type introduced by a callback does not influence the type of the
-collection literal:
+collection literal.
 
 ```py
 from typing import Any
@@ -3353,7 +3353,7 @@ def _():
 
 ## Multi-inference diagnostics
 
-Diagnostics unrelated to the type-context are only reported once:
+Diagnostics unrelated to the type-context are only reported once.
 
 ```py
 from typing import TypedDict

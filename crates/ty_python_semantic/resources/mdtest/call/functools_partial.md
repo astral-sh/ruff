@@ -32,7 +32,7 @@ reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello") -> bool]
 ### Leading parameter bound by keyword
 
 Binding a positional-or-keyword parameter by keyword makes it defaulted and keyword-only in the
-reduced signature, and later positional-or-keyword parameters become keyword-only too:
+reduced signature, and later positional-or-keyword parameters become keyword-only too.
 
 ```py
 from functools import partial
@@ -162,7 +162,7 @@ reveal_type(p)  # revealed: partial[(**kwargs: str) -> bool]
 ### Specialized generic variadics remain non-gradual
 
 Specializing variadic parameter types to `Any` does not make them gradual when constructing a
-`partial`:
+`partial`.
 
 ```py
 from functools import partial
@@ -184,7 +184,7 @@ static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
 ### Expanded ParamSpec variadics preserve non-gradual parameters
 
 When a `partial` expands specialized `P.args` and `P.kwargs`, it preserves the kind of the
-parameters inferred for `P`:
+parameters inferred for `P`.
 
 ```py
 from functools import partial
@@ -347,7 +347,7 @@ reveal_type(p)  # revealed: partial[Unknown]
 ### Keyword binding to positional-only param
 
 Positional-only parameters cannot be bound by keyword in `partial()`. The parameter should be
-preserved in the resulting callable, while still reporting a construction-time error:
+preserved in the resulting callable, while still reporting a construction-time error.
 
 ```py
 from functools import partial
@@ -364,7 +364,7 @@ reveal_type(p)  # revealed: partial[(x: int, /, y: str) -> bool]
 
 ### Generic functions
 
-Type variables are inferred from the bound arguments:
+Type variables are inferred from the bound arguments.
 
 ```py
 from functools import partial
@@ -686,7 +686,7 @@ def test_union_partial(flag: bool) -> None:
 The boolean-returning `partial` instance in the below example can be selected when `flag` is true.
 Its call signature is a subtype of the integer-returning `partial`'s signature, but each wraps a
 different function. Discarding `bool_partial` from the union would incorrectly make
-`selected is bool_partial` appear impossible:
+`selected is bool_partial` appear impossible.
 
 ```py
 from functools import partial
@@ -750,7 +750,7 @@ reveal_type(bound({}))  # revealed: Any
 ### Truthiness-narrowed gradual ParamSpec callable bound with `partial`
 
 Narrowing an optional callable by truthiness preserves its gradual parameter list when inferring a
-`ParamSpec`. The resulting callable remains compatible with any fixed parameter list:
+`ParamSpec`. The resulting callable remains compatible with any fixed parameter list.
 
 ```toml
 [environment]
@@ -790,7 +790,7 @@ def patch(original: Callable[..., Any] | None) -> None:
         callback = pep695
 ```
 
-Adding an unrelated intersection member does not change which arguments the callable accepts:
+Adding an unrelated intersection member does not change which arguments the callable accepts.
 
 ```py
 from ty_extensions import Intersection
@@ -828,7 +828,7 @@ reveal_type(bound(cfg="x"))  # revealed: int
 
 ### Overloaded stdlib callable narrowed by bound args
 
-`partial(reduce, mul)` should keep the narrowed return type from the bound reducer:
+`partial(reduce, mul)` should keep the narrowed return type from the bound reducer.
 
 ```py
 from functools import partial, reduce
@@ -847,7 +847,7 @@ reveal_type(prod(shape))  # revealed: int
 ### Overloaded stdlib callable with keyword-only binding
 
 `partial(zip, strict=True)` should accept the keyword-only argument and preserve the element types
-of the resulting iterator:
+of the resulting iterator.
 
 ```toml
 [environment]
@@ -871,7 +871,7 @@ reveal_type(pairs)  # revealed: list[Unknown]
 ### Keyword argument with literal sequence annotation
 
 `partial(...)` should accept keyword arguments whose literal container types are inferred without
-context at the call site:
+context at the call site.
 
 ```py
 from functools import partial
@@ -891,7 +891,7 @@ reveal_type(p())  # revealed: None
 ### Keyword argument with empty literal sequence annotation
 
 `partial(...)` should still re-run argument refinement even when the initial constructor binding
-already succeeds, so empty literals keep the parameter's contextual element type:
+already succeeds, so empty literals keep the parameter's contextual element type.
 
 ```py
 from functools import partial
@@ -1683,7 +1683,7 @@ reveal_type(p)  # revealed: partial[(b: str) -> bool]
 
 ### Overloaded function with later matching overload
 
-When the bound argument matches a later overload but not the first, no error should be emitted:
+When the bound argument matches a later overload but not the first, no error should be emitted.
 
 ```py
 from functools import partial
@@ -1703,7 +1703,7 @@ reveal_type(p)  # revealed: partial[() -> str]
 
 ### Overriding keyword-bound args at call time
 
-`partial` allows keyword arguments to be overridden when calling the result:
+`partial` allows keyword arguments to be overridden when calling the result.
 
 ```py
 from functools import partial
@@ -1742,7 +1742,7 @@ p(1, b="y")  # error: [invalid-argument-type]
 
 ### Assignability to callable
 
-A `partial` result is assignable to a `Callable` with the matching signature:
+A `partial` result is assignable to a `Callable` with the matching signature.
 
 ```py
 from functools import partial
@@ -1862,7 +1862,7 @@ factory: Callable[[], C] = partial(C.make, x=0)
 ### Partials of nested local functions with same signature
 
 Two `partial(...)` values from distinct nested local functions should still be assignable when their
-remaining callable signatures match:
+remaining callable signatures match.
 
 ```py
 from functools import partial
@@ -1881,7 +1881,7 @@ def outer(x, y):
 ### Keyword-bound predicate remains unary for filter
 
 Binding a predicate parameter via keyword should still produce a unary predicate acceptable to
-`filter(...)`:
+`filter(...)`.
 
 ```py
 from functools import partial
@@ -1930,7 +1930,7 @@ def task(
 ### Bound classmethod callback with weakref
 
 Binding the first explicit parameter of a bound classmethod callback should preserve assignability
-for `ReferenceType[Self]` arguments:
+for `ReferenceType[Self]` arguments.
 
 ```py
 from functools import partial
@@ -1952,7 +1952,7 @@ class CallbackHost(Generic[T]):
 
 A `partial` result is assignable to a `Protocol` with a matching `__call__` signature. Required
 keyword-only parameters can be bound away, and extra keyword-only parameters with defaults in the
-resulting `partial` are allowed, since they don't need to be provided by the caller:
+resulting `partial` are allowed, since they don't need to be provided by the caller.
 
 ```py
 from functools import partial
@@ -2079,7 +2079,7 @@ reveal_type(p.func(2, "x"))  # revealed: tuple[Literal[2], Literal["x"]]
 
 ### Attribute assignment on partial results
 
-Attribute assignment should go through the standard nominal instance path:
+Attribute assignment should go through the standard nominal instance path.
 
 ```py
 from functools import partial

@@ -185,7 +185,7 @@ reveal_type(c.desc)  # revealed: int
 
 An attribute provided by `__getattr__` need not return the value assigned to it. Here, `__setattr__`
 ignores assignments, and `__getattr__` always returns `"hello"`. Assigning `"goodbye"` therefore
-does not make later reads return `"goodbye"`:
+does not make later reads return `"goodbye"`.
 
 ```py
 class AlwaysString:
@@ -202,7 +202,7 @@ reveal_type(obj.value)  # revealed: str
 
 ### Dynamic attributes returning `Any`
 
-When `__getattr__` returns `Any`, assigning a value does not make later reads more precise:
+When `__getattr__` returns `Any`, assigning a value does not make later reads more precise.
 
 ```py
 from typing import Any
@@ -216,7 +216,7 @@ def update(props: Props) -> None:
     reveal_type(props.status)  # revealed: Any
 ```
 
-A `hasattr` check tells us that an attribute exists, but not what it returns after an assignment:
+A `hasattr` check tells us that an attribute exists, but not what it returns after an assignment.
 
 ```py
 def update_if_present(props: Props) -> None:
@@ -228,7 +228,7 @@ def update_if_present(props: Props) -> None:
 ### Dynamic attributes after an `isinstance` check
 
 An `isinstance` check can narrow the type of a dynamic attribute. Assigning to that attribute
-discards the narrowing, since `__getattr__` may return a different value on the next read:
+discards the narrowing, since `__getattr__` may return a different value on the next read.
 
 ```py
 class Values:
@@ -247,7 +247,7 @@ def update(values: Values) -> None:
 ### Dynamic attributes without a custom setter
 
 Defining `__getattr__` does not make assignments to missing attributes valid. We report the invalid
-assignment and continue to use the getter's return type for later reads:
+assignment and continue to use the getter's return type for later reads.
 
 ```py
 class GetterOnly:
@@ -263,7 +263,7 @@ def update(obj: GetterOnly) -> None:
 
 Ordinary attributes still narrow after assignment when a class defines `__getattr__` and
 `__setattr__`. This applies both to annotated attributes and to attributes inferred from assignments
-in the class body or `__init__`:
+in the class body or `__init__`.
 
 ```py
 from typing import Any
@@ -291,7 +291,7 @@ def update(obj: Values) -> None:
 
 A union may include a class that provides `value` through `__getattr__`. In that case, assigning
 `value` does not determine the type of the next read, even if another class in the union declares
-the attribute:
+the attribute.
 
 ```py
 class Dynamic:
@@ -311,7 +311,7 @@ def update(obj: Dynamic | Declared) -> None:
 ### Module attributes
 
 This module defines neither `value` nor `__getattr__`, so assigning `value` produces an error. We
-still track the assigned type and report an incompatible use later:
+still track the assigned type and report an incompatible use later.
 
 `module.py`:
 
@@ -333,7 +333,7 @@ value: str = module.value
 ### Modules with `__getattr__`
 
 A module's `__getattr__` is only called for missing attributes. Assigning an attribute adds it to
-the module, so later reads use the assigned value:
+the module, so later reads use the assigned value.
 
 `module.py`:
 

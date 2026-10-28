@@ -42,7 +42,7 @@ c.ten = 11
 When assigning to the `ten` attribute from the class object, we get an error. The descriptor
 protocol is *not* triggered in this case. Since the attribute is declared as `Ten` in the class
 body, we do not allow these assignments, preventing users from accidentally overwriting the data
-descriptor, which is what would happen at runtime:
+descriptor, which is what would happen at runtime.
 
 ```py
 # error: [invalid-assignment] "Object of type `Literal[10]` is not assignable to attribute `ten` of type `Ten`"
@@ -53,7 +53,7 @@ C.ten = 11
 
 ### Different types for `__get__` and `__set__`
 
-The return type of `__get__` and the value type of `__set__` can be different:
+The return type of `__get__` and the value type of `__set__` can be different.
 
 ```py
 class FlexibleInt:
@@ -188,7 +188,7 @@ C.data_descriptor = "something else"
 
 Our implementation of the descriptor protocol takes into account that symbols can be possibly
 unbound. In those cases, we fall back to lower precedence steps of the descriptor protocol and union
-all possible results accordingly. We start by defining a data and a non-data descriptor:
+all possible results accordingly. We start by defining a data and a non-data descriptor.
 
 ```py
 from typing import Literal
@@ -206,7 +206,7 @@ class NonDataDescriptor:
 ```
 
 Then, we demonstrate that we fall back to an instance attribute if a data descriptor is possibly
-unbound:
+unbound.
 
 ```py
 def f1(flag: bool):
@@ -226,7 +226,7 @@ def f1(flag: bool):
 ```
 
 We never treat implicit instance attributes as definitely bound, so we fall back to the non-data
-descriptor here:
+descriptor here.
 
 ```py
 class C2:
@@ -247,7 +247,7 @@ C2().attr = 1
 
 When we cannot determine a class's base, we treat that base as `Unknown`. A `__get__` method written
 on the class still makes it a descriptor, but we do not assume that `Unknown` supplies `__set__` or
-`__delete__`. A `__set__` method written on the class still makes it a data descriptor:
+`__delete__`. A `__set__` method written on the class still makes it a data descriptor.
 
 ```py
 from typing import Literal
@@ -278,7 +278,7 @@ reveal_type(C().data)  # revealed: Literal["data"]
 
 An `Any` base follows the same rule. A `__get__` method written on the class still makes it a
 descriptor, but we do not assume that `Any` supplies `__set__` or `__delete__`. A `__set__` method
-written on the class still makes it a data descriptor:
+written on the class still makes it a data descriptor.
 
 ```py
 from typing import Any, Literal
@@ -318,7 +318,7 @@ reveal_type(optional_attribute.value)  # revealed: NotADescriptor
 
 An `Any` base that appears before another base class may override that class's `__get__` method at
 runtime. We still use the later method to determine that the class is a descriptor, but its return
-type must account for the earlier `Any` base:
+type must account for the earlier `Any` base.
 
 ```py
 class DynamicBase:
@@ -346,7 +346,7 @@ reveal_type(DescriptorOwner().attribute)  # revealed: Literal["concrete"] & Any
 
 A metaclass attribute typed as `Any` could itself be a data descriptor. When the attribute is read
 on a class, it therefore takes precedence over a class attribute with the same name. The same
-applies when `Any` is one arm of a union:
+applies when `Any` is one arm of a union.
 
 ```py
 from typing import Any, Literal
@@ -381,7 +381,7 @@ reveal_type(UnionC.attribute)  # revealed: Any | Literal["descriptor"]
 A `TypeForm` argument describes the instances produced by a type form, not the runtime type form
 value itself. A metaclass attribute typed as `TypeForm[Descriptor]` can therefore be a class whose
 own metaclass makes it a data descriptor, and must continue to take precedence over a class
-attribute with the same name when assigning to the attribute:
+attribute with the same name when assigning to the attribute.
 
 ```py
 from typing_extensions import TypeForm
@@ -404,7 +404,7 @@ C.attribute = Descriptor  # error: [invalid-assignment]
 ```
 
 A quoted type expression remains valid when both possible write targets accept the same runtime
-string:
+string.
 
 ```py
 class StringC(metaclass=Meta):
@@ -415,7 +415,7 @@ StringC.attribute = "Descriptor"
 ```
 
 The descriptor setter still rejects a class object even when the fallback attribute accepts that
-same class object:
+same class object.
 
 ```py
 class TypeFormC(metaclass=Meta):
@@ -424,7 +424,7 @@ class TypeFormC(metaclass=Meta):
 TypeFormC.attribute = Descriptor  # error: [invalid-assignment]
 ```
 
-The same contextual check applies when the metaclass attribute can also hold an ordinary string:
+The same contextual check applies when the metaclass attribute can also hold an ordinary string.
 
 ```py
 class UnionMeta(type):
@@ -440,7 +440,7 @@ UnionC.attribute = 1  # error: [invalid-assignment]
 
 An inexact `type[Base]` attribute can hold a subclass whose custom metaclass makes the class object
 a data descriptor. It must therefore continue to take precedence over a class attribute with the
-same name when assigning to the attribute:
+same name when assigning to the attribute.
 
 ```py
 class Base: ...
@@ -463,7 +463,7 @@ C.attribute = Descriptor  # error: [invalid-assignment]
 ```
 
 An assignment succeeds when both the possible descriptor setter and class attribute accept the
-assigned string:
+assigned string.
 
 ```py
 class StringC(metaclass=Meta):
@@ -473,7 +473,7 @@ StringC.attribute = "valid"
 ```
 
 An assignment fails when the class attribute accepts the assigned class but the descriptor setter
-does not:
+does not.
 
 ```py
 class ClassC(metaclass=Meta):
@@ -485,7 +485,7 @@ ClassC.attribute = Base  # error: [invalid-assignment]
 ### Broad class-object metaclass attributes
 
 Both `type[object]` and bare `type` can contain a class whose metaclass implements `__set__`. Their
-possible descriptor setters must therefore be checked independently of the class-attribute fallback:
+possible descriptor setters must therefore be checked independently of the class-attribute fallback.
 
 ```py
 class Base: ...
@@ -510,7 +510,7 @@ class ObjectClassC(metaclass=ObjectMeta):
 ObjectClassC.attribute = Base  # error: [invalid-assignment]
 ```
 
-The unparameterized spelling follows the same descriptor and class-attribute paths:
+The unparameterized spelling follows the same descriptor and class-attribute paths.
 
 ```py
 class BareMeta(type):
@@ -531,7 +531,7 @@ BareClassC.attribute = Base  # error: [invalid-assignment]
 
 A `type[Any]` value could contain a class whose metaclass implements the descriptor protocol. We
 therefore preserve the possibility that an attribute typed as `type[Any]` is a data descriptor, both
-when reading the attribute and after assigning to it:
+when reading the attribute and after assigning to it.
 
 ```py
 from typing import Any
@@ -589,7 +589,7 @@ When attributes are accessed on a class object, the following [precedence chain]
 - Non-data descriptor on the metaclass
 - Metaclass attribute
 
-To verify this, we define a data and a non-data descriptor:
+To verify this, we define a data and a non-data descriptor.
 
 ```py
 from typing import Literal, Any
@@ -607,7 +607,7 @@ class NonDataDescriptor:
 ```
 
 First, we make sure that the descriptors are correctly accessed when defined on the metaclass or the
-class:
+class.
 
 ```py
 class Meta1(type):
@@ -626,7 +626,7 @@ reveal_type(C1.class_non_data_descriptor)  # revealed: Literal["non-data"]
 ```
 
 Assignments to class object attribute only trigger the descriptor protocol if the data descriptor is
-on the metaclass:
+on the metaclass.
 
 ```py
 C1.meta_data_descriptor = 1
@@ -639,7 +639,7 @@ When writing to a class-level data descriptor from the class object itself, the 
 is *not* triggered (this is in contrast to what happens when you read class-level descriptor
 attributes!). So the following assignment does not call `__set__`. At runtime, the assignment would
 overwrite the data descriptor, but the attribute is declared as `DataDescriptor` in the class body,
-so we do not allow this:
+so we do not allow this.
 
 ```py
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `class_data_descriptor` of type `DataDescriptor`"
@@ -647,7 +647,7 @@ C1.class_data_descriptor = 1
 ```
 
 We now demonstrate that a *metaclass data descriptor* takes precedence over all class-level
-attributes:
+attributes.
 
 ```py
 class Meta2(type):
@@ -678,7 +678,7 @@ C2.meta_data_descriptor2 = "invalid"
 ```
 
 On the other hand, normal metaclass attributes and metaclass non-data descriptors are shadowed by
-class-level attributes (descriptor or not):
+class-level attributes (descriptor or not).
 
 ```py
 class Meta3(type):
@@ -704,7 +704,7 @@ C3.meta_non_data_descriptor1 = "invalid"
 ```
 
 Finally, metaclass attributes and metaclass non-data descriptors are only accessible when they are
-not shadowed by class-level attributes:
+not shadowed by class-level attributes.
 
 ```py
 class Meta4(type):
@@ -718,7 +718,7 @@ reveal_type(C4.meta_non_data_descriptor)  # revealed: Literal["non-data"]
 ```
 
 When a metaclass data descriptor is possibly missing, we union the result type of its `__get__`
-method with an underlying class level attribute, if present:
+method with an underlying class level attribute, if present.
 
 ```py
 def _(flag: bool):
@@ -746,7 +746,7 @@ def _(flag: bool):
 ```
 
 When a class-level attribute is possibly missing, we union its (descriptor protocol) type with the
-metaclass attribute (unless it's a data descriptor, which always takes precedence):
+metaclass attribute (unless it's a data descriptor, which always takes precedence).
 
 ```py
 from typing import Any
@@ -771,7 +771,7 @@ def _(flag: bool):
     reveal_type(C6.attribute4)  # revealed: Literal["value on class"]
 ```
 
-Finally, we can also have unions of various types of attributes:
+Finally, we can also have unions of various types of attributes.
 
 ```py
 def _(flag: bool):
@@ -1020,7 +1020,7 @@ reveal_type(c.helper("string"))  # revealed: str
 
 Functions are descriptors because they implement a `__get__` method. This is crucial in making sure
 that method calls work as expected. See [this test suite](./call/methods.md) for more information.
-Here, we only demonstrate how `__get__` works on functions:
+Here, we only demonstrate how `__get__` works on functions.
 
 ```py
 import types
@@ -1050,7 +1050,7 @@ reveal_type(f.__get__.__hash__)  # revealed: bound method MethodWrapperType.__ha
 reveal_type(wrapper_descriptor.__qualname__)  # revealed: str
 ```
 
-We can also bind the free function `f` to an instance of a class `C`:
+We can also bind the free function `f` to an instance of a class `C`.
 
 ```py
 class C: ...
@@ -1061,13 +1061,13 @@ reveal_type(bound_method)  # revealed: bound method C.f() -> str
 ```
 
 We can then call it, and the instance of `C` is implicitly passed to the first parameter of `f`
-(`x`):
+(`x`).
 
 ```py
 reveal_type(bound_method())  # revealed: str
 ```
 
-Finally, we test some error cases for the call to the wrapper descriptor:
+Finally, we test some error cases for the call to the wrapper descriptor.
 
 ```py
 # Calling the wrapper descriptor without any arguments is an
@@ -1250,14 +1250,14 @@ class Holder:
 compatible: HasItem = Holder()  # no diagnostic
 ```
 
-Checking a class that only annotates its attribute with the descriptor type also terminates:
+Checking a class that only annotates its attribute with the descriptor type also terminates.
 
 ```py
 class AnnotationOnlyHolder:
     item: ItemDescriptor  # no diagnostic
 ```
 
-The recursive check does not make an incompatible setter acceptable:
+The recursive check does not make an incompatible setter acceptable.
 
 ```py
 class WrongValueDescriptor:
@@ -1976,7 +1976,7 @@ def access(flag: bool) -> None:
 ### Descriptors with non-function `__get__` callables that are descriptors themselves
 
 The descriptor protocol is recursive, i.e. looking up `__get__` can involve triggering the
-descriptor protocol on the callable's `__call__` method:
+descriptor protocol on the callable's `__call__` method.
 
 ```py
 from __future__ import annotations
