@@ -1,18 +1,11 @@
-//! Build script to package our vendored typeshed files
-//! into a zip archive that can be included in the Ruff binary.
-//!
-//! This script should be automatically run at build time
-//! whenever the script itself changes, or whenever any files
-//! in `crates/ty_vendored/vendor/typeshed` change.
+//! Build a sorted file index and independently compressed contents for vendored typeshed.
 
-use std::fs::File;
-use std::io::Write;
-use std::path::Path;
+use std::collections::BTreeMap;
+use std::fs::{self, File};
+use std::io::{self, BufWriter, Write};
+use std::path::{Path, PathBuf};
 
 use path_slash::PathExt;
-use zip::CompressionMethod;
-use zip::result::ZipResult;
-use zip::write::{SimpleFileOptions, ZipWriter};
 
 const TYPESHED_SOURCE_DIR: &str = "vendor/typeshed";
 const TY_EXTENSIONS_STUBS: &[(&str, &str)] = &[
@@ -29,87 +22,88 @@ const TY_EXTENSIONS_STUBS: &[(&str, &str)] = &[
         "stdlib/ty_extensions/pydantic.pyi",
     ),
 ];
-const TYPESHED_ZIP_LOCATION: &str = "/zipped_typeshed.zip";
 
-/// Recursively zip the contents of the entire typeshed directory and patch typeshed
-/// on the fly to include the `ty_extensions` module.
-///
-/// This routine is adapted from a recipe at
-/// <https://github.com/zip-rs/zip-old/blob/5d0f198124946b7be4e5969719a7f29f363118cd/examples/write_dir.rs>
-fn write_zipped_typeshed_to(writer: File) -> ZipResult<File> {
-    let mut zip = ZipWriter::new(writer);
-
-    // Use deflated compression for WASM builds because compiling `zstd-sys` requires clang
-    // [source](https://github.com/gyscos/zstd-rs/wiki/Compile-for-WASM) which complicates the build
-    // by a lot. Deflated compression is slower but it shouldn't matter much for the WASM use case
-    // (WASM itself is already slower than a native build for a specific platform).
+fn compress(contents: &[u8]) -> io::Result<Vec<u8>> {
     #[cfg(feature = "zstd")]
-    let method = CompressionMethod::Zstd;
+    {
+        zstd::bulk::compress(contents, zstd::DEFAULT_COMPRESSION_LEVEL)
+    }
+    // WASM uses a Rust Deflate implementation so building the playground does not require
+    // a C toolchain for `zstd-sys`.
     #[cfg(all(not(feature = "zstd"), feature = "deflate"))]
-    let method = CompressionMethod::Deflated;
+    {
+        let mut encoder =
+            flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::default());
+        encoder.write_all(contents)?;
+        encoder.finish()
+    }
     #[cfg(not(any(feature = "zstd", feature = "deflate")))]
-    let method = CompressionMethod::Stored;
+    {
+        Ok(contents.to_vec())
+    }
+}
 
-    let options = SimpleFileOptions::default()
-        .compression_method(method)
-        .unix_permissions(0o644);
-
-    for entry in walkdir::WalkDir::new(TYPESHED_SOURCE_DIR) {
-        let dir_entry = entry.unwrap();
-        let absolute_path = dir_entry.path();
-        let normalized_relative_path = absolute_path
-            .strip_prefix(Path::new(TYPESHED_SOURCE_DIR))
-            .unwrap()
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut paths: BTreeMap<String, Option<PathBuf>> = BTreeMap::new();
+    for entry in walkdir::WalkDir::new(TYPESHED_SOURCE_DIR).min_depth(1) {
+        let entry = entry?;
+        let path = entry.path();
+        let relative = path
+            .strip_prefix(Path::new(TYPESHED_SOURCE_DIR))?
             .to_slash()
-            .expect("Unexpected non-utf8 typeshed path!");
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "non-UTF-8 typeshed path"))?
+            .into_owned();
+        paths.insert(relative, path.is_file().then(|| path.to_owned()));
+    }
 
-        // Write file or directory explicitly
-        // Some unzip tools unzip files with directory paths correctly, some do not!
-        if absolute_path.is_file() {
-            println!("adding file {absolute_path:?} as {normalized_relative_path:?} ...");
-            zip.start_file(&*normalized_relative_path, options)?;
-            let mut f = File::open(absolute_path)?;
-            std::io::copy(&mut f, &mut zip).unwrap();
-
-            // Patch the VERSIONS file to make `ty_extensions` available
-            if normalized_relative_path == "stdlib/VERSIONS" {
-                writeln!(&mut zip, "ty_extensions: 3.0-")?;
-            }
-        } else if !normalized_relative_path.is_empty() {
-            // Only if not root! Avoids path spec / warning
-            // and mapname conversion failed error on unzip
-            println!("adding dir {absolute_path:?} as {normalized_relative_path:?} ...");
-            zip.add_directory(normalized_relative_path, options)?;
+    paths.insert("stdlib/ty_extensions".to_owned(), None);
+    for (source, destination) in TY_EXTENSIONS_STUBS {
+        if paths
+            .insert((*destination).to_owned(), Some(PathBuf::from(source)))
+            .is_some()
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "duplicate ty_extensions stub",
+            )
+            .into());
         }
     }
 
-    // Patch typeshed and add the stubs for the `ty_extensions` package.
-    zip.add_directory("stdlib/ty_extensions/", options)?;
-    for (source, destination) in TY_EXTENSIONS_STUBS {
-        println!("adding file {source} as {destination} ...");
-        zip.start_file(destination, options)?;
-        let mut f = File::open(source)?;
-        std::io::copy(&mut f, &mut zip).unwrap();
+    let out_dir = PathBuf::from(std::env::var("OUT_DIR")?);
+    let mut data = BufWriter::new(File::create(out_dir.join("typeshed.bin"))?);
+    let mut index = BufWriter::new(File::create(out_dir.join("typeshed_index.rs"))?);
+    let mut offset = 0usize;
+    writeln!(index, "&[")?;
+    for (path, source) in paths {
+        if let Some(source) = source {
+            println!("adding file {source:?} as {path:?} ...");
+            let mut contents = fs::read(source)?;
+            if path == "stdlib/VERSIONS" {
+                contents.extend_from_slice(b"ty_extensions: 3.0-\n");
+            }
+            let compressed = compress(&contents)?;
+            let end = offset.checked_add(compressed.len()).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "vendored contents are too large",
+                )
+            })?;
+            writeln!(
+                index,
+                "    VendoredEntry::file({path:?}, {offset}..{end}, {}, {}),",
+                contents.len(),
+                crc32fast::hash(&contents),
+            )?;
+            data.write_all(&compressed)?;
+            offset = end;
+        } else {
+            println!("adding dir {path:?} ...");
+            writeln!(index, "    VendoredEntry::directory({path:?}),")?;
+        }
     }
-
-    zip.finish()
-}
-
-fn main() {
-    assert!(
-        Path::new(TYPESHED_SOURCE_DIR).is_dir(),
-        "Where is typeshed?"
-    );
-    let out_dir = std::env::var("OUT_DIR").unwrap();
-
-    // N.B. Deliberately using `format!()` instead of `Path::join()` here,
-    // so that we use `/` as a path separator on all platforms.
-    // That enables us to load the typeshed zip at compile time in `module.rs`
-    // (otherwise we'd have to dynamically determine the exact path to the typeshed zip
-    // based on the default path separator for the specific platform we're on,
-    // which can't be done at compile time.)
-    let zipped_typeshed_location = format!("{out_dir}{TYPESHED_ZIP_LOCATION}");
-
-    let zipped_typeshed_file = File::create(zipped_typeshed_location).unwrap();
-    write_zipped_typeshed_to(zipped_typeshed_file).unwrap();
+    writeln!(index, "]")?;
+    index.flush()?;
+    data.flush()?;
+    Ok(())
 }

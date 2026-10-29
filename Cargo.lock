@@ -3233,10 +3233,12 @@ dependencies = [
  "arc-swap",
  "camino",
  "compact_str",
+ "crc32fast",
  "dashmap",
  "dunce",
  "etcetera",
  "filetime",
+ "flate2",
  "get-size2",
  "ignore",
  "insta",
@@ -3270,7 +3272,7 @@ dependencies = [
  "url",
  "web-time",
  "which",
- "zip",
+ "zstd",
 ]
 
 [[package]]
@@ -3361,7 +3363,6 @@ dependencies = [
  "serde",
  "ty_module_resolver",
  "ty_site_packages",
- "zip",
 ]
 
 [[package]]
@@ -4724,7 +4725,6 @@ dependencies = [
  "ty_site_packages",
  "ty_static",
  "wild",
- "zip",
 ]
 
 [[package]]
@@ -5083,11 +5083,13 @@ dependencies = [
 name = "ty_vendored"
 version = "0.0.20"
 dependencies = [
+ "crc32fast",
+ "flate2",
  "path-slash",
  "ruff_db",
  "static_assertions",
  "walkdir",
- "zip",
+ "zstd",
 ]
 
 [[package]]
@@ -5121,12 +5123,6 @@ name = "typed-arena"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6af6ae20167a9ece4bcb41af5b80f8a1f1df981f6391189ce00fd257af04126a"
-
-[[package]]
-name = "typed-path"
-version = "0.12.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e28f89b80c87b8fb0cf04ab448d5dd0dd0ade2f8891bae878de66a75a28600e"
 
 [[package]]
 name = "typeid"
@@ -5964,21 +5960,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.6",
-]
-
-[[package]]
-name = "zip"
-version = "9.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e04976da629d3b04204ba8105b396a193af8ad2583b2c79bfb3ab8af580a11e"
-dependencies = [
- "crc32fast",
- "flate2",
- "indexmap",
- "memchr",
- "nix",
- "typed-path",
- "zstd",
 ]
 
 [[package]]
