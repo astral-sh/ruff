@@ -637,27 +637,27 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ///
     /// Reusing a cached relation can put its quantifiers in several independently checked scopes.
     /// Their witnesses must not constrain each other through a shared bound-typevar identity.
-    pub(super) fn freshen_quantified_typevars(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Self {
+    pub(super) fn freshen_quantified_typevars(self, db: &'db dyn Db) -> Self {
         let storage = self.builder.storage.borrow();
         let Some(supports) = storage.node_supports(self.node) else {
             return self;
         };
         let locals = &supports.quantified;
         let variables = || locals.iter().map(|id| storage.typevar_data(id));
+        let Some(var) = variables().next() else {
+            return self;
+        };
+        let env = ProgramEnvironment::from_program(var.binding_context(db).program(db));
         let Some(delta) = storage.freshening_delta(db, variables(), None) else {
             return self;
         };
-        let generic_context = GenericContext::from_typevar_instances(db, env, variables());
+        let generic_context = GenericContext::from_typevar_instances(db, &env, variables());
         drop(storage);
         self.freshen_quantified_typevars_impl(
             db,
             generic_context,
             delta,
-            &ApplyTypeMappingVisitor::new(env),
+            &ApplyTypeMappingVisitor::new(&env),
             &mut FxHashMap::default(),
         )
     }
@@ -739,16 +739,42 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.implies(db, builder, || when)
     }
 
+    fn avoid_capture(self, db: &'db dyn Db, other: Self) -> (Self, Self) {
+        let storage = self.builder.storage.borrow();
+        let (Some(left), Some(right)) = (
+            storage.node_supports(self.node),
+            storage.node_supports(other.node),
+        ) else {
+            return (self, other);
+        };
+        let lhs = left.quantified.overlaps_with(&right.free);
+        let rhs = right.quantified.overlaps_with(&left.free);
+        drop(storage);
+        (
+            if lhs {
+                self.freshen_quantified_typevars(db)
+            } else {
+                self
+            },
+            if rhs {
+                other.freshen_quantified_typevars(db)
+            } else {
+                other
+            },
+        )
+    }
+
     /// Updates this constraint set to hold the union of itself and another constraint set.
     ///
     /// In the result's source order, `self` will appear before `other`.
     pub(crate) fn union(
         &mut self,
-        _db: &'db dyn Db,
+        db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        other: Self,
+        mut other: Self,
     ) -> Self {
         self.verify_builder(builder);
+        (*self, other) = self.avoid_capture(db, other);
         let mut storage = builder.storage.borrow_mut();
         self.node = self.node.or(&mut storage, other.node);
         self.source_order = storage.ordered_source_order(self.source_order, other.source_order);
@@ -760,11 +786,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// In the result's source order, `self` will appear before `other`.
     pub(crate) fn intersect(
         &mut self,
-        _db: &'db dyn Db,
+        db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        other: Self,
+        mut other: Self,
     ) -> Self {
         self.verify_builder(builder);
+        (*self, other) = self.avoid_capture(db, other);
         let mut storage = builder.storage.borrow_mut();
         self.node = self.node.and(&mut storage, other.node);
         self.source_order = storage.ordered_source_order(self.source_order, other.source_order);
@@ -836,14 +863,15 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// In the result's source order, `self` will appear before `other`.
     pub(crate) fn iff(
         self,
-        _db: &'db dyn Db,
+        db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         other: Self,
     ) -> Self {
         self.verify_builder(builder);
+        let (lhs, other) = self.avoid_capture(db, other);
         let mut storage = builder.storage.borrow_mut();
-        let node = self.node.iff(&mut storage, other.node);
-        let source_order = storage.ordered_source_order(self.source_order, other.source_order);
+        let node = lhs.node.iff(&mut storage, other.node);
+        let source_order = storage.ordered_source_order(lhs.source_order, other.source_order);
         Self::from_node(builder, node, source_order)
     }
 
@@ -1383,37 +1411,6 @@ impl<'db> ConstraintSetBuilder<'db> {
         storage
             .max_reserved_freshness
             .update(|old| old.max(Some(var.freshness(db))));
-    }
-
-    pub(super) fn reserve_free_typevars(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        types: impl IntoIterator<Item = Type<'db>>,
-    ) {
-        for ty in types {
-            for typevar in ty.free_typevars(db, env).free.iter(db) {
-                self.reserve_typevar(db, typevar);
-            }
-        }
-    }
-
-    /// Both operands' free variables are already in scope when we allocate either one's witnesses.
-    pub(super) fn load_pair<'c>(
-        &'c self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        lhs: &OwnedConstraintSet<'db>,
-        rhs: &OwnedConstraintSet<'db>,
-    ) -> (ConstraintSet<'db, 'c>, ConstraintSet<'db, 'c>) {
-        for operand in [lhs, rhs] {
-            if let Some(inner) = &operand.inner {
-                for id in inner.node_supports(operand.node).free.iter() {
-                    self.reserve_typevar(db, inner.typevars[id]);
-                }
-            }
-        }
-        (self.load(db, env, lhs), self.load(db, env, rhs))
     }
 
     /// Loads an [`OwnedConstraintSet`] into this builder, freshening its existential binders
