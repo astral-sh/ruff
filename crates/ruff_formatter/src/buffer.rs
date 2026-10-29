@@ -1,4 +1,4 @@
-use super::{Arguments, FormatElement, write};
+use super::{Arguments, FormatElement, Formatter, write};
 use crate::format_element::Interned;
 use crate::prelude::{LineMode, Tag};
 use crate::{FormatResult, FormatState};
@@ -101,7 +101,7 @@ impl BufferSnapshot {
     /// # Panics
     ///
     /// If self is not a [`BufferSnapshot::Position`]
-    fn unwrap_position(&self) -> usize {
+    pub(crate) fn unwrap_position(&self) -> usize {
         match self {
             BufferSnapshot::Position(index) => *index,
             BufferSnapshot::Any(_) => panic!("Tried to unwrap Any snapshot as a position."),
@@ -170,8 +170,8 @@ impl<W: Buffer<Context = Context> + ?Sized, Context> Buffer for &mut W {
 /// The buffer writes all elements into the internal elements buffer.
 #[derive(Debug)]
 pub struct VecBuffer<'a, Context> {
-    state: &'a mut FormatState<Context>,
-    elements: Vec<FormatElement>,
+    pub(crate) state: &'a mut FormatState<Context>,
+    pub(crate) elements: Vec<FormatElement>,
 }
 
 impl<'a, Context> VecBuffer<'a, Context> {
@@ -218,6 +218,10 @@ impl<Context> DerefMut for VecBuffer<'_, Context> {
 
 impl<Context> Buffer for VecBuffer<'_, Context> {
     type Context = Context;
+
+    fn write_fmt(&mut self, arguments: Arguments<Context>) -> FormatResult<()> {
+        Formatter::new_vec(self).write_fmt(arguments)
+    }
 
     fn write_element(&mut self, element: FormatElement) {
         self.elements.push(element);
@@ -698,5 +702,62 @@ impl Deref for Recorded<'_> {
 
     fn deref(&self) -> &Self::Target {
         self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::format_element::tag::Condition;
+    use crate::prelude::*;
+    use crate::{
+        Buffer, FormatError, FormatState, RemoveSoftLinesBuffer, VecBuffer, format_args, write,
+    };
+
+    #[test]
+    fn rollback_through_buffer_adapters() -> FormatResult<()> {
+        for remove_soft_lines in [false, true] {
+            let mut state = FormatState::new(SimpleFormatContext::default());
+            let mut buffer = VecBuffer::new(&mut state);
+            let mut filtered;
+            let output: &mut dyn Buffer<Context = SimpleFormatContext> = if remove_soft_lines {
+                filtered = RemoveSoftLinesBuffer::new(&mut buffer);
+                &mut filtered
+            } else {
+                &mut buffer
+            };
+
+            output.write_fmt(format_args!(format_with(|f| {
+                write!(f, [token("before")])?;
+                let snapshot = f.state_snapshot();
+                let failed = format_with(|f| {
+                    f.write_element(FormatElement::Tag(Tag::StartConditionalContent(
+                        Condition::if_breaks(),
+                    )));
+                    write!(f, [token("discarded")])?;
+                    Err(FormatError::PoorLayout)
+                });
+                assert!(failed.fmt(f).is_err());
+                f.restore_state_snapshot(snapshot);
+
+                // Restoring must also reset the adapter's conditional-content state,
+                // or it would discard the replacement along with the failed layout.
+                let mut recording = f.start_recording();
+                write!(recording, [token("after")])?;
+                assert_eq!(
+                    &*recording.stop(),
+                    &[FormatElement::Token { text: "after" }]
+                );
+                Ok(())
+            })))?;
+
+            assert_eq!(
+                buffer.into_vec(),
+                vec![
+                    FormatElement::Token { text: "before" },
+                    FormatElement::Token { text: "after" },
+                ]
+            );
+        }
+        Ok(())
     }
 }
