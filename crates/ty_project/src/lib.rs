@@ -541,10 +541,10 @@ impl Project {
         let open_files = self.open_files(db);
         let check_start = ruff_db::Instant::now();
 
-        let files: Vec<_> = (&files).into_iter().collect();
-
-        files
-            .into_par_iter()
+        // File checks vary widely in cost. Let each worker take the next file as it finishes.
+        (&files)
+            .into_iter()
+            .par_bridge()
             .for_each_with_project_db(db, |db, file| {
                 db.unwind_if_revision_cancelled();
 
