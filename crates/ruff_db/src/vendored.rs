@@ -14,14 +14,16 @@ mod path;
 
 type Result<T> = io::Result<T>;
 
-/// Read-only files backed by a sorted index and independently compressed contents.
+/// File system that stores all content in a sorted index and data blob
+/// that can be bundled as part of the binary.
 ///
-/// The index and contents can be embedded in the binary without allocating or parsing them.
-/// Readers share immutable data and decompress files independently, without synchronization.
+/// "Files" in the `VendoredFileSystem` are read-only and immutable.
 /// Directories are supported, but symlinks and hardlinks cannot exist.
 ///
+/// # Path separators
+///
 /// Paths in the index use `/` separators and have no trailing slash. On Windows, callers may
-/// also use `\\` separators, which are normalized to `/` before lookup.
+/// also use `\` separators, which are normalized to `/` before lookup.
 #[derive(Clone, Default)]
 pub struct VendoredFileSystem {
     inner: Arc<VendoredData>,
@@ -86,9 +88,14 @@ impl VendoredFileSystem {
             .is_some_and(|entry| entry.kind.is_file())
     }
 
-    /// Read a vendored file, checking its size, content hash, and UTF-8 encoding.
+    /// Read the entire contents of the vendored file at `path` into a string
     ///
-    /// Returns an error if the path is missing, represents a directory, or has invalid contents.
+    /// Returns an error if any of the following are true:
+    /// - The path does not exist in the underlying index
+    /// - The path exists in the underlying index, but represents a directory
+    /// - The indexed byte range or compressed contents are invalid
+    /// - The contents do not match the indexed size or CRC32 hash
+    /// - The contents of the file at `path` contain invalid UTF-8
     pub fn read_to_string(&self, path: impl AsRef<VendoredPath>) -> Result<String> {
         let entry = self
             .entry(path.as_ref())
@@ -108,6 +115,7 @@ impl VendoredFileSystem {
             Compression::Zstd => zstd::bulk::decompress(data, entry.uncompressed_size)?,
             #[cfg(feature = "deflate")]
             Compression::Deflate => {
+                // Limit the initial allocation because the indexed size may be invalid.
                 let mut contents = Vec::with_capacity(entry.uncompressed_size.min(10_000_000));
                 flate2::read::DeflateDecoder::new(data)
                     .take(entry.uncompressed_size as u64 + 1)
@@ -127,7 +135,10 @@ impl VendoredFileSystem {
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
     }
 
-    /// Read the direct children of a directory. Directory entry paths end in `/`.
+    /// Read the direct children of the directory
+    /// identified by `dir`.
+    ///
+    /// Directory entry paths end in `/`.
     pub fn read_directory(
         &self,
         dir: impl AsRef<VendoredPath>,
@@ -253,7 +264,13 @@ impl VendoredEntry {
     }
 }
 
-/// Private metadata used by the alternate `Debug` implementation.
+/// Private struct only used in `Debug` implementations
+///
+/// This could possibly be unified with the `Metadata` struct,
+/// but that is deliberately kept small, and only exposes metadata
+/// that users of the `VendoredFileSystem` could realistically need.
+/// For debugging purposes, however, we want to have all information
+/// available.
 #[expect(unused)]
 #[derive(Debug)]
 struct FileDebugInfo {
@@ -265,7 +282,10 @@ struct FileDebugInfo {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FileType {
+    /// The path exists in the index and represents a vendored file
     File,
+
+    /// The path exists in the index and represents a vendored directory of files
     Directory,
 }
 
@@ -676,7 +696,6 @@ pub(crate) mod tests {
         test_file(&mock_typeshed, path);
         let functools_stub = mock_typeshed.read_to_string(path).unwrap();
         assert_eq!(functools_stub.as_str(), FUNCTOOLS_CONTENTS);
-        // Repeated reads independently decode the same file contents.
         let functools_stub_again = mock_typeshed.read_to_string(path).unwrap();
         assert_eq!(functools_stub_again.as_str(), FUNCTOOLS_CONTENTS);
     }

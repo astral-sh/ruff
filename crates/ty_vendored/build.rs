@@ -1,4 +1,9 @@
-//! Build a sorted file index and independently compressed contents for vendored typeshed.
+//! Build script to package our vendored typeshed files
+//! into a static index and data blob that can be included in the binary.
+//!
+//! This script should be automatically run at build time
+//! whenever the script itself changes, or whenever any files
+//! in `crates/ty_vendored/vendor/typeshed` change.
 
 use std::collections::BTreeMap;
 use std::fs::{self, File};
@@ -56,6 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         paths.insert(relative, path.is_file().then(|| path.to_owned()));
     }
 
+    // Patch typeshed and add the stubs for the `ty_extensions` package.
     paths.insert("stdlib/ty_extensions".to_owned(), None);
     for (source, destination) in TY_EXTENSIONS_STUBS {
         if paths
@@ -79,6 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(source) = source {
             println!("adding file {source:?} as {path:?} ...");
             let mut contents = fs::read(source)?;
+            // Patch the VERSIONS file to make `ty_extensions` available
             if path == "stdlib/VERSIONS" {
                 contents.extend_from_slice(b"ty_extensions: 3.0-\n");
             }
