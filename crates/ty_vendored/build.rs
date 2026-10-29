@@ -34,8 +34,8 @@ fn compress(contents: &[u8]) -> io::Result<Vec<u8>> {
     {
         zstd::bulk::compress(contents, zstd::DEFAULT_COMPRESSION_LEVEL)
     }
-    // WASM uses a Rust Deflate implementation so building the playground does not require
-    // a C toolchain for `zstd-sys`.
+    // Use Rust's Deflate implementation for WASM builds so the playground doesn't need a C toolchain
+    // to compile `zstd-sys` (https://github.com/gyscos/zstd-rs/wiki/Compile-for-WASM).
     #[cfg(all(not(feature = "zstd"), feature = "deflate"))]
     {
         let mut encoder =
@@ -49,6 +49,11 @@ fn compress(contents: &[u8]) -> io::Result<Vec<u8>> {
     }
 }
 
+/// Recursively index the contents of the entire typeshed directory and patch typeshed
+/// on the fly to include the `ty_extensions` module.
+///
+/// The directory traversal is adapted from a recipe at
+/// <https://github.com/zip-rs/zip-old/blob/5d0f198124946b7be4e5969719a7f29f363118cd/examples/write_dir.rs>
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut paths: BTreeMap<String, Option<PathBuf>> = BTreeMap::new();
     for entry in walkdir::WalkDir::new(TYPESHED_SOURCE_DIR).min_depth(1) {

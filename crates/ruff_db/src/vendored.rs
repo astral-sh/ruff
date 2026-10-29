@@ -18,10 +18,21 @@ type Result<T> = io::Result<T>;
 /// "Files" in the `VendoredFileSystem` are read-only and immutable.
 /// Directories are supported, but symlinks and hardlinks cannot exist.
 ///
+/// Cloning the file system is cheap: clones share the index and file contents.
+/// Reads can decompress files concurrently without synchronizing access to shared reader state.
+///
 /// # Path separators
 ///
-/// Paths in the index use `/` separators and have no trailing slash. On Windows, callers may
-/// also use `\` separators, which are normalized to `/` before lookup.
+/// This implementation always uses `/` as a
+/// path separator, even in Windows environments where `\` is traditionally
+/// used as a file path separator. The vendored typeshed index is built by
+/// `crates/ty_vendored/build.rs`.
+///
+/// Callers on Windows may provide paths that use a `\` as a separator. It will
+/// be transparently normalized to `/`.
+///
+/// A directory can be looked up with or without a trailing slash: `stdlib` and
+/// `stdlib/` refer to the same entry.
 #[derive(Clone, Default)]
 pub struct VendoredFileSystem {
     inner: Arc<VendoredData>,
@@ -129,7 +140,9 @@ impl VendoredFileSystem {
     /// Read the direct children of the directory
     /// identified by `dir`.
     ///
-    /// Directory entry paths end in `/`.
+    /// If there are no entries under `dir` (for example, if it is a file or
+    /// does not exist), this will return an empty iterator.
+    /// Paths for child directories end in `/`.
     pub fn read_directory(
         &self,
         dir: impl AsRef<VendoredPath>,
@@ -138,6 +151,8 @@ impl VendoredFileSystem {
             .with_trailing_slash()
             .0
             .into_owned();
+        // Any entry that doesn't have the directory prefix (including the trailing slash)
+        // cannot be in this directory. Entries with the same prefix are consecutive in the index.
         let start = self
             .inner
             .entries
@@ -147,6 +162,8 @@ impl VendoredFileSystem {
             .iter()
             .map_while(move |entry| {
                 let relative = entry.path.strip_prefix(&prefix)?;
+                // We only want *direct* children. Their paths relative to `dir` have exactly
+                // one component, for both files and directories.
                 Some((entry, !relative.is_empty() && !relative.contains('/')))
             })
             .filter(|(_, is_direct_child)| *is_direct_child)
@@ -357,8 +374,10 @@ impl DirectoryEntry {
     }
 }
 
-/// A path that has been normalized via the `normalize_vendored_path` function.
+/// A path that has been normalized for lookup in the vendored file system.
 ///
+/// Index keys have no trailing slash. Directory listings add one to the prefix
+/// so that `stdlib/` cannot match a sibling such as `stdlib_extra`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct NormalizedVendoredPath<'a>(Cow<'a, str>);
 
@@ -710,6 +729,7 @@ pub(crate) mod tests {
         test_file(&mock_typeshed, path);
         let functools_stub = mock_typeshed.read_to_string(path).unwrap();
         assert_eq!(functools_stub.as_str(), FUNCTOOLS_CONTENTS);
+        // Reading the file must not affect subsequent reads of the same path.
         let functools_stub_again = mock_typeshed.read_to_string(path).unwrap();
         assert_eq!(functools_stub_again.as_str(), FUNCTOOLS_CONTENTS);
     }
