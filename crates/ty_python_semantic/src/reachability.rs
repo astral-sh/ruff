@@ -227,7 +227,9 @@ use ty_python_core::{
         CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
         ScopedPredicateId,
     },
-    reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
+    reachability_constraints::{
+        InteriorNode, ReachabilityConstraints, ScopedReachabilityConstraintId,
+    },
     scope::ScopeId,
     use_def_map,
 };
@@ -624,15 +626,27 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
 /// Reentrant analysis is handled by Salsa cycle recovery on the cached-range queries. The final
 /// incomplete block is left for the reachability walk: it can add at most 15 nested call queries,
 /// and analyzing it eagerly would bypass the range query's cycle recovery and could introduce a
-/// divergent inference cycle. For large scopes, keeping the complete-block pass unconditional
-/// ensures that tracked callers record the same dependencies on every thread. Small scopes do not
-/// need to precompute calls to bound the Salsa stack, so their calls are evaluated entirely on
-/// demand.
+/// divergent inference cycle. For large scopes, the decision to warm calls depends only on the
+/// structure of the constraint, so every thread takes the same path. A condition whose branches
+/// are all terminals has no call prefix to warm unless it is itself a statement call. Small
+/// scopes evaluate calls on demand because their reverse call chains are already bounded.
 fn analyze_non_terminal_calls_up_to_predicate<'db>(
     db: &'db dyn Db,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-    root_predicate: ScopedPredicateId,
+    root: InteriorNode,
 ) -> bool {
+    let root_predicate = root.atom();
+    if !matches!(
+        predicates[root_predicate].node,
+        PredicateNode::IsNonTerminalCall(_)
+    ) && [root.if_true(), root.if_false(), root.if_ambiguous()]
+        .into_iter()
+        .all(|id| terminal_reachability(id).is_some())
+    {
+        // No branch of this constraint can visit a statement-call predicate. If inferring
+        // the condition itself needs earlier calls, their own reachability walks warm them.
+        return false;
+    }
     let scope = predicate_scope(db, &predicates[root_predicate]);
     let has_many_calls = predicates
         .iter()
@@ -743,8 +757,8 @@ fn evaluate_reachability_constraint<'db>(
     let use_def = use_def_map(db, scope);
     let constraints = use_def.reachability_constraints();
     let predicates = use_def.predicates();
-    let root_predicate = constraints.get_interior_node(id).atom();
-    let has_many_calls = analyze_non_terminal_calls_up_to_predicate(db, predicates, root_predicate);
+    let root = constraints.get_interior_node(id);
+    let has_many_calls = analyze_non_terminal_calls_up_to_predicate(db, predicates, root);
     let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
 
     evaluate_reachability_path(
@@ -941,11 +955,11 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             return reachability;
         }
 
-        let root_predicate = self.get_interior_node(id).atom();
-        analyze_non_terminal_calls_up_to_predicate(db, predicates, root_predicate);
+        let root = self.get_interior_node(id);
+        analyze_non_terminal_calls_up_to_predicate(db, predicates, root);
         evaluate_reachability_path(
             db,
-            predicate_scope(db, &predicates[root_predicate]),
+            predicate_scope(db, &predicates[root.atom()]),
             self,
             predicates,
             None,
@@ -2320,6 +2334,30 @@ class TargetB:
         // Enter the range directly so it becomes the cycle head when inferring `other.target`
         // reaches the other module and then re-enters this scope.
         analyze_non_terminal_call_range(&db, setup_scope, 0, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn a_loop_exit_can_be_checked_without_inferring_the_calls_in_its_body() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        let calls = "        callback()\n".repeat(NON_TERMINAL_CALL_CHUNK_SIZE + 1);
+        db.write_file(
+            "/src/test.py",
+            format!("def f(flag: bool, callback):\n    while flag:\n{calls}"),
+        )?;
+        let file = system_path_to_file(&db, "/src/test.py")?;
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let index = semantic_index(&db, file);
+        let (scope, _) = index.child_scopes(FileScopeId::global()).next().unwrap();
+
+        assert!(is_end_of_scope_reachable(&db, scope.to_scope_id(&db, file)));
+        let events = db.take_salsa_events();
+        ruff_db::testing::assert_function_query_was_not_run_by_name(
+            &db,
+            "analyze_non_terminal_call_range",
+            None,
+            &events,
+        );
         Ok(())
     }
 
