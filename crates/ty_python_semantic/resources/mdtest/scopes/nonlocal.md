@@ -841,6 +841,7 @@ def _(x: int | None):
         if x is not None:
             def read():
                 assert_type(x, int | None)
+                [assert_type(x, int | None) for _ in (0,)]
 
             clear()
             read()
@@ -854,6 +855,7 @@ def _(x: int | None):
         if x is not None:
             def read():
                 assert_type(x, int)
+                [assert_type(x, int) for _ in (0,)]
 
             set_int()
             read()

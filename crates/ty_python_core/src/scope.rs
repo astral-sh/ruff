@@ -172,6 +172,15 @@ impl Scope {
         self.descendants = self.descendants.start..children_end;
     }
 
+    pub(crate) fn is_eager_comprehension(&self) -> bool {
+        matches!(
+            self.node(),
+            NodeWithScopeKind::ListComprehension(_)
+                | NodeWithScopeKind::SetComprehension(_)
+                | NodeWithScopeKind::DictComprehension(_)
+        )
+    }
+
     pub fn is_eager(&self) -> bool {
         self.kind().is_eager()
     }

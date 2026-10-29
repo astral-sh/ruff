@@ -2252,6 +2252,7 @@ def callbacks(values: list[int | None]):
     for value in values:
         if value is not None:
             def read():
+                [value + 1 for _ in (0,)]  # error: [unsupported-operator]
                 return value + 1  # error: [unsupported-operator]
 
             result.append(read)
@@ -2267,6 +2268,7 @@ def first(values: list[int | None]):
     for value in values:
         if value is not None:
             def read():
+                [value + 1 for _ in (0,)]
                 return value + 1
 
             break

@@ -165,6 +165,8 @@ struct PendingCapture {
     nested_scope: FileScopeId,
     laziness: ScopeLaziness,
     binding_definition_ids: SmallVec<[ScopedDefinitionId; 2]>,
+    /// The closure whose snapshot this eager comprehension can borrow.
+    closure_snapshot: Option<EnclosingSnapshotKey>,
 }
 
 #[derive(Debug)]
@@ -174,6 +176,7 @@ struct UnresolvedCapture {
     nested_scope: FileScopeId,
     name: Name,
     laziness: ScopeLaziness,
+    closure_snapshot: Option<EnclosingSnapshotKey>,
 }
 
 impl UnresolvedCapture {
@@ -313,6 +316,9 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     annotations: Vec<NodeIndex>,
     /// Snapshots of enclosing-scope place states visible from nested scopes.
     enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
+    /// Publish aliases only after invalidating ordinary closure snapshots. Exposing closure
+    /// cells allows mutation outside the owning scope and disables this additional narrowing.
+    comprehension_snapshot_aliases: Option<Vec<(EnclosingSnapshotKey, FileScopeId)>>,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
 
@@ -371,6 +377,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             annotations: Vec::new(),
 
             enclosing_snapshots: FxHashMap::default(),
+            comprehension_snapshot_aliases: Some(Vec::new()),
 
             resolver_environment: file.resolver_environment(db),
             python_version: file.python_version(db),
@@ -705,6 +712,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .iter_mut()
             .find(|pending| pending.nested_scope == capture.nested_scope)
         {
+            pending.closure_snapshot = pending.closure_snapshot.or(capture.closure_snapshot);
             pending
                 .binding_definition_ids
                 .extend(binding_definition_ids);
@@ -713,6 +721,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
         } else {
             captures.push(PendingCapture {
+                closure_snapshot: capture.closure_snapshot,
                 nested_scope: capture.nested_scope,
                 laziness: capture.laziness,
                 binding_definition_ids,
@@ -725,21 +734,26 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         symbol: ScopedSymbolId,
         definition_id: ScopedDefinitionId,
     ) {
-        let current_scope = self.current_scope();
-        let name = self.place_tables[current_scope]
-            .symbol(symbol)
-            .name()
-            .clone();
-
+        let owner = self.current_scope();
+        let name = self.place_tables[owner].symbol(symbol).name();
         let Some(captures) = self
-            .current_scope_info_mut()
+            .scope_stack
+            .last_mut()
+            .expect("current scope")
             .pending_captures
-            .get_mut(&name)
+            .get_mut(name)
         else {
             return;
         };
-
         for capture in captures {
+            if let Some(closure) = capture.closure_snapshot.take()
+                && self.place_tables[closure.nested_scope]
+                    .symbol_id(name)
+                    .is_none()
+            {
+                // No direct reader needs this snapshot's later binding history.
+                self.enclosing_snapshots.remove(&closure);
+            }
             if capture.laziness.is_lazy() {
                 capture.binding_definition_ids.push(definition_id);
             }
@@ -765,9 +779,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 {
                     self.use_def_maps[popped_scope_id]
                         .mark_binding_definitions_used(capture.binding_definition_ids);
+                    if let Some(closure) = capture.closure_snapshot
+                        && let Some(aliases) = &mut self.comprehension_snapshot_aliases
+                        && let Some(symbol) = self.place_tables[popped_scope_id].symbol_id(&name)
+                        && !self.place_tables[popped_scope_id]
+                            .symbol(symbol)
+                            .is_deleted()
+                    {
+                        aliases.push((closure, capture.nested_scope));
+                    }
                 } else {
                     unresolved.push(
                         UnresolvedCapture {
+                            closure_snapshot: capture.closure_snapshot,
                             nested_scope: capture.nested_scope,
                             name: name.clone(),
                             laziness: capture.laziness,
@@ -781,6 +805,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         for symbol in self.place_tables[popped_scope_id].symbols() {
             if symbol.is_used() && !symbol.is_local() && !symbol.is_global() {
                 unresolved.push(UnresolvedCapture {
+                    closure_snapshot: None,
                     nested_scope: popped_scope_id,
                     name: symbol.name().clone(),
                     laziness: popped_scope_laziness,
@@ -791,15 +816,92 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         unresolved
     }
 
+    /// Include names used only inside eager comprehensions in the closure's usual snapshots.
+    fn comprehension_capture_symbols(
+        &mut self,
+        closure: FileScopeId,
+        captures: &mut [UnresolvedCapture],
+    ) -> Vec<ScopedSymbolId> {
+        let mut additional = Vec::new();
+        let owner = self.current_scope();
+        let is_function = |scope: FileScopeId| {
+            matches!(
+                self.scopes[scope].kind(),
+                ScopeKind::Function | ScopeKind::Lambda
+            )
+        };
+        if self.comprehension_snapshot_aliases.is_none()
+            || !is_function(closure)
+            || !is_function(owner)
+        {
+            return additional;
+        }
+        let outer = self.scopes[owner]
+            .parent()
+            .filter(|scope| is_function(*scope));
+        for capture in captures {
+            if capture.nested_scope == closure
+                || crate::AncestorsIter::new(&self.scopes, capture.nested_scope)
+                    .find(|(_, scope)| !scope.is_eager_comprehension())
+                    .is_none_or(|(scope, _)| scope != closure)
+            {
+                continue;
+            }
+            let Some(owner_symbol) = self.place_tables[owner].symbol_id(&capture.name) else {
+                continue;
+            };
+            let direct = self.place_tables[closure].symbol_id(&capture.name);
+            let symbol = self.place_tables[owner].symbol(owner_symbol);
+            if (!symbol.is_local()
+                && (symbol.is_bound()
+                    || symbol.is_global()
+                    || outer.is_none()
+                    || self.resolve_nested_reference_scope(closure, &capture.name) != outer))
+                || direct.is_some_and(|id| {
+                    let symbol = self.place_tables[closure].symbol(id);
+                    symbol.is_global() || symbol.is_nonlocal()
+                })
+                || !self.use_def_maps[owner].can_snapshot_stable_capture(
+                    owner_symbol,
+                    self.db,
+                    self.module,
+                    symbol,
+                )
+            {
+                continue;
+            }
+            capture.closure_snapshot = Some(EnclosingSnapshotKey {
+                enclosing_scope: owner,
+                enclosing_place: owner_symbol.into(),
+                nested_scope: closure,
+                nested_laziness: ScopeLaziness::Lazy,
+            });
+            if direct.is_none() {
+                additional.push(owner_symbol);
+            }
+        }
+        additional
+    }
+
     // Records snapshots of the place states visible from the current lazy scope.
-    fn record_lazy_snapshots(&mut self, popped_scope_id: FileScopeId) {
+    fn record_lazy_snapshots(
+        &mut self,
+        popped_scope_id: FileScopeId,
+        additional: &[ScopedSymbolId],
+    ) {
+        // These symbols belong to the immediate parent. Consume them on the first iteration.
+        let mut additional = additional.iter().copied().unique();
         for enclosing_scope_info in self.scope_stack.iter().rev() {
             let enclosing_scope_id = enclosing_scope_info.file_scope_id;
             let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();
             let enclosing_place_table = &self.place_tables[enclosing_scope_id];
 
             // We don't record lazy snapshots of attributes or subscripts, because these are difficult to track as they modify.
-            for nested_symbol in self.place_tables[popped_scope_id].symbols() {
+            for nested_symbol in self.place_tables[popped_scope_id].symbols().chain(
+                additional
+                    .by_ref()
+                    .map(|id| enclosing_place_table.symbol(id)),
+            ) {
                 // For the same reason, we don't snapshot bindings owned by `global`/`nonlocal`
                 // forwarding declarations here; `snapshot_enclosing_state` stores only a
                 // constraint for those symbols. Also, if the enclosing scope allows its members to
@@ -1074,14 +1176,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let popped_scope_laziness = popped_scope.kind().laziness();
 
+        let mut unresolved_captures =
+            self.finish_pending_captures(popped_scope_id, popped_scope_laziness, pending_captures);
         if popped_scope_laziness.is_eager() {
             self.record_eager_snapshots(popped_scope_id);
         } else {
-            self.record_lazy_snapshots(popped_scope_id);
+            let additional =
+                self.comprehension_capture_symbols(popped_scope_id, &mut unresolved_captures);
+            self.record_lazy_snapshots(popped_scope_id, &additional);
         }
 
-        let unresolved_captures =
-            self.finish_pending_captures(popped_scope_id, popped_scope_laziness, pending_captures);
         if !self.scope_stack.is_empty() {
             for capture in unresolved_captures {
                 self.register_pending_capture(capture);
@@ -3541,6 +3645,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         // Pop the root scope
         self.pop_scope();
+        for (closure, comprehension) in self
+            .comprehension_snapshot_aliases
+            .take()
+            .unwrap_or_default()
+        {
+            if let Some(snapshot) = self.enclosing_snapshots.get(&closure).copied() {
+                self.enclosing_snapshots.insert(
+                    EnclosingSnapshotKey {
+                        nested_scope: comprehension,
+                        ..closure
+                    },
+                    snapshot,
+                );
+            }
+        }
         let nonlocal_snapshot_writers = self.sweep_nonlocal_lazy_snapshots();
         assert!(self.scope_stack.is_empty());
 
@@ -3642,6 +3761,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Expr::Name(ast::ExprName { ctx, .. })
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
+                if let ast::Expr::Attribute(attribute) = expr
+                    && attribute.attr.as_str() == "__closure__"
+                {
+                    self.comprehension_snapshot_aliases = None;
+                }
+
                 // Record place effects after walking the expression. For names, this is
                 // equivalent because `walk_expr` is a no-op; for attribute/subscript places,
                 // child evaluation can introduce bindings (for example via walrus operators),

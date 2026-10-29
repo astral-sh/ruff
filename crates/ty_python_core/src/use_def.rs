@@ -252,6 +252,8 @@ use std::ops::Index;
 use std::rc::Rc;
 use std::sync::{Arc, LazyLock};
 
+use itertools::Itertools;
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::{FrozenIndexVec, Idx, IndexVec, newtype_index};
 use ruff_python_ast::NodeIndex;
 use ruff_text_size::TextRange;
@@ -260,7 +262,7 @@ use smallvec::SmallVec;
 use thin_vec::ThinVec;
 
 use crate::ast_ids::ScopedUseId;
-use crate::definition::{Definition, DefinitionCategory, DefinitionState};
+use crate::definition::{Definition, DefinitionCategory, DefinitionKind, DefinitionState};
 use crate::frozen::FrozenMap;
 use crate::member::ScopedMemberId;
 use crate::narrowing_constraints::{
@@ -272,13 +274,14 @@ use crate::reachability_constraints::{
     ReachabilityConstraints, ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
 use crate::scope::{FileScopeId, ScopeKind, ScopeLaziness};
-use crate::symbol::ScopedSymbolId;
+use crate::symbol::{ScopedSymbolId, Symbol};
 use crate::use_def::place_state::{
     Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
     LiveDeclarationsIterator, PlaceState,
 };
 use crate::{
-    BoundnessAnalysis, EnclosingSnapshotResult, LoopHeader, PossiblyNarrowedPlaces, SemanticIndex,
+    BoundnessAnalysis, Db, EnclosingSnapshotResult, LoopHeader, PossiblyNarrowedPlaces,
+    SemanticIndex,
 };
 
 mod exception_checkpoint;
@@ -2954,6 +2957,52 @@ impl<'db> UseDefMapBuilder<'db> {
             (true, false) => LiveBindingStatus::Bound,
             (false, _) => LiveBindingStatus::Unbound,
         }
+    }
+
+    /// Whether this binding's type at capture is safe to reuse once the closure runs.
+    /// A type guard on an aliased object can expire even if the captured name is never rebound.
+    pub(super) fn can_snapshot_stable_capture(
+        &mut self,
+        symbol: ScopedSymbolId,
+        db: &'db dyn Db,
+        module: &ParsedModuleRef,
+        place: &Symbol,
+    ) -> bool {
+        let Ok(binding) = self
+            .current_bindings(symbol.into())
+            .filter(|binding| {
+                binding.reachability_constraint() != ScopedReachabilityConstraintId::ALWAYS_FALSE
+            })
+            .exactly_one()
+        else {
+            return false;
+        };
+        let constraint = binding.narrowing_constraint();
+        let stable_guard = self
+            .narrowing_constraints
+            .single_predicate(constraint)
+            .is_some_and(|id| {
+                self.predicates
+                    .is_none_identity_test(id, db, module, place.name())
+            });
+        let DefinitionState::Defined(definition) = self.all_definitions[binding.binding()].state()
+        else {
+            return !place.is_local() && binding.binding().is_unbound() && stable_guard;
+        };
+        match definition.kind(db) {
+            DefinitionKind::Parameter(_) | DefinitionKind::LambdaParameter(_) => {}
+            DefinitionKind::For(_) if !place.is_reassigned() && !place.is_declared() => {
+                return stable_guard;
+            }
+            DefinitionKind::Assignment(assignment)
+                if assignment.unpack().is_none() && assignment.value(module).is_literal_expr() => {}
+            DefinitionKind::AnnotatedAssignment(assignment)
+                if assignment
+                    .value(module)
+                    .is_some_and(ruff_python_ast::Expr::is_literal_expr) => {}
+            _ => return false,
+        }
+        place.is_local() && (constraint == ScopedNarrowingConstraint::ALWAYS_TRUE || stable_guard)
     }
 
     pub(super) fn mark_binding_definitions_used(

@@ -10,6 +10,7 @@
 use crate::Program;
 use ruff_db::PythonFile;
 use ruff_db::files::File;
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::{FrozenIndexVec, Idx, IndexVec};
 use ruff_python_ast::{self as ast, Singleton, name::Name};
 
@@ -64,6 +65,29 @@ pub(crate) struct PredicatesBuilder<'db> {
 }
 
 impl<'db> PredicatesBuilder<'db> {
+    /// Checks for an identity test on the captured name that remains valid as long as its cell is unchanged.
+    pub(crate) fn is_none_identity_test(
+        &self,
+        id: ScopedPredicateId,
+        db: &'db dyn Db,
+        module: &ParsedModuleRef,
+        name: &str,
+    ) -> bool {
+        let PredicateNode::Expression(expression) = self.predicates[id].node else {
+            return false;
+        };
+        let ast::Expr::Compare(compare) = expression.node_ref(db).node(module) else {
+            return false;
+        };
+        let Some((left, ast::CmpOp::Is | ast::CmpOp::IsNot, right)) = compare.as_single() else {
+            return false;
+        };
+        let is_name =
+            |operand: &ast::Expr| operand.as_name_expr().is_some_and(|expr| expr.id == name);
+        (is_name(left) && right.is_none_literal_expr())
+            || (is_name(right) && left.is_none_literal_expr())
+    }
+
     /// Adds a predicate. Note that we do not deduplicate predicates. If you add a `Predicate`
     /// more than once, you will get distinct `ScopedPredicateId`s for each one. (This lets you
     /// model predicates that might evaluate to different values at different points of execution.)

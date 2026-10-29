@@ -304,6 +304,66 @@ def _():
     x = 2
 ```
 
+A comprehension can use the value captured by its enclosing function even when the function has no
+other reference to that name.
+
+```py
+def _(x: int | None):
+    if x is not None:
+        def inner():
+            [reveal_type(x) for _ in (0,)]  # revealed: int
+
+def _():
+    x = None
+    x = 1
+    def inner():
+        {reveal_type(x) for _ in (0,)}  # revealed: Literal[1]
+```
+
+A deletion can empty the cell before the comprehension runs.
+
+```py
+def _(x: int | None):
+    if x is not None:
+        def read():
+            [reveal_type(x) for _ in (0,)]  # revealed: int | None
+
+        del (x,)
+        read()
+```
+
+Narrowing the contents of a list can become stale before the function runs.
+
+```py
+from typing import TypeGuard
+
+def integers(xs: list[int | None]) -> TypeGuard[list[int]]:
+    return all(x is not None for x in xs)
+
+def _(xs: list[int | None]):
+    alias = xs
+    if integers(xs):
+        def inner():
+            [reveal_type(xs) for _ in (0,)]  # revealed: list[int | None]
+
+        alias[0] = None
+        inner()
+```
+
+### Explicit writes to closure cells
+
+```py
+def _(x: int | None):
+    if x is not None:
+        def read():
+            [reveal_type(x) for _ in (0,)]  # revealed: int | None
+
+        cells = read.__closure__
+        if cells is not None:
+            cells[0].cell_contents = None
+        read()
+```
+
 ### Lazy scope within an eager scope
 
 The function definition is a lazy scope, and it is enclosed within a class definition, which is an

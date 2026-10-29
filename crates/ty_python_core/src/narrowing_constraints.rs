@@ -165,6 +165,21 @@ impl NarrowingConstraintsBuilder {
         }
     }
 
+    /// Returns the predicate if no branch of this constraint tests another predicate.
+    pub(crate) fn single_predicate(
+        &self,
+        id: ScopedNarrowingConstraint,
+    ) -> Option<ScopedPredicateId> {
+        if id.is_terminal() {
+            return None;
+        }
+        let node = self.interiors[id];
+        (node.if_true.is_terminal()
+            && node.if_false.is_terminal()
+            && node.if_uncertain.is_terminal())
+        .then_some(node.atom)
+    }
+
     pub(crate) fn mark_used(&mut self, node: ScopedNarrowingConstraint) {
         if !node.is_terminal() && !self.interior_used[node.index()] {
             self.interior_used.set(node.index(), true);
