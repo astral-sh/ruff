@@ -248,6 +248,19 @@ impl<'db> CallableSignature<'db> {
         }))
     }
 
+    pub(super) fn freshen_for_owner_specialization(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        Self::from_overloads(
+            self.overloads.iter().map(|signature| {
+                signature.freshen_for_owner_specialization(db, env, specialization)
+            }),
+        )
+    }
+
     /// Returns the reduced overloaded signature exposed by a `functools.partial(...)` object.
     pub(crate) fn partially_apply(
         db: &'db dyn Db,
@@ -279,6 +292,12 @@ impl<'db> CallableSignature<'db> {
         previous: &Self,
         cycle: &salsa::Cycle,
     ) -> Self {
+        // A nested query can return its cycle-initial signature after an earlier iteration saw
+        // the declaration. Its synthetic parameters have no counterparts in that declaration.
+        if self.is_cycle_initial() {
+            return self.clone();
+        }
+
         if previous.overloads.len() == self.overloads.len() {
             Self {
                 overloads: self
@@ -352,10 +371,9 @@ impl<'db> CallableSignature<'db> {
                         parameter.source_parameter_index = source.source_parameter_index;
                     }
 
-                    let env = visitor.env;
                     Some(CallableSignature::single(Signature {
                         generic_context: self_signature.generic_context.and_then(|context| {
-                            type_mapping.update_signature_generic_context(db, env, context)
+                            type_mapping.update_signature_generic_context(db, context, visitor)
                         }),
                         definition: self_signature.definition,
                         extras: SignatureExtras::new(
@@ -384,7 +402,8 @@ impl<'db> CallableSignature<'db> {
                                 db,
                                 signature.generic_context,
                                 self_signature.generic_context.and_then(|context| {
-                                    type_mapping.update_signature_generic_context(db, env, context)
+                                    type_mapping
+                                        .update_signature_generic_context(db, context, visitor)
                                 }),
                             ),
                             // Keep the enclosing method's definition for binding `Self` and
@@ -480,6 +499,13 @@ impl<'db> CallableSignature<'db> {
         for signature in &self.overloads {
             signature.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
         }
+    }
+
+    pub(super) fn without_receiver_for_variance(&self, db: &'db dyn Db) -> Self {
+        Self::from_overloads(self.iter().map(|signature| {
+            let (_, parameters) = signature.parameters.split_receiver(db);
+            signature.clone().with_parameters(parameters)
+        }))
     }
 
     /// Binds the receiver using its runtime type while using `typing_self_type` to replace
@@ -626,7 +652,7 @@ impl<'db> CallableSignature<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
+        checker.check_callable_signature_pair(db, self, other)
     }
 }
 
@@ -962,7 +988,7 @@ impl<'db> Signature<'db> {
         self
     }
 
-    fn is_paramspec_value(&self) -> bool {
+    pub(super) fn is_paramspec_value(&self) -> bool {
         self.extras
             .as_ref()
             .is_some_and(|extras| extras.is_paramspec_value)
@@ -1179,10 +1205,9 @@ impl<'db> Signature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        let env = visitor.env;
         Self {
             generic_context: self.generic_context.and_then(|context| {
-                type_mapping.update_signature_generic_context(db, env, context)
+                type_mapping.update_signature_generic_context(db, context, visitor)
             }),
             definition: self.definition,
             extras: SignatureExtras::new(
@@ -1221,6 +1246,39 @@ impl<'db> Signature<'db> {
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
         )
+    }
+
+    /// Keep incoming class arguments separate from this method's own type parameters.
+    fn freshen_for_owner_specialization(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        if let Some(generic_context) = self.generic_context
+            && specialization.types(db).iter().any(|ty| {
+                any_over_type(db, env, *ty, false, |ty| {
+                    matches!(ty, Type::TypeVar(typevar)
+                        if generic_context.contains(db, typevar.identity(db))
+                            && specialization.get(db, typevar).is_none())
+                })
+            })
+            && let Some(freshness) = max_typevar_freshness_matching_generic_context(
+                db,
+                specialization.types(db).iter().copied(),
+                generic_context,
+            )
+        {
+            // Accessing `Box[T]` inside `Box.method[T]` must keep the class argument separate
+            // from the projected method's local T. Rename the method's binders before
+            // substituting the class arguments, while those occurrences are distinguishable.
+            self.freshen_bound_typevars(db, env, freshness.increment().value())
+        } else {
+            // Identity substitutions introduce no new occurrences. A different nonce already
+            // distinguishes two occurrences; freshening just because they share a declaration
+            // would introduce unbounded new identities during recursive member projection.
+            self.clone()
+        }
     }
 
     fn max_typevar_freshness_matching_generic_context(
@@ -1402,40 +1460,12 @@ impl<'db> Signature<'db> {
         receiver_type: Option<Type<'db>>,
         typing_self_type: Option<Type<'db>>,
     ) -> Self {
-        // A fixed unpacked tuple has a known first positional argument, even though it is
-        // declared with `*args`. Expand it before consuming the receiver.
-        let binding_parameters = if self.parameters.get(0).is_some_and(|parameter| {
-            parameter.is_variadic()
-                && parameter.has_starred_annotation()
-                && parameter
-                    .annotated_type()
-                    .exact_tuple_instance_spec(db)
-                    .is_some_and(|tuple| matches!(tuple.as_ref(), Tuple::Fixed(_)))
-        }) {
-            self.parameters.expand_starred_variadic_annotations(db)
-        } else {
-            self.parameters.clone()
-        };
-        let removed_receiver = binding_parameters
-            .get(0)
-            .is_some_and(Parameter::is_positional);
-        let first_parameter = binding_parameters.get(0);
-        let explicit_receiver = first_parameter.filter(|parameter| {
-            (parameter.is_positional()
-                || (parameter.is_variadic() && !parameter.has_starred_annotation()))
-                && !parameter.inferred_annotation
+        let (receiver_parameter, mut parameters) = self.parameters.split_receiver(db);
+        let impossible_receiver = receiver_parameter.is_none() && parameters.is_standard();
+        let explicit_receiver = receiver_parameter.filter(|parameter| {
+            !parameter.inferred_annotation
+                && (parameter.is_positional() || !parameter.has_starred_annotation())
         });
-        let impossible_receiver = binding_parameters.is_standard()
-            && !removed_receiver
-            && !first_parameter.is_some_and(Parameter::is_variadic);
-
-        // TODO: Binding a receiver through a variable-length unpacked tuple needs to account for
-        // its possible positional prefixes and suffixes.
-        let mut parameters = if removed_receiver {
-            binding_parameters.without_first()
-        } else {
-            binding_parameters.clone()
-        };
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
         let receiver_constraint = if impossible_receiver {
@@ -2717,8 +2747,26 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
             }
 
-            // source is definitely not overloaded while target is possibly overloaded.
-            ([_], _) => {
+            (_, _) => {
+                // Create separate freshened copies of any typevars introduced by the source
+                // signature, so that each target overload can infer an independent specialization
+                // of them.
+                let overloads = source_overloads.iter().chain(target_overloads);
+                let max_freshness = overloads
+                    .clone()
+                    .filter_map(|signature| signature.generic_context)
+                    .flat_map(|context| {
+                        overloads.clone().filter_map(move |signature| {
+                            signature.max_typevar_freshness_matching_generic_context(db, context)
+                        })
+                    })
+                    .max();
+                self.constraints.signature_typevar_freshness.set(
+                    self.constraints
+                        .signature_typevar_freshness
+                        .get()
+                        .max(max_freshness),
+                );
                 target_overloads
                     .iter()
                     .when_all(db, self.constraints, |target_signature| {
@@ -2729,17 +2777,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )
                     })
             }
-
-            // source is definitely overloaded while target is possibly overloaded.
-            (_, _) => target_overloads
-                .iter()
-                .when_all(db, self.constraints, |target_signature| {
-                    self.check_callable_signature_pair_inner(
-                        db,
-                        source_overloads,
-                        std::slice::from_ref(target_signature),
-                    )
-                }),
         }
     }
 
@@ -2790,18 +2827,34 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     || self.typevar_evaluation != TypeVarEvaluation::Lazy
             })
         };
+        let freshen = |signature: &Signature<'db>,
+                       generic_context: GenericContext<'db>,
+                       after: TypeVarNonce| {
+            // Shift the least-fresh local past the reserved range, without adding that entire
+            // range to identities that have already been freshened.
+            let delta = generic_context
+                .variables(db)
+                .map(|typevar| typevar.freshness(db))
+                .min()
+                .map_or(0, |freshness| {
+                    after.increment().value().saturating_sub(freshness.value())
+                });
+            signature.freshen_bound_typevars(db, env, delta)
+        };
         // If either signature is generic, freshen that signature's typevars before considering
         // them inferable for this relation. The relation only needs to find one specialization of
         // each generic callable that causes the check to succeed, but those callable-local
         // specializations must not collide with any same-source typevars in the other signature.
+        let max_freshness = self.constraints.signature_typevar_freshness.get();
         let freshened_source;
-        let source = if signature_context(source) != signature_context(target)
+        let source = if (max_freshness.is_some()
+            || signature_context(source) != signature_context(target))
             && let Some(generic_context) = signature_context(source)
-            && let Some(delta) = target
+            && let Some(freshness) = target
                 .max_typevar_freshness_matching_generic_context(db, generic_context)
-                .map(|freshness| freshness.increment().value())
+                .max(max_freshness)
         {
-            freshened_source = source.freshen_bound_typevars(db, env, delta);
+            freshened_source = freshen(source, generic_context, freshness);
             &freshened_source
         } else {
             source
@@ -2809,11 +2862,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let freshened_target;
         let target = if let Some(generic_context) = signature_context(target)
-            && let Some(delta) = source
+            && let Some(freshness) = source
                 .max_typevar_freshness_matching_generic_context(db, generic_context)
-                .map(|freshness| freshness.increment().value())
+                .max(max_freshness)
         {
-            freshened_target = target.freshen_bound_typevars(db, env, delta);
+            freshened_target = freshen(target, generic_context, freshness);
             &freshened_target
         } else {
             target
@@ -2826,6 +2879,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let source_inferable = signature_typevars(source);
         let target_inferable = signature_typevars(target);
         let signature_inferable = source_inferable.merge(db, target_inferable);
+        // Reserve these identities before checking receivers, parameters, or return types, any
+        // of which can recursively compare more signatures using this builder.
+        self.constraints.signature_typevar_freshness.set(
+            signature_inferable
+                .iter(db)
+                .map(|typevar| typevar.freshness(db))
+                .max()
+                .max(max_freshness),
+        );
 
         let inferable = self.inferable.merge(db, signature_inferable);
 
@@ -5179,12 +5241,36 @@ impl<'db> Parameters<'db> {
         Self::new(parameters, kind)
     }
 
-    /// Return a copy of this parameter list without its first parameter.
-    ///
-    /// Removing the only prefix parameter from a `Concatenate` form leaves the tail as a plain
-    /// gradual or `ParamSpec` parameter list.
-    fn without_first(&self) -> Self {
-        self.with_transformed_parameters(self.iter().skip(1).cloned())
+    /// Returns the parameter that accepts an implicit positional argument and the parameters
+    /// available to the caller. A variadic parameter can serve both purposes.
+    fn split_receiver(&self, db: &'db dyn Db) -> (Option<Parameter<'db>>, Self) {
+        // A fixed unpacked tuple has a known first positional argument, even though it is
+        // declared with `*args`. Expand it before consuming the receiver.
+        let parameters = if self.get(0).is_some_and(|parameter| {
+            parameter.is_variadic()
+                && parameter.has_starred_annotation()
+                && parameter
+                    .annotated_type()
+                    .exact_tuple_instance_spec(db)
+                    .is_some_and(|tuple| matches!(tuple.as_ref(), Tuple::Fixed(_)))
+        }) {
+            self.expand_starred_variadic_annotations(db)
+        } else {
+            self.clone()
+        };
+        match parameters.get(0) {
+            Some(first) if first.is_positional() => {
+                // Removing the last prefix parameter of a `Concatenate` leaves its gradual or
+                // `ParamSpec` tail as the remaining parameter list.
+                let remaining =
+                    parameters.with_transformed_parameters(parameters.iter().skip(1).cloned());
+                (Some(first.clone()), remaining)
+            }
+            // TODO: Binding a receiver through a variable-length unpacked tuple needs to account
+            // for its possible positional prefixes and suffixes.
+            Some(first) if first.is_variadic() => (Some(first.clone()), parameters),
+            _ => (None, parameters),
+        }
     }
 
     /// Returns `true` if the parameters represent a gradual form using `...` as the only parameter
@@ -5543,7 +5629,18 @@ impl<'db> Parameters<'db> {
         } else {
             self.data.kind
         };
-        Self::new(value, kind).expand_starred_variadic_annotations(db)
+        let parameters = Self::new(value, kind);
+        if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. }) {
+            // Resolving typevar identities does not specialize a pack. Keep its fixed boundaries
+            // in the starred annotation so call binding can infer the residual tuple shape.
+            parameters
+        } else {
+            // TODO: Make expansion an explicit operation for consumers that need it. Type
+            // mappings can otherwise introduce positional suffixes after unsolved variadics,
+            // which call binding does not handle correctly. This also happens when specializing
+            // a class parameter unrelated to a method's pack.
+            parameters.expand_starred_variadic_annotations(db)
+        }
     }
     pub(crate) fn len(&self) -> usize {
         self.data.value.len()
@@ -5664,6 +5761,10 @@ impl<'db> Parameters<'db> {
     ///
     /// Preserve the original `*args` definition and source position on every expanded parameter
     /// so diagnostics can identify its declaration after specialization or overload filtering.
+    ///
+    /// TODO: This also expands unsolved packs, producing positional suffixes that call binding
+    /// does not support. Type mappings should preserve starred annotations and leave expansion
+    /// to consumers that support the expanded representation, such as signature comparison.
     ///
     /// ```python
     /// from typing import Unpack

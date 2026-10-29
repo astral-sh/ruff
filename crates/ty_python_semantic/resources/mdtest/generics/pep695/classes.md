@@ -2260,13 +2260,59 @@ class Pair[T, U]:
     def __init__(self, first: T, second: U):
         self.first: T = first
         self.second: U = second
+        self.values: list[T] = [first]
 
     def swapped(self, other: "Pair[U, T]"):
         reveal_type(other.first)  # revealed: U@Pair
         reveal_type(other.second)  # revealed: T@Pair
+        # revealed: list[U@Pair]
+        reveal_type(other.values)
 
     def nested(self, other: "Pair[list[T], U]"):
         reveal_type(other.first)  # revealed: list[T@Pair]
+        # revealed: list[list[T@Pair]]
+        reveal_type(other.values)
+```
+
+## Inferred attributes preserve captured type variables
+
+Specializing a local generic class replaces its own type variables in inferred attributes. Type
+variables captured from the enclosing function retain that function's binding.
+
+```py
+def outer[T](captured: T) -> None:
+    class Local[U]:
+        def __init__(self, value: U) -> None:
+            self.value = (value,)
+            self.captured = (captured,)
+
+    local = Local[int](1)
+    # revealed: tuple[int]
+    reveal_type(local.value)
+    unchanged: tuple[T] = local.captured  # no diagnostic
+```
+
+## Annotated attributes preserve captured type variables
+
+A local class's attribute and method annotations capture the enclosing function's type variables.
+The class's own parameters remain available for specialization.
+
+```py
+def outer[T](captured: T) -> None:
+    class Local[U]:
+        value: U
+        captured: T
+
+        def __init__(self, value: U, captured: T) -> None:
+            self.value = value  # no diagnostic
+            self.captured = captured  # no diagnostic
+
+    local = Local[int](1, captured)
+    # revealed: int
+    reveal_type(local.value)
+    unchanged: T = local.captured  # no diagnostic
+    Local[int]("wrong", captured)  # error: [invalid-argument-type]
+    Local[int](1, "wrong")  # error: [invalid-argument-type]
 ```
 
 ## Materialized `TypeIs` return types
@@ -2853,6 +2899,72 @@ def invalid() -> Nested:
     return Box("wrong")  # error: [invalid-return-type]
 ```
 
+## Generic constructors inheriting recursive protocols
+
+A constructor can infer its type argument from an expected protocol even when an inherited method's
+receiver is annotated with that same protocol.
+
+```py
+from __future__ import annotations
+from collections.abc import Iterable
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def value(self) -> T:
+        raise RuntimeError
+    def combine[S](self: Chain[S], pair: tuple[S, T]) -> Chain[T]:
+        raise RuntimeError
+
+class Concrete[T](Chain[T]):
+    def __init__(self, values: Iterable[T]) -> None: ...
+
+contextual: Chain[int] = Concrete(())  # no diagnostic
+reveal_type(contextual)  # revealed: Concrete[int]
+
+def make() -> Chain[int]:
+    return Concrete(())  # no diagnostic
+```
+
+We still reject incompatible arguments. Without an expected type, the empty iterable determines the
+constructor's type argument.
+
+```py
+wrong: Chain[int] = Concrete(("wrong",))  # error: [invalid-assignment]
+reveal_type(Concrete(()))  # revealed: Concrete[Never]
+```
+
+## Structural implementations with recursive receiver annotations
+
+A class can satisfy a protocol without inheriting from it, even when checking a method's receiver
+requires checking the same protocol. The remaining parameters must still be compatible.
+
+```py
+from __future__ import annotations
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def value(self) -> T:
+        raise NotImplementedError
+    def combine[S](self: Chain[S], pair: tuple[S, T]) -> Chain[T]:
+        raise NotImplementedError
+
+class Valid[T]:
+    def value(self) -> T:
+        raise NotImplementedError
+    def combine[S](self: Chain[S], pair: tuple[S, T]) -> Chain[T]:
+        raise NotImplementedError
+
+class Invalid[T]:
+    def value(self) -> T:
+        raise NotImplementedError
+    def combine[S](self: Chain[S], pair: tuple[S, str]) -> Chain[T]:
+        raise NotImplementedError
+
+def check(valid: Valid[int], invalid: Invalid[int]):
+    accepted: Chain[int] = valid  # no diagnostic
+    rejected: Chain[int] = invalid  # error: [invalid-assignment]
+```
+
 ## Multiple inherited recursive protocol methods
 
 A subclass with several inherited recursive methods satisfies the matching protocol specialization.
@@ -2975,6 +3087,27 @@ def accepts(value: Required) -> None: ...
 def check(broad: Broad, incompatible: Incompatible):
     accepts(broad)  # no diagnostic
     accepts(incompatible)  # error: [invalid-argument-type]
+```
+
+## Receiver requirements in constructor overloads
+
+Each constructor overload checks its receiver restriction together with its arguments. The receiver
+restriction also applies when every explicit argument has a default.
+
+```py
+from typing import overload
+
+class Required[T]:
+    @overload
+    def __init__(self: "Required[int]", value: int = 0) -> None: ...
+    @overload
+    def __init__(self: "Required[str]", value: str = "") -> None: ...
+    def __init__(self, value: object = 0) -> None: ...
+
+Required[int]()  # no diagnostic
+Required[str]()  # no diagnostic
+Required[bytes]()  # error: [no-matching-overload]
+Required[int]("wrong")  # error: [no-matching-overload]
 ```
 
 ## Aliased `Self` in explicit receivers

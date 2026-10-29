@@ -3175,8 +3175,7 @@ reveal_type(invoke(lift_contravariant, 1))
 ```py
 from functions import invoke, Invariant, head_invariant, lift_invariant
 
-# TODO: revealed: `int`
-# revealed: Unknown
+# revealed: int
 reveal_type(invoke(head_invariant, Invariant[int]()))
 # TODO: revealed: `Invariant[int]`
 # revealed: Unknown
@@ -4020,6 +4019,26 @@ box.accept("invalid", other=1)
 box.accept(1, other="invalid")
 ```
 
+## Nested overloads capture enclosing type variables
+
+Overload signatures and their implementation refer to the same type variables captured from an
+enclosing function.
+
+```py
+from typing import overload
+
+def outer[T](value: T) -> None:
+    @overload
+    def inner(value: T) -> T: ...
+    @overload
+    def inner(value: T, count: int) -> T: ...
+    def inner(value: T, count: int = 1) -> T:
+        return value
+
+    first: T = inner(value)  # no diagnostic
+    second: T = inner(value, 2)  # no diagnostic
+```
+
 ## `~T` is never assignable to `T`
 
 ```py
@@ -4029,6 +4048,18 @@ def f[T](x: T, y: Not[T]) -> T:
     x = y  # error: [invalid-assignment]
     y = x  # error: [invalid-assignment]
     return x
+```
+
+## Invalid assignments preserve type variable bindings
+
+After an invalid assignment, a local variable retains its declared type, including references to the
+enclosing function's type variables.
+
+```py
+def recover[T](value: list[T]) -> list[T]:
+    result: list[T] = value
+    result = None  # error: [invalid-assignment]
+    return result  # no diagnostic
 ```
 
 ## `Callable` parameters
@@ -5342,6 +5373,68 @@ class BoundedSetter(Base):
 
     @value.setter
     def value[I: int](self, value: I) -> None: ...  # error: [invalid-property-type-override]
+```
+
+## Recursive calls preserve captured type variables
+
+A recursive call can infer a new specialization of the function's type parameter. A nested function
+that captures that parameter still refers to the original argument's type. Comparing a generic
+callback with that captured type also leaves the original parameter unchanged.
+
+```py
+from collections.abc import Callable
+
+def recursive[T](value: T) -> T:
+    def captured(other: T) -> T:
+        return other
+
+    def generic[U](other: U) -> U:
+        return other
+
+    def accepts(callback: Callable[[T], T]) -> None: ...
+
+    accepts(generic)  # no diagnostic
+    captured(1)  # error: [invalid-argument-type]
+    # revealed: Literal[1]
+    reveal_type(recursive(1))
+    # revealed: T@recursive
+    reveal_type(captured(value))
+    return recursive(value)  # no diagnostic
+```
+
+## Type parameter defaults referring to other parameters
+
+Defaults use the type arguments inferred for the same call, including when the argument's type is
+fixed by an enclosing generic function.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+def defaults[T, U = list[T], V = tuple[U, T]](value: T) -> tuple[U, V]:
+    raise NotImplementedError
+
+def check[T](value: T) -> tuple[list[T], tuple[list[T], T]]:
+    result = defaults(value)
+    return result  # no diagnostic
+
+def concrete(value: int):
+    # revealed: tuple[list[int], tuple[list[int], int]]
+    reveal_type(defaults(value))
+```
+
+## Type arguments in annotation metadata
+
+Expressions in `Annotated` metadata can call constructors specialized with the enclosing function's
+type parameters.
+
+```py
+from typing import Annotated
+
+def metadata[T](value: T) -> None:
+    annotated: Annotated[int, list[T]([value])]  # no diagnostic
 ```
 
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md

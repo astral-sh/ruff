@@ -98,7 +98,7 @@ pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDes
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
 use crate::types::newtype::NewType;
-use crate::types::signatures::{ConcatenateTail, walk_signature};
+use crate::types::signatures::{CallableSignature, ConcatenateTail};
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::TupleSpec;
@@ -386,6 +386,12 @@ pub(crate) fn may_exist_at_runtime<'db>(db: &'db dyn Db, definition: Definition<
 }
 
 /// Infer the type of a declaration, returning `Rejected` if it is not valid.
+///
+/// Use this to inspect the declared type of a variable or parameter. The type of its annotation
+/// expression is an input to declaration inference, and can differ from the declaration's type.
+///
+/// To inspect the value assigned by a definition, use [`binding_type`] instead; that type can be
+/// narrower than the declared type.
 pub(crate) fn inferred_declaration<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -397,6 +403,8 @@ pub(crate) fn inferred_declaration<'db>(
 /// Infer the type of a (possibly deferred) sub-expression of a [`Definition`].
 ///
 /// Supports expressions that are evaluated within a type-params sub-scope.
+///
+/// Use [`inferred_declaration`] to read the declared type of the annotated variable or parameter.
 ///
 /// ## Panics
 /// If the expression is absent from the semantic index for the definition's file.
@@ -417,6 +425,8 @@ fn definition_expression_type<'db>(
 /// [`definition_expression_type`] can look up the scope of a string literal used as an annotation,
 /// but not the scope of nodes parsed from its contents: those nodes are absent from the semantic
 /// index. This helper lets the caller supply the enclosing annotation's scope for such nodes.
+/// It still returns the expression's type; use [`inferred_declaration`] for the declared type of
+/// an annotated variable or parameter.
 fn definition_expression_type_in_scope<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -9506,6 +9516,73 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Freshens a member's method binders to avoid capturing typevars in incoming class arguments.
+    /// Constructor lookup must do this before adding the inherited class generic context.
+    fn freshen_member_for_owner_specialization(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Option<Specialization<'db>>,
+    ) -> Self {
+        let Some(specialization) = specialization else {
+            return self;
+        };
+        let freshen = |signatures: &CallableSignature<'db>| {
+            signatures.freshen_for_owner_specialization(db, env, specialization)
+        };
+        match self {
+            Type::FunctionLiteral(function) => {
+                Type::FunctionLiteral(function.map_signatures(db, freshen))
+            }
+            Type::Callable(callable) => {
+                Type::Callable(callable.with_signatures(db, freshen(callable.signatures(db))))
+            }
+            Type::BoundMethod(method) => Type::BoundMethod(method.with_func(
+                db,
+                method.func(db).freshen_member_for_owner_specialization(
+                    db,
+                    env,
+                    Some(specialization),
+                ),
+            )),
+            Type::PropertyInstance(property) => {
+                let freshen = |ty: Type<'db>| {
+                    ty.freshen_member_for_owner_specialization(db, env, Some(specialization))
+                };
+                Type::PropertyInstance(PropertyInstanceType::new_internal(
+                    db,
+                    property.getter(db).map(freshen),
+                    property.setter(db).map(freshen),
+                    property.deleter(db).map(freshen),
+                    property.instance_class(db),
+                    property.accessor_definitions(db),
+                ))
+            }
+            Type::Union(union) => union.map(db, env, |ty| {
+                ty.freshen_member_for_owner_specialization(db, env, Some(specialization))
+            }),
+            Type::Intersection(intersection) => {
+                let mut builder = IntersectionBuilder::new(db, env).preserve_positive_aliases(true);
+                for ty in intersection.positive(db) {
+                    builder.add_positive_in_place(ty.freshen_member_for_owner_specialization(
+                        db,
+                        env,
+                        Some(specialization),
+                    ));
+                }
+                for ty in intersection.negative(db) {
+                    builder.add_negative_in_place(ty.freshen_member_for_owner_specialization(
+                        db,
+                        env,
+                        Some(specialization),
+                    ));
+                }
+                builder.build()
+            }
+            _ => self,
+        }
+    }
+
     /// Projects a member from its generic owner, applying the owner's specialization to both
     /// ordinary occurrences and the domain of any retained synthetic `Self` variable.
     ///
@@ -9650,6 +9727,26 @@ impl<'db> Type<'db> {
         };
 
         self.apply_type_mapping(db, env, &type_mapping, TypeContext::default())
+    }
+
+    /// Maps the typevars bound by `context`, adding `delta` to their occurrence nonces.
+    /// Occurrences outside that context retain their identities, preserving captured typevars.
+    fn resolve_typevars(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        context: GenericContext<'db>,
+        delta: u32,
+    ) -> Self {
+        self.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::FreshenBoundTypeVars {
+                generic_context: context,
+                delta,
+            },
+            TypeContext::default(),
+        )
     }
 
     fn apply_type_mapping<'a>(
@@ -11507,17 +11604,20 @@ impl<'db> TypeMapping<'_, 'db> {
     fn update_signature_generic_context(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
         context: GenericContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Option<GenericContext<'db>> {
+        let env = visitor.env;
         match self {
             TypeMapping::FreshenBoundTypeVars { .. } => {
+                // A default can refer back to this signature, so keep the enclosing
+                // traversal's recursion guard when mapping its generic context.
                 Some(GenericContext::from_typevar_instances(
                     db,
                     env,
                     context.variables(db).map(|bound_typevar| {
                         Type::TypeVar(bound_typevar)
-                            .apply_type_mapping(db, env, self, TypeContext::default())
+                            .apply_type_mapping_impl(db, self, TypeContext::default(), visitor)
                             .as_typevar()
                             .unwrap_or(bound_typevar)
                     }),

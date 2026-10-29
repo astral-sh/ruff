@@ -869,8 +869,8 @@ impl<'db> TypeVarInstance<'db> {
 
 /// A nonce that gives a bound typevar occurrence a fresh identity.
 ///
-/// `0` is reserved for source-level, non-freshened typevars. Positive values identify fresh
-/// occurrences.
+/// `0` is the source-level occurrence. Higher values distinguish other occurrences of the same
+/// typevar. Inferability is determined by membership in a [`TypeVarSet`], not by the nonce itself.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct TypeVarNonce(u32);
 
@@ -893,7 +893,7 @@ impl TypeVarNonce {
         )
     }
 
-    fn add(self, delta: u32) -> Self {
+    pub(super) fn add(self, delta: u32) -> Self {
         Self(
             self.0
                 .checked_add(delta)
@@ -1318,7 +1318,11 @@ impl<'db> BoundTypeVarInstance<'db> {
     ) -> Self {
         let env = ProgramEnvironment::from_program(self.binding_context(db).program(db));
         let typevar = self.typevar(db);
-        let bound_or_constraints = f(typevar.bound_or_constraints(db, &env));
+        let original_bound_or_constraints = typevar.bound_or_constraints(db, &env);
+        let bound_or_constraints = f(original_bound_or_constraints);
+        if bound_or_constraints == original_bound_or_constraints {
+            return self;
+        }
         let typevar = TypeVarInstance::new(
             db,
             typevar.identity(db),
@@ -1468,27 +1472,21 @@ impl<'db> BoundTypeVarInstance<'db> {
             TypeMapping::FreshenBoundTypeVars {
                 generic_context,
                 delta,
-            } => {
+            } => visitor.visit(db, Type::TypeVar(self), type_mapping, || {
                 let identity = if self.is_paramspec(db) {
                     self.identity(db).without_paramspec_attr(db)
                 } else {
                     self.identity(db)
                 };
-                if generic_context.contains(db, identity) {
-                    Type::TypeVar(self.freshen_with_mapping(
-                        db,
-                        self.freshness(db).add(*delta),
-                        type_mapping,
-                        visitor,
-                    ))
+                let nonce = if generic_context.contains(db, identity) {
+                    self.freshness(db).add(*delta)
                 } else {
-                    Type::TypeVar(self.apply_type_mapping_to_bound_or_constraints(
-                        db,
-                        type_mapping,
-                        visitor,
-                    ))
-                }
-            }
+                    self.freshness(db)
+                };
+                // Bounds and defaults can mention this context's typevars even when the
+                // typevar itself belongs to another context.
+                Type::TypeVar(self.freshen_with_mapping(db, nonce, type_mapping, visitor))
+            }),
             TypeMapping::Promote(..)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
@@ -1590,6 +1588,27 @@ impl<'db> BoundTypeVarInstance<'db> {
         )
     }
 
+    pub(super) fn freshen_bound_typevars(
+        self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+        delta: u32,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        Type::TypeVar(self)
+            .apply_type_mapping_impl(
+                db,
+                &TypeMapping::FreshenBoundTypeVars {
+                    generic_context,
+                    delta,
+                },
+                TypeContext::default(),
+                visitor,
+            )
+            .as_typevar()
+            .unwrap_or(self)
+    }
+
     fn freshen_with_mapping(
         self,
         db: &'db dyn Db,
@@ -1601,30 +1620,26 @@ impl<'db> BoundTypeVarInstance<'db> {
         let bound_or_constraints = typevar.bound_or_constraints(db, visitor.env);
         let default = self.default_type(db);
 
-        if bound_or_constraints.is_none() && default.is_none() {
-            return Self::new(
-                db,
-                typevar,
-                self.binding_context(db),
-                self.paramspec_attr(db),
-                nonce,
-            );
-        }
-
-        let typevar = TypeVarInstance::new(
-            db,
-            typevar.identity(db),
-            bound_or_constraints.map(|bound_or_constraints| {
-                bound_or_constraints
-                    .apply_type_mapping_impl(db, type_mapping, visitor)
-                    .into()
-            }),
-            typevar.explicit_variance(db),
-            default.map(|ty| {
-                ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
-                    .into()
-            }),
-        );
+        let mapped_bound_or_constraints = bound_or_constraints.map(|bound_or_constraints| {
+            bound_or_constraints.apply_type_mapping_impl(db, type_mapping, visitor)
+        });
+        let mapped_default = default.map(|ty| {
+            ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
+        });
+        // Replacing unchanged lazy bounds or defaults with eager values changes the interned
+        // typevar even when freshening only needs a new occurrence identity.
+        let typevar =
+            if mapped_bound_or_constraints == bound_or_constraints && mapped_default == default {
+                typevar
+            } else {
+                TypeVarInstance::new(
+                    db,
+                    typevar.identity(db),
+                    mapped_bound_or_constraints.map(Into::into),
+                    typevar.explicit_variance(db),
+                    mapped_default.map(Into::into),
+                )
+            };
 
         Self::new(
             db,

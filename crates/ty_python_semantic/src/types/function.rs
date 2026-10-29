@@ -84,7 +84,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ClassType, FindLegacyTypeVarsVisitor, KnownClass, MemberLookupPolicy,
     SubclassOfInner, SubclassOfType, Type, TypeContext, TypeMapping, UnionType, binding_type,
-    definition_expression_type, walk_signature,
+    definition_expression_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -1204,7 +1204,7 @@ pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 ) {
     if let Some(callable_signature) = function.updated_signature(db) {
         for signature in &callable_signature.overloads {
-            walk_signature(db, signature, visitor);
+            visitor.visit_signature(db, signature);
         }
     }
     if let Some(callables) = function.updated_implementation_callables(db) {
@@ -1270,7 +1270,7 @@ impl<'db> FunctionType<'db> {
         Some(signature)
     }
 
-    fn class_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+    pub(super) fn class_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         self.updated_signatures(db)
             .as_deref()
             .and_then(|updated| updated.class_specialization)
@@ -1318,21 +1318,23 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         inherited_generic_context: GenericContext<'db>,
     ) -> Self {
-        let updated_signature = self
-            .signature(db)
-            .with_inherited_generic_context(db, inherited_generic_context);
+        self.map_signatures(db, |signature| {
+            signature.with_inherited_generic_context(db, inherited_generic_context)
+        })
+    }
+
+    /// Transforms the public overloads and any separate implementation signatures.
+    pub(super) fn map_signatures(
+        self,
+        db: &'db dyn Db,
+        mut map: impl FnMut(&CallableSignature<'db>) -> CallableSignature<'db>,
+    ) -> Self {
+        let updated_signature = map(self.signature(db));
         let literal = self.literal(db);
         let updated_implementation_callables = literal.has_separate_implementation(db).then(|| {
             self.implementation_callables(db)
                 .iter()
-                .map(|callable| {
-                    callable.with_signatures(
-                        db,
-                        callable
-                            .signatures(db)
-                            .with_inherited_generic_context(db, inherited_generic_context),
-                    )
-                })
+                .map(|callable| callable.with_signatures(db, map(callable.signatures(db))))
                 .collect()
         });
         Self::new_internal(

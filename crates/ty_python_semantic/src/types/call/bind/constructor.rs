@@ -409,10 +409,8 @@ impl<'db> ConstructorBinding<'db> {
         // non-specialized generic class (`C(...)`), it'll be the identity specialization. If we're
         // constructing an already-specialized generic alias (`C[str](...)`), it'll be the
         // specialization of that alias.
-        let (_, class_specialization) = constructed_instance_type.class_specialization(db, env)?;
-        let static_class_literal = self
-            .constructed_class_literal(db, env)
-            .and_then(ClassLiteral::as_static);
+        let (class_literal, class_specialization) =
+            constructed_instance_type.class_specialization(db, env)?;
         let class_context = class_specialization.generic_context(db);
 
         let mut combined: Option<Vec<Option<Type<'db>>>> = None;
@@ -458,11 +456,10 @@ impl<'db> ConstructorBinding<'db> {
             };
             let project_class_arguments =
                 |ty: Type<'db>, resolved_ty: Type<'db>| -> Option<Vec<Option<Type<'db>>>> {
-                    let class = static_class_literal?;
                     let partial = ty
                         .apply_optional_specialization(db, partial_specialization)
-                        .specialization_of(db, env, class)?;
-                    let resolved = resolved_ty.specialization_of(db, env, class)?;
+                        .specialization_of(db, env, class_literal)?;
+                    let resolved = resolved_ty.specialization_of(db, env, class_literal)?;
                     Some(inferred_types(partial, resolved))
                 };
             let return_types =
@@ -645,7 +642,7 @@ impl<'db> ConstructorBinding<'db> {
             .apply_optional_specialization(
                 db,
                 overload.merged_specialization(db).map(|specialization| {
-                    self.unspecialize_class_type_variables(db, env, specialization)
+                    Self::unspecialize_class_type_variables(db, env, overload, specialization)
                 }),
             );
         if self
@@ -673,40 +670,40 @@ impl<'db> ConstructorBinding<'db> {
     /// inferring a type for a constructed instance, we need to also consider other sources of
     /// specialization, such as downstream constructors, but we lose the class type variables
     /// before the constructor-wide specialization can refine them. To avoid that, this helper
-    /// identity-specializes any type variables belonging to the constructed class, while
-    /// preserving specializations of method-level type parameters.
+    /// maps the call's class type variables back to their declaration occurrences, where the
+    /// constructor-wide specialization can replace them, while preserving specializations of
+    /// method-level type parameters.
     ///
     /// TODO: This could be made simpler if we more clearly marked unsolved typevars in a
     /// specialization; we could probably avoid this entirely and just combine the specializations.
     fn unspecialize_class_type_variables(
-        &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        overload: &Binding<'db>,
         specialization: Specialization<'db>,
     ) -> Specialization<'db> {
-        let Some(class_context) = self
-            .constructed_instance_type()
-            .class_specialization(db, env)
-            .map(|(_, specialization)| specialization.generic_context(db))
+        let Some((_, class_specialization)) = overload
+            .constructor_context
+            .and_then(|context| context.instance_type().class_specialization(db, env))
         else {
             return specialization;
         };
 
-        let class_variables: Vec<_> = class_context
-            .variables(db)
-            .map(|typevar| typevar.identity(db))
-            .collect();
         let types: Box<[_]> = specialization
             .types(db)
             .iter()
             .copied()
             .zip(specialization.generic_context(db).variables(db))
             .map(|(mapped_ty, typevar)| {
-                if class_variables.contains(&typevar.identity(db)) {
-                    Type::TypeVar(typevar)
-                } else {
-                    mapped_ty
-                }
+                class_specialization
+                    .types(db)
+                    .iter()
+                    .zip(class_specialization.generic_context(db).variables(db))
+                    .find_map(|(argument, parameter)| {
+                        (argument.as_typevar()?.identity(db) == typevar.identity(db))
+                            .then_some(Type::TypeVar(parameter))
+                    })
+                    .unwrap_or(mapped_ty)
             })
             .collect();
 
@@ -754,14 +751,14 @@ impl<'db> ConstructorContext<'db> {
         }
     }
 
-    fn with_instance_type(self, instance_type: Type<'db>) -> Self {
+    pub(super) fn with_instance_type(self, instance_type: Type<'db>) -> Self {
         Self {
             instance_type,
             ..self
         }
     }
 
-    fn instance_type(self) -> Type<'db> {
+    pub(super) fn instance_type(self) -> Type<'db> {
         self.instance_type
     }
 

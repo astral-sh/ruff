@@ -1794,6 +1794,18 @@ reveal_type(C("a"))  # revealed: C[str | None]
 reveal_type(C(1))  # revealed: C[int | None]
 ```
 
+## Variadic receiver annotations
+
+A variadic parameter can accept both the receiver and the explicit constructor arguments.
+
+```py
+class Plain:
+    def __init__(*args: *tuple[object, ...]) -> None: ...
+
+Plain()  # no diagnostic
+Plain(1, "a")  # no diagnostic
+```
+
 ## Union `self` annotations with variadic constructor parameters
 
 The `object` argument selects the `Any` constraint, even when the constructor also infers a

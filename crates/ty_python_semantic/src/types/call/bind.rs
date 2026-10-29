@@ -8678,10 +8678,21 @@ impl<'db> Binding<'db> {
         env: &ProgramEnvironment<'db>,
         delta: u32,
     ) {
-        if self.signature.generic_context.is_none() {
+        let Some(generic_context) = self.signature.generic_context else {
             return;
-        }
+        };
         self.signature = self.signature.freshen_bound_typevars(db, env, delta);
+        if let Some(context) = self.constructor_context {
+            self.set_constructor_context(
+                db,
+                context.with_instance_type(context.instance_type().resolve_typevars(
+                    db,
+                    env,
+                    generic_context,
+                    delta,
+                )),
+            );
+        }
         self.return_ty = self.initial_return_type(db);
     }
 
