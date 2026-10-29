@@ -3983,7 +3983,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         )
     }
 
-    /// Whether union matching can discard gradual evidence before reaching a type variable.
+    /// Conservatively checks whether union matching may discard gradual evidence.
+    ///
+    /// The formal type limits which gradual types we look for in the actual type; we do not
+    /// match corresponding positions to determine whether that evidence reaches a type variable.
     fn has_gradual_union_evidence(&self, formal: Type<'db>, actual: Type<'db>) -> bool {
         let db = self.db;
         let formal = formal.resolve_type_alias(db);

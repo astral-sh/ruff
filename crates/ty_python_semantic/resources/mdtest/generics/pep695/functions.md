@@ -3405,7 +3405,7 @@ def provide[T, R = Never](box: Box[T | R], value: T) -> Box[R]:
     raise NotImplementedError
 
 def check(box: Box[int | str], value: int):
-    provide(box, value)
+    reveal_type(provide(box, value))  # revealed: Box[str]
 ```
 
 ## Inferring nested generic function calls
