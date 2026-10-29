@@ -227,7 +227,9 @@ use ty_python_core::{
         CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
         ScopedPredicateId,
     },
-    reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
+    reachability_constraints::{
+        InteriorNode, ReachabilityConstraints, ScopedReachabilityConstraintId,
+    },
     scope::ScopeId,
     use_def_map,
 };
@@ -624,15 +626,27 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
 /// Reentrant analysis is handled by Salsa cycle recovery on the cached-range queries. The final
 /// incomplete block is left for the reachability walk: it can add at most 15 nested call queries,
 /// and analyzing it eagerly would bypass the range query's cycle recovery and could introduce a
-/// divergent inference cycle. For large scopes, keeping the complete-block pass unconditional
-/// ensures that tracked callers record the same dependencies on every thread. Small scopes do not
-/// need to precompute calls to bound the Salsa stack, so their calls are evaluated entirely on
-/// demand.
+/// divergent inference cycle. For large scopes, the decision to warm calls depends only on the
+/// structure of the constraint, so every thread takes the same path. A condition whose branches
+/// are all terminals has no call prefix to warm unless it is itself a statement call. Small
+/// scopes evaluate calls on demand because their reverse call chains are already bounded.
 fn analyze_non_terminal_calls_up_to_predicate<'db>(
     db: &'db dyn Db,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-    root_predicate: ScopedPredicateId,
+    root: InteriorNode,
 ) -> bool {
+    let root_predicate = root.atom();
+    if !matches!(
+        predicates[root_predicate].node,
+        PredicateNode::IsNonTerminalCall(_)
+    ) && [root.if_true(), root.if_false(), root.if_ambiguous()]
+        .into_iter()
+        .all(|id| terminal_reachability(id).is_some())
+    {
+        // No branch of this constraint can visit a statement-call predicate. If inferring
+        // the condition itself needs earlier calls, their own reachability walks warm them.
+        return false;
+    }
     let scope = predicate_scope(db, &predicates[root_predicate]);
     let has_many_calls = predicates
         .iter()
@@ -743,8 +757,8 @@ fn evaluate_reachability_constraint<'db>(
     let use_def = use_def_map(db, scope);
     let constraints = use_def.reachability_constraints();
     let predicates = use_def.predicates();
-    let root_predicate = constraints.get_interior_node(id).atom();
-    let has_many_calls = analyze_non_terminal_calls_up_to_predicate(db, predicates, root_predicate);
+    let root = constraints.get_interior_node(id);
+    let has_many_calls = analyze_non_terminal_calls_up_to_predicate(db, predicates, root);
     let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
 
     evaluate_reachability_path(
@@ -941,11 +955,11 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             return reachability;
         }
 
-        let root_predicate = self.get_interior_node(id).atom();
-        analyze_non_terminal_calls_up_to_predicate(db, predicates, root_predicate);
+        let root = self.get_interior_node(id);
+        analyze_non_terminal_calls_up_to_predicate(db, predicates, root);
         evaluate_reachability_path(
             db,
-            predicate_scope(db, &predicates[root_predicate]),
+            predicate_scope(db, &predicates[root.atom()]),
             self,
             predicates,
             None,
