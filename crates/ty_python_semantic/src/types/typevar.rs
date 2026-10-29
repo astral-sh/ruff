@@ -17,8 +17,8 @@ use crate::{
         ApplySpecialization, ApplyTypeMappingVisitor, ClassLiteral, CycleDetector, DynamicType,
         GenericContext, InstanceProjection, IntersectionType, KnownClass, KnownInstanceType,
         MaterializationKind, Parameter, Parameters, PropertyInstanceClass, ProtocolInstanceType,
-        RecursiveType, Signature, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
-        TypeVarVariance, UnionBuilder, UnionType, any_over_type,
+        RecursiveType, Signature, Specialization, StaticClassLiteral, Type, TypeAliasType,
+        TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType, any_over_type,
         any_over_type_including_alias_arguments, binding_type,
         cyclic::TypeIdentity,
         definition_expression_type,
@@ -2147,6 +2147,7 @@ fn collect_typevar_supports<'db>(
         seen: SeenTypes<'db>,
     }
 
+    #[derive(Default)]
     struct InternMentionedTypevars<'db> {
         supports: CollectedTypeVarSupports<'db>,
         aliases: Vec<AliasVisit<'db>>,
@@ -2356,29 +2357,26 @@ fn collect_typevar_supports<'db>(
                 if let Some(specialization) = specialization {
                     self.visit_specialization(db, env, specialization, source, bound);
                 }
-                let Some(origin) = class.into_protocol_class(db) else {
-                    self.mark_incomplete(source);
-                    return;
-                };
                 if source == Source::Occurrence {
                     self.supports.occurrences.mark_incomplete();
                 }
-                let bound = self.bind_context(db, env, class.generic_context(db), bound);
-                // Walk the definition separately from its arguments. Dependencies
-                // need not unfold an expanding sequence such as P[list[T]].
-                if !self.already_visited(
-                    Type::ClassLiteral(class.into()),
-                    Source::Definition,
-                    &bound,
-                ) {
-                    self.visit_protocol_interface(
-                        db,
-                        env,
-                        ProtocolInterfaceView::new(origin.interface(db), None),
-                        protocol,
-                        Source::Definition,
-                        &bound,
-                    );
+                // Keep mutually recursive definitions in the same walk, and substitute
+                // alias arguments in the scope of their use.
+                if source == Source::Definition || !self.aliases.is_empty() {
+                    self.visit_protocol_definition(db, env, class, protocol, bound);
+                } else {
+                    let (captures, complete) =
+                        protocol_captures(db, env.program(db), class, protocol);
+                    for capture in captures
+                        .iter(db)
+                        .filter(|capture| !bound.contains(db, *capture))
+                    {
+                        self.supports.validation.insert(db, capture);
+                        self.supports.free.insert(db, capture);
+                    }
+                    if !complete {
+                        self.mark_incomplete(Source::Definition);
+                    }
                 }
             } else {
                 self.visit_protocol_interface(
@@ -2388,6 +2386,33 @@ fn collect_typevar_supports<'db>(
                     protocol,
                     source,
                     bound,
+                );
+            }
+        }
+
+        fn visit_protocol_definition(
+            &mut self,
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            class: StaticClassLiteral<'db>,
+            protocol: ProtocolInstanceType<'db>,
+            bound: &CollectedTypeVarSupport<'db>,
+        ) {
+            let Some(origin) = class.into_protocol_class(db) else {
+                self.mark_incomplete(Source::Definition);
+                return;
+            };
+            let bound = self.bind_context(db, env, class.generic_context(db), bound);
+            // Walk the definition separately from its arguments. Dependencies
+            // need not unfold an expanding sequence such as P[list[T]].
+            if !self.already_visited(Type::ClassLiteral(class.into()), Source::Definition, &bound) {
+                self.visit_protocol_interface(
+                    db,
+                    env,
+                    ProtocolInterfaceView::new(origin.interface(db), None),
+                    protocol,
+                    Source::Definition,
+                    &bound,
                 );
             }
         }
@@ -2773,11 +2798,35 @@ fn collect_typevar_supports<'db>(
             }
         }
     }
-    let mut visitor = InternMentionedTypevars {
-        supports: CollectedTypeVarSupports::default(),
-        aliases: Vec::new(),
-        seen: SeenTypes::default(),
-    };
+    /// Captures are relative to the protocol's own binders. Only the caller can decide
+    /// which of them are also bound in the enclosing constraint.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _, _, _| (TypeVarSet::None, false),
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn protocol_captures<'db>(
+        db: &'db dyn Db,
+        program: Program<'db>,
+        class: StaticClassLiteral<'db>,
+        protocol: ProtocolInstanceType<'db>,
+    ) -> (TypeVarSet<'db>, bool) {
+        let mut visitor = InternMentionedTypevars::default();
+        visitor.visit_protocol_definition(
+            db,
+            &ProgramEnvironment::from_program(program),
+            class,
+            protocol,
+            &CollectedTypeVarSupport::default(),
+        );
+        let captures = visitor.supports.free;
+        (
+            TypeVarSet::from_typevars(db, captures.variables.into_values()),
+            !captures.incomplete,
+        )
+    }
+
+    let mut visitor = InternMentionedTypevars::default();
     visitor.visit_type(
         db,
         env,
