@@ -4390,10 +4390,12 @@ impl<'db> CallableBinding<'db> {
                             .is_always_satisfied(db, env, TypeVarSet::None)
                         {
                             participating_slot_indices.insert(slot_index);
+                            break;
                         }
                     }
                     (Some(_), None) => {
                         participating_slot_indices.insert(slot_index);
+                        break;
                     }
                     (None, Some(current_parameter_type)) => {
                         first_parameter_type = Some(current_parameter_type);
@@ -4403,22 +4405,22 @@ impl<'db> CallableBinding<'db> {
             }
         }
 
-        // A flag to indicate whether we've found the overload that makes the remaining overloads
-        // unmatched for the given argument types.
-        let mut filter_remaining_overloads = false;
+        // Each overload adds its parameter types to the same prefix. Keep the builders so
+        // earlier parameters don't need to be compared for redundancy again at every step.
+        let mut union_parameter_types = std::iter::repeat_with(|| UnionBuilder::new(db, env))
+            .take(max_slot_count)
+            .collect::<Vec<_>>();
 
-        for (upto, current_index) in matching_overload_indexes.iter().enumerate() {
-            if filter_remaining_overloads {
-                self.overloads[*current_index].mark_as_unmatched_overload();
-                continue;
+        for (upto, (current_index, current_slots)) in matching_overload_slots.iter().enumerate() {
+            let remaining = &matching_overload_indexes[upto + 1..];
+            if remaining.is_empty() {
+                break;
             }
 
             let mut union_argument_type_builders =
                 std::iter::repeat_with(|| UnionBuilder::new(db, env))
                     .take(max_slot_count)
                     .collect::<Vec<_>>();
-
-            let (_, current_slots) = &matching_overload_slots[upto];
 
             for (_, slots) in &matching_overload_slots {
                 for (slot_index, slot) in slots.iter().enumerate() {
@@ -4448,27 +4450,20 @@ impl<'db> CallableBinding<'db> {
                     }),
             );
 
-            let mut union_parameter_types = std::iter::repeat_with(|| UnionBuilder::new(db, env))
-                .take(max_slot_count)
-                .collect::<Vec<_>>();
-            for (_, slots) in &matching_overload_slots[..=upto] {
-                for (slot_index, slot) in slots.iter().enumerate() {
-                    if participating_slot_indices.contains(&slot_index) {
-                        union_parameter_types[slot_index].add_in_place(slot.parameter);
-                    }
+            for (slot_index, slot) in current_slots.iter().enumerate() {
+                if participating_slot_indices.contains(&slot_index) {
+                    union_parameter_types[slot_index].add_in_place(slot.parameter);
                 }
             }
 
             let parameter_types = Type::heterogeneous_tuple(
                 db,
                 env,
-                union_parameter_types.into_iter().filter_map(|builder| {
-                    if builder.is_empty() {
-                        None
-                    } else {
-                        Some(builder.build())
-                    }
-                }),
+                union_parameter_types
+                    .iter()
+                    .filter(|builder| !builder.is_empty())
+                    .cloned()
+                    .map(UnionBuilder::build),
             );
 
             let inferable = self.overloads[*current_index].inferable_typevars;
@@ -4476,7 +4471,10 @@ impl<'db> CallableBinding<'db> {
                 .when_assignable_to(db, env, parameter_types, constraints, inferable)
                 .is_always_satisfied(db, env, inferable)
             {
-                filter_remaining_overloads = true;
+                for &index in remaining {
+                    self.overloads[index].mark_as_unmatched_overload();
+                }
+                break;
             }
         }
 
