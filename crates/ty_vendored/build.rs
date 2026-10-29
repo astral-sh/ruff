@@ -13,18 +13,19 @@ use std::path::{Path, PathBuf};
 use path_slash::PathExt;
 
 const TYPESHED_SOURCE_DIR: &str = "vendor/typeshed";
-const TY_EXTENSIONS_STUBS: &[(&str, &str)] = &[
+const TY_EXTENSIONS: &[(&str, Option<&str>)] = &[
+    ("stdlib/ty_extensions", None),
     (
-        "ty_extensions/__init__.pyi",
         "stdlib/ty_extensions/__init__.pyi",
+        Some("ty_extensions/__init__.pyi"),
     ),
     (
-        "ty_extensions/_internal.pyi",
         "stdlib/ty_extensions/_internal.pyi",
+        Some("ty_extensions/_internal.pyi"),
     ),
     (
-        "ty_extensions/pydantic.pyi",
         "stdlib/ty_extensions/pydantic.pyi",
+        Some("ty_extensions/pydantic.pyi"),
     ),
 ];
 
@@ -62,15 +63,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Patch typeshed and add the stubs for the `ty_extensions` package.
-    paths.insert("stdlib/ty_extensions".to_owned(), None);
-    for (source, destination) in TY_EXTENSIONS_STUBS {
+    for &(destination, source) in TY_EXTENSIONS {
         if paths
-            .insert((*destination).to_owned(), Some(PathBuf::from(source)))
+            .insert(destination.to_owned(), source.map(PathBuf::from))
             .is_some()
         {
             return Err(io::Error::new(
                 io::ErrorKind::AlreadyExists,
-                "duplicate ty_extensions stub",
+                format!("duplicate vendored path: {destination}"),
             )
             .into());
         }

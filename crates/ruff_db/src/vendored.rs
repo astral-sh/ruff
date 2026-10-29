@@ -2,8 +2,6 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt::{self, Debug};
 use std::io;
-#[cfg(feature = "deflate")]
-use std::io::Read;
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -114,14 +112,7 @@ impl VendoredFileSystem {
             #[cfg(feature = "zstd")]
             Compression::Zstd => zstd::bulk::decompress(data, entry.uncompressed_size)?,
             #[cfg(feature = "deflate")]
-            Compression::Deflate => {
-                // Limit the initial allocation because the indexed size may be invalid.
-                let mut contents = Vec::with_capacity(entry.uncompressed_size.min(10_000_000));
-                flate2::read::DeflateDecoder::new(data)
-                    .take(entry.uncompressed_size as u64 + 1)
-                    .read_to_end(&mut contents)?;
-                contents
-            }
+            Compression::Deflate => decompress_deflate(data, entry.uncompressed_size)?,
         };
         if contents.len() != entry.uncompressed_size
             || crc32fast::hash(&contents) != entry.crc32_hash
@@ -168,6 +159,33 @@ impl VendoredFileSystem {
                 file_type: entry.kind,
             })
     }
+}
+
+#[cfg(feature = "deflate")]
+fn decompress_deflate(data: &[u8], expected_size: usize) -> io::Result<Vec<u8>> {
+    let mut decoder = flate2::Decompress::new(false);
+    let mut contents = Vec::new();
+    // Leave room for one extra byte to detect an undersized entry, including an empty file.
+    let limit = expected_size.saturating_add(1);
+    while contents.len() < limit {
+        // Grow with the decoded contents instead of trusting the indexed size up front.
+        contents.reserve_exact(contents.len().max(8 * 1024).min(limit - contents.len()));
+        let remaining = &data[decoder.total_in() as usize..];
+        let status = decoder
+            .decompress_vec(remaining, &mut contents, flate2::FlushDecompress::None)
+            .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
+        match status {
+            flate2::Status::StreamEnd if decoder.total_in() == data.len() as u64 => {
+                return Ok(contents);
+            }
+            flate2::Status::Ok => {}
+            _ => break,
+        }
+    }
+    Err(io::Error::new(
+        io::ErrorKind::InvalidData,
+        "invalid vendored Deflate stream",
+    ))
 }
 
 impl fmt::Debug for VendoredFileSystem {
@@ -396,20 +414,16 @@ impl<'a> From<&'a VendoredPath> for NormalizedVendoredPath<'a> {
             normalized_parts.join("/")
         }
 
-        let path_str = path.as_str();
-
-        if std::path::MAIN_SEPARATOR == '\\' && path_str.contains('\\') {
-            // Normalize paths so that they always use Unix path separators
-            NormalizedVendoredPath(Cow::Owned(normalize_unnormalized_path(path)))
-        } else if !path
+        let path_str = path.as_str().trim_end_matches('/');
+        // Components skip repeated separators and interior dots. Borrow the original spelling
+        // only when its slash-separated parts already match the normalized components.
+        if path
             .components()
-            .all(|component| matches!(component, camino::Utf8Component::Normal(_)))
+            .eq(path_str.split('/').map(camino::Utf8Component::Normal))
         {
-            // Remove non-`Normal` components
-            NormalizedVendoredPath(Cow::Owned(normalize_unnormalized_path(path)))
+            NormalizedVendoredPath(Cow::Borrowed(path_str))
         } else {
-            // Strip trailing slashes from the path
-            NormalizedVendoredPath(Cow::Borrowed(path_str.trim_end_matches('/')))
+            NormalizedVendoredPath(Cow::Owned(normalize_unnormalized_path(path)))
         }
     }
 }
@@ -761,6 +775,30 @@ pub(crate) mod tests {
         }
     }
 
+    #[cfg(feature = "deflate")]
+    #[test]
+    fn deflate_requires_one_complete_stream() {
+        // Two raw Deflate streams, "hello" and "", with a byte between them.
+        const DATA: &[u8] = b"\xcb\x48\xcd\xc9\xc9\x07\x00\xff\x03\x00";
+        static ENTRIES: &[VendoredEntry] = &[
+            VendoredEntry::file("complete", 0..7, 5, 0x3610_a686),
+            VendoredEntry::file("empty", 8..10, 0, 0),
+            VendoredEntry::file("missing_stream", 0..0, 0, 0),
+            VendoredEntry::file("too_small", 0..7, 4, 0x3610_a686),
+            VendoredEntry::file("trailing", 0..8, 5, 0x3610_a686),
+            VendoredEntry::file("truncated", 0..6, 5, 0x3610_a686),
+        ];
+        let fs = VendoredFileSystem::new_static(ENTRIES, DATA, Compression::Deflate).unwrap();
+        assert_eq!(fs.read_to_string("complete").unwrap(), "hello");
+        assert_eq!(fs.read_to_string("empty").unwrap(), "");
+        for path in ["missing_stream", "too_small", "trailing", "truncated"] {
+            assert_eq!(
+                fs.read_to_string(path).unwrap_err().kind(),
+                io::ErrorKind::InvalidData,
+            );
+        }
+    }
+
     #[test]
     fn directory_listing_excludes_descendants_and_sibling_prefixes() {
         let mut builder = VendoredFileSystemBuilder::new();
@@ -780,21 +818,28 @@ pub(crate) mod tests {
 
     #[test]
     fn builder_rejects_duplicate_normalized_paths() {
+        let aliases = [
+            "stdlib/module.pyi",
+            "./stdlib/module.pyi",
+            "stdlib/./module.pyi",
+            "stdlib//module.pyi",
+        ];
         let mut builder = VendoredFileSystemBuilder::new();
-        builder.add_file("stdlib/module.pyi", "original").unwrap();
+        builder.add_directory("stdlib").unwrap();
+        builder.add_file("stdlib//module.pyi", "original").unwrap();
+        for alias in aliases {
+            assert_eq!(
+                builder.add_file(alias, "replacement").unwrap_err().kind(),
+                io::ErrorKind::AlreadyExists,
+            );
+        }
+        let fs = builder.finish();
+        for alias in aliases {
+            assert_eq!(fs.read_to_string(alias).unwrap(), "original");
+        }
         assert_eq!(
-            builder
-                .add_file("./stdlib/module.pyi", "replacement")
-                .unwrap_err()
-                .kind(),
-            io::ErrorKind::AlreadyExists,
-        );
-        assert_eq!(
-            builder
-                .finish()
-                .read_to_string("stdlib/module.pyi")
-                .unwrap(),
-            "original"
+            readdir_snapshot(&fs, "stdlib/."),
+            "vendored://stdlib/module.pyi"
         );
     }
 }
