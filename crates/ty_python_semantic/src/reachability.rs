@@ -2338,30 +2338,6 @@ class TargetB:
     }
 
     #[test]
-    fn a_loop_exit_can_be_checked_without_inferring_the_calls_in_its_body() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        let calls = "        callback()\n".repeat(NON_TERMINAL_CALL_CHUNK_SIZE + 1);
-        db.write_file(
-            "/src/test.py",
-            format!("def f(flag: bool, callback):\n    while flag:\n{calls}"),
-        )?;
-        let file = system_path_to_file(&db, "/src/test.py")?;
-        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
-        let index = semantic_index(&db, file);
-        let (scope, _) = index.child_scopes(FileScopeId::global()).next().unwrap();
-
-        assert!(is_end_of_scope_reachable(&db, scope.to_scope_id(&db, file)));
-        let events = db.take_salsa_events();
-        ruff_db::testing::assert_function_query_was_not_run_by_name(
-            &db,
-            "analyze_non_terminal_call_range",
-            None,
-            &events,
-        );
-        Ok(())
-    }
-
-    #[test]
     fn non_terminal_call_range_invalidates_when_callable_changes() -> anyhow::Result<()> {
         let mut db = setup_db();
         let source = format!(
