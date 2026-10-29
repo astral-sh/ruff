@@ -363,6 +363,24 @@ def possible[X, A]() -> None:
     reveal_type(invalid.solutions(inferable=tuple[A]))
 ```
 
+## Free and bound occurrences of the same type variable
+
+In `(∃X. int ≤ X ≤ A) ∧ X = str`, the witness for the existential can be `int` even though the free
+occurrence of `X` must be `str`.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def independent[X, A]() -> None:
+    body = ConstraintSet.lower_bound(int, X) & ConstraintSet.upper_bound(X, A)
+    quantified = body.exists(tuple[X])
+    free = ConstraintSet.equality(X, str)
+    # revealed: tuple[Solution[A=int, X=str]]
+    reveal_type((quantified & free).solutions(inferable=tuple[X, A]))
+    # revealed: tuple[Solution[X=str, A=int]]
+    reveal_type((free & quantified).solutions(inferable=tuple[X, A]))
+```
+
 ## Negated inner quantification with free variables
 
 An inner existential can hold for some choices of a free variable and fail for others. Its negation

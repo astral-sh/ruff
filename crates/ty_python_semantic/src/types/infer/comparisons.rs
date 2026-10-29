@@ -1297,8 +1297,8 @@ fn infer_binary_type_comparison_inner<'db>(
             Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
         ) => {
             let constraints = ConstraintSetBuilder::new();
-            let left = constraints.load(db, env, left.constraints(db));
-            let right = constraints.load(db, env, right.constraints(db));
+            let (left, right) =
+                constraints.load_pair(db, env, left.constraints(db), right.constraints(db));
             let equivalent =
                 left.iff(db, &constraints, right)
                     .is_always_satisfied(db, env, TypeVarSet::None);
