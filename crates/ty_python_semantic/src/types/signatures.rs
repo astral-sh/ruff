@@ -501,6 +501,13 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
+    pub(super) fn without_receiver_for_variance(&self, db: &'db dyn Db) -> Self {
+        Self::from_overloads(self.iter().map(|signature| {
+            let (_, parameters) = signature.parameters.split_receiver(db);
+            signature.clone().with_parameters(parameters)
+        }))
+    }
+
     /// Binds the receiver using its runtime type while using `typing_self_type` to replace
     /// occurrences of `typing.Self`.
     ///
@@ -1453,40 +1460,12 @@ impl<'db> Signature<'db> {
         receiver_type: Option<Type<'db>>,
         typing_self_type: Option<Type<'db>>,
     ) -> Self {
-        // A fixed unpacked tuple has a known first positional argument, even though it is
-        // declared with `*args`. Expand it before consuming the receiver.
-        let binding_parameters = if self.parameters.get(0).is_some_and(|parameter| {
-            parameter.is_variadic()
-                && parameter.has_starred_annotation()
-                && parameter
-                    .annotated_type()
-                    .exact_tuple_instance_spec(db)
-                    .is_some_and(|tuple| matches!(tuple.as_ref(), Tuple::Fixed(_)))
-        }) {
-            self.parameters.expand_starred_variadic_annotations(db)
-        } else {
-            self.parameters.clone()
-        };
-        let removed_receiver = binding_parameters
-            .get(0)
-            .is_some_and(Parameter::is_positional);
-        let first_parameter = binding_parameters.get(0);
-        let explicit_receiver = first_parameter.filter(|parameter| {
-            (parameter.is_positional()
-                || (parameter.is_variadic() && !parameter.has_starred_annotation()))
-                && !parameter.inferred_annotation
+        let (receiver_parameter, mut parameters) = self.parameters.split_receiver(db);
+        let impossible_receiver = receiver_parameter.is_none() && parameters.is_standard();
+        let explicit_receiver = receiver_parameter.filter(|parameter| {
+            !parameter.inferred_annotation
+                && (parameter.is_positional() || !parameter.has_starred_annotation())
         });
-        let impossible_receiver = binding_parameters.is_standard()
-            && !removed_receiver
-            && !first_parameter.is_some_and(Parameter::is_variadic);
-
-        // TODO: Binding a receiver through a variable-length unpacked tuple needs to account for
-        // its possible positional prefixes and suffixes.
-        let mut parameters = if removed_receiver {
-            binding_parameters.without_first()
-        } else {
-            binding_parameters.clone()
-        };
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
         let receiver_constraint = if impossible_receiver {
@@ -5262,12 +5241,36 @@ impl<'db> Parameters<'db> {
         Self::new(parameters, kind)
     }
 
-    /// Return a copy of this parameter list without its first parameter.
-    ///
-    /// Removing the only prefix parameter from a `Concatenate` form leaves the tail as a plain
-    /// gradual or `ParamSpec` parameter list.
-    fn without_first(&self) -> Self {
-        self.with_transformed_parameters(self.iter().skip(1).cloned())
+    /// Returns the parameter that accepts an implicit positional argument and the parameters
+    /// available to the caller. A variadic parameter can serve both purposes.
+    fn split_receiver(&self, db: &'db dyn Db) -> (Option<Parameter<'db>>, Self) {
+        // A fixed unpacked tuple has a known first positional argument, even though it is
+        // declared with `*args`. Expand it before consuming the receiver.
+        let parameters = if self.get(0).is_some_and(|parameter| {
+            parameter.is_variadic()
+                && parameter.has_starred_annotation()
+                && parameter
+                    .annotated_type()
+                    .exact_tuple_instance_spec(db)
+                    .is_some_and(|tuple| matches!(tuple.as_ref(), Tuple::Fixed(_)))
+        }) {
+            self.expand_starred_variadic_annotations(db)
+        } else {
+            self.clone()
+        };
+        match parameters.get(0) {
+            Some(first) if first.is_positional() => {
+                // Removing the last prefix parameter of a `Concatenate` leaves its gradual or
+                // `ParamSpec` tail as the remaining parameter list.
+                let remaining =
+                    parameters.with_transformed_parameters(parameters.iter().skip(1).cloned());
+                (Some(first.clone()), remaining)
+            }
+            // TODO: Binding a receiver through a variable-length unpacked tuple needs to account
+            // for its possible positional prefixes and suffixes.
+            Some(first) if first.is_variadic() => (Some(first.clone()), parameters),
+            _ => (None, parameters),
+        }
     }
 
     /// Returns `true` if the parameters represent a gradual form using `...` as the only parameter

@@ -929,15 +929,28 @@ impl<'db> ProtocolInterface<'db> {
         env: &'a ProgramEnvironment<'db>,
     ) -> impl Iterator<Item = (Type<'db>, TypeVarVariance)> + 'a {
         self.members(db).flat_map(move |member| {
-            // Instance methods are checked only through their bound instance signature.
-            let is_instance_method = member.is_instance_method();
-            [
-                ProtocolMemberAccessMode::Instance,
-                ProtocolMemberAccessMode::Class,
-            ]
-            .into_iter()
-            .filter(move |mode| *mode != ProtocolMemberAccessMode::Class || !is_instance_method)
-            .flat_map(move |mode| member.access(mode).variances(db, env))
+            if let ProtocolMemberKind::Method(ty, kind) = member.data.kind {
+                // Only the exposed parameters and return type contribute to variance. Checking
+                // the receiver annotation here can ask for the variance of this same protocol.
+                let ty = if kind != ProtocolMethodKind::Static
+                    && let Type::Callable(callable) = ty
+                    && !callable.is_dunder_paramspec(db)
+                {
+                    let signatures = callable.signatures(db).without_receiver_for_variance(db);
+                    Type::Callable(callable.with_signatures(db, signatures))
+                } else {
+                    ty
+                };
+                return Either::Left(std::iter::once((ty, TypeVarVariance::Covariant)));
+            }
+            Either::Right(
+                [
+                    ProtocolMemberAccessMode::Instance,
+                    ProtocolMemberAccessMode::Class,
+                ]
+                .into_iter()
+                .flat_map(move |mode| member.access(mode).variances(db, env)),
+            )
         })
     }
 
