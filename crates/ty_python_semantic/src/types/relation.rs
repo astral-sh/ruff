@@ -15,7 +15,7 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::relation_error::ErrorRelation;
 use crate::types::set_theoretic::RecursivelyDefined;
-use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
+use crate::types::signatures::{ParametersKind, ReceiverConstraints, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
 use crate::types::typevar::TypeVarDomain;
 use crate::types::{
@@ -1377,6 +1377,59 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             signature_relation_visitor,
             materialization_visitor,
         }
+    }
+
+    pub(super) fn when_receiver_constraints_satisfied(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_constraints: Option<&ReceiverConstraints<'db>>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
+        let checker = TypeRelationChecker::constraint_set_assignability(
+            env,
+            constraints,
+            &relation_visitor,
+            &disjointness_visitor,
+            &signature_relation_visitor,
+            &materialization_visitor,
+        );
+        checker.check_receiver_constraints(db, receiver_constraints)
+    }
+
+    /// Evaluates receiver constraints within an existing checker. In particular, this reuses the
+    /// existing recursion guards, which helps prevent runaway recursion when checking recursive
+    /// signatures.
+    pub(super) fn check_receiver_constraints(
+        &self,
+        db: &'db dyn Db,
+        receiver_constraints: Option<&ReceiverConstraints<'db>>,
+    ) -> ConstraintSet<'db, 'c> {
+        let pairs = match receiver_constraints {
+            None => return self.always(),
+            Some(ReceiverConstraints::Unsatisfiable) => return self.never(),
+            Some(ReceiverConstraints::Conjunction(pairs)) => pairs,
+        };
+        let check_relation = |relation| {
+            let checker = Self {
+                relation,
+                typevar_evaluation: TypeVarEvaluation::Lazy,
+                ..self.clone()
+            };
+            pairs
+                .iter()
+                .when_all(db, self.constraints, |(receiver, annotation)| {
+                    checker.check_type_pair(db, *receiver, *annotation)
+                })
+        };
+        let assignability = check_relation(TypeRelation::Assignability);
+        if self.relation == TypeRelation::Assignability {
+            return assignability;
+        }
+        assignability.and(db, self.constraints, || check_relation(self.relation))
     }
 
     pub(super) fn with_inferable_typevars(&self, inferable: TypeVarSet<'db>) -> Self {
