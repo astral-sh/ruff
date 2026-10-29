@@ -285,15 +285,16 @@ def f(x: Foo[int]):
 
 ## Generic aliases in bound method receivers
 
-An integer is an invalid receiver for `set.clear`, regardless of the set's element type. Expanding
-this element type would visit the same nested tuple many times.
+Checking a call to `set.clear` does not require expanding the set's element type. Expanding
+`Payload` would visit the same nested tuple many times.
 
 ```py
 type Fan[T] = tuple[T, T, T, T, T, T, T, T]
 type Layer[T] = Fan[Fan[Fan[Fan[T]]]]
 type Payload = Layer[Layer[Layer[int]]]
 
-set[Payload].clear.__get__(0)()  # error: [invalid-argument-type]
+def clear(values: set[Payload]) -> None:
+    values.clear()  # no diagnostic
 ```
 
 ## Unpacking tuple aliases

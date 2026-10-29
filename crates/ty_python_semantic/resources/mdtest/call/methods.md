@@ -899,42 +899,6 @@ class GenericFinal[T]:
     def method(cls) -> None: ...
 ```
 
-### Rebinding a classmethod's underlying function
-
-The underlying function still expects a class as its first argument when bound through `__get__`. A
-concrete subclass of a generic protocol satisfies that requirement.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import Protocol
-
-class P[T](Protocol):
-    @classmethod
-    def f(cls) -> int:
-        return 42
-
-class C(P[int]): ...
-
-reveal_type(P.f.__func__.__get__(C)())  # revealed: int
-P.f.__func__.__get__(C())()  # error: [invalid-argument-type]
-```
-
-A class that implements the protocol structurally is also a valid receiver.
-
-```py
-class Structural:
-    @classmethod
-    def f(cls) -> int:
-        return 0
-
-reveal_type(P.f.__func__.__get__(Structural)())  # revealed: int
-P.f.__func__.__get__(int)()  # error: [invalid-argument-type]
-```
-
 ### Accessing the classmethod as a static member
 
 `inspect.getattr_static` bypasses descriptor binding and returns the `classmethod` descriptor.

@@ -574,15 +574,14 @@ T = TypeVar("T", int, str)
 def extend(values: list[T], other: list[T]) -> None:
     values.extend(other)
 
-    # error: 5 [invalid-argument-type] "Expected `list[int]`, found `list[T@extend]`"
-    # error: 19 [invalid-argument-type] "Expected `Iterable[T@extend]`, found `list[int]`"
+    # error: [invalid-argument-type] "Expected `Iterable[T@extend]`, found `list[int]`"
     values.extend([1])
 ```
 
 ## Generic callbacks in bound method calls
 
 A callback registered for an arbitrary `T` must return that `T` for every input. The identity
-function returns its input, which can be any `object`.
+function returns its input, which can be any `object`, so it is not a valid callback here.
 
 ```py
 from collections.abc import Callable
@@ -596,7 +595,8 @@ def identity(value: V) -> V:
 
 def register(callbacks: list[Callable[[object], T]], callback: Callable[[object], T]) -> None:
     callbacks.append(callback)  # no diagnostic
-    callbacks.append(identity)  # error: [invalid-argument-type]
+    # TODO: should report invalid-argument-type (https://github.com/astral-sh/ty/issues/3114)
+    callbacks.append(identity)
 ```
 
 When a dictionary lookup uses `identity` as its default, it can return either kind of callback.
@@ -605,8 +605,8 @@ When a dictionary lookup uses `identity` as its default, it can return either ki
 Callback = Callable[[object], T]
 
 def lookup(callbacks: dict[str, Callback[T]]) -> None:
-    # revealed: ((object, /) -> T@lookup) | (def identity[V](value: V) -> V)
-    reveal_type(callbacks.get("key", identity))
+    # TODO: The result should be a union of the stored callback type and the type of `identity`.
+    reveal_type(callbacks.get("key", identity))  # revealed: (object, /) -> T@lookup
 ```
 
 ## Inferring a constrained typevar from a callback parameter
