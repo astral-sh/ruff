@@ -832,6 +832,70 @@ def j(x: Container1.Item, y: Container2.Item) -> None:
     a: Container1.Item = y
 ```
 
+## Capturing an enclosing type parameter
+
+An alias defined inside a generic function refers to that function's type parameter.
+
+```py
+def outer[T](value: T) -> T:
+    type Captured = T
+
+    def identity(other: Captured) -> Captured:
+        return other
+
+    return identity(value)  # no diagnostic
+```
+
+The alias can also have its own parameters. Specializing them preserves the captured parameter.
+
+```py
+def generic_outer[T](value: T) -> tuple[T, int]:
+    type Pair[U] = tuple[T, U]
+
+    def integers(other: Pair[int]) -> Pair[int]:
+        return other
+
+    def strings(other: Pair[str]) -> Pair[str]:
+        return other
+
+    strings((value, "text"))  # no diagnostic
+    integers((value, "text"))  # error: [invalid-argument-type]
+    return integers((value, 1))  # no diagnostic
+```
+
+## Constructor inference through captured alias parameters
+
+A class-local alias captures its class's type parameter. Constructing another instance inside the
+class infers a new specialization without constraining the enclosing instance's type parameter.
+
+```py
+class Box[T]:
+    type Items = list[T]
+
+    def __init__(self, value: Items) -> None: ...
+    def copy(self, value: list[T]) -> None:
+        # revealed: Box[T@Box]
+        reveal_type(Box(value))
+        # revealed: Box[int]
+        reveal_type(Box([1]))
+```
+
+The alias's own parameters retain their specialization while its captured class parameter is
+inferred for the new instance.
+
+```py
+class PairBox[T]:
+    type Pair[U] = tuple[T, U]
+
+    def __init__(self, value: Pair[int]) -> None: ...
+    def copy(self, value: T) -> None:
+        # revealed: PairBox[T@PairBox]
+        reveal_type(PairBox((value, 1)))
+        # revealed: PairBox[str]
+        reveal_type(PairBox(("text", 1)))
+        PairBox((value, "wrong"))  # error: [invalid-argument-type]
+```
+
 ## Default type parameter after `TypeVarTuple`
 
 A `TypeVar` with a default cannot follow a `TypeVarTuple` in a type alias. Its default would make it

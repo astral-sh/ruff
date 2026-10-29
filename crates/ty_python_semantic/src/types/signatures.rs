@@ -365,10 +365,9 @@ impl<'db> CallableSignature<'db> {
                         parameter.source_parameter_index = source.source_parameter_index;
                     }
 
-                    let env = visitor.env;
                     Some(CallableSignature::single(Signature {
                         generic_context: self_signature.generic_context.and_then(|context| {
-                            type_mapping.update_signature_generic_context(db, env, context)
+                            type_mapping.update_signature_generic_context(db, context, visitor)
                         }),
                         definition: self_signature.definition,
                         extras: SignatureExtras::new(
@@ -397,7 +396,8 @@ impl<'db> CallableSignature<'db> {
                                 db,
                                 signature.generic_context,
                                 self_signature.generic_context.and_then(|context| {
-                                    type_mapping.update_signature_generic_context(db, env, context)
+                                    type_mapping
+                                        .update_signature_generic_context(db, context, visitor)
                                 }),
                             ),
                             // Keep the enclosing method's definition for binding `Self` and
@@ -1192,10 +1192,9 @@ impl<'db> Signature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        let env = visitor.env;
         Self {
             generic_context: self.generic_context.and_then(|context| {
-                type_mapping.update_signature_generic_context(db, env, context)
+                type_mapping.update_signature_generic_context(db, context, visitor)
             }),
             definition: self.definition,
             extras: SignatureExtras::new(
@@ -5589,7 +5588,18 @@ impl<'db> Parameters<'db> {
         } else {
             self.data.kind
         };
-        Self::new(value, kind).expand_starred_variadic_annotations(db)
+        let parameters = Self::new(value, kind);
+        if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. }) {
+            // Resolving typevar identities does not specialize a pack. Keep its fixed boundaries
+            // in the starred annotation so call binding can infer the residual tuple shape.
+            parameters
+        } else {
+            // TODO: Make expansion an explicit operation for consumers that need it. Type
+            // mappings can otherwise introduce positional suffixes after unsolved variadics,
+            // which call binding does not handle correctly. This also happens when specializing
+            // a class parameter unrelated to a method's pack.
+            parameters.expand_starred_variadic_annotations(db)
+        }
     }
     pub(crate) fn len(&self) -> usize {
         self.data.value.len()
@@ -5710,6 +5720,10 @@ impl<'db> Parameters<'db> {
     ///
     /// Preserve the original `*args` definition and source position on every expanded parameter
     /// so diagnostics can identify its declaration after specialization or overload filtering.
+    ///
+    /// TODO: This also expands unsolved packs, producing positional suffixes that call binding
+    /// does not support. Type mappings should preserve starred annotations and leave expansion
+    /// to consumers that support the expanded representation, such as signature comparison.
     ///
     /// ```python
     /// from typing import Unpack

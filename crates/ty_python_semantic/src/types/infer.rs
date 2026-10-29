@@ -1115,6 +1115,9 @@ impl<'db> InferenceRegion<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ScopeInference<'db> {
     /// The types of every expression in this region.
+    ///
+    /// Annotation expressions are inputs to declaration inference. Use
+    /// [`crate::types::inferred_declaration`] to read the type of the declaration they annotate.
     expressions: FrozenValueMap<ExpressionNodeKey, Type<'db>>,
 
     /// The extra data that is only present for few inference regions.
@@ -1305,6 +1308,9 @@ impl<'db> InferredDeclaration<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct DefinitionInference<'db> {
     /// The types of every expression in this region.
+    ///
+    /// Annotation expressions are inputs to declaration inference. Use
+    /// [`Self::inferred_declaration`] to read the type of the declaration they annotate.
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// The scope this region is part of.
@@ -1930,6 +1936,8 @@ impl<'db> DefinitionInference<'db> {
         self.types.bindings(owner)
     }
 
+    /// Returns the declaration's type, which can differ from its annotation expression's type.
+    /// See [`crate::types::inferred_declaration`] for how to choose between the two.
     pub(crate) fn inferred_declaration(
         &self,
         definition: Definition<'db>,

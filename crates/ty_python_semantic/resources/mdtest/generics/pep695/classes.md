@@ -2260,13 +2260,59 @@ class Pair[T, U]:
     def __init__(self, first: T, second: U):
         self.first: T = first
         self.second: U = second
+        self.values: list[T] = [first]
 
     def swapped(self, other: "Pair[U, T]"):
         reveal_type(other.first)  # revealed: U@Pair
         reveal_type(other.second)  # revealed: T@Pair
+        # revealed: list[U@Pair]
+        reveal_type(other.values)
 
     def nested(self, other: "Pair[list[T], U]"):
         reveal_type(other.first)  # revealed: list[T@Pair]
+        # revealed: list[list[T@Pair]]
+        reveal_type(other.values)
+```
+
+## Inferred attributes preserve captured type variables
+
+Specializing a local generic class replaces its own type variables in inferred attributes. Type
+variables captured from the enclosing function retain that function's binding.
+
+```py
+def outer[T](captured: T) -> None:
+    class Local[U]:
+        def __init__(self, value: U) -> None:
+            self.value = (value,)
+            self.captured = (captured,)
+
+    local = Local[int](1)
+    # revealed: tuple[int]
+    reveal_type(local.value)
+    unchanged: tuple[T] = local.captured  # no diagnostic
+```
+
+## Annotated attributes preserve captured type variables
+
+A local class's attribute and method annotations capture the enclosing function's type variables.
+The class's own parameters remain available for specialization.
+
+```py
+def outer[T](captured: T) -> None:
+    class Local[U]:
+        value: U
+        captured: T
+
+        def __init__(self, value: U, captured: T) -> None:
+            self.value = value  # no diagnostic
+            self.captured = captured  # no diagnostic
+
+    local = Local[int](1, captured)
+    # revealed: int
+    reveal_type(local.value)
+    unchanged: T = local.captured  # no diagnostic
+    Local[int]("wrong", captured)  # error: [invalid-argument-type]
+    Local[int](1, "wrong")  # error: [invalid-argument-type]
 ```
 
 ## Materialized `TypeIs` return types
@@ -2975,6 +3021,27 @@ def accepts(value: Required) -> None: ...
 def check(broad: Broad, incompatible: Incompatible):
     accepts(broad)  # no diagnostic
     accepts(incompatible)  # error: [invalid-argument-type]
+```
+
+## Receiver requirements in constructor overloads
+
+Each constructor overload checks its receiver restriction together with its arguments. The receiver
+restriction also applies when every explicit argument has a default.
+
+```py
+from typing import overload
+
+class Required[T]:
+    @overload
+    def __init__(self: "Required[int]", value: int = 0) -> None: ...
+    @overload
+    def __init__(self: "Required[str]", value: str = "") -> None: ...
+    def __init__(self, value: object = 0) -> None: ...
+
+Required[int]()  # no diagnostic
+Required[str]()  # no diagnostic
+Required[bytes]()  # error: [no-matching-overload]
+Required[int]("wrong")  # error: [no-matching-overload]
 ```
 
 ## Aliased `Self` in explicit receivers

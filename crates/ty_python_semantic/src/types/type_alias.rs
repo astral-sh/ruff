@@ -724,6 +724,21 @@ impl<'db> TypeAliasType<'db> {
             TypeMapping::ApplyRecursiveSubstitution(_) => {
                 Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
             }
+            TypeMapping::FreshenBoundTypeVars { .. } => {
+                visitor.visit(db, ty, type_mapping, || {
+                    // Stored arguments account for the alias's own parameters, but its
+                    // definition can also capture outer typevars. Expand only when those
+                    // captures change; changing arguments alone must retain the alias.
+                    let raw = self.raw_value_type(db);
+                    let mapped = raw.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                    if mapped == raw || mapped == ty {
+                        Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
+                    } else {
+                        self.value_type_with_recursion(db, visitor.recursion_context)
+                            .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                    }
+                })
+            }
             TypeMapping::Materialize(_) if self.materialization_kind(db).is_some() => ty,
             TypeMapping::EagerExpansion if self.materialization_kind(db).is_some() => self
                 .value_type_with_recursion(db, visitor.recursion_context)
