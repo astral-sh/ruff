@@ -19,7 +19,7 @@ use crate::Db;
 use crate::place::definitions::DefinitionResolution;
 use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::place::{
-    builtins_module_scope, class_body_implicit_symbol, implicit_builtins_symbol_scope,
+    TypeOrigin, builtins_module_scope, class_body_implicit_symbol, implicit_builtins_symbol_scope,
     loop_header_reachability, place_from_bindings,
 };
 use crate::place_load::{
@@ -29,8 +29,8 @@ use crate::place_load::{
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
-    CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
-    infer_complete_scope_types, infer_definition_types, inferred_declaration,
+    CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeAndQualifiers, TypeQualifiers,
+    binding_type, infer_complete_scope_types, infer_definition_types, inferred_declaration,
     is_discarded_dict_key_assignment,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -596,6 +596,20 @@ impl<'db> SemanticModel<'db> {
             }
             _ => false,
         }
+    }
+
+    /// Returns the type inferred at this assignment and the qualifiers that apply to its
+    /// target. For example, assigning a `bool` to an inherited `ClassVar[int]` gives the
+    /// target type `bool` and the qualifier `ClassVar`.
+    pub fn assignment_target_type(&self, target: &Expr) -> Option<TypeAndQualifiers<'db>> {
+        let scope = self.scope(target.into())?.to_scope_id(self.db, self.file);
+        let inference = infer_complete_scope_types(self.db, scope);
+        let ty = inference.try_expression_type(target)?;
+        let mut qualifiers = inference.qualifiers(target);
+        if qualifiers.is_empty() && target.is_attribute_expr() {
+            qualifiers = self.type_qualifiers(target.into());
+        }
+        Some(TypeAndQualifiers::new(ty, TypeOrigin::Inferred, qualifiers))
     }
 
     /// Returns the type qualifiers (e.g. `Final`, `ClassVar`) for a given expression,

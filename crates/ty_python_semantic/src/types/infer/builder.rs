@@ -294,7 +294,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// during multi-inference can reuse predicate truthiness computed by the parent builder.
     reachability_cache: OnceCell<Rc<ReachabilityEvaluationCache<'db>>>,
 
-    /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
+    /// Type qualifiers for annotations and assignment targets.
     /// Only populated for expressions that have non-empty qualifiers.
     qualifiers: FxHashMap<ExpressionNodeKey, TypeQualifiers>,
 
@@ -1057,7 +1057,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .unwrap_or_else(|| self.infer_expression(expr, tcx))
     }
 
-    /// Store qualifiers for an annotation expression.
+    /// Store qualifiers for an annotation or assignment target.
     fn store_qualifiers(&mut self, expr: &ast::Expr, qualifiers: TypeQualifiers) {
         if !qualifiers.is_empty() {
             self.qualifiers.insert(expr.into(), qualifiers);
@@ -3532,6 +3532,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target_ty =
             self.infer_assignment_definition_impl(assignment, definition, add.type_context());
         self.store_expression_type(target, target_ty);
+        self.store_qualifiers(target, add.qualifiers);
         add.insert(self, target_ty);
     }
 
