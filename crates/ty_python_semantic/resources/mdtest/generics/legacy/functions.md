@@ -4846,6 +4846,33 @@ def optional_callback(value: O) -> Callable[[O | None], O | None]:
     return reveal_type(identity_callback(value))
 ```
 
+## Inferring a recursive protocol from a factory's return context
+
+The annotated assignment supplies `Stream[int]` as the type argument to `make_result`. Comparing the
+return types of `first_or` reaches `Stream`, whose `window` method adds the layer of nesting that
+`flatten` removes.
+
+```py
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Result(Protocol[T_co]):
+    def first_or(self, default: U) -> T_co | U: ...
+
+class Stream(Protocol[T_co]):
+    def flatten(self: "Stream[Stream[U]]") -> "Stream[U]": ...
+    def window(self) -> "Stream[Stream[T_co]]": ...
+
+def make_result() -> Result[T]:
+    raise NotImplementedError
+
+result: Result[Stream[int]] = make_result()
+reveal_type(result)  # revealed: Result[Stream[int]]
+```
+
 ## Generic property setter overrides
 
 A method-scoped type variable is inferred for each write, so an unconstrained setter preserves an
