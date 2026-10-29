@@ -3700,7 +3700,12 @@ fn proto_interface_cycle_recover<'db>(
 /// Protocol interfaces can be prepared before their receiver is known, so we do not use
 /// [`CallableType::bind_self`] here. Preserve all overloads and record receiver constraints for
 /// later compatibility checks instead of specializing or filtering signatures here.
-#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+/// Checking a receiver annotation can lead back to the method through a recursive protocol.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|db, _, _, _, _| CallableType::bottom(db),
+    heap_size=ruff_memory_usage::heap_size
+)]
 fn protocol_bind_self<'db>(
     db: &'db dyn Db,
     program: Program<'db>,
