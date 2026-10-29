@@ -4,12 +4,14 @@
 //! <https://github.com/astral-sh/uv/blob/main/crates/uv/tests/project/check.rs>.
 
 #[cfg(feature = "test-uv")]
-use std::{path::Path, process::Command};
+use std::{fmt::Write as _, fs::File, io::Write, path::Path, process::Command};
 
 use insta_cmd::assert_cmd_snapshot;
 #[cfg(feature = "test-uv")]
 use ty_project::uv_test_env_vars;
 use ty_static::EnvVars;
+#[cfg(feature = "test-uv")]
+use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
 use crate::CliTest;
 
@@ -100,23 +102,45 @@ fn set_uv_envs(command: &mut Command, case: &CliTest, virtual_env: Option<&Path>
 }
 
 #[cfg(feature = "test-uv")]
-pub(super) fn write_dependency_wheels(case: &CliTest) -> anyhow::Result<()> {
+pub(super) fn write_dependency_wheel(
+    case: &CliTest,
+    distribution: &str,
+    module: &str,
+    dependencies: &[&str],
+) -> anyhow::Result<()> {
     let wheel_directory = case.root().join("wheels");
     std::fs::create_dir_all(&wheel_directory)?;
-    for (name, contents) in [
+
+    let prefix = format!("{}-0.1.0", distribution.replace('-', "_"));
+    let mut wheel = ZipWriter::new(File::create(
+        wheel_directory.join(format!("{prefix}-py3-none-any.whl")),
+    )?);
+    let options = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
+    let mut metadata = format!("Metadata-Version: 2.1\nName: {distribution}\nVersion: 0.1.0\n");
+    for dependency in dependencies {
+        writeln!(metadata, "Requires-Dist: {dependency}")?;
+    }
+    let mut record = Vec::new();
+
+    for (path, contents) in [
+        (format!("{module}.py"), "value: int = 1\n"),
+        (format!("{prefix}.dist-info/METADATA"), metadata.as_str()),
         (
-            "indirect_dependency-0.1.0-py3-none-any.whl",
-            include_bytes!("../../resources/test/uv/indirect_dependency-0.1.0-py3-none-any.whl")
-                .as_slice(),
-        ),
-        (
-            "direct_dependency-0.1.0-py3-none-any.whl",
-            include_bytes!("../../resources/test/uv/direct_dependency-0.1.0-py3-none-any.whl")
-                .as_slice(),
+            format!("{prefix}.dist-info/WHEEL"),
+            "Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
         ),
     ] {
-        std::fs::write(wheel_directory.join(name), contents)?;
+        wheel.start_file(&path, options)?;
+        wheel.write_all(contents.as_bytes())?;
+        record.push(format!("{path},,"));
     }
+
+    let record_path = format!("{prefix}.dist-info/RECORD");
+    record.push(format!("{record_path},,"));
+    wheel.start_file(record_path, options)?;
+    writeln!(wheel, "{}", record.join("\n"))?;
+    wheel.finish()?;
+
     Ok(())
 }
 
@@ -155,7 +179,13 @@ fn dependency_workspace_case() -> anyhow::Result<CliTest> {
         ),
         ("packages/sibling/sibling.py", "import direct_module\n"),
     ])?;
-    write_dependency_wheels(&case)?;
+    write_dependency_wheel(&case, "indirect-dependency", "indirect_module", &[])?;
+    write_dependency_wheel(
+        &case,
+        "direct-dependency",
+        "direct_module",
+        &["indirect-dependency"],
+    )?;
 
     Ok(case)
 }

@@ -1441,7 +1441,7 @@ mod uv_metadata {
     use ty_static::EnvVars;
 
     use crate::CliTest;
-    use crate::uv_workspace::{uv_sync_command, write_dependency_wheels};
+    use crate::uv_workspace::{uv_sync_command, write_dependency_wheel};
 
     fn command_with_script_uv(case: &CliTest) -> Command {
         let mut command = case.command();
@@ -1562,7 +1562,13 @@ mod uv_metadata {
             import indirect_module
             "#,
         )?;
-        write_dependency_wheels(&case)?;
+        write_dependency_wheel(&case, "indirect-dependency", "indirect_module", &[])?;
+        write_dependency_wheel(
+            &case,
+            "direct-dependency",
+            "direct_module",
+            &["indirect-dependency"],
+        )?;
         Ok(case)
     }
 
