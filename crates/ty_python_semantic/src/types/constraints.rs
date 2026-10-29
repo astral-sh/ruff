@@ -120,8 +120,8 @@ use crate::types::visitor::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, DynamicType, IntersectionType,
-    KnownInstanceType, PropertyInstanceClass, ProtocolInstanceType, Type, TypeContext, TypeMapping,
-    TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    KnownInstanceType, PropertyInstanceClass, ProtocolInstanceType, StaticClassLiteral, Type,
+    TypeContext, TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
@@ -1515,6 +1515,7 @@ impl<'db> ConstraintSetStorage<'db> {
             seen: SeenTypes<'db>,
         }
 
+        #[derive(Default)]
         struct InternMentionedTypevars<'db> {
             supports: ConstraintSupports,
             aliases: Vec<AliasVisit<'db>>,
@@ -1728,31 +1729,22 @@ impl<'db> ConstraintSetStorage<'db> {
                     if let Some(specialization) = specialization {
                         self.visit_specialization(db, env, storage, specialization, source, bound);
                     }
-                    let Some(origin) = class.into_protocol_class(db) else {
-                        self.mark_incomplete(source);
-                        return;
-                    };
                     if source == Source::Occurrence {
                         self.supports.occurrences.mark_incomplete();
                     }
-                    let bound =
-                        self.bind_context(db, env, storage, class.generic_context(db), bound);
-                    // Walk the definition separately from its arguments. Dependencies
-                    // need not unfold an expanding sequence such as P[list[T]].
-                    if !self.already_visited(
-                        Type::ClassLiteral(class.into()),
-                        Source::Definition,
-                        &bound,
-                    ) {
-                        self.visit_protocol_interface(
-                            db,
-                            env,
-                            storage,
-                            ProtocolInterfaceView::new(origin.interface(db), None),
-                            protocol,
-                            Source::Definition,
-                            &bound,
-                        );
+                    // Keep mutually recursive definitions in the same walk, and substitute
+                    // alias arguments in the scope of their use.
+                    if source == Source::Definition || !self.aliases.is_empty() {
+                        self.visit_protocol_definition(db, env, storage, class, protocol, bound);
+                    } else {
+                        let (captures, complete) =
+                            protocol_captures(db, env.program(db), class, protocol);
+                        let captures = &Support::from_typevar_set(db, storage, captures) - bound;
+                        self.supports.validation |= &captures;
+                        self.supports.free |= &captures;
+                        if !complete {
+                            self.mark_incomplete(Source::Definition);
+                        }
                     }
                 } else {
                     self.visit_protocol_interface(
@@ -1763,6 +1755,39 @@ impl<'db> ConstraintSetStorage<'db> {
                         protocol,
                         source,
                         bound,
+                    );
+                }
+            }
+
+            fn visit_protocol_definition(
+                &mut self,
+                db: &'db dyn Db,
+                env: &ProgramEnvironment<'db>,
+                storage: &mut ConstraintSetStorage<'db>,
+                class: StaticClassLiteral<'db>,
+                protocol: ProtocolInstanceType<'db>,
+                bound: &Support,
+            ) {
+                let Some(origin) = class.into_protocol_class(db) else {
+                    self.mark_incomplete(Source::Definition);
+                    return;
+                };
+                let bound = self.bind_context(db, env, storage, class.generic_context(db), bound);
+                // Walk the definition separately from its arguments. Dependencies
+                // need not unfold an expanding sequence such as P[list[T]].
+                if !self.already_visited(
+                    Type::ClassLiteral(class.into()),
+                    Source::Definition,
+                    &bound,
+                ) {
+                    self.visit_protocol_interface(
+                        db,
+                        env,
+                        storage,
+                        ProtocolInterfaceView::new(origin.interface(db), None),
+                        protocol,
+                        Source::Definition,
+                        &bound,
                     );
                 }
             }
@@ -2271,6 +2296,36 @@ impl<'db> ConstraintSetStorage<'db> {
             }
         }
 
+        /// Captures are relative to the protocol's own binders. Only the caller can decide
+        /// which of them are also bound in the enclosing constraint.
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _, _, _| (TypeVarSet::None, false),
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn protocol_captures<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            class: StaticClassLiteral<'db>,
+            protocol: ProtocolInstanceType<'db>,
+        ) -> (TypeVarSet<'db>, bool) {
+            let mut storage = ConstraintSetStorage::default();
+            let mut visitor = InternMentionedTypevars::default();
+            visitor.visit_protocol_definition(
+                db,
+                &ProgramEnvironment::from_program(program),
+                &mut storage,
+                class,
+                protocol,
+                &Support::default(),
+            );
+            let captures = visitor.supports.free;
+            (
+                TypeVarSet::from_typevars(db, captures.iter().map(|id| storage.typevar_data(id))),
+                captures.is_complete(),
+            )
+        }
+
         let types = match constraint {
             Constraint::Atomic(atomic) => match atomic {
                 AtomicConstraint::ConcreteLower(bound) => {
@@ -2299,11 +2354,7 @@ impl<'db> ConstraintSetStorage<'db> {
                 return supports;
             }
         };
-        let mut visitor = InternMentionedTypevars {
-            supports: ConstraintSupports::default(),
-            aliases: Vec::new(),
-            seen: SeenTypes::default(),
-        };
+        let mut visitor = InternMentionedTypevars::default();
         visitor.visit_types(
             db,
             env,
