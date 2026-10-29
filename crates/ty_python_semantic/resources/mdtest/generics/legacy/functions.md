@@ -581,6 +581,53 @@ info: Type variable defined here
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
+## Constrained type variables in bound method receivers
+
+The argument to `list.extend` must be valid for every possible element type of the receiver.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+
+def extend(values: list[T], other: list[T]) -> None:
+    values.extend(other)
+
+    # error: [invalid-argument-type] "Expected `Iterable[T@extend]`, found `list[int]`"
+    values.extend([1])
+```
+
+## Generic callbacks in bound method calls
+
+A callback registered for an arbitrary `T` must return that `T` for every input. The identity
+function returns its input, which can be any `object`, so it is not a valid callback here.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+V = TypeVar("V")
+T = TypeVar("T")
+
+def identity(value: V) -> V:
+    return value
+
+def register(callbacks: list[Callable[[object], T]], callback: Callable[[object], T]) -> None:
+    callbacks.append(callback)  # no diagnostic
+    # TODO: should report invalid-argument-type (https://github.com/astral-sh/ty/issues/3114)
+    callbacks.append(identity)
+```
+
+When a dictionary lookup uses `identity` as its default, it can return either kind of callback.
+
+```py
+Callback = Callable[[object], T]
+
+def lookup(callbacks: dict[str, Callback[T]]) -> None:
+    # TODO: The result should be a union of the stored callback type and the type of `identity`.
+    reveal_type(callbacks.get("key", identity))  # revealed: (object, /) -> T@lookup
+```
+
 ## Inferring a constrained typevar from a callback parameter
 
 A callback must accept every value of at least one declared constraint. A callback accepting only

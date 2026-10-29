@@ -7109,6 +7109,10 @@ impl<'db> Type<'db> {
                             )
                         {
                             specialized.overloads
+                        } else if let Some(specialized) =
+                            overload.with_unused_self_upper_bound(db, env)
+                        {
+                            smallvec_inline![specialized]
                         } else {
                             smallvec_inline![overload.clone()]
                         }

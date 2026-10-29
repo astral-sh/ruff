@@ -4020,6 +4020,53 @@ box.accept("invalid", other=1)
 box.accept(1, other="invalid")
 ```
 
+## Constrained type variables in bound method receivers
+
+The argument to `list.extend` must be valid for every possible element type of the receiver,
+including when a type alias refers to that element type.
+
+```py
+def extend[T: (int, str)](values: list[T], other: list[T]) -> None:
+    values.extend(other)
+
+    # error: [invalid-argument-type] "Expected `Iterable[T@extend]`, found `list[int]`"
+    values.extend([1])
+
+    type Item = T
+    aliased: list[Item] = values
+    # error: 20 [invalid-argument-type] "Expected `Iterable[Item]`, found `list[int]`"
+    aliased.extend([1])
+```
+
+## Generic callbacks in bound method calls
+
+A callback registered for an arbitrary `T` must return that `T` for every input. The identity
+function returns its input, which can be any `object`, so it is not a valid callback here.
+
+```py
+from collections.abc import Callable
+
+def identity[V](value: V) -> V:
+    return value
+
+def register[T](callbacks: list[Callable[[object], T]], callback: Callable[[object], T]) -> None:
+    callbacks.append(callback)  # no diagnostic
+    # TODO: should report invalid-argument-type (https://github.com/astral-sh/ty/issues/3114)
+    callbacks.append(identity)
+
+    type Callback = Callable[[object], T]
+    aliased: list[Callback] = callbacks
+    aliased.append(identity)  # TODO: should report invalid-argument-type
+```
+
+When a dictionary lookup uses `identity` as its default, it can return either kind of callback.
+
+```py
+def lookup[T](callbacks: dict[str, Callable[[object], T]]) -> None:
+    # TODO: The result should be a union of the stored callback type and the type of `identity`.
+    reveal_type(callbacks.get("key", identity))  # revealed: (object, /) -> T@lookup
+```
+
 ## `~T` is never assignable to `T`
 
 ```py

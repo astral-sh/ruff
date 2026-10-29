@@ -1783,6 +1783,52 @@ impl<'db> Signature<'db> {
             .is_some_and(|parameter| parameter.is_positional() && parameter.inferred_annotation)
     }
 
+    /// Returns the receiver's `Self` type variable if it is unused in the rest of the signature.
+    fn unused_self_typevar(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<BoundTypeVarInstance<'db>> {
+        let (receiver, parameters) = self.parameters.as_slice().split_first()?;
+        let typevar = match receiver.annotated_type() {
+            Type::TypeVar(typevar) => typevar,
+            Type::SubclassOf(subclass) => subclass.into_type_var()?,
+            _ => return None,
+        };
+        (receiver.is_positional()
+            && typevar.typevar(db).is_self(db)
+            && !self.needs_self_mapping(db, env, parameters))
+        .then_some(typevar)
+    }
+
+    /// Replaces an unused implicit `Self` receiver with its upper bound.
+    pub(super) fn with_unused_self_upper_bound(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Self> {
+        let context = self.generic_context?;
+        if context.len(db) != 1 || !self.has_implicit_positional_receiver_annotation() {
+            return None;
+        }
+        let self_typevar = self.unused_self_typevar(db, env)?;
+        if !context.contains(db, self_typevar.identity(db)) {
+            return None;
+        }
+
+        let bound = self_typevar.typevar(db).upper_bound(db, env)?;
+        let mut signature = self.clone();
+        let receiver = Arc::make_mut(&mut signature.parameters.data)
+            .value
+            .first_mut()?;
+        receiver.annotated_type = match receiver.annotated_type() {
+            Type::SubclassOf(_) => bound.to_meta_type(db, env),
+            _ => bound,
+        };
+        signature.generic_context = None;
+        Some(signature)
+    }
+
     /// Binds the `Self` receiver if it is unused in the rest of the signature.
     ///
     /// This is purely a performance optimization. Eagerly binding the type of `Self` prevents
@@ -1794,23 +1840,7 @@ impl<'db> Signature<'db> {
         self_type: Type<'db>,
     ) -> Option<Self> {
         let context = self.generic_context?;
-        let (receiver, parameters) = self.parameters.as_slice().split_first()?;
-
-        // Ensure `Self` is not used elsewhere in the signature, in which case eagerly binding it
-        // would be unsound.
-        if !receiver.is_positional() || self.needs_self_mapping(db, env, parameters) {
-            return None;
-        }
-
-        // Extract the `Self` type variable.
-        let self_typevar = match receiver.annotated_type() {
-            Type::TypeVar(typevar) => typevar,
-            Type::SubclassOf(subclass) => subclass.into_type_var()?,
-            _ => return None,
-        };
-        if !self_typevar.typevar(db).is_self(db) {
-            return None;
-        }
+        let self_typevar = self.unused_self_typevar(db, env)?;
 
         // Also ensure that the receiver satisfies the upper bound of `Self`.
         let bound = self_typevar.typevar(db).upper_bound(db, env)?;
