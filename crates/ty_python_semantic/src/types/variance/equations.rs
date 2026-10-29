@@ -30,12 +30,6 @@ pub(crate) enum VarianceTerm<'db> {
     Compose(VarianceProduct<'db>),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-enum VariancePurpose {
-    Type,
-    AliasParameter,
-}
-
 impl<'db> VarianceTerm<'db> {
     pub(crate) const BIVARIANT: Self = Self::Constant(TypeVarVariance::Bivariant);
 
@@ -85,17 +79,19 @@ impl<'db> VarianceTerm<'db> {
 
     /// Evaluate an expression using declared variance at protocol-parameter references.
     pub(crate) fn evaluate(self, db: &'db dyn Db) -> TypeVarVariance {
-        self.evaluate_with(db, &|variable| {
-            variable.effective_variance(db, VariancePurpose::Type)
-        })
+        self.evaluate_with(db, &|variable| variable.effective_variance(db))
     }
 
-    /// Whether an alias parameter contributes to call inference. For growing recursive aliases,
-    /// following the parameter through the constructor keeps this check finite.
+    /// Whether the type variable contributes to call inference through this alias.
     pub(in crate::types) fn is_used_in_alias(self, db: &'db dyn Db) -> bool {
-        self.evaluate_with(db, &|variable| {
-            variable.effective_variance(db, VariancePurpose::AliasParameter)
-        }) != TypeVarVariance::Bivariant
+        match self {
+            Self::Constant(variance) => variance != TypeVarVariance::Bivariant,
+            Self::Variable(variable) => variable.is_used_in_alias(db),
+            Self::Join(sum) => sum.terms(db).iter().any(|term| term.is_used_in_alias(db)),
+            Self::Compose(product) => {
+                product.left(db).is_used_in_alias(db) && product.right(db).is_used_in_alias(db)
+            }
+        }
     }
 
     /// Substitute the supplied variable values; the component solver supplies its current
@@ -192,22 +188,32 @@ impl get_size2::GetSize for VarianceVariable<'_> {}
 impl<'db> VarianceVariable<'db> {
     /// Honor the protocol declaration attached to this reference even when its equation infers
     /// a different variance. References without a declaration are evaluated from their equations.
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
-    fn effective_variance(self, db: &'db dyn Db, purpose: VariancePurpose) -> TypeVarVariance {
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
+    fn effective_variance(self, db: &'db dyn Db) -> TypeVarVariance {
         if let VarianceOrigin::ProtocolParameter(_, declared) = self.origin(db) {
-            return declared;
+            declared
+        } else {
+            self.equation(db).evaluate(db)
+        }
+    }
+
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
+    fn is_used_in_alias(self, db: &'db dyn Db) -> bool {
+        if let VarianceOrigin::ProtocolParameter(_, declared) = self.origin(db) {
+            return declared != TypeVarVariance::Bivariant;
         }
 
-        let mut equation = self.equation(db);
-        if purpose == VariancePurpose::AliasParameter
-            && !matches!(equation, VarianceTerm::Constant(_))
+        // Specialization can erase a recursive reference. An equation that is already
+        // constant gives the answer without consulting the constructor's parameters.
+        let equation = self.equation(db);
+        if !matches!(equation, VarianceTerm::Constant(_))
             && let VarianceOrigin::Recursive(recursive) = self.origin(db)
             && let Some(parameter_variance) =
                 recursive.growing_parameter_variance(db, self.typevar(db))
         {
-            equation = parameter_variance;
+            return parameter_variance.is_used_in_alias(db);
         }
-        equation.evaluate_with(db, &|variable| variable.effective_variance(db, purpose))
+        equation.is_used_in_alias(db)
     }
 
     /// Return the defining expression, or declared variance for an unsupported protocol.
@@ -296,7 +302,7 @@ impl<'db> VarianceComponent<'db> {
             queued[index] = false;
             let variance = equations[index].evaluate_with(db, &|dependency| {
                 indices.get(&dependency).map_or_else(
-                    || dependency.effective_variance(db, VariancePurpose::Type),
+                    || dependency.effective_variance(db),
                     |&dependency_index| values[dependency_index],
                 )
             });
