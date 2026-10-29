@@ -293,7 +293,7 @@ fn generic_context_has_paramspec<'db>(
         .any(|typevar| typevar.is_paramspec(db))
 }
 
-/// Transforms a partial's callable leaves while preserving combined parameter lists.
+/// Transforms each callable while preserving the surrounding unions and intersections.
 /// Negated types cannot be transformed this way, so intersections containing them are rejected.
 fn try_map_partial_callable<'db>(
     db: &'db dyn Db,
