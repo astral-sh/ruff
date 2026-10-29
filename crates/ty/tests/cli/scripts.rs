@@ -1573,6 +1573,112 @@ mod uv_metadata {
     }
 
     #[test]
+    fn unused_script_dependencies_report_and_suppress() -> anyhow::Result<()> {
+        let case = script_with_indirect_dependency()?;
+        let source = r#"
+            # /// script
+            # requires-python = ">=3.8"
+            # dependencies = ["direct-dependency"]
+            # [tool.uv]
+            # no-index = true
+            # find-links = ["wheels"]
+            # ///
+            pass
+        "#;
+        case.write_file("script.py", source)?;
+        let mut command = command_with_script_uv(&case);
+        command
+            .args(["script.py", "--error", "unused-dependency"])
+            .env(EnvVars::TY_UV, "scripts")
+            .env("UV_OFFLINE", "1")
+            .env("UV_PYTHON_DOWNLOADS", "never");
+        assert_cmd_snapshot!(command, @r#"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        error[unused-dependency]: Dependency `direct-dependency` is declared but never imported
+         --> script.py:4:19
+          |
+        4 | # dependencies = ["direct-dependency"]
+          |                   ^^^^^^^^^^^^^^^^^^^
+
+        Found 1 diagnostic
+
+        ----- stderr -----
+        "#);
+
+        case.write_file(
+            "script.py",
+            &source.replace(
+                "# dependencies = [\"direct-dependency\"]",
+                "# dependencies = [\"direct-dependency\"]  # ty: ignore[unused-dependency]",
+            ),
+        )?;
+        command.args(["--error", "unused-ignore-comment"]);
+        assert_cmd_snapshot!(command, @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        All checks passed!
+
+        ----- stderr -----
+        ");
+        Ok(())
+    }
+
+    #[test]
+    fn unused_script_dependencies_follow_local_helpers() -> anyhow::Result<()> {
+        let case = script_with_indirect_dependency()?;
+        case.write_file(
+            "script.py",
+            r#"
+            # /// script
+            # requires-python = ">=3.8"
+            # dependencies = ["direct-dependency"]
+            # [tool.uv]
+            # no-index = true
+            # find-links = ["wheels"]
+            # [tool.ty.environment]
+            # root = ["."]
+            # ///
+            import helper
+            "#,
+        )?;
+        case.write_file("helper.py", "import direct_module\n")?;
+        let mut command = command_with_script_uv(&case);
+        command
+            .args(["script.py", "--error", "unused-dependency"])
+            .env(EnvVars::TY_UV, "scripts")
+            .env("UV_OFFLINE", "1")
+            .env("UV_PYTHON_DOWNLOADS", "never");
+        assert_cmd_snapshot!(command, @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        All checks passed!
+
+        ----- stderr -----
+        ");
+
+        case.write_file("helper.py", "pass\n")?;
+        assert_cmd_snapshot!(command, @r#"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        error[unused-dependency]: Dependency `direct-dependency` is declared but never imported
+         --> script.py:4:19
+          |
+        4 | # dependencies = ["direct-dependency"]
+          |                   ^^^^^^^^^^^^^^^^^^^
+
+        Found 1 diagnostic
+
+        ----- stderr -----
+        "#);
+        Ok(())
+    }
+
+    #[test]
     fn indirect_dependencies_use_script_declarations() -> anyhow::Result<()> {
         assert_uv_supports_script_metadata()?;
 
