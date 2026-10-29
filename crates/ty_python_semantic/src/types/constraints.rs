@@ -1510,7 +1510,7 @@ impl<'db> ConstraintSetStorage<'db> {
             ty: Type<'db>,
             source: Source,
             supports: ConstraintSupports,
-            specialization: Option<Specialization<'db>>,
+            specialization: Specialization<'db>,
             bound: Support,
             seen: SeenTypes<'db>,
         }
@@ -1622,6 +1622,14 @@ impl<'db> ConstraintSetStorage<'db> {
                 source: Source,
                 bound: &Support,
             ) {
+                // Without a substitution, the body is in the caller's scope and can share
+                // its visited set across recursive references.
+                let Some(specialization) = specialization else {
+                    if !self.already_visited(ty, source, bound) {
+                        self.visit_type(db, env, storage, body, source, bound);
+                    }
+                    return;
+                };
                 let mut previous = self.aliases.iter().rev().filter(|alias| {
                     alias.ty == ty && alias.source == source && alias.bound == *bound
                 });
@@ -1658,7 +1666,7 @@ impl<'db> ConstraintSetStorage<'db> {
                 if let Some(alias) = self.aliases.pop() {
                     // Substitute in the caller's scope. Finite use-site nesting is not a
                     // recursive reference in the alias definition.
-                    if let Some(argument) = alias.specialization.and_then(|s| s.get(db, typevar)) {
+                    if let Some(argument) = alias.specialization.get(db, typevar) {
                         self.visit_type(db, env, storage, argument, source, &alias.bound);
                     } else {
                         self.visit_type(db, env, storage, ty, source, bound);
