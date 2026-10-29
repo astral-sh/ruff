@@ -1101,6 +1101,24 @@ fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
 }
 
 #[test]
+fn subscript_result_tracks_getitem_signature() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let table = "class Table:\n    def __getitem__(self, key: int) -> str: ...\n";
+    db.write_files([
+        ("/src/table.pyi", table),
+        (
+            "/src/main.py",
+            "from typing_extensions import reveal_type\nfrom table import Table\nreveal_type(Table()[0])",
+        ),
+    ])?;
+    assert_revealed_type(&db, "/src/main.py", "str");
+
+    db.write_file("/src/table.pyi", table.replace("-> str", "-> bytes"))?;
+    assert_revealed_type(&db, "/src/main.py", "bytes");
+    Ok(())
+}
+
+#[test]
 fn undefined_reveal_fix_updates_after_source_changes() -> anyhow::Result<()> {
     let mut db = TestDbBuilder::new()
         .with_python_version(PythonVersion::PY311)
