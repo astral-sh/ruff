@@ -2603,7 +2603,7 @@ fn infer_legacy_generic_subscript<'db>(
             Type::unknown(),
             SubscriptErrorKind::DuplicateTypevar {
                 origin,
-                typevar_name,
+                typevar_name: typevar_name.into(),
             },
         )),
         Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked(generic_context)) => {
