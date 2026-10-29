@@ -326,6 +326,14 @@ struct InternedBindingsId;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BindingsSnapshotId(InternedBindingsId);
 
+/// Identifies the shared prefix and loop-write history of a closure capture within one scope.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub struct LoopCaptureKey {
+    before: InternedBindingsId,
+    symbol: ScopedSymbolId,
+    start: ScopedDefinitionId,
+}
+
 /// Uniquely identifies an interned [`Declarations`] entry in [`UseDefMap::interned_declarations`].
 #[newtype_index]
 #[derive(get_size2::GetSize, salsa::SalsaValue)]
@@ -632,6 +640,7 @@ struct DefinitionsAtDefinition<B, D> {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 enum InternedEnclosingSnapshotId {
+    LoopBindings(LoopCaptureKey),
     Constraint(ScopedNarrowingConstraint),
     Bindings(InternedBindingsId),
 }
@@ -1168,6 +1177,18 @@ impl<'db> UseDefMap<'db> {
         self.reachable_bindings(symbol.into())
     }
 
+    /// A nested writer can run after a closure captures its cell, or never run at all.
+    pub fn possible_nonlocal_writes(
+        &self,
+        symbol: ScopedSymbolId,
+    ) -> BindingWithConstraintsIterator<'_, 'db> {
+        BindingWithConstraintsIterator {
+            initial_unbound: Some(ScopedReachabilityConstraintId::AMBIGUOUS),
+            boundness_analysis: BoundnessAnalysis::BasedOnUnboundVisibility,
+            ..self.reachable_symbol_bindings(symbol)
+        }
+    }
+
     pub fn reachable_member_bindings(
         &self,
         member: ScopedMemberId,
@@ -1175,11 +1196,29 @@ impl<'db> UseDefMap<'db> {
         self.reachable_bindings(member.into())
     }
 
-    pub(crate) fn enclosing_snapshot(
+    /// Reconstructs a closure's binding history, or returns `None` if an incremental edit
+    /// removed the symbol or the prefix from the scope.
+    pub fn loop_capture_bindings(
         &self,
+        key: LoopCaptureKey,
+    ) -> Option<BindingWithConstraintsIterator<'_, 'db>> {
+        self.interned_bindings.ends.get(key.before)?;
+        let state = self.symbol_states.get(key.symbol)?;
+        let history = &self.interned_bindings[state.reachable.bindings_id()];
+        let offset = history.partition_point(|binding| binding.binding() < key.start);
+        Some(BindingWithConstraintsIterator {
+            prefix: self.interned_bindings[key.before].iter(),
+            ..self.bindings_iterator(&history[offset..], BoundnessAnalysis::AssumeBound)
+        })
+    }
+
+    pub(crate) fn enclosing_snapshot<'map>(
+        &'map self,
         snapshot_id: ScopedEnclosingSnapshotId,
+        scope: FileScopeId,
         nested_laziness: ScopeLaziness,
-    ) -> EnclosingSnapshotResult<'_, 'db> {
+        writers: &'map [(FileScopeId, ScopedSymbolId)],
+    ) -> EnclosingSnapshotResult<'map, 'db> {
         let boundness_analysis = if nested_laziness.is_eager() {
             BoundnessAnalysis::BasedOnUnboundVisibility
         } else {
@@ -1193,7 +1232,14 @@ impl<'db> UseDefMap<'db> {
 
         match extra.enclosing_snapshots.get(snapshot_id) {
             Some(InternedEnclosingSnapshotId::Constraint(constraint)) => {
-                EnclosingSnapshotResult::FoundConstraint(*constraint)
+                EnclosingSnapshotResult::FoundConstraint(*constraint, writers)
+            }
+            Some(InternedEnclosingSnapshotId::LoopBindings(key)) => {
+                let mut bindings = self
+                    .loop_capture_bindings(*key)
+                    .expect("retained loop capture");
+                bindings.loop_capture = Some((scope, *key));
+                EnclosingSnapshotResult::FoundBindings(bindings)
             }
             Some(InternedEnclosingSnapshotId::Bindings(bindings_id)) => {
                 EnclosingSnapshotResult::FoundBindings(
@@ -1377,6 +1423,8 @@ impl<'db> UseDefMap<'db> {
             constraint_tables: self.constraint_tables(),
             boundness_analysis,
             initial_unbound: None,
+            loop_capture: None,
+            prefix: [].iter(),
             inner: bindings.iter(),
         }
     }
@@ -1443,10 +1491,16 @@ pub struct BindingWithConstraintsIterator<'map, 'db> {
     constraint_tables: &'map ConstraintTables<'db>,
     boundness_analysis: BoundnessAnalysis,
     initial_unbound: Option<ScopedReachabilityConstraintId>,
+    loop_capture: Option<(FileScopeId, LoopCaptureKey)>,
+    prefix: LiveBindingsIterator<'map>,
     inner: LiveBindingsIterator<'map>,
 }
 
 impl<'map, 'db> BindingWithConstraintsIterator<'map, 'db> {
+    pub fn loop_capture(&self) -> Option<(FileScopeId, LoopCaptureKey)> {
+        self.loop_capture
+    }
+
     pub const fn predicates(&self) -> &'map Predicates<'db> {
         &self.constraint_tables.predicates
     }
@@ -1476,8 +1530,9 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
             });
         }
 
-        self.inner
+        self.prefix
             .next()
+            .or_else(|| self.inner.next())
             .map(|live_binding| BindingWithConstraints {
                 binding: self.all_definitions.get(live_binding.binding()).state(),
                 binding_order: live_binding.binding(),
@@ -1650,6 +1705,9 @@ impl ReachableDefinitions {
     }
 }
 
+/// Closures whose creation can reach a given point in control flow.
+pub(super) type LoopCapturePath = Option<Rc<FxHashSet<FileScopeId>>>;
+
 /// A snapshot of the definitions and constraints state at a particular point in control flow.
 #[derive(Clone, Debug)]
 pub(super) struct FlowSnapshot {
@@ -1658,6 +1716,7 @@ pub(super) struct FlowSnapshot {
     reachability: ScopedReachabilityConstraintId,
     checkpoint_flow: ScopedReachabilityConstraintId,
     checkpoint_state: ExceptionCheckpointSnapshot,
+    loop_captures: LoopCapturePath,
     pending_reachability: PendingReachabilityId,
 }
 
@@ -2098,6 +2157,8 @@ pub(super) struct UseDefMapBuilder<'db> {
 
     /// Restorable identity of the bindings visible to exception handlers.
     checkpoint_state: ExceptionCheckpointState,
+    /// Closures created on a path that reaches the current point in a repeating loop.
+    loop_captures: LoopCapturePath,
 
     /// Active only while visiting the final `elif` condition of an `if` chain without an `else`.
     if_chain_start: Option<FlowSnapshot>,
@@ -2152,6 +2213,7 @@ impl<'db> UseDefMapBuilder<'db> {
             boolean_test_roots: Vec::new(),
             checkpoint_flow: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             checkpoint_state: ExceptionCheckpointState::default(),
+            loop_captures: None,
             if_chain_start: None,
             if_chain_start_by_use: Vec::new(),
             definitions_by_definition: FxHashMap::default(),
@@ -2983,6 +3045,85 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
+    pub(super) fn loop_capture_path(&self) -> LoopCapturePath {
+        self.loop_captures.clone()
+    }
+
+    pub(super) fn clear_loop_capture_path(&mut self) {
+        self.loop_captures = None;
+    }
+
+    pub(super) fn merge_loop_capture_path(&mut self, branch: LoopCapturePath) {
+        if let Some(branch) = branch {
+            if let Some(current) = &mut self.loop_captures {
+                if !Rc::ptr_eq(current, &branch) {
+                    Rc::make_mut(current).extend(branch.iter().copied());
+                }
+            } else {
+                self.loop_captures = Some(branch);
+            }
+        }
+    }
+
+    pub(super) fn record_loop_capture(&mut self, scope: FileScopeId) {
+        if Rc::make_mut(self.loop_captures.get_or_insert_with(Rc::default)).insert(scope) {
+            // A handler can reach the loop header after the closure has escaped.
+            self.checkpoint_state.record_binding_change();
+        }
+    }
+
+    pub(super) fn loop_capture_reaches_here(&self, scope: FileScopeId) -> bool {
+        self.loop_captures
+            .as_ref()
+            .is_some_and(|captures| captures.contains(&scope))
+    }
+
+    pub(super) fn symbol_bound_since(
+        &self,
+        symbol: ScopedSymbolId,
+        first: ScopedDefinitionId,
+    ) -> bool {
+        self.reachable_symbol_definitions[symbol]
+            .bindings
+            .as_slice()
+            .last()
+            .is_some_and(|binding| binding.binding() >= first)
+    }
+
+    /// Reuse the whole-scope lookup when the symbol was first bound in the loop.
+    /// Otherwise exclude pre-loop assignments shadowed before the closure was created.
+    pub(super) fn widen_loop_capture(
+        &mut self,
+        id: ScopedEnclosingSnapshotId,
+        symbol: ScopedSymbolId,
+        start: ScopedDefinitionId,
+    ) -> bool {
+        if self.reachable_symbol_definitions[symbol]
+            .bindings
+            .as_slice()
+            .first()
+            .is_none_or(|binding| binding.binding() >= start)
+        {
+            return false;
+        }
+        let snapshot = &mut self.enclosing_snapshots[id];
+        let before = match snapshot {
+            EnclosingSnapshot::Bindings(bindings)
+            | EnclosingSnapshot::LoopBindings {
+                before: bindings, ..
+            } => std::mem::take(bindings),
+            EnclosingSnapshot::Constraint(_) => return false,
+        };
+        let mut before = before;
+        before.truncate_before(start);
+        *snapshot = EnclosingSnapshot::LoopBindings {
+            before,
+            symbol,
+            start,
+        };
+        true
+    }
+
     pub(super) fn update_enclosing_snapshot(
         &mut self,
         snapshot_id: ScopedEnclosingSnapshotId,
@@ -3010,7 +3151,7 @@ impl<'db> UseDefMapBuilder<'db> {
             Some(EnclosingSnapshot::Constraint(constraint)) => {
                 *constraint = ScopedNarrowingConstraint::ALWAYS_TRUE;
             }
-            None => {}
+            Some(EnclosingSnapshot::LoopBindings { .. }) | None => {}
         }
     }
 
@@ -3038,6 +3179,7 @@ impl<'db> UseDefMapBuilder<'db> {
             reachability: self.reachability,
             checkpoint_flow: self.checkpoint_flow,
             checkpoint_state: self.checkpoint_state.snapshot(),
+            loop_captures: self.loop_captures.clone(),
             pending_reachability: self.pending_reachability.current,
         }
     }
@@ -3066,6 +3208,7 @@ impl<'db> UseDefMapBuilder<'db> {
     /// Restore the current builder places state to the given snapshot.
     pub(super) fn restore(&mut self, snapshot: FlowSnapshot) {
         self.checkpoint_state.restore(snapshot.checkpoint_state);
+        self.loop_captures = snapshot.loop_captures;
         // We never remove places from `place_states` (it's an IndexVec, and the place
         // IDs must line up), so the current number of known places must always be equal to or
         // greater than the number of known places in a previously-taken snapshot.
@@ -3111,6 +3254,7 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         self.checkpoint_state.merge(snapshot.checkpoint_state);
+        self.merge_loop_capture_path(snapshot.loop_captures);
 
         // We never remove places from `place_states` (it's an IndexVec, and the place
         // IDs must line up), so the current number of known places must always be equal to or
@@ -3472,6 +3616,15 @@ impl<'db> UseDefMapBuilder<'db> {
 
         for snapshot in enclosing_snapshots {
             let interned_id = match snapshot {
+                EnclosingSnapshot::LoopBindings {
+                    before,
+                    symbol,
+                    start,
+                } => InternedEnclosingSnapshotId::LoopBindings(LoopCaptureKey {
+                    before: place_state_interner.intern_bindings(&before),
+                    symbol,
+                    start,
+                }),
                 EnclosingSnapshot::Bindings(bindings) => {
                     let interned_bindings_id = place_state_interner.intern_bindings(&bindings);
                     InternedEnclosingSnapshotId::Bindings(interned_bindings_id)

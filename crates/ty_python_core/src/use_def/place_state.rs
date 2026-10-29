@@ -304,6 +304,13 @@ impl Declarations {
 /// `Constraint`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) enum EnclosingSnapshot {
+    /// Preserve the bindings that reach the closure from before the loop, and share the
+    /// symbol's remaining history for assignments that can execute on later iterations.
+    LoopBindings {
+        before: Bindings,
+        symbol: crate::symbol::ScopedSymbolId,
+        start: ScopedDefinitionId,
+    },
     Constraint(ScopedNarrowingConstraint),
     Bindings(Bindings),
 }
@@ -322,6 +329,13 @@ pub(super) struct Bindings {
 }
 
 impl Bindings {
+    pub(super) fn truncate_before(&mut self, first: ScopedDefinitionId) {
+        self.live_bindings.truncate(
+            self.live_bindings
+                .partition_point(|binding| binding.binding() < first),
+        );
+    }
+
     pub(super) fn is_always_unbound(&self) -> bool {
         let [binding] = self.live_bindings.as_slice() else {
             return false;

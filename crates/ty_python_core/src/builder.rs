@@ -68,8 +68,8 @@ use crate::symbol::{ScopedSymbolId, Symbol};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, ImportedQualifierAction, LiveBinding,
-    LiveBindingStatus, PreviousDefinitions, ScopedDefinitionId, ScopedEnclosingSnapshotId,
-    UseDefMapBuilder, UseDefMapInterner,
+    LiveBindingStatus, LoopCapturePath, PreviousDefinitions, ScopedDefinitionId,
+    ScopedEnclosingSnapshotId, UseDefMapBuilder, UseDefMapInterner,
 };
 use crate::{Db, Statement, StatementNodeKey};
 use crate::{
@@ -88,6 +88,13 @@ struct Loop {
     break_states: Vec<FlowSnapshot>,
     /// Flow states at each `continue` in the current loop.
     continue_states: Vec<FlowSnapshot>,
+}
+
+/// Captures in a repeating loop that can observe another iteration's assignments.
+struct LoopCaptures {
+    scope: FileScopeId,
+    first_definition: ScopedDefinitionId,
+    snapshots: Vec<EnclosingSnapshotKey>,
 }
 
 /// A narrowing alias: a variable whose RHS is a narrowing expression
@@ -240,6 +247,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     source_type: PySourceType,
     module: &'ast ParsedModuleRef,
     scope_stack: Vec<ScopeInfo<'ast>>,
+    loop_captures: Vec<LoopCaptures>,
     /// The assignments we're currently visiting, with
     /// the most recent visit at the end of the Vec.
     current_assignments: Vec<CurrentAssignment<'ast, 'db>>,
@@ -328,6 +336,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             source_type: file.file(db).source_type(db),
             module: module_ref,
             scope_stack: Vec::new(),
+            loop_captures: Vec::new(),
             current_assignments: Vec::new(),
             current_statements: Vec::new(),
             current_match_case: None,
@@ -496,6 +505,53 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
 
         false
+    }
+
+    fn start_loop_captures(&mut self) {
+        self.loop_captures.push(LoopCaptures {
+            scope: self.current_scope(),
+            first_definition: self.current_use_def_map().next_definition_id(),
+            snapshots: Vec::new(),
+        });
+    }
+
+    fn finish_loop_captures(&mut self) -> LoopCapturePath {
+        let active = self.loop_captures.pop().expect("a repeating loop");
+        let owner = &mut self.use_def_maps[active.scope];
+        if owner.reachability == ScopedReachabilityConstraintId::ALWAYS_FALSE {
+            return None;
+        }
+        for key in active.snapshots {
+            if owner.loop_capture_reaches_here(key.nested_scope) {
+                if key.enclosing_scope == active.scope
+                    && let Some(&snapshot) = self.enclosing_snapshots.get(&key)
+                    && owner.widen_loop_capture(
+                        snapshot,
+                        key.enclosing_place.as_symbol().expect("captured name"),
+                        active.first_definition,
+                    )
+                {
+                    continue;
+                }
+                self.enclosing_snapshots.remove(&key);
+            }
+        }
+        owner.loop_capture_path()
+    }
+
+    /// A closure created on an earlier inner-loop iteration can reach the outer loop after
+    /// a later iteration terminates. Keep these paths until we leave the outermost loop.
+    fn merge_loop_exit_captures(&mut self, loopback: LoopCapturePath) {
+        if self
+            .loop_captures
+            .last()
+            .is_some_and(|active| active.scope == self.current_scope())
+        {
+            self.current_use_def_map_mut()
+                .merge_loop_capture_path(loopback);
+        } else {
+            self.current_use_def_map_mut().clear_loop_capture_path();
+        }
     }
 
     /// Push a new loop, returning the outer loop, if any.
@@ -788,6 +844,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     enclosing_place.into(),
                     false,
                 );
+                if !self.loop_captures.is_empty() {
+                    let owner_scope = if enclosing_place.is_local() {
+                        Some(enclosing_scope_id)
+                    } else {
+                        self.resolve_nested_reference_scope(
+                            enclosing_scope_id,
+                            nested_symbol.name(),
+                        )
+                    };
+                    if let Some(owner_scope) = owner_scope
+                        && let Some(owner_symbol) =
+                            self.place_tables[owner_scope].symbol_id(nested_symbol.name())
+                    {
+                        let owner = &mut self.use_def_maps[owner_scope];
+                        for active in self
+                            .loop_captures
+                            .iter_mut()
+                            .filter(|active| active.scope == owner_scope)
+                        {
+                            if owner.symbol_bound_since(owner_symbol, active.first_definition) {
+                                active.snapshots.push(key);
+                                owner.record_loop_capture(popped_scope_id);
+                            }
+                        }
+                    }
+                }
                 self.enclosing_snapshots.insert(key, lazy_snapshot);
             }
         }
@@ -865,41 +947,85 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn sweep_nonlocal_lazy_snapshots(&mut self) {
+    fn sweep_nonlocal_lazy_snapshots(&mut self) -> crate::NonlocalSnapshotWriters {
         if self.enclosing_snapshots.is_empty() {
-            return;
+            return FrozenMap::default();
         }
 
-        // Only the last scope containing a bound nonlocal matters: a lazy snapshot must be
-        // discarded if such a scope occurs at or after its enclosing scope. Build this index once
-        // instead of searching all later scopes separately for every snapshot.
-        let mut last_nonlocal_binding = FxHashMap::default();
-        for (scope_id, place_table) in self.place_tables.iter_enumerated() {
-            for symbol in place_table.symbols() {
-                if symbol.is_nonlocal() && symbol.is_bound() {
-                    last_nonlocal_binding.insert(symbol.name(), scope_id);
+        // A sibling can mutate an enclosing cell regardless of the order of the function
+        // definitions. Resolve both ends against the completed scope tables.
+        let mut writers = FxHashMap::<_, Vec<_>>::default();
+        let mut deleted = FxHashSet::default();
+        for (scope, table) in self.place_tables.iter_enumerated() {
+            for symbol in table.symbols() {
+                if symbol.is_nonlocal()
+                    && (symbol.is_bound() || symbol.is_deleted())
+                    && let Some(owner) = self.resolve_nested_reference_scope(scope, symbol.name())
+                {
+                    let cell = (owner, symbol.name());
+                    let id = table.symbol_id(symbol.name()).expect("symbol in table");
+                    writers.entry(cell).or_default().push((scope, id));
+                    if symbol.is_deleted() {
+                        deleted.insert(cell);
+                    }
                 }
             }
         }
-
-        if last_nonlocal_binding.is_empty() {
-            return;
+        if writers.is_empty() {
+            return FrozenMap::default();
         }
 
-        self.enclosing_snapshots.retain(|key, _| {
+        let writers: FxHashMap<_, Arc<[_]>> = writers
+            .into_iter()
+            .map(|(cell, writers)| (cell, Arc::from(writers)))
+            .collect();
+        let mut snapshots = std::mem::take(&mut self.enclosing_snapshots);
+        let mut guarded_writers = FxHashMap::default();
+        snapshots.retain(|key, _| {
             if key.nested_laziness.is_eager() {
                 return true;
             }
-            let ScopedPlaceId::Symbol(symbol_id) = key.enclosing_place else {
+            let ScopedPlaceId::Symbol(id) = key.enclosing_place else {
                 return true;
             };
-            let name = self.place_tables[key.enclosing_scope]
-                .symbol(symbol_id)
-                .name();
-            last_nonlocal_binding
-                .get(name)
-                .is_none_or(|scope| scope.index() < key.enclosing_scope.index())
+            let symbol = self.place_tables[key.enclosing_scope].symbol(id);
+            let name = symbol.name();
+            let owner = if symbol.is_local() {
+                key.enclosing_scope
+            } else if let Some(owner) =
+                self.resolve_nested_reference_scope(key.enclosing_scope, name)
+            {
+                owner
+            } else {
+                return true;
+            };
+            let cell = (owner, name);
+            let Some(writers) = writers.get(&cell) else {
+                return true;
+            };
+
+            // Use normal enclosing-scope lookup for a cell with a writer. A guard in an
+            // intermediate scope can still narrow the original value, but assignments in
+            // the writer may have happened since that guard.
+            if owner == key.enclosing_scope
+                || symbol.is_global()
+                || (symbol.is_nonlocal() && symbol.is_bound())
+                || self.scopes[key.enclosing_scope].kind().is_class()
+                || deleted.contains(&cell)
+                || self.place_tables[key.nested_scope]
+                    .symbol_id(name)
+                    .is_some_and(|id| {
+                        let reader = self.place_tables[key.nested_scope].symbol(id);
+                        reader.is_nonlocal() && reader.is_bound()
+                    })
+            {
+                return false;
+            }
+            guarded_writers.insert(*key, Arc::clone(writers));
+            true
         });
+        self.enclosing_snapshots = snapshots;
+        FrozenMap::from(guarded_writers)
     }
 
     /// Finds the nearest visible ancestor scope that actually owns a local binding for `name`.
@@ -1575,6 +1701,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn delete_binding(&mut self, place: ScopedPlaceId) {
+        if let Some(symbol) = place.as_symbol() {
+            self.current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_deleted();
+        }
         self.current_use_def_map_mut().delete_binding(place);
     }
 
@@ -3130,6 +3261,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let saved_assignments = std::mem::take(&mut self.current_assignments);
 
         self.push_scope(scope);
+        let can_repeat = generators
+            .iter()
+            .any(|generator| generator.is_async || literal_can_repeat(&generator.iter));
+        if can_repeat {
+            self.start_loop_captures();
+        }
         let comprehension_scope = self.current_scope();
 
         if generators.iter().any(|generator| generator.is_async) {
@@ -3177,6 +3314,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.flow_merge(filtered_out_path);
         }
         self.record_exception_checkpoint_if(loopback_can_raise);
+        if can_repeat {
+            self.finish_loop_captures();
+        }
         let nested_bindings = self.pop_scope();
         self.synthesize_comprehension_binding_definitions(nested_bindings);
         self.record_exception_checkpoint();
@@ -3401,7 +3541,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         // Pop the root scope
         self.pop_scope();
-        self.sweep_nonlocal_lazy_snapshots();
+        let nonlocal_snapshot_writers = self.sweep_nonlocal_lazy_snapshots();
         assert!(self.scope_stack.is_empty());
 
         assert_eq!(&self.current_assignments, &[]);
@@ -3472,6 +3612,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             imported_modules: FrozenSet::from(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
+            nonlocal_snapshot_writers,
             semantic_syntax_errors,
             generator_functions: FrozenSet::from(self.generator_functions),
             async_comprehensions: FrozenSet::from(self.async_comprehensions),
@@ -3543,7 +3684,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         }
                         (ast::ExprContext::Load, _) => (true, false),
                         (ast::ExprContext::Store, _) => (false, true),
-                        (ast::ExprContext::Del, _) => (true, true),
+                        (ast::ExprContext::Del, _) => {
+                            if let PlaceExpr::Symbol(symbol) = &mut place_expr {
+                                // Deletion targets can also be nested inside tuples and lists.
+                                symbol.mark_deleted();
+                            }
+                            (true, true)
+                        }
                         (ast::ExprContext::Invalid, _) => (false, false),
                     };
                     deferred_effects = Some((place_expr, is_use, is_definition));
@@ -4647,6 +4794,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // Visit the test expression after creating loop headers, so that loop-back values
                 // are visible.
+                self.start_loop_captures();
                 let outer_loop = self.push_loop();
                 self.visit_condition(test);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
@@ -4670,6 +4818,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 for continue_state in this_loop.continue_states {
                     self.flow_merge(continue_state);
                 }
+
+                let loopback_captures = self.finish_loop_captures();
 
                 // Collect all the loop-back bindings (including the `continue` states we just
                 // merged) and populate the `LoopHeader`.
@@ -4708,6 +4858,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 for break_state in this_loop.break_states {
                     self.flow_merge(break_state);
                 }
+                self.merge_loop_exit_captures(loopback_captures);
             }
             ast::Stmt::With(ast::StmtWith {
                 items,
@@ -4861,9 +5012,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     ));
                 }
 
-                self.add_unpackable_assignment(&Unpackable::For(for_stmt), target, iter_expr);
-
+                let can_repeat = *is_async || literal_can_repeat(iter);
+                if can_repeat {
+                    self.start_loop_captures();
+                }
                 let outer_loop = self.push_loop();
+                self.add_unpackable_assignment(&Unpackable::For(for_stmt), target, iter_expr);
                 self.visit_body(body);
                 let this_loop = self.pop_loop(outer_loop);
 
@@ -4873,6 +5027,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 for continue_state in this_loop.continue_states {
                     self.flow_merge(continue_state);
                 }
+
+                let loopback_captures = if can_repeat {
+                    self.finish_loop_captures()
+                } else {
+                    None
+                };
 
                 // Collect all the loop-back bindings (including the `continue` states we just
                 // merged) and populate the `LoopHeader`.
@@ -4909,6 +5069,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 for break_state in this_loop.break_states {
                     self.flow_merge(break_state);
                 }
+                self.merge_loop_exit_captures(loopback_captures);
             }
             ast::Stmt::Match(ast::StmtMatch {
                 subject,
@@ -6260,6 +6421,23 @@ impl ExpressionsScopeMapBuilder {
         interval_map.push((range, current_scope));
 
         ExpressionsScopeMap(interval_map.into_boxed_slice())
+    }
+}
+
+/// Whether an iterable might advance to a second element.
+fn literal_can_repeat(expr: &ast::Expr) -> bool {
+    match expr {
+        ast::Expr::List(ast::ExprList { elts, .. })
+        | ast::Expr::Tuple(ast::ExprTuple { elts, .. })
+        | ast::Expr::Set(ast::ExprSet { elts, .. }) => {
+            elts.len() > 1 || elts.first().is_some_and(ast::Expr::is_starred_expr)
+        }
+        ast::Expr::Dict(dict) => {
+            dict.items.len() > 1 || dict.items.first().is_some_and(|item| item.key.is_none())
+        }
+        ast::Expr::StringLiteral(string) => string.value.to_str().chars().nth(1).is_some(),
+        ast::Expr::BytesLiteral(bytes) => bytes.value.len() > 1,
+        _ => true,
     }
 }
 

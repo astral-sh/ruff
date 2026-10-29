@@ -823,3 +823,56 @@ def _():
             # scope.
             reveal_type(x)  # revealed: Literal["f2"] | int
 ```
+
+## Captured guards and nonlocal writes
+
+A sibling can run after the guard, even if its definition comes first. Its assignments can then be
+observed alongside the value narrowed by the guard.
+
+```py
+from typing import assert_type
+
+def _(x: int | None):
+    def clear():
+        nonlocal x
+        x = None
+
+    def middle():
+        if x is not None:
+            def read():
+                assert_type(x, int | None)
+
+            clear()
+            read()
+
+def _(x: int | None):
+    def set_int():
+        nonlocal x
+        x = 0
+
+    def middle():
+        if x is not None:
+            def read():
+                assert_type(x, int)
+
+            set_int()
+            read()
+```
+
+A writer for a different cell of the same name does not invalidate the guard.
+
+```py
+def _(x: int | None):
+    if x is not None:
+        def read():
+            assert_type(x, int)
+
+        def other(x: int | None):
+            def clear():
+                nonlocal x
+                x = None
+            clear()
+
+        other(x)
+        read()
+```

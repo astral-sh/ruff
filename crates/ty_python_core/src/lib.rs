@@ -34,7 +34,7 @@ use symbol::ScopedSymbolId;
 pub use use_def::{
     ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
     BindingsSnapshotId, DeclarationWithConstraint, DeclarationsIterator, ImportedFinalCandidate,
-    ImportedFinalCandidatesIterator, LiveBinding, LoopHeaderId, NarrowingEvaluator,
+    ImportedFinalCandidatesIterator, LiveBinding, LoopCaptureKey, LoopHeaderId, NarrowingEvaluator,
     PredicateNarrowingTargets, ScopedDefinitionId, UseDefMap,
 };
 use use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId};
@@ -234,8 +234,15 @@ pub fn global_scope<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> ScopeId<'db
     FileScopeId::global().to_scope_id(db, file)
 }
 
+type NonlocalSnapshotWriters =
+    FrozenMap<EnclosingSnapshotKey, Arc<[(FileScopeId, ScopedSymbolId)]>>;
+
 pub enum EnclosingSnapshotResult<'map, 'db> {
-    FoundConstraint(ScopedNarrowingConstraint),
+    /// The guard applies to the captured value; these nonlocal writers can subsequently replace it.
+    FoundConstraint(
+        ScopedNarrowingConstraint,
+        &'map [(FileScopeId, ScopedSymbolId)],
+    ),
     FoundBindings(BindingWithConstraintsIterator<'map, 'db>),
     NotFound,
     NoLongerInEagerContext,
@@ -338,6 +345,8 @@ pub struct SemanticIndex<'db> {
 
     /// Map of all of the enclosing snapshots that appear in this file.
     enclosing_snapshots: FrozenMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
+    /// Nonlocal assignments that may run after a captured guard was checked.
+    nonlocal_snapshot_writers: NonlocalSnapshotWriters,
 
     /// List of all semantic syntax errors in this file.
     semantic_syntax_errors: Vec<SemanticSyntaxError>,
@@ -813,8 +822,14 @@ impl<'db> SemanticIndex<'db> {
                         nested_laziness: ScopeLaziness::Lazy,
                     };
                     if let Some(id) = self.enclosing_snapshots.get(&key) {
-                        return self.use_def_maps[enclosing_scope]
-                            .enclosing_snapshot(*id, key.nested_laziness);
+                        return self.use_def_maps[enclosing_scope].enclosing_snapshot(
+                            *id,
+                            enclosing_scope,
+                            key.nested_laziness,
+                            self.nonlocal_snapshot_writers
+                                .get(&key)
+                                .map_or(&[], Arc::as_ref),
+                        );
                     }
                 }
                 return EnclosingSnapshotResult::NoLongerInEagerContext;
@@ -832,7 +847,12 @@ impl<'db> SemanticIndex<'db> {
         let Some(id) = self.enclosing_snapshots.get(&key) else {
             return EnclosingSnapshotResult::NotFound;
         };
-        self.use_def_maps[enclosing_scope].enclosing_snapshot(*id, key.nested_laziness)
+        self.use_def_maps[enclosing_scope].enclosing_snapshot(
+            *id,
+            enclosing_scope,
+            key.nested_laziness,
+            &[],
+        )
     }
 
     pub fn semantic_syntax_errors(&self) -> &[SemanticSyntaxError] {

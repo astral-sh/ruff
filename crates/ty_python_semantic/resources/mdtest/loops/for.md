@@ -2240,3 +2240,56 @@ def narrowed_replacement(box: Box, replacement: Box):
         box = replacement
         assert not box.value
 ```
+
+## Closures can observe later iterations
+
+A closure shares its loop variable with later iterations. A guard on the current value no longer
+applies if the loop can assign a new value before the closure runs.
+
+```py
+def callbacks(values: list[int | None]):
+    result = []
+    for value in values:
+        if value is not None:
+            def read():
+                return value + 1  # error: [unsupported-operator]
+
+            result.append(read)
+            continue
+    return result
+```
+
+If the path that creates the closure leaves the loop, the guard still applies. Other paths can
+continue iterating.
+
+```py
+def first(values: list[int | None]):
+    for value in values:
+        if value is not None:
+            def read():
+                return value + 1
+
+            break
+    else:
+        return None
+    return read
+
+def unchanged(value: int | None, n: int):
+    if value is not None:
+        return [lambda: value + i for i in range(n)]
+    return []
+```
+
+A value that was overwritten before the closure was created cannot reach its read, even if a later
+iteration overwrites the cell again.
+
+```py
+def replaced_each_time(n: int):
+    value = None
+    callbacks = []
+    while n:
+        value = 1
+        callbacks.append(lambda: value + 1)
+        n -= 1
+    return callbacks
+```

@@ -30,8 +30,8 @@ use ty_python_core::reachability_constraints::{
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
-    DeclarationWithConstraint, DeclarationsIterator, ImportedFinalCandidatesIterator, ProgramFile,
-    Truthiness, global_scope, place_table, use_def_map,
+    DeclarationWithConstraint, DeclarationsIterator, ImportedFinalCandidatesIterator,
+    LoopCaptureKey, ProgramFile, Truthiness, global_scope, place_table, use_def_map,
 };
 
 pub(crate) use implicit_globals::{
@@ -814,6 +814,28 @@ pub(super) fn place_from_bindings_with_reachability_cache<'db>(
         RequiresExplicitReExport::No,
         Some(reachability_cache),
     )
+}
+
+/// Infer a repeated loop-write history once for all closures that share it.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, id, _, _| Place::bound(Type::divergent(id)).into(),
+    cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, scope: ScopeId<'db>, _| {
+        place.cycle_normalized(db, &ProgramEnvironment::from_scope(scope), *previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(super) fn place_from_loop_capture<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    key: LoopCaptureKey,
+) -> PlaceAndQualifiers<'db> {
+    let Some(bindings) = use_def_map(db, scope).loop_capture_bindings(key) else {
+        return Place::Undefined.into();
+    };
+    place_from_bindings(db, &ProgramEnvironment::from_scope(scope), bindings)
+        .place
+        .into()
 }
 
 /// Build a declared type from a [`DeclarationsIterator`].

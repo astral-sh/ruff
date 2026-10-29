@@ -44,6 +44,7 @@ bitflags! {
         /// true if the symbol is assigned more than once, or if it is assigned even though it is already in use
         const IS_REASSIGNED         = 1 << 5;
         const IS_PARAMETER          = 1 << 6;
+        const IS_DELETED            = 1 << 7;
     }
 }
 
@@ -140,6 +141,14 @@ impl Symbol {
         }
 
         self.insert_flags(SymbolFlags::IS_BOUND);
+    }
+
+    pub(super) fn is_deleted(&self) -> bool {
+        self.flags.contains(SymbolFlags::IS_DELETED)
+    }
+
+    pub(super) fn mark_deleted(&mut self) {
+        self.insert_flags(SymbolFlags::IS_DELETED);
     }
 
     pub(super) fn mark_used(&mut self) {

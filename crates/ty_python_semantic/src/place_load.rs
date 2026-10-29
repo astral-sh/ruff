@@ -140,6 +140,8 @@ pub(crate) struct PlaceLoadResolutionProcedure<'db, 'ast> {
     constraints: PlaceLoadConstraints,
     /// Whether resolution has crossed a `global` or `nonlocal` declaration so far.
     crosses_scope_declaration: bool,
+    /// Possible nonlocal assignments, yielded before applying the captured guard.
+    nonlocal_writes: Option<std::slice::Iter<'db, (FileScopeId, ScopedSymbolId)>>,
 }
 
 impl<'db> Iterator for PlaceLoadResolutionProcedure<'db, '_> {
@@ -333,6 +335,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
             next_node: Some(PlaceLoadResolutionNode::LocalSource),
             constraints: PlaceLoadConstraints::default(),
             crosses_scope_declaration,
+            nonlocal_writes: None,
         }
     }
 
@@ -427,7 +430,31 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
                     place_expr,
                     file_scope,
                 ) {
-                    EnclosingSnapshotResult::FoundConstraint(constraint) => {
+                    EnclosingSnapshotResult::FoundConstraint(constraint, writers) => {
+                        if !writers.is_empty()
+                            && let Some(&(writer, symbol)) = self
+                                .nonlocal_writes
+                                .get_or_insert_with(|| writers.iter())
+                                .next()
+                        {
+                            return (
+                                PlaceLoadResolutionNode::EnclosingScopeSource(
+                                    self.context.index.ancestor_scopes(enclosing_file_scope),
+                                ),
+                                Some(
+                                    self.constraints.source(
+                                        PlaceLoadSourceKind::Bindings(
+                                            self.context
+                                                .index
+                                                .use_def_map(writer)
+                                                .possible_nonlocal_writes(symbol),
+                                        ),
+                                        PlaceLoadSourceRole::Ordinary,
+                                        None,
+                                    ),
+                                ),
+                            );
+                        }
                         self.constraints.push(
                             enclosing_file_scope,
                             ConstraintKey::NarrowingConstraint(constraint),
@@ -541,7 +568,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
                 PlaceExprRef::from(self.place_expr),
                 current_scope,
             ) {
-                EnclosingSnapshotResult::FoundConstraint(constraint) => {
+                EnclosingSnapshotResult::FoundConstraint(constraint, _) => {
                     self.constraints.push(
                         FileScopeId::global(),
                         ConstraintKey::NarrowingConstraint(constraint),

@@ -40,7 +40,7 @@ use crate::place::{
     explicit_global_symbol, implicit_builtins_symbol, loop_header_reachability,
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
     place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
-    typing_extensions_symbol,
+    place_from_loop_capture, typing_extensions_symbol,
 };
 use crate::place_load::{
     ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceExprPrefixLoads, PlaceLoadFailure, PlaceLoadMode,
@@ -10839,13 +10839,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let place = match source.kind {
             PlaceLoadSourceKind::Bindings(bindings) => {
-                let mut place = place_from_bindings_with_reachability_cache(
-                    db,
-                    env,
-                    bindings,
-                    self.reachability_cache(),
-                )
-                .place;
+                let mut place = if let Some((scope, key)) = bindings.loop_capture() {
+                    place_from_loop_capture(db, scope.to_scope_id(db, self.program_file()), key)
+                        .place
+                } else {
+                    place_from_bindings_with_reachability_cache(
+                        db,
+                        env,
+                        bindings,
+                        self.reachability_cache(),
+                    )
+                    .place
+                };
 
                 // Compatibility policy: ty historically treats a possibly-bound module snapshot
                 // reached through a class-body global fallback as definitely bound. At runtime,
