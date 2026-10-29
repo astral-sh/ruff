@@ -210,6 +210,42 @@ def make_item_with_error(name: str) -> Item:
     )
 ```
 
+## Type context from target type
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+The parameter type of the value passed to `cast` is declared as `Any`. This declared type is ignored
+when inferring the value, as it may incorrectly make the cast appear redundant if provided as type
+context to a nested generic call:
+
+```py
+from typing import Any, cast
+
+def first[T](values: list[T]) -> T:
+    return values[0]
+
+def _(value: int):
+    cast(Any, first([value]))  # ok
+```
+
+An explicit outer annotation, however, can influence the type of the generic call, leading to the
+cast being redundant:
+
+```py
+def _(value: int):
+    result: list[Any] = cast(list[Any], list((value,)))  # error: [redundant-cast]
+```
+
+A conditional collection literal expression may also receive peer type context:
+
+```py
+def _(prefix: str):
+    cast(list[str], [prefix] if prefix else [])  # error: [redundant-cast]
+```
+
 ## Redundant casts of tuple classes with unknown elements
 
 A tuple class with an `Unknown` element is not fully static, even when its other element is `object`

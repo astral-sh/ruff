@@ -6709,6 +6709,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         fallback_tcx: TypeContext<'db>,
         mut infer_expression: impl FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
     ) -> Type<'db> {
+        if tcx == fallback_tcx {
+            return infer_expression(self, tcx);
+        }
+
         // Cache nested expressions so retries do not lead to exponential inference work.
         let teardown_expression_cache = self.setup_expression_cache();
         let mut speculative_builder = self.speculate();
@@ -9885,8 +9889,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &bindings,
         );
 
-        let cast_value = if call_expression_tcx.annotation.is_some()
-            && let Type::FunctionLiteral(function) = callable_type
+        let cast_value = if let Type::FunctionLiteral(function) = callable_type
             && function.is_known(db, KnownFunction::Cast)
         {
             arguments.find_argument_value("val", 1)
@@ -9906,7 +9909,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Redundant casts inside the value are also an intended result of propagation.
                     return builder.infer_with_type_context_fallback(
                         call_expression_tcx,
-                        tcx,
+                        // The value parameter of `cast` is declared as `Any`. If provided as
+                        // type context to a nested generic call, it can incorrectly make the
+                        // cast appear redundant.
+                        TypeContext::default(),
                         |builder, tcx| builder.infer_expression(value, tcx),
                     );
                 }
