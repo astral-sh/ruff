@@ -2142,7 +2142,7 @@ fn collect_typevar_supports<'db>(
         ty: Type<'db>,
         source: Source,
         supports: CollectedTypeVarSupports<'db>,
-        specialization: Option<Specialization<'db>>,
+        specialization: Specialization<'db>,
         bound: CollectedTypeVarSupport<'db>,
         seen: SeenTypes<'db>,
     }
@@ -2250,6 +2250,14 @@ fn collect_typevar_supports<'db>(
             source: Source,
             bound: &CollectedTypeVarSupport<'db>,
         ) {
+            // Without a substitution, the body is in the caller's scope and can share
+            // its visited set across recursive references.
+            let Some(specialization) = specialization else {
+                if !self.already_visited(ty, source, bound) {
+                    self.visit_type(db, env, body, source, bound);
+                }
+                return;
+            };
             let mut previous =
                 self.aliases.iter().rev().filter(|alias| {
                     alias.ty == ty && alias.source == source && alias.bound == *bound
@@ -2286,12 +2294,8 @@ fn collect_typevar_supports<'db>(
             if let Some(alias) = self.aliases.pop() {
                 // Substitute in the caller's scope. Finite use-site nesting is not a
                 // recursive reference in the alias definition.
-                if let Some(argument) = alias.specialization.map(|s| ty.apply_specialization(db, s))
-                {
-                    self.visit_type(db, env, argument, source, &alias.bound);
-                } else {
-                    self.visit_type(db, env, ty, source, bound);
-                }
+                let argument = ty.apply_specialization(db, alias.specialization);
+                self.visit_type(db, env, argument, source, &alias.bound);
                 self.aliases.push(alias);
                 return;
             }
