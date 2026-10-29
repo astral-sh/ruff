@@ -4,6 +4,7 @@ use clap::builder::Styles;
 use clap::builder::styling::{AnsiColor, Effects};
 use clap::error::ErrorKind;
 use clap::{ArgAction, ArgMatches, Error, Parser};
+use ruff_command_line::TerminalColor;
 use ruff_db::system::SystemPathBuf;
 use ruff_ranged_value::{RangedValue, ValueSource};
 use ty_combine::Combine;
@@ -474,20 +475,6 @@ impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
             OutputFormat::Sarif => Self::Sarif,
         }
     }
-}
-
-/// Control when colored output is used.
-#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
-pub(crate) enum TerminalColor {
-    /// Display colors if the output goes to an interactive terminal.
-    #[default]
-    Auto,
-
-    /// Always display colors.
-    Always,
-
-    /// Never display colors.
-    Never,
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]

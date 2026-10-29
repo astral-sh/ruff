@@ -1,8 +1,8 @@
 //! Sets up logging for ty
 
-use crate::args::TerminalColor;
 use anyhow::Context;
 use colored::Colorize;
+use ruff_command_line::TerminalColor;
 use std::fmt;
 use std::fs::File;
 use std::io::{BufWriter, IsTerminal};

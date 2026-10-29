@@ -4,11 +4,12 @@ use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 
 use anyhow::Result;
+use ruff_command_line::TerminalColor;
 use ruff_db::system::OsSystem;
 use ty_project::ProjectMetadata;
 use ty_site_packages::PythonEnvironment;
 
-use crate::args::{ServerCommand, TerminalColor};
+use crate::args::ServerCommand;
 use crate::logging::{VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 use crate::{ExitStatus, current_directory};
@@ -28,7 +29,7 @@ pub(crate) fn run(args: &ServerCommand) -> Result<ExitStatus> {
 fn find_executable() -> Result<ExitStatus> {
     let verbosity = VerbosityLevel::Quiet;
     let printer = Printer::new(verbosity, true);
-    let _guard = setup_tracing(verbosity, TerminalColor::default())?;
+    let _guard = setup_tracing(verbosity, TerminalColor::Auto)?;
     let cwd = current_directory()?;
     let system = OsSystem::new(&cwd);
 

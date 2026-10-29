@@ -15,6 +15,7 @@ use colored::Colorize;
 use itertools::Itertools;
 use path_absolutize::path_dedot;
 use regex::Regex;
+use ruff_command_line::TerminalColor;
 use ruff_graph::Direction;
 use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
@@ -89,20 +90,6 @@ impl GlobalConfigArgs {
     fn partition(self) -> (LogLevel, Vec<SingleConfigArgument>, bool) {
         (self.log_level(), self.config, self.isolated)
     }
-}
-
-/// Control when colored output is used.
-#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
-pub(crate) enum TerminalColor {
-    /// Display colors if the output goes to an interactive terminal.
-    #[default]
-    Auto,
-
-    /// Always display colors.
-    Always,
-
-    /// Never display colors.
-    Never,
 }
 
 // Configures Clap v3-style help menu colors

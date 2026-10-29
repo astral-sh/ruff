@@ -17,6 +17,7 @@ use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
+use ruff_command_line::TerminalColor;
 use ruff_db::cancellation::{Canceled, CancellationToken, CancellationTokenSource};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity};
 use ruff_db::files::File;
@@ -35,7 +36,7 @@ use ty_project::{ProjectDatabase, ProjectMetadata, ProjectReloadResult};
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
 use ty_static::EnvVars;
 
-use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat, TerminalColor};
+use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat};
 use crate::logging::{VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 pub use args::Cli;
@@ -95,10 +96,14 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
-    set_colored_override(args.color);
+    let color = TerminalColor::resolve(
+        args.color,
+        std::env::var_os(EnvVars::FORCE_COLOR).as_deref(),
+    );
+    color.set_colored_override();
 
     let verbosity = args.verbosity.level();
-    let _guard = setup_tracing(verbosity, args.color.unwrap_or_default())?;
+    let _guard = setup_tracing(verbosity, color)?;
 
     let printer = Printer::new(verbosity, args.no_progress);
 
@@ -952,24 +957,6 @@ fn current_directory() -> Result<SystemPathBuf> {
             path.display()
         )
     })
-}
-
-fn set_colored_override(color: Option<TerminalColor>) {
-    let Some(color) = color else {
-        return;
-    };
-
-    match color {
-        TerminalColor::Auto => {
-            colored::control::unset_override();
-        }
-        TerminalColor::Always => {
-            colored::control::set_override(true);
-        }
-        TerminalColor::Never => {
-            colored::control::set_override(false);
-        }
-    }
 }
 
 /// Initializes the global rayon thread pool to never use more than `TY_MAX_PARALLELISM` threads.
