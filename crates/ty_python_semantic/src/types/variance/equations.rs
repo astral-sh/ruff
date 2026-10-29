@@ -82,14 +82,15 @@ impl<'db> VarianceTerm<'db> {
         self.evaluate_with(db, &|variable| variable.effective_variance(db))
     }
 
-    /// Whether the type variable contributes to call inference through this alias.
-    pub(in crate::types) fn is_used_in_alias(self, db: &'db dyn Db) -> bool {
+    /// Does this term represent a non-bivariant use of the type variable passed to `variance_of`?
+    /// For example, `list[T]` uses `T`, while `Ignore[T]` erases `T` if `type Ignore[X] = None`.
+    pub(in crate::types) fn is_non_bivariant(self, db: &'db dyn Db) -> bool {
         match self {
             Self::Constant(variance) => variance != TypeVarVariance::Bivariant,
-            Self::Variable(variable) => variable.is_used_in_alias(db),
-            Self::Join(sum) => sum.terms(db).iter().any(|term| term.is_used_in_alias(db)),
+            Self::Variable(variable) => variable.is_non_bivariant(db),
+            Self::Join(sum) => sum.terms(db).iter().any(|term| term.is_non_bivariant(db)),
             Self::Compose(product) => {
-                product.left(db).is_used_in_alias(db) && product.right(db).is_used_in_alias(db)
+                product.left(db).is_non_bivariant(db) && product.right(db).is_non_bivariant(db)
             }
         }
     }
@@ -197,8 +198,10 @@ impl<'db> VarianceVariable<'db> {
         }
     }
 
+    /// For a growing recursive specialization, estimate parameter use from the constructor's
+    /// formal parameters so that the equations stay finite.
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
-    fn is_used_in_alias(self, db: &'db dyn Db) -> bool {
+    fn is_non_bivariant(self, db: &'db dyn Db) -> bool {
         if let VarianceOrigin::ProtocolParameter(_, declared) = self.origin(db) {
             return declared != TypeVarVariance::Bivariant;
         }
@@ -211,9 +214,9 @@ impl<'db> VarianceVariable<'db> {
             && let Some(parameter_variance) =
                 recursive.growing_parameter_variance(db, self.typevar(db))
         {
-            return parameter_variance.is_used_in_alias(db);
+            return parameter_variance.is_non_bivariant(db);
         }
-        equation.is_used_in_alias(db)
+        equation.is_non_bivariant(db)
     }
 
     /// Return the defining expression, or declared variance for an unsupported protocol.

@@ -8030,7 +8030,7 @@ fn inferable_typevar_occurrences<'db>(
                         .filter(|var| {
                             value
                                 .variance_of(db, self.env, var.identity(db))
-                                .is_used_in_alias(db)
+                                .is_non_bivariant(db)
                         })
                         .count();
                     self.count.set(self.count.get() + count);
