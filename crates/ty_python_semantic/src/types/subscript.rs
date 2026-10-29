@@ -28,7 +28,7 @@ use super::{
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SubscriptKind {
     Tuple,
     String,
@@ -52,7 +52,7 @@ impl Display for SubscriptKind {
 }
 
 /// A dunder method used for subscripting.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum DunderMethod {
     GetItem,
     ClassGetItem,
@@ -79,37 +79,81 @@ impl DunderMethod {
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
     ) -> Option<Result<Type<'db>, SubscriptError<'db>>> {
-        let arguments = CallArguments::positional([slice_ty]);
-        let call = match self {
-            Self::GetItem => {
-                value_ty.try_call_dunder(db, env, self.as_str(), arguments, TypeContext::default())
+        // The same receiver and key types recur across subscript expressions. Only the return
+        // type and the callable's type are needed after overload resolution.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+        enum Outcome<'db> {
+            Returned(Type<'db>),
+            PossiblyUnbound(Type<'db>),
+            Invalid {
+                return_ty: Type<'db>,
+                callable_ty: Type<'db>,
+                kind: CallErrorKind,
+            },
+        }
+
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn call_subscript_method<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            method: DunderMethod,
+            value_ty: Type<'db>,
+            slice_ty: Type<'db>,
+        ) -> Option<Outcome<'db>> {
+            let env = ProgramEnvironment::from_program(program);
+            let arguments = CallArguments::positional([slice_ty]);
+            let call = match method {
+                DunderMethod::GetItem => value_ty.try_call_dunder(
+                    db,
+                    &env,
+                    method.as_str(),
+                    arguments,
+                    TypeContext::default(),
+                ),
+                DunderMethod::ClassGetItem => value_ty.try_call_dunder_on_class(
+                    db,
+                    &env,
+                    method.as_str(),
+                    &arguments,
+                    TypeContext::default(),
+                ),
+            };
+            match call {
+                Ok(bindings) => Some(Outcome::Returned(bindings.return_type(db, &env))),
+                Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
+                    Some(Outcome::PossiblyUnbound(bindings.return_type(db, &env)))
+                }
+                Err(CallDunderError::CallError(kind, bindings, _)) => Some(Outcome::Invalid {
+                    return_ty: bindings.return_type(db, &env),
+                    callable_ty: bindings.callable_type(),
+                    kind,
+                }),
+                Err(CallDunderError::MethodNotAvailable) => None,
             }
-            Self::ClassGetItem => value_ty.try_call_dunder_on_class(
-                db,
-                env,
-                self.as_str(),
-                &arguments,
-                TypeContext::default(),
-            ),
-        };
-        Some(match call {
-            Ok(bindings) => Ok(bindings.return_type(db, env)),
-            Err(CallDunderError::MethodNotAvailable) => return None,
-            Err(CallDunderError::PossiblyUnbound { bindings, .. }) => Err(SubscriptError::new(
-                bindings.return_type(db, env),
+        }
+
+        let outcome = call_subscript_method(db, env.program(db), self, value_ty, slice_ty)?;
+        Some(match outcome {
+            Outcome::Returned(ty) => Ok(ty),
+            Outcome::PossiblyUnbound(ty) => Err(SubscriptError::new(
+                ty,
                 SubscriptErrorKind::DunderPossiblyUnbound {
                     method: self,
                     value_ty,
                 },
             )),
-            Err(CallDunderError::CallError(kind, bindings, _)) => Err(SubscriptError::new(
-                bindings.return_type(db, env),
+            Outcome::Invalid {
+                return_ty,
+                callable_ty,
+                kind,
+            } => Err(SubscriptError::new(
+                return_ty,
                 SubscriptErrorKind::DunderCallError {
                     method: self,
                     value_ty,
                     slice_ty,
                     kind,
-                    callable_ty: bindings.callable_type(),
+                    callable_ty,
                 },
             )),
         })
@@ -117,7 +161,7 @@ impl DunderMethod {
 }
 
 /// The origin of a legacy generic subscription (`Generic` or `Protocol`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LegacyGenericOrigin {
     Generic,
     Protocol,
@@ -132,13 +176,13 @@ impl Display for LegacyGenericOrigin {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Debug)]
 pub(crate) struct SubscriptError<'db> {
     result_ty: Type<'db>,
-    errors: Box<[SubscriptErrorKind<'db>]>,
+    errors: Vec<SubscriptErrorKind<'db>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Debug)]
 pub(crate) enum SubscriptErrorKind<'db> {
     /// An index is out of bounds for a literal tuple/string/bytes subscript.
     IndexOutOfBounds {
@@ -185,7 +229,7 @@ pub(crate) enum SubscriptErrorKind<'db> {
     /// A duplicate typevar was provided to `Generic` or `Protocol`.
     DuplicateTypevar {
         origin: LegacyGenericOrigin,
-        typevar_name: Box<str>,
+        typevar_name: &'db str,
     },
     /// A `TypeVarTuple` was provided to `Generic` or `Protocol` without being unpacked.
     TypeVarTupleNotUnpacked { origin: LegacyGenericOrigin },
@@ -197,15 +241,12 @@ impl<'db> SubscriptError<'db> {
     pub(crate) fn new(result_ty: Type<'db>, error: SubscriptErrorKind<'db>) -> Self {
         Self {
             result_ty,
-            errors: Box::new([error]),
+            errors: vec![error],
         }
     }
 
     fn with_errors(result_ty: Type<'db>, errors: Vec<SubscriptErrorKind<'db>>) -> Self {
-        Self {
-            result_ty,
-            errors: errors.into_boxed_slice(),
-        }
+        Self { result_ty, errors }
     }
 
     pub(crate) fn result_type(&self) -> Type<'db> {
@@ -213,7 +254,7 @@ impl<'db> SubscriptError<'db> {
     }
 
     fn into_errors(self) -> Vec<SubscriptErrorKind<'db>> {
-        self.errors.into_vec()
+        self.errors
     }
 
     /// Returns `true` if any error indicates the subscript method was available.
@@ -604,49 +645,6 @@ fn typed_dict_subscript<'db>(
 
 impl<'db> Type<'db> {
     pub(super) fn subscript(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        slice_ty: Type<'db>,
-        expr_context: ast::ExprContext,
-    ) -> Result<Type<'db>, SubscriptError<'db>> {
-        #[salsa::tracked(
-            returns(ref),
-            cycle_initial=|_, id, _, _, _, _| Ok(Type::divergent(id)),
-            heap_size=ruff_memory_usage::heap_size
-        )]
-        fn cached_subscript<'db>(
-            db: &'db dyn Db,
-            program: Program<'db>,
-            value_ty: Type<'db>,
-            slice_ty: Type<'db>,
-            is_store: bool,
-        ) -> Result<Type<'db>, Box<SubscriptError<'db>>> {
-            let env = ProgramEnvironment::from_program(program);
-            let context = if is_store {
-                ast::ExprContext::Store
-            } else {
-                ast::ExprContext::Load
-            };
-            value_ty
-                .subscript_impl(db, &env, slice_ty, context)
-                .map_err(Box::new)
-        }
-
-        // Only stores change how we handle a TypedDict key or a missing subscript method.
-        cached_subscript(
-            db,
-            env.program(db),
-            self,
-            slice_ty,
-            expr_context == ast::ExprContext::Store,
-        )
-        .as_ref()
-        .copied()
-        .map_err(|err| (**err).clone())
-    }
-
-    fn subscript_impl(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
