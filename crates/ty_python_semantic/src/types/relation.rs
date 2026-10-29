@@ -1939,7 +1939,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             )
             .unwrap_or_else(|item| self.recursive_type_pair_fallback(db, item.0, item.1));
         if reused {
-            result.freshen_quantified_typevars(db, self.env)
+            result.freshen_quantified_typevars(db)
         } else {
             result
         }

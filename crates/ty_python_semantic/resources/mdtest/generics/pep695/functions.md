@@ -2052,6 +2052,16 @@ class Array[D]:
             # revealed: tuple[S@get, int]
             reveal_type(pair(ys, xs))
 
+        class Captured:
+            def get(self) -> S:
+                raise NotImplementedError
+
+        def check_capture(xs: Array[int], ys: Captured) -> None:
+            # revealed: tuple[int, S@get]
+            reveal_type(pair(xs, ys))
+            # revealed: tuple[S@get, int]
+            reveal_type(pair(ys, xs))
+
         raise NotImplementedError
 
 def pair[T, U](x: Produces[T], y: Produces[U]) -> tuple[T, U]:
