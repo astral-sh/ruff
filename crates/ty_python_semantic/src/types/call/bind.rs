@@ -3151,8 +3151,12 @@ impl<'db> Bindings<'db> {
 
                         let constraints = ConstraintSetBuilder::new();
                         let result = constraints.into_owned(|constraints| {
-                            let lhs = constraints.load(db, env, tracked.constraints(db));
-                            let rhs = constraints.load(db, env, other.constraints(db));
+                            let (lhs, rhs) = constraints.load_pair(
+                                db,
+                                env,
+                                tracked.constraints(db),
+                                other.constraints(db),
+                            );
                             lhs.implies(db, constraints, || rhs)
                         });
                         let tracked = InternedConstraintSet::new(db, result);
@@ -6896,6 +6900,17 @@ impl<'db> CallInference<'_, 'db> {
                 constraint_set_errors,
             };
         };
+
+        // A witness introduced by checking an earlier argument must not capture a typevar
+        // in a later argument or in the expected return type.
+        constraints.reserve_free_typevars(
+            db,
+            self.env,
+            self.argument_relations()
+                .flat_map(|relation| [relation.argument_type, relation.declared_type])
+                .chain([self.return_ty])
+                .chain(self.call_expression_tcx.expected_type()),
+        );
 
         if uses_legacy_inference(db, generic_context) {
             return self.infer_legacy(constraints, generic_context, constraint_set_errors);
