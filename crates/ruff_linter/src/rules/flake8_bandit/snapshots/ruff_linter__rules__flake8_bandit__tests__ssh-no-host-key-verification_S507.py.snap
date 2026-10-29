@@ -86,3 +86,37 @@ S507 Paramiko call with policy set to automatically trust the unknown host key
 23 |
 24 | # Unrelated
    |
+
+S507 Paramiko call with policy set to automatically trust the unknown host key
+  --> S507.py:35:42
+   |
+33 |     def __init__(self):
+34 |         super().__init__()
+35 |         self.set_missing_host_key_policy(paramiko.AutoAddPolicy)
+   |                                          ^^^^^^^^^^^^^^^^^^^^^^
+
+S507 Paramiko call with policy set to automatically trust the unknown host key
+  --> S507.py:40:42
+   |
+38 | class NestedCustomClient(CustomClient):
+39 |     def connect_insecurely(self):
+40 |         self.set_missing_host_key_policy(client.WarningPolicy())
+   |                                          ^^^^^^^^^^^^^^^^^^^^^^
+
+S507 Paramiko call with policy set to automatically trust the unknown host key
+  --> S507.py:44:43
+   |
+43 | custom_client = CustomClient()
+44 | custom_client.set_missing_host_key_policy(paramiko.AutoAddPolicy)
+   |                                           ^^^^^^^^^^^^^^^^^^^^^^
+45 | nested_custom_client = NestedCustomClient()
+46 | nested_custom_client.set_missing_host_key_policy(AutoAddPolicy)
+   |
+
+S507 Paramiko call with policy set to automatically trust the unknown host key
+  --> S507.py:46:50
+   |
+44 | custom_client.set_missing_host_key_policy(paramiko.AutoAddPolicy)
+45 | nested_custom_client = NestedCustomClient()
+46 | nested_custom_client.set_missing_host_key_policy(AutoAddPolicy)
+   |                                                  ^^^^^^^^^^^^^
