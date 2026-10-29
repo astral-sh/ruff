@@ -257,7 +257,7 @@ wasm-bindgen-test = { version = "0.3.42", default-features = false, features = [
 web-time = { version = "1.1.0", default-features = false }
 which = { version = "8.0.0", default-features = false, features = ["real-sys"] }
 wild = { version = "2", default-features = false }
-zip = { version = "8.0", default-features = false }
+zip = { version = "9.0.5", default-features = false }
 
 [workspace.metadata.cargo-shear]
 ignored = [
