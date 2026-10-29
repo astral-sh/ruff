@@ -409,7 +409,7 @@ ALL: Final = [
         revision="f9f1772ce010001208475f751d19253469788410",
         python_version="3.12",
         include=["numpy"],
-        exclude=["numpy/**/tests/**"],
+        exclude=["numpy/tests/**", "numpy/**/tests/**"],
         # Check the Python implementation and array stubs without building C extensions.
         install_arguments=["typing-extensions", "packaging"],
         edit=IncrementalEdit(
