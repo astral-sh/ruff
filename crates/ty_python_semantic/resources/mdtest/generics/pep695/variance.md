@@ -518,6 +518,27 @@ static_assert(is_subtype_of(Source[int], Source[object]))
 static_assert(not is_subtype_of(Source[object], Source[int]))
 ```
 
+## Receiver restriction on an inherited protocol method
+
+Checking the concrete subclass leads back to the inherited protocol through the return type of
+`iter` and the parameter of `collect_into`.
+
+`collection.pyi`:
+
+```pyi
+from typing import Protocol
+
+class Items[T](Protocol):
+    def iter(self: Items[int]) -> Cursor[int]: ...
+
+class Cursor[T]:
+    def collect_into(self, collection: Mutable) -> None: ...
+
+class Reversible[T](Items[T], Protocol): ...
+class Sequence[T](Reversible[T]): ...
+class Mutable(Sequence[int]): ...  # no diagnostic
+```
+
 ## Expanding recursive protocol variance
 
 Variance inference terminates when a recursive reference changes the specialization. The mutable
