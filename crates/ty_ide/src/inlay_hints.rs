@@ -81,11 +81,6 @@ impl InlayHint {
         // span for its range, and then advance where we are.
         let mut offset = 0;
 
-        // This edit label could be different from the original label if we need to
-        // qualify certain imported symbols. `A` could turn into `foo.A`.
-        let mut edit_label = details.label.clone();
-        let mut edit_offset: isize = 0;
-
         let mut label_parts = vec![prefix.into()];
         for (target, detail) in details.targets.iter().zip(&details.details) {
             match detail {
@@ -97,8 +92,13 @@ impl InlayHint {
                         label_parts.push(details.label[offset..start].into());
                     }
 
-                    // Possibly import the current type and return the qualified name
-                    let mut qualified_name = |dynamic_importer: &mut DynamicImporter<'_, 'db>| {
+                    let mut import_type = |dynamic_importer: &mut DynamicImporter<'_, 'db>| {
+                        // Keep the formatter's wording in descriptive labels. For example, the
+                        // word `module` in `<module 'foo'>` links to `types.ModuleType`, but
+                        // replacing it with the import name would display `<ModuleType 'foo'>`.
+                        if !details.is_valid_syntax {
+                            return None;
+                        }
                         let type_definition = ty.definition(db, &env)?;
                         let definition = type_definition.definition()?;
 
@@ -125,47 +125,32 @@ impl InlayHint {
                             return None;
                         }
 
-                        let definition_name = definition.name(db);
-
-                        // Fallback to the label if we cannot find the name
-                        let definition_name = definition_name
-                            .as_deref()
-                            .unwrap_or(&details.label[start..end]);
-
                         if should_skip_import(db, module, *ty) {
                             return None;
                         }
 
+                        let Some(definition_name) = definition.name(db) else {
+                            allow_edits = false;
+                            return None;
+                        };
                         let module_name = module.name(db).as_str();
 
-                        dynamic_importer.import_symbol(
+                        Some(dynamic_importer.import_symbol(
                             db,
                             &env,
                             ty,
                             module_name,
-                            definition_name,
+                            &definition_name,
                             &details.label[start..end],
-                        )
+                        ))
                     };
 
                     // Ok, this is the first type that claimed these bytes, give it the target
                     if start >= offset {
-                        // Try to import the symbol and update the edit label if required
-                        if let Some(qualified_name) = qualified_name(&mut dynamic_importer) {
-                            let edit_start = (start.cast_signed() + edit_offset).cast_unsigned();
-                            let edit_end = (end.cast_signed() + edit_offset).cast_unsigned();
-
-                            edit_label.replace_range(edit_start..edit_end, &qualified_name);
-                            edit_offset +=
-                                qualified_name.len().cast_signed() - (end - start).cast_signed();
-                        }
-
+                        let text = import_type(&mut dynamic_importer)
+                            .unwrap_or_else(|| details.label[start..end].to_owned());
                         let target = ty.navigation_targets(db, &env).into_iter().next();
-
-                        // Always use original text for the label part
-                        label_parts.push(
-                            InlayHintLabelPart::new(&details.label[start..end]).with_target(target),
-                        );
+                        label_parts.push(InlayHintLabelPart::new(text).with_target(target));
                         offset = end;
                     }
                 }
@@ -179,13 +164,13 @@ impl InlayHint {
 
         // "flush" the rest of the label without any target
         if offset < details.label.len() {
-            label_parts.push(details.label[offset..details.label.len()].into());
+            label_parts.push(details.label[offset..].into());
         }
 
         let text_edits = if details.is_valid_syntax && allow_edits {
             let mut text_edits = vec![InlayHintTextEdit {
                 range: TextRange::new(position, position),
-                new_text: format!("{prefix}{edit_label}"),
+                new_text: label_parts.iter().map(InlayHintLabelPart::text).collect(),
             }];
 
             text_edits.extend(dynamic_importer.text_edits());
@@ -805,8 +790,9 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
         }
     }
 
-    /// Attempts to import a given symbol.
-    /// If the symbol in the text edit needs to be qualified, we return the qualified symbol text.
+    /// Records any import needed for the annotation and returns the name to use at the hint.
+    /// `symbol_name` is the definition's bare name, while `label_text` may already be
+    /// qualified to distinguish types with the same name, such as `a.T` and `b.T`.
     fn import_symbol(
         &mut self,
         db: &'db dyn Db,
@@ -815,26 +801,18 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
         module_name: &str,
         symbol_name: &str,
         label_text: &str,
-    ) -> Option<String> {
+    ) -> String {
         // Ensure members are computed before borrowing other fields.
         let members = self.members.get_or_insert_with(|| {
             self.importer
                 .members_in_scope_at(self.scope_node, self.scope_offset)
         });
 
-        // Check if the label is like `foo.A`
-        let mut is_possibly_qualified_name = label_text.contains('.');
-
-        if let Some(member) = members.find_member(symbol_name) {
-            if member.ty.definition(db, env) == ty.definition(db, env) {
-                return None;
-            }
-
-            // There is another member in scope with the same name,
-            // so we need to qualify this so we don't reference the
-            // in scope member.
-            is_possibly_qualified_name = true;
+        let in_scope = members.find_member(symbol_name);
+        if in_scope.is_some_and(|member| member.ty.definition(db, env) == ty.definition(db, env)) {
+            return symbol_name.to_owned();
         }
+        let shadowed = in_scope.is_some();
 
         let key = DynamicallyImportedMember {
             module: module_name.to_string(),
@@ -842,7 +820,9 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
         };
 
         let action = self.dynamic_imports.entry(key).or_insert_with(|| {
-            let request = if is_possibly_qualified_name {
+            // Keep module names when they distinguish types such as `a.T | b.T` or when the
+            // bare name would refer to a different symbol at the hint's location.
+            let request = if shadowed || label_text.contains('.') {
                 ImportRequest::import(module_name, symbol_name).force()
             } else {
                 ImportRequest::import_from(module_name, symbol_name)
@@ -851,7 +831,7 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
             self.importer.import(request, members)
         });
 
-        qualified_symbol_text(action).map(str::to_string)
+        action.symbol_text().to_owned()
     }
 
     /// Builds the text edits from all collected imports.
@@ -868,15 +848,6 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
             })
             .collect()
     }
-}
-
-/// If the import action requires qualifying the symbol (e.g. `import foo` instead of
-/// `from foo import A`), returns the qualified symbol text. Otherwise returns `None`.
-fn qualified_symbol_text(import_action: &ImportAction) -> Option<&str> {
-    if import_action.import().is_some() {
-        return None;
-    }
-    Some(import_action.symbol_text())
 }
 
 #[cfg(test)]
@@ -7492,7 +7463,7 @@ Source with applied edits:
 
         import foo
 
-        a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+        a[: foo.B[foo.A[D[int, list[str | foo.A[foo.B[int]]]]]]] = foo.C().foo()
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
@@ -7503,8 +7474,8 @@ Source with applied edits:
         info: Source
          --> main2.py:4:5
           |
-        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
-          |     ^
+        4 | a[: foo.B[foo.A[D[int, list[str | foo.A[foo.B[int]]]]]]] = foo.C().foo()
+          |     ^^^^^
 
         info[inlay-hint-location]: Inlay Hint Target
          --> foo.py:4:19
@@ -7512,10 +7483,10 @@ Source with applied edits:
         4 |             class A[T]: ...
           |                   ^
         info: Source
-         --> main2.py:4:7
+         --> main2.py:4:11
           |
-        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
-          |       ^
+        4 | a[: foo.B[foo.A[D[int, list[str | foo.A[foo.B[int]]]]]]] = foo.C().foo()
+          |           ^^^^^
 
         info[inlay-hint-location]: Inlay Hint Target
          --> bar.py:2:19
@@ -7523,10 +7494,10 @@ Source with applied edits:
         2 |             class D[T, U]: ...
           |                   ^
         info: Source
-         --> main2.py:4:9
+         --> main2.py:4:17
           |
-        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
-          |         ^
+        4 | a[: foo.B[foo.A[D[int, list[str | foo.A[foo.B[int]]]]]]] = foo.C().foo()
+          |                 ^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -7534,10 +7505,10 @@ Source with applied edits:
         LL | class int:
            |       ^^^
         info: Source
-          --> main2.py:LL:11
+          --> main2.py:LL:19
            |
-        LL | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
-           |           ^^^
+        LL | a[: foo.B[foo.A[D[int, list[str | foo.A[foo.B[int]]]]]]] = foo.C().foo()
+           |                   ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -7545,10 +7516,10 @@ Source with applied edits:
         LL | class list(MutableSequence[_T]):
            |       ^^^^
         info: Source
-          --> main2.py:LL:16
+          --> main2.py:LL:24
            |
-        LL | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
-           |                ^^^^
+        LL | a[: foo.B[foo.A[D[int, list[str | foo.A[foo.B[int]]]]]]] = foo.C().foo()
+           |                        ^^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -7556,10 +7527,10 @@ Source with applied edits:
         LL | class str(Sequence[str]):
            |       ^^^
         info: Source
-          --> main2.py:LL:21
+          --> main2.py:LL:29
            |
-        LL | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
-           |                     ^^^
+        LL | a[: foo.B[foo.A[D[int, list[str | foo.A[foo.B[int]]]]]]] = foo.C().foo()
+           |                             ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
          --> foo.py:4:19
@@ -7567,10 +7538,10 @@ Source with applied edits:
         4 |             class A[T]: ...
           |                   ^
         info: Source
-         --> main2.py:4:27
+         --> main2.py:4:35
           |
-        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
-          |                           ^
+        4 | a[: foo.B[foo.A[D[int, list[str | foo.A[foo.B[int]]]]]]] = foo.C().foo()
+          |                                   ^^^^^
 
         info[inlay-hint-location]: Inlay Hint Target
          --> foo.py:6:19
@@ -7578,10 +7549,10 @@ Source with applied edits:
         6 |             class B[T]: ...
           |                   ^
         info: Source
-         --> main2.py:4:29
+         --> main2.py:4:41
           |
-        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
-          |                             ^
+        4 | a[: foo.B[foo.A[D[int, list[str | foo.A[foo.B[int]]]]]]] = foo.C().foo()
+          |                                         ^^^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -7589,10 +7560,10 @@ Source with applied edits:
         LL | class int:
            |       ^^^
         info: Source
-          --> main2.py:LL:31
+          --> main2.py:LL:47
            |
-        LL | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
-           |                               ^^^
+        LL | a[: foo.B[foo.A[D[int, list[str | foo.A[foo.B[int]]]]]]] = foo.C().foo()
+           |                                               ^^^
 
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
@@ -8276,7 +8247,7 @@ Source with applied edits:
         class B[T]:
             x: T
 
-        b[: B[A]] = B([x=]foo.A())
+        b[: B[foo.A]] = B([x=]foo.A())
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
@@ -8287,7 +8258,7 @@ Source with applied edits:
         info: Source
           --> main2.py:11:5
            |
-        11 | b[: B[A]] = B([x=]foo.A())
+        11 | b[: B[foo.A]] = B([x=]foo.A())
            |     ^
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -8298,8 +8269,8 @@ Source with applied edits:
         info: Source
           --> main2.py:11:7
            |
-        11 | b[: B[A]] = B([x=]foo.A())
-           |       ^
+        11 | b[: B[foo.A]] = B([x=]foo.A())
+           |       ^^^^^
 
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:9:5
@@ -8307,10 +8278,10 @@ Source with applied edits:
         9 |     x: T
           |     ^
         info: Source
-          --> main2.py:11:16
+          --> main2.py:11:20
            |
-        11 | b[: B[A]] = B([x=]foo.A())
-           |                ^
+        11 | b[: B[foo.A]] = B([x=]foo.A())
+           |                    ^
 
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
@@ -8491,7 +8462,7 @@ Source with applied edits:
 
         import test
 
-        x[: Literal[Color.RED]] = test.Color.RED
+        x[: Literal[test.Color.RED]] = test.Color.RED
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
@@ -8502,7 +8473,7 @@ Source with applied edits:
         info: Source
           --> main2.py:LL:5
            |
-        LL | x[: Literal[Color.RED]] = test.Color.RED
+        LL | x[: Literal[test.Color.RED]] = test.Color.RED
            |     ^^^^^^^
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -8513,8 +8484,8 @@ Source with applied edits:
         info: Source
          --> main2.py:4:13
           |
-        4 | x[: Literal[Color.RED]] = test.Color.RED
-          |             ^^^^^
+        4 | x[: Literal[test.Color.RED]] = test.Color.RED
+          |             ^^^^^^^^^^
 
         info[inlay-hint-location]: Inlay Hint Target
          --> test.py:5:17
@@ -8522,10 +8493,10 @@ Source with applied edits:
         5 |                 RED = 1
           |                 ^^^
         info: Source
-         --> main2.py:4:19
+         --> main2.py:4:24
           |
-        4 | x[: Literal[Color.RED]] = test.Color.RED
-          |                   ^^^
+        4 | x[: Literal[test.Color.RED]] = test.Color.RED
+          |                        ^^^
         ");
     }
 
