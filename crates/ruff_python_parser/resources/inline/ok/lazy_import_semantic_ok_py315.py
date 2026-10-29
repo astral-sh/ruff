@@ -4,3 +4,4 @@ with contextlib.nullcontext():
     lazy import os
 with contextlib.nullcontext():
     lazy from sys import path
+lazy from .__future__ import x

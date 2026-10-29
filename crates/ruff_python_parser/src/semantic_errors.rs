@@ -93,6 +93,7 @@ impl SemanticSyntaxChecker {
                     //     lazy import os
                     // with contextlib.nullcontext():
                     //     lazy from sys import path
+                    // lazy from .__future__ import x
 
                     // test_err lazy_import_invalid_context_py315
                     // # parse_options: {"target-version": "3.15"}
@@ -130,7 +131,7 @@ impl SemanticSyntaxChecker {
                         //     lazy from sys import *
                         Self::add_error(ctx, SemanticSyntaxErrorKind::LazyImportStar, *range);
                         handled_lazy_error = true;
-                    } else if matches!(module.as_deref(), Some("__future__")) {
+                    } else if *level == 0 && matches!(module.as_deref(), Some("__future__")) {
                         Self::add_error(ctx, SemanticSyntaxErrorKind::LazyFutureImport, *range);
                         handled_lazy_error = true;
                     }
@@ -139,11 +140,12 @@ impl SemanticSyntaxChecker {
                 if handled_lazy_error {
                     // Skip the regular `from`-import validations after reporting the lazy-specific
                     // syntax error with the highest precedence.
-                } else if matches!(module.as_deref(), Some("__future__")) {
+                } else if *level == 0 && matches!(module.as_deref(), Some("__future__")) {
                     for name in names {
                         if !is_known_future_feature(&name.name) {
                             // test_ok valid_future_feature
                             // from __future__ import annotations
+                            // from .__future__ import invalid_feature
 
                             // test_err invalid_future_feature
                             // from __future__ import invalid_feature
@@ -877,11 +879,14 @@ impl SemanticSyntaxChecker {
             Stmt::Expr(StmtExpr { value, .. })
                 if !self.seen_module_docstring_boundary && value.is_string_literal_expr() => {}
             Stmt::ImportFrom(StmtImportFrom {
-                module, is_lazy, ..
+                module,
+                level,
+                is_lazy,
+                ..
             }) => {
                 // Allow eager `__future__` imports until we see any other import. Lazy imports,
                 // including `lazy from __future__ import ...`, always close the boundary.
-                if *is_lazy || !matches!(module.as_deref(), Some("__future__")) {
+                if *is_lazy || *level > 0 || !matches!(module.as_deref(), Some("__future__")) {
                     self.seen_futures_boundary = true;
                 }
             }

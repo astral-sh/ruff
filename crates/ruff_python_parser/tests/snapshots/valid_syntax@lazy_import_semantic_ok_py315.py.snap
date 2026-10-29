@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/lazy_import_semantic_o
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..173,
+        range: 0..204,
         body: [
             Import(
                 StmtImport {
@@ -169,6 +169,33 @@ Module(
                             },
                         ),
                     ],
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 173..203,
+                    module: Some(
+                        Identifier {
+                            id: Name("__future__"),
+                            range: 184..194,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 202..203,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("x"),
+                                range: 202..203,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 1,
+                    is_lazy: true,
                 },
             ),
         ],
