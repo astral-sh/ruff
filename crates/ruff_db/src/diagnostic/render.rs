@@ -2434,6 +2434,23 @@ watermelon
     }
 
     #[test]
+    fn diagnostic_order_with_missing_locations() {
+        let mut env = TestEnvironment::new();
+        env.add("fruits", FRUITS);
+
+        let fileless = Diagnostic::new(DiagnosticId::Io, Severity::Hint, "Missing directory");
+        let mut whole_file =
+            Diagnostic::new(DiagnosticId::Io, Severity::Warning, "Check this file");
+        whole_file.annotate(Annotation::primary(env.path("fruits")));
+        let at_zero = env.err().primary("fruits", "1:0", "1:0", "").build();
+        let at_one = env.err().primary("fruits", "1:1", "1:1", "").build();
+
+        let mut diagnostics = [&at_one, &whole_file, &at_zero, &fileless];
+        diagnostics.sort_by_key(|diagnostic| diagnostic.rendering_sort_key(&env.db));
+        assert_eq!(diagnostics, [&fileless, &at_zero, &whole_file, &at_one]);
+    }
+
+    #[test]
     fn diagnostics_with_equal_locations_sort_by_concise_message() {
         let mut env = TestEnvironment::new();
         env.add("fruits", FRUITS);

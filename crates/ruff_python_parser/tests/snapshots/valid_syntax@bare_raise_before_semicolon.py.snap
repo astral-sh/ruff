@@ -1,0 +1,108 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/bare_raise_before_semicolon.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..47,
+        body: [
+            Try(
+                StmtTry {
+                    node_index: NodeIndex(None),
+                    range: 0..46,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 5..11,
+                                value: Call(
+                                    ExprCall {
+                                        node_index: NodeIndex(None),
+                                        range: 5..11,
+                                        func: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 5..9,
+                                                id: Name("work"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 9..11,
+                                            node_index: NodeIndex(None),
+                                            args: [],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 12..46,
+                                node_index: NodeIndex(None),
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 19..29,
+                                            id: Name("ValueError"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Raise(
+                                        StmtRaise {
+                                            node_index: NodeIndex(None),
+                                            range: 31..36,
+                                            exc: None,
+                                            cause: None,
+                                        },
+                                    ),
+                                    Expr(
+                                        StmtExpr {
+                                            node_index: NodeIndex(None),
+                                            range: 38..46,
+                                            value: Call(
+                                                ExprCall {
+                                                    node_index: NodeIndex(None),
+                                                    range: 38..46,
+                                                    func: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 38..44,
+                                                            id: Name("report"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    arguments: Arguments {
+                                                        range: 44..46,
+                                                        node_index: NodeIndex(None),
+                                                        args: [],
+                                                        keywords: [],
+                                                    },
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
+        ],
+    },
+)
+```

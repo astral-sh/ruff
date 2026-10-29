@@ -40,6 +40,7 @@ pub use uv::{
     uv_test_env_vars,
 };
 
+pub mod baseline;
 mod db;
 mod files;
 pub mod glob;
@@ -826,6 +827,16 @@ impl Project {
         }
     }
 
+    /// Returns the scripts whose uv environments need preparing at startup or after a reload.
+    pub fn scripts_to_synchronize(self, db: &dyn Db) -> Vec<File> {
+        // Discovering scripts reads every project file. Keep the index lazy when
+        // no environment synchronization will be requested.
+        if !self.metadata(db).use_uv().script_environments_enabled() {
+            return Vec::new();
+        }
+        self.script_files(db).iter().collect()
+    }
+
     fn reload_files(self, db: &mut dyn Db) {
         tracing::debug!("Reloading files for project `{}`", self.name(db));
 
@@ -856,6 +867,7 @@ impl Project {
             .iter()
             .map(OptionDiagnostic::to_diagnostic)
             .chain(uv_diagnostic)
+            .chain(baseline::settings_diagnostic(db))
             .collect()
     }
 }
@@ -1032,7 +1044,10 @@ pub(crate) fn check_file_impl(
             diagnostics.extend(dependency_diagnostic);
             Ok(diagnostics.into_boxed_slice())
         }) {
-            Ok(result) => result,
+            Ok(result) => result.map(|mut diagnostics| {
+                baseline::demote_diagnostics(*db, source_file, &mut diagnostics);
+                diagnostics
+            }),
             Err(diagnostic) => Ok(Box::new([diagnostic])),
         }
     }

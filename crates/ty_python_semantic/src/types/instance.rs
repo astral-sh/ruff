@@ -834,8 +834,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let source_protocol = ty.as_protocol_instance();
 
         // Every gradual type lies between its bottom and top materializations, and is assignable
-        // to and from either one. Comparing the exact same class specialization can therefore
-        // settle these directions without expanding a recursive protocol's members.
+        // to and from either one. Each materialization is a subtype of itself. For the same class
+        // specialization, we can check these relations without expanding recursive members.
         if let Some(source) = source_protocol
             && let (Some(source_origin), Some(target_origin)) =
                 (source.class_origin(db), protocol.class_origin(db))
@@ -844,8 +844,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 source.materialization_kind(db),
                 protocol.materialization_kind(db),
             ) {
-                (None | Some(MaterializationKind::Bottom), Some(MaterializationKind::Top))
-                | (Some(MaterializationKind::Bottom), None) => true,
+                (_, Some(MaterializationKind::Top)) | (Some(MaterializationKind::Bottom), _) => {
+                    true
+                }
                 (Some(MaterializationKind::Top), None)
                 | (None, Some(MaterializationKind::Bottom))
                     if self.relation.is_assignability() =>

@@ -302,7 +302,7 @@ impl Session {
                 files_changed: true,
             })
         ) {
-            let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+            let scripts = db.project().scripts_to_synchronize(db);
             Self::synchronize_closed_scripts(
                 db,
                 &scripts,
@@ -838,7 +838,7 @@ impl Session {
         let untracked = previous
             .map(|state| state.untracked_files_with_pushed_diagnostics)
             .unwrap_or_default();
-        let scripts: Vec<_> = db.project().script_files(&db).iter().collect();
+        let scripts = db.project().scripts_to_synchronize(&db);
         Self::synchronize_closed_scripts(
             &mut db,
             &scripts,

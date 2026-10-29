@@ -22,7 +22,7 @@ impl Renderer for AzureRenderer<'_> {
     fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         for diag in diagnostics {
             let severity = match diag.severity() {
-                Severity::Info | Severity::Warning => "warning",
+                Severity::Hint | Severity::Info | Severity::Warning => "warning",
                 Severity::Error | Severity::Fatal => "error",
             };
             write!(f, "##vso[task.logissue type={severity};")?;

@@ -3522,6 +3522,26 @@ static_assert(is_subtype_of(LegacyWrappedReceiver[str], LegacyWrappedReceiver[in
 static_assert(is_subtype_of(Top[LegacyWrappedReceiver[int]], LegacyWrappedReceiver[int]))
 ```
 
+### Reflexivity of materialized recursive protocols
+
+Each materialization of `Stream[Any]` is a subtype of itself, even though checking its methods
+structurally can produce an ever more deeply nested receiver type.
+
+```py
+from __future__ import annotations
+
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Stream[T](Protocol):
+    def flatten[U](self: Stream[Stream[U]]) -> Stream[U]: ...
+    def window(self) -> Stream[Stream[T]]: ...
+
+static_assert(is_subtype_of(Top[Stream[Any]], Top[Stream[Any]]))
+static_assert(is_subtype_of(Bottom[Stream[Any]], Bottom[Stream[Any]]))
+```
+
 ### Recursive protocol receivers with gradual members
 
 A gradual member changes the materializations even when the receiver is recursively specialized.

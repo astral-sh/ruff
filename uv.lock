@@ -1529,7 +1529,7 @@ wheels = [
 
 [[package]]
 name = "ruff"
-version = "0.17.2"
+version = "0.17.3"
 source = { editable = "." }
 
 [package.dev-dependencies]

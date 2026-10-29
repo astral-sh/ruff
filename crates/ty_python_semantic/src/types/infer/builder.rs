@@ -44,7 +44,7 @@ use crate::place::{
 };
 use crate::place_load::{
     ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceExprPrefixLoads, PlaceLoadFailure, PlaceLoadMode,
-    PlaceLoadResolutionStep, PlaceLoadSource, PlaceLoadSourceKind, resolve_place_load,
+    PlaceLoadResolutionProcedure, PlaceLoadResolutionStep, PlaceLoadSource, PlaceLoadSourceKind,
 };
 use crate::reachability::{
     ReachabilityEvaluationCache, evaluate_reachability_with_cache, is_end_of_scope_reachable,
@@ -118,7 +118,9 @@ use crate::types::special_form::TypeQualifier;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType, VariableSegment};
-use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
+use crate::types::type_alias::{
+    ManualPEP695TypeAliasType, PEP695TypeAliasType, type_alias_arguments,
+};
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
@@ -1515,7 +1517,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.context.inference_flags |= InferenceFlags::CHECK_UNBOUND_TYPEVARS;
                 self.infer_expression_impl(expression.node_ref(self.db()).node(self.module()), tcx);
             }
-            ExpressionKind::Normal => {
+            ExpressionKind::Normal | ExpressionKind::Predicate { .. } => {
                 self.infer_expression_impl(expression.node_ref(self.db()).node(self.module()), tcx);
             }
             ExpressionKind::TypeExpression => {
@@ -3975,12 +3977,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_typealiastype_assignment_deferred(definition, target, arguments);
                 if !arguments.keywords.is_empty() {
                     let mut call_arguments = self.prepare_call_arguments(arguments);
-                    // The positional arguments and `type_params` have their own validation rules;
-                    // leaving their types unset excludes them from ordinary call type checks.
+                    // Leave the types of `name`, `value`, and `type_params` unset because
+                    // these parameters have their own validation rules.
                     for (index, argument) in arguments.iter_source_order().enumerate() {
                         if let ArgOrKeyword::Keyword(keyword) = argument
                             && let Some(name) = keyword.arg.as_deref()
-                            && name != "type_params"
+                            && !matches!(name, "name" | "value" | "type_params")
                         {
                             call_arguments.insert_type(
                                 index,
@@ -4168,24 +4170,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        if arguments.args.len() != 2 {
+        if arguments.args.len() > 2 {
             return error(
                 &self.context,
                 format_args!(
-                    "Wrong number of arguments in `TypeAliasType` creation: expected 2, found {}",
+                    "Expected at most 2 positional arguments to `TypeAliasType`, got {}",
                     arguments.args.len()
                 ),
                 call_expr,
             );
         }
 
-        let name_param_ty = self.infer_expression(&arguments.args[0], TypeContext::default());
+        let Some((name_arg, _)) = type_alias_arguments(arguments) else {
+            return error(
+                &self.context,
+                "`TypeAliasType` requires both a `name` and a `value` argument",
+                call_expr,
+            );
+        };
+
+        let name_param_ty = self.infer_expression(name_arg, TypeContext::default());
 
         let Some(name) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
             return error(
                 &self.context,
-                "The first argument to `TypeAliasType` must be a string literal",
-                &arguments.args[0],
+                "The `name` argument to `TypeAliasType` must be a string literal",
+                name_arg,
             );
         };
 
@@ -4203,7 +4213,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if name != target_name {
             report_mismatched_type_name(
                 &self.context,
-                &arguments.args[0],
+                name_arg,
                 "TypeAliasType",
                 target_name,
                 Some(name),
@@ -4234,27 +4244,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         arguments: &ast::Arguments,
     ) {
         let db = self.db();
+        let Some((name_arg, value_arg)) = type_alias_arguments(arguments) else {
+            return;
+        };
         // Match the binding context used by eager assignment inference so legacy type variables
         // in the alias value are bound to the alias definition.
         let previous_context = self.typevar_binding_context.replace(definition);
 
-        let value_ty = self.infer_type_expression(&arguments.args[1]);
+        let value_ty = self.infer_type_expression(value_arg);
         let mut type_params = FxHashSet::default();
         let mut valid_type_params = true;
         // Infer keyword arguments (e.g. `type_params`) so their types are stored.
-        for keyword in &arguments.keywords {
-            self.infer_expression(&keyword.value, TypeContext::default());
+        for ast::Keyword { arg, value, .. } in &arguments.keywords {
+            if std::ptr::eq(value, name_arg) || std::ptr::eq(value, value_arg) {
+                continue;
+            }
+            self.infer_expression(value, TypeContext::default());
 
-            if keyword.arg.as_deref() != Some("type_params") {
+            if arg.as_deref() != Some("type_params") {
                 continue;
             }
 
-            let Some(tuple) = keyword.value.as_tuple_expr() else {
+            let Some(tuple) = value.as_tuple_expr() else {
                 valid_type_params = false;
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&INVALID_TYPE_ALIAS_TYPE, &keyword.value)
-                {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_ALIAS_TYPE, value) {
                     builder.into_diagnostic(
                         "The `type_params` argument to `TypeAliasType` must be a tuple literal",
                     );
@@ -4321,7 +4334,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .default_type(db, self.program_environment())
                     .is_some()
                 {
-                    if let Some(typevar_tuple) = typevar_tuple {
+                    if let Some(typevar_tuple) = typevar_tuple
+                        && !typevar.is_paramspec(db)
+                    {
                         valid_type_params = false;
                         if let Some(builder) = self
                             .context
@@ -4382,7 +4397,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if !type_params.contains(&typevar.identity(self.db()))
                     && let Some(builder) = self
                         .context
-                        .report_lint(&INVALID_TYPE_ALIAS_TYPE, &arguments.args[1])
+                        .report_lint(&INVALID_TYPE_ALIAS_TYPE, value_arg)
                 {
                     builder.into_diagnostic(format_args!(
                         "Type parameter `{}` used in the alias value \
@@ -4395,7 +4410,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.typevar_binding_context = previous_context;
         if let Some(name) = target.as_name_expr() {
-            self.check_type_alias_cycle(&name.id, &arguments.args[1]);
+            self.check_type_alias_cycle(&name.id, value_arg);
         }
     }
 
@@ -10706,9 +10721,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         name_node: &ast::ExprName,
     ) -> (Type<'db>, Option<Definition<'db>>) {
         let db = self.db();
-        let expr = PlaceExpr::from_expr_name(name_node);
+        let place_expr = PlaceExpr::from_expr_name(name_node);
 
-        let (resolved, _) = self.infer_place_load(expr, ast::ExprRef::Name(name_node));
+        let (resolved, _) = self.infer_place_load(&place_expr, ast::ExprRef::Name(name_node));
         let definition = match resolved.place {
             Place::Defined(place) => place.provenance.definition(),
             Place::Undefined => None,
@@ -10734,7 +10749,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// This also returns the [`ConstraintKey`]s used by expression-level narrowing.
     fn infer_place_load(
         &self,
-        place_expr: PlaceExpr,
+        place_expr: &PlaceExpr,
         expr_ref: ast::ExprRef,
     ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
         let env = self.program_environment();
@@ -10745,13 +10760,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             PlaceLoadMode::AtExpression(expr_ref)
         };
-        let mut resolution =
-            resolve_place_load(self.db(), self.index, self.scope(), place_expr, mode);
+        let mut procedure = PlaceLoadResolutionProcedure::new(
+            self.db(),
+            self.index,
+            self.scope(),
+            place_expr,
+            mode,
+        );
         let mut place = PlaceAndQualifiers::from(Place::Undefined);
         let mut failure = None;
         let mut checked_deprecated = false;
 
-        while let Some(step) = resolution.next() {
+        while let Some(step) = procedure.next() {
             match step {
                 PlaceLoadResolutionStep::Source(source) => {
                     if !checked_deprecated && source.is_post_lexical() {
@@ -10765,10 +10785,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         checked_deprecated = true;
                     }
-                    let narrowing_constraints = resolution.narrowing_constraints_for(&source);
+                    let narrowing_constraints = procedure.narrowing_constraints_for(&source);
                     place = place.or_fall_back_to(self.db(), env, || {
                         self.infer_place_load_source(
-                            resolution.place_expr(),
+                            procedure.place_expr(),
                             source,
                             narrowing_constraints,
                         )
@@ -10802,7 +10822,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             place
         };
 
-        let constraint_keys = resolution.into_constraints();
+        let constraint_keys = procedure.into_constraints();
 
         (place, constraint_keys)
     }
@@ -11148,7 +11168,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut assigned_type = None;
         if let Some(place_expr) = PlaceExpr::try_from_expr(attribute) {
             let (resolved, keys) =
-                self.infer_place_load(place_expr, ast::ExprRef::Attribute(attribute));
+                self.infer_place_load(&place_expr, ast::ExprRef::Attribute(attribute));
             constraint_keys.extend(keys);
             if let Place::Defined(
                 place @ DefinedPlace {
@@ -12254,25 +12274,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     pub(super) fn finish_function_decorator_inference(mut self) -> FunctionDecoratorInference<'db> {
+        // Specializing a nominal return type can change a descriptor's type arguments, but it
+        // cannot turn the descriptor into an abstract function, bound method, or property.
+        fn returns_nominal_instance<'db>(db: &'db dyn Db, decorator: Type<'db>) -> bool {
+            let Type::Callable(callable) = decorator else {
+                return false;
+            };
+            if callable.kind(db) != CallableTypeKind::Regular {
+                return false;
+            }
+            let [signature] = callable.signatures(db).overloads.as_slice() else {
+                return false;
+            };
+            matches!(signature.return_ty, Type::NominalInstance(_))
+        }
+
         self.infer_region();
 
         let mut known_decorators = FunctionDecorators::empty();
-        let mut has_unknown_decorators = true;
+        let mut may_produce_abstract_method = true;
         if let InferenceRegion::FunctionDecorators(definition) = self.region
             && let DefinitionKind::Function(function) = definition.kind(self.db())
         {
-            has_unknown_decorators = false;
-            for decorator in &function.node(self.module()).decorator_list {
+            may_produce_abstract_method = false;
+            let decorators = &function.node(self.module()).decorator_list;
+            for decorator in decorators {
                 let ty = self.expression_type(&decorator.expression);
                 let flags = FunctionDecorators::from_decorator_type(self.db(), ty);
                 known_decorators |= flags;
                 if flags.is_empty()
                     && !matches!(ty, Type::ClassLiteral(class)
                         if class.known(self.db()) == Some(KnownClass::Property))
+                    && !(decorators.len() == 1 && returns_nominal_instance(self.db(), ty))
                 {
-                    has_unknown_decorators = true;
+                    may_produce_abstract_method = true;
                 }
             }
+            may_produce_abstract_method |=
+                known_decorators.contains(FunctionDecorators::ABSTRACT_METHOD);
         }
 
         let Self {
@@ -12314,7 +12353,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
             known_decorators,
-            has_unknown_decorators,
+            may_produce_abstract_method,
             context,
         }
     }

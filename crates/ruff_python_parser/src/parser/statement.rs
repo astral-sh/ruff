@@ -171,7 +171,9 @@ impl<'src> Parser<'src> {
                     ParseErrorType::SimpleStatementsOnSameLine,
                     self.current_token_range(),
                 );
-            } else if self.at_compound_stmt() {
+            } else if self.at_compound_stmt() && !self.at(TokenKind::Match) {
+                // `match` can also be an identifier. Report this error when parsing it as a keyword.
+
                 // test_err simple_and_compound_stmt_on_same_line
                 // a; if b: pass; b
                 self.add_error(
@@ -532,7 +534,10 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Raise);
 
         let exc = match self.current_token_kind() {
-            TokenKind::Newline => None,
+            // test_ok bare_raise_before_semicolon
+            // try: work()
+            // except ValueError: raise; report()
+            TokenKind::Newline | TokenKind::Semi => None,
             TokenKind::From => {
                 // test_err raise_stmt_from_without_exc
                 // raise from exc
@@ -2528,6 +2533,31 @@ impl<'src> Parser<'src> {
         target
     }
 
+    /// Consume `match` as a keyword and report an error if the compound statement follows
+    /// a semicolon. If `match` turns out to be an identifier, rewinding discards the error.
+    fn bump_match_statement_keyword(&mut self) {
+        // test_ok semicolon_before_match_identifier
+        // first(); match = value
+        // first(); match(value)
+        // first(); match[0]: int
+        // first();
+        // match (value):
+        //     case _: pass
+
+        // test_err semicolon_before_match_statement
+        // first(); match value:
+        //     case _: pass
+        // first(); match (value):
+        //     case _: pass
+        if self.tokens.previous_kind() == Some(TokenKind::Semi) {
+            self.add_error(
+                ParseErrorType::SimpleAndCompoundStatementOnSameLine,
+                self.current_token_range(),
+            );
+        }
+        self.bump(TokenKind::Match);
+    }
+
     /// Try parsing a `match` statement.
     ///
     /// This uses speculative parsing to remove the ambiguity of whether the `match` token is used
@@ -2558,7 +2588,7 @@ impl<'src> Parser<'src> {
         let checkpoint = self.checkpoint();
 
         let start = self.node_start();
-        self.bump(TokenKind::Match);
+        self.bump_match_statement_keyword();
 
         let subject = self.parse_match_subject_expression();
 
@@ -2622,7 +2652,7 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-match-statement>
     fn parse_match_statement(&mut self) -> ast::StmtMatch {
         let start = self.node_start();
-        self.bump(TokenKind::Match);
+        self.bump_match_statement_keyword();
 
         let match_range = self.node_range(start);
 

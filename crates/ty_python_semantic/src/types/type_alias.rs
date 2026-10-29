@@ -276,6 +276,15 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 }
 
+/// Find the `name` and `value` arguments to `TypeAliasType`. If either is supplied
+/// twice, use the positional argument for error recovery.
+pub(super) fn type_alias_arguments(arguments: &ast::Arguments) -> Option<(&ast::Expr, &ast::Expr)> {
+    let keyword = |name| arguments.find_keyword(name).map(|keyword| &keyword.value);
+    let name = arguments.args.first().or_else(|| keyword("name"))?;
+    let value = arguments.args.get(1).or_else(|| keyword("value"))?;
+    Some((name, value))
+}
+
 /// A PEP 695 `types.TypeAliasType` created by manually calling the constructor.
 ///
 /// The value type is computed lazily via [`ManualPEP695TypeAliasType::value_type()`]
@@ -341,8 +350,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         let ast::Expr::Call(call) = value_node else {
             return Type::unknown();
         };
-        // The value is the second positional argument to TypeAliasType(name, value).
-        let Some(value_arg) = call.arguments.find_argument_value("value", 1) else {
+        let Some((_, value_arg)) = type_alias_arguments(&call.arguments) else {
             return Type::unknown();
         };
         definition_expression_type(db, definition, value_arg)

@@ -2698,9 +2698,8 @@ reveal_type((1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
 
 <!-- snapshot-diagnostics -->
 
-A type parameter with a default cannot follow a `TypeVarTuple` in a type parameter list. This is
-prohibited by the typing spec because a `TypeVarTuple` consumes all remaining positional type
-arguments, making any subsequent defaults meaningless.
+A `TypeVar` with a default cannot follow a `TypeVarTuple`, even if a required `TypeVar` comes
+between them. A specialization could use the default and bind one more argument to the pack.
 
 ```py
 # error: [invalid-type-variable-default] "Type parameter `T` with a default follows TypeVarTuple `Ts`"
@@ -2712,11 +2711,11 @@ class Bar[T1, *Ts, T2 = int]: ...
 # error: [invalid-type-variable-default]
 class Baz[*Ts, T1 = int, T2 = str]: ...
 
-# Note: the spec says this is fine,
-# but it raises `TypeError` at runtime
-# (<https://github.com/python/typing/issues/2211>)
-#
 # error: [invalid-type-variable-default]
+class Separated[*Ts, U, T = int]: ...
+
+# A parameter list for a ParamSpec is distinguishable from the types that fill the pack.
+# CPython raises TypeError here (https://github.com/python/typing/issues/2211).
 class Qux[*Ts, **P = [int, str]]: ...
 
 # error: [invalid-type-variable-default]
@@ -2725,7 +2724,6 @@ class Quux[*Ts, T1 = int, **P = [int, str]]: ...
 # error: [invalid-type-variable-default]
 class Corge[*Ts, T1 = int, T2 = str, **P = [int, str]]: ...
 
-# error: [invalid-type-variable-default]
 # error: [invalid-type-form] "Generic class `Grault` cannot have multiple `TypeVarTuple` type parameters"
 class Grault[*Us, *Ts = *tuple[int, str]]: ...
 

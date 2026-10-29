@@ -5,6 +5,7 @@ use std::fmt::{Debug, Display};
 
 use itertools::Either;
 
+use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::variables::{
     AtomicConstraint, ConcreteEquivalenceBound, ConcreteLowerBound, ConcreteUpperBound,
     ConstraintProvenance, ProvidesConcreteBound, ProvidesConcreteLowerBound,
@@ -16,10 +17,16 @@ use crate::types::constraints::{
     ALWAYS_FALSE, AtomicConstraintId, ConstraintSetBuilder, ConstraintSetStorage, Node,
     OwnedConstraintSet,
 };
+use crate::types::signatures::CallableSignature;
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
-use crate::types::{BoundTypeVarInstance, IntersectionType, Type, TypeVarVariance, UnionType};
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type_expanding_aliases, walk_type_with_recursion_guard,
+};
+use crate::types::{
+    ApplySpecialization, ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type,
+    TypeContext, TypeMapping, TypeVarVariance, UnionType,
+};
 use crate::{Db, Program, ProgramEnvironment};
 
 /// A constraint can occur in many cached pairs and their derived sequents. Intern it once instead
@@ -387,6 +394,12 @@ impl<'db> SequentMap<'db> {
             AtomicConstraint::ConcreteUpper(bound) => {
                 bound.bound == bound.typevar.domain(db).top(db)
                     || bound.bound == bound.typevar.domain(db).bottom(db)
+                    || bound.bound.as_union().is_some_and(|union| {
+                        union
+                            .elements(db)
+                            .iter()
+                            .any(|element| element.is_type_var())
+                    })
             }
             AtomicConstraint::ConcreteEquivalence(_) => false,
             AtomicConstraint::TypeVarRange(bound) => bound.left.is_same_typevar_as(db, bound.right),
@@ -497,25 +510,23 @@ impl<'db> SequentMap<'db> {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ReplacementIs {
-    FromEquivalence,
-    FromRange,
+struct ReplacementSource {
+    is_equivalence: bool,
+    provenance: ConstraintProvenance,
 }
 
-impl ReplacementIs {
-    fn from_concrete_bound<'db>(bound: impl ProvidesConcreteBound<'db>) -> ReplacementIs {
-        if bound.is_equivalence() {
-            ReplacementIs::FromEquivalence
-        } else {
-            ReplacementIs::FromRange
+impl ReplacementSource {
+    fn from_concrete_bound<'db>(bound: impl ProvidesConcreteBound<'db>) -> Self {
+        Self {
+            is_equivalence: bound.is_equivalence(),
+            provenance: bound.provenance(),
         }
     }
 
-    fn from_typevar_bound<'db>(bound: impl ProvidesTypeVarBound<'db>) -> ReplacementIs {
-        if bound.is_equivalence() {
-            ReplacementIs::FromEquivalence
-        } else {
-            ReplacementIs::FromRange
+    fn from_typevar_bound<'db>(bound: impl ProvidesTypeVarBound<'db>) -> Self {
+        Self {
+            is_equivalence: bound.is_equivalence(),
+            provenance: bound.provenance(),
         }
     }
 }
@@ -837,8 +848,8 @@ impl<'db> AtomicConstraint<'db> {
         });
     }
 
-    /// Substitutes `replacement_bound` for `replacement_typevar` unless the two bounds contain a
-    /// direct self-reference.
+    /// Substitutes `replacement_bound` for `replacement_typevar`, avoiding recursive bounds and
+    /// preserving captured generic parameters when substituting validity bounds.
     ///
     /// A replacement containing `replacement_typevar`, such as substituting `G[U]` for `U`, can be
     /// fed back into the same substitution to produce `G[G[U]]`. A replacement containing
@@ -851,7 +862,7 @@ impl<'db> AtomicConstraint<'db> {
         needle_bound: Type<'db>,
         replacement_typevar: BoundTypeVarInstance<'db>,
         replacement_bound: Type<'db>,
-        replacement_is: ReplacementIs,
+        replacement_source: ReplacementSource,
     ) -> Option<Type<'db>> {
         // Substituting a gradual type is not always safe.
         //
@@ -863,7 +874,7 @@ impl<'db> AtomicConstraint<'db> {
         // If we are substituting because of an equivalence bound, that means we have two terms
         // that are equal, and we are just substituting one for the other. This does not rely on
         // transitivity, and is therefore sound even for gradual types.
-        if replacement_is == ReplacementIs::FromRange
+        if !replacement_source.is_equivalence
             && !replacement_bound.is_static_sequent_eligible(db, env)
         {
             return None;
@@ -898,6 +909,38 @@ impl<'db> AtomicConstraint<'db> {
             return None;
         }
 
+        if replacement_source.provenance == ConstraintProvenance::Validity
+            && let Type::Callable(callable) = needle_bound
+            && callable.kind(db) == CallableTypeKind::ParamSpecValue
+        {
+            // A captured signature already retains its typevars' declared bounds. Substituting
+            // those bounds for its local generic parameters would enumerate combinations of
+            // specialized overloads without providing any new call-site evidence. Free typevars
+            // still participate in substitution, as do evidence-backed bounds on local typevars.
+            let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                replacement_typevar,
+                replacement_bound,
+            ));
+            let visitor = ApplyTypeMappingVisitor::new(env);
+            let signatures = CallableSignature::from_overloads(
+                callable.signatures(db).iter().flat_map(|signature| {
+                    let is_local = signature.generic_context.is_some_and(|context| {
+                        context.contains(db, replacement_typevar.identity(db))
+                    });
+                    let signatures = CallableSignature::single(signature.clone());
+                    if is_local {
+                        signatures.overloads
+                    } else {
+                        signatures
+                            .apply_type_mapping_impl(db, &mapping, TypeContext::default(), &visitor)
+                            .overloads
+                    }
+                }),
+            );
+            let replacement = Type::Callable(callable.with_signatures(db, signatures));
+            return (replacement != needle_bound).then_some(replacement);
+        }
+
         Some(needle_bound.substitute_one_typevar(db, env, replacement_typevar, replacement_bound))
     }
 
@@ -926,7 +969,7 @@ impl<'db> AtomicConstraint<'db> {
             left.bound(),
             right.typevar(),
             right.bound(),
-            ReplacementIs::from_concrete_bound(right),
+            ReplacementSource::from_concrete_bound(right),
         ) else {
             return;
         };
@@ -964,7 +1007,7 @@ impl<'db> AtomicConstraint<'db> {
             left.bound(),
             right.typevar(),
             right.bound(),
-            ReplacementIs::from_concrete_bound(right),
+            ReplacementSource::from_concrete_bound(right),
         ) else {
             return;
         };
@@ -1002,7 +1045,7 @@ impl<'db> AtomicConstraint<'db> {
             left.bound(),
             right.typevar(),
             right.bound(),
-            ReplacementIs::from_concrete_bound(right),
+            ReplacementSource::from_concrete_bound(right),
         ) else {
             return;
         };
@@ -1035,7 +1078,7 @@ impl<'db> AtomicConstraint<'db> {
                 lower.bound(),
                 upper.typevar(),
                 upper.bound(),
-                ReplacementIs::from_concrete_bound(upper),
+                ReplacementSource::from_concrete_bound(upper),
             )
         {
             let derived = lower.into_lower_bound().map(provenance, replacement);
@@ -1061,7 +1104,7 @@ impl<'db> AtomicConstraint<'db> {
                 upper.bound(),
                 lower.typevar(),
                 lower.bound(),
-                ReplacementIs::from_concrete_bound(lower),
+                ReplacementSource::from_concrete_bound(lower),
             )
         {
             let derived = upper.into_upper_bound().map(provenance, replacement);
@@ -1099,7 +1142,7 @@ impl<'db> AtomicConstraint<'db> {
             left.bound(),
             right.typevar(),
             right.bound(),
-            ReplacementIs::from_concrete_bound(right),
+            ReplacementSource::from_concrete_bound(right),
         ) else {
             return;
         };
@@ -1134,7 +1177,7 @@ impl<'db> AtomicConstraint<'db> {
             left.bound(),
             right.right(),
             Type::TypeVar(right.left()),
-            ReplacementIs::from_typevar_bound(right),
+            ReplacementSource::from_typevar_bound(right),
         ) else {
             return;
         };
@@ -1169,7 +1212,7 @@ impl<'db> AtomicConstraint<'db> {
             left.bound(),
             right.left(),
             Type::TypeVar(right.right()),
-            ReplacementIs::from_typevar_bound(right),
+            ReplacementSource::from_typevar_bound(right),
         ) else {
             return;
         };
@@ -1204,7 +1247,7 @@ impl<'db> AtomicConstraint<'db> {
             left.bound(),
             right.left(),
             Type::TypeVar(right.right()),
-            ReplacementIs::from_typevar_bound(right),
+            ReplacementSource::from_typevar_bound(right),
         ) else {
             return;
         };
@@ -1239,7 +1282,7 @@ impl<'db> AtomicConstraint<'db> {
             left.bound(),
             right.left(),
             Type::TypeVar(right.right()),
-            ReplacementIs::from_typevar_bound(right),
+            ReplacementSource::from_typevar_bound(right),
         ) else {
             return;
         };
@@ -1274,7 +1317,7 @@ impl<'db> AtomicConstraint<'db> {
             left.bound(),
             right.right(),
             Type::TypeVar(right.left()),
-            ReplacementIs::from_typevar_bound(right),
+            ReplacementSource::from_typevar_bound(right),
         ) else {
             return;
         };
@@ -1309,7 +1352,7 @@ impl<'db> AtomicConstraint<'db> {
             left.bound(),
             right.left(),
             Type::TypeVar(right.right()),
-            ReplacementIs::from_typevar_bound(right),
+            ReplacementSource::from_typevar_bound(right),
         ) else {
             return;
         };
@@ -1344,7 +1387,7 @@ impl<'db> AtomicConstraint<'db> {
             left.bound(),
             right.left(),
             Type::TypeVar(right.right()),
-            ReplacementIs::from_typevar_bound(right),
+            ReplacementSource::from_typevar_bound(right),
         ) else {
             return;
         };
@@ -1620,7 +1663,7 @@ impl<'db> ConcreteUpperBound<'db> {
     fn add_sequents(
         self,
         db: &'db dyn Db,
-        _env: &ProgramEnvironment<'db>,
+        env: &ProgramEnvironment<'db>,
         map: &mut SequentMapBuilder<'db>,
     ) {
         // `T ≤ ⊤` is always true
@@ -1632,6 +1675,46 @@ impl<'db> ConcreteUpperBound<'db> {
         if self.bound == self.typevar.domain(db).bottom(db) {
             let derived = ConcreteEquivalenceBound::new(self.provenance, self.typevar, self.bound);
             map.add_single_implication(self.into(), derived.into());
+        }
+
+        // `U ≤ T | A` implies `U & ~Top[A] ≤ T`. In particular, when U is fixed by the caller,
+        // the original upper bound cannot select a solution for T. The residual lower bound
+        // preserves U without requiring T to accept the part of U already covered by A.
+        // Subtracting A's top materialization excludes every materialization of a gradual arm, so
+        // a fully covered U contributes no inference evidence and does not override T's default.
+        let Type::Union(union) = self.bound else {
+            return;
+        };
+        for element in union.elements(db) {
+            let Type::TypeVar(typevar) = *element else {
+                continue;
+            };
+            let other_elements = union.elements(db).iter().filter(|other| *other != element);
+            // Wait for substitutions to resolve other type variables in the union. Otherwise,
+            // `U ≤ T | V` would produce mutually dependent lower bounds `U & ~V ≤ T` and
+            // `U & ~T ≤ V`, which cannot independently select solutions for T and V.
+            if other_elements
+                .clone()
+                .any(|other| any_over_type_expanding_aliases(db, env, *other, Type::is_type_var))
+            {
+                continue;
+            }
+            let residual = IntersectionType::bounded_from_elements(
+                db,
+                env,
+                std::iter::once(Type::TypeVar(self.typevar)).chain(
+                    other_elements.map(|other| other.top_materialization(db, env).negate(db, env)),
+                ),
+            );
+            // `Never ≤ T` supplies no inference evidence and must not override T's default.
+            let Some(residual) = residual.filter(|residual| !residual.is_never()) else {
+                continue;
+            };
+            for derived in AtomicConstraint::new_lower_bound(db, self.provenance, typevar, residual)
+                .filter_map(Result::ok)
+            {
+                map.add_single_implication(self.into(), derived);
+            }
         }
     }
 
@@ -2134,8 +2217,15 @@ mod tests {
     use super::*;
 
     use crate::db::tests::{TestDb, setup_db};
-    use crate::types::typevar::TypeVarBoundOrConstraints;
-    use crate::types::{BoundTypeVarInstance, KnownClass, SubclassOfType, TypeVarVariance};
+    use crate::types::generics::GenericContext;
+    use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
+    use crate::types::typevar::{
+        BindingContext, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind,
+        TypeVarNonce,
+    };
+    use crate::types::{
+        BoundTypeVarInstance, CallableType, KnownClass, SubclassOfType, TypeVarVariance,
+    };
     use ruff_python_ast::name::Name;
 
     fn create_typevar<'db>(db: &'db TestDb, name: &'static str) -> BoundTypeVarInstance<'db> {
@@ -2149,6 +2239,188 @@ mod tests {
 
     fn known_instance(db: &TestDb, class: KnownClass) -> Type<'_> {
         class.to_instance(db, &db.program_environment())
+    }
+
+    fn paramspec_signature<'db>(
+        db: &'db TestDb,
+        parameter: Type<'db>,
+        local_typevar: Option<BoundTypeVarInstance<'db>>,
+    ) -> Signature<'db> {
+        Signature::new_generic(
+            local_typevar.map(|typevar| {
+                GenericContext::from_typevar_instances(db, &db.program_environment(), [typevar])
+            }),
+            Parameters::standard([Parameter::positional_only(None).with_annotated_type(parameter)]),
+            Type::unknown(),
+        )
+    }
+
+    #[test]
+    fn paramspec_local_typevars_require_evidence_for_specialization() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let p = create_typevar(db, "P");
+        let t = create_typevar(db, "T");
+        let int = known_instance(db, KnownClass::Int);
+        let captured = Type::Callable(CallableType::paramspec_value_from_signatures(
+            db,
+            CallableSignature::single(paramspec_signature(db, Type::TypeVar(t), Some(t))),
+        ));
+        let specialized = Type::Callable(CallableType::paramspec_value_from_signatures(
+            db,
+            CallableSignature::single(paramspec_signature(db, int, None)),
+        ));
+        let lower = AtomicConstraint::from(ConcreteLowerBound::new(
+            ConstraintProvenance::Evidence,
+            p,
+            captured,
+        ));
+
+        for provenance in [
+            ConstraintProvenance::Validity,
+            ConstraintProvenance::Evidence,
+            ConstraintProvenance::Mixed,
+        ] {
+            for replacement in [
+                AtomicConstraint::from(ConcreteUpperBound::new(provenance, t, int)),
+                AtomicConstraint::from(ConcreteEquivalenceBound::new(provenance, t, int)),
+            ] {
+                let sequents = SequentMap::for_constraint_pair(db, &env, lower, replacement);
+                if provenance == ConstraintProvenance::Validity {
+                    assert!(
+                        sequents.is_none_or(|sequents| sequents.all_sequents().next().is_none()),
+                        "{replacement:?}: {sequents:#?}",
+                    );
+                } else {
+                    let expected = AtomicConstraint::from(ConcreteLowerBound::new(
+                        ConstraintProvenance::derived(ConstraintProvenance::Evidence, provenance),
+                        p,
+                        specialized,
+                    ));
+                    assert!(sequents.is_some_and(|sequents| {
+                        sequents.all_sequents().any(|sequent| {
+                            matches!(sequent, Sequent::PairImplication { post, .. }
+                                if post.constraint(db) == expected)
+                        })
+                    }));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn paramspec_declared_bounds_specialize_only_free_typevars() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let p = create_typevar(db, "P");
+        let t = create_typevar(db, "T");
+        let int = known_instance(db, KnownClass::Int);
+        let local = paramspec_signature(db, Type::TypeVar(t), Some(t));
+        let free = paramspec_signature(db, Type::TypeVar(t), None);
+        let specialized = paramspec_signature(db, int, None);
+
+        // The same variable can be bound in one signature and free in another.
+        for keep_local in [false, true] {
+            let captured = Type::Callable(CallableType::paramspec_value_from_signatures(
+                db,
+                CallableSignature::from_overloads(
+                    keep_local
+                        .then(|| local.clone())
+                        .into_iter()
+                        .chain([free.clone()]),
+                ),
+            ));
+            let expected_bound = Type::Callable(CallableType::paramspec_value_from_signatures(
+                db,
+                CallableSignature::from_overloads(
+                    keep_local
+                        .then(|| local.clone())
+                        .into_iter()
+                        .chain([specialized.clone()]),
+                ),
+            ));
+            let lower = AtomicConstraint::from(ConcreteLowerBound::new(
+                ConstraintProvenance::Evidence,
+                p,
+                captured,
+            ));
+            let upper = AtomicConstraint::from(ConcreteUpperBound::new(
+                ConstraintProvenance::Validity,
+                t,
+                int,
+            ));
+            let expected = AtomicConstraint::from(ConcreteLowerBound::new(
+                ConstraintProvenance::Mixed,
+                p,
+                expected_bound,
+            ));
+            let sequents = SequentMap::for_constraint_pair(db, &env, lower, upper);
+            assert!(sequents.is_some_and(|sequents| {
+                sequents.all_sequents().any(|sequent| {
+                    matches!(sequent, Sequent::PairImplication { post, .. }
+                        if post.constraint(db) == expected)
+                })
+            }));
+        }
+    }
+
+    #[test]
+    fn paramspec_validity_substitution_expands_free_paramspec_overloads() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let p = create_typevar(db, "P");
+        let identity = TypeVarIdentity::new(
+            db,
+            Name::new_static("Q"),
+            None,
+            TypeVarKind::Pep695ParamSpec,
+        );
+        let q = BoundTypeVarInstance::new(
+            db,
+            TypeVarInstance::new(db, identity, None, None, None),
+            BindingContext::Synthetic(env.program(db)),
+            None,
+            TypeVarNonce::NONE,
+        );
+        let captured = Type::Callable(CallableType::paramspec_value_from_signatures(
+            db,
+            CallableSignature::single(Signature::new(
+                Parameters::paramspec(db, q),
+                Type::unknown(),
+            )),
+        ));
+        let overloads = Type::Callable(CallableType::paramspec_value_from_signatures(
+            db,
+            CallableSignature::from_overloads(
+                [KnownClass::Int, KnownClass::Str]
+                    .map(|class| paramspec_signature(db, known_instance(db, class), None)),
+            ),
+        ));
+        let lower = AtomicConstraint::from(ConcreteLowerBound::new(
+            ConstraintProvenance::Evidence,
+            p,
+            captured,
+        ));
+        let replacement = AtomicConstraint::from(ConcreteEquivalenceBound::new(
+            ConstraintProvenance::Validity,
+            q,
+            overloads,
+        ));
+        let expected = AtomicConstraint::from(ConcreteLowerBound::new(
+            ConstraintProvenance::Mixed,
+            p,
+            captured.substitute_one_typevar(db, &env, q, overloads),
+        ));
+        let sequents = SequentMap::for_constraint_pair(db, &env, lower, replacement);
+        assert!(sequents.is_some_and(|sequents| {
+            sequents.all_sequents().any(|sequent| {
+                matches!(sequent, Sequent::PairImplication { post, .. }
+                    if post.constraint(db) == expected)
+            })
+        }));
     }
 
     #[test]
