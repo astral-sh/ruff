@@ -292,6 +292,12 @@ impl<'db> CallableSignature<'db> {
         previous: &Self,
         cycle: &salsa::Cycle,
     ) -> Self {
+        // A nested query can return its cycle-initial signature after an earlier iteration saw
+        // the declaration. Its synthetic parameters have no counterparts in that declaration.
+        if self.is_cycle_initial() {
+            return self.clone();
+        }
+
         if previous.overloads.len() == self.overloads.len() {
             Self {
                 overloads: self

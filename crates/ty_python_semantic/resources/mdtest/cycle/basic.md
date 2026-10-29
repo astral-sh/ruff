@@ -36,6 +36,48 @@ def f(x: f):
 reveal_type(f)  # revealed: def f(x: Unknown) -> Unknown
 ```
 
+## Recovering an inherited protocol method signature
+
+Checking these modules concurrently can require the signature of `Boxed.wrap` while the checker is
+still computing the interface of `Stream`, which inherits that method. Once the cycle resolves, the
+return type of `wrap` reflects the receiver on which it was called.
+
+```toml
+parallel = true
+
+[environment]
+python-version = "3.13"
+```
+
+`boxed.pyi`:
+
+```pyi
+from typing import Protocol, Self
+from stream import Box
+
+class Boxed(Protocol):
+    def wrap(self) -> Box[Self]: ...
+```
+
+`stream.py`:
+
+```py
+from __future__ import annotations
+from typing import Protocol
+from boxed import Boxed
+
+class Stream[T](Boxed, Protocol):
+    def tail(self) -> Stream[T] | None: ...
+
+class Box[T]:
+    def stream(self) -> Stream[T]:
+        raise NotImplementedError
+
+def check(stream: Stream[int]) -> None:
+    # revealed: Box[Stream[int]]
+    reveal_type(stream.wrap())
+```
+
 ## Unpacking a recursively growing tuple
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3838>.
