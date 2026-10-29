@@ -484,6 +484,50 @@ fn simple_assignment_does_not_enter_salsa_cycle() {
     assert_eq!(cycles, Vec::<String>::new());
 }
 
+/// Mdtests check their files one at a time. Checking these modules concurrently can expose the
+/// cycle-initial signature of `Boxed.wrap` after an earlier iteration saw its declared signature.
+#[test]
+fn recover_recursive_protocol_method_signature() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY313)
+        .build()?;
+    db.write_dedented(
+        "src/boxed.pyi",
+        r#"
+        from typing import Protocol, Self
+        from stream import Box
+
+        class Boxed(Protocol):
+            def wrap(self) -> Box[Self]: ...
+        "#,
+    )?;
+    db.write_dedented(
+        "src/stream.py",
+        r#"
+        from __future__ import annotations
+        from typing import Protocol, assert_type
+        from boxed import Boxed
+
+        class Stream[T](Boxed, Protocol):
+            def tail(self) -> Stream[T] | None: ...
+
+        class Box[T]:
+            def stream(self) -> Stream[T]:
+                raise NotImplementedError
+
+        def check(stream: Stream[int]) -> None:
+            assert_type(stream.wrap(), Box[Stream[int]])
+        "#,
+    )?;
+
+    let boxed_db = db.clone();
+    std::thread::scope(|scope| {
+        scope.spawn(move || assert_file_diagnostics(&boxed_db, "src/boxed.pyi", &[]));
+        assert_file_diagnostics(&db, "src/stream.py", &[]);
+    });
+    Ok(())
+}
+
 /// Mutually dependent loop conditions must not select different fixed points depending on which
 /// imported variable is inferred first. Both inputs are `Never`, so neither conditional assignment
 /// can execute. Regression test for <https://github.com/astral-sh/ty/issues/4577>.
