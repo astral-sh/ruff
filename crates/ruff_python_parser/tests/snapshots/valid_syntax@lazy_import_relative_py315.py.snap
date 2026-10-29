@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/lazy_import_relative_p
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..124,
+        range: 0..165,
         body: [
             ImportFrom(
                 StmtImportFrom {
@@ -90,6 +90,33 @@ Module(
                             name: Identifier {
                                 id: Name("x"),
                                 range: 122..123,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 1,
+                    is_lazy: true,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 124..164,
+                    module: Some(
+                        Identifier {
+                            id: Name("__future__"),
+                            range: 135..145,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 153..164,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("annotations"),
+                                range: 153..164,
                                 node_index: NodeIndex(None),
                             },
                             asname: None,

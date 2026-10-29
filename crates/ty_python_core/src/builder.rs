@@ -4286,6 +4286,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // import, so we still check using it (and will also emit a diagnostic about a
                     // miss-placed `__future__` import.)
                     self.has_future_annotations |= !node.is_lazy
+                        && node.level == 0
                         && alias.name.id == "annotations"
                         && node.module.as_deref() == Some("__future__");
 

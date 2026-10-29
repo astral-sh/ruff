@@ -113,7 +113,7 @@ pub(crate) fn lazy_import_mismatch(checker: &Checker, stmt: &Stmt) {
     let names = match stmt {
         Stmt::Import(import) => &import.names,
         Stmt::ImportFrom(import)
-            if import.module.as_deref() != Some("__future__")
+            if (import.level > 0 || import.module.as_deref() != Some("__future__"))
                 && !import.names.iter().any(|alias| alias.name.as_str() == "*") =>
         {
             &import.names

@@ -43,13 +43,14 @@ pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
         range,
         module: Some(module_name),
         names,
+        level,
         ..
     } = target
     else {
         return;
     };
 
-    if module_name != "__future__" {
+    if *level != 0 || module_name != "__future__" {
         return;
     }
 

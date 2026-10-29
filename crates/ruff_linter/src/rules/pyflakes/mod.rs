@@ -3259,6 +3259,21 @@ lambda: fu
     }
 
     #[test]
+    fn relative_future_import() {
+        // Relative imports from `__future__` are treated as normal relative imports,
+        // not future feature imports.
+        flakes(
+            r"
+        from .__future__ import non_existent_feature
+        from ..__future__ import non_existent_feature2
+
+        assert non_existent_feature is not non_existent_feature2
+        ",
+            &[],
+        );
+    }
+
+    #[test]
     fn ignored_in_function() {
         // An C{__all__} definition does not suppress unused import warnings in a
         // function scope.

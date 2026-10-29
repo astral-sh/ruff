@@ -2,3 +2,4 @@
 lazy from . import basic2
 lazy from .basic2 import x, f
 lazy from . import b, x
+lazy from .__future__ import annotations

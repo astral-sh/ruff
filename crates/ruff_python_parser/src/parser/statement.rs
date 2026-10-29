@@ -309,6 +309,7 @@ impl<'src> Parser<'src> {
                         // lazy from . import basic2
                         // lazy from .basic2 import x, f
                         // lazy from . import b, x
+                        // lazy from .__future__ import annotations
 
                         // test_ok lazy_import_soft_keyword_split_py315
                         // # parse_options: {"target-version": "3.15"}

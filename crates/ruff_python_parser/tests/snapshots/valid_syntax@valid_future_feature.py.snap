@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/valid_future_feature.p
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..35,
+        range: 0..116,
         body: [
             ImportFrom(
                 StmtImportFrom {
@@ -34,6 +34,60 @@ Module(
                         },
                     ],
                     level: 0,
+                    is_lazy: false,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 35..74,
+                    module: Some(
+                        Identifier {
+                            id: Name("__future__"),
+                            range: 41..51,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 59..74,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("invalid_feature"),
+                                range: 59..74,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 1,
+                    is_lazy: false,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 75..115,
+                    module: Some(
+                        Identifier {
+                            id: Name("__future__"),
+                            range: 82..92,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 100..115,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("invalid_feature"),
+                                range: 100..115,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 2,
                     is_lazy: false,
                 },
             ),
