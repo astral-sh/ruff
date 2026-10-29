@@ -88,3 +88,16 @@ The benchmark script supports snapshotting the results when running with `--snap
 The goal of those snapshots is to catch accidental regressions. For example, if a project adds
 new dependencies that we fail to install. They are not intended as a testing tool. E.g. the snapshot runner doesn't account for platform differences so that
 you might see differences when running the snapshots on your machine.
+
+## Project coverage
+
+The suite includes HTTPX's synchronous and asynchronous HTTP client, FastAPI's
+web framework, NumPy's Python implementation and array stubs, and SQLAlchemy's
+typed ORM and SQL-expression APIs, alongside the existing application and library
+benchmarks. NumPy excludes its tests and does not build its C extensions; its
+source requires a Python 3.12 project environment.
+
+Each of these projects has an incremental edit that changes diagnostics in an
+importing file as well as exercising the edited module. Keep their source
+revisions identical across the existing- and updated-project runs when measuring
+the refresh of the other projects.
