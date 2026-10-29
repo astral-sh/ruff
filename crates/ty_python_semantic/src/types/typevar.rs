@@ -1870,7 +1870,7 @@ impl<'db> BindingContext<'db> {
         }
     }
 
-    fn program(self, db: &'db dyn Db) -> Program<'db> {
+    pub(super) fn program(self, db: &'db dyn Db) -> Program<'db> {
         match self {
             Self::Definition(definition) => definition.program(db),
             Self::Synthetic(program) => program,
