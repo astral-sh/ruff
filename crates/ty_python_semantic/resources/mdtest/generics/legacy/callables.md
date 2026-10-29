@@ -699,6 +699,14 @@ def _() -> None:
     reveal_type(infer_pair(swap))  # revealed: Result[tuple[int, str]] & Result[tuple[str, int]]
 ```
 
+The refined return type is retained even with an explicit declared type annotation:
+
+```py
+def _() -> None:
+    result: Result[tuple[int, str] | tuple[str, int]] = infer_pair(swap)
+    reveal_type(result)  # revealed: Result[tuple[int, str]] & Result[tuple[str, int]]
+```
+
 ## Returning callables with generic overloads
 
 Matching the generic overload's return type to `A` also lets us infer `A` as the argument type of

@@ -819,6 +819,26 @@ def _(sink: Intersection[Sink[A], Sink[B]]) -> None:
     reveal_type(element(sink))  # revealed: A & B
 ```
 
+If multiple distinct alternatives are valid but their intersection is not, the compatible return
+types are unioned:
+
+```py
+from collections.abc import Sequence
+
+def make_list[T](sink: Sink[list[T]]) -> list[T]:
+    return []
+
+def _(sink: Intersection[Sink[list[A]], Sink[list[B]], Sink[list[C]]]) -> None:
+    inferred = make_list(sink)
+    reveal_type(inferred)  # revealed: list[A] | list[B] | list[C]
+
+    result: Sequence[A | B] = make_list(sink)
+    reveal_type(result)  # revealed: list[A] | list[B]
+
+    # error: [invalid-assignment] "Object of type `list[A] | list[B] | list[C]` is not assignable to `int`"
+    bad: int = make_list(sink)
+```
+
 Assignments to different type variables remain correlated within an alternative: the choices here
 are `(T = A, U = B)` and `(T = B, U = C)`. The contravariant `Sink[A]` selects the first pair, so
 the result is `B`:
@@ -1339,9 +1359,14 @@ def correlated[T](x: Source[T], y: Source[T]) -> T:
     raise NotImplementedError
 
 def _(x: Intersection[Source[A], Source[B]], other: Any) -> None:
-    assert isinstance(other, DSource)
-    # TODO: revealed: (A & B) | (Any & D)
-    reveal_type(correlated(x, other))  # revealed: (A & B) | D
+    if isinstance(other, DSource):
+        # TODO: revealed: (A & B) | (Any & D)
+        reveal_type(correlated(x, other))  # revealed: (A & B) | D
+
+    reveal_type(correlated(x, other))  # revealed: A | B
+
+    result: B = correlated(x, other)
+    reveal_type(result)  # revealed: B
 ```
 
 A gradual component in the return annotation is preserved in both specialized return types:
@@ -1405,6 +1430,7 @@ a subtype of all others, we select that one.)
 ### Mutable returns from intersection arguments
 
 ```py
+from collections.abc import Sequence
 from ty_extensions import Intersection
 
 class Source[T]:
@@ -1422,6 +1448,10 @@ def _(source: Intersection[Source[A], Source[B]]) -> None:
     # the argument also fits `Source[A | B]`. Inference uses `T = A | B`, producing `list[A | B]`
     # instead of intersecting `list[A]` and `list[B]`.
     reveal_type(make_list(source))  # revealed: list[A | B]
+
+    # Only `T = B` is assignable to the declared type.
+    result: Sequence[B] = make_list(source)
+    reveal_type(result)  # revealed: list[B]
 ```
 
 The same applies when an alias hides the mutable result:
@@ -1488,6 +1518,11 @@ def _(value: Intersection[Source[A], Source[B]]) -> None:
 
 ### Mutable returns from alternative specializations
 
+```toml
+[environment]
+python-version = "3.13"
+```
+
 Each sink accepts one of the two possible element types. Both complete specializations can return a
 mutable list, but merging their element types does not produce a specialization accepted by either
 sink. The call retains the union of the separately specialized list types:
@@ -1508,6 +1543,19 @@ def make_list[T](sink: Sink[T]) -> list[T]:
 
 def _(sink: Intersection[ASink, BSink]) -> None:
     reveal_type(make_list(sink))  # revealed: list[A] | list[B]
+
+    result: list[A] | list[B] = make_list(sink)
+    reveal_type(result)  # revealed: list[A] | list[B]
+```
+
+A call with an unbound type variable retains the separately specialized list types:
+
+```py
+def collect_pairs[T, U = bytes](items: tuple[list[T], list[U]] | tuple[list[int], list[T]]) -> list[tuple[T, U]]:
+    return []
+
+def _(items: tuple[list[int], list[str]]) -> None:
+    reveal_type(collect_pairs(items))  # revealed: list[tuple[int, str]] | list[tuple[str, bytes]]
 ```
 
 Evidence from another argument can leave only one valid specialization. A supplied value of type `A`
@@ -1519,6 +1567,32 @@ def with_value[T](sink: Sink[T], value: T) -> list[T]:
 
 def _(sink: Intersection[ASink, BSink], value: A) -> None:
     reveal_type(with_value(sink, value))  # revealed: list[A]
+```
+
+If a nested callback accepts each distinct specialization of the list but not the merged
+`list[A | B]`, we retain the union of the separately specialized list types:
+
+```py
+from collections.abc import Callable, Sequence
+from typing import Unpack, overload
+
+class Source[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def consume_lists(items: list[A] | list[B]) -> None: ...
+@overload
+def collect[T](
+    source: Source[T],
+    *args: Unpack[tuple[Sequence[Callable[[list[T]], None]]]],
+) -> list[T]: ...
+@overload
+def collect(source: None, arg: list[object], /) -> None: ...
+def collect(source: object, *args: object) -> object:
+    raise NotImplementedError
+
+def _(source: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(collect(source, [consume_lists]))  # revealed: list[A] | list[B]
 ```
 
 ### Mutable components in inferred return types
@@ -1539,6 +1613,16 @@ def invoke[R](callback: Callable[[object], R], value: object) -> R:
 
 def _(callback: Intersection[Callable[[object], list[A]], Callable[[object], list[B]]]) -> None:
     reveal_type(invoke(callback, object()))  # revealed: list[A] | list[B]
+```
+
+If the declared type excludes a given element of the intersection, the result is inferred from the
+remaining alternatives.
+
+```py
+def _(callback: Intersection[Callable[[object], A], Callable[[object], B], Callable[[object], list[int]]]) -> None:
+    result: A | B = invoke(callback, object())
+    # TODO: We could infer `A & B` here.
+    reveal_type(result)  # revealed: A | B
 ```
 
 An inferred tuple can still be refined when its mutable component has the same type in both

@@ -1197,6 +1197,14 @@ def _() -> None:
     reveal_type(infer_pair(swap))  # revealed: Result[tuple[int, str]] & Result[tuple[str, int]]
 ```
 
+The refined return type is retained even with an explicit declared type annotation:
+
+```py
+def _() -> None:
+    result: Result[tuple[int, str] | tuple[str, int]] = infer_pair(swap)
+    reveal_type(result)  # revealed: Result[tuple[int, str]] & Result[tuple[str, int]]
+```
+
 When `T` is constrained to a union by other arguments, the overloaded callable must still be treated
 as a whole to satisfy `Callable[[T], T]`.
 
