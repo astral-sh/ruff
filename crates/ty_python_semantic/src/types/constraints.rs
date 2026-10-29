@@ -96,7 +96,7 @@ use std::marker::PhantomData;
 use std::ops::{ControlFlow, Range};
 use std::sync::{Arc, LazyLock};
 
-use itertools::Either;
+use itertools::{Either, Itertools};
 use ruff_index::{Idx, IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -321,7 +321,6 @@ impl<'db> OwnedConstraintSet<'db> {
         };
         let builder = ConstraintSetBuilder {
             storage: RefCell::new(storage),
-            signature_typevar_freshness: Cell::new(None),
         };
         let set = ConstraintSet::from_node(&builder, self.node, self.source_order);
         f(&builder, set)
@@ -329,6 +328,11 @@ impl<'db> OwnedConstraintSet<'db> {
 }
 
 impl OwnedConstraintSetInner<'_> {
+    fn node_supports(&self, node: NodeId) -> &ConstraintSupports {
+        let support = self.node_supports[self.retained_node_index(node)];
+        &self.supports[self.retained_support_index(support)]
+    }
+
     fn retained_node_index(&self, id: NodeId) -> usize {
         let index = id.index();
         debug_assert_eq!(
@@ -649,27 +653,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         };
         let locals = &supports.quantified;
         let variables = || locals.iter().map(|id| storage.typevar_data(id));
-        let Some(min_freshness) = variables().map(|var| var.freshness(db)).min() else {
+        let Some(delta) = storage.freshening_delta(db, variables(), None) else {
             return self;
         };
-        let max_local_freshness = variables()
-            .map(|var| var.freshness(db))
-            .max()
-            .unwrap_or(min_freshness);
-        let max_freshness = supports
-            .occurrences
-            .iter()
-            .chain(supports.validation.iter())
-            .map(|id| storage.typevar_data(id).freshness(db))
-            .chain(self.builder.signature_typevar_freshness.get())
-            .fold(max_local_freshness, TypeVarNonce::max);
-        let delta = max_freshness.increment().value() - min_freshness.value();
         let generic_context = GenericContext::from_typevar_instances(db, env, variables());
         drop(storage);
-
-        self.builder
-            .signature_typevar_freshness
-            .set(Some(max_local_freshness.add(delta)));
         self.freshen_quantified_typevars_impl(
             db,
             generic_context,
@@ -1174,10 +1162,6 @@ impl Debug for ConstraintSet<'_, '_> {
 #[derive(Default)]
 pub(crate) struct ConstraintSetBuilder<'db> {
     storage: RefCell<ConstraintSetStorage<'db>>,
-    /// Maximum freshness reserved by signature comparisons and cached quantifiers. Independent
-    /// comparisons, including recursive protocol member checks, can contribute existential scopes
-    /// to the same constraint set. Sharing this bound keeps their local typevars distinct.
-    pub(super) signature_typevar_freshness: Cell<Option<TypeVarNonce>>,
 }
 
 type ExistsCacheKey<'db> = (NodeId, TypeVarSet<'db>, Option<SourceOrderId>);
@@ -1222,6 +1206,11 @@ struct ConstraintSetStorage<'db> {
     /// This is encoded as an interned binary DAG over [`ConstraintId`]s. The first occurrence of
     /// each constraint in a left-first traversal defines the ordering.
     source_orders: IndexVec<SourceOrderId, SourceOrder>,
+
+    /// These identities are in scope but might not have contributed any constraints yet.
+    /// Interning them early would change the order of typevars in the resulting solutions.
+    reserved_typevars: FxHashSet<BoundTypeVarIdentity<'db>>,
+    max_reserved_freshness: Cell<Option<TypeVarNonce>>,
 
     // Everything below are the memoization tables for the arenas and for our BDD operations.
     constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
@@ -1364,7 +1353,58 @@ impl<'db> ConstraintSetBuilder<'db> {
         OwnedConstraintSetBuilder::build(storage, root, source_order)
     }
 
-    /// Loads an [`OwnedConstraintSet`] into this builder.
+    pub(super) fn reserved_freshness(&self) -> Option<TypeVarNonce> {
+        self.storage.borrow().max_reserved_freshness.get()
+    }
+
+    pub(super) fn reserve_freshness(&self, freshness: Option<TypeVarNonce>) {
+        let storage = self.storage.borrow();
+        storage
+            .max_reserved_freshness
+            .update(|old| old.max(freshness));
+    }
+
+    pub(super) fn reserve_typevar(&self, db: &'db dyn Db, var: BoundTypeVarInstance<'db>) {
+        let mut storage = self.storage.borrow_mut();
+        storage.reserved_typevars.insert(var.identity(db));
+        storage
+            .max_reserved_freshness
+            .update(|old| old.max(Some(var.freshness(db))));
+    }
+
+    pub(super) fn reserve_free_typevars(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        types: impl IntoIterator<Item = Type<'db>>,
+    ) {
+        let mut inputs = ConstraintSetStorage::default();
+        let support = inputs.intern_typevars_in_types(db, env, types);
+        for id in support.free.iter() {
+            self.reserve_typevar(db, inputs.typevar_data(id));
+        }
+    }
+
+    /// Both operands' free variables are already in scope when we allocate either one's witnesses.
+    pub(super) fn load_pair<'c>(
+        &'c self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        lhs: &OwnedConstraintSet<'db>,
+        rhs: &OwnedConstraintSet<'db>,
+    ) -> (ConstraintSet<'db, 'c>, ConstraintSet<'db, 'c>) {
+        for operand in [lhs, rhs] {
+            if let Some(inner) = &operand.inner {
+                for id in inner.node_supports(operand.node).free.iter() {
+                    self.reserve_typevar(db, inner.typevars[id]);
+                }
+            }
+        }
+        (self.load(db, env, lhs), self.load(db, env, rhs))
+    }
+
+    /// Loads an [`OwnedConstraintSet`] into this builder, freshening its existential binders
+    /// if their identities are already in use.
     ///
     /// The BDD structure inside a builder depends on the ordering of constraints and typevars in
     /// the builder's arenas. (The constraint ordering defines the BDD variable ordering, while the
@@ -1402,11 +1442,11 @@ impl<'db> ConstraintSetStorage<'db> {
     }
 
     /// Collects occurrence, validation, and free-variable supports in one traversal.
-    fn intern_constraint_typevars(
+    fn intern_typevars_in_types(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        constraint: &Constraint<'db>,
+        types: impl IntoIterator<Item = Type<'db>>,
     ) -> ConstraintSupports {
         #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
         enum Source {
@@ -2248,6 +2288,24 @@ impl<'db> ConstraintSetStorage<'db> {
             )
         }
 
+        let mut visitor = InternMentionedTypevars::default();
+        visitor.visit_types(
+            db,
+            env,
+            self,
+            types,
+            Source::Occurrence,
+            &Support::default(),
+        );
+        visitor.supports
+    }
+
+    fn intern_constraint_typevars(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraint: &Constraint<'db>,
+    ) -> ConstraintSupports {
         let types = match constraint {
             Constraint::Atomic(atomic) => match atomic {
                 AtomicConstraint::ConcreteLower(bound) => {
@@ -2276,16 +2334,7 @@ impl<'db> ConstraintSetStorage<'db> {
                 return supports;
             }
         };
-        let mut visitor = InternMentionedTypevars::default();
-        visitor.visit_types(
-            db,
-            env,
-            self,
-            types,
-            Source::Occurrence,
-            &Support::default(),
-        );
-        visitor.supports
+        self.intern_typevars_in_types(db, env, types)
     }
 
     fn intern_constraint(
@@ -2563,6 +2612,28 @@ impl<'db> ConstraintSetStorage<'db> {
             .map(|support| self.support_data(support))
     }
 
+    /// Shift the least-fresh local just past the occupied range. Adding the maximum nonce
+    /// directly would double the nonce of a single witness on repeated loads.
+    fn freshening_delta(
+        &self,
+        db: &'db dyn Db,
+        locals: impl Iterator<Item = BoundTypeVarInstance<'db>>,
+        incoming_max: Option<TypeVarNonce>,
+    ) -> Option<u32> {
+        let (min, max) = locals.map(|var| var.freshness(db)).minmax().into_option()?;
+        let ceiling = self
+            .typevars
+            .iter()
+            .chain(self.compacted.iter().flat_map(|inner| &inner.typevars))
+            .map(|var| var.freshness(db))
+            .chain(self.max_reserved_freshness.get())
+            .chain(incoming_max)
+            .fold(max, TypeVarNonce::max);
+        let delta = ceiling.increment().value() - min.value();
+        self.max_reserved_freshness.set(Some(max.add(delta)));
+        Some(delta)
+    }
+
     /// Loads an [`OwnedConstraintSet`] into this storage.
     fn load(
         &mut self,
@@ -2581,6 +2652,7 @@ impl<'db> ConstraintSetStorage<'db> {
             constraints: &[RemappedConstraint],
             source_orders: &[Option<SourceOrderId>],
             cache: &mut FxHashMap<NodeId, NodeId>,
+            typevar: &impl Fn(TypeVarId) -> BoundTypeVarInstance<'db>,
             old_node: NodeId,
         ) -> NodeId {
             if old_node.is_terminal() {
@@ -2600,6 +2672,7 @@ impl<'db> ConstraintSetStorage<'db> {
                 constraints,
                 source_orders,
                 cache,
+                typevar,
                 old_interior.if_true,
             );
             let if_uncertain = rebuild_node(
@@ -2610,6 +2683,7 @@ impl<'db> ConstraintSetStorage<'db> {
                 constraints,
                 source_orders,
                 cache,
+                typevar,
                 old_interior.if_uncertain,
             );
             let if_false = rebuild_node(
@@ -2620,6 +2694,7 @@ impl<'db> ConstraintSetStorage<'db> {
                 constraints,
                 source_orders,
                 cache,
+                typevar,
                 old_interior.if_false,
             );
             let old_constraint_index = inner.retained_constraint_index(old_interior.constraint);
@@ -2634,6 +2709,7 @@ impl<'db> ConstraintSetStorage<'db> {
                             constraints,
                             source_orders,
                             cache,
+                            typevar,
                             existential.body,
                         );
                         let source_order = existential
@@ -2641,10 +2717,12 @@ impl<'db> ConstraintSetStorage<'db> {
                             .and_then(|old_source_order| source_orders[old_source_order.index()]);
                         // Typevar IDs are local to each builder, which can encounter typevars
                         // in a different order. Preserve which typevars are quantified away.
-                        let locals =
-                            Support::from_typevars(existential.locals.iter().map(|typevar| {
-                                storage.intern_typevar(db, inner.typevars[typevar])
-                            }));
+                        let locals = Support::from_typevars(
+                            existential
+                                .locals
+                                .iter()
+                                .map(|id| storage.intern_typevar(db, typevar(id))),
+                        );
                         let Some(existential) = ExistentialBound::new(
                             storage,
                             existential.provenance,
@@ -2693,8 +2771,41 @@ impl<'db> ConstraintSetStorage<'db> {
             referenced_typevars |=
                 &inner.supports[inner.retained_support_index(*support)].quantified;
         }
-        for typevar in referenced_typevars.iter() {
-            self.intern_typevar(db, inner.typevars[typevar]);
+        let quantified = &inner.node_supports(other.node).quantified;
+        let locals = || quantified.iter().map(|id| inner.typevars[id]);
+        self.ensure_overlay_typevar_identity_cache(db);
+        let collision = locals().any(|var| {
+            let id = var.identity(db);
+            self.typevar_cache.contains_key(&id) || self.reserved_typevars.contains(&id)
+        });
+        let freshening = if collision {
+            let incoming_max = referenced_typevars
+                .iter()
+                .map(|id| inner.typevars[id].freshness(db))
+                .max();
+            self.freshening_delta(db, locals(), incoming_max)
+                .map(|delta| {
+                    (
+                        GenericContext::from_typevar_instances(db, env, locals()),
+                        delta,
+                        ApplyTypeMappingVisitor::new(env),
+                    )
+                })
+        } else {
+            let max = locals().map(|var| var.freshness(db)).max();
+            self.max_reserved_freshness.update(|old| old.max(max));
+            None
+        };
+        let typevar = |id: TypeVarId| {
+            let var = inner.typevars[id];
+            freshening
+                .as_ref()
+                .map_or(var, |(context, delta, visitor)| {
+                    var.freshen_bound_typevars(db, *context, *delta, visitor)
+                })
+        };
+        for id in referenced_typevars.iter() {
+            self.intern_typevar(db, typevar(id));
         }
 
         // Rebuild atomic constraints in their saved order, using the destination's typevar
@@ -2705,7 +2816,13 @@ impl<'db> ConstraintSetStorage<'db> {
             .map(|old_constraint| {
                 Cell::new(match old_constraint {
                     Constraint::Atomic(atomic) => {
-                        Some(Constraint::Atomic(*atomic).new_node(db, env, self))
+                        let atomic =
+                            freshening
+                                .as_ref()
+                                .map_or(*atomic, |(context, delta, visitor)| {
+                                    atomic.freshen_bound_typevars(db, *context, *delta, visitor)
+                                });
+                        Some(Constraint::Atomic(atomic).new_node(db, env, self))
                     }
                     Constraint::Existential(_) => None,
                 })
@@ -2741,6 +2858,7 @@ impl<'db> ConstraintSetStorage<'db> {
             &constraints,
             &source_orders,
             &mut cache,
+            &typevar,
             other.node,
         );
         let old_source_order = other
@@ -7724,6 +7842,43 @@ class E: ...
                 assert_eq!(original, reloaded);
             }
         }
+    }
+
+    #[test]
+    fn repeatedly_loading_an_existential_preserves_its_free_typevar() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let x = create_typevar(db, "X");
+        let a = create_typevar(db, "A");
+        let lower = Some(KnownClass::Int.to_instance(db, &env));
+        let upper = Some(Type::TypeVar(a));
+        // ∃X. int ≤ X ≤ A
+        let mut relation =
+            ConstraintSetBuilder::new().into_owned(|builder| {
+                create_constraint_set_with_bounds(db, &env, builder, x, lower, upper)
+                    .reduce_inferable(db, &env, builder, TypeVarSet::from_typevars(db, [x]))
+            });
+
+        // A single witness can be loaded more times than there are bits in a freshness nonce.
+        for _ in 0..=u32::BITS {
+            relation =
+                ConstraintSetBuilder::new().into_owned(|builder| builder.load(db, &env, &relation));
+        }
+        relation.query(|builder, relation| {
+            let inferable = TypeVarSet::from_typevars(db, [a]);
+            for (specialization, expected_unsat) in
+                [(KnownClass::Int, false), (KnownClass::Str, true)]
+            {
+                let constrained = relation.and(db, builder, || {
+                    create_constraint(db, builder, a, specialization)
+                });
+                assert_eq!(
+                    constrained.is_never_satisfied(db, &env, inferable),
+                    expected_unsat
+                );
+            }
+        });
     }
 
     #[test]
