@@ -613,8 +613,8 @@ fn cached_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>
     evaluate_predicate_truthiness(db, expression)
 }
 
-/// Read the truthiness computed during inference, or evaluate it from the normalized
-/// operands if cycle recovery changed them.
+/// Read the truthiness computed during inference, or evaluate a cyclic predicate from
+/// its normalized operands in the caller.
 fn evaluate_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
     let ExpressionKind::Predicate { context, .. } = expression.kind(db) else {
         return Truthiness::Ambiguous;
@@ -2160,6 +2160,10 @@ impl<'db> ExpressionInference<'db> {
         previous: &ExpressionInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ExpressionInference<'db> {
+        // A cyclic predicate can acquire new operands or require a different metaclass
+        // lookup as inference converges. Evaluate it from the normalized types in the caller.
+        self.predicate_truthiness = None;
+
         if let Some(extra) = self.extra.as_mut() {
             for (binding, binding_ty) in &mut extra.bindings {
                 if let Some((_, previous_binding)) = previous.extra.as_deref().and_then(|extra| {
@@ -2181,13 +2185,7 @@ impl<'db> ExpressionInference<'db> {
 
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous.expression_type(*expr);
-            let normalized = ty.cycle_normalized(db, env, previous_ty, cycle);
-            if normalized != *ty {
-                // The widened type may need a new metaclass lookup. Salsa cannot discover
-                // a new cycle during recovery, so leave that lookup to the caller.
-                self.predicate_truthiness = None;
-                *ty = normalized;
-            }
+            *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -2231,11 +2229,7 @@ impl<'db> ExpressionInference<'db> {
             |expression| previous.expression_type(expression).bool(db, env),
         );
         if comparison_truthiness.iter().next().is_some() {
-            let current = &mut self.extra.get_or_insert_default().comparison_truthiness;
-            if *current != comparison_truthiness {
-                self.predicate_truthiness = None;
-                *current = comparison_truthiness;
-            }
+            self.extra.get_or_insert_default().comparison_truthiness = comparison_truthiness;
         }
     }
 
