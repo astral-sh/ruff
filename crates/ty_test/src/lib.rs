@@ -7,6 +7,7 @@ use mdtest::parser::{self};
 use mdtest::{
     Failures, FileFailures, MarkdownEdit, OutputFormat, TestFile, TestOutcome, attempt_test,
 };
+use rayon::iter::{Either, IntoParallelRefIterator, ParallelIterator};
 use ruff_db::Db;
 use ruff_db::cancellation::CancellationTokenSource;
 use ruff_db::diagnostic::DiagnosticId;
@@ -320,13 +321,34 @@ fn run_test(
     let mut any_pull_types_failures = false;
     let mut panic_info = None;
 
-    let mut failures: Failures = test_files
-        .iter()
-        .filter_map(|test_file| {
-            let mdtest_result = attempt_test(
-                |file| ty_python_semantic::Db::check_file(db, file),
-                test_file,
-            );
+    let check_file = |db: &db::Db, test_file| {
+        (
+            test_file,
+            attempt_test(|file| db.check_file(file), test_file),
+        )
+    };
+    let checked_files = if configuration.parallel {
+        // A worker waiting on a query that panics can unwind with `Cancelled::PropagatedPanic`.
+        // We keep only one panic per section, so that cancellation can mask the original message.
+        assert!(
+            test.should_expect_panic().is_err(),
+            "`parallel = true` does not support the `expect-panic` directive"
+        );
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(2)
+            .stack_size(ruff_db::STACK_SIZE)
+            .build()
+            .expect("failed to create mdtest worker pool");
+        let dispatch = tracing::dispatcher::get_default(Clone::clone);
+        let checks = test_files.par_iter().map_with(db.clone(), |db, file| {
+            tracing::dispatcher::with_default(&dispatch, || check_file(db, file))
+        });
+        Either::Left(pool.install(|| checks.collect::<Vec<_>>()).into_iter())
+    } else {
+        Either::Right(test_files.iter().map(|file| check_file(db, file)))
+    };
+    let mut failures: Failures = checked_files
+        .filter_map(|(test_file, mdtest_result)| {
             let diagnostics = match mdtest_result {
                 Ok(diagnostics) => diagnostics,
                 Err(failures) => {
