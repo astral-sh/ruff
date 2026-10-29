@@ -29,8 +29,8 @@ use crate::{
         place_from_bindings,
     },
     place_load::{
-        ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceLoadMode, PlaceLoadResolutionStep,
-        PlaceLoadSourceKind, resolve_place_load,
+        ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceLoadMode, PlaceLoadResolutionProcedure,
+        PlaceLoadResolutionStep, PlaceLoadSourceKind,
     },
     types::{
         Type, TypeContext,
@@ -400,18 +400,18 @@ fn place_condition_definition_info<'db>(
     let mut info = ConditionDefinitionInfo::default();
     let index = semantic_index(db, file);
     if let Some(scope) = index.try_expression_scope_id(expression)
-        && let Some(place) = PlaceExpr::try_from_expr(expression)
+        && let Some(place_expr) = PlaceExpr::try_from_expr(expression)
     {
         let scope = scope.to_scope_id(db, file);
         let env = ProgramEnvironment::from_scope(scope);
-        let resolution = resolve_place_load(
+        let procedure = PlaceLoadResolutionProcedure::new(
             db,
             index,
             scope,
-            place,
+            &place_expr,
             PlaceLoadMode::AtExpression(expression.into()),
         );
-        for step in resolution {
+        for step in procedure {
             let source = match step {
                 PlaceLoadResolutionStep::Source(source) => source,
                 PlaceLoadResolutionStep::MemberResolutionCondition(prefixes) => {
@@ -876,9 +876,9 @@ fn predicate_contains_special_cased_condition<'db>(
     predicate: ScopedPredicateId,
 ) -> bool {
     let expression = match use_def_map(db, scope).predicates()[predicate].node {
-        PredicateNode::Expression { expression, .. }
-        | PredicateNode::Condition(expression)
-        | PredicateNode::IsNonEmptyIterable(expression) => expression,
+        PredicateNode::Expression(expression) | PredicateNode::IsNonEmptyIterable(expression) => {
+            expression
+        }
         PredicateNode::Pattern(pattern) => pattern.subject(db),
         PredicateNode::SubjectElementPattern(element) => element.pattern.subject(db),
         // These predicates describe implicit control flow rather than a tested value. In

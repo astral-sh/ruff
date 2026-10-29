@@ -68,7 +68,7 @@ use crate::{Db, FxIndexSet};
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_core::expression::Expression;
+use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::statement::StatementInner;
 use ty_python_core::unpack::Unpack;
@@ -309,7 +309,7 @@ pub(crate) fn is_discarded_dict_key_assignment<'db>(
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|_, _, _| FunctionDecoratorInference {
-        has_unknown_decorators: true,
+        may_produce_abstract_method: true,
         ..FunctionDecoratorInference::default()
     },
     heap_size=ruff_memory_usage::heap_size
@@ -356,8 +356,9 @@ pub(crate) struct FunctionDecoratorInference<'db> {
     called_functions: Box<[FunctionType<'db>]>,
     legacy_aliases: Box<[Definition<'db>]>,
     known_decorators: FunctionDecorators,
-    /// Whether any decorator is unrecognized, or decorator inference is incomplete.
-    has_unknown_decorators: bool,
+    /// Whether a decorator could produce an explicitly abstract method, or decorator
+    /// inference is incomplete.
+    may_produce_abstract_method: bool,
     context: InferContextResult,
 }
 
@@ -387,12 +388,12 @@ impl<'db> FunctionDecoratorInference<'db> {
         &self.legacy_aliases
     }
 
-    pub(super) fn known_decorators(&self) -> FunctionDecorators {
+    fn known_decorators(&self) -> FunctionDecorators {
         self.known_decorators
     }
 
-    pub(super) fn has_unknown_decorators(&self) -> bool {
-        self.has_unknown_decorators
+    pub(super) fn may_produce_abstract_method(&self) -> bool {
+        self.may_produce_abstract_method
     }
 
     fn context_result(&self) -> &InferContextResult {
@@ -575,6 +576,59 @@ pub(crate) fn infer_expression_types<'db>(
     tcx: TypeContext<'db>,
 ) -> &'db ExpressionInference<'db> {
     infer_expression_types_impl(db, InferExpression::new(db, expression, tcx))
+}
+
+/// A loop predicate can depend on bindings it guards in the previous iteration.
+/// Evaluate it in the caller's query to keep an extra query out of that cycle.
+pub(crate) fn infer_predicate_truthiness<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+) -> Truthiness {
+    if matches!(
+        expression.kind(db),
+        ExpressionKind::Predicate { in_loop: true, .. }
+    ) {
+        evaluate_predicate_truthiness(db, expression)
+    } else {
+        cached_predicate_truthiness(db, expression)
+    }
+}
+
+/// Reachability walks can revisit the same predicate for many different bindings.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _| Truthiness::Ambiguous,
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, current: Truthiness, _| {
+        // A predicate can guard one of its own inputs. Keep both outcomes when iterations
+        // disagree, but give the initial ambiguous result a chance to resolve first.
+        if cycle.iteration() > crate::TAINTED_CYCLES {
+            previous.union(current)
+        } else {
+            current
+        }
+    },
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn cached_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+    evaluate_predicate_truthiness(db, expression)
+}
+
+/// A widened operand can require a new metaclass lookup, so evaluate truthiness after
+/// expression inference has normalized the operand types.
+fn evaluate_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+    let ExpressionKind::Predicate { context, .. } = expression.kind(db) else {
+        return Truthiness::Ambiguous;
+    };
+    let inference = infer_expression_types(db, expression, TypeContext::default());
+    let env = ProgramEnvironment::from_scope(expression.scope(db));
+    let module = parsed_module(db, expression.python_file(db)).load(db);
+    TruthinessAnalyzer::new(
+        db,
+        &env,
+        |node| inference.expression_type(node),
+        |node| inference.comparison_truthiness(node),
+    )
+    .truthiness(expression.node_ref(db).node(&module), context)
 }
 
 #[salsa::tracked(
@@ -2163,7 +2217,7 @@ impl<'db> ExpressionInference<'db> {
             .unwrap_or_else(Type::unknown)
     }
 
-    pub(crate) fn comparison_truthiness(
+    fn comparison_truthiness(
         &self,
         expression: impl Into<ExpressionNodeKey>,
     ) -> Option<Truthiness> {

@@ -226,7 +226,7 @@ class Author(models.Model):
 
 class Book(models.Model):
     author = models.ForeignKey(Author, on_delete=models.CASCADE)
-    editor = models.ForeignKey(Author, on_delete=models.SET_NULL, null=True, related_name="edited_books")
+    editor = models.ForeignKey(to=Author, on_delete=models.SET_NULL, null=True, related_name="edited_books")
 
 def _(book: Book):
     reveal_type(book.author)  # revealed: Author
@@ -234,6 +234,9 @@ def _(book: Book):
 
     reveal_type(book.editor)  # revealed: Author | None
     reveal_type(book.editor_id)  # revealed: int | None
+
+    book.editor = None
+    book.author = None  # error: [invalid-assignment]
 ```
 
 A `ForeignKey` adds a reverse accessor to the related model. By default, its name is the lowercase
@@ -384,6 +387,152 @@ def _(article: NewsArticle):
     reveal_type(article.get_previous_by_published())  # revealed: NewsArticle
     reveal_type(Article.get_next_by_published(article))  # revealed: NewsArticle
     reveal_type(Article.get_previous_by_published(article))  # revealed: NewsArticle
+```
+
+## Abstract models
+
+### Basic
+
+An abstract model provides reusable fields without creating its own database table. Its concrete
+subclasses receive an integer primary key unless they declare or inherit an explicit primary key.
+
+```py
+from django.db import models
+
+class AbstractBook(models.Model):
+    title = models.CharField(max_length=200)
+
+    class Meta:
+        abstract = True
+
+class Ebook(AbstractBook):
+    file_size = models.IntegerField()
+
+class Book(AbstractBook):
+    isbn = models.CharField(max_length=13, primary_key=True)
+
+def _(abstract: AbstractBook, ebook: Ebook, book: Book):
+    # Abstract models do not have an automatic primary key.
+    abstract.id  # error: [unresolved-attribute]
+
+    # Concrete models without an explicit primary key have an automatic integer key.
+    reveal_type(ebook.id)  # revealed: int
+    reveal_type(ebook.pk)  # revealed: int
+    reveal_type(ebook.title)  # revealed: str
+    reveal_type(ebook.file_size)  # revealed: int
+
+    # The explicit ISBN primary key prevents an automatic `id`.
+    book.id  # error: [unresolved-attribute]
+    reveal_type(book.pk)  # revealed: str
+    reveal_type(book.title)  # revealed: str
+    reveal_type(book.isbn)  # revealed: str
+```
+
+### Annotated abstract setting
+
+A bare annotation for `Meta.abstract` does not make a model abstract.
+
+```py
+from django.db import models
+
+class Book(models.Model):
+    class Meta:
+        abstract: bool
+
+def _(book: Book):
+    reveal_type(book.id)  # revealed: int
+    reveal_type(book.pk)  # revealed: int
+```
+
+When an assignment follows the annotation, its value determines whether the model is abstract.
+
+```py
+class AbstractBook(models.Model):
+    class Meta:
+        abstract: bool
+        abstract = True
+
+def _(abstract: AbstractBook):
+    abstract.id  # error: [unresolved-attribute]
+```
+
+### Inherited Meta configuration
+
+Django resets an abstract model's `Meta.abstract` to `False`. A child that subclasses this `Meta` is
+concrete unless it explicitly sets `abstract = True` again.
+
+```py
+from django.db import models
+
+class AbstractBook(models.Model):
+    class Meta:
+        abstract = True
+
+class NotAbstract(AbstractBook):
+    class Meta(AbstractBook.Meta):
+        ordering = ["id"]
+
+class Abstract(AbstractBook):
+    class Meta(AbstractBook.Meta):
+        abstract = True
+
+def _(not_abstract: NotAbstract, abstract: Abstract):
+    # concrete models have an automatic primary key
+    not_abstract.id
+
+    # abstract models do not:
+    abstract.id  # error: [unresolved-attribute]
+```
+
+Configuration inherited from an ordinary class retains its `abstract` setting.
+
+```py
+class Options:
+    abstract = True
+
+class InheritedAbstract(models.Model):
+    class Meta(Options):
+        pass
+
+def _(abstract: InheritedAbstract):
+    abstract.id  # error: [unresolved-attribute]
+```
+
+### Multiple inheritance
+
+An abstract base without a primary key does not shadow an inherited `id`, regardless of the base
+class order. Regression test for <https://github.com/astral-sh/ty/issues/4822>.
+
+```py
+from uuid import uuid4
+from django.db import models
+
+class AbstractHasTitle(models.Model):
+    title = models.CharField(max_length=200)
+
+    class Meta:
+        abstract = True
+
+class AbstractHasId(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4)
+
+    class Meta:
+        abstract = True
+
+class Book1(AbstractHasTitle, AbstractHasId):
+    pass
+
+class Book2(AbstractHasId, AbstractHasTitle):
+    pass
+
+def _(book1: Book1, book2: Book2):
+    reveal_type(book1.id)  # revealed: UUID
+    reveal_type(book1.pk)  # revealed: UUID
+    reveal_type(book1.title)  # revealed: str
+
+    reveal_type(book2.id)  # revealed: UUID
+    reveal_type(book2.pk)  # revealed: UUID
+    reveal_type(book2.title)  # revealed: str
 ```
 
 [django-types]: https://github.com/sbdchd/django-types

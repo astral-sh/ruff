@@ -425,6 +425,25 @@ def consume_comparable(values: Iterable[ComparableT]) -> None: ...
 consume_comparable([None, 2])  # error: [invalid-argument-type]
 ```
 
+## Widening a lower bound to a hashable type
+
+The first tuple element can contribute `object` as a lower bound for `T`. Its union with the second
+element's `list[Any]` is `object`, which satisfies the `Hashable` bound.
+
+```py
+from collections.abc import Callable, Hashable
+from typing import Any, TypeVar
+
+T = TypeVar("T", bound=Hashable)
+
+def consume(callback: Callable[[], tuple[tuple[T] | T, T]]) -> T:
+    return callback()[1]
+
+def check(callback: Callable[[], tuple[tuple[object], list[Any]]]) -> None:
+    # TODO: Reject this call because the callback's second tuple element, `list[Any]`, is unhashable.
+    reveal_type(consume(callback))  # revealed: object
+```
+
 ## Inferring a bound from a caller's type variable
 
 An argument whose type is fixed by an enclosing function must satisfy the callee's bound for every
@@ -1064,6 +1083,60 @@ def _(x: int, y: str, a: list[int], b: list[str]) -> None:
     # error: [invalid-argument-type] "Expected `list[int | str]`, found `list[int]`"
     # error: [invalid-argument-type] "Expected `list[int | str]`, found `list[str]`"
     reveal_type(g(x, y, a, b))  # revealed: int | str
+```
+
+## Diagnostic recovery preserves gradual evidence
+
+The middle tuple element can match either `U` or `tuple[U]`. In both cases the last element
+contributes an incompatible `int` for `T`. The diagnostic also includes the `Any` inferred from the
+first element's `list[Any]`.
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeVar
+
+T = TypeVar("T", bound=list[Any])
+U = TypeVar("U")
+
+def consume(producer: Callable[[], tuple[list[T], U | tuple[U], T]]) -> None: ...
+def check(callback: Callable[[], tuple[list[Any], tuple[str], int]]) -> None:
+    # error: [invalid-argument-type] "Argument type `Any | int` does not satisfy upper bound `list[Any]` of type variable `T`"
+    consume(callback)
+```
+
+## Diagnostic recovery reports the shared lower bound
+
+Matching the first element against `T | tuple[T]` contributes either `tuple[str]` or `str`. The
+diagnostic reports the `int` from the second element, which violates the bound in both cases.
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeVar
+
+T = TypeVar("T", bound=list[Any])
+
+def consume(callback: Callable[[], tuple[T | tuple[T], T]]) -> None: ...
+def check(callback: Callable[[], tuple[tuple[str], int]]) -> None:
+    # error: [invalid-argument-type] "Argument type `int` does not satisfy upper bound `list[Any]` of type variable `T`"
+    consume(callback)
+```
+
+## Diagnostic recovery preserves independent type-variable evidence
+
+Both choices for the middle element violate `T`'s bound once the last `int` is included. The
+diagnostic identifies the violation in the first tuple element, where `U` is inferred as `bytes`.
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeVar
+
+T = TypeVar("T", bound=list[Any])
+U = TypeVar("U", bound=list[Any])
+
+def consume(producer: Callable[[], tuple[U, T | tuple[T], T]]) -> None: ...
+def check(callback: Callable[[], tuple[bytes, tuple[str], int]]) -> None:
+    # error: [invalid-argument-type] "Argument type `bytes` does not satisfy upper bound `list[Any]` of type variable `U`"
+    consume(callback)
 ```
 
 ## Diagnostic recovery with outer typevars
@@ -2622,6 +2695,241 @@ def check(
     reveal_type(ensure_box_reversed(box_first))  # revealed: Box[str]
 ```
 
+## Fixed outer variables in unions
+
+TODO: After #29236 lands, simplify these tests to use direct union annotations instead of `Callable`
+types, which are currently needed to exercise the full constraints.
+
+A caller's type variable contributes to the inferred return type even when the callee's type also
+accepts a concrete union member:
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def helper(value: Callable[[], T | int]) -> T:
+    raise NotImplementedError
+
+def outer(value: Callable[[], U | str]) -> None:
+    reveal_type(helper(value))  # revealed: (U@outer & ~int) | str
+```
+
+A disjoint bound also preserves the caller's variable. When the variable's entire bound fits the
+concrete `int` member, only the remaining `str` member contributes to inference:
+
+```py
+Disjoint = TypeVar("Disjoint", bound=bytes)
+Covered = TypeVar("Covered", bound=int)
+
+def disjoint(value: Callable[[], Disjoint | str]) -> None:
+    reveal_type(helper(value))  # revealed: Disjoint@disjoint | str
+
+def covered(value: Callable[[], Covered | str]) -> None:
+    reveal_type(helper(value))  # revealed: str
+```
+
+The caller's variable also supplies inference evidence without a separate union member:
+
+```py
+OnlyOuter = TypeVar("OnlyOuter", bound=str)
+
+def only_outer(value: Callable[[], OnlyOuter]) -> None:
+    # Since str and int are disjoint, OnlyOuter & ~int simplifies to OnlyOuter.
+    reveal_type(helper(value))  # revealed: OnlyOuter@only_outer
+```
+
+A literal union member excludes only that literal from the caller's contribution:
+
+```py
+from typing import Literal
+
+def helper_literal(value: Callable[[], T | Literal[1]]) -> T:
+    raise NotImplementedError
+
+def outer_literal(value: Callable[[], U | str]) -> None:
+    reveal_type(helper_literal(value))  # revealed: (U@outer_literal & ~Literal[1]) | str
+```
+
+## Fully covered outer variables in unions
+
+When the concrete union member covers the caller's entire variable, it contributes no inference
+evidence. We use the callee's default, or `Unknown` if there is none.
+
+```py
+from collections.abc import Callable
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+Default = TypeVar("Default", default=str)
+Covered = TypeVar("Covered", bound=int)
+
+def helper(value: Callable[[], T | int]) -> T:
+    raise NotImplementedError
+
+def defaulted(value: Callable[[], Default | int]) -> Default:
+    raise NotImplementedError
+
+def covered(value: Callable[[], Covered]):
+    reveal_type(helper(value))  # revealed: Unknown
+    result = defaulted(value)
+    reveal_type(result)  # revealed: str
+```
+
+## Invariant arguments with unions
+
+When a union annotation contains two inferred variables (e.g. `T | V`), invariant arguments can
+determine which variable accepts each union member:
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T")
+V = TypeVar("V")
+U = TypeVar("U")
+
+def helper(value: Callable[[], T | V], first: list[T], second: list[V]) -> tuple[T, V]:
+    raise NotImplementedError
+
+def outer(value: Callable[[], U | str], variables: list[U], strings: list[str]) -> None:
+    reveal_type(helper(value, variables, strings))  # revealed: tuple[U@outer, str]
+    reveal_type(helper(value, strings, variables))  # revealed: tuple[str, U@outer]
+```
+
+## Forwarding unions of invariant containers
+
+Passing a union of `list[U]` and `list[U | str]` to the same annotation with an inferred `T`
+preserves `U`: choosing `T = U` makes the two annotations identical.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def inner(value: Callable[[], list[T] | list[T | str]]) -> T:
+    raise NotImplementedError
+
+def outer(value: Callable[[], list[U] | list[U | str]]) -> None:
+    reveal_type(inner(value))  # revealed: U@outer
+
+def invalid(value: Callable[[], list[U] | list[U | str] | int]) -> None:
+    inner(value)  # error: [invalid-argument-type]
+```
+
+## Bounds and constraints with fixed outer union members
+
+In a union annotation like `T | int`, the concrete part (`int` here) can accept part of the caller's
+type variable. The remaining part must satisfy the callee's bound or constraints; requiring the
+entire caller variable to satisfy them would reject these valid calls:
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+Bounded = TypeVar("Bounded", bound=str)
+Constrained = TypeVar("Constrained", str, bytes)
+UnionBound = TypeVar("UnionBound", bound=int | str)
+Constraints = TypeVar("Constraints", int, str)
+
+def bounded(value: Callable[[], Bounded | int]) -> Bounded:
+    raise NotImplementedError
+
+def constrained(value: Callable[[], Constrained | int]) -> Constrained:
+    raise NotImplementedError
+
+def split_constraints(value: Callable[[], Constraints | str]) -> None:
+    reveal_type(bounded(value))  # revealed: str
+    reveal_type(constrained(value))  # revealed: str
+```
+
+Without a separate `str` member, the inferred bound preserves the caller's variable while excluding
+its `int` part. A constrained callee instead selects the compatible declared constraint:
+
+```py
+def only_bound(value: Callable[[], UnionBound]) -> None:
+    reveal_type(bounded(value))  # revealed: UnionBound@only_bound & ~int
+    reveal_type(constrained(value))  # revealed: str
+```
+
+The caller's variable remains fixed. An unrestricted variable, or one permitting an incompatible
+type, cannot be specialized just to make the call succeed:
+
+```py
+Unrestricted = TypeVar("Unrestricted")
+Incompatible = TypeVar("Incompatible", int, complex)
+
+def invalid_bound(value: Callable[[], Unrestricted | str]) -> None:
+    bounded(value)  # error: [invalid-argument-type]
+
+def invalid_constraints(value: Callable[[], Incompatible | str]) -> None:
+    constrained(value)  # error: [invalid-argument-type]
+```
+
+## Gradual types in union arms
+
+When matching the caller's `U` against `T | A`, we infer `T` from the part of `U` outside the top
+materialization of `A`: `U & ~Top[A]`.
+
+```py
+from collections.abc import Callable
+from typing import Any
+from typing_extensions import TypeAliasType, TypeVar
+
+T = TypeVar("T", default=bytes)
+Unrestricted = TypeVar("Unrestricted")
+Disjoint = TypeVar("Disjoint", bound=int)
+Gradual = TypeAliasType("Gradual", list[Any])
+
+def aliased(value: Callable[[], T | tuple[Gradual]]) -> T:
+    raise NotImplementedError
+
+def inline(value: Callable[[], T | tuple[list[Any]]]) -> T:
+    raise NotImplementedError
+
+def unrestricted(value: Callable[[], Unrestricted | str]) -> None:
+    # revealed: (Unrestricted@unrestricted & ~tuple[Top[list[Any]]]) | str
+    reveal_type(inline(value))
+
+def disjoint(value: Callable[[], Disjoint | str]) -> None:
+    reveal_type(inline(value))  # revealed: Disjoint@disjoint | str
+```
+
+Here, `U` is assignable to `tuple[list[Any]]`, so only `str` contributes to the inferred `T`. This
+holds whether `list[Any]` is written inline or wrapped in a lazy alias.
+
+```py
+U = TypeVar("U", bound=tuple[list[int]])
+
+def outer(value: Callable[[], U | str]) -> None:
+    reveal_type(aliased(value))  # revealed: str
+    reveal_type(inline(value))  # revealed: str
+```
+
+Without the separate `str` member, the gradual arm covers the entire caller variable, so we use
+`T`'s default.
+
+```py
+def covered_default(value: Callable[[], U]) -> None:
+    reveal_type(inline(value))  # revealed: bytes
+```
+
+The uncovered portion of the caller's variable must still satisfy the callee's bound.
+
+```py
+Bounded = TypeVar("Bounded", bound=str)
+
+def bounded(value: Callable[[], Bounded | tuple[list[Any]]]) -> Bounded:
+    raise NotImplementedError
+
+def invalid(value: Callable[[], Disjoint | str]) -> None:
+    bounded(value)  # error: [invalid-argument-type]
+```
+
 ## Gradual overload alternatives remain compatible with other arguments
 
 An overload returning `Any` can satisfy a concrete callback return type independently of other
@@ -4142,7 +4450,7 @@ def make_sink(mapping: Callable[[], V | Invariant[V] | Covariant[V]]) -> Callabl
     return lambda value: None
 
 def wrapped_returns(mapping: V | Invariant[V] | Covariant[V]) -> None:
-    # revealed: list[V@wrapped_returns | Covariant[V@wrapped_returns] | Invariant[V@wrapped_returns]]
+    # revealed: list[Invariant[V@wrapped_returns] | V@wrapped_returns | Covariant[V@wrapped_returns]]
     reveal_type(make_list(lambda: mapping))
     reveal_type(make_sink(lambda: mapping))  # revealed: (Invariant[V@wrapped_returns] | V@wrapped_returns, /) -> None
 ```
@@ -4536,6 +4844,33 @@ def identity_callback(value: I) -> Callable[[I], I]:
 def optional_callback(value: O) -> Callable[[O | None], O | None]:
     # revealed: (O@optional_callback | None, /) -> O@optional_callback | None
     return reveal_type(identity_callback(value))
+```
+
+## Inferring a recursive protocol from a factory's return context
+
+The annotated assignment supplies `Stream[int]` as the type argument to `make_result`. Comparing the
+return types of `first_or` reaches `Stream`, whose `window` method adds the layer of nesting that
+`flatten` removes.
+
+```py
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Result(Protocol[T_co]):
+    def first_or(self, default: U) -> T_co | U: ...
+
+class Stream(Protocol[T_co]):
+    def flatten(self: "Stream[Stream[U]]") -> "Stream[U]": ...
+    def window(self) -> "Stream[Stream[T_co]]": ...
+
+def make_result() -> Result[T]:
+    raise NotImplementedError
+
+result: Result[Stream[int]] = make_result()
+reveal_type(result)  # revealed: Result[Stream[int]]
 ```
 
 ## Generic property setter overrides

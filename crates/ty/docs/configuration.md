@@ -1,6 +1,35 @@
 <!-- WARNING: This file is auto-generated (cargo dev generate-all). Update the doc comments on the 'Options' struct in 'crates/ty_project/src/metadata/options.rs' if you want to change anything here. -->
 
 # Configuration
+## `baseline`
+
+Path to the JSON file that records existing lint diagnostics for this project.
+Relative paths are resolved against the project root. Use `ty check --update-baseline`
+to create or update the file.
+
+Diagnostic baselines are in preview. The file format may change between ty releases.
+
+**Default value**: `null`
+
+**Type**: `str`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty]
+    baseline = "ty-baseline.json"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    baseline = "ty-baseline.json"
+    ```
+
+---
+
 ## `rules`
 
 Configures the enabled rules and their severity.

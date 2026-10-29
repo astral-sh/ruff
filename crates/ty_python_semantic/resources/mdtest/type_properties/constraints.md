@@ -1579,6 +1579,70 @@ def upper_bounded_noninferable[I, N]() -> None:
     reveal_type(constraints.solutions(inferable=tuple[I]))
 ```
 
+### Type variables in union upper bounds
+
+An upper bound on a caller-fixed variable can provide evidence for an inferable variable inside the
+bound. From `U ≤ T | int`, we infer `U & ~int ≤ T`: `T` only needs to accept the portion of `U` that
+the concrete `int` arm does not cover. The solution preserves `U` symbolically without binding it.
+
+```py
+from typing import Any
+from ty_extensions._internal import ConstraintSet
+
+def union_upper[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(U, T | int) & ConstraintSet.lower_bound(str, T)
+    # revealed: tuple[Solution[T=(U@union_upper & ~int) | str]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
+Every other union arm contributes to the residual, even when there is no separate lower-bound
+evidence for `T`.
+
+```py
+def several_arms[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(U, T | int | bytes)
+    # revealed: tuple[Solution[T=U@several_arms & ~int & ~bytes]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
+We reject the constraint when the remaining portion of `U` cannot satisfy `T`'s declared bound.
+
+```py
+def uncovered[T: str, U: int | bytes]() -> None:
+    constraints = ConstraintSet.upper_bound(U, T | int)
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
+```
+
+For a gradual arm, we subtract its top materialization: `U & ~Top[A] ≤ T`. This preserves the
+portion of `U` that the gradual arm cannot accept.
+
+```py
+def nested_gradual[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(U, T | list[Any]) & ConstraintSet.lower_bound(str, T)
+    # revealed: tuple[Solution[T=(U@nested_gradual & ~Top[list[Any]]) | str]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
+Propagating the residual through `T = U` can produce `T & ~str ≤ T`. This tautology contributes no
+inference evidence: the solution remains `U`, rather than the self-referential `U | (T & ~str)`.
+
+```py
+def propagated_residual[T, U]() -> None:
+    constraints = ConstraintSet.range(U, T, U) & ConstraintSet.upper_bound(T, U | str)
+    # revealed: tuple[Solution[T=U@propagated_residual]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
+```
+
+The dual tautology, `T ≤ T | V`, also contributes no evidence. Here, `T = U` satisfies both upper
+bounds without leaving a reference to `T` in its own solution.
+
+```py
+def propagated_union[T, U, V]() -> None:
+    constraints = ConstraintSet.upper_bound(T, U) & ConstraintSet.upper_bound(U, T | V)
+    # revealed: tuple[Solution[T=U@propagated_union]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
+```
+
 ### Substitution exceeding the derivation budget
 
 If substituting an exact type into a deeply nested bound exceeds the derivation budget, the original
@@ -1765,6 +1829,60 @@ def legacy_bounded_upper_bound(source: BoundedS, target: T) -> None:
     reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
 ```
 
+### Valid alternatives after a declared-bound violation
+
+With `T` bounded by `list[Any]`, the `list[int]` alternative still yields a solution when the `int`
+and `str` alternatives fail.
+
+```py
+from typing import Any, TypeVar
+from ty_extensions._internal import ConstraintSet
+
+def valid_alternative[T: list[Any]]() -> None:
+    valid = ConstraintSet.lower_bound(list[int], T)
+    invalid = ConstraintSet.lower_bound(int, T) | ConstraintSet.lower_bound(str, T)
+    reveal_type((valid | invalid).solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=list[int]]]
+
+T = TypeVar("T", bound=list[Any])
+
+def legacy_valid_alternative(target: T) -> None:
+    valid = ConstraintSet.lower_bound(list[int], T)
+    invalid = ConstraintSet.lower_bound(int, T) | ConstraintSet.lower_bound(str, T)
+    reveal_type((valid | invalid).solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=list[int]]]
+```
+
+### Collecting solutions within the traversal budget
+
+Matching `Wrapped[X]` against `T | tuple[T] | Wrapped[T]` can contribute `Wrapped[X]`, `tuple[X]`,
+or `X` as a lower bound for `T`. When `X` is an integer literal, the two tuple types satisfy the
+bound `T: tuple[Any]`. When `X` is itself a one-element tuple, all three choices satisfy the bound.
+
+```py
+from typing import Any, Literal
+from ty_extensions._internal import is_constraint_set_assignable_to
+
+type Wrapped[X] = tuple[tuple[X]]
+type Common = (
+    Wrapped[Literal[0]]
+    | Wrapped[Literal[1]]
+    | Wrapped[Literal[2]]
+    | Wrapped[tuple[Literal[3]]]
+    | Wrapped[tuple[Literal[4]]]
+    | Wrapped[tuple[Literal[5]]]
+)
+
+def check[T: tuple[Any]]() -> None:
+    fits = is_constraint_set_assignable_to(Common | Wrapped[tuple[Literal[6]]], T | tuple[T] | Wrapped[T])
+    reveal_type(len(fits.solutions(inferable=tuple[T])))  # revealed: Literal[648]
+
+    over = is_constraint_set_assignable_to(Common | Wrapped[Literal[6]], T | tuple[T] | Wrapped[T])
+    reveal_type(over.solutions(inferable=tuple[T]))  # revealed: Unknown
+```
+
+Both inputs have seven union members. The first yields `2³ × 3⁴ = 648` solutions. Removing one tuple
+layer from the last member leaves more rejected paths to check for diagnostic recovery. That extra
+work exceeds the budget.
+
 ### Joint inference
 
 When both variables are inferable, the solver can specialize them together.
@@ -1783,6 +1901,68 @@ T = TypeVar("T", bound=str)
 def legacy_joint(source: S, target: T) -> None:
     constraints = ConstraintSet.lower_bound(S, T) & ConstraintSet.equality(S, str)
     reveal_type(constraints.solutions(inferable=tuple[S, T]))  # revealed: tuple[Solution[T=str, S=str]]
+```
+
+### Joint inference through nested lower bounds
+
+The lower bound `tuple[U]` satisfies `T`'s declared bound `tuple[int | str]` when `U` is `int` or
+`str`. Rejecting `U = bytes` preserves both valid pairs of bindings.
+
+```py
+from typing import TypeVar
+from ty_extensions._internal import ConstraintSet
+
+def symbolic_lower[T: tuple[int | str], U]() -> None:
+    choices = ConstraintSet.equality(U, str) | ConstraintSet.equality(U, int) | ConstraintSet.equality(U, bytes)
+    constraints = choices & ConstraintSet.lower_bound(tuple[U], T)
+    # revealed: tuple[Solution[U=str, T=tuple[str]], Solution[U=int, T=tuple[int]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+
+T = TypeVar("T", bound=tuple[int | str])
+U = TypeVar("U")
+
+def legacy_symbolic_lower(source: U, target: T) -> None:
+    choices = ConstraintSet.equality(U, str) | ConstraintSet.equality(U, int) | ConstraintSet.equality(U, bytes)
+    constraints = choices & ConstraintSet.lower_bound(tuple[U], T)
+    # revealed: tuple[Solution[U=str, T=tuple[str]], Solution[U=int, T=tuple[int]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+### Joint inference through `Self` bounds
+
+The bound of `Self` is the enclosing class, including its type arguments. For the covariant
+`Box[U]`, the lower bound `Box[int]` satisfies that declaration when `U` is `int` or `object`, but
+not when `U` is `bytes`. Checking the bound before specializing `U` would lose valid solutions.
+
+```py
+from typing import Generic, Self, TypeVar
+from ty_extensions._internal import ConstraintSet
+
+class Box[U]:
+    def get(self) -> U:
+        raise NotImplementedError
+
+    def check(self) -> None:
+        choices = ConstraintSet.equality(U, object) | ConstraintSet.equality(U, int) | ConstraintSet.equality(U, bytes)
+        constraints = choices & ConstraintSet.lower_bound(Box[int], Self)
+        # revealed: tuple[Solution[U=object, Self=Box[int]], Solution[U=int, Self=Box[int]]]
+        reveal_type(constraints.solutions(inferable=tuple[Self, U]))
+```
+
+The legacy class declares `U_co` covariant.
+
+```py
+U_co = TypeVar("U_co", covariant=True)
+
+class LegacyBox(Generic[U_co]):
+    def get(self) -> U_co:
+        raise NotImplementedError
+
+    def check(self) -> None:
+        choices = ConstraintSet.equality(U_co, object) | ConstraintSet.equality(U_co, int) | ConstraintSet.equality(U_co, bytes)
+        constraints = choices & ConstraintSet.lower_bound(LegacyBox[int], Self)
+        # revealed: tuple[Solution[U_co=object, Self=LegacyBox[int]], Solution[U_co=int, Self=LegacyBox[int]]]
+        reveal_type(constraints.solutions(inferable=tuple[Self, U_co]))
 ```
 
 ## Existential quantification
@@ -2101,7 +2281,7 @@ def defaults[**P]() -> None:
     static_assert(reverse == ConstraintSet.never())
 ```
 
-Variadic positional parameters accept fixed positional lists, but not the reverse.
+A variadic positional parameter can match a fixed positional parameter list, but not the reverse.
 
 ```pyi
 def args(*args: int) -> None: ...

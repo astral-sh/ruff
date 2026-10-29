@@ -3602,9 +3602,9 @@ func(G())  # error: [invalid-argument-type]
 
 ## Default type parameter after `TypeVarTuple`
 
-A type parameter with a default cannot follow a `TypeVarTuple` in a legacy `Generic[...]` or
-`Protocol[...]` subscription. This is prohibited by the typing spec because a `TypeVarTuple`
-consumes all remaining positional type arguments, making any subsequent defaults meaningless.
+A `TypeVar` with a default cannot follow a `TypeVarTuple` in a legacy `Generic[...]` or
+`Protocol[...]` base. A specialization could bind the last type argument to the `TypeVar` or use its
+default and bind one more argument to the pack.
 
 ```toml
 [environment]
@@ -3622,35 +3622,48 @@ Ts2 = TypeVarTuple("Ts2", default=Unpack[tuple[int, str]])
 Us = TypeVarTuple("Us")
 P = ParamSpec("P", default=[int, str])
 
-# TODO: should emit [invalid-type-variable-default]
+# error: [invalid-type-variable-default] "Type parameter `T` with a default follows TypeVarTuple `Ts`"
 class Foo(Generic[*Ts, T]): ...
 
-# TODO: should emit [invalid-type-variable-default]
+# error: [invalid-type-variable-default]
 class Bar(Generic[U, *Ts, T]): ...
 
-# TODO: should emit [invalid-type-variable-default]
+# error: [invalid-type-variable-default]
 class Baz(Protocol[*Ts, T]): ...
 
-# TODO: should emit [invalid-type-variable-default]
+# error: [invalid-type-variable-default]
 class Qux(Generic[*Ts, T, T2]): ...
 
-# TODO: should emit [invalid-type-variable-default]
+# error: [invalid-type-variable-default]
 class Quux(Generic[Unpack[Ts], T]): ...
 
-# Note: the spec says this is fine,
-# but it raises `TypeError` at runtime
-# (<https://github.com/python/typing/issues/2211>)
-#
-# TODO: should emit [invalid-type-variable-default]
-class Corge(Generic[Unpack[Us], P]): ...
+# A parameter list for a ParamSpec is distinguishable from the types that fill the pack.
+class Corge(Generic[Unpack[Us], P]): ...  # no diagnostic
 
-# TODO: should also emit [invalid-type-variable-default]
 # error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
 class Grault(Generic[Unpack[Us], Unpack[Ts2]]): ...
 
 # These are fine:
 class Ok1(Generic[U, *Ts]): ...
 class Ok2(Generic[U, Unpack[Ts]]): ...
+```
+
+A required `TypeVar` between the pack and the defaulted `TypeVar` leaves the same ambiguity.
+
+```py
+# snapshot: invalid-type-variable-default
+class Separated(Generic[*Ts, U, T]): ...
+```
+
+```snapshot
+error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
+  --> src/mdtest_snippet.py:36:33
+   |
+36 | class Separated(Generic[*Ts, U, T]): ...
+   |                         ---     ^ `T` has a default
+   |                         |
+   |                         `Ts` is a TypeVarTuple
+info: Using the default would let the TypeVarTuple consume an extra positional type argument
 ```
 
 ## Inferring constructor type arguments through growing recursive aliases

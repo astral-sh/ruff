@@ -1564,10 +1564,8 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        // Check if this class is dataclass-like (either via @dataclass or via dataclass_transform)
-        if CodeGeneratorKind::from_class(db, self.into())
-            .is_some_and(CodeGeneratorKind::is_dataclass_like)
-        {
+        let code_generator = CodeGeneratorKind::from_static_class(db, self);
+        if code_generator.is_some_and(CodeGeneratorKind::is_dataclass_like) {
             if name == "__dataclass_fields__" {
                 // Make this class look like a subclass of the `DataClassInstance` protocol
                 return Member {
@@ -1589,7 +1587,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        if CodeGeneratorKind::NamedTuple.matches(db, self.into()) {
+        if matches!(code_generator, Some(CodeGeneratorKind::NamedTuple)) {
             if let Some(field) = self
                 .own_fields(db, specialization, CodeGeneratorKind::NamedTuple)
                 .get(name)
@@ -1672,8 +1670,7 @@ impl<'db> StaticClassLiteral<'db> {
             .place
             .raw_type()
             .is_some_and(|ty| ty.is_instance_of(db, KnownClass::KwOnly))
-            && CodeGeneratorKind::from_static_class(db, self)
-                .is_some_and(CodeGeneratorKind::is_dataclass_like)
+            && code_generator.is_some_and(CodeGeneratorKind::is_dataclass_like)
         {
             return Member::unbound();
         }
@@ -1723,8 +1720,8 @@ impl<'db> StaticClassLiteral<'db> {
         // Only synthesize methods that are not already defined in the MRO.
         // Note: We use direct scope lookups here to avoid infinite recursion
         // through `own_class_member` -> `own_synthesized_member`.
-        if self.total_ordering(db)
-            && matches!(name, "__lt__" | "__le__" | "__gt__" | "__ge__")
+        if matches!(name, "__lt__" | "__le__" | "__gt__" | "__ge__")
+            && self.total_ordering(db)
             && !self
                 .iter_mro(db, specialization)
                 .filter_map(ClassBase::into_class)
@@ -3045,36 +3042,41 @@ impl<'db> StaticClassLiteral<'db> {
                     if has_binding {
                         // The attribute is declared and bound in the class body.
 
-                        let implicit = self.implicit_attribute(db, name, MethodDecorator::None);
+                        let implicit = match declaredness {
+                            Definedness::AlwaysDefined
+                                if self.has_implicit_instance_attribute(db, name) =>
+                            {
+                                // A method assigns to this attribute, but its declared type
+                                // already determines what an instance can read.
+                                return Member {
+                                    inner: declared.with_qualifiers(qualifiers),
+                                };
+                            }
+                            Definedness::AlwaysDefined => Member::unbound(),
+                            Definedness::PossiblyUndefined => {
+                                self.implicit_attribute(db, name, MethodDecorator::None)
+                            }
+                        };
                         if let Place::Defined(DefinedPlace {
                             ty: implicit_ty,
                             provenance: implicit_provenance,
                             ..
                         }) = implicit.inner.place
                         {
-                            if declaredness == Definedness::AlwaysDefined {
-                                // If a symbol is definitely declared, and we see
-                                // attribute assignments in methods of the class,
-                                // we trust the declared type.
-                                Member {
-                                    inner: declared.with_qualifiers(qualifiers),
-                                }
-                            } else {
-                                Member {
-                                    inner: Place::Defined(DefinedPlace {
-                                        ty: UnionType::from_two_elements(
-                                            db,
-                                            env,
-                                            declared_ty,
-                                            implicit_ty,
-                                        ),
-                                        origin: TypeOrigin::Declared,
-                                        definedness: declaredness,
-                                        public_type_policy: PublicTypePolicy::Raw,
-                                        provenance: implicit_provenance.or(declared_provenance),
-                                    })
-                                    .with_qualifiers(qualifiers),
-                                }
+                            Member {
+                                inner: Place::Defined(DefinedPlace {
+                                    ty: UnionType::from_two_elements(
+                                        db,
+                                        env,
+                                        declared_ty,
+                                        implicit_ty,
+                                    ),
+                                    origin: TypeOrigin::Declared,
+                                    definedness: declaredness,
+                                    public_type_policy: PublicTypePolicy::Raw,
+                                    provenance: implicit_provenance.or(declared_provenance),
+                                })
+                                .with_qualifiers(qualifiers),
                             }
                         } else if self.is_own_dataclass_instance_field(db, name)
                             && declared_ty

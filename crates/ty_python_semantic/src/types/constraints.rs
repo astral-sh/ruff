@@ -107,7 +107,7 @@ use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
 use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarConstraints, TypeVarInstance, TypeVarSet,
+    BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarInstance, TypeVarSet,
 };
 use crate::types::visitor::{
     NonAtomicType, TypeCollector, TypeKind, TypeVisitor, any_over_type_expanding_aliases,
@@ -3557,6 +3557,10 @@ pub(crate) struct CandidateSolution<'db> {
 trait SolutionLimits {
     type Break;
 
+    fn traversal_budget(&self) -> Option<(&BoundedSolutionLimits, Self::Break)> {
+        None
+    }
+
     fn visit_node(&mut self) -> ControlFlow<Self::Break> {
         ControlFlow::Continue(())
     }
@@ -3579,6 +3583,10 @@ struct BoundedSolutionLimits {
 
 impl SolutionLimits for BoundedSolutionLimits {
     type Break = ProjectionError;
+
+    fn traversal_budget(&self) -> Option<(&BoundedSolutionLimits, Self::Break)> {
+        Some((self, ProjectionError::TraversalBudgetExceeded))
+    }
 
     fn visit_node(&mut self) -> ControlFlow<Self::Break> {
         let Some(remaining) = self.remaining_visits.checked_sub(1) else {
@@ -4004,6 +4012,15 @@ impl<'db> CandidateSolutions<'db> {
 
         // An empty gradual range makes the constraint path unsatisfiable.
         if restricted.is_never() && !solution.is_never() {
+            return PathBoundSolution::Unsatisfiable;
+        }
+
+        // A single parameter list must satisfy all of its lower bounds. A union of captured
+        // parameter lists represents neither that common signature nor alternative runtime calls.
+        // TODO: Construct a common behavioral supertype where possible.
+        if path_bound.bound_typevar.domain(db) == TypeVarDomain::ParameterSignature
+            && restricted.is_union()
+        {
             return PathBoundSolution::Unsatisfiable;
         }
 

@@ -1,14 +1,12 @@
 use crate::ProgramEnvironment;
-use itertools::Either;
 use ruff_python_ast::name::Name;
 
 use crate::{
     Db, DisplaySettings,
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
-        ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
-        PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
-        TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
+        ClassType, GenericContext, KnownClass, PromotionKind, PromotionMode, StringLiteralType,
+        Type, TypeAliasType, TypeContext, TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
         callable::{CallableTypeKind, CallableTypes},
         class::NamedTupleSpec,
         constraints::{OwnedConstraintSet, TypeVarSolution},
@@ -17,11 +15,12 @@ use crate::{
         generics::{Specialization, walk_generic_context},
         newtype::NewType,
         typevar::TypeVarInstance,
+        union_type_instance::{UnionTypeInstance, walk_union_type_instance},
         variance::VarianceInferable,
         visitor,
     },
 };
-use ty_python_core::{definition::Definition, scope::ScopeId};
+use ty_python_core::definition::Definition;
 
 /// A Salsa-interned constraint set. This is only needed to have something appropriately small to
 /// put in a [`KnownInstance::ConstraintSet`]. We don't actually manipulate these as part of using
@@ -345,11 +344,7 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
                 visitor.visit_type(db, output_ty);
             }
         }
-        KnownInstanceType::UnionType(instance) => {
-            if let Ok(union_type) = instance.union_type(db) {
-                visitor.visit_type(db, *union_type);
-            }
-        }
+        KnownInstanceType::UnionType(instance) => walk_union_type_instance(db, instance, visitor),
         KnownInstanceType::Literal(ty)
         | KnownInstanceType::Annotated(ty)
         | KnownInstanceType::TypeGenericAlias(ty)
@@ -541,7 +536,7 @@ impl<'db> KnownInstanceType<'db> {
     ) -> Option<Type<'db>> {
         match self {
             Self::TypeAliasType(alias) => Some(Type::TypeAlias(alias)),
-            Self::UnionType(instance) => instance.union_type(db).as_ref().ok().copied(),
+            Self::UnionType(instance) => instance.union_type(db, env).ok(),
             Self::Literal(ty) | Self::Annotated(ty) | Self::LiteralStringAlias(ty) => {
                 Some(ty.inner(db))
             }
@@ -837,175 +832,6 @@ impl<'db> FieldInstance<'db> {
             self.strict(db),
             self.frozen(db),
         ))
-    }
-}
-
-/// Contains information about a `types.UnionType` instance built from a PEP 604
-/// union or a legacy `typing.Union[…]` annotation in a value expression context,
-/// e.g. `IntOrStr = int | str` or `IntOrStr = Union[int, str]`.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub struct UnionTypeInstance<'db> {
-    /// You probably don't want to access this field outside `UnionTypeInstance`
-    /// internals.
-    ///
-    /// This field is the types of the elements of this union, as they were inferred
-    /// in a value expression context. For `int | str`, this would contain
-    /// `<class 'int'>` and `<class 'str'>`. For `Union[int, str]`, this field is
-    /// `None`, as we infer the elements as type expressions.
-    ///
-    /// Use `value_expression_types` to get the corresponding value expression types.
-    #[returns(ref)]
-    _value_expr_types: Option<[Type<'db>; 2]>,
-
-    /// The type of the full union, which can be used when this `UnionType` instance
-    /// is used in a type expression context. For `int | str`, this would contain
-    /// `Ok(int | str)`. If any of the element types could not be converted, this
-    /// contains the first encountered error.
-    #[returns(ref)]
-    pub(super) union_type: Result<Type<'db>, InvalidTypeExpressionError<'db>>,
-}
-
-impl get_size2::GetSize for UnionTypeInstance<'_> {}
-
-impl<'db> UnionTypeInstance<'db> {
-    pub(crate) fn from_value_expression_types(
-        db: &'db dyn Db,
-        value_expr_types: [Type<'db>; 2],
-        scope_id: ScopeId<'db>,
-        typevar_binding_context: Option<Definition<'db>>,
-        inference_flags: InferenceFlags,
-    ) -> Type<'db> {
-        let env = ProgramEnvironment::from_scope(scope_id);
-        let mut builder = UnionBuilder::new(db, &env);
-        for ty in &value_expr_types {
-            match ty.in_type_expression_impl(db, scope_id, typevar_binding_context, inference_flags)
-            {
-                Ok(ty) => builder.add_in_place(ty),
-                Err(error) => {
-                    return Type::KnownInstance(KnownInstanceType::UnionType(
-                        UnionTypeInstance::new(db, Some(value_expr_types), Err(error)),
-                    ));
-                }
-            }
-        }
-
-        let union_type = builder.build();
-
-        // `A | B | B` is the same runtime union value as `A | B`. Reuse the existing union
-        // instance when its semantic union already contains the new operand, rather than storing
-        // an ever-deeper value-expression tree like `((A | B) | B) | B`.
-        for ty in &value_expr_types {
-            if let Type::KnownInstance(KnownInstanceType::UnionType(union)) = ty
-                && let Ok(&existing_union) = union.union_type(db).as_ref()
-                && existing_union == union_type
-            {
-                return *ty;
-            }
-        }
-
-        Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
-            db,
-            Some(value_expr_types),
-            Ok(union_type),
-        )))
-    }
-
-    fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Self {
-        if let Ok(union_type) = self.union_type(db) {
-            let value_expr_types = match *self._value_expr_types(db) {
-                Some([first, second]) if type_mapping.is_structural() => Some([
-                    first.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                    second.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                ]),
-                value_expr_types => value_expr_types,
-            };
-
-            UnionTypeInstance::new(
-                db,
-                value_expr_types,
-                Ok(union_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
-            )
-        } else {
-            self
-        }
-    }
-
-    /// Get the types of the elements of this union as they would appear in a value
-    /// expression context. For a PEP 604 union, we return the actual types that were
-    /// inferred when we encountered the union in a value expression context. For a
-    /// legacy `typing.Union[…]` annotation, we turn the type-expression types into
-    /// their corresponding value-expression types, i.e. we turn instances like `int`
-    /// into class literals like `<class 'int'>`. This operation is potentially lossy.
-    pub(crate) fn value_expression_types(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Result<impl Iterator<Item = Type<'db>> + 'db, InvalidTypeExpressionError<'db>> {
-        let env = env.clone();
-        let to_class_literal = move |ty: Type<'db>| {
-            ty.as_nominal_instance()
-                .and_then(|instance| {
-                    instance
-                        .class(db, &env)
-                        .static_class_literal(db)
-                        .map(|(lit, _)| Type::ClassLiteral(lit.into()))
-                })
-                .unwrap_or_else(Type::unknown)
-        };
-
-        if let Some(value_expr_types) = self._value_expr_types(db) {
-            Ok(Either::Left(value_expr_types.iter().copied()))
-        } else {
-            match self.union_type(db).clone()? {
-                Type::Union(union) => Ok(Either::Right(Either::Left(
-                    union.elements(db).iter().copied().map(to_class_literal),
-                ))),
-                ty => Ok(Either::Right(Either::Right(std::iter::once(
-                    to_class_literal(ty),
-                )))),
-            }
-        }
-    }
-
-    fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        // The `Divergent` elimination rules are different within union types.
-        // See `UnionType::recursive_type_normalized_impl` for details.
-        let value_expr_types = match self._value_expr_types(db).as_ref() {
-            Some([first, second]) if nested => Some([
-                first.recursive_type_normalized_impl(db, env, div, nested)?,
-                second.recursive_type_normalized_impl(db, env, div, nested)?,
-            ]),
-            Some([first, second]) => Some([
-                first
-                    .recursive_type_normalized_impl(db, env, div, nested)
-                    .unwrap_or(div),
-                second
-                    .recursive_type_normalized_impl(db, env, div, nested)
-                    .unwrap_or(div),
-            ]),
-            None => None,
-        };
-        let union_type = match self.union_type(db).clone() {
-            Ok(ty) if nested => Ok(ty.recursive_type_normalized_impl(db, env, div, nested)?),
-            Ok(ty) => Ok(ty
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .unwrap_or(div)),
-            Err(err) => Err(err),
-        };
-
-        Some(Self::new(db, value_expr_types, union_type))
     }
 }
 

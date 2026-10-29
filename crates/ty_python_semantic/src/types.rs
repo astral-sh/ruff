@@ -25,6 +25,7 @@ use ty_module_resolver::{
     ImportingFile, KnownModule, Module, ModuleName, file_to_module, resolve_module,
 };
 
+use self::callable::CallableTypeKind;
 pub(crate) use self::callable::UpcastPolicy;
 use self::class::ClassInstanceFlags;
 pub use self::cyclic::CycleDetector;
@@ -38,9 +39,10 @@ pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
-    InferredDeclaration, TruthinessAnalyzer, TypeContext, infer_complete_scope_types,
-    infer_deferred_types, infer_definition_types, infer_expression_type, infer_expression_types,
-    infer_same_file_expression_type, infer_scope_types, is_discarded_dict_key_assignment,
+    InferredDeclaration, TypeContext, infer_complete_scope_types, infer_deferred_types,
+    infer_definition_types, infer_expression_type, infer_expression_types,
+    infer_predicate_truthiness, infer_same_file_expression_type, infer_scope_types,
+    is_discarded_dict_key_assignment,
 };
 use self::infer::{
     infer_function_default_types, infer_legacy_type_alias, legacy_type_alias_parameters,
@@ -54,12 +56,12 @@ pub(crate) use self::match_pattern::{
     starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
+use self::set_theoretic::KnownUnion;
 use self::set_theoretic::NegativeIntersectionElements;
 pub(crate) use self::set_theoretic::builder::{
     IntersectionBuilder, UnionAccumulator, UnionBuilder,
 };
 pub use self::set_theoretic::{IntersectionType, UnionType};
-use self::set_theoretic::{KnownUnion, RecursivelyDefined};
 pub(crate) use self::signatures::Signature;
 pub use self::signatures::{ParameterDefault, ParameterKind};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
@@ -91,9 +93,7 @@ use crate::types::function::{
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{ApplySpecialization, Specialization, bind_typevar};
 use crate::types::infer::InferenceFlags;
-use crate::types::known_instance::{
-    InternedConstraintSet, InternedType, SentinelInstance, UnionTypeInstance,
-};
+use crate::types::known_instance::{InternedConstraintSet, InternedType, SentinelInstance};
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
@@ -110,7 +110,8 @@ pub(crate) use crate::types::typevar::{
     TypeVarBoundOrConstraints, TypeVarNonce,
 };
 pub use crate::types::typevar::{BoundTypeVarInstance, TypeVarKind};
-use crate::types::typevar::{TypeVarInstance, TypeVarSet};
+use crate::types::typevar::{TypeVarDomain, TypeVarInstance, TypeVarSet};
+use crate::types::union_type_instance::UnionTypeInstance;
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::visitor::{
@@ -183,6 +184,7 @@ mod type_expansion;
 mod type_form;
 mod typed_dict;
 mod typevar;
+mod union_type_instance;
 mod unpacker;
 mod variance;
 mod visitor;
@@ -2169,6 +2171,77 @@ pub enum Type<'db> {
     NewTypeInstance(NewType<'db>),
 }
 
+/// A captured parameter list, another `ParamSpec`, or an intersection of those values.
+///
+/// An intersection of callables describes a callable supporting every constituent signature, so it
+/// accurately represents a conjunction of upper bounds on a `ParamSpec`. A union of callables
+/// describes alternative callable types rather than their shared calling interface, so it's not an
+/// accurate representation of a conjunction of lower bounds on a `ParamSpec`.
+///
+/// For example, callbacks accepting `(int, object)` and `(object, int)` share the calling interface
+/// `(int, int)`. A callable accepting only two integers satisfies that shared interface but
+/// satisfies neither original callable type, so `(int, int)` does not belong to the union
+/// `(int, object) | (object, int)`. Supporting conjunctions of lower bounds on a `ParamSpec`
+/// requires constructing a common signature (e.g. constructing `(int, int)` from the conjunction
+/// of `(object, int)` and `(int, object)`); until we implement that, union-valued solutions are
+/// rejected.
+///
+/// Use [`Type::as_paramspec_value`] to validate callable kinds, whole `ParamSpec` references,
+/// and the members of positive-only intersections.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum ParamSpecValue<'db> {
+    Callable(CallableType<'db>),
+    ParamSpec(BoundTypeVarInstance<'db>),
+    Intersection(IntersectionType<'db>),
+}
+
+impl<'db> ParamSpecValue<'db> {
+    /// Maps captured parameter lists and `ParamSpec` references, retaining their intersection.
+    fn try_map(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        map: &mut impl FnMut(Self) -> Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        match self {
+            Self::Intersection(intersection) if intersection.negative(db).is_empty() => {
+                let elements = intersection
+                    .positive(db)
+                    .iter()
+                    .map(|element| element.as_paramspec_value(db)?.try_map(db, env, map))
+                    .collect::<Option<Vec<_>>>()?;
+                IntersectionType::bounded_from_elements(db, env, elements)
+            }
+            Self::Intersection(_) => None,
+            Self::Callable(_) | Self::ParamSpec(_) => map(self),
+        }
+    }
+
+    /// Reifies captured parameter lists as callables for argument matching and checking.
+    fn to_callable_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Type<'db>> {
+        match self {
+            Self::Callable(callable) => Some(Type::Callable(callable.into_regular(db))),
+            Self::ParamSpec(paramspec) => Some(Type::Callable(CallableType::single(
+                db,
+                Signature::new(Parameters::paramspec(db, paramspec), Type::unknown()),
+            ))),
+            Self::Intersection(_) => {
+                self.try_map(db, env, &mut |value| value.to_callable_type(db, env))
+            }
+        }
+    }
+}
+
+impl<'db> From<ParamSpecValue<'db>> for Type<'db> {
+    fn from(value: ParamSpecValue<'db>) -> Self {
+        match value {
+            ParamSpecValue::Callable(callable) => Self::Callable(callable),
+            ParamSpecValue::ParamSpec(paramspec) => Self::TypeVar(paramspec),
+            ParamSpecValue::Intersection(intersection) => Self::Intersection(intersection),
+        }
+    }
+}
+
 /// The result of discarding disjoint elements from a union.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum DiscardDisjointUnionElementsResult<'db> {
@@ -2919,7 +2992,10 @@ impl<'db> Type<'db> {
     ///
     /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
     /// But for a subclass of `tuple[int, str]`, it will return `None`.
-    fn exact_tuple_instance_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
+    pub(crate) fn exact_tuple_instance_spec(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<Cow<'db, TupleSpec<'db>>> {
         self.as_nominal_instance()
             .and_then(|instance| instance.own_tuple_spec(db))
     }
@@ -3053,6 +3129,27 @@ impl<'db> Type<'db> {
     const fn as_callable(self) -> Option<CallableType<'db>> {
         match self {
             Type::Callable(callable_type) => Some(callable_type),
+            _ => None,
+        }
+    }
+
+    fn as_paramspec_value(self, db: &'db dyn Db) -> Option<ParamSpecValue<'db>> {
+        match self {
+            Self::Callable(callable) if callable.kind(db) == CallableTypeKind::ParamSpecValue => {
+                Some(ParamSpecValue::Callable(callable))
+            }
+            Self::TypeVar(typevar) if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
+                Some(ParamSpecValue::ParamSpec(typevar))
+            }
+            Self::Intersection(intersection)
+                if intersection.negative(db).is_empty()
+                    && intersection
+                        .positive(db)
+                        .iter()
+                        .all(|element| element.as_paramspec_value(db).is_some()) =>
+            {
+                Some(ParamSpecValue::Intersection(intersection))
+            }
             _ => None,
         }
     }
@@ -9029,11 +9126,7 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec_inline![InvalidTypeExpression::NamedTupleSpec],
                     fallback_type: Type::unknown(),
                 }),
-                KnownInstanceType::UnionType(instance) => {
-                    // Cloning here is cheap if the result is a `Type` (which is `Copy`). It's more
-                    // expensive if there are errors.
-                    instance.union_type(db).clone()
-                }
+                KnownInstanceType::UnionType(instance) => instance.union_type(db, env),
                 KnownInstanceType::Literal(ty) => Ok(ty.inner(db)),
                 KnownInstanceType::Annotated(ty) => Ok(ty.inner(db)),
                 KnownInstanceType::TypeGenericAlias(instance) => {
@@ -9576,6 +9669,10 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        // Each nested type is specialized independently of the parameter lists selected for
+        // the enclosing callable (e.g., the return type of `Callable[P, Callable[P, None]]`).
+        let underlying = type_mapping.without_bindings();
+        let type_mapping = underlying.as_ref().unwrap_or(type_mapping);
         if let TypeMapping::GeneralizeLocalTypes(scope) = type_mapping {
             let is_local = |definition: Definition<'db>| {
                 definition.program_file(db) == scope.program_file(db)
@@ -9648,11 +9745,13 @@ impl<'db> Type<'db> {
             return SubclassOfType::from(db, visitor.env, class.default_specialization(db));
         }
 
-        // Expand union-valued `ParamSpec`s before specializing a given callable.
+        // Expand intersection-valued `ParamSpec`s before specializing a given callable.
         if let TypeMapping::ApplySpecialization(specialization)
         | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } =
             type_mapping
         {
+            const MAX_PARAMSPEC_EXPANSION: usize = 64;
+
             let function_signatures = |function: FunctionType<'db>| {
                 if specialization.preserves_lazy_signatures() {
                     function.updated_signature(db)
@@ -9678,77 +9777,85 @@ impl<'db> Type<'db> {
             };
 
             let mut seen = FxHashSet::default();
-            let union_paramspecs = signatures
+            let intersection_paramspecs = signatures
                 .into_iter()
                 .flat_map(|signatures| signatures.iter())
                 .filter_map(|signature| {
                     let (_, typevar) = signature.parameters().as_paramspec_with_prefix()?;
-                    let Type::Union(union) = specialization.get(db, typevar)? else {
-                        return None;
-                    };
-
-                    Some((typevar, union))
+                    let value = specialization.get(db, typevar)?.as_paramspec_value(db)?;
+                    if matches!(value, ParamSpecValue::Intersection(_)) {
+                        Some((typevar, value))
+                    } else {
+                        None
+                    }
                 })
-                .filter(|(typevar, _)| seen.insert(typevar.identity(db)))
-                .collect::<Vec<_>>();
+                .filter(|(typevar, _)| seen.insert(typevar.identity(db)));
 
-            if !union_paramspecs.is_empty() {
-                // Independent union-valued `ParamSpec`s produce a Cartesian product. Bound
-                // the expansion to avoid exponential blowup.
-                const MAX_PARAMSPEC_EXPANSION: usize = 64;
-
-                let mut expanded_callables = UnionBuilder::new(db, visitor.env);
-                let mut expansion_size = 1usize;
-                for (_, union) in &union_paramspecs {
-                    expansion_size = expansion_size.saturating_mul(union.elements(db).len());
-                    if expansion_size > MAX_PARAMSPEC_EXPANSION {
-                        return Type::unknown();
-                    }
-
-                    if union.recursively_defined(db).is_yes() {
-                        expanded_callables =
-                            expanded_callables.or_recursively_defined(RecursivelyDefined::Yes);
-                    }
+            // Independent parameter lists produce a Cartesian product. Bound the number of
+            // combinations before specializing any of the callable's signatures.
+            let mut choices = Vec::new();
+            let mut expansion_size = 1usize;
+            for (paramspec, value) in intersection_paramspecs {
+                let mut members = Vec::new();
+                let collected = value.try_map(db, visitor.env, &mut |member| {
+                    let member = Type::from(member);
+                    members.push((paramspec, member));
+                    (members.len() <= MAX_PARAMSPEC_EXPANSION).then_some(member)
+                });
+                expansion_size = expansion_size.saturating_mul(members.len());
+                if collected.is_none() || expansion_size > MAX_PARAMSPEC_EXPANSION {
+                    return Type::Callable(CallableType::unknown(db));
                 }
+                choices.push(members);
+            }
 
+            if !choices.is_empty() {
+                // All branches specialize the same input type, so cache the finished intersection.
                 return visitor.visit(db, self, type_mapping, || {
-                    let expanded_paramspecs = union_paramspecs
-                        .iter()
-                        .map(|(typevar, union)| {
-                            union.elements(db).iter().map(move |ty| (*typevar, *ty))
-                        })
-                        .multi_cartesian_product();
-
-                    for bindings in expanded_paramspecs {
-                        // Override the specialization with a specific parameter-list assigned to
-                        // each `ParamSpec` from the union expansion.
-                        let specialization = ApplySpecialization::WithBindings {
-                            specialization,
-                            bindings: &bindings,
-                        };
-
-                        let mapping = match type_mapping {
-                            TypeMapping::ApplySpecializationWithMaterialization {
-                                materialization_kind,
-                                ..
-                            } => TypeMapping::ApplySpecializationWithMaterialization {
+                    let callables = choices
+                        .into_iter()
+                        .multi_cartesian_product()
+                        .map(|bindings| {
+                            let specialization = ApplySpecialization::WithBindings {
                                 specialization,
-                                materialization_kind: *materialization_kind,
-                            },
-                            _ => TypeMapping::ApplySpecialization(specialization),
-                        };
-
-                        // Use a fresh visitor, as the visitor cache does not distinguish
-                        // between these specialization bindings.
-                        let callable = self.apply_type_mapping(db, visitor.env, &mapping, tcx);
-                        expanded_callables.add_in_place(callable);
-                    }
-
-                    expanded_callables.build()
+                                bindings: &bindings,
+                            };
+                            let mapping = match type_mapping {
+                                TypeMapping::ApplySpecializationWithMaterialization {
+                                    materialization_kind,
+                                    ..
+                                } => TypeMapping::ApplySpecializationWithMaterialization {
+                                    specialization,
+                                    materialization_kind: *materialization_kind,
+                                },
+                                _ => TypeMapping::ApplySpecialization(specialization),
+                            };
+                            self.map_type(db, &mapping, tcx, visitor)
+                        })
+                        .collect::<Vec<_>>();
+                    IntersectionType::bounded_from_elements(db, visitor.env, callables)
+                        .unwrap_or_else(|| Type::Callable(CallableType::unknown(db)))
                 });
             }
         }
 
+        let map = || self.map_type(db, type_mapping, tcx, visitor);
+        if matches!(self, Type::Callable(_) | Type::FunctionLiteral(_)) {
+            visitor.visit(db, self, type_mapping, map)
+        } else {
+            map()
+        }
+    }
+
+    /// Maps the current node. The caller handles expansion and caching, so each branch of an
+    /// expanded callable can supply its own bindings while sharing the visitor for nested types.
+    fn map_type(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
         match self {
             Type::TypeVar(bound_typevar) => {
                 bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor)
@@ -9764,27 +9871,24 @@ impl<'db> Type<'db> {
                 reference.apply_type_mapping_impl(db, type_mapping, visitor)
             }
 
-            Type::FunctionLiteral(function) => visitor.visit(db, self, type_mapping, || {
-                match type_mapping {
-                    // Promote the types within the signature before promoting the signature to its
-                    // callable form.
-                    TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
-                        Type::FunctionLiteral(function.apply_type_mapping_impl(
-                            db,
-                            type_mapping,
-                            tcx,
-                            visitor,
-                        ))
-                        .promote_impl(db, visitor.env)
-                    }
-                    _ => Type::FunctionLiteral(function.apply_type_mapping_impl(
-                        db,
-                        type_mapping,
-                        tcx,
-                        visitor,
-                    )),
+            Type::FunctionLiteral(function) => {
+                let function = Type::FunctionLiteral(function.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                ));
+                // Promote the types within the signature before promoting the signature to its
+                // callable form.
+                if matches!(
+                    type_mapping,
+                    TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
+                ) {
+                    function.promote_impl(db, visitor.env)
+                } else {
+                    function
                 }
-            }),
+            }
 
             Type::BoundMethod(method) => {
                 Type::BoundMethod(method.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
@@ -9885,9 +9989,9 @@ impl<'db> Type<'db> {
                 ))
             }
 
-            Type::Callable(callable) => visitor.visit(db, self, type_mapping, || {
+            Type::Callable(callable) => {
                 Type::Callable(callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-            }),
+            }
 
             Type::GenericAlias(generic) => {
                 Type::GenericAlias(generic.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
@@ -10294,7 +10398,7 @@ impl<'db> Type<'db> {
 
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::UnionType(instance) => {
-                    if let Ok(union_type) = instance.union_type(db) {
+                    if let Ok(union_type) = instance.union_type(db, env) {
                         union_type.find_legacy_typevars_impl(
                             db,
                             env,
@@ -11380,6 +11484,23 @@ pub enum TypeMapping<'a, 'db> {
 }
 
 impl<'db> TypeMapping<'_, 'db> {
+    /// Returns the mapping for nested types when a callable has selected outer parameter lists.
+    fn without_bindings(&self) -> Option<Self> {
+        match self {
+            Self::ApplySpecialization(ApplySpecialization::WithBindings {
+                specialization, ..
+            }) => Some(Self::ApplySpecialization(**specialization)),
+            Self::ApplySpecializationWithMaterialization {
+                specialization: ApplySpecialization::WithBindings { specialization, .. },
+                materialization_kind,
+            } => Some(Self::ApplySpecializationWithMaterialization {
+                specialization: **specialization,
+                materialization_kind: *materialization_kind,
+            }),
+            _ => None,
+        }
+    }
+
     /// Updates the generic context of a [`Signature`] according to the current type mapping.
     ///
     /// Returns `None` if the mapping removes all type variables from the context.

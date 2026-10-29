@@ -30,6 +30,19 @@ use crate::package::PackageRoot;
 /// `__init__.py` file is typically meant to be a regular package, and
 /// the absence of the `__init__.py` file is probably an oversight.
 ///
+/// ## Preview
+///
+/// In preview, the rule also checks for packages without `__init__.py` files between two regular
+/// packages, such as `bar` in the project structure below.
+///
+/// ```text
+/// foo/
+/// ├── __init__.py
+/// └── bar/
+///     └── baz/
+///         └── __init__.py
+/// ```
+///
 /// ## Options
 /// - `namespace-packages`
 #[derive(ViolationMetadata)]

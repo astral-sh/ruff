@@ -1028,6 +1028,30 @@ class OverrideOnFirstOverload(StubParent):
     @overload
     def method(self, value: str) -> str: ...
 
+# With an overload implementation, `@override` belongs on the implementation, including in stubs.
+class OverrideOnStubImplementation(StubParent):
+    @overload
+    def method(self, value: int) -> int: ...
+    @overload
+    def method(self, value: str) -> str: ...
+    @override
+    def method(self, value: int | str) -> int | str: ...  # no diagnostic
+
+class MissingOverrideOnStubImplementation(StubParent):
+    @overload
+    def method(self, value: int) -> int: ...
+    @overload
+    def method(self, value: str) -> str: ...
+    def method(self, value: int | str) -> int | str: ...  # error: [missing-override-decorator]
+
+class OverrideOnStubOverloadWithImplementation(StubParent):
+    @overload
+    @override
+    def method(self, value: int) -> int: ...  # error: [invalid-overload]
+    @overload
+    def method(self, value: str) -> str: ...
+    def method(self, value: int | str) -> int | str: ...  # error: [missing-override-decorator]
+
 class StubProtocolInterface(Protocol):
     def method(self) -> int: ...
 
@@ -1399,8 +1423,9 @@ class Spam:
         return x
 ```
 
-In a stub file, `@override` should always be applied to the first overload. Even if it isn't, we
-always emit `invalid-explicit-override` diagnostics on the first overload.
+Without an implementation, `@override` should be applied to the first overload. Even if it isn't, we
+emit `invalid-explicit-override` diagnostics on the first overload. When an implementation is
+present, the diagnostic points to it, including in stub files.
 
 `module.pyi`:
 
@@ -1426,6 +1451,12 @@ class Spam:
     def baz(self, x: str) -> str: ...  # error: [invalid-explicit-override]
     @overload
     def baz(self, x: int) -> int: ...
+    @overload
+    def quux(self, x: str) -> str: ...
+    @overload
+    def quux(self, x: int) -> int: ...
+    @override
+    def quux(self, x: str | int) -> str | int: ...  # error: [invalid-explicit-override]
 ```
 
 ## Overloads in statically-known branches in stub files
