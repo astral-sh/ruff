@@ -1,4 +1,4 @@
-use ruff_python_ast::StringLike;
+use ruff_python_ast::flat::StringLike;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;

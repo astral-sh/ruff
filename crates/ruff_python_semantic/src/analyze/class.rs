@@ -4,17 +4,16 @@ use rustc_hash::FxHashSet;
 
 use crate::analyze::typing;
 use crate::{BindingId, SemanticModel};
-use ruff_python_ast as ast;
-use ruff_python_ast::helpers::map_subscript;
+use ruff_python_ast::flat::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{
-    ExceptHandler, Expr, ExprName, ExprStarred, ExprSubscript, ExprTuple, Stmt, StmtFor, StmtIf,
-    StmtMatch, StmtTry, StmtWhile, StmtWith,
+    Expr, ExprName, StmtAnnAssign, StmtAssign, StmtClassDef, StmtFunctionDef,
+    flat::{self, fields as ast},
 };
 
 /// Return `true` if any base class matches a [`QualifiedName`] predicate.
 pub fn any_qualified_base_class<F>(
-    class_def: &ast::StmtClassDef,
+    class_def: flat::View<'_, StmtClassDef>,
     semantic: &SemanticModel,
     mut func: F,
 ) -> bool
@@ -30,17 +29,17 @@ where
 
 /// Return `true` if any base class matches an [`Expr`] predicate.
 pub fn any_base_class<F>(
-    class_def: &ast::StmtClassDef,
+    class_def: flat::View<'_, StmtClassDef>,
     semantic: &SemanticModel,
     mut func: F,
 ) -> bool
 where
-    F: FnMut(&Expr) -> bool,
+    F: FnMut(flat::View<'_, Expr>) -> bool,
 {
     fn inner(
-        class_def: &ast::StmtClassDef,
+        class_def: flat::View<'_, StmtClassDef>,
         semantic: &SemanticModel,
-        func: &mut dyn FnMut(&Expr) -> bool,
+        func: &mut dyn FnMut(flat::View<'_, Expr>) -> bool,
         seen: &mut FxHashSet<BindingId>,
     ) -> bool {
         class_def.bases().iter().any(|expr| {
@@ -61,7 +60,7 @@ where
                         .map(|id| &semantic.scopes[*id])
                         .and_then(|scope| scope.kind.as_class())
                     {
-                        if inner(base_class, semantic, func, seen) {
+                        if inner(*base_class, semantic, func, seen) {
                             return true;
                         }
                     }
@@ -84,17 +83,17 @@ where
 /// The traversal of the class hierarchy is breadth-first, since
 /// this graph tends to have small width but could be rather deep.
 pub fn iter_super_class<'stmt>(
-    class_def: &'stmt ast::StmtClassDef,
+    class_def: flat::View<'stmt, StmtClassDef>,
     semantic: &'stmt SemanticModel,
-) -> impl Iterator<Item = &'stmt ast::StmtClassDef> {
+) -> impl Iterator<Item = flat::View<'stmt, StmtClassDef>> {
     struct SuperClassIterator<'stmt> {
         semantic: &'stmt SemanticModel<'stmt>,
-        to_visit: VecDeque<&'stmt ast::StmtClassDef>,
+        to_visit: VecDeque<flat::View<'stmt, StmtClassDef>>,
         seen: FxHashSet<BindingId>,
     }
 
     impl<'a> Iterator for SuperClassIterator<'a> {
-        type Item = &'a ast::StmtClassDef;
+        type Item = flat::View<'a, StmtClassDef>;
 
         fn next(&mut self) -> Option<Self::Item> {
             let current = self.to_visit.pop_front()?;
@@ -110,7 +109,7 @@ pub fn iter_super_class<'stmt>(
                             .map(|id| &self.semantic.scopes[*id])
                             .and_then(|scope| scope.kind.as_class())
                         {
-                            self.to_visit.push_back(base_class);
+                            self.to_visit.push_back(*base_class);
                         }
                     }
                 }
@@ -127,10 +126,14 @@ pub fn iter_super_class<'stmt>(
 }
 
 /// Return `true` if any base class, including the given class,
-/// matches an [`ast::StmtClassDef`] predicate.
-pub fn any_super_class<F>(class_def: &ast::StmtClassDef, semantic: &SemanticModel, func: F) -> bool
+/// matches an [`StmtClassDef`] predicate.
+pub fn any_super_class<F>(
+    class_def: flat::View<'_, StmtClassDef>,
+    semantic: &SemanticModel,
+    func: F,
+) -> bool
 where
-    F: Fn(&ast::StmtClassDef) -> bool,
+    F: Fn(flat::View<'_, StmtClassDef>) -> bool,
 {
     iter_super_class(class_def, semantic).any(func)
 }
@@ -159,26 +162,32 @@ pub enum ClassMemberBoundness {
 
 #[derive(Copy, Clone, Debug)]
 pub enum ClassMemberKind<'a> {
-    Assign(&'a ast::StmtAssign),
-    AnnAssign(&'a ast::StmtAnnAssign),
-    FunctionDef(&'a ast::StmtFunctionDef),
+    Assign(flat::View<'a, StmtAssign>),
+    AnnAssign(flat::View<'a, StmtAnnAssign>),
+    FunctionDef(flat::View<'a, StmtFunctionDef>),
 }
 
-pub fn any_member_declaration<F>(class: &ast::StmtClassDef, mut func: F) -> bool
+pub fn any_member_declaration<F>(class: flat::View<'_, StmtClassDef>, mut func: F) -> bool
 where
     F: FnMut(ClassMemberDeclaration) -> bool,
 {
     fn any_stmt_in_body(
-        body: &[Stmt],
+        body: flat::Suite<'_>,
         func: &mut dyn FnMut(ClassMemberDeclaration) -> bool,
         boundness: ClassMemberBoundness,
     ) -> bool {
         body.iter().any(|stmt| {
-            let kind = match stmt {
-                Stmt::FunctionDef(function_def) => Some(ClassMemberKind::FunctionDef(function_def)),
-                Stmt::Assign(assign) => Some(ClassMemberKind::Assign(assign)),
-                Stmt::AnnAssign(assign) => Some(ClassMemberKind::AnnAssign(assign)),
-                Stmt::With(StmtWith { body, .. }) => {
+            let kind = match stmt.fields() {
+                ast::Stmt::FunctionDef(ast::StmtFunctionDef {
+                    node: function_def, ..
+                }) => Some(ClassMemberKind::FunctionDef(function_def)),
+                ast::Stmt::Assign(ast::StmtAssign { node: assign, .. }) => {
+                    Some(ClassMemberKind::Assign(assign))
+                }
+                ast::Stmt::AnnAssign(ast::StmtAnnAssign { node: assign, .. }) => {
+                    Some(ClassMemberKind::AnnAssign(assign))
+                }
+                ast::Stmt::With(ast::StmtWith { body, .. }) => {
                     if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound) {
                         return true;
                     }
@@ -186,8 +195,8 @@ where
                     None
                 }
 
-                Stmt::For(StmtFor { body, orelse, .. })
-                | Stmt::While(StmtWhile { body, orelse, .. }) => {
+                ast::Stmt::For(ast::StmtFor { body, orelse, .. })
+                | ast::Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
                     if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound)
                         || any_stmt_in_body(orelse, func, ClassMemberBoundness::PossiblyUnbound)
                     {
@@ -197,14 +206,14 @@ where
                     None
                 }
 
-                Stmt::If(StmtIf {
+                ast::Stmt::If(ast::StmtIf {
                     body,
                     elif_else_clauses,
                     ..
                 }) => {
                     if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound)
                         || elif_else_clauses.iter().any(|it| {
-                            any_stmt_in_body(&it.body, func, ClassMemberBoundness::PossiblyUnbound)
+                            any_stmt_in_body(it.body(), func, ClassMemberBoundness::PossiblyUnbound)
                         })
                     {
                         return true;
@@ -212,9 +221,9 @@ where
                     None
                 }
 
-                Stmt::Match(StmtMatch { cases, .. }) => {
+                ast::Stmt::Match(ast::StmtMatch { cases, .. }) => {
                     if cases.iter().any(|it| {
-                        any_stmt_in_body(&it.body, func, ClassMemberBoundness::PossiblyUnbound)
+                        any_stmt_in_body(it.body(), func, ClassMemberBoundness::PossiblyUnbound)
                     }) {
                         return true;
                     }
@@ -222,7 +231,7 @@ where
                     None
                 }
 
-                Stmt::Try(StmtTry {
+                ast::Stmt::Try(ast::StmtTry {
                     body,
                     handlers,
                     orelse,
@@ -232,9 +241,16 @@ where
                     if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound)
                         || any_stmt_in_body(orelse, func, ClassMemberBoundness::PossiblyUnbound)
                         || any_stmt_in_body(finalbody, func, ClassMemberBoundness::PossiblyUnbound)
-                        || handlers.iter().any(|ExceptHandler::ExceptHandler(it)| {
-                            any_stmt_in_body(&it.body, func, ClassMemberBoundness::PossiblyUnbound)
-                        })
+                        || handlers
+                            .iter()
+                            .filter_map(flat::View::as_except_handler)
+                            .any(|it| {
+                                any_stmt_in_body(
+                                    it.body(),
+                                    func,
+                                    ClassMemberBoundness::PossiblyUnbound,
+                                )
+                            })
                     {
                         return true;
                     }
@@ -254,22 +270,22 @@ where
                 // ```
                 //
                 // Those cases are not yet supported because they're rare.
-                Stmt::ClassDef(_)
-                | Stmt::Return(_)
-                | Stmt::Delete(_)
-                | Stmt::AugAssign(_)
-                | Stmt::TypeAlias(_)
-                | Stmt::Raise(_)
-                | Stmt::Assert(_)
-                | Stmt::Import(_)
-                | Stmt::ImportFrom(_)
-                | Stmt::Global(_)
-                | Stmt::Nonlocal(_)
-                | Stmt::Expr(_)
-                | Stmt::Pass(_)
-                | Stmt::Break(_)
-                | Stmt::Continue(_)
-                | Stmt::IpyEscapeCommand(_) => None,
+                ast::Stmt::ClassDef(_)
+                | ast::Stmt::Return(_)
+                | ast::Stmt::Delete(_)
+                | ast::Stmt::AugAssign(_)
+                | ast::Stmt::TypeAlias(_)
+                | ast::Stmt::Raise(_)
+                | ast::Stmt::Assert(_)
+                | ast::Stmt::Import(_)
+                | ast::Stmt::ImportFrom(_)
+                | ast::Stmt::Global(_)
+                | ast::Stmt::Nonlocal(_)
+                | ast::Stmt::Expr(_)
+                | ast::Stmt::Pass(_)
+                | ast::Stmt::Break(_)
+                | ast::Stmt::Continue(_)
+                | ast::Stmt::IpyEscapeCommand(_) => None,
             };
 
             if let Some(kind) = kind {
@@ -282,11 +298,11 @@ where
         })
     }
 
-    any_stmt_in_body(&class.body, &mut func, ClassMemberBoundness::Bound)
+    any_stmt_in_body(class.body(), &mut func, ClassMemberBoundness::Bound)
 }
 
 /// Return `true` if `class_def` is a class that has one or more enum classes in its mro
-pub fn is_enumeration(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+pub fn is_enumeration(class_def: flat::View<'_, StmtClassDef>, semantic: &SemanticModel) -> bool {
     any_qualified_base_class(class_def, semantic, |qualified_name| {
         matches!(
             qualified_name.segments(),
@@ -328,15 +344,17 @@ impl IsMetaclass {
 ///     def __new__(cls, name: str, bases: tuple[Any, ...], attrs: dict[str, Any], **kwargs: Any) -> MyMetaclass:
 ///         ...
 /// ```
-fn has_metaclass_new_signature(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+fn has_metaclass_new_signature(
+    class_def: flat::View<'_, StmtClassDef>,
+    semantic: &SemanticModel,
+) -> bool {
     // Look for a __new__ method in the class body
-    for stmt in &class_def.body {
-        let ast::Stmt::FunctionDef(ast::StmtFunctionDef {
-            name, parameters, ..
-        }) = stmt
-        else {
+    for stmt in class_def.body() {
+        let Some(function_def_node) = stmt.as_function_def_stmt() else {
             continue;
         };
+        let name = function_def_node.name();
+        let parameters = function_def_node.parameters();
 
         if name != "__new__" {
             continue;
@@ -348,12 +366,12 @@ fn has_metaclass_new_signature(class_def: &ast::StmtClassDef, semantic: &Semanti
         }
 
         // Check that there is no variadic parameter
-        if parameters.vararg.is_some() {
+        if parameters.vararg().is_some() {
             continue;
         }
 
         // Check that the last parameter is keyword-variadic (**kwargs)
-        if parameters.kwarg.is_none() {
+        if parameters.kwarg().is_none() {
             continue;
         }
 
@@ -400,19 +418,25 @@ fn has_metaclass_new_signature(class_def: &ast::StmtClassDef, semantic: &Semanti
 /// Returns `IsMetaclass::Yes` if the given class is definitely a metaclass,
 /// `IsMetaclass::No` if it's definitely *not* a metaclass, and
 /// `IsMetaclass::Maybe` otherwise.
-pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> IsMetaclass {
+pub fn is_metaclass(
+    class_def: flat::View<'_, StmtClassDef>,
+    semantic: &SemanticModel,
+) -> IsMetaclass {
     let mut maybe = false;
-    let is_base_class = any_base_class(class_def, semantic, |expr| match expr {
-        Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) => {
+    let is_base_class = any_base_class(class_def, semantic, |expr| match expr.classify() {
+        flat::ExprKind::Call(expr_call) => {
+            let func = expr_call.func();
+            let arguments = expr_call.arguments();
+
             maybe = true;
             // Ex) `class Foo(type(Protocol)): ...`
-            arguments.len() == 1 && semantic.match_builtin_expr(func.as_ref(), "type")
+            arguments.len() == 1 && semantic.match_builtin_expr(func, "type")
         }
-        Expr::Subscript(ast::ExprSubscript { value, .. }) => {
+        flat::ExprKind::Subscript(expr_subscript) => {
+            let value = expr_subscript.value();
+
             // Ex) `class Foo(type[int]): ...`
-            semantic.match_builtin_expr(value.as_ref(), "type")
+            semantic.match_builtin_expr(value, "type")
         }
         _ => semantic
             .resolve_qualified_name(expr)
@@ -452,47 +476,57 @@ pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> 
 /// Therefore, a class *might* be generic if it uses PEP-695 syntax
 /// or at least one of its direct bases is a subscript expression that
 /// is subscripted with an object that *might* be a `TypeVar`-like.
-pub fn might_be_generic(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    if class_def.type_params.is_some() {
+pub fn might_be_generic(class_def: flat::View<'_, StmtClassDef>, semantic: &SemanticModel) -> bool {
+    if class_def.type_params().is_some() {
         return true;
     }
 
     class_def.bases().iter().any(|base| {
-        let Expr::Subscript(ExprSubscript { slice, .. }) = base else {
+        let Some(subscript_node) = base.as_subscript_expr() else {
             return false;
         };
+        let slice = subscript_node.slice();
 
-        let Expr::Tuple(ExprTuple { elts, .. }) = slice.as_ref() else {
+        let Some(tuple_node) = slice.as_tuple_expr() else {
             return expr_might_be_typevar_like(slice, semantic);
         };
+        let elts = tuple_node.elts();
 
         elts.iter()
             .any(|elt| expr_might_be_typevar_like(elt, semantic))
     })
 }
 
-fn expr_might_be_typevar_like(expr: &Expr, semantic: &SemanticModel) -> bool {
+fn expr_might_be_typevar_like(expr: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
     is_known_typevar(expr, semantic) || expr_might_be_old_style_typevar_like(expr, semantic)
 }
 
-fn is_known_typevar(expr: &Expr, semantic: &SemanticModel) -> bool {
+fn is_known_typevar(expr: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
     semantic.match_typing_expr(expr, "AnyStr")
 }
 
-fn expr_might_be_old_style_typevar_like(expr: &Expr, semantic: &SemanticModel) -> bool {
-    match expr {
-        Expr::Attribute(..) => true,
-        Expr::Name(name) => might_be_old_style_typevar_like(name, semantic),
-        Expr::Starred(ExprStarred { value, .. }) => {
+fn expr_might_be_old_style_typevar_like(
+    expr: flat::View<'_, Expr>,
+    semantic: &SemanticModel,
+) -> bool {
+    match expr.fields() {
+        ast::Expr::Attribute(..) => true,
+        ast::Expr::Name(ast::ExprName { node: name, .. }) => {
+            might_be_old_style_typevar_like(name, semantic)
+        }
+        ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
             expr_might_be_old_style_typevar_like(value, semantic)
         }
         _ => false,
     }
 }
 
-fn might_be_old_style_typevar_like(name: &ExprName, semantic: &SemanticModel) -> bool {
+fn might_be_old_style_typevar_like(
+    name: flat::View<'_, ExprName>,
+    semantic: &SemanticModel,
+) -> bool {
     let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
-        return !semantic.has_builtin_binding(&name.id);
+        return !semantic.has_builtin_binding(name.id());
     };
     typing::is_type_var_like(binding, semantic)
 }

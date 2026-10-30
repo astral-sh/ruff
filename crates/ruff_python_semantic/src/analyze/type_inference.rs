@@ -1,5 +1,6 @@
 //! Analysis rules to perform basic type inference on individual expressions.
 
+use ruff_python_ast::flat;
 use rustc_hash::FxHashSet;
 
 use ruff_python_ast as ast;
@@ -67,89 +68,107 @@ impl ResolvedPythonType {
     }
 }
 
-impl From<&Expr> for ResolvedPythonType {
-    fn from(expr: &Expr) -> Self {
-        match expr {
+impl From<flat::View<'_, Expr>> for ResolvedPythonType {
+    fn from(expr: flat::View<'_, Expr>) -> Self {
+        match expr.classify() {
             // Primitives.
-            Expr::Dict(_) => ResolvedPythonType::Atom(PythonType::Dict),
-            Expr::DictComp(_) => ResolvedPythonType::Atom(PythonType::Dict),
-            Expr::Set(_) => ResolvedPythonType::Atom(PythonType::Set),
-            Expr::SetComp(_) => ResolvedPythonType::Atom(PythonType::Set),
-            Expr::List(_) => ResolvedPythonType::Atom(PythonType::List),
-            Expr::ListComp(_) => ResolvedPythonType::Atom(PythonType::List),
-            Expr::Tuple(_) => ResolvedPythonType::Atom(PythonType::Tuple),
-            Expr::Generator(_) => ResolvedPythonType::Atom(PythonType::Generator),
-            Expr::FString(_) => ResolvedPythonType::Atom(PythonType::String),
-            Expr::TString(_) => ResolvedPythonType::Unknown,
-            Expr::StringLiteral(_) => ResolvedPythonType::Atom(PythonType::String),
-            Expr::BytesLiteral(_) => ResolvedPythonType::Atom(PythonType::Bytes),
-            Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
-                ast::Number::Int(_) => {
-                    ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
+            flat::ExprKind::Dict(_) => ResolvedPythonType::Atom(PythonType::Dict),
+            flat::ExprKind::DictComp(_) => ResolvedPythonType::Atom(PythonType::Dict),
+            flat::ExprKind::Set(_) => ResolvedPythonType::Atom(PythonType::Set),
+            flat::ExprKind::SetComp(_) => ResolvedPythonType::Atom(PythonType::Set),
+            flat::ExprKind::List(_) => ResolvedPythonType::Atom(PythonType::List),
+            flat::ExprKind::ListComp(_) => ResolvedPythonType::Atom(PythonType::List),
+            flat::ExprKind::Tuple(_) => ResolvedPythonType::Atom(PythonType::Tuple),
+            flat::ExprKind::Generator(_) => ResolvedPythonType::Atom(PythonType::Generator),
+            flat::ExprKind::FString(_) => ResolvedPythonType::Atom(PythonType::String),
+            flat::ExprKind::TString(_) => ResolvedPythonType::Unknown,
+            flat::ExprKind::StringLiteral(_) => ResolvedPythonType::Atom(PythonType::String),
+            flat::ExprKind::BytesLiteral(_) => ResolvedPythonType::Atom(PythonType::Bytes),
+            flat::ExprKind::NumberLiteral(expr_number_literal) => {
+                let value = expr_number_literal.value();
+                match value {
+                    ast::Number::Int(_) => {
+                        ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
+                    }
+                    ast::Number::Float(_) => {
+                        ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float))
+                    }
+                    ast::Number::Complex { .. } => {
+                        ResolvedPythonType::Atom(PythonType::Number(NumberLike::Complex))
+                    }
                 }
-                ast::Number::Float(_) => {
-                    ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float))
-                }
-                ast::Number::Complex { .. } => {
-                    ResolvedPythonType::Atom(PythonType::Number(NumberLike::Complex))
-                }
-            },
-            Expr::BooleanLiteral(_) => {
+            }
+            flat::ExprKind::BooleanLiteral(_) => {
                 ResolvedPythonType::Atom(PythonType::Number(NumberLike::Bool))
             }
-            Expr::NoneLiteral(_) => ResolvedPythonType::Atom(PythonType::None),
-            Expr::EllipsisLiteral(_) => ResolvedPythonType::Atom(PythonType::Ellipsis),
+            flat::ExprKind::NoneLiteral(_) => ResolvedPythonType::Atom(PythonType::None),
+            flat::ExprKind::EllipsisLiteral(_) => ResolvedPythonType::Atom(PythonType::Ellipsis),
             // Simple container expressions.
-            Expr::Named(ast::ExprNamed { value, .. }) => ResolvedPythonType::from(value.as_ref()),
-            Expr::If(ast::ExprIf { body, orelse, .. }) => {
-                let body = ResolvedPythonType::from(body.as_ref());
-                let orelse = ResolvedPythonType::from(orelse.as_ref());
+            flat::ExprKind::Named(expr_named) => {
+                let value = expr_named.value();
+                ResolvedPythonType::from(value)
+            }
+            flat::ExprKind::If(expr_if) => {
+                let body = expr_if.body();
+                let orelse = expr_if.orelse();
+
+                let body = ResolvedPythonType::from(body);
+                let orelse = ResolvedPythonType::from(orelse);
                 body.union(orelse)
             }
 
             // Boolean operators.
-            Expr::BoolOp(ast::ExprBoolOp { values, .. }) => values
-                .iter()
-                .map(ResolvedPythonType::from)
-                .reduce(ResolvedPythonType::union)
-                .unwrap_or(ResolvedPythonType::Unknown),
+            flat::ExprKind::BoolOp(expr_bool_op) => {
+                let values = expr_bool_op.values();
+                values
+                    .iter()
+                    .map(ResolvedPythonType::from)
+                    .reduce(ResolvedPythonType::union)
+                    .unwrap_or(ResolvedPythonType::Unknown)
+            }
 
             // Unary operators.
-            Expr::UnaryOp(ast::ExprUnaryOp { operand, op, .. }) => match op {
-                UnaryOp::Invert => match ResolvedPythonType::from(operand.as_ref()) {
-                    ResolvedPythonType::Atom(PythonType::Number(
-                        NumberLike::Bool | NumberLike::Integer,
-                    )) => ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)),
-                    ResolvedPythonType::Atom(_) => ResolvedPythonType::TypeError,
-                    _ => ResolvedPythonType::Unknown,
-                },
-                // Ex) `not 1.0`
-                UnaryOp::Not => ResolvedPythonType::Atom(PythonType::Number(NumberLike::Bool)),
-                // Ex) `+1` or `-1`
-                UnaryOp::UAdd | UnaryOp::USub => match ResolvedPythonType::from(operand.as_ref()) {
-                    ResolvedPythonType::Atom(PythonType::Number(number)) => {
+            flat::ExprKind::UnaryOp(expr_unary_op) => {
+                let operand = expr_unary_op.operand();
+                let op = expr_unary_op.op();
+                match op {
+                    UnaryOp::Invert => match ResolvedPythonType::from(operand) {
                         ResolvedPythonType::Atom(PythonType::Number(
-                            if number == NumberLike::Bool {
-                                NumberLike::Integer
-                            } else {
-                                number
-                            },
-                        ))
-                    }
-                    ResolvedPythonType::Atom(_) => ResolvedPythonType::TypeError,
-                    _ => ResolvedPythonType::Unknown,
-                },
-            },
+                            NumberLike::Bool | NumberLike::Integer,
+                        )) => ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)),
+                        ResolvedPythonType::Atom(_) => ResolvedPythonType::TypeError,
+                        _ => ResolvedPythonType::Unknown,
+                    },
+                    // Ex) `not 1.0`
+                    UnaryOp::Not => ResolvedPythonType::Atom(PythonType::Number(NumberLike::Bool)),
+                    // Ex) `+1` or `-1`
+                    UnaryOp::UAdd | UnaryOp::USub => match ResolvedPythonType::from(operand) {
+                        ResolvedPythonType::Atom(PythonType::Number(number)) => {
+                            ResolvedPythonType::Atom(PythonType::Number(
+                                if number == NumberLike::Bool {
+                                    NumberLike::Integer
+                                } else {
+                                    number
+                                },
+                            ))
+                        }
+                        ResolvedPythonType::Atom(_) => ResolvedPythonType::TypeError,
+                        _ => ResolvedPythonType::Unknown,
+                    },
+                }
+            }
 
             // Binary operators.
-            Expr::BinOp(ast::ExprBinOp {
-                left, op, right, ..
-            }) => {
+            flat::ExprKind::BinOp(expr_bin_op) => {
+                let left = expr_bin_op.left();
+                let op = expr_bin_op.op();
+                let right = expr_bin_op.right();
+
                 match op {
                     Operator::Add => {
                         match (
-                            ResolvedPythonType::from(left.as_ref()),
-                            ResolvedPythonType::from(right.as_ref()),
+                            ResolvedPythonType::from(left),
+                            ResolvedPythonType::from(right),
                         ) {
                             // Ex) `"Hello" + "world"`
                             (
@@ -189,8 +208,8 @@ impl From<&Expr> for ResolvedPythonType {
                     }
                     Operator::Sub => {
                         match (
-                            ResolvedPythonType::from(left.as_ref()),
-                            ResolvedPythonType::from(right.as_ref()),
+                            ResolvedPythonType::from(left),
+                            ResolvedPythonType::from(right),
                         ) {
                             // Ex) `1 - 1`
                             (
@@ -215,8 +234,8 @@ impl From<&Expr> for ResolvedPythonType {
                     }
                     // Ex) "a" % "b"
                     Operator::Mod => match (
-                        ResolvedPythonType::from(left.as_ref()),
-                        ResolvedPythonType::from(right.as_ref()),
+                        ResolvedPythonType::from(left),
+                        ResolvedPythonType::from(right),
                     ) {
                         // Ex) `"Hello" % "world"`
                         (ResolvedPythonType::Atom(PythonType::String), _) => {
@@ -238,8 +257,8 @@ impl From<&Expr> for ResolvedPythonType {
                         _ => {}
                     },
                     Operator::Mult => match (
-                        ResolvedPythonType::from(left.as_ref()),
-                        ResolvedPythonType::from(right.as_ref()),
+                        ResolvedPythonType::from(left),
+                        ResolvedPythonType::from(right),
                     ) {
                         // Ex) `2 * 4`
                         (
@@ -266,8 +285,8 @@ impl From<&Expr> for ResolvedPythonType {
                     },
                     // Standard arithmetic operators, which coerce to the "highest" number type.
                     Operator::FloorDiv | Operator::Pow => match (
-                        ResolvedPythonType::from(left.as_ref()),
-                        ResolvedPythonType::from(right.as_ref()),
+                        ResolvedPythonType::from(left),
+                        ResolvedPythonType::from(right),
                     ) {
                         // Ex) `2 ** 4`
                         (
@@ -285,8 +304,8 @@ impl From<&Expr> for ResolvedPythonType {
                     },
                     // Division, which returns at least `float`.
                     Operator::Div => match (
-                        ResolvedPythonType::from(left.as_ref()),
-                        ResolvedPythonType::from(right.as_ref()),
+                        ResolvedPythonType::from(left),
+                        ResolvedPythonType::from(right),
                     ) {
                         // Ex) `1 / 2`
                         (
@@ -314,8 +333,8 @@ impl From<&Expr> for ResolvedPythonType {
                     | Operator::LShift
                     | Operator::RShift => {
                         match (
-                            ResolvedPythonType::from(left.as_ref()),
-                            ResolvedPythonType::from(right.as_ref()),
+                            ResolvedPythonType::from(left),
+                            ResolvedPythonType::from(right),
                         ) {
                             // Ex) `1 & 2`
                             (
@@ -341,18 +360,18 @@ impl From<&Expr> for ResolvedPythonType {
                 }
                 ResolvedPythonType::Unknown
             }
-            Expr::Lambda(_)
-            | Expr::Await(_)
-            | Expr::Yield(_)
-            | Expr::YieldFrom(_)
-            | Expr::Compare(_)
-            | Expr::Call(_)
-            | Expr::Attribute(_)
-            | Expr::Subscript(_)
-            | Expr::Starred(_)
-            | Expr::Name(_)
-            | Expr::Slice(_)
-            | Expr::IpyEscapeCommand(_) => ResolvedPythonType::Unknown,
+            flat::ExprKind::Lambda(_)
+            | flat::ExprKind::Await(_)
+            | flat::ExprKind::Yield(_)
+            | flat::ExprKind::YieldFrom(_)
+            | flat::ExprKind::Compare(_)
+            | flat::ExprKind::Call(_)
+            | flat::ExprKind::Attribute(_)
+            | flat::ExprKind::Subscript(_)
+            | flat::ExprKind::Starred(_)
+            | flat::ExprKind::Name(_)
+            | flat::ExprKind::Slice(_)
+            | flat::ExprKind::IpyEscapeCommand(_) => ResolvedPythonType::Unknown,
         }
     }
 }

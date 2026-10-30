@@ -5,9 +5,9 @@ use bitflags::bitflags;
 
 use crate::all::DunderAllName;
 use ruff_index::{IndexSlice, IndexVec, newtype_index};
-use ruff_python_ast::helpers::extract_handled_exceptions;
+use ruff_python_ast::flat::helpers::extract_handled_exceptions;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::{self as ast, Stmt, flat};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::ScopeId;
@@ -274,7 +274,7 @@ impl<'a> Binding<'a> {
     }
 
     /// Returns the statement in which the binding was defined.
-    pub fn statement<'b>(&self, semantic: &SemanticModel<'b>) -> Option<&'b Stmt> {
+    pub fn statement<'b>(&self, semantic: &SemanticModel<'b>) -> Option<flat::View<'b, Stmt>> {
         self.source
             .map(|statement_id| semantic.statement(statement_id))
     }
@@ -283,7 +283,10 @@ impl<'a> Binding<'a> {
     /// (e.g. for the binding `x` in `y = (x := 1)`, return the node representing `x := 1`).
     ///
     /// This is only really applicable for assignment expressions.
-    pub fn expression<'b>(&self, semantic: &SemanticModel<'b>) -> Option<&'b ast::Expr> {
+    pub fn expression<'b>(
+        &self,
+        semantic: &SemanticModel<'b>,
+    ) -> Option<flat::View<'b, ast::Expr>> {
         self.source
             .and_then(|expression_id| semantic.parent_expression(expression_id))
     }
@@ -708,12 +711,9 @@ bitflags! {
 }
 
 impl Exceptions {
-    pub fn from_try_stmt(
-        ast::StmtTry { handlers, .. }: &ast::StmtTry,
-        semantic: &SemanticModel,
-    ) -> Self {
+    pub fn from_try_stmt(node: flat::View<'_, ast::StmtTry>, semantic: &SemanticModel) -> Self {
         let mut handled_exceptions = Self::empty();
-        for type_ in extract_handled_exceptions(handlers) {
+        for type_ in extract_handled_exceptions(node.handlers()) {
             handled_exceptions |= match semantic.resolve_builtin_symbol(type_) {
                 Some("NameError") => Self::NAME_ERROR,
                 Some("ModuleNotFoundError") => Self::MODULE_NOT_FOUND_ERROR,

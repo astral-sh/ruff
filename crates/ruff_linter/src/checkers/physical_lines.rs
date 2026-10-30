@@ -31,7 +31,8 @@ pub(crate) fn check_physical_lines(
     let enforce_no_newline_at_end_of_file =
         context.is_rule_enabled(Rule::MissingNewlineAtEndOfFile);
     let enforce_mixed_spaces_and_tabs = context.is_rule_enabled(Rule::MixedSpacesAndTabs);
-    let enforce_bidirectional_unicode = context.is_rule_enabled(Rule::BidirectionalUnicode);
+    let enforce_bidirectional_unicode =
+        context.is_rule_enabled(Rule::BidirectionalUnicode) && !locator.contents().is_ascii();
     let enforce_trailing_whitespace = context.is_rule_enabled(Rule::TrailingWhitespace);
     let enforce_blank_line_contains_whitespace =
         context.is_rule_enabled(Rule::BlankLineWithWhitespace);

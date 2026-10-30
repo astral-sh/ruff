@@ -1,4 +1,6 @@
 use ruff_macros::CacheKey;
+#[cfg(feature = "serde")]
+use ruff_python_ast::flat;
 use ruff_python_ast::helpers::collect_import_from_member;
 use ruff_python_ast::name::QualifiedName;
 
@@ -204,9 +206,6 @@ impl serde::Serialize for NameImport {
 #[cfg(feature = "serde")]
 impl<'de> serde::de::Deserialize<'de> for NameImports {
     fn deserialize<D: serde::de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        use ruff_python_ast::{self as ast, Stmt};
-        use ruff_python_parser::Parsed;
-
         struct AnyNameImportsVisitor;
 
         impl serde::de::Visitor<'_> for AnyNameImportsVisitor {
@@ -217,50 +216,44 @@ impl<'de> serde::de::Deserialize<'de> for NameImports {
             }
 
             fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<Self::Value, E> {
-                let body = ruff_python_parser::parse_module(value)
-                    .map(Parsed::into_suite)
-                    .map_err(E::custom)?;
-                let [stmt] = body.as_slice() else {
+                let parsed = ruff_python_parser::parse_module(value).map_err(E::custom)?;
+                let Some([stmt]) = parsed.suite().as_array() else {
                     return Err(E::custom("Expected a single statement"));
                 };
 
-                let imports = match stmt {
-                    Stmt::ImportFrom(ast::StmtImportFrom {
-                        module,
-                        names,
-                        level,
-                        is_lazy: _,
-                        range: _,
-                        node_index: _,
-                    }) => names
-                        .iter()
-                        .map(|name| {
-                            NameImport::ImportFrom(MemberNameImport {
-                                module: module.as_deref().map(ToString::to_string),
-                                name: Alias {
-                                    name: name.name.to_string(),
-                                    as_name: name.asname.as_deref().map(ToString::to_string),
-                                },
-                                level: *level,
+                let imports = match stmt.classify() {
+                    flat::StmtKind::ImportFrom(stmt_import_from) => {
+                        let module = stmt_import_from.module();
+                        let names = stmt_import_from.names();
+                        let level = stmt_import_from.level();
+                        names
+                            .iter()
+                            .map(|name| {
+                                NameImport::ImportFrom(MemberNameImport {
+                                    module: module.map(|name| name.to_string()),
+                                    name: Alias {
+                                        name: name.name().to_string(),
+                                        as_name: name.asname().map(|name| name.to_string()),
+                                    },
+                                    level,
+                                })
                             })
-                        })
-                        .collect(),
-                    Stmt::Import(ast::StmtImport {
-                        names,
-                        is_lazy: _,
-                        range: _,
-                        node_index: _,
-                    }) => names
-                        .iter()
-                        .map(|name| {
-                            NameImport::Import(ModuleNameImport {
-                                name: Alias {
-                                    name: name.name.to_string(),
-                                    as_name: name.asname.as_deref().map(ToString::to_string),
-                                },
+                            .collect()
+                    }
+                    flat::StmtKind::Import(stmt_import) => {
+                        let names = stmt_import.names();
+                        names
+                            .iter()
+                            .map(|name| {
+                                NameImport::Import(ModuleNameImport {
+                                    name: Alias {
+                                        name: name.name().to_string(),
+                                        as_name: name.asname().map(|name| name.to_string()),
+                                    },
+                                })
                             })
-                        })
-                        .collect(),
+                            .collect()
+                    }
                     _ => {
                         return Err(E::custom("Expected an import statement"));
                     }

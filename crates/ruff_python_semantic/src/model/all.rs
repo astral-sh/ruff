@@ -1,8 +1,9 @@
 //! Utilities for semantic analysis of `__all__` definitions
 
 use bitflags::bitflags;
+use ruff_python_ast::flat::{self, fields as ast};
 
-use ruff_python_ast::{self as ast, Expr, Stmt, helpers::map_subscript};
+use ruff_python_ast::{Expr, Stmt, flat::helpers::map_subscript};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::SemanticModel;
@@ -74,23 +75,20 @@ impl SemanticModel<'_> {
     /// Extract the names bound to a given __all__ assignment.
     pub fn extract_dunder_all_names<'expr>(
         &self,
-        stmt: &'expr Stmt,
+        stmt: flat::View<'expr, Stmt>,
     ) -> (Vec<DunderAllName<'expr>>, DunderAllFlags) {
         fn add_to_names<'expr>(
-            elts: &'expr [Expr],
+            elts: flat::NodeList<'expr, Expr>,
             names: &mut Vec<DunderAllName<'expr>>,
             flags: &mut DunderAllFlags,
         ) {
             for elt in elts {
-                if let Expr::StringLiteral(ast::ExprStringLiteral {
-                    value,
-                    range,
-                    node_index: _,
-                }) = elt
-                {
+                if let flat::ExprKind::StringLiteral(string_literal) = elt.classify() {
+                    let value = string_literal.value();
+                    let range = string_literal.range();
                     names.push(DunderAllName {
                         name: value.to_str(),
-                        range: *range,
+                        range,
                     });
                 } else {
                     *flags |= DunderAllFlags::INVALID_OBJECT;
@@ -101,13 +99,21 @@ impl SemanticModel<'_> {
         let mut names: Vec<DunderAllName> = vec![];
         let mut flags = DunderAllFlags::empty();
 
-        if let Some(value) = match stmt {
-            Stmt::Assign(ast::StmtAssign { value, .. }) => Some(value),
-            Stmt::AnnAssign(ast::StmtAnnAssign { value, .. }) => value.as_ref(),
-            Stmt::AugAssign(ast::StmtAugAssign { value, .. }) => Some(value),
+        if let Some(value) = match stmt.classify() {
+            flat::StmtKind::Assign(stmt_assign) => {
+                let value = stmt_assign.value();
+                Some(value)
+            }
+            flat::StmtKind::AnnAssign(stmt_ann_assign) => stmt_ann_assign.value(),
+            flat::StmtKind::AugAssign(stmt_aug_assign) => {
+                let value = stmt_aug_assign.value();
+                Some(value)
+            }
             _ => None,
         } {
-            if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = value.as_ref() {
+            if let flat::ExprKind::BinOp(bin_op) = value.classify() {
+                let left = bin_op.left();
+                let right = bin_op.right();
                 let mut current_left = left;
                 let mut current_right = right;
                 loop {
@@ -120,7 +126,9 @@ impl SemanticModel<'_> {
 
                     // Process the left side, which can be a "real" value or the "rest" of the
                     // binary operation.
-                    if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = current_left.as_ref() {
+                    if let flat::ExprKind::BinOp(bin_op) = current_left.classify() {
+                        let left = bin_op.left();
+                        let right = bin_op.right();
                         current_left = left;
                         current_right = right;
                     } else {
@@ -146,43 +154,48 @@ impl SemanticModel<'_> {
 
     fn extract_dunder_all_elts<'expr>(
         &self,
-        expr: &'expr Expr,
-    ) -> (Option<&'expr [Expr]>, DunderAllFlags) {
-        match expr {
-            Expr::List(ast::ExprList { elts, .. }) => {
+        expr: flat::View<'expr, Expr>,
+    ) -> (Option<flat::NodeList<'expr, Expr>>, DunderAllFlags) {
+        match expr.classify() {
+            flat::ExprKind::List(expr_list) => {
+                let elts = expr_list.elts();
+
                 return (Some(elts), DunderAllFlags::empty());
             }
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            flat::ExprKind::Tuple(expr_tuple) => {
+                let elts = expr_tuple.elts();
+
                 return (Some(elts), DunderAllFlags::empty());
             }
-            Expr::ListComp(_) => {
+            flat::ExprKind::ListComp(_) => {
                 // Allow comprehensions, even though we can't statically analyze them.
                 return (None, DunderAllFlags::empty());
             }
             // Ex) `__all__ = __all__ + multiprocessing.__all__`
-            Expr::Name(ast::ExprName { id, .. }) if id == "__all__" => {
+            flat::ExprKind::Name(expr_name) if expr_name.id() == "__all__" => {
                 return (None, DunderAllFlags::empty());
             }
             // Ex) `__all__ = __all__ + multiprocessing.__all__`
-            Expr::Attribute(ast::ExprAttribute { attr, .. }) if attr == "__all__" => {
+            flat::ExprKind::Attribute(expr_attribute) if expr_attribute.attr() == "__all__" => {
                 return (None, DunderAllFlags::empty());
             }
             // Allow `tuple()`, `list()`, and their generic forms, like `list[int]()`.
-            Expr::Call(ast::ExprCall {
-                func, arguments, ..
-            }) if arguments.keywords.is_empty()
-                && arguments.args.len() <= 1
-                && self
-                    .resolve_builtin_symbol(map_subscript(func))
-                    .is_some_and(|symbol| matches!(symbol, "tuple" | "list")) =>
+            flat::ExprKind::Call(expr_call)
+                if expr_call.arguments().keywords().is_empty()
+                    && expr_call.arguments().args().len() <= 1
+                    && self
+                        .resolve_builtin_symbol(map_subscript(expr_call.func()))
+                        .is_some_and(|symbol| matches!(symbol, "tuple" | "list")) =>
             {
-                let [arg] = arguments.args.as_ref() else {
+                let arguments = expr_call.arguments();
+
+                let Some([arg]) = arguments.args().as_array() else {
                     return (None, DunderAllFlags::empty());
                 };
-                match arg {
-                    Expr::List(ast::ExprList { elts, .. })
-                    | Expr::Set(ast::ExprSet { elts, .. })
-                    | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                match arg.fields() {
+                    ast::Expr::List(ast::ExprList { elts, .. })
+                    | ast::Expr::Set(ast::ExprSet { elts, .. })
+                    | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                         return (Some(elts), DunderAllFlags::empty());
                     }
                     _ => {
@@ -193,7 +206,9 @@ impl SemanticModel<'_> {
                     }
                 }
             }
-            Expr::Named(ast::ExprNamed { value, .. }) => {
+            flat::ExprKind::Named(expr_named) => {
+                let value = expr_named.value();
+
                 // Allow, e.g., `__all__ += (value := ["A", "B"])`.
                 return self.extract_dunder_all_elts(value);
             }

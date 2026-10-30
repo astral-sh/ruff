@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, ExprStringLiteral};
+use ruff_python_ast::{Expr, ExprStringLiteral, flat};
 use ruff_python_semantic::{ScopeId, Snapshot};
 
 /// A collection of AST nodes that are deferred for later visitation. Used to, e.g., store
@@ -6,13 +6,13 @@ use ruff_python_semantic::{ScopeId, Snapshot};
 /// visited.
 #[derive(Debug, Default)]
 pub(crate) struct Visit<'a> {
-    pub(crate) string_type_definitions: Vec<(&'a ExprStringLiteral, Snapshot)>,
-    pub(crate) future_type_definitions: Vec<(&'a Expr, Snapshot)>,
-    pub(crate) type_param_definitions: Vec<(&'a Expr, Snapshot)>,
+    pub(crate) string_type_definitions: Vec<(flat::View<'a, ExprStringLiteral>, Snapshot)>,
+    pub(crate) future_type_definitions: Vec<(flat::View<'a, Expr>, Snapshot)>,
+    pub(crate) type_param_definitions: Vec<(flat::View<'a, Expr>, Snapshot)>,
     pub(crate) functions: Vec<Snapshot>,
     pub(crate) lambdas: Vec<Snapshot>,
     /// N.B. This field should always be empty unless it's a stub file
-    pub(crate) class_bases: Vec<(&'a Expr, Snapshot)>,
+    pub(crate) class_bases: Vec<(flat::View<'a, Expr>, Snapshot)>,
 }
 
 impl Visit<'_> {

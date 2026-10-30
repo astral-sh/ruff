@@ -21,6 +21,7 @@
 //! represents the lint-rule analysis phase. In the future, these steps may be separated into
 //! distinct passes over the AST.
 
+use ruff_python_ast::flat::{self, fields};
 use std::cell::{OnceCell, RefCell};
 use std::path::Path;
 
@@ -32,19 +33,19 @@ use smallvec::SmallVec;
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticTag, IntoDiagnosticMessage, Span};
 use ruff_diagnostics::{Applicability, Fix, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
+use ruff_python_ast::flat::traversal::{self, EnclosingSuite};
+use ruff_python_ast::flat::visitor::{Visitor, walk_except_handler, walk_pattern};
 use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::Tokens;
-use ruff_python_ast::traversal::{self, EnclosingSuite};
-use ruff_python_ast::visitor::{Visitor, walk_except_handler, walk_pattern};
 use ruff_python_ast::{
-    self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
-    ExprContext, ExprFString, ExprTString, InterpolatedStringElement, Keyword, MatchCase,
-    ModModule, Parameter, Parameters, Pattern, PythonVersion, Stmt, Suite, UnaryOp,
+    self as ast, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
+    InterpolatedStringElement, MatchCase, ModModule, Parameter, Parameters, Pattern, PythonVersion,
+    Stmt, UnaryOp, flat::AnyParameter as AnyParameterRef, flat::ArgOrKeyword,
 };
-use ruff_python_ast::{PySourceType, helpers, str, visitor};
+use ruff_python_ast::{PySourceType, flat::visitor, helpers, str};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_parser::semantic_errors::{
@@ -273,6 +274,7 @@ impl<'a> Checker<'a> {
         context: &'a LintContext<'a>,
     ) -> Self {
         let semantic = SemanticModel::new(
+            parsed,
             &settings.typing_modules,
             &settings.builtins,
             target_version.linter_version(),
@@ -304,7 +306,7 @@ impl<'a> Checker<'a> {
             last_stmt_end: TextSize::default(),
             docstring_state: DocstringState::default(),
             target_version,
-            semantic_checker: SemanticSyntaxChecker::new(),
+            semantic_checker: SemanticSyntaxChecker::new(parsed.ast()),
             semantic_errors: RefCell::default(),
             context,
         }
@@ -354,7 +356,7 @@ impl<'a> Checker<'a> {
         }
 
         for statement in self.semantic.current_statements().skip(1) {
-            if matches!(statement, Stmt::Try(_)) {
+            if statement.is_try_stmt() {
                 return Some(LazyImportContext::TryExceptBlocks);
             }
         }
@@ -365,8 +367,8 @@ impl<'a> Checker<'a> {
     /// Whether changing this import's module preserves membership in `__lazy_modules__`.
     pub(crate) fn import_rewrite_preserves_laziness(&self, original: &str, target: &str) -> bool {
         if self.lazy_import_context().is_some()
-            || matches!(self.semantic.current_statement(), Stmt::ImportFrom(import)
-                if import.names.iter().any(|alias| alias.name.as_str() == "*"))
+            || matches!(self.semantic.current_statement().classify(), flat::StmtKind::ImportFrom(import)
+                if import.names().iter().any(|alias| alias.name().as_str() == "*"))
         {
             return true;
         }
@@ -418,11 +420,15 @@ impl<'a> Checker<'a> {
         // Find the quote character used to start the containing interpolated string.
         self.semantic
             .current_expressions()
-            .find_map(|expr| match expr {
-                Expr::FString(ExprFString { value, .. }) => {
+            .find_map(|expr| match expr.classify() {
+                flat::ExprKind::FString(expr_f_string) => {
+                    let value = expr_f_string.value();
+
                     Some(value.iter().next()?.quote_style().opposite())
                 }
-                Expr::TString(ExprTString { value, .. }) => {
+                flat::ExprKind::TString(expr_t_string) => {
+                    let value = expr_t_string.value();
+
                     Some(value.iter().next()?.quote_style().opposite())
                 }
                 _ => None,
@@ -597,7 +603,7 @@ impl<'a> Checker<'a> {
     /// that adds caching.
     pub(crate) fn parse_type_annotation(
         &self,
-        annotation: &ast::ExprStringLiteral,
+        annotation: flat::View<'_, ast::ExprStringLiteral>,
     ) -> Result<&'a ParsedAnnotation, &'a ParseError> {
         self.parsed_annotations_cache
             .lookup_or_parse(annotation, self.locator.contents())
@@ -610,10 +616,10 @@ impl<'a> Checker<'a> {
     /// `foo: "typing.Any"` means the same thing to a type checker as `foo: typing.Any`.
     pub(crate) fn match_maybe_stringized_annotation(
         &self,
-        expr: &ast::Expr,
-        match_fn: impl FnOnce(&ast::Expr) -> bool,
+        expr: flat::View<'_, ast::Expr>,
+        match_fn: impl FnOnce(flat::View<'_, ast::Expr>) -> bool,
     ) -> bool {
-        if let ast::Expr::StringLiteral(string_annotation) = expr {
+        if let Some(string_annotation) = expr.as_string_literal_expr() {
             let Some(parsed_annotation) = self.parse_type_annotation(string_annotation).ok() else {
                 return false;
             };
@@ -643,7 +649,7 @@ impl<'a> Checker<'a> {
     }
 
     fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Checker)) {
-        let mut checker = std::mem::take(&mut self.semantic_checker);
+        let mut checker = self.semantic_checker;
         f(&mut checker, self);
         self.semantic_checker = checker;
     }
@@ -699,7 +705,9 @@ impl<'a> Checker<'a> {
     /// a docstring (a plain string literal) is up to the caller.
     pub(crate) fn in_docstring_position(&self, range: TextRange) -> bool {
         let stmt = self.semantic.current_statement();
-        let Some(ast::StmtExpr { value, .. }) = stmt.as_expr_stmt() else {
+        let Some(fields::StmtExpr { value, .. }) =
+            stmt.as_expr_stmt().map(flat::View::<ast::StmtExpr>::fields)
+        else {
             return false;
         };
         if value.range() != range {
@@ -719,15 +727,21 @@ impl<'a> Checker<'a> {
         // Attribute docstrings are also recognized in conditional suites within a class.
         let allows_attribute_docstring =
             self.semantic.at_top_level() || self.semantic.current_scope().kind.is_class();
-        match suite.previous_sibling() {
+        match suite.previous_sibling().map(flat::View::<Stmt>::fields) {
             None => matches!(
-                parent,
-                None | Some(Stmt::FunctionDef(_) | Stmt::ClassDef(_))
+                parent.map(flat::View::<Stmt>::classify),
+                None | Some(flat::StmtKind::FunctionDef(_) | flat::StmtKind::ClassDef(_))
             ),
-            Some(Stmt::Assign(ast::StmtAssign { targets, .. })) => {
-                allows_attribute_docstring && matches!(targets.as_slice(), [Expr::Name(_)])
+            Some(fields::Stmt::Assign(fields::StmtAssign { targets, .. })) => {
+                allows_attribute_docstring
+                    && matches!(
+                        targets
+                            .as_array()
+                            .map(|items| items.map(flat::View::<Expr>::classify)),
+                        Some([flat::ExprKind::Name(_)])
+                    )
             }
-            Some(Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })) => {
+            Some(fields::Stmt::AnnAssign(fields::StmtAnnAssign { target, .. })) => {
                 allows_attribute_docstring && target.is_name_expr()
             }
             Some(_) => false,
@@ -1012,17 +1026,14 @@ impl SemanticSyntaxContext for Checker<'_> {
         let mut child = self.semantic.current_statement();
 
         for parent in self.semantic.current_statements().skip(1) {
-            match parent {
-                Stmt::For(ast::StmtFor { orelse, .. })
-                | Stmt::While(ast::StmtWhile { orelse, .. })
-                    if !orelse.contains(child) =>
-                {
-                    return true;
-                }
-                Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
-                    break;
-                }
-                _ => {}
+            let orelse = match parent.classify() {
+                flat::StmtKind::For(stmt) => Some(stmt.orelse()),
+                flat::StmtKind::While(stmt) => Some(stmt.orelse()),
+                flat::StmtKind::FunctionDef(_) | flat::StmtKind::ClassDef(_) => break,
+                _ => None,
+            };
+            if orelse.is_some_and(|orelse| !orelse.iter().any(|stmt| stmt.is_same_node(child))) {
+                return true;
             }
             child = parent;
         }
@@ -1031,7 +1042,8 @@ impl SemanticSyntaxContext for Checker<'_> {
 
     fn is_bound_parameter(&self, name: &str) -> bool {
         match self.semantic.current_scope().kind {
-            ScopeKind::Function(ast::StmtFunctionDef { parameters, .. }) => {
+            ScopeKind::Function(stmt_function_def) => {
+                let parameters = stmt_function_def.parameters();
                 parameters.includes(name)
             }
             ScopeKind::Class(_)
@@ -1045,7 +1057,7 @@ impl SemanticSyntaxContext for Checker<'_> {
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+    fn visit_stmt(&mut self, stmt: flat::View<'a, Stmt>) {
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
 
@@ -1068,33 +1080,37 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         // Track whether we've seen module docstrings, non-imports, etc.
-        match stmt {
-            Stmt::Expr(ast::StmtExpr { value, .. })
+        match stmt.classify() {
+            flat::StmtKind::Expr(stmt_expr)
                 if !self.semantic.seen_module_docstring_boundary()
-                    && value.is_string_literal_expr() =>
+                    && stmt_expr.value().is_string_literal_expr() =>
             {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
             }
-            Stmt::ImportFrom(ast::StmtImportFrom {
-                module,
-                names,
-                is_lazy,
-                ..
-            }) => {
+            flat::StmtKind::ImportFrom(stmt_import_from) => {
+                let module = stmt_import_from.module();
+                let names = stmt_import_from.names();
+                let is_lazy = stmt_import_from.is_lazy();
+
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
 
                 // Allow eager `__future__` imports until we see any other import. Lazy imports,
                 // including `lazy from __future__ import ...`, don't enable future annotations.
-                if !*is_lazy && matches!(module.as_deref(), Some("__future__")) {
+                if !is_lazy
+                    && matches!(
+                        module.map(flat::View::<ast::Identifier>::as_str),
+                        Some("__future__")
+                    )
+                {
                     if names
                         .iter()
-                        .any(|alias| alias.name.as_str() == "annotations")
+                        .any(|alias| alias.name().as_str() == "annotations")
                     {
                         self.semantic.flags |= SemanticModelFlags::FUTURE_ANNOTATIONS;
                     }
                 }
             }
-            Stmt::Import(_) => {
+            flat::StmtKind::Import(_) => {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
             }
             _ => {
@@ -1129,22 +1145,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         // Step 1: Binding
-        match stmt {
-            Stmt::AugAssign(ast::StmtAugAssign {
-                target,
-                op: _,
-                value: _,
-                range: _,
-                node_index: _,
-            }) => {
+        match stmt.classify() {
+            flat::StmtKind::AugAssign(stmt_aug_assign) => {
+                let target = stmt_aug_assign.target();
+
                 self.handle_node_load(target);
             }
-            Stmt::Import(ast::StmtImport {
-                names,
-                is_lazy: _,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::StmtKind::Import(stmt_import) => {
+                let names = stmt_import.names();
+
                 if self.semantic.at_top_level() {
                     self.importer.visit_import(stmt);
                 }
@@ -1152,7 +1161,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 for alias in names {
                     // Given `import foo.bar`, `module` would be "foo", and `call_path` would be
                     // `["foo", "bar"]`.
-                    let module = alias.name.split('.').next().unwrap();
+                    let module = alias.name().as_str().split('.').next().unwrap();
 
                     // Mark the top-level module as "seen" by the semantic model.
                     self.semantic.add_module(module);
@@ -1164,8 +1173,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         flags |= BindingFlags::LAZY;
                     }
 
-                    if alias.asname.is_none() && alias.name.contains('.') {
-                        let qualified_name = QualifiedName::user_defined(&alias.name);
+                    if alias.asname().is_none() && alias.name().contains('.') {
+                        let qualified_name = QualifiedName::user_defined(alias.name().as_str());
                         self.add_binding(
                             module,
                             alias.identifier(),
@@ -1175,21 +1184,20 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             flags,
                         );
                     } else {
-                        if alias.asname.is_some() {
+                        if alias.asname().is_some() {
                             flags |= BindingFlags::ALIAS;
                         }
                         if alias
-                            .asname
-                            .as_ref()
-                            .is_some_and(|asname| asname.as_str() == alias.name.as_str())
+                            .asname()
+                            .is_some_and(|asname| asname.as_str() == alias.name().as_str())
                         {
                             flags |= BindingFlags::EXPLICIT_EXPORT;
                         }
 
-                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
-                        let qualified_name = QualifiedName::user_defined(&alias.name);
+                        let name = alias.asname().unwrap_or(alias.name());
+                        let qualified_name = QualifiedName::user_defined(alias.name().as_str());
                         self.add_binding(
-                            name,
+                            name.as_str(),
                             alias.identifier(),
                             BindingKind::Import(Import {
                                 qualified_name: Box::new(qualified_name),
@@ -1199,42 +1207,46 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
             }
-            Stmt::ImportFrom(ast::StmtImportFrom {
-                names,
-                module,
-                level,
-                is_lazy,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::StmtKind::ImportFrom(stmt_import_from) => {
+                let names = stmt_import_from.names();
+                let module = stmt_import_from.module();
+                let level = stmt_import_from.level();
+                let is_lazy = stmt_import_from.is_lazy();
+
                 if self.semantic.at_top_level() {
                     self.importer.visit_import(stmt);
                 }
 
-                let module = module.as_deref();
-                let level = *level;
-                let is_lazy = *is_lazy;
-
                 // Mark the top-level module as "seen" by the semantic model.
                 if level == 0 {
-                    if let Some(module) = module.and_then(|module| module.split('.').next()) {
+                    if let Some(module) =
+                        module.and_then(|module| module.as_str().split('.').next())
+                    {
                         self.semantic.add_module(module);
                     }
                 }
 
                 for alias in names {
-                    if !is_lazy && matches!(module, Some("__future__")) {
-                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                    if !is_lazy
+                        && matches!(
+                            module.map(flat::View::<ast::Identifier>::as_str),
+                            Some("__future__")
+                        )
+                    {
+                        let name = alias.asname().unwrap_or(alias.name());
                         self.add_binding(
-                            name,
+                            name.as_str(),
                             alias.identifier(),
                             BindingKind::FutureImport,
                             BindingFlags::empty(),
                         );
-                    } else if &alias.name == "*" {
+                    } else if alias.name() == "*" {
                         self.semantic
                             .current_scope_mut()
-                            .add_star_import(StarImport { level, module });
+                            .add_star_import(StarImport {
+                                level,
+                                module: module.map(flat::View::<ast::Identifier>::as_str),
+                            });
                     } else {
                         let mut flags = BindingFlags::EXTERNAL;
                         if self.lazy_import_context().is_none()
@@ -1242,13 +1254,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         {
                             flags |= BindingFlags::LAZY;
                         }
-                        if alias.asname.is_some() {
+                        if alias.asname().is_some() {
                             flags |= BindingFlags::ALIAS;
                         }
                         if alias
-                            .asname
-                            .as_ref()
-                            .is_some_and(|asname| asname.as_str() == alias.name.as_str())
+                            .asname()
+                            .is_some_and(|asname| asname.as_str() == alias.name().as_str())
                         {
                             flags |= BindingFlags::EXPLICIT_EXPORT;
                         }
@@ -1256,14 +1267,18 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         // Given `from foo import bar`, `name` would be "bar" and `qualified_name` would
                         // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
                         // and `qualified_name` would be "foo.bar".
-                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                        let name = alias.asname().unwrap_or(alias.name());
 
                         // Attempt to resolve any relative imports; but if we don't know the current
                         // module path, or the relative import extends beyond the package root,
                         // fallback to a literal representation (e.g., `[".", "foo"]`).
-                        let qualified_name = collect_import_from_member(level, module, &alias.name);
+                        let qualified_name = collect_import_from_member(
+                            level,
+                            module.map(flat::View::<ast::Identifier>::as_str),
+                            alias.name().as_str(),
+                        );
                         self.add_binding(
-                            name,
+                            name.as_str(),
                             alias.identifier(),
                             BindingKind::FromImport(FromImport {
                                 qualified_name: Box::new(qualified_name),
@@ -1273,13 +1288,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
             }
-            Stmt::Global(ast::StmtGlobal {
-                names,
-                range: _,
-                node_index: _,
-            }) if !self.semantic.scope_id.is_global() => {
+            flat::StmtKind::Global(stmt_global) if !self.semantic.scope_id.is_global() => {
+                let names = stmt_global.names();
+
                 for name in names {
-                    let binding_id = self.semantic.global_binding(name);
+                    let binding_id = self.semantic.global_binding(name.as_str());
 
                     // Mark the binding in the global scope as "rebound" in the current scope.
                     if let Some(binding_id) = binding_id {
@@ -1289,22 +1302,20 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                     // Add a binding to the current scope.
                     let binding_id = self.semantic.push_binding(
-                        name,
+                        name.as_str(),
                         name.range(),
                         BindingKind::Global(binding_id),
                         BindingFlags::GLOBAL,
                     );
                     let scope = self.semantic.current_scope_mut();
-                    scope.add(name, binding_id);
+                    scope.add(name.as_str(), binding_id);
                 }
             }
-            Stmt::Nonlocal(ast::StmtNonlocal {
-                names,
-                range: _,
-                node_index: _,
-            }) if !self.semantic.scope_id.is_global() => {
+            flat::StmtKind::Nonlocal(stmt_nonlocal) if !self.semantic.scope_id.is_global() => {
+                let names = stmt_nonlocal.names();
+
                 for name in names {
-                    if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
+                    if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name.as_str()) {
                         // Mark the binding as "used", since the `nonlocal` requires an existing
                         // binding.
                         self.semantic.add_local_reference(
@@ -1320,13 +1331,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                         // Add a binding to the current scope.
                         let binding_id = self.semantic.push_binding(
-                            name,
+                            name.as_str(),
                             name.range(),
                             BindingKind::Nonlocal(binding_id, scope_id),
                             BindingFlags::NONLOCAL,
                         );
                         let scope = self.semantic.current_scope_mut();
-                        scope.add(name, binding_id);
+                        scope.add(name.as_str(), binding_id);
                     }
                 }
             }
@@ -1334,18 +1345,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         // Step 2: Traversal
-        match stmt {
-            Stmt::FunctionDef(
-                function_def @ ast::StmtFunctionDef {
-                    name,
-                    body,
-                    parameters,
-                    decorator_list,
-                    returns,
-                    type_params,
-                    ..
-                },
-            ) => {
+        match stmt.classify() {
+            flat::StmtKind::FunctionDef(function_def) => {
+                let name = function_def.name();
+                let body = function_def.body();
+                let parameters = function_def.parameters();
+                let decorator_list = function_def.decorator_list();
+                let returns = function_def.returns();
+                let type_params = function_def.type_params();
+
                 // Visit the decorators and arguments, but avoid the body, which will be
                 // deferred.
                 for decorator in decorator_list {
@@ -1353,7 +1361,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                     if self
                         .semantic
-                        .match_typing_expr(&decorator.expression, "no_type_check")
+                        .match_typing_expr(decorator.expression(), "no_type_check")
                     {
                         self.semantic.flags |= SemanticModelFlags::NO_TYPE_CHECK;
                     }
@@ -1377,7 +1385,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 // The default values of the parameters needs to be evaluated in the enclosing
                 // scope.
-                for parameter in parameters {
+                for parameter in parameters.iter() {
                     if let Some(expr) = parameter.default() {
                         self.visit_expr(expr);
                     }
@@ -1408,7 +1416,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.visit_type_params(type_params);
                 }
 
-                for parameter in parameters {
+                for parameter in parameters.iter() {
                     if let Some(expr) = parameter.annotation() {
                         if singledispatch && !parameter.is_variadic() {
                             self.visit_runtime_required_annotation(expr);
@@ -1475,22 +1483,19 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.semantic.pop_scope(); // `__class__` cell closure scope
                 }
                 self.add_binding(
-                    name,
+                    name.as_str(),
                     stmt.identifier(),
                     BindingKind::FunctionDefinition(scope_id),
                     BindingFlags::empty(),
                 );
             }
-            Stmt::ClassDef(
-                class_def @ ast::StmtClassDef {
-                    name,
-                    body,
-                    arguments,
-                    decorator_list,
-                    type_params,
-                    ..
-                },
-            ) => {
+            flat::StmtKind::ClassDef(class_def) => {
+                let name = class_def.name();
+                let body = class_def.body();
+                let arguments = class_def.arguments();
+                let decorator_list = class_def.decorator_list();
+                let type_params = class_def.type_params();
+
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
@@ -1503,14 +1508,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 if let Some(arguments) = arguments {
                     self.semantic.flags |= SemanticModelFlags::CLASS_BASE;
-                    for base in &*arguments.args {
+                    for base in arguments.args() {
                         self.visit_expr(base);
                     }
-                    for keyword in &*arguments.keywords {
-                        if keyword.arg.as_ref().is_some_and(|arg| arg == "extra_items")
+                    for keyword in arguments.keywords() {
+                        if keyword.arg().is_some_and(|arg| arg == "extra_items")
                             && self.is_typed_dict(class_def)
                         {
-                            self.visit_type_definition(&keyword.value);
+                            self.visit_type_definition(keyword.value());
                         } else {
                             self.visit_keyword(keyword);
                         }
@@ -1542,19 +1547,17 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.pop_definition();
                 self.semantic.pop_scope(); // Type parameter scope
                 self.add_binding(
-                    name,
+                    name.as_str(),
                     stmt.identifier(),
                     BindingKind::ClassDefinition(scope_id),
                     BindingFlags::empty(),
                 );
             }
-            Stmt::TypeAlias(ast::StmtTypeAlias {
-                range: _,
-                node_index: _,
-                name,
-                type_params,
-                value,
-            }) => {
+            flat::StmtKind::TypeAlias(stmt_type_alias) => {
+                let name = stmt_type_alias.name();
+                let type_params = stmt_type_alias.type_params();
+                let value = stmt_type_alias.value();
+
                 self.semantic.push_scope(ScopeKind::Type);
                 if let Some(type_params) = type_params {
                     self.visit_type_params(type_params);
@@ -1563,15 +1566,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.pop_scope();
                 self.visit_expr(name);
             }
-            Stmt::Try(
-                try_node @ ast::StmtTry {
-                    body,
-                    handlers,
-                    orelse,
-                    finalbody,
-                    ..
-                },
-            ) => {
+            flat::StmtKind::Try(try_node) => {
+                let body = try_node.body();
+                let handlers = try_node.handlers();
+                let orelse = try_node.orelse();
+                let finalbody = try_node.finalbody();
+
                 // Iterate over the `body`, then the `handlers`, then the `orelse`, then the
                 // `finalbody`, but treat the body and the `orelse` as a single branch for
                 // flow analysis purposes.
@@ -1600,12 +1600,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit_body(finalbody);
                 self.semantic.pop_branch();
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                target,
-                annotation,
-                value,
-                ..
-            }) => {
+            flat::StmtKind::AnnAssign(stmt_ann_assign) => {
+                let target = stmt_ann_assign.target();
+                let annotation = stmt_ann_assign.annotation();
+                let value = stmt_ann_assign.value();
+
                 match AnnotationContext::from_model(
                     &self.semantic,
                     self.settings(),
@@ -1634,10 +1633,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             self.semantic(),
                         ) =>
                     {
-                        if let Expr::Subscript(subscript) = &**annotation {
+                        if let Some(subscript) = annotation.as_subscript_expr() {
                             // Ex) `InitVar[str]`
-                            self.visit_runtime_required_annotation(&subscript.value);
-                            self.visit_annotation(&subscript.slice);
+                            self.visit_runtime_required_annotation(subscript.value());
+                            self.visit_annotation(subscript.slice());
                         } else {
                             // Ex) `InitVar`
                             self.visit_runtime_required_annotation(annotation);
@@ -1655,12 +1654,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
                 self.visit_expr(target);
             }
-            Stmt::Assert(ast::StmtAssert {
-                test,
-                msg,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::StmtKind::Assert(stmt_assert) => {
+                let test = stmt_assert.test();
+                let msg = stmt_assert.msg();
+
                 let snapshot = self.semantic.flags;
                 self.semantic.flags |= SemanticModelFlags::ASSERT_STATEMENT;
                 self.visit_boolean_test(test);
@@ -1669,13 +1666,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
                 self.semantic.flags = snapshot;
             }
-            Stmt::With(ast::StmtWith {
-                items,
-                body,
-                is_async: _,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::StmtKind::With(stmt_with) => {
+                let items = stmt_with.items();
+                let body = stmt_with.body();
+
                 for item in items {
                     self.visit_with_item(item);
                 }
@@ -1683,13 +1677,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit_body(body);
                 self.semantic.pop_branch();
             }
-            Stmt::While(ast::StmtWhile {
-                test,
-                body,
-                orelse,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::StmtKind::While(stmt_while) => {
+                let test = stmt_while.test();
+                let body = stmt_while.body();
+                let orelse = stmt_while.orelse();
+
                 self.visit_boolean_test(test);
                 self.visit_body(body);
                 let flags_snapshot = self.semantic.flags;
@@ -1697,15 +1689,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit_body(orelse);
                 self.semantic.flags = flags_snapshot;
             }
-            Stmt::For(ast::StmtFor {
-                node_index: _,
-                range: _,
-                is_async: _,
-                target,
-                iter,
-                body,
-                orelse,
-            }) => {
+            flat::StmtKind::For(stmt_for) => {
+                let target = stmt_for.target();
+                let iter = stmt_for.iter();
+                let body = stmt_for.body();
+                let orelse = stmt_for.orelse();
+
                 self.visit_expr(iter);
                 self.visit_expr(target);
                 self.visit_body(body);
@@ -1714,15 +1703,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit_body(orelse);
                 self.semantic.flags = flags_snapshot;
             }
-            Stmt::If(
-                stmt_if @ ast::StmtIf {
-                    test,
-                    body,
-                    elif_else_clauses,
-                    range: _,
-                    node_index: _,
-                },
-            ) => {
+            flat::StmtKind::If(stmt_if) => {
+                let test = stmt_if.test();
+                let body = stmt_if.body();
+                let elif_else_clauses = stmt_if.elif_else_clauses();
+
                 self.visit_boolean_test(test);
 
                 self.semantic.push_branch();
@@ -1746,14 +1731,20 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         if self.semantic().at_top_level() || self.semantic().current_scope().kind.is_class() {
-            match stmt {
-                Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                    if let [Expr::Name(_)] = targets.as_slice() {
+            match stmt.classify() {
+                flat::StmtKind::Assign(stmt_assign) => {
+                    let targets = stmt_assign.targets();
+
+                    if let Some([expr]) = targets.as_array()
+                        && expr.is_name_expr()
+                    {
                         self.docstring_state =
                             DocstringState::Expected(ExpectedDocstringKind::Attribute);
                     }
                 }
-                Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) if target.is_name_expr() => {
+                flat::StmtKind::AnnAssign(stmt_ann_assign)
+                    if stmt_ann_assign.target().is_name_expr() =>
+                {
                     self.docstring_state =
                         DocstringState::Expected(ExpectedDocstringKind::Attribute);
                 }
@@ -1771,15 +1762,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.last_stmt_end = stmt.end();
     }
 
-    fn visit_annotation(&mut self, expr: &'a Expr) {
+    fn visit_annotation(&mut self, expr: flat::View<'a, Expr>) {
         let flags_snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::TYPING_ONLY_ANNOTATION;
         self.visit_type_definition(expr);
         self.semantic.flags = flags_snapshot;
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
+    fn visit_expr(&mut self, expr: flat::View<'a, Expr>) {
+        SemanticSyntaxChecker::check_expr(expr, self);
 
         // Step 0: Pre-processing
         if self.source_type.is_stub()
@@ -1802,7 +1793,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 || self.target_version().defers_annotations())
             && (self.semantic.in_annotation() || self.source_type.is_stub())
         {
-            if let Expr::StringLiteral(string_literal) = expr {
+            if let Some(string_literal) = expr.as_string_literal_expr() {
                 self.visit
                     .string_type_definitions
                     .push((string_literal, self.semantic.snapshot()));
@@ -1822,108 +1813,82 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
         // If we're in a boolean test (e.g., the `test` of a `Stmt::If`), but now within a
         // subexpression (e.g., `a` in `f(a)`), then we're no longer in a boolean test.
-        if !matches!(
-            expr,
-            Expr::BoolOp(_)
-                | Expr::UnaryOp(ast::ExprUnaryOp {
-                    op: UnaryOp::Not,
-                    ..
-                })
-        ) {
+        let inherits_boolean_test = match expr.classify() {
+            flat::ExprKind::BoolOp(_) => true,
+            flat::ExprKind::UnaryOp(unary) => unary.op() == UnaryOp::Not,
+            _ => false,
+        };
+        if !inherits_boolean_test {
             self.semantic.flags -= SemanticModelFlags::BOOLEAN_TEST;
         }
 
         // Step 1: Binding
-        match expr {
-            Expr::Call(ast::ExprCall {
-                func,
-                arguments: _,
-                range_start: _,
-                node_index: _,
-            }) => {
-                if let Expr::Name(ast::ExprName {
-                    id,
-                    ctx,
-                    range: _,
-                    node_index: _,
-                }) = func.as_ref()
+        match expr.classify() {
+            flat::ExprKind::Call(expr_call) => {
+                let func = expr_call.func();
+
+                if let Some(name) = func.as_name_expr()
+                    && name.id() == "locals"
+                    && name.ctx().is_load()
                 {
-                    if id == "locals" && ctx.is_load() {
-                        let scope = self.semantic.current_scope_mut();
-                        scope.set_uses_locals();
-                    }
+                    self.semantic.current_scope_mut().set_uses_locals();
                 }
             }
-            Expr::Name(ast::ExprName {
-                id,
-                ctx,
-                range: _,
-                node_index: _,
-            }) => match ctx {
-                ExprContext::Load => self.handle_node_load(expr),
-                ExprContext::Store => self.handle_node_store(id, expr),
-                ExprContext::Del => self.handle_node_delete(expr),
-                ExprContext::Invalid => {}
-            },
+            flat::ExprKind::Name(expr_name) => {
+                let id = expr_name.id();
+                let ctx = expr_name.ctx();
+                match ctx {
+                    ExprContext::Load => self.handle_node_load(expr),
+                    ExprContext::Store => self.handle_node_store(id, expr),
+                    ExprContext::Del => self.handle_node_delete(expr),
+                    ExprContext::Invalid => {}
+                }
+            }
             _ => {}
         }
 
         // Step 2: Traversal
-        match expr {
-            Expr::ListComp(ast::ExprListComp {
-                elt,
-                generators,
-                range: _,
-                node_index: _,
-            }) => {
+        match expr.classify() {
+            flat::ExprKind::ListComp(expr_list_comp) => {
+                let elt = expr_list_comp.elt();
+                let generators = expr_list_comp.generators();
+
                 self.visit_generators(GeneratorKind::ListComprehension, generators);
                 self.visit_expr(elt);
             }
-            Expr::SetComp(ast::ExprSetComp {
-                elt,
-                generators,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::ExprKind::SetComp(expr_set_comp) => {
+                let elt = expr_set_comp.elt();
+                let generators = expr_set_comp.generators();
+
                 self.visit_generators(GeneratorKind::SetComprehension, generators);
                 self.visit_expr(elt);
             }
-            Expr::Generator(ast::ExprGenerator {
-                elt,
-                generators,
-                range: _,
-                node_index: _,
-                parenthesized: _,
-            }) => {
+            flat::ExprKind::Generator(expr_generator) => {
+                let elt = expr_generator.elt();
+                let generators = expr_generator.generators();
+
                 self.visit_generators(GeneratorKind::Generator, generators);
                 self.visit_expr(elt);
             }
-            Expr::DictComp(ast::ExprDictComp {
-                key,
-                value,
-                generators,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::ExprKind::DictComp(expr_dict_comp) => {
+                let key = expr_dict_comp.key();
+                let value = expr_dict_comp.value();
+                let generators = expr_dict_comp.generators();
+
                 self.visit_generators(GeneratorKind::DictComprehension, generators);
                 if let Some(key) = key {
                     self.visit_expr(key);
                 }
                 self.visit_expr(value);
             }
-            Expr::Lambda(
-                lambda @ ast::ExprLambda {
-                    parameters,
-                    body: _,
-                    range: _,
-                    node_index: _,
-                },
-            ) => {
+            flat::ExprKind::Lambda(lambda) => {
+                let parameters = lambda.parameters();
+
                 // Visit the default arguments, but avoid the body, which will be deferred.
                 if let Some(parameters) = parameters {
                     for default in parameters
                         .iter_non_variadic_params()
-                        .filter_map(|param| param.default.as_deref())
+                        .filter_map(flat::View::<ast::ParameterWithDefault>::default)
                     {
                         self.visit_expr(default);
                     }
@@ -1933,13 +1898,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit.lambdas.push(self.semantic.snapshot());
                 self.analyze.lambdas.push(self.semantic.snapshot());
             }
-            Expr::If(ast::ExprIf {
-                test,
-                body,
-                orelse,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::ExprKind::If(expr_if) => {
+                let test = expr_if.test();
+                let body = expr_if.body();
+                let orelse = expr_if.orelse();
+
                 self.visit_boolean_test(test);
                 self.visit_expr(body);
                 let flags_snapshot = self.semantic.flags;
@@ -1947,20 +1910,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit_expr(orelse);
                 self.semantic.flags = flags_snapshot;
             }
-            Expr::UnaryOp(ast::ExprUnaryOp {
-                op: UnaryOp::Not,
-                operand,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::ExprKind::UnaryOp(expr_unary_op) if expr_unary_op.op() == UnaryOp::Not => {
+                let operand = expr_unary_op.operand();
+
                 self.visit_boolean_test(operand);
             }
-            Expr::Call(ast::ExprCall {
-                func,
-                arguments,
-                range_start: _,
-                node_index: _,
-            }) => {
+            flat::ExprKind::Call(expr_call) => {
+                let func = expr_call.func();
+                let arguments = expr_call.arguments();
+
                 self.visit_expr(func);
 
                 let callable =
@@ -2024,7 +1982,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         });
                 match callable {
                     Some(typing::Callable::Bool) => {
-                        let mut args = arguments.args.iter();
+                        let mut args = arguments.args().iter();
                         if let Some(arg) = args.next() {
                             self.visit_boolean_test(arg);
                         }
@@ -2037,9 +1995,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             match (i, arg) {
                                 (0, ArgOrKeyword::Arg(arg)) => self.visit_cast_type_argument(arg),
                                 (_, ArgOrKeyword::Arg(arg)) => self.visit_non_type_definition(arg),
-                                (_, ArgOrKeyword::Keyword(Keyword { arg, value, .. })) => {
+                                (_, ArgOrKeyword::Keyword(keyword)) => {
+                                    let arg = keyword.arg();
+                                    let value = keyword.value();
                                     if let Some(id) = arg {
-                                        if id == "typ" {
+                                        if *id == *"typ" {
                                             self.visit_cast_type_argument(value);
                                         } else {
                                             self.visit_non_type_definition(value);
@@ -2050,15 +2010,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
                     }
                     Some(typing::Callable::TypeForm) => {
-                        let mut args = arguments.args.iter();
+                        let mut args = arguments.args().iter();
                         if let Some(arg) = args.next() {
                             self.visit_type_definition(arg);
                         }
                         for arg in args {
                             self.visit_non_type_definition(arg);
                         }
-                        for keyword in &*arguments.keywords {
-                            self.visit_non_type_definition(&keyword.value);
+                        for keyword in arguments.keywords() {
+                            self.visit_non_type_definition(keyword.value());
                         }
                     }
                     Some(typing::Callable::NewType) => {
@@ -2066,9 +2026,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             match (i, arg) {
                                 (1, ArgOrKeyword::Arg(arg)) => self.visit_type_definition(arg),
                                 (_, ArgOrKeyword::Arg(arg)) => self.visit_non_type_definition(arg),
-                                (_, ArgOrKeyword::Keyword(Keyword { arg, value, .. })) => {
+                                (_, ArgOrKeyword::Keyword(keyword)) => {
+                                    let arg = keyword.arg();
+                                    let value = keyword.value();
                                     if let Some(id) = arg {
-                                        if id == "tp" {
+                                        if *id == *"tp" {
                                             self.visit_type_definition(value);
                                         } else {
                                             self.visit_non_type_definition(value);
@@ -2079,22 +2041,18 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
                     }
                     Some(typing::Callable::TypeVar) => {
-                        let mut args = arguments.args.iter();
+                        let mut args = arguments.args().iter();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
                         }
                         for arg in args {
                             self.visit_type_definition(arg);
                         }
-                        for keyword in &*arguments.keywords {
-                            let Keyword {
-                                arg,
-                                value,
-                                range: _,
-                                node_index: _,
-                            } = keyword;
+                        for keyword in arguments.keywords() {
+                            let arg = keyword.arg();
+                            let value = keyword.value();
                             if let Some(id) = arg {
-                                if matches!(&**id, "bound" | "default") {
+                                if matches!(id.as_str(), "bound" | "default") {
                                     self.visit_type_definition(value);
                                 } else {
                                     self.visit_non_type_definition(value);
@@ -2111,9 +2069,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             match (i, arg) {
                                 (1, ArgOrKeyword::Arg(arg)) => self.visit_type_definition(arg),
                                 (_, ArgOrKeyword::Arg(arg)) => self.visit_non_type_definition(arg),
-                                (_, ArgOrKeyword::Keyword(Keyword { arg, value, .. })) => {
+                                (_, ArgOrKeyword::Keyword(keyword)) => {
+                                    let arg = keyword.arg();
+                                    let value = keyword.value();
                                     if let Some(id) = arg {
-                                        if matches!(&**id, "value" | "type_params") {
+                                        if matches!(id.as_str(), "value" | "type_params") {
                                             self.visit_type_definition(value);
                                         } else {
                                             self.visit_non_type_definition(value);
@@ -2125,24 +2085,26 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                     Some(typing::Callable::NamedTuple) => {
                         // Ex) NamedTuple("a", [("a", int)])
-                        let mut args = arguments.args.iter();
+                        let mut args = arguments.args().iter();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
                         }
 
                         for arg in args {
-                            match arg {
+                            match arg.fields() {
                                 // Ex) NamedTuple("a", [("a", int)])
-                                Expr::List(ast::ExprList { elts, .. })
-                                | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                                fields::Expr::List(fields::ExprList { elts, .. })
+                                | fields::Expr::Tuple(fields::ExprTuple { elts, .. }) => {
                                     for elt in elts {
-                                        match elt {
-                                            Expr::List(ast::ExprList { elts, .. })
-                                            | Expr::Tuple(ast::ExprTuple { elts, .. })
-                                                if elts.len() == 2 =>
-                                            {
-                                                self.visit_non_type_definition(&elts[0]);
-                                                self.visit_type_definition(&elts[1]);
+                                        match elt.fields() {
+                                            fields::Expr::List(fields::ExprList {
+                                                elts, ..
+                                            })
+                                            | fields::Expr::Tuple(fields::ExprTuple {
+                                                elts, ..
+                                            }) if elts.len() == 2 => {
+                                                self.visit_non_type_definition(elts.at(0));
+                                                self.visit_type_definition(elts.at(1));
                                             }
                                             _ => {
                                                 self.visit_non_type_definition(elt);
@@ -2154,13 +2116,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             }
                         }
 
-                        for keyword in &*arguments.keywords {
-                            let Keyword { arg, value, .. } = keyword;
-                            match (arg.as_ref(), value) {
+                        for keyword in arguments.keywords() {
+                            let arg = keyword.arg();
+                            let value = keyword.value();
+                            match (arg, value.classify()) {
                                 // Ex) NamedTuple("a", **{"a": int})
-                                (None, Expr::Dict(dict)) => {
-                                    for ast::DictItem { key, value } in dict {
-                                        if let Some(key) = key.as_ref() {
+                                (None, flat::ExprKind::Dict(dict)) => {
+                                    for flat::DictItemView { key, value } in dict {
+                                        if let Some(key) = key {
                                             self.visit_non_type_definition(key);
                                             self.visit_type_definition(value);
                                         } else {
@@ -2181,18 +2144,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                     Some(typing::Callable::TypedDict) => {
                         // Ex) TypedDict("a", {"a": int})
-                        let mut args = arguments.args.iter();
+                        let mut args = arguments.args().iter();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
                         }
                         for arg in args {
-                            if let Expr::Dict(ast::ExprDict {
-                                items,
-                                range: _,
-                                node_index: _,
-                            }) = arg
-                            {
-                                for ast::DictItem { key, value } in items {
+                            if let Some(dict_node) = arg.as_dict_expr() {
+                                let items = dict_node.items();
+                                for flat::DictItemView { key, value } in items {
                                     if let Some(key) = key {
                                         self.visit_non_type_definition(key);
                                     }
@@ -2214,10 +2173,16 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         // frozenset({'closed'})
                         // ```
                         let legacy_fields = self.target_version() < PythonVersion::PY313
-                            && matches!(&*arguments.args, [_] | [_, Expr::NoneLiteral(_)]);
+                            && (arguments.args().len() == 1
+                                || arguments
+                                    .args()
+                                    .as_array()
+                                    .is_some_and(|[_, last]| last.is_none_literal_expr()));
 
-                        for Keyword { arg, value, .. } in &*arguments.keywords {
-                            let is_type = match arg.as_deref() {
+                        for keyword in arguments.keywords() {
+                            let arg = keyword.arg();
+                            let value = keyword.value();
+                            let is_type = match arg.map(flat::View::<ast::Identifier>::as_str) {
                                 // `total` is a boolean argument available since `TypedDict` was
                                 // introduced.
                                 Some("total") => false,
@@ -2241,7 +2206,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
                     }
                     Some(typing::Callable::MypyExtension) => {
-                        let mut args = arguments.args.iter();
+                        let mut args = arguments.args().iter();
                         if let Some(arg) = args.next() {
                             // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
                             self.visit_type_definition(arg);
@@ -2249,20 +2214,16 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             for arg in args {
                                 self.visit_non_type_definition(arg);
                             }
-                            for keyword in &*arguments.keywords {
-                                let Keyword { value, .. } = keyword;
+                            for keyword in arguments.keywords() {
+                                let value = keyword.value();
                                 self.visit_non_type_definition(value);
                             }
                         } else {
                             // Ex) DefaultNamedArg(type="bool", name="some_prop_name")
-                            for keyword in &*arguments.keywords {
-                                let Keyword {
-                                    value,
-                                    arg,
-                                    range: _,
-                                    node_index: _,
-                                } = keyword;
-                                if arg.as_ref().is_some_and(|arg| arg == "type") {
+                            for keyword in arguments.keywords() {
+                                let value = keyword.value();
+                                let arg = keyword.arg();
+                                if arg.is_some_and(|arg| arg == "type") {
                                     self.visit_type_definition(value);
                                 } else {
                                     self.visit_non_type_definition(value);
@@ -2274,23 +2235,21 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         // If we're in a type definition, we need to treat the arguments to any
                         // other callables as non-type definitions (i.e., we don't want to treat
                         // any strings as deferred type definitions).
-                        for arg in &*arguments.args {
+                        for arg in arguments.args() {
                             self.visit_non_type_definition(arg);
                         }
-                        for keyword in &*arguments.keywords {
-                            let Keyword { value, .. } = keyword;
+                        for keyword in arguments.keywords() {
+                            let value = keyword.value();
                             self.visit_non_type_definition(value);
                         }
                     }
                 }
             }
-            Expr::Subscript(ast::ExprSubscript {
-                value,
-                slice,
-                ctx,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::ExprKind::Subscript(expr_subscript) => {
+                let value = expr_subscript.value();
+                let slice = expr_subscript.slice();
+                let ctx = expr_subscript.ctx();
+
                 // Only allow annotations in `ExprContext::Load`. If we have, e.g.,
                 // `obj["foo"]["bar"]`, we need to avoid treating the `obj["foo"]`
                 // portion as an annotation, despite having `ExprContext::Load`. Thus, we track
@@ -2325,14 +2284,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         Some(typing::SubscriptKind::PEP593Annotation) => {
                             // First argument is a type (including forward references); the
                             // rest are arbitrary Python objects.
-                            if let Expr::Tuple(ast::ExprTuple {
-                                elts,
-                                ctx,
-                                range: _,
-                                node_index: _,
-                                parenthesized: _,
-                            }) = slice.as_ref()
-                            {
+                            if let Some(tuple) = slice.as_tuple_expr() {
+                                let elts = tuple.elts();
+                                let ctx = tuple.ctx();
                                 let mut iter = elts.iter();
                                 if let Some(expr) = iter.next() {
                                     self.visit_type_definition(expr);
@@ -2354,18 +2308,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             }
                         }
                         Some(typing::SubscriptKind::TypedDict) => {
-                            if let Expr::Dict(ast::ExprDict {
-                                items,
-                                range: _,
-                                node_index: _,
-                            }) = slice.as_ref()
-                            {
+                            if let Some(dict_node) = slice.as_dict_expr() {
+                                let items = dict_node.items();
                                 for item in items {
-                                    if let Some(key) = &item.key {
+                                    if let Some(key) = item.key {
                                         self.visit_non_type_definition(key);
-                                        self.visit_type_definition(&item.value);
+                                        self.visit_type_definition(item.value);
                                     } else {
-                                        self.visit_non_type_definition(&item.value);
+                                        self.visit_non_type_definition(item.value);
                                     }
                                 }
                             } else {
@@ -2379,27 +2329,25 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
             }
-            Expr::StringLiteral(string_literal) => {
+            flat::ExprKind::StringLiteral(string_literal) => {
                 if self.semantic.in_type_definition() && !self.semantic.in_typing_literal() {
                     self.visit
                         .string_type_definitions
                         .push((string_literal, self.semantic.snapshot()));
                 }
             }
-            Expr::FString(_) => {
+            flat::ExprKind::FString(_) => {
                 self.semantic.flags |= SemanticModelFlags::F_STRING;
                 visitor::walk_expr(self, expr);
             }
-            Expr::TString(_) => {
+            flat::ExprKind::TString(_) => {
                 self.semantic.flags |= SemanticModelFlags::T_STRING;
                 visitor::walk_expr(self, expr);
             }
-            Expr::Named(ast::ExprNamed {
-                target,
-                value,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::ExprKind::Named(expr_named) => {
+                let target = expr_named.target();
+                let value = expr_named.value();
+
                 self.visit_expr(value);
 
                 self.semantic.flags |= SemanticModelFlags::NAMED_EXPRESSION_ASSIGNMENT;
@@ -2409,12 +2357,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         // Step 3: Clean-up
-        match expr {
-            Expr::Lambda(_)
-            | Expr::Generator(_)
-            | Expr::ListComp(_)
-            | Expr::DictComp(_)
-            | Expr::SetComp(_) => {
+        match expr.classify() {
+            flat::ExprKind::Lambda(_)
+            | flat::ExprKind::Generator(_)
+            | flat::ExprKind::ListComp(_)
+            | flat::ExprKind::DictComp(_)
+            | flat::ExprKind::SetComp(_) => {
                 self.analyze.scopes.push(self.semantic.scope_id);
                 self.semantic.pop_scope(); // Lambda/Generator/Comprehension scope
             }
@@ -2422,13 +2370,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
 
         // Step 4: Analysis
-        match expr {
-            Expr::StringLiteral(string_literal) => {
+        match expr.classify() {
+            flat::ExprKind::StringLiteral(string_literal) => {
                 analyze::string_like(string_literal.into(), self);
             }
-            Expr::BytesLiteral(bytes_literal) => analyze::string_like(bytes_literal.into(), self),
-            Expr::FString(f_string) => analyze::string_like(f_string.into(), self),
-            Expr::TString(t_string) => analyze::string_like(t_string.into(), self),
+            flat::ExprKind::BytesLiteral(bytes_literal) => {
+                analyze::string_like(bytes_literal.into(), self);
+            }
+            flat::ExprKind::FString(f_string) => analyze::string_like(f_string.into(), self),
+            flat::ExprKind::TString(t_string) => analyze::string_like(t_string.into(), self),
             _ => {}
         }
 
@@ -2437,19 +2387,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.pop_node();
     }
 
-    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
+    fn visit_except_handler(&mut self, except_handler: flat::View<'a, ExceptHandler>) {
         let flags_snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::EXCEPTION_HANDLER;
 
         // Step 1: Binding
-        let binding = match except_handler {
-            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                type_: _,
-                name,
-                body: _,
-                range: _,
-                node_index: _,
-            }) => {
+        let binding = match except_handler.classify() {
+            flat::ExceptHandlerKind::ExceptHandler(except_handler_except_handler) => {
+                let name = except_handler_except_handler.name();
+
                 if let Some(name) = name {
                     // Store the existing binding, if any.
                     let binding_id = self.semantic.lookup_binding(name.as_str());
@@ -2488,7 +2434,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.flags = flags_snapshot;
     }
 
-    fn visit_parameters(&mut self, parameters: &'a Parameters) {
+    fn visit_parameters(&mut self, parameters: flat::View<'a, Parameters>) {
         // Step 1: Binding.
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
@@ -2500,12 +2446,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
         analyze::parameters(parameters, self);
     }
 
-    fn visit_parameter(&mut self, parameter: &'a Parameter) {
+    fn visit_parameter(&mut self, parameter: flat::View<'a, Parameter>) {
         // Step 1: Binding.
         // Bind, but intentionally avoid walking the annotation, as we handle it
         // upstream.
         self.add_binding(
-            &parameter.name,
+            parameter.name().as_str(),
             parameter.identifier(),
             BindingKind::Argument,
             BindingFlags::empty(),
@@ -2515,22 +2461,22 @@ impl<'a> Visitor<'a> for Checker<'a> {
         analyze::parameter(parameter, self);
     }
 
-    fn visit_pattern(&mut self, pattern: &'a Pattern) {
+    fn visit_pattern(&mut self, pattern: flat::View<'a, Pattern>) {
         // Step 1: Binding
-        if let Pattern::MatchAs(ast::PatternMatchAs {
+        if let fields::Pattern::MatchAs(fields::PatternMatchAs {
             name: Some(name), ..
         })
-        | Pattern::MatchStar(ast::PatternMatchStar {
+        | fields::Pattern::MatchStar(fields::PatternMatchStar {
             name: Some(name),
             range: _,
-            node_index: _,
+            node: _,
         })
-        | Pattern::MatchMapping(ast::PatternMatchMapping {
+        | fields::Pattern::MatchMapping(fields::PatternMatchMapping {
             rest: Some(name), ..
-        }) = pattern
+        }) = pattern.fields()
         {
             self.add_binding(
-                name,
+                name.as_str(),
                 name.range(),
                 BindingKind::Assignment,
                 BindingFlags::empty(),
@@ -2544,7 +2490,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         analyze::pattern(pattern, self);
     }
 
-    fn visit_body(&mut self, body: &'a [Stmt]) {
+    fn visit_body(&mut self, body: flat::Suite<'a>) {
         // Step 4: Analysis
         analyze::suite(body, self);
 
@@ -2554,23 +2500,23 @@ impl<'a> Visitor<'a> for Checker<'a> {
         }
     }
 
-    fn visit_match_case(&mut self, match_case: &'a MatchCase) {
-        self.visit_pattern(&match_case.pattern);
-        if let Some(expr) = &match_case.guard {
+    fn visit_match_case(&mut self, match_case: flat::View<'a, MatchCase>) {
+        self.visit_pattern(match_case.pattern());
+        if let Some(expr) = match_case.guard() {
             self.visit_boolean_test(expr);
         }
 
         self.semantic.push_branch();
-        self.visit_body(&match_case.body);
+        self.visit_body(match_case.body());
         self.semantic.pop_branch();
     }
 
-    fn visit_type_param(&mut self, type_param: &'a ast::TypeParam) {
+    fn visit_type_param(&mut self, type_param: flat::View<'a, ast::TypeParam>) {
         // Step 1: Binding
-        match type_param {
-            ast::TypeParam::TypeVar(ast::TypeParamTypeVar { name, .. })
-            | ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { name, .. })
-            | ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { name, .. }) => {
+        match type_param.fields() {
+            fields::TypeParam::TypeVar(fields::TypeParamTypeVar { name, .. })
+            | fields::TypeParam::TypeVarTuple(fields::TypeParamTypeVarTuple { name, .. })
+            | fields::TypeParam::ParamSpec(fields::TypeParamParamSpec { name, .. }) => {
                 self.add_binding(
                     name.as_str(),
                     name.range(),
@@ -2580,14 +2526,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }
         }
         // Step 2: Traversal
-        match type_param {
-            ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
-                bound,
-                default,
-                name: _,
-                range: _,
-                node_index: _,
-            }) => {
+        match type_param.classify() {
+            flat::TypeParamKind::TypeVar(type_param_type_var) => {
+                let bound = type_param_type_var.bound();
+                let default = type_param_type_var.default();
+
                 if let Some(expr) = bound {
                     self.visit
                         .type_param_definitions
@@ -2599,24 +2542,18 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         .push((expr, self.semantic.snapshot()));
                 }
             }
-            ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple {
-                default,
-                name: _,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::TypeParamKind::TypeVarTuple(type_param_type_var_tuple) => {
+                let default = type_param_type_var_tuple.default();
+
                 if let Some(expr) = default {
                     self.visit
                         .type_param_definitions
                         .push((expr, self.semantic.snapshot()));
                 }
             }
-            ast::TypeParam::ParamSpec(ast::TypeParamParamSpec {
-                default,
-                name: _,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::TypeParamKind::ParamSpec(type_param_param_spec) => {
+                let default = type_param_param_spec.default();
+
                 if let Some(expr) = default {
                     self.visit
                         .type_param_definitions
@@ -2628,7 +2565,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
     fn visit_interpolated_string_element(
         &mut self,
-        interpolated_string_element: &'a InterpolatedStringElement,
+        interpolated_string_element: flat::View<'a, InterpolatedStringElement>,
     ) {
         let snapshot = self.semantic.flags;
         if interpolated_string_element.is_interpolation() {
@@ -2641,7 +2578,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
 impl<'a> Checker<'a> {
     /// Visit a [`Module`].
-    fn visit_module(&mut self, python_ast: &'a Suite) {
+    fn visit_module(&mut self, python_ast: flat::Suite<'a>) {
         // Extract any global bindings from the module body.
         if let Some(globals) = Globals::from_body(python_ast) {
             self.semantic.set_globals(globals);
@@ -2651,7 +2588,11 @@ impl<'a> Checker<'a> {
 
     /// Visit a list of [`Comprehension`] nodes, assumed to be the comprehensions that compose a
     /// generator expression, like a list or set comprehension.
-    fn visit_generators(&mut self, kind: GeneratorKind, generators: &'a [Comprehension]) {
+    fn visit_generators(
+        &mut self,
+        kind: GeneratorKind,
+        generators: flat::NodeList<'a, Comprehension>,
+    ) {
         let mut iterator = generators.iter();
 
         let Some(generator) = iterator.next() else {
@@ -2687,28 +2628,26 @@ impl<'a> Checker<'a> {
         // Following Python's scoping rules, the `T` in `x=T` is thus evaluated in the outer scope,
         // while all subsequent reads and writes are evaluated in the inner scope. In particular,
         // `x` is local to `foo`, and the `T` in `y=T` skips the class scope when resolving.
-        self.visit_expr(&generator.iter);
+        self.visit_expr(generator.iter());
         self.semantic.push_scope(ScopeKind::Generator {
             kind,
-            is_async: generators
-                .iter()
-                .any(|comprehension| comprehension.is_async),
+            is_async: generators.iter().any(flat::View::<Comprehension>::is_async),
         });
 
-        self.visit_expr(&generator.target);
+        self.visit_expr(generator.target());
         self.semantic.flags = flags;
 
-        for expr in &generator.ifs {
+        for expr in generator.ifs() {
             self.visit_boolean_test(expr);
         }
 
         for generator in iterator {
-            self.visit_expr(&generator.iter);
+            self.visit_expr(generator.iter());
 
-            self.visit_expr(&generator.target);
+            self.visit_expr(generator.target());
             self.semantic.flags = flags;
 
-            for expr in &generator.ifs {
+            for expr in generator.ifs() {
                 self.visit_boolean_test(expr);
             }
         }
@@ -2726,7 +2665,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit a body of [`Stmt`] nodes within a type-checking block.
-    fn visit_type_checking_block(&mut self, body: &'a [Stmt]) {
+    fn visit_type_checking_block(&mut self, body: flat::Suite<'a>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::TYPE_CHECKING_BLOCK;
         self.visit_body(body);
@@ -2734,7 +2673,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as a runtime-evaluated type annotation.
-    fn visit_runtime_evaluated_annotation(&mut self, expr: &'a Expr) {
+    fn visit_runtime_evaluated_annotation(&mut self, expr: flat::View<'a, Expr>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::RUNTIME_EVALUATED_ANNOTATION;
         self.visit_type_definition(expr);
@@ -2742,7 +2681,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as a runtime-required type annotation.
-    fn visit_runtime_required_annotation(&mut self, expr: &'a Expr) {
+    fn visit_runtime_required_annotation(&mut self, expr: flat::View<'a, Expr>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::RUNTIME_REQUIRED_ANNOTATION;
         self.visit_type_definition(expr);
@@ -2750,7 +2689,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as a runtime-ambiguous type annotation.
-    fn visit_runtime_ambiguous_annotation(&mut self, expr: &'a Expr) {
+    fn visit_runtime_ambiguous_annotation(&mut self, expr: flat::View<'a, Expr>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::RUNTIME_AMBIGUOUS_ANNOTATION;
         self.visit_type_definition(expr);
@@ -2768,7 +2707,7 @@ impl<'a> Checker<'a> {
     /// ```
     ///
     /// [PEP 613]: https://peps.python.org/pep-0613/
-    fn visit_annotated_type_alias_value(&mut self, expr: &'a Expr) {
+    fn visit_annotated_type_alias_value(&mut self, expr: flat::View<'a, Expr>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::ANNOTATED_TYPE_ALIAS;
         self.visit_type_definition(expr);
@@ -2784,7 +2723,7 @@ impl<'a> Checker<'a> {
     /// ```
     ///
     /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
-    fn visit_deferred_type_alias_value(&mut self, expr: &'a Expr) {
+    fn visit_deferred_type_alias_value(&mut self, expr: flat::View<'a, Expr>) {
         let snapshot = self.semantic.flags;
         // even though we don't visit these nodes immediately we need to
         // modify the semantic flags before we push the expression and its
@@ -2797,7 +2736,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as a type definition.
-    fn visit_type_definition(&mut self, expr: &'a Expr) {
+    fn visit_type_definition(&mut self, expr: flat::View<'a, Expr>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
@@ -2805,7 +2744,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as _not_ a type definition.
-    fn visit_non_type_definition(&mut self, expr: &'a Expr) {
+    fn visit_non_type_definition(&mut self, expr: flat::View<'a, Expr>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags -= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
@@ -2813,7 +2752,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`Expr`], and treat it as the `typ` argument to `typing.cast`.
-    fn visit_cast_type_argument(&mut self, arg: &'a Expr) {
+    fn visit_cast_type_argument(&mut self, arg: flat::View<'a, Expr>) {
         self.visit_type_definition(arg);
 
         if !self.source_type.is_stub() && self.is_rule_enabled(Rule::RuntimeCastValue) {
@@ -2824,7 +2763,7 @@ impl<'a> Checker<'a> {
     /// Visit an [`Expr`], and treat it as a boolean test. This is useful for detecting whether an
     /// expressions return value is significant, or whether the calling context only relies on
     /// its truthiness.
-    fn visit_boolean_test(&mut self, expr: &'a Expr) {
+    fn visit_boolean_test(&mut self, expr: flat::View<'a, Expr>) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::BOOLEAN_TEST;
         self.visit_expr(expr);
@@ -2832,11 +2771,11 @@ impl<'a> Checker<'a> {
     }
 
     /// Visit an [`ElifElseClause`]
-    fn visit_elif_else_clause(&mut self, clause: &'a ElifElseClause) {
-        if let Some(test) = &clause.test {
+    fn visit_elif_else_clause(&mut self, clause: flat::View<'a, ElifElseClause>) {
+        if let Some(test) = clause.test() {
             self.visit_boolean_test(test);
         }
-        self.visit_body(&clause.body);
+        self.visit_body(clause.body());
     }
 
     /// Add a [`Binding`] to the current scope, bound to the given name.
@@ -2929,14 +2868,14 @@ impl<'a> Checker<'a> {
         binding_id
     }
 
-    fn handle_node_load(&mut self, expr: &'a Expr) {
-        let Expr::Name(expr) = expr else {
+    fn handle_node_load(&mut self, expr: flat::View<'a, Expr>) {
+        let Some(expr) = expr.as_name_expr() else {
             return;
         };
         self.semantic.resolve_load(expr);
     }
 
-    fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
+    fn handle_node_store(&mut self, id: &'a str, expr: flat::View<'_, Expr>) {
         let parent = self.semantic.current_statement();
 
         let mut flags = BindingFlags::empty();
@@ -2944,13 +2883,15 @@ impl<'a> Checker<'a> {
             flags.insert(BindingFlags::UNPACKED_ASSIGNMENT);
         }
 
-        match parent {
-            Stmt::TypeAlias(_) => flags.insert(BindingFlags::DEFERRED_TYPE_ALIAS),
+        match parent.classify() {
+            flat::StmtKind::TypeAlias(_) => flags.insert(BindingFlags::DEFERRED_TYPE_ALIAS),
             // TODO: It is a bit unfortunate that we do this check twice. Maybe we should change how
             // we visit this statement so the semantic flag for the type alias sticks around until
             // after we've handled this store, so we can check the flag instead of duplicating this check.
-            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. })
-                if self.semantic.match_typing_expr(annotation, "TypeAlias") =>
+            flat::StmtKind::AnnAssign(stmt_ann_assign)
+                if self
+                    .semantic
+                    .match_typing_expr(stmt_ann_assign.annotation(), "TypeAlias") =>
             {
                 flags.insert(BindingFlags::ANNOTATED_TYPE_ALIAS);
             }
@@ -2990,19 +2931,20 @@ impl<'a> Checker<'a> {
         }
 
         if id == "__lazy_modules__" && self.semantic.current_scope().kind.is_module() {
-            match parent {
-                Stmt::Assign(ast::StmtAssign { targets, value, .. })
-                    if let [Expr::Name(name)] = targets.as_slice()
-                        && name.id == id =>
+            match parent.classify() {
+                flat::StmtKind::Assign(stmt_assign)
+                    if let Some([expr]) = stmt_assign.targets().as_array()
+                        && let Some(name) = expr.as_name_expr()
+                        && name.id() == id =>
                 {
+                    let value = stmt_assign.value();
+
                     self.semantic.set_lazy_modules(value);
                 }
-                Stmt::AnnAssign(ast::StmtAnnAssign {
-                    target,
-                    value: Some(value),
-                    ..
-                }) if let Expr::Name(name) = target.as_ref()
-                    && name.id == id =>
+                flat::StmtKind::AnnAssign(stmt_ann_assign)
+                    if let Some(value) = stmt_ann_assign.value()
+                        && let Some(name) = stmt_ann_assign.target().as_name_expr()
+                        && name.id() == id =>
                 {
                     self.semantic.set_lazy_modules(value);
                 }
@@ -3013,10 +2955,10 @@ impl<'a> Checker<'a> {
         // Match the left-hand side of an annotated assignment without a value,
         // like `x` in `x: int`. N.B. In stub files, these should be viewed
         // as assignments on par with statements such as `x: int = 5`.
-        if matches!(
-            parent,
-            Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
-        ) && !self.semantic.in_annotation()
+        if parent
+            .as_ann_assign_stmt()
+            .is_some_and(|assign| assign.value().is_none())
+            && !self.semantic.in_annotation()
         {
             self.add_binding(id, expr.range(), BindingKind::Annotation, flags);
             return;
@@ -3045,10 +2987,11 @@ impl<'a> Checker<'a> {
         self.add_binding(id, expr.range(), BindingKind::Assignment, flags);
     }
 
-    fn handle_node_delete(&mut self, expr: &'a Expr) {
-        let Expr::Name(ast::ExprName { id, .. }) = expr else {
+    fn handle_node_delete(&mut self, expr: flat::View<'a, Expr>) {
+        let Some(name_node) = expr.as_name_expr() else {
             return;
         };
+        let id = name_node.id();
 
         self.semantic.resolve_del(id, expr.range());
 
@@ -3070,7 +3013,7 @@ impl<'a> Checker<'a> {
         scope.add(id, binding_id);
     }
 
-    fn is_typed_dict(&self, class_def: &ast::StmtClassDef) -> bool {
+    fn is_typed_dict(&self, class_def: flat::View<'_, ast::StmtClassDef>) -> bool {
         class::any_base_class(class_def, &self.semantic, |base| {
             let base = helpers::map_subscript(base);
             if self.semantic.match_typing_expr(base, "TypedDict") {
@@ -3085,9 +3028,9 @@ impl<'a> Checker<'a> {
                 return false;
             };
             matches!(
-                typing::find_binding_value(self.semantic.binding(binding_id), &self.semantic),
-                Some(Expr::Call(call))
-                    if self.semantic.match_typing_expr(&call.func, "TypedDict")
+                typing::find_binding_value(self.semantic.binding(binding_id), &self.semantic).map(flat::View::<Expr>::classify),
+                Some(flat::ExprKind::Call(call))
+                    if self.semantic.match_typing_expr(call.func(), "TypedDict")
             )
         })
     }
@@ -3115,10 +3058,10 @@ impl<'a> Checker<'a> {
             // Set this flag to avoid infinite recursion, or we'll just defer it again:
             self.semantic.flags |= SemanticModelFlags::DEFERRED_CLASS_BASE;
             // A forward base may only now identify this class as a `TypedDict`.
-            if let Stmt::ClassDef(class_def) = self.semantic.current_statement()
+            if let Some(class_def) = self.semantic.current_statement().as_class_def_stmt()
                 && class_def.keywords().iter().any(|keyword| {
-                    keyword.arg.as_ref().is_some_and(|arg| arg == "extra_items")
-                        && keyword.value.range() == expr.range()
+                    keyword.arg().is_some_and(|arg| arg == "extra_items")
+                        && keyword.value().range() == expr.range()
                 })
                 && self.is_typed_dict(class_def)
             {
@@ -3221,7 +3164,7 @@ impl<'a> Checker<'a> {
                     Ok(parsed_annotation) => {
                         self.parsed_type_annotation = Some(parsed_annotation);
 
-                        let annotation = string_expr.value.to_str();
+                        let annotation = string_expr.value().to_str();
                         let range = string_expr.range();
 
                         self.semantic.restore(snapshot);
@@ -3327,14 +3270,15 @@ impl<'a> Checker<'a> {
 
                 let stmt = self.semantic.current_statement();
 
-                let Stmt::FunctionDef(ast::StmtFunctionDef {
-                    body, parameters, ..
-                }) = stmt
-                else {
+                let Some(function_def_node) = stmt.as_function_def_stmt() else {
                     unreachable!("Expected Stmt::FunctionDef")
                 };
+                let body = function_def_node.body();
+                let parameters = function_def_node.parameters();
 
-                self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+                self.with_semantic_checker(|semantic, context| {
+                    semantic.visit_stmt(function_def_node.into(), context);
+                });
 
                 self.visit_parameters(parameters);
                 // Set the docstring state before visiting the function body.
@@ -3355,12 +3299,15 @@ impl<'a> Checker<'a> {
             for snapshot in lambdas {
                 self.semantic.restore(snapshot);
 
-                let Some(Expr::Lambda(ast::ExprLambda {
+                let Some(fields::Expr::Lambda(fields::ExprLambda {
                     parameters,
                     body,
                     range: _,
-                    node_index: _,
-                })) = self.semantic.current_expression()
+                    node: _,
+                })) = self
+                    .semantic
+                    .current_expression()
+                    .map(flat::View::<Expr>::fields)
                 else {
                     unreachable!("Expected Expr::Lambda");
                 };
@@ -3482,28 +3429,35 @@ impl<'a> Checker<'a> {
     ///
     /// This differs from [`SemanticModel::in_dunder_all_definition`], which is set only while
     /// adding bindings for the entries in `__all__`.
-    pub(crate) fn in_dunder_all_assignment(&self, parent: &Stmt) -> bool {
+    pub(crate) fn in_dunder_all_assignment(&self, parent: flat::View<'_, Stmt>) -> bool {
         if !self.semantic.current_scope().kind.is_module() {
             return false;
         }
 
-        match parent {
-            Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                if let Some(Expr::Name(ast::ExprName { id, .. })) = targets.first() {
+        match parent.classify() {
+            flat::StmtKind::Assign(stmt_assign) => {
+                let targets = stmt_assign.targets();
+
+                targets
+                    .first()
+                    .and_then(flat::View::as_name_expr)
+                    .is_some_and(|name| name.id() == "__all__")
+            }
+            flat::StmtKind::AugAssign(stmt_aug_assign) => {
+                let target = stmt_aug_assign.target();
+
+                if let Some(name_node_view) = target.as_name_expr() {
+                    let id = name_node_view.id();
                     id == "__all__"
                 } else {
                     false
                 }
             }
-            Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
-                if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
-                    id == "__all__"
-                } else {
-                    false
-                }
-            }
-            Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
-                if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
+            flat::StmtKind::AnnAssign(stmt_ann_assign) => {
+                let target = stmt_ann_assign.target();
+
+                if let Some(name_node_view) = target.as_name_expr() {
+                    let id = name_node_view.id();
                     id == "__all__"
                 } else {
                     false
@@ -3529,7 +3483,7 @@ impl<'a> ParsedAnnotationsCache<'a> {
 
     fn lookup_or_parse(
         &self,
-        annotation: &ast::ExprStringLiteral,
+        annotation: flat::View<'_, ast::ExprStringLiteral>,
         source: &str,
     ) -> Result<&'a ParsedAnnotation, &'a ParseError> {
         *self

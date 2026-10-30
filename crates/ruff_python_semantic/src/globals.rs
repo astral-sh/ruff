@@ -2,14 +2,15 @@
 //! as `global`. This module provides data structures for storing and querying the set of `global`
 //! names in a given scope.
 
+use ruff_python_ast::flat;
 use std::ops::Index;
 
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::Stmt;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 
 use ruff_index::{IndexVec, newtype_index};
-use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
+use ruff_python_ast::flat::statement_visitor::{StatementVisitor, walk_stmt};
 
 /// Id uniquely identifying the set of global names for a given scope.
 #[newtype_index]
@@ -42,7 +43,7 @@ pub struct Globals<'a>(FxHashMap<&'a str, TextRange>);
 impl<'a> Globals<'a> {
     /// Extracts the set of global names from a given scope, or return `None` if the scope does not
     /// contain any `global` declarations.
-    pub fn from_body(body: &'a [Stmt]) -> Option<Self> {
+    pub fn from_body(body: flat::Suite<'a>) -> Option<Self> {
         let mut builder = GlobalsVisitor::new();
         builder.visit_body(body);
         builder.finish()
@@ -72,18 +73,16 @@ impl<'a> GlobalsVisitor<'a> {
 }
 
 impl<'a> StatementVisitor<'a> for GlobalsVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::Global(ast::StmtGlobal {
-                names,
-                range: _,
-                node_index: _,
-            }) => {
+    fn visit_stmt(&mut self, stmt: flat::View<'a, Stmt>) {
+        match stmt.classify() {
+            flat::StmtKind::Global(stmt_global) => {
+                let names = stmt_global.names();
+
                 for name in names {
                     self.0.insert(name.as_str(), name.range());
                 }
             }
-            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
+            flat::StmtKind::FunctionDef(_) | flat::StmtKind::ClassDef(_) => {
                 // Don't recurse.
             }
             _ => walk_stmt(self, stmt),

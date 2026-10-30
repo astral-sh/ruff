@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 
-use ruff_python_ast::{self as ast, StringFlags};
+use ruff_python_ast::{self as ast, StringFlags, flat};
 use ruff_python_semantic::Definition;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -16,14 +16,14 @@ pub(crate) mod styles;
 pub(crate) struct Docstring<'a> {
     pub(crate) definition: &'a Definition<'a>,
     /// The literal AST node representing the docstring.
-    pub(crate) expr: &'a ast::StringLiteral,
+    pub(crate) expr: flat::View<'a, ast::StringLiteral>,
     /// The source file the docstring was defined in.
     pub(crate) source: &'a str,
 }
 
 impl<'a> Docstring<'a> {
     fn flags(&self) -> ast::StringLiteralFlags {
-        self.expr.flags
+        self.expr.flags()
     }
 
     /// The contents of the docstring, including the opening and closing quotes.

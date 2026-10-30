@@ -1,4 +1,4 @@
-use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
@@ -12,16 +12,17 @@ pub(crate) fn deferred_comprehensions(checker: &mut Checker) {
 
         let checker = &*checker;
 
-        let Some(generators) = checker
-            .semantic
-            .current_expression()
-            .and_then(|expr| match expr {
-                Expr::ListComp(comp) => Some(comp.generators.as_slice()),
-                Expr::SetComp(comp) => Some(comp.generators.as_slice()),
-                Expr::DictComp(comp) => Some(comp.generators.as_ref()),
-                Expr::Generator(generator) => Some(generator.generators.as_slice()),
-                _ => None,
-            })
+        let Some(generators) =
+            checker
+                .semantic
+                .current_expression()
+                .and_then(|expr| match expr.classify() {
+                    flat::ExprKind::ListComp(comp) => Some(comp.generators()),
+                    flat::ExprKind::SetComp(comp) => Some(comp.generators()),
+                    flat::ExprKind::DictComp(comp) => Some(comp.generators()),
+                    flat::ExprKind::Generator(generator) => Some(generator.generators()),
+                    _ => None,
+                })
         else {
             debug_assert!(false, "Expected a comprehension");
             continue;
