@@ -141,6 +141,34 @@ def render(child: Child):
     return child.items[0].upper()  # error: [unresolved-attribute]
 ```
 
+## A subclass shadows the attribute read by its metaclass
+
+`Leaf.values` is an integer, so the metaclass initializes `values` with a list of integers. Copying
+that list between `Base` and `Child` preserves its element type.
+
+```py
+class Meta(type):
+    def initialize(cls, leaf: "Leaf"):
+        cls.values = [leaf.values]
+
+class Base(metaclass=Meta):
+    @classmethod
+    def reset(cls, other: "Child"):
+        cls.values = other.values or [1]
+
+class Child(Base):
+    @classmethod
+    def copy_from(cls, other: Base, use_other: bool):
+        cls.values = other.values if use_other else []
+
+class Leaf(Child):
+    values = 1
+
+def render(child: Child):
+    # error: [unresolved-attribute] "Object of type `int` has no attribute `upper`"
+    return child.values[0].upper()
+```
+
 ## Writing an attribute initialized by a metaclass and a classmethod
 
 Here the classmethod initializes an empty list. The nested list supplied by the metaclass is another

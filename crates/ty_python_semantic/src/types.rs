@@ -4781,15 +4781,15 @@ impl<'db> Type<'db> {
         } else {
             own_class_member
         };
-        let inherited_class_member = || {
-            class.class_literal(db).class_member_from_mro(
-                db,
-                env,
-                name,
-                policy,
-                class.iter_mro(db).skip(1),
-            )
-        };
+        // Look up inherited bindings eagerly. They can participate in the metaclass's inference
+        // cycle even when the class's own binding shadows them.
+        let inherited_class_member = class.class_literal(db).class_member_from_mro(
+            db,
+            env,
+            name,
+            policy,
+            class.iter_mro(db).skip(1),
+        );
 
         let metaclass_member = if metaclass_member_is_implicit {
             Self::with_definedness(metaclass_member, Definedness::PossiblyUndefined)
@@ -4798,7 +4798,7 @@ impl<'db> Type<'db> {
         };
         let class_member = own_class_member
             .or_fall_back_to(db, env, || metaclass_member)
-            .or_fall_back_to(db, env, inherited_class_member);
+            .or_fall_back_to(db, env, || inherited_class_member);
         let class_member = if metaclass_member_is_implicit {
             // Preserve the existing convention that an inferred instance member is assumed to be
             // available even when no lower-precedence fallback exists.
