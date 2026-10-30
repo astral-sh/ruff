@@ -5498,6 +5498,17 @@ impl<'db> Type<'db> {
         (member, kind, error)
     }
 
+    /// Looks for a concrete `__set__` or `__delete__` method. A type such as `type[Any]`
+    /// can hold a data descriptor without declaring either method.
+    fn has_data_descriptor_method(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        matches!(self, Type::PropertyInstance(_) | Type::SlotDescriptor(_))
+            || ["__set__", "__delete__"].into_iter().any(|name| {
+                !self
+                    .class_member_with_policy(db, env, name, MemberLookupPolicy::REQUIRE_CONCRETE)
+                    .is_undefined()
+            })
+    }
+
     /// Returns whether this type is a data descriptor, i.e. defines `__set__` or `__delete__`.
     /// If this type is a union, requires all elements of union to be data descriptors.
     /// A directly dynamic type is treated as a data descriptor because it could inhabit one.
@@ -5580,7 +5591,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Dynamic(_) => !any_of_union,
             Type::SubclassOf(_) if self.dynamic_descriptor_type().is_some() => true,
-            Type::Never | Type::PropertyInstance(_) | Type::SlotDescriptor(_) => true,
+            Type::Never => true,
             Type::Union(union) if any_of_union => union
                 .elements(db)
                 .iter()
@@ -5601,26 +5612,7 @@ impl<'db> Type<'db> {
                 .unfold(db, env)
                 .map(|unfolded| unfolded.is_data_descriptor_impl(db, program, any_of_union))
                 .unwrap_or(!any_of_union),
-            _ => {
-                !self
-                    .class_member_with_policy(
-                        db,
-                        env,
-                        "__set__",
-                        MemberLookupPolicy::REQUIRE_CONCRETE,
-                    )
-                    .place
-                    .is_undefined()
-                    || !self
-                        .class_member_with_policy(
-                            db,
-                            env,
-                            "__delete__",
-                            MemberLookupPolicy::REQUIRE_CONCRETE,
-                        )
-                        .place
-                        .is_undefined()
-            }
+            _ => self.has_data_descriptor_method(db, env),
         }
     }
 
@@ -5997,7 +5989,7 @@ impl<'db> Type<'db> {
             key: MemberLookupKey<'db>,
             receiver: Option<Type<'db>>,
         ) -> MemberLookupResult<'db> {
-            fn promote_inferred_attribute_class_literals<'db>(
+            fn promote_attribute_class_literals<'db>(
                 db: &'db dyn Db,
                 env: &ProgramEnvironment<'db>,
                 result: MemberLookupResult<'db>,
@@ -6005,13 +5997,15 @@ impl<'db> Type<'db> {
                 let member = result
                     .unwrap_or_else(|error| error.fallback_member(db))
                     .member(db);
-                let should_promote = matches!(
-                    member.place,
-                    Place::Defined(DefinedPlace {
-                        origin: TypeOrigin::Inferred,
-                        ..
-                    })
-                ) && !member.qualifiers.contains(TypeQualifiers::FINAL);
+                let should_promote =
+                    (matches!(
+                        member.place,
+                        Place::Defined(DefinedPlace {
+                            origin: TypeOrigin::Inferred,
+                            ..
+                        })
+                    ) || member.qualifiers.contains(TypeQualifiers::NESTED_CLASS))
+                        && !member.qualifiers.contains(TypeQualifiers::FINAL);
 
                 if should_promote {
                     map_member_lookup_type(db, result, |ty| ty.promote_class_literals(db, env))
@@ -6073,12 +6067,12 @@ impl<'db> Type<'db> {
                 }
 
                 let result = this.fallback_to_getattr(db, env, name, result, key.policy(db));
-                // An inferred attribute accessed through an instance can resolve to an override
-                // on a subclass, so an exact class object is not a safe public type here.
+                // An inferred attribute or nested class accessed through an instance can resolve
+                // to an override on a subclass, so an exact class object is not a safe public type.
                 let result = map_member_lookup_type(db, result, |ty| {
                     ty.bind_self_typevars(db, env, receiver)
                 });
-                promote_inferred_attribute_class_literals(db, env, result)
+                promote_attribute_class_literals(db, env, result)
             }
 
             let program = key.program(db);
@@ -6786,7 +6780,7 @@ impl<'db> Type<'db> {
                     let result = if let Type::SubclassOf(subclass_of) = this
                         && subclass_of.exact_typevar_upper_bound(db, env).is_none()
                     {
-                        promote_inferred_attribute_class_literals(db, env, result)
+                        promote_attribute_class_literals(db, env, result)
                     } else {
                         result
                     };
@@ -11776,7 +11770,7 @@ impl std::fmt::Display for DynamicType<'_> {
 bitflags! {
     /// Type qualifiers from annotations or synthesized member metadata.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, Hash)]
-    pub struct TypeQualifiers: u8 {
+    pub struct TypeQualifiers: u16 {
         /// `typing.ClassVar`
         const CLASS_VAR = 1 << 0;
         /// `typing.Final`
@@ -11797,6 +11791,10 @@ bitflags! {
         /// `__getattr__` function. We need this in order to implement precedence of submodules
         /// over module-level `__getattr__`, for compatibility with other type checkers.
         const FROM_MODULE_GETATTR = 1 << 7;
+        /// An attribute defined by a nested class statement. It is read-only, but can be
+        /// overridden by a subclass of the nested class. Indirect reads expose `type[C]`
+        /// rather than the exact class object, since an override may supply the value.
+        const NESTED_CLASS = 1 << 8;
     }
 }
 
@@ -11829,8 +11827,9 @@ impl TypeQualifiers {
     /// Non-standard qualifiers are internal implementation details like
     /// `IMPLICIT_INSTANCE_ATTRIBUTE` and `FROM_MODULE_GETATTR`.
     pub fn is_non_standard(self) -> bool {
-        const NON_STANDARD: TypeQualifiers =
-            TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE.union(TypeQualifiers::FROM_MODULE_GETATTR);
+        const NON_STANDARD: TypeQualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE
+            .union(TypeQualifiers::FROM_MODULE_GETATTR)
+            .union(TypeQualifiers::NESTED_CLASS);
         self.intersects(NON_STANDARD)
     }
 }

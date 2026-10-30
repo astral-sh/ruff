@@ -4298,5 +4298,34 @@ class Explicit(String, Integer):
         return ""
 ```
 
+## Nested generic class attributes
+
+Accessing a nested class through the defining class retains the exact class object. Accessing a
+nested class through an instance or an unspecified subclass accounts for possible overrides.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Outer:
+    class Inner(Generic[T]): ...
+
+reveal_type(Outer.Inner)  # revealed: <class 'Inner'>
+
+def inspect(obj: Outer, cls: type[Outer]) -> None:
+    reveal_type(obj.Inner)  # revealed: type[Inner[Unknown]]
+    reveal_type(cls.Inner)  # revealed: type[Inner[Unknown]]
+```
+
+The nested class can be used in annotations, explicit specializations, and base classes.
+
+```py
+class Integer(Outer.Inner[int]): ...  # no diagnostic
+
+value: Outer.Inner[int] = Integer()  # no diagnostic
+reveal_type(Outer.Inner[int]())  # revealed: Inner[int]
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

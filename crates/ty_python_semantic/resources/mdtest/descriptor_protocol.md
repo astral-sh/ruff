@@ -243,6 +243,124 @@ reveal_type(C2().attr)  # revealed: Literal["non-data"] | bytes
 C2().attr = 1
 ```
 
+### Nested classes as data descriptors
+
+A nested class whose metaclass defines `__set__` or `__delete__` uses the descriptor protocol.
+Assigning through an instance calls the setter without replacing the nested class binding.
+
+```py
+class DescriptorMeta(type):
+    def __get__(cls, instance: object, owner: type | None = None) -> object:
+        return 1
+
+    def __set__(cls, instance: object, value: int) -> None: ...
+    def __delete__(cls, instance: object) -> None: ...
+
+class Base:
+    __slots__ = ()
+
+    class Inner(metaclass=DescriptorMeta): ...
+
+def check(obj: Base):
+    obj.Inner = 1  # no diagnostic
+    obj.Inner = "wrong"  # error: [invalid-assignment]
+    del obj.Inner  # no diagnostic
+
+Base.Inner = 1  # error: [invalid-assignment]
+del Base.Inner  # error: [invalid-assignment]
+```
+
+A receiver annotation does not override the descriptor's setter contract, including during
+initialization.
+
+```py
+class Child(Base):
+    def __init__(self):
+        self.Inner: object = 1  # no diagnostic
+
+    def invalid(self):
+        self.Inner: object = "wrong"  # error: [invalid-assignment]
+
+def check_child(obj: Child):
+    obj.Inner = 1  # no diagnostic
+    obj.Inner = "wrong"  # error: [invalid-assignment]
+```
+
+### Nested classes as metaclass data descriptors
+
+A nested data descriptor on a metaclass also governs writes and deletions on its class objects, even
+when they have their own nested class with the same name.
+
+```py
+class DescriptorMeta(type):
+    def __set__(cls, instance: object, value: int) -> None: ...
+    def __delete__(cls, instance: object) -> None: ...
+
+class Meta(type):
+    class Inner(metaclass=DescriptorMeta): ...
+
+class C(metaclass=Meta):
+    class Inner: ...
+
+C.Inner = 1  # no diagnostic
+C.Inner = "wrong"  # error: [invalid-assignment]
+del C.Inner  # no diagnostic
+```
+
+### Conditional nested descriptors
+
+A receiver annotation only governs the ordinary class alternative of a conditional nested class.
+Assignments must also satisfy the setter when the descriptor alternative is present.
+
+```py
+def flag() -> bool:
+    return True
+
+class Setter(type):
+    def __set__(cls, instance: object, value: int) -> None: ...
+
+class Base:
+    if flag():
+        class Inner(metaclass=Setter): ...
+
+    else:
+        class Inner: ...
+
+class Child(Base):
+    def __init__(self):
+        self.Inner: type[Base.Inner] = Base.Inner  # error: [invalid-assignment]
+
+def write(obj: Child):
+    obj.Inner = Base.Inner  # error: [invalid-assignment]
+    obj.Inner = 1  # error: [invalid-assignment]
+```
+
+### Conditional nested metaclass descriptors
+
+A class attribute can shadow the ordinary class alternative of a nested metaclass member. Writes
+still satisfy the descriptor alternative's setter as well as the class attribute's annotation.
+
+```py
+def flag() -> bool:
+    return True
+
+class Setter(type):
+    def __set__(cls, instance: object, value: int) -> None: ...
+
+class Meta(type):
+    if flag():
+        class Inner(metaclass=Setter): ...
+
+    else:
+        class Inner: ...
+
+class Outer(metaclass=Meta):
+    Inner: int | str = 1
+
+Outer.Inner = 1  # no diagnostic
+Outer.Inner = "wrong"  # error: [invalid-assignment]
+```
+
 ### Classes with unknown bases are not automatically descriptors
 
 When we cannot determine a class's base, we treat that base as `Unknown`. A `__get__` method written

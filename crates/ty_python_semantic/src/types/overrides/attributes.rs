@@ -161,12 +161,15 @@ fn unbound_member_contract<'db>(
     {
         return None;
     }
-    let mut class_member = owner.own_class_member(db, env, None, name).inner;
-    let instance_member = if kind != AttributeContractKind::Receiver
-        && matches!(
-            class_member.place.ignore_possibly_undefined(),
-            Some(Type::SlotDescriptor(_))
-        ) {
+    let mut class_member = if kind == AttributeContractKind::Receiver {
+        PlaceAndQualifiers::unbound()
+    } else {
+        owner.own_class_member(db, env, None, name).inner
+    };
+    let instance_member = if matches!(
+        class_member.ignore_possibly_undefined(),
+        Some(Type::SlotDescriptor(_))
+    ) {
         // A slot provides storage without replacing an inherited annotation:
         //
         // ```python
@@ -194,23 +197,18 @@ fn unbound_member_contract<'db>(
         Place::Defined(DefinedPlace { origin: TypeOrigin::Declared, provenance, .. })
             if provenance.definition().is_some_and(|definition| definition.place(db).is_member())
     );
-    if kind == AttributeContractKind::Receiver
-        || kind == AttributeContractKind::Inherited
-            && has_receiver_declaration
-            && !class_member.qualifiers.contains(TypeQualifiers::CLASS_VAR)
-            && class_member
-                .place
-                .ignore_possibly_undefined()
-                .is_none_or(|ty| {
-                    ty.class_member_with_policy(
-                        db,
-                        env,
-                        "__get__",
-                        MemberLookupPolicy::REQUIRE_CONCRETE,
-                    )
-                    .place
-                    .is_undefined()
-                })
+    // An annotation such as `type[Any]` permits values that act as descriptors, but it
+    // still declares a writable attribute unless its type supplies a descriptor method.
+    let has_descriptor_method = !class_member.is_class_var()
+        && class_member.ignore_possibly_undefined().is_some_and(|ty| {
+            !ty.class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
+                .is_undefined()
+                || ty.has_data_descriptor_method(db, env)
+        });
+    if kind == AttributeContractKind::Inherited
+        && has_receiver_declaration
+        && !class_member.is_class_var()
+        && !has_descriptor_method
     {
         // An unannotated default may inherit an ancestor's type. It must not hide the
         // receiver declaration when this class is compared with its own subclasses.
@@ -224,17 +222,7 @@ fn unbound_member_contract<'db>(
         return None;
     }
     let qualifiers = class_member.qualifiers | instance_member.qualifiers;
-    let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
-    let is_slot = matches!(own_place.ty, Type::SlotDescriptor(_));
-    let is_descriptor = !is_class_var
-        && !class_member.place.is_undefined()
-        && (is_slot
-            || own_place
-                .ty
-                .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
-                .place
-                .ignore_possibly_undefined()
-                .is_some());
+    let is_descriptor = has_descriptor_method && !qualifiers.contains(TypeQualifiers::CLASS_VAR);
     // Unannotated defaults with an inherited annotation already have a declared type.
     // Other inferred bindings do not define an independent write contract: their raw
     // types can retain literals that ordinary attribute access widens.
@@ -270,9 +258,10 @@ fn bind_attribute<'db>(
         is_method,
     } = *attribute;
     let qualifiers = class_member.qualifiers | instance_member.qualifiers;
+    let is_nested_class = qualifiers.contains(TypeQualifiers::NESTED_CLASS);
     let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
     let (read, write) = if is_descriptor {
-        let read = Type::resolve_descriptor_access(
+        let member = Type::resolve_descriptor_access(
             db,
             env,
             class_member,
@@ -281,15 +270,18 @@ fn bind_attribute<'db>(
             InstanceFallbackShadowsNonDataDescriptor::No,
         )
         .ok()?
-        .member(db)
-        .place
-        .ignore_possibly_undefined()?
-        .bind_self_typevars(db, env, receiver);
-        // Explicit `staticmethod(f)` and `classmethod(f)` assignments expose method
-        // signatures, just like decorated definitions; the function's identity can change.
-        let read = if is_method
+        .member(db);
+        let read = member
+            .place
+            .ignore_possibly_undefined()?
+            .bind_self_typevars(db, env, receiver);
+        let read = if member.qualifiers.contains(TypeQualifiers::NESTED_CLASS) {
+            read.promote_class_literals(db, env)
+        } else if is_method
             || matches!(ty, Type::KnownInstance(KnownInstanceType::MethodWrapper(_)))
         {
+            // Explicit `staticmethod(f)` and `classmethod(f)` assignments expose method
+            // signatures, just like decorated definitions; the function's identity can change.
             read.try_upcast_to_callable(db, env)?.to_type(db, env)
         } else {
             read
@@ -308,6 +300,11 @@ fn bind_attribute<'db>(
         // The selected declaration defines the contract, including inherited annotations.
         // Inferred instance assignments do not narrow a class-body declaration.
         let read = ty.bind_self_typevars(db, env, receiver);
+        let read = if is_nested_class {
+            read.promote_class_literals(db, env)
+        } else {
+            read
+        };
         (
             read,
             Some(
@@ -329,6 +326,7 @@ fn bind_attribute<'db>(
         // writability of these attributes.
         write: if owner.is_object(db)
             || qualifiers.contains(TypeQualifiers::FINAL)
+            || is_nested_class && !ty.is_data_descriptor(db, env)
             || !is_class_var && is_frozen
         {
             None
@@ -369,12 +367,7 @@ fn descriptor_write_domain<'db>(
     match descriptor_setter_domain(db, env, descriptor, receiver) {
         DescriptorSetterDomain::Known(ty) => Some(ty),
         DescriptorSetterDomain::Deferred => Some(Type::unknown()),
-        DescriptorSetterDomain::Missing
-            if descriptor.as_property_instance().is_some()
-                || descriptor.is_data_descriptor(db, env) =>
-        {
-            None
-        }
+        DescriptorSetterDomain::Missing if descriptor.has_data_descriptor_method(db, env) => None,
         DescriptorSetterDomain::Missing => Some(storage_type),
     }
 }
@@ -442,6 +435,26 @@ fn attribute_violation<'db>(
             source: source.read,
             target: target.read,
         });
+    }
+    // Nested class declarations also constrain class access. A property returning a compatible
+    // value on instances does not necessarily preserve the class-side operation.
+    if target.qualifiers.contains(TypeQualifiers::NESTED_CLASS)
+        && let (Some(source), Some(target)) = (
+            receiver
+                .to_meta_type(db, env)
+                .member(db, env, name)
+                .ignore_possibly_undefined(),
+            target_receiver
+                .to_meta_type(db, env)
+                .member(db, env, name)
+                .ignore_possibly_undefined(),
+        )
+    {
+        let source = source.promote_class_literals(db, env);
+        let target = target.promote_class_literals(db, env);
+        if !source.is_assignable_to(db, env, target) {
+            return Some(AttributeViolation::Read { source, target });
+        }
     }
     let write = target.write?;
     // A neutral dataclass-transform base explicitly permits frozen subclasses. Its

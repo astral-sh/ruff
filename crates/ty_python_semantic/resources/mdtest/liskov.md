@@ -2954,6 +2954,123 @@ error[invalid-attribute-override]: Invalid override of attribute `value`
   |     ^^^^^ Type `str` is not assignable to inherited type `int`
 ```
 
+## Nested class overrides
+
+A nested class is a read-only attribute. A subclass can override it with a subclass of the nested
+class, even when mutable attribute narrowing is rejected. An unrelated nested class remains an
+incompatible override.
+
+```toml
+[rules]
+invalid-mutable-override = "error"
+```
+
+```py
+class Base:
+    class Inner: ...
+
+class Compatible(Base):
+    class Inner(Base.Inner): ...  # no diagnostic
+
+class Incompatible(Base):
+    class Inner: ...  # error: [invalid-attribute-override]
+```
+
+Making the attribute writable preserves the operations promised by the read-only base.
+
+```py
+class Writable(Base):
+    Inner: type[Base.Inner] = Base.Inner  # no diagnostic
+```
+
+The override also preserves class access. A property returning a compatible class on instances does
+not satisfy that requirement, since accessing it on the class returns the property object.
+
+```py
+class PropertyOverride(Base):
+    @property
+    def Inner(self) -> type[Base.Inner]:  # error: [invalid-property-type-override]
+        return Base.Inner
+```
+
+## Overriding nested data descriptors
+
+An override preserves the setter contract of a nested class acting as a data descriptor, even when
+both getters return the same type.
+
+```py
+class IntSetter(type):
+    def __get__(cls, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(cls, instance: object, value: int) -> None: ...
+
+class StrSetter(type):
+    def __get__(cls, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(cls, instance: object, value: str) -> None: ...
+
+class Base:
+    class Inner(metaclass=IntSetter): ...
+
+class Child(Base):
+    class Inner(metaclass=StrSetter): ...  # error: [invalid-mutable-override]
+```
+
+## Overriding setter-only nested descriptors
+
+A nested class whose metaclass defines `__set__` but no `__get__` exposes the class object on reads.
+Overrides still preserve the setter's accepted values.
+
+```py
+class Setter(type):
+    def __set__(cls, instance: object, value: int) -> None: ...
+
+class Base:
+    class Inner(metaclass=Setter): ...
+
+class Replacement:
+    def __get__(self, instance: object, owner: type | None = None) -> type[Base.Inner]:
+        return Base.Inner
+
+    def __set__(self, instance: object, value: str) -> None: ...
+
+class Child(Base):
+    Inner: Replacement = Replacement()  # error: [invalid-mutable-override]
+
+def write(base: Base):
+    base.Inner = 1  # no diagnostic
+```
+
+A receiver annotation does not replace the setter contract of a descriptor stored on the class.
+
+```py
+class Annotated:
+    Inner: type[Base.Inner] = Base.Inner
+
+    def __init__(self):
+        self.Inner: type[Base.Inner]
+
+class AnnotatedChild(Annotated):
+    Inner: Replacement = Replacement()  # error: [invalid-mutable-override]
+```
+
+## Nested classes overriding writable attributes
+
+A nested class cannot replace a writable attribute: the override removes writes permitted by the
+base, even when its readable type is compatible.
+
+```py
+class Inner: ...
+
+class Base:
+    Nested: type[Inner]
+
+class ReadOnly(Base):
+    class Nested(Inner): ...  # error: [invalid-attribute-override]
+```
+
 ## Annotated attributes with class defaults
 
 A class-body default does not erase an annotation's contract. Both the default and a later instance
@@ -3114,6 +3231,29 @@ class Same(Base):
     shared: ClassVar[int]
 ```
 
+A subclass can redeclare an `Any` attribute as `type[Any]` and still assign class objects to it.
+
+```py
+class DataType:
+    kind: Any
+
+class ConcreteDataType(DataType):
+    kind: type[Any]  # no diagnostic
+
+def set_kind(obj: ConcreteDataType):
+    obj.kind = int  # no diagnostic
+```
+
+The attribute remains writable when its type also permits a descriptor with only a getter.
+
+```py
+class Getter:
+    def __get__(self, instance: object, owner: type) -> Any: ...
+
+class WithGetter(DataType):
+    kind: Getter | type[Any]  # no diagnostic
+```
+
 ## Property value types
 
 Read-only properties may narrow their result types. They cannot return an unrelated type, even when
@@ -3173,7 +3313,7 @@ contract of an inherited attribute or property. The same check applies when an a
 method.
 
 ```py
-from typing import Callable
+from typing import Any, Callable
 
 class PropertyBase:
     @property
@@ -3214,6 +3354,20 @@ class CallablePropertyBase:
 class CompatibleMethod(CallablePropertyBase):
     def value(self) -> int:  # no diagnostic
         return 1
+```
+
+A method cannot replace a writable attribute that accepts both class objects and other callables.
+
+```py
+class Domain:
+    dtype: type[Any] | Callable[..., Any]
+
+def replace(domain: Domain):
+    domain.dtype = object  # no diagnostic
+
+class Field(Domain):
+    def dtype(self, value: int) -> int:  # error: [invalid-mutable-override]
+        return value
 ```
 
 ## Decorators preserving method binding

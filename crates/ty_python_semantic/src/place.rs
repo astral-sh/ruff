@@ -1087,9 +1087,10 @@ impl<'db> PlaceAndQualifiers<'db> {
         self.qualifiers.contains(TypeQualifiers::NOT_REQUIRED)
     }
 
-    /// Returns `true` if the place has a `ReadOnly` type qualifier.
+    /// Returns `true` if the place has a `ReadOnly` qualifier or is a nested class.
     pub(crate) fn is_read_only(&self) -> bool {
-        self.qualifiers.contains(TypeQualifiers::READ_ONLY)
+        self.qualifiers
+            .intersects(TypeQualifiers::READ_ONLY | TypeQualifiers::NESTED_CLASS)
     }
 
     /// Returns `Some(…)` if the place is qualified with `typing.Final` without a specified type.
