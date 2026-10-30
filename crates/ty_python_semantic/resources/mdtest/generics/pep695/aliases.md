@@ -647,6 +647,73 @@ def _(x: MyList[int]):
     reveal_type(head(x))  # revealed: int
 ```
 
+A sibling argument can supply the element type for a list literal passed to an aliased parameter.
+Here, `value` widens the element type of `[n]` to `int | str`.
+
+```py
+def append[T](items: MyList[T], value: T) -> None:
+    items.append(value)
+
+def _(n: int, value: int | str):
+    append([n], value)  # no diagnostic
+```
+
+## Repeated type variables in an alias body
+
+Both occurrences of `T` participate in inference for the callback, whether the parameter uses
+`Pair[T]` or `tuple[T, T]`.
+
+```py
+from collections.abc import Callable, Sequence
+
+type Pair[T] = tuple[T, T]
+
+class First[T]:
+    def __call__(self, items: Sequence[T]) -> T:
+        return items[0]
+
+def apply_to_pair[T](fn: Callable[[T], T], pair: Pair[T]) -> None: ...
+def apply_to_tuple[T](fn: Callable[[T], T], pair: tuple[T, T]) -> None: ...
+
+items = [["text"]]
+apply_to_pair(First(), (items, items))  # no diagnostic
+apply_to_tuple(First(), (items, items))  # no diagnostic
+```
+
+## Unused alias parameters in call inference
+
+An argument of type `Ignore[T]` supplies no information about `T`. Passing `None` explicitly
+therefore has the same effect on inference for the callback as omitting the argument.
+
+```py
+from collections.abc import Callable, Sequence
+
+type Ignore[T] = None
+
+class First[T]:
+    def __call__(self, items: Sequence[T]) -> T:
+        return items[0]
+
+def apply[T](fn: Callable[[T], T], x: T, y: T, unused: Ignore[T] = None) -> None: ...
+
+values = [["text"]]
+apply(First(), values, values)  # no diagnostic
+apply(First(), values, values, None)  # no diagnostic
+```
+
+## An alias parameter used through a recursive reference
+
+The tuple branch of `Layer[int, T]` contains `Layer[T, list[int]]`, whose list branch is `list[T]`.
+The sibling argument supplies `int | str` as the element type of `[n]`.
+
+```py
+type Layer[A, B] = list[A] | tuple[Layer[B, list[A]]]
+
+def accept[T](value: Layer[int, T], sibling: T) -> None: ...
+def _(n: int, sibling: int | str):
+    accept(([n],), sibling)  # no diagnostic
+```
+
 ## Bidirectional type inference with union type aliases
 
 When a PEP 695 type alias expands to a union, bidirectional type inference should still work
