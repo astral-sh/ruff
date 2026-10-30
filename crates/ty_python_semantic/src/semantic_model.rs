@@ -19,13 +19,9 @@ use crate::Db;
 use crate::place::definitions::DefinitionResolution;
 use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::place::{
-    builtins_module_scope, class_body_implicit_symbol, implicit_builtins_symbol_scope,
-    loop_header_reachability, place_from_bindings,
+    builtins_module_scope, implicit_builtins_symbol_scope, loop_header_reachability,
 };
-use crate::place_load::{
-    ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolutionProcedure, PlaceLoadResolutionStep,
-    PlaceLoadSourceKind,
-};
+use crate::place_load::{ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolver, PlaceLoadSourceKind};
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
@@ -814,63 +810,43 @@ impl<'db> SemanticModel<'db> {
         };
         if let ast::Expr::Name(name) = receiver {
             let place_expr = PlaceExpr::from_expr_name(name);
-            let mut procedure = PlaceLoadResolutionProcedure::new(
+            let env = self.program_environment();
+            let resolver = PlaceLoadResolver::new(
                 self.db,
+                &env,
                 index,
                 scope.to_scope_id(self.db, self.file),
                 &place_expr,
                 PlaceLoadMode::AtExpression(name.into()),
+                None,
             );
-            while let Some(PlaceLoadResolutionStep::Source(source)) = procedure.next() {
-                match source.kind {
-                    PlaceLoadSourceKind::Bindings(bindings) => {
-                        let bound = place_from_bindings(
-                            self.db,
-                            &self.program_environment(),
-                            bindings.clone(),
-                        )
-                        .place
-                        .is_definitely_bound();
-                        add_bindings(bindings);
-                        if bound {
-                            break;
-                        }
-                    }
-                    PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => {
-                        let index = semantic_index(self.db, scope.program_file(self.db));
+            resolver.resolve(|source| match source.kind() {
+                PlaceLoadSourceKind::Bindings(bindings) => {
+                    add_bindings(bindings.clone());
+                }
+                PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => {
+                    let index = semantic_index(self.db, scope.program_file(self.db));
+                    add_bindings(
+                        index
+                            .use_def_map(scope.file_scope_id(self.db))
+                            .reachable_bindings(*id),
+                    );
+                }
+                PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ExplicitGlobalSymbol {
+                    file,
+                    name,
+                }) => {
+                    let index = semantic_index(self.db, *file);
+                    if let Some(id) = index.place_table(FileScopeId::global()).symbol_id(name) {
                         add_bindings(
                             index
-                                .use_def_map(scope.file_scope_id(self.db))
-                                .reachable_bindings(id),
+                                .use_def_map(FileScopeId::global())
+                                .reachable_symbol_bindings(id),
                         );
-                        break;
                     }
-                    PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ClassBodySymbol(name)) => {
-                        if class_body_implicit_symbol(self.db, &self.program_environment(), &name)
-                            .place
-                            .is_definitely_bound()
-                        {
-                            break;
-                        }
-                    }
-                    PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ExplicitGlobalSymbol {
-                        file,
-                        name,
-                    }) => {
-                        let index = semantic_index(self.db, file);
-                        if let Some(id) = index.place_table(FileScopeId::global()).symbol_id(&name)
-                        {
-                            add_bindings(
-                                index
-                                    .use_def_map(FileScopeId::global())
-                                    .reachable_symbol_bindings(id),
-                            );
-                        }
-                        break;
-                    }
-                    PlaceLoadSourceKind::Implicit(_) => break,
                 }
-            }
+                PlaceLoadSourceKind::Implicit(_) => {}
+            });
         } else {
             add_bindings(index.use_def_map(scope).bindings_at_use(use_id));
         }
