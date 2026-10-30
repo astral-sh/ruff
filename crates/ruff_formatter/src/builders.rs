@@ -386,14 +386,13 @@ where
     Context: FormatContext,
 {
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        let source_code = f.context().source_code();
+        let context = f.context();
+        let source_code = context.source_code();
         let slice = source_code.slice(self.range);
-        debug_assert_no_newlines(slice.text(source_code));
+        let text = slice.text(source_code);
+        debug_assert_no_newlines(text);
 
-        let text_width = TextWidth::from_text(
-            slice.text(source_code),
-            f.context().options().indent_width(),
-        );
+        let text_width = TextWidth::from_text(text, context.options().indent_width());
 
         f.write_element(FormatElement::SourceCodeSlice { slice, text_width });
 
