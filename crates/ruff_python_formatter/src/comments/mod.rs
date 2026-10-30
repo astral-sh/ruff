@@ -264,7 +264,7 @@ impl<'a> Comments<'a> {
     /// A false result guarantees that the node has none. A true result can also
     /// mean another node with comments set the same bit in the filter.
     #[inline]
-    fn may_have_comment(&self, node: impl Into<AnyNodeRef<'a>>) -> bool {
+    pub(crate) fn may_have_comment(&self, node: impl Into<AnyNodeRef<'a>>) -> bool {
         self.data.bloom_filter.might_contain(node.into())
     }
 
