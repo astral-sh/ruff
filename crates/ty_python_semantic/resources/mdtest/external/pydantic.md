@@ -1195,6 +1195,16 @@ Person(name=None, id=1)  # error: [invalid-argument-type]
 Person(id=1)  # error: [missing-argument]
 ```
 
+Quoting the annotation preserves the field's alias.
+
+```py
+class Quoted(BaseModel):
+    x: "Annotated[int, Field(alias='y')]"
+
+Quoted(y=1)  # no diagnostic
+Quoted(x=1)  # error: [missing-argument] "No argument provided for required parameter `y`"
+```
+
 Multiple `Field(...)` calls in `Annotated[...]` are merged:
 
 ```py
@@ -1228,8 +1238,9 @@ AliasField = Annotated[int, Field(default=0)]
 
 class ModelWithAliasField(BaseModel):
     value: AliasField
+    quoted: "AliasField"
 
-ModelWithAliasField()
+ModelWithAliasField()  # no diagnostic
 ```
 
 Field metadata is also collected through a generic alias, where the `Field(...)` default is carried
