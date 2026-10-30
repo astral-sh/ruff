@@ -250,7 +250,7 @@ impl<'db> Iterator for PlaceLoadResolutionProcedure<'db, '_> {
                     });
 
                     let source = self.constraints.source(
-                        PlaceLoadSourceKind::Bindings(bindings),
+                        PlaceLoadSourceKind::Bindings(enclosing_scope, bindings),
                         PlaceLoadSourceRole::Ordinary,
                         Some((
                             enclosing_scope,
@@ -453,7 +453,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
                         return (
                             Self::node_after_enclosing_scope(enclosing_scope.kind()),
                             Some(self.constraints.source(
-                                PlaceLoadSourceKind::Bindings(bindings),
+                                PlaceLoadSourceKind::Bindings(enclosing_file_scope, bindings),
                                 PlaceLoadSourceRole::Ordinary,
                                 Some((
                                     enclosing_file_scope,
@@ -550,7 +550,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
                 }
                 EnclosingSnapshotResult::FoundBindings(bindings) => {
                     return Some(self.constraints.source(
-                        PlaceLoadSourceKind::Bindings(bindings),
+                        PlaceLoadSourceKind::Bindings(FileScopeId::global(), bindings),
                         role,
                         Some((
                             FileScopeId::global(),
@@ -702,7 +702,7 @@ impl PlaceLoadSource<'_> {
 
 /// Describes how a source can supply a place's value.
 pub(crate) enum PlaceLoadSourceKind<'db> {
-    /// Bindings already selected for this load state.
+    /// The source scope and the bindings that reach this load in that scope.
     ///
     /// For an ordinary expression, these are the bindings that reach that point:
     ///
@@ -714,7 +714,7 @@ pub(crate) enum PlaceLoadSourceKind<'db> {
     ///
     /// An enclosing eager snapshot is likewise a point-in-time view. A deferred load instead
     /// selects all bindings reachable in its scope.
-    Bindings(BindingWithConstraintsIterator<'db, 'db>),
+    Bindings(FileScopeId, BindingWithConstraintsIterator<'db, 'db>),
     /// The whole place in the scope that owns it.
     ///
     /// A free-variable load in a lazy nested scope can observe any definition reachable for the
@@ -928,18 +928,18 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
 
                 let use_id = expr_ref.scoped_use_id(self.db, self.file);
                 Some((
-                    PlaceLoadSourceKind::Bindings(use_def.bindings_at_use(use_id)),
+                    PlaceLoadSourceKind::Bindings(scope, use_def.bindings_at_use(use_id)),
                     Some((scope, ConstraintKey::UseId(use_id))),
                 ))
             }
             PlaceLoadMode::AtNameSnapshot(snapshot) => Some((
-                PlaceLoadSourceKind::Bindings(use_def.bindings_at_snapshot(snapshot)),
+                PlaceLoadSourceKind::Bindings(scope, use_def.bindings_at_snapshot(snapshot)),
                 Some((scope, ConstraintKey::Snapshot(snapshot))),
             )),
             PlaceLoadMode::Deferred | PlaceLoadMode::StringAnnotation => {
                 let source = table
                     .place_id(place_expr)
-                    .map(|id| PlaceLoadSourceKind::Bindings(use_def.reachable_bindings(id)));
+                    .map(|id| PlaceLoadSourceKind::Bindings(scope, use_def.reachable_bindings(id)));
                 assert!(
                     source.is_some() || matches!(self.mode, PlaceLoadMode::StringAnnotation),
                     "Expected the place table to create a place for every valid PlaceExpr node"

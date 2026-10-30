@@ -20,8 +20,8 @@ use ty_module_resolver::ModuleName;
 use crate::frozen::{FrozenMap, FrozenSet};
 use crate::place::ScopedPlaceId;
 pub use crate::statement::{Statement, StatementNodeKey};
-use ast_ids::AstIds;
 pub use ast_ids::ExpressionNodeKey;
+use ast_ids::{AstIds, FileUseId};
 use builder::SemanticIndexBuilder;
 use definition::{Definition, DefinitionNodeKey, Definitions};
 use expression::Expression;
@@ -372,6 +372,29 @@ impl<'db> SemanticIndex<'db> {
         expression: ast::ExprRef<'_>,
     ) -> Option<ast_ids::ScopedUseId> {
         self.ast_ids.try_use_id(expression)
+    }
+
+    /// Declarations visible to a name use after name resolution has identified its owner.
+    /// Local and eager reads use the declarations retained at that point, if requested.
+    /// A closure can run later, so it can see any reachable declaration in the owner.
+    pub fn symbol_declarations_at_use(
+        &self,
+        name: &ast::ExprName,
+        owner: FileScopeId,
+    ) -> Option<DeclarationsIterator<'_, 'db>> {
+        let expression = ast::ExprRef::Name(name);
+        let scope = self.try_expression_scope_id(&expression)?;
+        let use_def = self.use_def_map(owner);
+        if self.is_eager_in(scope, owner) {
+            use_def.declarations_at_use(FileUseId {
+                scope,
+                id: self.try_expression_use_id(expression)?,
+            })
+        } else {
+            Some(
+                use_def.reachable_symbol_declarations(self.place_table(owner).symbol_id(&name.id)?),
+            )
+        }
     }
 
     /// Returns the place table for a specific scope.
@@ -785,6 +808,13 @@ impl<'db> SemanticIndex<'db> {
         self.has_future_annotations
     }
 
+    /// Whether a use in `scope` runs while its ancestor `owner` is executing.
+    fn is_eager_in(&self, scope: FileScopeId, owner: FileScopeId) -> bool {
+        self.ancestor_scopes(scope)
+            .take_while(|(ancestor, _)| *ancestor != owner)
+            .all(|(_, ancestor)| ancestor.is_eager())
+    }
+
     /// Returns
     /// * `NoLongerInEagerContext` if the nested scope is no longer in an eager context
     ///   (that is, not every scope that will be traversed is eager) and no lazy snapshots were found.
@@ -797,40 +827,27 @@ impl<'db> SemanticIndex<'db> {
         expr: PlaceExprRef,
         nested_scope: FileScopeId,
     ) -> EnclosingSnapshotResult<'_, 'db> {
-        for (ancestor_scope_id, ancestor_scope) in self.ancestor_scopes(nested_scope) {
-            if ancestor_scope_id == enclosing_scope {
-                break;
-            }
-            if !ancestor_scope.is_eager() {
-                if let PlaceExprRef::Symbol(symbol) = expr
-                    && let Some(place_id) =
-                        self.place_tables[enclosing_scope].symbol_id(symbol.name())
-                {
-                    let key = EnclosingSnapshotKey {
-                        enclosing_scope,
-                        enclosing_place: place_id.into(),
-                        nested_scope,
-                        nested_laziness: ScopeLaziness::Lazy,
-                    };
-                    if let Some(id) = self.enclosing_snapshots.get(&key) {
-                        return self.use_def_maps[enclosing_scope]
-                            .enclosing_snapshot(*id, key.nested_laziness);
-                    }
-                }
-                return EnclosingSnapshotResult::NoLongerInEagerContext;
-            }
-        }
+        let (nested_laziness, missing) = if self.is_eager_in(nested_scope, enclosing_scope) {
+            (ScopeLaziness::Eager, EnclosingSnapshotResult::NotFound)
+        } else if expr.is_symbol() {
+            (
+                ScopeLaziness::Lazy,
+                EnclosingSnapshotResult::NoLongerInEagerContext,
+            )
+        } else {
+            return EnclosingSnapshotResult::NoLongerInEagerContext;
+        };
         let Some(place_id) = self.place_tables[enclosing_scope].place_id(expr) else {
-            return EnclosingSnapshotResult::NotFound;
+            return missing;
         };
         let key = EnclosingSnapshotKey {
             enclosing_scope,
             enclosing_place: place_id,
             nested_scope,
-            nested_laziness: ScopeLaziness::Eager,
+            nested_laziness,
         };
         let Some(id) = self.enclosing_snapshots.get(&key) else {
-            return EnclosingSnapshotResult::NotFound;
+            return missing;
         };
         self.use_def_maps[enclosing_scope].enclosing_snapshot(*id, key.nested_laziness)
     }
@@ -1369,6 +1386,46 @@ mod tests {
             declaration.kind(&db),
             DefinitionKind::AnnotatedAssignment(_)
         );
+    }
+
+    #[test]
+    fn declarations_at_selected_uses_in_eager_scopes() {
+        let TestCase { db, file } = test_case(
+            "
+d: dict[str, int] = {}
+class First:
+    d
+    d['key'] = 1
+d: dict[str, str]
+class Second:
+    d
+    d['key'] = 'value'
+",
+        );
+        let file = program_file(&db, file);
+        let module = parsed_module(&db, file.python_file(&db)).load(&db);
+        let index = semantic_index(&db, file);
+        let owner = FileScopeId::global();
+        let declarations_at = |expr: &ast::Expr| {
+            index.symbol_declarations_at_use(expr.as_name_expr().unwrap(), owner)
+        };
+
+        // Both class bodies have the same sequence of local use IDs.
+        for [annotation, class] in module.suite().as_chunks::<2>().0 {
+            let body = &class.as_class_def_stmt().unwrap().body;
+            let read = &body[0].as_expr_stmt().unwrap().value;
+            assert!(declarations_at(read).is_none());
+
+            let write = &body[1].as_assign_stmt().unwrap().targets[0];
+            let receiver = &write.as_subscript_expr().unwrap().value;
+            let expected = index.expect_single_definition(annotation.as_ann_assign_stmt().unwrap());
+            assert_eq!(
+                declarations_at(receiver)
+                    .unwrap()
+                    .find_map(|decl| decl.declaration.definition()),
+                Some(expected),
+            );
+        }
     }
 
     #[test]

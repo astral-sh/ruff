@@ -259,7 +259,7 @@ use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
 use smallvec::SmallVec;
 use thin_vec::ThinVec;
 
-use crate::ast_ids::ScopedUseId;
+use crate::ast_ids::{FileUseId, ScopedUseId};
 use crate::definition::{Definition, DefinitionCategory, DefinitionState};
 use crate::frozen::FrozenMap;
 use crate::member::ScopedMemberId;
@@ -686,6 +686,9 @@ impl PredicateNarrowingTargets {
 struct UseDefMapExtra {
     /// [`Bindings`] reaching a [`ScopedUseId`].
     bindings_by_use: FrozenIndexVec<ScopedUseId, InternedBindingsId>,
+
+    /// Declarations retained for selected name uses. An eager use may be in a nested scope.
+    declarations_by_use: ThinVec<(FileUseId, InternedDeclarationsId)>,
 
     /// Bindings before an `if` chain, for uses in its final `elif` condition.
     if_chain_start_by_use: FrozenMap<ScopedUseId, InternedBindingsId>,
@@ -1226,6 +1229,18 @@ impl<'db> UseDefMap<'db> {
             self.retained_declarations_at_binding(binding),
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
+    }
+
+    pub(super) fn declarations_at_use(
+        &self,
+        use_id: FileUseId,
+    ) -> Option<DeclarationsIterator<'_, 'db>> {
+        let entries = &self.extra.as_deref()?.declarations_by_use;
+        let index = entries.binary_search_by_key(&use_id, |&(id, _)| id).ok()?;
+        Some(self.declarations_iterator(
+            &self.interned_declarations[entries[index].1],
+            BoundnessAnalysis::BasedOnUnboundVisibility,
+        ))
     }
 
     /// Imports that may contribute a `Final` qualifier at this binding.
@@ -2072,6 +2087,8 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Live bindings at each so-far-recorded use.
     bindings_by_use: IndexVec<ScopedUseId, Bindings>,
 
+    declarations_by_use: ThinVec<(FileUseId, Declarations)>,
+
     /// Live bindings associated with each so-far-recorded use.
     ///
     /// Unlike `bindings_by_use`, this field supports associating multiple bindings with a
@@ -2146,6 +2163,7 @@ impl<'db> UseDefMapBuilder<'db> {
             reachability_constraints: ReachabilityConstraintsBuilder::default(),
             narrowing_constraints: NarrowingConstraintsBuilder::default(),
             bindings_by_use: IndexVec::new(),
+            declarations_by_use: ThinVec::new(),
             multi_bindings_by_use: FxHashMap::default(),
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             range_reachability: Vec::new(),
@@ -2774,6 +2792,22 @@ impl<'db> UseDefMapBuilder<'db> {
         );
     }
 
+    pub(super) fn record_declarations_at_use(&mut self, use_id: FileUseId, symbol: ScopedSymbolId) {
+        let state = self.pending_reachability.materialize_ref_at_use(
+            &mut self.symbol_states[symbol],
+            self.pending_reachability.current,
+            &mut self.reachability_constraints,
+        );
+        let declarations = state.declarations();
+        if declarations.iter().any(|declaration| {
+            declaration.declaration() != ScopedDefinitionId::UNBOUND
+                && !declaration.is_imported_qualifier()
+        }) {
+            self.declarations_by_use
+                .push((use_id, declarations.clone()));
+        }
+    }
+
     pub(super) fn record_use(&mut self, place: ScopedPlaceId, use_id: ScopedUseId) {
         if let Some(snapshot) = &mut self.if_chain_start {
             let state = match place {
@@ -3192,6 +3226,14 @@ impl<'db> UseDefMapBuilder<'db> {
         );
         let bindings_by_use =
             Self::intern_bindings_by_use(self.bindings_by_use, &mut place_state_interner);
+        let mut declarations_by_use = ThinVec::with_capacity(self.declarations_by_use.len());
+        for (use_id, declarations) in self.declarations_by_use {
+            declarations_by_use.push((
+                use_id,
+                place_state_interner.intern_declarations(declarations),
+            ));
+        }
+        declarations_by_use.sort_unstable_by_key(|&(id, _)| id);
         let if_chain_start_by_use = FrozenMap::from_entries(
             self.if_chain_start_by_use
                 .into_iter()
@@ -3271,6 +3313,7 @@ impl<'db> UseDefMapBuilder<'db> {
         // source order. Sort the recorded IDs so root membership can use binary search.
         boolean_test_roots.sort_unstable();
         let extra = (!bindings_by_use.is_empty()
+            || !declarations_by_use.is_empty()
             || !member_states.is_empty()
             || !enclosing_snapshots.is_empty()
             || !loop_headers.is_empty()
@@ -3278,6 +3321,7 @@ impl<'db> UseDefMapBuilder<'db> {
         .then(|| {
             Box::new(UseDefMapExtra {
                 bindings_by_use: bindings_by_use.into(),
+                declarations_by_use,
                 if_chain_start_by_use,
                 multi_bindings_by_use,
                 member_states,
