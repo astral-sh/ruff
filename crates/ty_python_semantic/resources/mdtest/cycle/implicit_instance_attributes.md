@@ -120,6 +120,68 @@ def check(child: Child):
     values.upper()  # error: [unresolved-attribute]
 ```
 
+## Reading an attribute initialized by a metaclass and a classmethod
+
+The inherited classmethod can initialize `items` to a list containing an empty list. Reading that
+element through an instance must account for the possibility that it has no `upper` method.
+
+```py
+class Meta(type):
+    def copy_defaults(cls, source: "type[Child] | None" = None):
+        cls.items = source.items if source else []
+
+class Base(metaclass=Meta):
+    @classmethod
+    def reset(cls, source: "Child | None" = None):
+        cls.items = source.items if source else [[]]
+
+class Child(Base): ...
+
+def render(child: Child):
+    return child.items[0].upper()  # error: [unresolved-attribute]
+```
+
+## Writing an attribute initialized by a metaclass and a classmethod
+
+Here the classmethod initializes an empty list. The nested list supplied by the metaclass is another
+possible value, so an instance can also store a list of integers.
+
+```py
+class Meta(type):
+    def copy_defaults(cls, source: "type[Child] | None" = None):
+        cls.items = source.items if source else [[]]
+
+class Base(metaclass=Meta):
+    @classmethod
+    def reset(cls, source: "Child | None" = None):
+        cls.items = source.items if source else []
+
+class Child(Base): ...
+
+def fill(child: Child):
+    child.items = [42]  # no diagnostic
+```
+
+## An attribute declaration incompatible with a metaclass assignment
+
+The classmethod copies the declared list of integers. The metaclass wraps it in another list, which
+is incompatible with the declaration.
+
+```py
+class Meta(type):
+    def wrap(cls, source: "Child"):
+        cls.items = [source.items]
+
+class Base(metaclass=Meta):
+    items: list[int]  # error: [invalid-assignment]
+
+    @classmethod
+    def copy_from(cls, source: "Child"):
+        cls.items = source.items
+
+class Child(Base): ...
+```
+
 ## Assigning a bound method in a loop
 
 Loop narrowing preserves a bound method's receiver type when inferring an implicit attribute,

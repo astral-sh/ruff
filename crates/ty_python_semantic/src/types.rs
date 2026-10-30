@@ -4732,21 +4732,22 @@ impl<'db> Type<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        let class_attr = || {
-            self.find_name_in_mro_with_policy(db, env, name, policy)
-                .expect("The meta-type of an instance-like type should always have an MRO")
-        };
+        // Metaclass assignments can read this same attribute through a subclass. Resolve the
+        // class member first so that recursive inference sees the bindings in the class hierarchy.
+        let class_attr = self
+            .find_name_in_mro_with_policy(db, env, name, policy)
+            .expect("The meta-type of an instance-like type should always have an MRO");
         let Some(metaclass) = class
             .inferred_metaclass(db)
             .for_inheritance(db, env)
             .to_instance_approximation(db, env)
             .and_then(|metaclass| metaclass.nominal_class(db, env))
         else {
-            return class_attr();
+            return class_attr;
         };
         let metaclass_member = metaclass.instance_member(db, env, name);
         if metaclass_member.is_undefined() {
-            return class_attr();
+            return class_attr;
         }
         let metaclass_member_is_implicit = metaclass_member
             .qualifiers

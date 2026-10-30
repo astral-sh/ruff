@@ -138,10 +138,6 @@ impl MemberNameHints {
     pub(super) fn may_be_implicit(&self, name: &str) -> bool {
         self.implicit & Self::bit(name) != 0
     }
-
-    pub(super) fn may_be_augmented(&self, name: &str) -> bool {
-        self.augmented & Self::bit(name) != 0
-    }
 }
 
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
