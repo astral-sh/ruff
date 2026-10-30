@@ -107,3 +107,10 @@ def handler4(x: str = Depends(get_x)): ...  # noqa: FAST002
 
 @app.get("/test5")
 def handler5(d: str = Depends(get_one), e: str = Depends(get_two)): ...
+
+
+@app.get("/test6")
+def handler6(
+    d: str = Depends(get_one),  # noqa: FAST002
+    e: str = Depends(get_two),
+): ...
