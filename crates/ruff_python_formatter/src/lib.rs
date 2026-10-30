@@ -56,9 +56,14 @@ where
     for<'a> AnyNodeRef<'a>: From<&'a N>,
 {
     fn fmt(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        let comments = f.context().comments().clone();
-
         let node_ref = AnyNodeRef::from(node);
+        let comments = f.context().comments();
+        if !f.options().source_map_generation().is_enabled() && !comments.may_have_comment(node_ref)
+        {
+            return self.fmt_fields(node, f);
+        }
+
+        let comments = comments.clone();
         let node_comments = comments.leading_dangling_trailing(node_ref);
 
         leading_comments(node_comments.leading).fmt(f)?;
