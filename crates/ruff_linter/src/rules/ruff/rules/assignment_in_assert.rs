@@ -69,7 +69,7 @@ pub(crate) fn assignment_in_assert(checker: &Checker, binding: &Binding) {
 
     let Some(parent_expression) = binding
         .expression(semantic)
-        .and_then(|expr| expr.as_named_expr())
+        .and_then(ruff_python_ast::flat::View::as_named_expr)
     else {
         return;
     };

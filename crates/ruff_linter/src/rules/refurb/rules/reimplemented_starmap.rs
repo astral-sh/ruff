@@ -2,7 +2,8 @@ use anyhow::{Result, bail};
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::helpers::any_over_expr;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
@@ -70,7 +71,7 @@ impl Violation for ReimplementedStarmap {
 /// FURB140
 pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate) {
     // Generator should have exactly one comprehension.
-    let [comprehension] = target.generators() else {
+    let Some([comprehension]) = target.generators().as_array() else {
         return;
     };
 
@@ -100,28 +101,30 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
     match value {
         // Ex) `f(*x) for x in iter`
         ComprehensionTarget::Name(name) => {
-            let [arg] = args else {
+            let Some([arg]) = args.as_array() else {
                 return;
             };
 
-            let Expr::Starred(ast::ExprStarred { value, .. }) = arg else {
+            let flat::ExprKind::Starred(starred) = arg.classify() else {
                 return;
             };
+            let value = starred.value();
 
-            if ComparableExpr::from(value.as_ref()) != ComparableExpr::from(name) {
+            if ComparableExpr::from(value) != ComparableExpr::from(name) {
                 return;
             }
 
             // If the argument is used outside the function call, we can't replace it.
             if any_over_expr(func, |expr| {
-                expr.as_name_expr().is_some_and(|expr| expr.id == name.id)
+                expr.as_name_expr()
+                    .is_some_and(|expr| expr.id() == name.id())
             }) {
                 return;
             }
         }
         // Ex) `f(x, y, z) for x, y, z in iter`
         ComprehensionTarget::Tuple(tuple) => {
-            if tuple.len() != args.len()
+            if tuple.elts().len() != args.len()
                 || std::iter::zip(tuple, args)
                     .any(|(x, y)| ComparableExpr::from(x) != ComparableExpr::from(y))
             {
@@ -154,7 +157,7 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
         let main_edit = Edit::range_replacement(
             target.try_make_suggestion(
                 Name::from(starmap_name),
-                &comprehension.iter,
+                comprehension.iter(),
                 func,
                 checker,
             )?,
@@ -178,25 +181,25 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
 /// An enum for a node that can be considered a candidate for replacement with `starmap`.
 #[derive(Debug)]
 pub(crate) enum StarmapCandidate<'a> {
-    Generator(&'a ast::ExprGenerator),
-    ListComp(&'a ast::ExprListComp),
-    SetComp(&'a ast::ExprSetComp),
+    Generator(flat::View<'a, ast::ExprGenerator>),
+    ListComp(flat::View<'a, ast::ExprListComp>),
+    SetComp(flat::View<'a, ast::ExprSetComp>),
 }
 
-impl<'a> From<&'a ast::ExprGenerator> for StarmapCandidate<'a> {
-    fn from(generator: &'a ast::ExprGenerator) -> Self {
+impl<'a> From<flat::View<'a, ast::ExprGenerator>> for StarmapCandidate<'a> {
+    fn from(generator: flat::View<'a, ast::ExprGenerator>) -> Self {
         Self::Generator(generator)
     }
 }
 
-impl<'a> From<&'a ast::ExprListComp> for StarmapCandidate<'a> {
-    fn from(list_comp: &'a ast::ExprListComp) -> Self {
+impl<'a> From<flat::View<'a, ast::ExprListComp>> for StarmapCandidate<'a> {
+    fn from(list_comp: flat::View<'a, ast::ExprListComp>) -> Self {
         Self::ListComp(list_comp)
     }
 }
 
-impl<'a> From<&'a ast::ExprSetComp> for StarmapCandidate<'a> {
-    fn from(set_comp: &'a ast::ExprSetComp) -> Self {
+impl<'a> From<flat::View<'a, ast::ExprSetComp>> for StarmapCandidate<'a> {
+    fn from(set_comp: flat::View<'a, ast::ExprSetComp>) -> Self {
         Self::SetComp(set_comp)
     }
 }
@@ -213,20 +216,20 @@ impl Ranged for StarmapCandidate<'_> {
 
 impl StarmapCandidate<'_> {
     /// Return the generated element for the candidate.
-    fn element(&self) -> &Expr {
+    fn element(&self) -> flat::View<'_, Expr> {
         match self {
-            Self::Generator(generator) => generator.elt.as_ref(),
-            Self::ListComp(list_comp) => list_comp.elt.as_ref(),
-            Self::SetComp(set_comp) => set_comp.elt.as_ref(),
+            Self::Generator(generator) => generator.elt(),
+            Self::ListComp(list_comp) => list_comp.elt(),
+            Self::SetComp(set_comp) => set_comp.elt(),
         }
     }
 
     /// Return the generator comprehensions for the candidate.
-    fn generators(&self) -> &[ast::Comprehension] {
+    fn generators(&self) -> flat::NodeList<'_, ast::Comprehension> {
         match self {
-            Self::Generator(generator) => generator.generators.as_slice(),
-            Self::ListComp(list_comp) => list_comp.generators.as_slice(),
-            Self::SetComp(set_comp) => set_comp.generators.as_slice(),
+            Self::Generator(generator) => generator.generators(),
+            Self::ListComp(list_comp) => list_comp.generators(),
+            Self::SetComp(set_comp) => set_comp.generators(),
         }
     }
 
@@ -234,8 +237,8 @@ impl StarmapCandidate<'_> {
     fn try_make_suggestion(
         &self,
         name: Name,
-        iter: &Expr,
-        func: &Expr,
+        iter: flat::View<'_, Expr>,
+        func: flat::View<'_, Expr>,
         checker: &Checker,
     ) -> Result<String> {
         match self {
@@ -283,8 +286,8 @@ impl StarmapCandidate<'_> {
 /// Try constructing the call to `itertools.starmap` and wrapping it with the given builtin.
 fn try_construct_call(
     name: Name,
-    iter: &Expr,
-    func: &Expr,
+    iter: flat::View<'_, Expr>,
+    func: flat::View<'_, Expr>,
     builtin: Name,
     checker: &Checker,
 ) -> Result<String> {
@@ -310,23 +313,27 @@ fn try_construct_call(
 }
 
 /// Construct the call to `itertools.starmap` for suggestion.
-fn construct_starmap_call(starmap_binding: Name, iter: &Expr, func: &Expr) -> ast::ExprCall {
+fn construct_starmap_call(
+    starmap_binding: Name,
+    iter: flat::View<'_, Expr>,
+    func: flat::View<'_, Expr>,
+) -> ast::ExprCall {
     let starmap = ast::ExprName {
         id: starmap_binding,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     ast::ExprCall {
         func: Box::new(starmap.into()),
         arguments: ast::Arguments {
-            args: [func.clone(), iter.clone()].into(),
+            args: [func, iter].map(flat::View::to_owned_node).into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         },
         range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     }
 }
 
@@ -336,7 +343,7 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: Name) -> ast::ExprCall {
         id: func_name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     ast::ExprCall {
         func: Box::new(name.into()),
@@ -344,42 +351,44 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: Name) -> ast::ExprCall {
             args: [call.into()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         },
         range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     }
 }
 
 #[derive(Debug)]
 enum ComprehensionTarget<'a> {
     /// E.g., `(x, y, z, ...)` in `(x, y, z, ...) in iter`.
-    Tuple(&'a ast::ExprTuple),
+    Tuple(flat::View<'a, ast::ExprTuple>),
     /// E.g., `x` in `x in iter`.
-    Name(&'a ast::ExprName),
+    Name(flat::View<'a, ast::ExprName>),
 }
 
 /// Extract the target from the comprehension (e.g., `(x, y, z)` in `(x, y, z, ...) in iter`).
 fn match_comprehension_target(
-    comprehension: &ast::Comprehension,
+    comprehension: flat::View<'_, ast::Comprehension>,
 ) -> Option<ComprehensionTarget<'_>> {
-    if comprehension.is_async || !comprehension.ifs.is_empty() {
+    if comprehension.is_async() || !comprehension.ifs().is_empty() {
         return None;
     }
-    match &comprehension.target {
-        Expr::Tuple(tuple) => Some(ComprehensionTarget::Tuple(tuple)),
-        Expr::Name(name) => Some(ComprehensionTarget::Name(name)),
+    match comprehension.target().classify() {
+        flat::ExprKind::Tuple(tuple) => Some(ComprehensionTarget::Tuple(tuple)),
+        flat::ExprKind::Name(name) => Some(ComprehensionTarget::Name(name)),
         _ => None,
     }
 }
 
 /// Match that the given expression is `func(x, y, z, ...)`.
-fn match_call(element: &Expr) -> Option<(&[Expr], &Expr)> {
-    let ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
-    } = element.as_call_expr()?;
+fn match_call(
+    element: flat::View<'_, Expr>,
+) -> Option<(flat::NodeList<'_, Expr>, flat::View<'_, Expr>)> {
+    let expr_call = element.as_call_expr()?;
+    let func = expr_call.func();
+    let arguments = expr_call.arguments();
+    let args = arguments.args();
+    let keywords = arguments.keywords();
 
     if !keywords.is_empty() {
         return None;

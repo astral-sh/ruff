@@ -4,7 +4,8 @@ use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{Fix, FixAvailability, Violation};
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::StmtClassDef;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields as ast;
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -50,13 +51,18 @@ impl Violation for UselessClassMetaclassType {
 }
 
 /// UP050
-pub(crate) fn useless_class_metaclass_type(checker: &Checker, class_def: &StmtClassDef) {
-    let Some(arguments) = class_def.arguments.as_deref() else {
+pub(crate) fn useless_class_metaclass_type(checker: &Checker, class_def: &ast::StmtClassDef<'_>) {
+    let Some(arguments) = class_def.arguments else {
         return;
     };
 
-    for keyword in &arguments.keywords {
-        if let (Some("metaclass"), expr) = (keyword.arg.as_deref(), &keyword.value) {
+    for keyword in arguments.keywords() {
+        if let (Some("metaclass"), expr) = (
+            keyword
+                .arg()
+                .map(flat::View::<ruff_python_ast::Identifier>::as_str),
+            keyword.value(),
+        ) {
             if checker.semantic().match_builtin_expr(expr, "type") {
                 let mut diagnostic = checker.report_diagnostic(
                     UselessClassMetaclassType {
@@ -67,7 +73,7 @@ pub(crate) fn useless_class_metaclass_type(checker: &Checker, class_def: &StmtCl
 
                 diagnostic.try_set_fix(|| {
                     let edit = remove_argument(
-                        keyword,
+                        &keyword,
                         arguments,
                         Parentheses::Remove,
                         checker.locator().contents(),

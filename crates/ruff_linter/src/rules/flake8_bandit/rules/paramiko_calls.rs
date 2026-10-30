@@ -1,4 +1,5 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -39,7 +40,7 @@ impl Violation for ParamikoCall {
 }
 
 /// S601
-pub(crate) fn paramiko_call(checker: &Checker, func: &Expr) {
+pub(crate) fn paramiko_call(checker: &Checker, func: flat::View<'_, Expr>) {
     if checker
         .semantic()
         .resolve_qualified_name(func)

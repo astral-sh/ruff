@@ -1,4 +1,5 @@
 use ruff_python_ast::Stmt;
+use ruff_python_ast::flat;
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::UniversalNewlines;
@@ -9,7 +10,7 @@ use crate::rules::isort::types::TrailingComma;
 
 /// Return `true` if a `Stmt::ImportFrom` statement ends with a magic
 /// trailing comma.
-pub(super) fn trailing_comma(stmt: &Stmt, tokens: &Tokens) -> TrailingComma {
+pub(super) fn trailing_comma(stmt: flat::View<'_, Stmt>, tokens: &Tokens) -> TrailingComma {
     let mut count = 0u32;
     let mut trailing_comma = TrailingComma::Absent;
     for token in tokens.in_range(stmt.range()) {
@@ -33,7 +34,7 @@ pub(super) fn trailing_comma(stmt: &Stmt, tokens: &Tokens) -> TrailingComma {
 }
 
 /// Return `true` if a [`Stmt`] is preceded by a "comment break"
-pub(super) fn has_comment_break(stmt: &Stmt, locator: &Locator) -> bool {
+pub(super) fn has_comment_break(stmt: flat::View<'_, Stmt>, locator: &Locator) -> bool {
     // Starting from the `Stmt` (`def f(): pass`), we want to detect patterns like
     // this:
     //

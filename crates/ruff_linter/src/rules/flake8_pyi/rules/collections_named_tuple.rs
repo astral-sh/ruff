@@ -1,4 +1,5 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
@@ -52,7 +53,7 @@ impl Violation for CollectionsNamedTuple {
 }
 
 /// PYI024
-pub(crate) fn collections_named_tuple(checker: &Checker, expr: &Expr) {
+pub(crate) fn collections_named_tuple(checker: &Checker, &expr: &flat::View<'_, Expr>) {
     if !checker.semantic().seen_module(Modules::COLLECTIONS) {
         return;
     }

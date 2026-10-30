@@ -1,6 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields as ast;
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::{Expr, ExprAttribute, ExprCall, Stmt};
+use ruff_python_ast::{Expr, ExprCall};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -76,11 +78,11 @@ enum PatchApi {
 
 impl PatchApi {
     /// Recognize imported patch functions before falling back to fixture names.
-    fn from_call(checker: &Checker, call: &ExprCall) -> Option<Self> {
+    fn from_call(checker: &Checker, call: flat::View<'_, ExprCall>) -> Option<Self> {
         if let Some(name) = checker
             .semantic()
-            .resolve_qualified_name(&call.func)
-            .or_else(|| typing::resolve_assignment(&call.func, checker.semantic()))
+            .resolve_qualified_name(call.func())
+            .or_else(|| typing::resolve_assignment(call.func(), checker.semantic()))
         {
             return match name.segments() {
                 ["unittest", "mock", "patch"] | ["mock", "patch"] => Some(Self::String),
@@ -98,7 +100,7 @@ impl PatchApi {
             };
         }
 
-        let name = UnqualifiedName::from_expr(&call.func)?;
+        let name = UnqualifiedName::from_expr(call.func())?;
         match name.segments() {
             ["monkeypatch", "setattr" | "delattr"] => Some(Self::MonkeyPatch),
             [
@@ -116,11 +118,11 @@ impl PatchApi {
 }
 
 /// `shared-clock-mock`
-pub(crate) fn shared_clock_mock(checker: &Checker, call: &ExprCall) {
+pub(crate) fn shared_clock_mock(checker: &Checker, call: flat::View<'_, ExprCall>) {
     let Some(api) = PatchApi::from_call(checker, call) else {
         return;
     };
-    let Some(target) = call.arguments.find_argument_value("target", 0) else {
+    let Some(target) = call.arguments().find_argument_value("target", 0) else {
         return;
     };
 
@@ -128,7 +130,7 @@ pub(crate) fn shared_clock_mock(checker: &Checker, call: &ExprCall) {
         PatchApi::String | PatchApi::MonkeyPatch
             if let Some(target) = target.as_string_literal_expr() =>
         {
-            let Some((module, member)) = target.value.to_str().rsplit_once('.') else {
+            let Some((module, member)) = target.value().to_str().rsplit_once('.') else {
                 return;
             };
             (module.rsplit('.').next(), member, target.range())
@@ -139,15 +141,15 @@ pub(crate) fn shared_clock_mock(checker: &Checker, call: &ExprCall) {
                 _ => "attribute",
             };
             let Some(member) = call
-                .arguments
+                .arguments()
                 .find_argument_value(attribute, 1)
-                .and_then(Expr::as_string_literal_expr)
+                .and_then(flat::View::as_string_literal_expr)
             else {
                 return;
             };
             (
                 clock_module(checker, target),
-                member.value.to_str(),
+                member.value().to_str(),
                 target.range().cover(member.range()),
             )
         }
@@ -158,19 +160,19 @@ pub(crate) fn shared_clock_mock(checker: &Checker, call: &ExprCall) {
 }
 
 /// `shared-clock-mock`
-pub(crate) fn shared_clock_attribute(checker: &Checker, attribute: &ExprAttribute) {
+pub(crate) fn shared_clock_attribute(checker: &Checker, &attribute: &ast::ExprAttribute<'_>) {
     // An annotation without a value does not write to the attribute.
-    if let Stmt::AnnAssign(assignment) = checker.semantic().current_statement()
-        && assignment.value.is_none()
-        && assignment.target.range() == attribute.range()
+    if let flat::StmtKind::AnnAssign(assignment) = checker.semantic().current_statement().classify()
+        && assignment.value().is_none()
+        && assignment.target().range() == attribute.range
     {
         return;
     }
     report_shared_clock(
         checker,
-        clock_module(checker, &attribute.value),
+        clock_module(checker, attribute.value),
         attribute.attr.as_str(),
-        attribute.range(),
+        attribute.range,
     );
 }
 
@@ -201,7 +203,7 @@ fn report_shared_clock(checker: &Checker, module: Option<&str>, member: &str, ra
 }
 
 /// Resolve direct imports and use the final attribute as a heuristic for consumers.
-fn clock_module<'a>(checker: &Checker, target: &'a Expr) -> Option<&'a str> {
+fn clock_module<'a>(checker: &Checker, target: flat::View<'a, Expr>) -> Option<&'a str> {
     if let Some(name) = checker.semantic().resolve_qualified_name(target) {
         match name.segments() {
             ["time"] => return Some("time"),
@@ -211,8 +213,8 @@ fn clock_module<'a>(checker: &Checker, target: &'a Expr) -> Option<&'a str> {
     }
 
     let attribute = target.as_attribute_expr()?;
-    if let Some(receiver) = attribute.value.as_name_expr()
-        && matches!(receiver.id.as_str(), "self" | "cls")
+    if let Some(receiver) = attribute.value().as_name_expr()
+        && matches!(receiver.id().as_str(), "self" | "cls")
         && checker
             .semantic()
             .resolve_name(receiver)
@@ -220,5 +222,5 @@ fn clock_module<'a>(checker: &Checker, target: &'a Expr) -> Option<&'a str> {
     {
         return None;
     }
-    Some(attribute.attr.as_str())
+    Some(attribute.attr().as_str())
 }

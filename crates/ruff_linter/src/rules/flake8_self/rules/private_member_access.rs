@@ -1,7 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::helpers::{is_dunder, is_sunder};
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprName, Stmt};
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::analyze::typing::TypeChecker;
@@ -73,10 +74,12 @@ impl Violation for PrivateMemberAccess {
 }
 
 /// SLF001
-pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = expr else {
+pub(crate) fn private_member_access(checker: &Checker, &expr: &flat::View<'_, Expr>) {
+    let Some(attribute) = expr.as_attribute_expr() else {
         return;
     };
+    let value = attribute.value();
+    let attr = attribute.attr();
 
     let semantic = checker.semantic();
     let current_scope = semantic.current_scope();
@@ -85,7 +88,7 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    if !attr.starts_with('_') || is_dunder(attr) || is_sunder(attr) {
+    if !attr.starts_with('_') || is_dunder(attr.as_str()) || is_sunder(attr.as_str()) {
         return;
     }
 
@@ -99,10 +102,10 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
     }
 
     // Ignore accesses on instances within special methods (e.g., `__eq__`).
-    if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) = current_scope.kind {
-        if is_dunder_operator_method(name) {
-            return;
-        }
+    if let ScopeKind::Function(function) = current_scope.kind
+        && is_dunder_operator_method(&function.name())
+    {
+        return;
     }
 
     // Allow some public functions whose names start with an underscore, like `os._exit()`.
@@ -112,7 +115,8 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
         }
     }
 
-    if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
+    if let Some(call_node) = value.as_call_expr() {
+        let func = call_node.func();
         // Ignore `super()` calls.
         if let Some(name) = UnqualifiedName::from_expr(func) {
             if matches!(name.segments(), ["super"]) {
@@ -128,7 +132,7 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
         }
     }
 
-    if let Expr::Name(name) = value.as_ref() {
+    if let Some(name) = value.as_name_expr() {
         // Ignore accesses on class members from _within_ the class.
         if semantic
             .resolve_name(name)
@@ -188,7 +192,7 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
 /// This function is intentionally naive and does not handle more complex cases.
 /// It is expected to be expanded overtime, possibly when type-aware APIs are available.
 fn is_same_class_instance(
-    name: &ast::ExprName,
+    name: flat::View<'_, ExprName>,
     semantic: &SemanticModel,
     classmethod_decorators: &[String],
     staticmethod_decorators: &[String],
@@ -213,7 +217,7 @@ fn is_same_class_instance(
 /// Return `true` if `name` resolves to the first parameter of a syntactic
 /// method receiver, including class methods and `__new__`.
 fn is_method_receiver(
-    name: &ast::ExprName,
+    name: flat::View<'_, ExprName>,
     semantic: &SemanticModel,
     classmethod_decorators: &[String],
     staticmethod_decorators: &[String],
@@ -227,20 +231,23 @@ fn is_method_receiver(
         return false;
     }
 
-    let Some(ast::Stmt::FunctionDef(function)) = binding.statement(semantic) else {
-        return false;
-    };
-
-    let Some(first_parameter) = function
-        .parameters
-        .posonlyargs
-        .first()
-        .or_else(|| function.parameters.args.first())
+    let Some(flat::StmtKind::FunctionDef(function)) = binding
+        .statement(semantic)
+        .map(flat::View::<Stmt>::classify)
     else {
         return false;
     };
 
-    if binding.range != first_parameter.parameter.name.range() {
+    let Some(first_parameter) = function
+        .parameters()
+        .posonlyargs()
+        .first()
+        .or_else(|| function.parameters().args().first())
+    else {
+        return false;
+    };
+
+    if binding.range != first_parameter.parameter().name().range() {
         return false;
     }
 
@@ -251,8 +258,8 @@ fn is_method_receiver(
 
     matches!(
         function_type::classify(
-            &function.name,
-            &function.decorator_list,
+            function.name().as_str(),
+            function.decorator_list(),
             parent_scope,
             semantic,
             classmethod_decorators,
@@ -268,27 +275,27 @@ struct SameClassInstanceChecker;
 
 impl SameClassInstanceChecker {
     /// Whether `name` resolves to a class which the semantic model is traversing.
-    fn is_current_class_name(name: &ast::ExprName, semantic: &SemanticModel) -> bool {
+    fn is_current_class_name(name: flat::View<'_, ExprName>, semantic: &SemanticModel) -> bool {
         semantic.current_scopes().any(|scope| {
             let ScopeKind::Class(class) = scope.kind else {
                 return false;
             };
 
-            class.name.id == name.id
+            class.name().id() == name.id()
         })
     }
 }
 
 impl TypeChecker for SameClassInstanceChecker {
     /// `C`, `C[T]`, `Annotated[C, ...]`, `Annotated[C[T], ...]`, `Self`, `Annotated[Self, ...]`
-    fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+    fn match_annotation(annotation: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
         let inner = unwrap_annotated(annotation, semantic);
 
         if semantic.match_typing_expr(inner, "Self") {
             return true;
         }
 
-        let Expr::Name(class_name) = inner else {
+        let Some(class_name) = inner.as_name_expr() else {
             return false;
         };
 
@@ -296,11 +303,11 @@ impl TypeChecker for SameClassInstanceChecker {
     }
 
     /// `cls()`, `C()`, `C[T]()`, `super().__new__()`, `object.__new__()`, `self`
-    fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
+    fn match_initializer(initializer: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
         // `this = self` — a direct assignment from `self`, but only when
         // `self` is actually a function parameter (not a local rebinding).
-        if let Expr::Name(name) = initializer
-            && name.id == "self"
+        if let Some(name) = initializer.as_name_expr()
+            && name.id() == "self"
             && semantic
                 .resolve_name(name)
                 .is_some_and(|id| matches!(semantic.binding(id).kind, BindingKind::Argument))
@@ -308,32 +315,35 @@ impl TypeChecker for SameClassInstanceChecker {
             return true;
         }
 
-        let Expr::Call(call) = initializer else {
+        let Some(call) = initializer.as_call_expr() else {
             return false;
         };
 
-        match &*call.func {
-            Expr::Subscript(_) => Self::match_annotation(&call.func, semantic),
+        match call.func().classify() {
+            flat::ExprKind::Subscript(_) => Self::match_annotation(call.func(), semantic),
 
-            Expr::Name(name) => {
-                matches!(&*name.id, "cls" | "mcs") || Self::is_current_class_name(name, semantic)
+            flat::ExprKind::Name(name) => {
+                matches!(name.id().as_str(), "cls" | "mcs")
+                    || Self::is_current_class_name(name, semantic)
             }
 
-            Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+            flat::ExprKind::Attribute(expr_attribute) => {
+                let value = expr_attribute.value();
+                let attr = expr_attribute.attr();
+
                 if attr != "__new__" {
                     return false;
                 }
 
-                match &**value {
+                if let Some(call) = value.as_call_expr() {
                     // `super().__new__()`, `object().__new__()`
-                    Expr::Call(ast::ExprCall {
-                        func, arguments, ..
-                    }) => {
-                        matches!(&**func, Expr::Name(ast::ExprName { id, .. }) if id == "super")
-                            || (arguments.is_empty() && semantic.match_builtin_expr(func, "object"))
-                    }
+                    let func = call.func();
+                    func.as_name_expr().is_some_and(|name| name.id() == "super")
+                        || (call.arguments().is_empty()
+                            && semantic.match_builtin_expr(func, "object"))
+                } else {
                     // `object.__new__()`
-                    value => semantic.match_builtin_expr(value, "object"),
+                    semantic.match_builtin_expr(value, "object")
                 }
             }
 
@@ -343,12 +353,18 @@ impl TypeChecker for SameClassInstanceChecker {
 }
 
 /// Unwrap `Annotated[X, ...]` and `C[T]` to the innermost type expression.
-fn unwrap_annotated<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> &'a Expr {
-    match expr {
-        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+fn unwrap_annotated<'a>(
+    expr: flat::View<'a, Expr>,
+    semantic: &'a SemanticModel,
+) -> flat::View<'a, Expr> {
+    match expr.classify() {
+        flat::ExprKind::Subscript(expr_subscript) => {
+            let value = expr_subscript.value();
+            let slice = expr_subscript.slice();
+
             if semantic.match_typing_expr(value, "Annotated")
                 && let Some(tuple) = slice.as_tuple_expr()
-                && let [inner, ..] = &tuple.elts[..]
+                && let Some((inner, _)) = tuple.elts().slice(..).split_first()
             {
                 return unwrap_annotated(inner, semantic);
             }

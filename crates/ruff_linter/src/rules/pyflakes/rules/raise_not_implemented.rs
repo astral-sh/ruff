@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -52,16 +53,19 @@ impl Violation for RaiseNotImplemented {
     }
 }
 
-fn match_not_implemented(expr: &Expr) -> Option<&Expr> {
-    match expr {
-        Expr::Call(ast::ExprCall { func, .. }) => {
-            if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
+fn match_not_implemented(expr: flat::View<'_, Expr>) -> Option<flat::View<'_, Expr>> {
+    match expr.classify() {
+        flat::ExprKind::Call(expr_call) => {
+            let func = expr_call.func();
+
+            if let flat::ExprKind::Name(name) = func.classify() {
+                let id = name.id();
                 if id == "NotImplemented" {
                     return Some(func);
                 }
             }
         }
-        Expr::Name(ast::ExprName { id, .. }) if id == "NotImplemented" => {
+        flat::ExprKind::Name(expr_name) if expr_name.id() == "NotImplemented" => {
             return Some(expr);
         }
         _ => {}
@@ -70,7 +74,7 @@ fn match_not_implemented(expr: &Expr) -> Option<&Expr> {
 }
 
 /// F901
-pub(crate) fn raise_not_implemented(checker: &Checker, expr: &Expr) {
+pub(crate) fn raise_not_implemented(checker: &Checker, expr: flat::View<'_, Expr>) {
     let Some(expr) = match_not_implemented(expr) else {
         return;
     };

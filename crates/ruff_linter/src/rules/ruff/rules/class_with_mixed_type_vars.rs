@@ -1,9 +1,11 @@
+use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
 use std::iter;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
-    Arguments, Expr, ExprStarred, ExprSubscript, ExprTuple, StmtClassDef, TypeParams,
+    Arguments, Expr, ExprSubscript, TypeParams,
+    flat::{self, fields as ast},
 };
 use ruff_python_semantic::SemanticModel;
 
@@ -80,16 +82,13 @@ impl Violation for ClassWithMixedTypeVars {
 }
 
 /// RUF053
-pub(crate) fn class_with_mixed_type_vars(checker: &Checker, class_def: &StmtClassDef) {
+pub(crate) fn class_with_mixed_type_vars(checker: &Checker, class_def: &ast::StmtClassDef<'_>) {
     if checker.target_version() < PythonVersion::PY312 {
         return;
     }
 
-    let StmtClassDef {
-        type_params,
-        arguments,
-        ..
-    } = class_def;
+    let type_params = class_def.type_params;
+    let arguments = class_def.arguments;
 
     let Some(type_params) = type_params else {
         return;
@@ -105,7 +104,7 @@ pub(crate) fn class_with_mixed_type_vars(checker: &Checker, class_def: &StmtClas
         return;
     };
 
-    let mut diagnostic = checker.report_diagnostic(ClassWithMixedTypeVars, generic_base.range);
+    let mut diagnostic = checker.report_diagnostic(ClassWithMixedTypeVars, generic_base.range());
 
     diagnostic.try_set_optional_fix(|| {
         convert_type_vars(
@@ -119,30 +118,35 @@ pub(crate) fn class_with_mixed_type_vars(checker: &Checker, class_def: &StmtClas
 }
 
 fn typing_generic_base_and_arguments<'a>(
-    class_arguments: &'a Arguments,
+    class_arguments: flat::View<'a, Arguments>,
     semantic: &SemanticModel,
-) -> Option<(&'a ExprSubscript, &'a Expr)> {
-    let (_, base @ ExprSubscript { slice, .. }) = find_generic(class_arguments, semantic)?;
+) -> Option<(flat::View<'a, ExprSubscript>, flat::View<'a, Expr>)> {
+    let (_, base @ expr_subscript) = find_generic(class_arguments, semantic)?;
+    let slice = expr_subscript.slice();
 
-    Some((base, slice.as_ref()))
+    Some((base, slice))
 }
 
 fn convert_type_vars(
-    generic_base: &ExprSubscript,
-    old_style_type_vars: &Expr,
-    type_params: &TypeParams,
-    class_arguments: &Arguments,
+    generic_base: flat::View<'_, ExprSubscript>,
+    old_style_type_vars: flat::View<'_, Expr>,
+    type_params: flat::View<'_, TypeParams>,
+    class_arguments: flat::View<'_, Arguments>,
     checker: &Checker,
 ) -> anyhow::Result<Option<Fix>> {
-    let mut type_vars: Vec<_> = type_params.type_params.iter().map(TypeVar::from).collect();
+    let mut type_vars: Vec<_> = type_params
+        .type_params()
+        .iter()
+        .map(TypeVar::from)
+        .collect();
 
     let semantic = checker.semantic();
-    let converted_type_vars = match old_style_type_vars {
-        Expr::Tuple(ExprTuple { elts, .. }) => {
+    let converted_type_vars = match old_style_type_vars.fields() {
+        ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             generic_arguments_to_type_vars(elts.iter(), type_params, semantic)
         }
-        expr @ (Expr::Subscript(_) | Expr::Name(_)) => {
-            generic_arguments_to_type_vars(iter::once(expr), type_params, semantic)
+        expr @ (ast::Expr::Subscript(_) | ast::Expr::Name(_)) => {
+            generic_arguments_to_type_vars(iter::once(expr.view()), type_params, semantic)
         }
         _ => None,
     };
@@ -160,14 +164,14 @@ fn convert_type_vars(
     };
 
     let remove_generic_base = remove_argument(
-        generic_base,
+        &generic_base,
         class_arguments,
         Parentheses::Remove,
         source,
         checker.tokens(),
     )?;
     let replace_type_params =
-        Edit::range_replacement(new_type_params.to_string(), type_params.range);
+        Edit::range_replacement(new_type_params.to_string(), type_params.range());
 
     Ok(Some(Fix::unsafe_edits(
         remove_generic_base,
@@ -180,8 +184,8 @@ fn convert_type_vars(
 /// If at least one of them cannot be converted to [`TypeVar`],
 /// `None` is returned.
 fn generic_arguments_to_type_vars<'a>(
-    exprs: impl Iterator<Item = &'a Expr>,
-    existing_type_params: &TypeParams,
+    exprs: impl Iterator<Item = flat::View<'a, Expr>>,
+    existing_type_params: flat::View<'_, TypeParams>,
     semantic: &'a SemanticModel,
 ) -> Option<Vec<TypeVar<'a>>> {
     let mut type_vars = vec![];
@@ -191,11 +195,18 @@ fn generic_arguments_to_type_vars<'a>(
         .collect();
 
     for expr in exprs {
-        let (name, unpacked) = match expr {
-            Expr::Name(name) => (name, false),
-            Expr::Starred(ExprStarred { value, .. }) => (value.as_name_expr()?, true),
+        let (name, unpacked) = match expr.classify() {
+            flat::ExprKind::Name(name) => (name, false),
+            flat::ExprKind::Starred(expr_starred) => {
+                let value = expr_starred.value();
 
-            Expr::Subscript(ExprSubscript { value, slice, .. }) => {
+                (value.as_name_expr()?, true)
+            }
+
+            flat::ExprKind::Subscript(expr_subscript) => {
+                let value = expr_subscript.value();
+                let slice = expr_subscript.slice();
+
                 if !semantic.match_typing_expr(value, "Unpack") {
                     return None;
                 }
@@ -206,7 +217,7 @@ fn generic_arguments_to_type_vars<'a>(
             _ => return None,
         };
 
-        if !encountered.insert(name.id.as_str()) {
+        if !encountered.insert(name.id().as_str()) {
             continue;
         }
 

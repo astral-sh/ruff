@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Comprehension, Expr};
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{Comprehension, Expr};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
@@ -79,7 +80,7 @@ impl AlwaysFixableViolation for UnnecessaryComprehension {
 }
 
 /// Add diagnostic for C416 based on the expression node id.
-fn add_diagnostic(checker: &Checker, expr: &Expr) {
+fn add_diagnostic(checker: &Checker, expr: flat::View<'_, Expr>) {
     let Some(comprehension_kind) = ComprehensionKind::try_from_expr(expr) else {
         return;
     };
@@ -104,37 +105,44 @@ fn add_diagnostic(checker: &Checker, expr: &Expr) {
 /// C416
 pub(crate) fn unnecessary_dict_comprehension(
     checker: &Checker,
-    expr: &Expr,
-    key: &Expr,
-    value: &Expr,
-    generators: &[Comprehension],
+    &expr: &flat::View<'_, Expr>,
+    key: flat::View<'_, Expr>,
+    value: flat::View<'_, Expr>,
+    generators: flat::NodeList<'_, Comprehension>,
 ) {
-    let [generator] = generators else {
+    let Some([generator]) = generators.as_array() else {
         return;
     };
-    if !generator.ifs.is_empty() || generator.is_async {
+    if !generator.ifs().is_empty() || generator.is_async() {
         return;
     }
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = &generator.target else {
+    let flat::ExprKind::Tuple(tuple) = generator.target().classify() else {
         return;
     };
-    let [
-        Expr::Name(ast::ExprName { id: target_key, .. }),
-        Expr::Name(ast::ExprName {
-            id: target_value, ..
-        }),
-    ] = elts.as_slice()
+    let elts = tuple.elts();
+    let Some(
+        [
+            ast::Expr::Name(ast::ExprName { id: target_key, .. }),
+            ast::Expr::Name(ast::ExprName {
+                id: target_value, ..
+            }),
+        ],
+    ) = elts
+        .as_array()
+        .map(|items| items.map(flat::View::<Expr>::fields))
     else {
         return;
     };
-    let Expr::Name(ast::ExprName { id: key, .. }) = &key else {
+    let flat::ExprKind::Name(name_node) = key.classify() else {
         return;
     };
-    let Expr::Name(ast::ExprName { id: value, .. }) = &value else {
+    let key = name_node.id();
+    let flat::ExprKind::Name(name_node) = value.classify() else {
         return;
     };
+    let value = name_node.id();
 
-    if target_key == key && target_value == value {
+    if *target_key == *key && *target_value == *value {
         add_diagnostic(checker, expr);
     }
 }
@@ -142,41 +150,49 @@ pub(crate) fn unnecessary_dict_comprehension(
 /// C416
 pub(crate) fn unnecessary_list_set_comprehension(
     checker: &Checker,
-    expr: &Expr,
-    elt: &Expr,
-    generators: &[Comprehension],
+    &expr: &flat::View<'_, Expr>,
+    elt: flat::View<'_, Expr>,
+    generators: flat::NodeList<'_, Comprehension>,
 ) {
-    let [generator] = generators else {
+    let Some([generator]) = generators.as_array() else {
         return;
     };
-    if !generator.ifs.is_empty() || generator.is_async {
+    if !generator.ifs().is_empty() || generator.is_async() {
         return;
     }
-    if is_dict_items(checker, &generator.iter) {
-        match (&generator.target, elt) {
+    if is_dict_items(checker, generator.iter()) {
+        match (generator.target().fields(), elt.fields()) {
             // [(k, v) for k, v in dict.items()] or [(k, v) for [k, v] in dict.items()]
             (
-                Expr::Tuple(ast::ExprTuple {
+                ast::Expr::Tuple(ast::ExprTuple {
                     elts: target_elts, ..
                 })
-                | Expr::List(ast::ExprList {
+                | ast::Expr::List(ast::ExprList {
                     elts: target_elts, ..
                 }),
-                Expr::Tuple(ast::ExprTuple { elts, .. }),
+                ast::Expr::Tuple(ast::ExprTuple { elts, .. }),
             ) => {
-                let [
-                    Expr::Name(ast::ExprName { id: target_key, .. }),
-                    Expr::Name(ast::ExprName {
-                        id: target_value, ..
-                    }),
-                ] = target_elts.as_slice()
+                let Some(
+                    [
+                        ast::Expr::Name(ast::ExprName { id: target_key, .. }),
+                        ast::Expr::Name(ast::ExprName {
+                            id: target_value, ..
+                        }),
+                    ],
+                ) = target_elts
+                    .as_array()
+                    .map(|items| items.map(flat::View::<Expr>::fields))
                 else {
                     return;
                 };
-                let [
-                    Expr::Name(ast::ExprName { id: key, .. }),
-                    Expr::Name(ast::ExprName { id: value, .. }),
-                ] = elts.as_slice()
+                let Some(
+                    [
+                        ast::Expr::Name(ast::ExprName { id: key, .. }),
+                        ast::Expr::Name(ast::ExprName { id: value, .. }),
+                    ],
+                ) = elts
+                    .as_array()
+                    .map(|items| items.map(flat::View::<Expr>::fields))
                 else {
                     return;
                 };
@@ -186,10 +202,10 @@ pub(crate) fn unnecessary_list_set_comprehension(
             }
             // [x for x in dict.items()]
             (
-                Expr::Name(ast::ExprName {
+                ast::Expr::Name(ast::ExprName {
                     id: target_name, ..
                 }),
-                Expr::Name(ast::ExprName { id: elt_name, .. }),
+                ast::Expr::Name(ast::ExprName { id: elt_name, .. }),
             ) if target_name == elt_name => {
                 add_diagnostic(checker, expr);
             }
@@ -197,35 +213,37 @@ pub(crate) fn unnecessary_list_set_comprehension(
         }
     } else {
         // [x for x in iterable]
-        let Expr::Name(ast::ExprName {
-            id: target_name, ..
-        }) = &generator.target
-        else {
+        let flat::ExprKind::Name(name_node) = generator.target().classify() else {
             return;
         };
-        let Expr::Name(ast::ExprName { id: elt_name, .. }) = &elt else {
+        let target_name = name_node.id();
+        let flat::ExprKind::Name(name_node) = elt.classify() else {
             return;
         };
+        let elt_name = name_node.id();
         if elt_name == target_name {
             add_diagnostic(checker, expr);
         }
     }
 }
 
-fn is_dict_items(checker: &Checker, expr: &Expr) -> bool {
-    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+fn is_dict_items(checker: &Checker, expr: flat::View<'_, Expr>) -> bool {
+    let flat::ExprKind::Call(call_node) = expr.classify() else {
         return false;
     };
+    let func = call_node.func();
 
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+    let flat::ExprKind::Attribute(attribute) = func.classify() else {
         return false;
     };
+    let value = attribute.value();
+    let attr = attribute.attr();
 
     if attr.as_str() != "items" {
         return false;
     }
 
-    let Expr::Name(name) = value.as_ref() else {
+    let flat::ExprKind::Name(name) = value.classify() else {
         return false;
     };
 
@@ -252,11 +270,11 @@ impl ComprehensionKind {
         }
     }
 
-    const fn try_from_expr(expr: &Expr) -> Option<Self> {
-        match expr {
-            Expr::ListComp(_) => Some(Self::List),
-            Expr::DictComp(_) => Some(Self::Dict),
-            Expr::SetComp(_) => Some(Self::Set),
+    fn try_from_expr(expr: flat::View<'_, Expr>) -> Option<Self> {
+        match expr.classify() {
+            flat::ExprKind::ListComp(_) => Some(Self::List),
+            flat::ExprKind::DictComp(_) => Some(Self::Dict),
+            flat::ExprKind::SetComp(_) => Some(Self::Set),
             _ => None,
         }
     }

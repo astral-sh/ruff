@@ -1,11 +1,14 @@
 use itertools::Itertools;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ast::ExprContext;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::{any_over_expr, contains_effect};
-use ruff_python_ast::{self as ast, AtomicNodeIndex, BoolOp, CmpOp, Expr};
+use ruff_python_ast::flat::helpers::any_over_expr;
+use ruff_python_ast::helpers::contains_effect;
+use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr, NodeIndex};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -87,9 +90,8 @@ impl AlwaysFixableViolation for RepeatedEqualityComparison {
 }
 
 /// PLR1714
-pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::ExprBoolOp) {
-    // Map from expression hash to (starting offset, number of comparisons, list
-    let mut value_to_comparators: FxHashMap<ComparableExpr, (&Expr, Vec<&Expr>, Vec<usize>)> =
+pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &fields::ExprBoolOp<'_>) {
+    let mut value_to_comparators: FxHashMap<ComparableExpr, _> =
         FxHashMap::with_capacity_and_hasher(bool_op.values.len() * 2, FxBuildHasher);
 
     for (i, value) in bool_op.values.iter().enumerate() {
@@ -97,7 +99,10 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
             continue;
         };
 
-        if matches!(left, Expr::Name(_) | Expr::Attribute(_)) {
+        if matches!(
+            left.classify(),
+            flat::ExprKind::Name(_) | flat::ExprKind::Attribute(_)
+        ) {
             let (_, left_matches, index_matches) = value_to_comparators
                 .entry(left.into())
                 .or_insert_with(|| (left, Vec::new(), Vec::new()));
@@ -105,7 +110,10 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
             index_matches.push(i);
         }
 
-        if matches!(right, Expr::Name(_) | Expr::Attribute(_)) {
+        if matches!(
+            right.classify(),
+            flat::ExprKind::Name(_) | flat::ExprKind::Attribute(_)
+        ) {
             let (_, right_matches, index_matches) = value_to_comparators
                 .entry(right.into())
                 .or_insert_with(|| (right, Vec::new(), Vec::new()));
@@ -124,7 +132,7 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
         }
 
         // Break into sequences of consecutive comparisons.
-        let mut sequences: Vec<(Vec<usize>, Vec<&Expr>)> = Vec::new();
+        let mut sequences: Vec<(Vec<usize>, Vec<flat::View<'_, Expr>>)> = Vec::new();
         let mut last = None;
         for (index, comparator) in indices.iter().zip(comparators) {
             if last.is_some_and(|last| last + 1 == *index) {
@@ -171,27 +179,43 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                     )),
                     all_hashable,
                 },
-                bool_op.range(),
+                bool_op.range,
             );
 
             // Grab the remaining comparisons.
             let [first, .., last] = indices.as_slice() else {
                 unreachable!("Indices should have at least two elements")
             };
-            let before = bool_op.values.iter().take(*first).cloned();
-            let after = bool_op.values.iter().skip(last + 1).cloned();
+            let before = bool_op
+                .values
+                .iter()
+                .take(*first)
+                .map(flat::View::to_owned_node);
+            let after = bool_op
+                .values
+                .iter()
+                .skip(last + 1)
+                .map(flat::View::to_owned_node);
 
             let comparator = if all_hashable {
                 Expr::Set(ast::ExprSet {
-                    elts: comparators.iter().copied().cloned().collect(),
+                    elts: comparators
+                        .iter()
+                        .copied()
+                        .map(flat::View::to_owned_node)
+                        .collect(),
                     range: TextRange::default(),
-                    node_index: AtomicNodeIndex::NONE,
+                    node_index: NodeIndex::NONE,
                 })
             } else {
                 Expr::Tuple(ast::ExprTuple {
-                    elts: comparators.iter().copied().cloned().collect(),
+                    elts: comparators
+                        .iter()
+                        .copied()
+                        .map(flat::View::to_owned_node)
+                        .collect(),
                     range: TextRange::default(),
-                    node_index: AtomicNodeIndex::NONE,
+                    node_index: NodeIndex::NONE,
                     ctx: ExprContext::Load,
                     parenthesized: true,
                 })
@@ -206,16 +230,16 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                                 BoolOp::Or => [CmpOp::In].into(),
                                 BoolOp::And => [CmpOp::NotIn].into(),
                             },
-                            operands: Box::from([expr.clone(), comparator]),
-                            range: bool_op.range(),
-                            node_index: AtomicNodeIndex::NONE,
+                            operands: Box::from([expr.to_owned_node(), comparator]),
+                            range: bool_op.range,
+                            node_index: NodeIndex::NONE,
                         })))
                         .chain(after)
                         .collect(),
-                    range: bool_op.range(),
-                    node_index: AtomicNodeIndex::NONE,
+                    range: bool_op.range,
+                    node_index: NodeIndex::NONE,
                 })),
-                bool_op.range(),
+                bool_op.range,
             )));
         }
     }
@@ -226,9 +250,9 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
 /// joined with `and`.
 fn to_allowed_value<'a>(
     bool_op: BoolOp,
-    value: &'a Expr,
+    value: flat::View<'a, Expr>,
     semantic: &SemanticModel,
-) -> Option<(&'a Expr, &'a Expr)> {
+) -> Option<(flat::View<'a, Expr>, flat::View<'a, Expr>)> {
     // Ignore, e.g., `foo == bar == baz`.
     let (left, op, right) = value.as_compare_expr()?.as_single()?;
 
@@ -269,9 +293,9 @@ fn to_allowed_value<'a>(
 /// Generate a string like `obj in (a, b, c)` or `obj not in (a, b, c)`.
 /// If `all_hashable` is `true`, the string will use a set instead of a tuple.
 fn merged_membership_test(
-    left: &Expr,
+    left: flat::View<'_, Expr>,
     op: BoolOp,
-    comparators: &[&Expr],
+    comparators: &[flat::View<'_, Expr>],
     locator: &Locator,
     all_hashable: bool,
 ) -> String {

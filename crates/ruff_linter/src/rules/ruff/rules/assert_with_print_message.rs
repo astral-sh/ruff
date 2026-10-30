@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, Stmt, flat};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -57,20 +57,20 @@ impl AlwaysFixableViolation for AssertWithPrintMessage {
 ///
 /// Checks if the `msg` argument to an `assert` statement is a `print` call, and if so,
 /// replace the message with the arguments to the `print` call.
-pub(crate) fn assert_with_print_message(checker: &Checker, stmt: &ast::StmtAssert) {
-    if let Some(Expr::Call(call)) = stmt.msg.as_deref() {
+pub(crate) fn assert_with_print_message(checker: &Checker, stmt: flat::View<'_, ast::StmtAssert>) {
+    if let Some(flat::ExprKind::Call(call)) = stmt.msg().map(flat::View::<ast::Expr>::classify) {
         // We have to check that the print call is a call to the built-in `print` function
         let semantic = checker.semantic();
 
-        if semantic.match_builtin_expr(&call.func, "print") {
+        if semantic.match_builtin_expr(call.func(), "print") {
             // This is the confirmed rule condition
             let mut diagnostic = checker.report_diagnostic(AssertWithPrintMessage, call.range());
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.generator().stmt(&Stmt::Assert(ast::StmtAssert {
-                    test: stmt.test.clone(),
-                    msg: print_arguments::to_expr(&call.arguments, checker).map(Box::new),
+                    test: Box::new(stmt.test().to_owned_node()),
+                    msg: print_arguments::to_expr(call.arguments(), checker).map(Box::new),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                 })),
                 // We have to replace the entire statement,
                 // as the `print` could be empty and thus `call.range()`
@@ -90,6 +90,7 @@ pub(crate) fn assert_with_print_message(checker: &Checker, stmt: &ast::StmtAsser
 /// - otherwise, return a `Expr::FString`.
 mod print_arguments {
     use itertools::Itertools;
+    use ruff_python_ast::flat;
     use ruff_python_ast::{
         Arguments, ConversionFlag, Expr, ExprFString, FString, FStringFlags, FStringValue,
         InterpolatedElement, InterpolatedStringElement, InterpolatedStringElements,
@@ -106,34 +107,38 @@ mod print_arguments {
     ///   `FStringLiteralElement`.
     /// - if the expression is an f-string, the elements will be returned as-is.
     /// - otherwise, the expression will be wrapped in a `FStringExpressionElement`.
-    fn expr_to_fstring_elements(expr: &Expr) -> Vec<InterpolatedStringElement> {
-        match expr {
+    fn expr_to_fstring_elements(expr: flat::View<'_, Expr>) -> Vec<InterpolatedStringElement> {
+        match expr.classify() {
             // If the expression is a string literal, convert each part to a `FStringLiteralElement`.
-            Expr::StringLiteral(string) => string
-                .value
+            flat::ExprKind::StringLiteral(string) => string
+                .value()
                 .iter()
                 .map(|part| {
                     InterpolatedStringElement::Literal(InterpolatedStringLiteralElement {
-                        value: part.value.clone(),
+                        value: part.value().into(),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                        node_index: ruff_python_ast::NodeIndex::NONE,
                     })
                 })
                 .collect(),
 
             // If the expression is an f-string, return the elements.
-            Expr::FString(fstring) => fstring.value.elements().cloned().collect(),
+            flat::ExprKind::FString(fstring) => fstring
+                .value()
+                .elements()
+                .map(flat::View::to_owned_node)
+                .collect(),
 
             // Otherwise, return the expression as a single `FStringExpressionElement` wrapping
             // the expression.
             expr => vec![InterpolatedStringElement::Interpolation(
                 InterpolatedElement {
-                    expression: Box::new(expr.clone()),
+                    expression: Box::new(expr.view().to_owned_node()),
                     debug_text: None,
                     conversion: ConversionFlag::None,
                     format_spec: None,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                 },
             )],
         }
@@ -156,7 +161,7 @@ mod print_arguments {
                     value: literal.value.clone(),
                     flags,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                 });
                 Some(acc)
             } else {
@@ -214,7 +219,7 @@ mod print_arguments {
             value: combined_string.into(),
             flags,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         }))
     }
 
@@ -248,10 +253,10 @@ mod print_arguments {
                 elements: InterpolatedStringElements::from(fstring_elements),
                 flags,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
             }),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         }))
     }
 
@@ -268,17 +273,17 @@ mod print_arguments {
     /// - [`Some`]<[`Expr::StringLiteral`]> if all arguments including `sep` are string literals.
     /// - [`Some`]<[`Expr::FString`]> if any of the arguments are not string literals.
     /// - [`None`] if the `print` contains no positional arguments at all.
-    pub(super) fn to_expr(arguments: &Arguments, checker: &Checker) -> Option<Expr> {
+    pub(super) fn to_expr(arguments: flat::View<'_, Arguments>, checker: &Checker) -> Option<Expr> {
         // Convert the `sep` argument into `FStringElement`s
         let sep = arguments
             .find_keyword("sep")
             .and_then(
                 // If the `sep` argument is `None`, treat this as default behavior.
                 |keyword| {
-                    if let Expr::NoneLiteral(_) = keyword.value {
+                    if let flat::ExprKind::NoneLiteral(_) = keyword.value().classify() {
                         None
                     } else {
-                        Some(&keyword.value)
+                        Some(keyword.value())
                     }
                 },
             )
@@ -287,14 +292,14 @@ mod print_arguments {
                 vec![InterpolatedStringElement::Literal(
                     InterpolatedStringLiteralElement {
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                        node_index: ruff_python_ast::NodeIndex::NONE,
                         value: " ".into(),
                     },
                 )]
             });
 
         let args = arguments
-            .args
+            .args()
             .iter()
             .map(expr_to_fstring_elements)
             .collect::<Vec<_>>();

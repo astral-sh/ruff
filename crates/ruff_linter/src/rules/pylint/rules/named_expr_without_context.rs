@@ -1,4 +1,6 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
+use ruff_text_size::Ranged;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
@@ -37,8 +39,9 @@ impl Violation for NamedExprWithoutContext {
 }
 
 /// PLW0131
-pub(crate) fn named_expr_without_context(checker: &Checker, value: &Expr) {
-    if let Expr::Named(ast::ExprNamed { range, .. }) = value {
-        checker.report_diagnostic(NamedExprWithoutContext, *range);
+pub(crate) fn named_expr_without_context(checker: &Checker, value: flat::View<'_, Expr>) {
+    if let flat::ExprKind::Named(named_node) = value.classify() {
+        let range = named_node.range();
+        checker.report_diagnostic(NamedExprWithoutContext, range);
     }
 }

@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::helpers::generate_comparison;
-use ruff_python_ast::{self as ast, CmpOp, Expr};
+use ruff_python_ast::{self as ast, CmpOp};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -81,21 +82,21 @@ impl AlwaysFixableViolation for NotIsTest {
 }
 
 /// E713, E714
-pub(crate) fn not_tests(checker: &Checker, unary_op: &ast::ExprUnaryOp) {
-    if !unary_op.op.is_not() {
+pub(crate) fn not_tests(checker: &Checker, unary_op: flat::View<'_, ast::ExprUnaryOp>) {
+    if !unary_op.op().is_not() {
         return;
     }
 
-    let Expr::Compare(compare) = unary_op.operand.as_ref() else {
+    let flat::ExprKind::Compare(compare) = unary_op.operand().classify() else {
         return;
     };
 
     let left = compare.first_operand();
     let comparators = compare.comparators();
 
-    match &*compare.ops {
-        [CmpOp::In] if checker.is_rule_enabled(Rule::NotInTest) => {
-            let mut diagnostic = checker.report_diagnostic(NotInTest, unary_op.operand.range());
+    match &compare.ops().as_array() {
+        Some([CmpOp::In]) if checker.is_rule_enabled(Rule::NotInTest) => {
+            let mut diagnostic = checker.report_diagnostic(NotInTest, unary_op.operand().range());
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 pad(
                     generate_comparison(
@@ -112,8 +113,8 @@ pub(crate) fn not_tests(checker: &Checker, unary_op: &ast::ExprUnaryOp) {
                 unary_op.range(),
             )));
         }
-        [CmpOp::Is] if checker.is_rule_enabled(Rule::NotIsTest) => {
-            let mut diagnostic = checker.report_diagnostic(NotIsTest, unary_op.operand.range());
+        Some([CmpOp::Is]) if checker.is_rule_enabled(Rule::NotIsTest) => {
+            let mut diagnostic = checker.report_diagnostic(NotIsTest, unary_op.operand().range());
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 pad(
                     generate_comparison(

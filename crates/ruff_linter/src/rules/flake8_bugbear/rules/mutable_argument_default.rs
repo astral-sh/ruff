@@ -4,7 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
+use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, flat};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
@@ -97,13 +97,16 @@ impl Violation for MutableArgumentDefault {
 }
 
 /// B006
-pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn mutable_argument_default(
+    checker: &Checker,
+    function_def: flat::View<'_, ast::StmtFunctionDef>,
+) {
     // Skip stub files
     if checker.source_type.is_stub() {
         return;
     }
 
-    for parameter in function_def.parameters.iter_non_variadic_params() {
+    for parameter in function_def.parameters().iter_non_variadic_params() {
         let Some(default) = parameter.default() else {
             continue;
         };
@@ -136,13 +139,19 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
 }
 
 /// Returns `true` if the expression is guaranteed to create a mutable object.
-fn is_guaranteed_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
-    match expr {
-        Expr::Generator(_) => true,
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+fn is_guaranteed_mutable_expr(expr: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
+    match expr.classify() {
+        flat::ExprKind::Generator(_) => true,
+        flat::ExprKind::Tuple(expr_tuple) => {
+            let elts = expr_tuple.elts();
+
             elts.iter().any(|e| is_guaranteed_mutable_expr(e, semantic))
         }
-        Expr::Named(ast::ExprNamed { value, .. }) => is_guaranteed_mutable_expr(value, semantic),
+        flat::ExprKind::Named(expr_named) => {
+            let value = expr_named.value();
+
+            is_guaranteed_mutable_expr(value, semantic)
+        }
         _ => is_mutable_expr(expr, semantic),
     }
 }
@@ -150,24 +159,24 @@ fn is_guaranteed_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
 /// Generate a [`Fix`] to move a mutable argument default initialization
 /// into the function body.
 fn move_initialization(
-    function_def: &ast::StmtFunctionDef,
-    parameter: &ParameterWithDefault,
-    default: &Expr,
+    function_def: flat::View<'_, ast::StmtFunctionDef>,
+    parameter: flat::View<'_, ParameterWithDefault>,
+    default: flat::View<'_, Expr>,
     checker: &Checker,
 ) -> Option<Fix> {
     let indexer = checker.indexer();
     let locator = checker.locator();
     let stylist = checker.stylist();
 
-    let mut body = function_def.body.iter().peekable();
+    let mut body = function_def.body().iter().peekable();
 
     // Avoid attempting to fix single-line functions.
     let statement = body.peek()?;
-    if indexer.preceded_by_multi_statement_line(statement, locator.contents()) {
+    if indexer.preceded_by_multi_statement_line(*statement, locator.contents()) {
         return None;
     }
 
-    let range = match parenthesized_range(default.into(), parameter.into(), checker.tokens()) {
+    let range = match parenthesized_range(default, parameter.into(), checker.tokens()) {
         Some(range) => range,
         None => default.range(),
     };
@@ -181,16 +190,16 @@ fn move_initialization(
 
     // Add an `if`, to set the argument to its original value if still `None`.
     let mut content = String::new();
-    let _ = write!(&mut content, "if {} is None:", parameter.parameter.name());
+    let _ = write!(&mut content, "if {} is None:", parameter.parameter().name());
     content.push_str(stylist.line_ending().as_str());
     content.push_str(stylist.indentation());
     if is_b006_unsafe_fix_preserve_assignment_expr_enabled(checker.settings()) {
         let _ = write!(
             &mut content,
             "{} = {}",
-            parameter.parameter.name(),
+            parameter.parameter().name(),
             locator.slice(
-                parenthesized_range(default.into(), parameter.into(), checker.tokens())
+                parenthesized_range(default, parameter.into(), checker.tokens())
                     .unwrap_or(default.range())
             )
         );
@@ -199,7 +208,7 @@ fn move_initialization(
             &mut content,
             "{} = {}",
             parameter.name(),
-            checker.generator().expr(default)
+            checker.generator().expr_view(default)
         );
     }
 

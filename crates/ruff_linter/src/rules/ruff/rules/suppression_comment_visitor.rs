@@ -1,9 +1,10 @@
 use std::iter::Peekable;
 
 use ruff_python_ast::{
-    AnyNodeRef, Suite,
+    flat,
+    flat::AnyNodeRef,
+    flat::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal},
     helpers::comment_indentation_after,
-    visitor::source_order::{self, SourceOrderVisitor, TraversalSignal},
 };
 use ruff_python_trivia::{
     CommentLinePosition, SimpleTokenizer, SuppressionKind, indentation_at_offset,
@@ -52,8 +53,8 @@ where
         }
     }
 
-    pub(super) fn visit(mut self, suite: &'src Suite) {
-        self.visit_body(suite.as_slice());
+    pub(super) fn visit(mut self, suite: flat::Suite<'src>) {
+        self.visit_body(suite);
     }
 
     fn can_skip(&mut self, node_end: TextSize) -> bool {
@@ -174,29 +175,24 @@ where
 
         self.preceding_node = Some(node);
     }
-    fn visit_body(&mut self, body: &'ast [ruff_python_ast::Stmt]) {
-        match body {
-            [] => {
-                // no-op
+    fn visit_body(&mut self, body: flat::Suite<'ast>) {
+        let Some((first, rest)) = body.split_first() else {
+            return;
+        };
+        if let Some(last) = rest.last() {
+            if self.can_skip(last.end()) {
+                // The first statement may have leading comments after the previous node.
+                self.visit_stmt(first);
+                self.preceding_node = Some(last.into());
+            } else {
+                source_order::walk_body(self, body);
             }
-            [only] => {
-                self.visit_stmt(only);
-            }
-            [first, .., last] => {
-                if self.can_skip(last.end()) {
-                    // Skip traversing the body when there's no comment between the first and last statement.
-                    // It is still necessary to visit the first statement to process all comments between
-                    // the previous node and the first statement.
-                    self.visit_stmt(first);
-                    self.preceding_node = Some(last.into());
-                } else {
-                    source_order::walk_body(self, body);
-                }
-            }
+        } else {
+            self.visit_stmt(first);
         }
     }
 
-    fn visit_identifier(&mut self, _identifier: &'ast ruff_python_ast::Identifier) {
+    fn visit_identifier(&mut self, _identifier: flat::View<'ast, ruff_python_ast::Identifier>) {
         // Skip identifiers, matching the formatter comment extraction
     }
 }

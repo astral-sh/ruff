@@ -4,7 +4,7 @@ use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::{self as ast, Expr, ExprContext};
+use ruff_python_ast::{self as ast, Expr, ExprContext, flat};
 use ruff_python_semantic::analyze::typing::traverse_literal;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -58,20 +58,20 @@ impl AlwaysFixableViolation for DuplicateLiteralMember {
 }
 
 /// PYI062
-pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
+pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, &expr: &flat::View<'a, Expr>) {
     let mut seen_nodes: HashSet<ComparableExpr<'_>, _> = FxHashSet::default();
-    let mut unique_nodes: Vec<&Expr> = Vec::new();
+    let mut unique_nodes: Vec<flat::View<'_, Expr>> = Vec::new();
     let mut diagnostics = Vec::new();
 
     // Adds a member to `literal_exprs` if it is a `Literal` annotation
-    let mut check_for_duplicate_members = |expr: &'a Expr, _: &'a Expr| {
+    let mut check_for_duplicate_members = |expr: flat::View<'a, Expr>, _: flat::View<'a, Expr>| {
         // If we've already seen this literal member, raise a violation.
         if seen_nodes.insert(expr.into()) {
             unique_nodes.push(expr);
         } else {
             diagnostics.push(checker.report_diagnostic(
                 DuplicateLiteralMember {
-                    duplicate_name: checker.generator().expr(expr),
+                    duplicate_name: checker.generator().expr_view(expr),
                 },
                 expr.range(),
             ));
@@ -86,22 +86,25 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
     }
 
     // If there's at least one diagnostic, create a fix to remove the duplicate members.
-    if let Expr::Subscript(subscript) = expr {
+    if let flat::ExprKind::Subscript(subscript) = expr.classify() {
         let subscript = Expr::Subscript(ast::ExprSubscript {
             slice: Box::new(if let [elt] = unique_nodes.as_slice() {
-                (*elt).clone()
+                (elt).to_owned_node()
             } else {
                 Expr::Tuple(ast::ExprTuple {
-                    elts: unique_nodes.into_iter().cloned().collect(),
+                    elts: unique_nodes
+                        .into_iter()
+                        .map(flat::View::to_owned_node)
+                        .collect(),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                     ctx: ExprContext::Load,
                     parenthesized: false,
                 })
             }),
-            value: subscript.value.clone(),
+            value: Box::new(subscript.value().to_owned_node()),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
             ctx: ExprContext::Load,
         });
         let fix = Fix::applicable_edit(

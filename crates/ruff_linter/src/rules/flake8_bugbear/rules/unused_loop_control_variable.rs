@@ -1,8 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::visitor::Visitor;
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::{NameFinder, StoredNameFinder};
-use ruff_python_ast::visitor::Visitor;
 use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
@@ -82,16 +83,19 @@ impl Violation for UnusedLoopControlVariable {
 }
 
 /// B007
-pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::StmtFor) {
+pub(crate) fn unused_loop_control_variable(
+    checker: &Checker,
+    stmt_for: flat::View<'_, ast::StmtFor>,
+) {
     let control_names = {
         let mut finder = StoredNameFinder::default();
-        finder.visit_expr(stmt_for.target.as_ref());
+        finder.visit_expr(stmt_for.target());
         finder.names
     };
 
     let used_names = {
         let mut finder = NameFinder::default();
-        for stmt in &stmt_for.body {
+        for stmt in stmt_for.body() {
             finder.visit_stmt(stmt);
         }
         finder.names
@@ -113,7 +117,7 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
         }
 
         // Avoid fixing any variables that _may_ be used, but undetectably so.
-        let certainty = if helpers::uses_magic_variable_access(&stmt_for.body, |id| {
+        let certainty = if helpers::uses_magic_variable_access(stmt_for.body(), |id| {
             checker.semantic().has_builtin_binding(id)
         }) {
             Certainty::Uncertain

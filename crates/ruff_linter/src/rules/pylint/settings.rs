@@ -1,5 +1,6 @@
 //! Settings for the `pylint` plugin.
 
+use ruff_python_ast::flat;
 use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -7,7 +8,7 @@ use std::fmt;
 use crate::display_settings;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
-use ruff_python_ast::{ExprNumberLiteral, LiteralExpressionRef, Number, UnaryOp};
+use ruff_python_ast::{Number, UnaryOp};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, CacheKey)]
 #[serde(untagged)]
@@ -21,20 +22,16 @@ pub enum AllowedValue {
 impl AllowedValue {
     pub(crate) fn matches_value(
         &self,
-        literal_expr: LiteralExpressionRef<'_>,
-        unary_op: Option<&UnaryOp>,
+        literal_expr: flat::LiteralExpression<'_>,
+        unary_op: Option<UnaryOp>,
     ) -> bool {
         match (self, literal_expr) {
-            (Self::String(allowed), LiteralExpressionRef::StringLiteral(string)) => {
-                unary_op.is_none() && allowed == string.value.to_str()
+            (Self::String(allowed), flat::LiteralExpression::StringLiteral(string)) => {
+                unary_op.is_none() && allowed == string.value().to_str()
             }
-            (
-                Self::Int(allowed),
-                LiteralExpressionRef::NumberLiteral(ExprNumberLiteral {
-                    value: Number::Int(value),
-                    ..
-                }),
-            ) => {
+            (Self::Int(allowed), flat::LiteralExpression::NumberLiteral(number))
+                if let Number::Int(value) = number.value() =>
+            {
                 let Some(value) = value.as_i64() else {
                     return false;
                 };
@@ -45,13 +42,9 @@ impl AllowedValue {
                 };
                 value == *allowed
             }
-            (
-                Self::Float(allowed),
-                LiteralExpressionRef::NumberLiteral(ExprNumberLiteral {
-                    value: Number::Float(value),
-                    ..
-                }),
-            ) => {
+            (Self::Float(allowed), flat::LiteralExpression::NumberLiteral(number))
+                if let Number::Float(value) = number.value() =>
+            {
                 let value = match unary_op {
                     None | Some(UnaryOp::UAdd) => *value,
                     Some(UnaryOp::USub) => -value,
@@ -104,18 +97,18 @@ pub enum ConstantType {
 }
 
 impl ConstantType {
-    pub(crate) fn try_from_literal_expr(literal_expr: LiteralExpressionRef<'_>) -> Option<Self> {
+    pub(crate) fn try_from_literal_expr(literal_expr: flat::LiteralExpression<'_>) -> Option<Self> {
         match literal_expr {
-            LiteralExpressionRef::StringLiteral(_) => Some(Self::Str),
-            LiteralExpressionRef::BytesLiteral(_) => Some(Self::Bytes),
-            LiteralExpressionRef::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
+            flat::LiteralExpression::StringLiteral(_) => Some(Self::Str),
+            flat::LiteralExpression::BytesLiteral(_) => Some(Self::Bytes),
+            flat::LiteralExpression::NumberLiteral(number) => match number.value() {
                 Number::Int(_) => Some(Self::Int),
                 Number::Float(_) => Some(Self::Float),
                 Number::Complex { .. } => Some(Self::Complex),
             },
-            LiteralExpressionRef::BooleanLiteral(_)
-            | LiteralExpressionRef::NoneLiteral(_)
-            | LiteralExpressionRef::EllipsisLiteral(_) => None,
+            flat::LiteralExpression::BooleanLiteral(_)
+            | flat::LiteralExpression::NoneLiteral(_)
+            | flat::LiteralExpression::EllipsisLiteral(_) => None,
         }
     }
 }

@@ -1,7 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::{Decorator, Expr, Parameters};
+use ruff_python_ast::{Decorator, Parameters};
 use ruff_python_semantic::analyze::visibility;
 
 use crate::Violation;
@@ -114,8 +115,8 @@ impl Violation for BooleanDefaultValuePositionalArgument {
 pub(crate) fn boolean_default_value_positional_argument(
     checker: &Checker,
     name: &str,
-    decorator_list: &[Decorator],
-    parameters: &Parameters,
+    decorator_list: flat::NodeList<'_, Decorator>,
+    parameters: flat::View<'_, Parameters>,
 ) {
     // https://github.com/astral-sh/ruff/issues/14535
     if checker.source_type.is_stub() {
@@ -126,11 +127,14 @@ pub(crate) fn boolean_default_value_positional_argument(
         return;
     }
 
-    for param in parameters.posonlyargs.iter().chain(&parameters.args) {
-        if param.default().is_some_and(Expr::is_boolean_literal_expr) {
+    for param in parameters.posonlyargs().iter().chain(parameters.args()) {
+        if param
+            .default()
+            .is_some_and(flat::View::is_boolean_literal_expr)
+        {
             // Allow Boolean defaults in setters.
             if decorator_list.iter().any(|decorator| {
-                UnqualifiedName::from_expr(&decorator.expression)
+                UnqualifiedName::from_expr(decorator.expression())
                     .is_some_and(|unqualified_name| unqualified_name.segments() == [name, "setter"])
             }) {
                 return;

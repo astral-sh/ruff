@@ -1,4 +1,5 @@
 use itertools::{EitherOrBoth, Itertools};
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::Tokens;
@@ -56,13 +57,13 @@ impl Violation for UnsortedImports {
     }
 }
 
-fn extract_range(body: &[&Stmt]) -> TextRange {
+fn extract_range(body: &[flat::View<'_, Stmt>]) -> TextRange {
     let location = body.first().unwrap().start();
     let end_location = body.last().unwrap().end();
     TextRange::new(location, end_location)
 }
 
-fn extract_indentation_range(body: &[&Stmt], locator: &Locator) -> TextRange {
+fn extract_indentation_range(body: &[flat::View<'_, Stmt>], locator: &Locator) -> TextRange {
     let location = body.first().unwrap().start();
 
     TextRange::new(locator.line_start(location), location)
@@ -102,9 +103,9 @@ pub(crate) fn organize_imports(
 
     // Special-cases: there's leading or trailing content in the import block. These
     // are too hard to get right, and relatively rare, so flag but don't fix.
-    if indexer.preceded_by_multi_statement_line(block.imports.first().unwrap(), locator.contents())
+    if indexer.preceded_by_multi_statement_line(*block.imports.first().unwrap(), locator.contents())
         || indexer
-            .followed_by_multi_statement_line(block.imports.last().unwrap(), locator.contents())
+            .followed_by_multi_statement_line(*block.imports.last().unwrap(), locator.contents())
     {
         context.report_diagnostic(UnsortedImports, range);
         return;

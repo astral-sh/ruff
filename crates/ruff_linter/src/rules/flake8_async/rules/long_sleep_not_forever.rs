@@ -1,5 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprCall, ExprNumberLiteral, Number};
+use ruff_python_ast::Number;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields as ast;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -62,7 +64,7 @@ impl Violation for LongSleepNotForever {
 }
 
 /// ASYNC116
-pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ExprCall) {
+pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ast::ExprCall<'_>) {
     if !(checker.semantic().seen_module(Modules::TRIO)
         || checker.semantic().seen_module(Modules::ANYIO))
     {
@@ -73,10 +75,7 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let Some(qualified_name) = checker
-        .semantic()
-        .resolve_qualified_name(call.func.as_ref())
-    else {
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func) else {
         return;
     };
 
@@ -95,9 +94,10 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ExprCall) {
         return;
     };
 
-    let Expr::NumberLiteral(ExprNumberLiteral { value, .. }) = arg else {
+    let flat::ExprKind::NumberLiteral(number_literal) = arg.classify() else {
         return;
     };
+    let value = number_literal.value();
 
     // TODO(ekohilas): Replace with Duration::from_days(1).as_secs(); when available.
     let one_day_in_secs = 60 * 60 * 24;
@@ -116,10 +116,7 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ExprCall) {
         Number::Complex { .. } => return,
     }
 
-    let Some(qualified_name) = checker
-        .semantic()
-        .resolve_qualified_name(call.func.as_ref())
-    else {
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func) else {
         return;
     };
 
@@ -135,7 +132,7 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(LongSleepNotForever { module }, call.range());
+    let mut diagnostic = checker.report_diagnostic(LongSleepNotForever { module }, call.range);
     let replacement_function = "sleep_forever";
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(

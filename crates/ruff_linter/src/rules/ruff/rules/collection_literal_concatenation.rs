@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat::{self, fields};
 use ruff_python_ast::{self as ast, Expr, ExprContext, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -70,112 +71,95 @@ impl Violation for CollectionLiteralConcatenation {
     }
 }
 
-fn make_splat_elts(
-    splat_element: &Expr,
-    other_elements: &[Expr],
-    splat_at_left: bool,
-) -> Vec<Expr> {
-    let mut new_elts = other_elements.to_owned();
-    let node = ast::ExprStarred {
-        value: Box::from(splat_element.clone()),
-        ctx: ExprContext::Load,
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    let splat = node.into();
-    if splat_at_left {
-        new_elts.insert(0, splat);
-    } else {
-        new_elts.push(splat);
-    }
-    new_elts
-}
-
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum Type {
     List,
     Tuple,
 }
 
-/// Recursively merge all the tuples and lists in the expression.
-fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
-    let Expr::BinOp(ast::ExprBinOp {
-        left,
-        op: Operator::Add,
-        right,
-        range: _,
-        node_index: _,
-    }) = expr
-    else {
+enum OperandType {
+    Collection(Type),
+    Splat,
+}
+
+enum Part<'a> {
+    Elements(flat::NodeList<'a, Expr>),
+    Splat(flat::View<'a, Expr>),
+}
+
+/// Collect operands in evaluation order. A splat takes its collection type from
+/// the other side of an addition. Two splats alone have no known collection type.
+fn collect_parts<'a>(expr: flat::View<'a, Expr>, parts: &mut Vec<Part<'a>>) -> Option<OperandType> {
+    match expr.classify() {
+        flat::ExprKind::List(list) => {
+            parts.push(Part::Elements(list.elts()));
+            Some(OperandType::Collection(Type::List))
+        }
+        flat::ExprKind::Tuple(tuple) => {
+            parts.push(Part::Elements(tuple.elts()));
+            Some(OperandType::Collection(Type::Tuple))
+        }
+        flat::ExprKind::BinOp(sum) if sum.op() == Operator::Add => {
+            let left = collect_parts(sum.left(), parts)?;
+            let right = collect_parts(sum.right(), parts)?;
+            match (left, right) {
+                (OperandType::Collection(a), OperandType::Collection(b)) if a == b => {
+                    Some(OperandType::Collection(a))
+                }
+                (OperandType::Collection(kind), OperandType::Splat)
+                | (OperandType::Splat, OperandType::Collection(kind)) => {
+                    Some(OperandType::Collection(kind))
+                }
+                _ => None,
+            }
+        }
+        flat::ExprKind::Call(_) | flat::ExprKind::Attribute(_) | flat::ExprKind::Name(_) => {
+            parts.push(Part::Splat(expr));
+            Some(OperandType::Splat)
+        }
+        flat::ExprKind::Subscript(subscript) if subscript.slice().is_slice_expr() => {
+            parts.push(Part::Splat(expr));
+            Some(OperandType::Splat)
+        }
+        _ => None,
+    }
+}
+
+fn concatenate_expressions(expr: flat::View<'_, Expr>) -> Option<(Expr, Type)> {
+    if !expr.is_bin_op_expr() {
+        return None;
+    }
+    let mut parts = Vec::new();
+    let OperandType::Collection(type_) = collect_parts(expr, &mut parts)? else {
         return None;
     };
-
-    let new_left = match left.as_ref() {
-        Expr::BinOp(ast::ExprBinOp { .. }) => match concatenate_expressions(left) {
-            Some((new_left, _)) => new_left,
-            None => *left.clone(),
-        },
-        _ => *left.clone(),
-    };
-
-    let new_right = match right.as_ref() {
-        Expr::BinOp(ast::ExprBinOp { .. }) => match concatenate_expressions(right) {
-            Some((new_right, _)) => new_right,
-            None => *right.clone(),
-        },
-        _ => *right.clone(),
-    };
-
-    // Figure out which way the splat is, and the type of the collection.
-    let (type_, splat_element, other_elements, splat_at_left) = match (&new_left, &new_right) {
-        (Expr::List(ast::ExprList { elts: l_elts, .. }), _) => {
-            (Type::List, &new_right, l_elts, false)
+    let mut new_elts = Vec::new();
+    for part in parts {
+        match part {
+            Part::Elements(elements) => {
+                new_elts.extend(elements.iter().map(flat::View::to_owned_node));
+            }
+            Part::Splat(element) => new_elts.push(Expr::Starred(ast::ExprStarred {
+                value: Box::new(element.to_owned_node()),
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+                node_index: ruff_python_ast::NodeIndex::NONE,
+            })),
         }
-        (Expr::Tuple(ast::ExprTuple { elts: l_elts, .. }), _) => {
-            (Type::Tuple, &new_right, l_elts, false)
-        }
-        (_, Expr::List(ast::ExprList { elts: r_elts, .. })) => {
-            (Type::List, &new_left, r_elts, true)
-        }
-        (_, Expr::Tuple(ast::ExprTuple { elts: r_elts, .. })) => {
-            (Type::Tuple, &new_left, r_elts, true)
-        }
-        _ => return None,
-    };
-
-    let new_elts = match splat_element {
-        // We'll be a bit conservative here; only calls, names and attribute accesses
-        // will be considered as splat elements.
-        Expr::Call(_) | Expr::Attribute(_) | Expr::Name(_) => {
-            make_splat_elts(splat_element, other_elements, splat_at_left)
-        }
-        // Subscripts are also considered safe-ish to splat if the indexer is a slice.
-        Expr::Subscript(ast::ExprSubscript { slice, .. }) if matches!(&**slice, Expr::Slice(_)) => {
-            make_splat_elts(splat_element, other_elements, splat_at_left)
-        }
-        // If the splat element is itself a list/tuple, insert them in the other list/tuple.
-        Expr::List(ast::ExprList { elts, .. }) if matches!(type_, Type::List) => {
-            other_elements.iter().chain(elts).cloned().collect()
-        }
-        Expr::Tuple(ast::ExprTuple { elts, .. }) if matches!(type_, Type::Tuple) => {
-            other_elements.iter().chain(elts).cloned().collect()
-        }
-        _ => return None,
-    };
-
+    }
     let new_expr = match type_ {
         Type::List => ast::ExprList {
             elts: new_elts,
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         }
         .into(),
         Type::Tuple => ast::ExprTuple {
             elts: new_elts,
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
             parenthesized: true,
         }
         .into(),
@@ -185,11 +169,14 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
 }
 
 /// RUF005
-pub(crate) fn collection_literal_concatenation(checker: &Checker, expr: &Expr) {
+pub(crate) fn collection_literal_concatenation(checker: &Checker, &expr: &flat::View<'_, Expr>) {
     // If the expression is already a child of an addition, we'll have analyzed it already.
     if matches!(
-        checker.semantic().current_expression_parent(),
-        Some(Expr::BinOp(ast::ExprBinOp {
+        checker
+            .semantic()
+            .current_expression_parent()
+            .map(flat::View::<Expr>::fields),
+        Some(fields::Expr::BinOp(fields::ExprBinOp {
             op: Operator::Add,
             ..
         }))
@@ -214,7 +201,7 @@ pub(crate) fn collection_literal_concatenation(checker: &Checker, expr: &Expr) {
     );
     if !checker
         .comment_ranges()
-        .has_comments(expr, checker.source())
+        .has_comments(&expr, checker.source())
     {
         // This suggestion could be unsafe if the non-literal expression in the
         // expression has overridden the `__add__` (or `__radd__`) magic methods.

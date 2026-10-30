@@ -1,6 +1,7 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprBinOp, Operator};
+use ruff_python_ast::flat::{self, fields};
+use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_semantic::{SemanticModel, analyze::typing::traverse_union};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
@@ -73,22 +74,19 @@ impl Violation for NeverUnion {
 }
 
 /// RUF020
-pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
+pub(crate) fn never_union(checker: &Checker, &expr: &flat::View<'_, Expr>) {
     let applicability = if checker.comment_ranges().intersects(expr.range()) {
         Applicability::Unsafe
     } else {
         Applicability::Safe
     };
 
-    match expr {
+    match expr.classify() {
         // Ex) `typing.NoReturn | int`
-        Expr::BinOp(ExprBinOp {
-            op: Operator::BitOr,
-            left,
-            right,
-            range: _,
-            node_index: _,
-        }) => {
+        flat::ExprKind::BinOp(expr_bin_op) if expr_bin_op.op() == Operator::BitOr => {
+            let left = expr_bin_op.left();
+            let right = expr_bin_op.right();
+
             // Analyze the left-hand side of the `|` operator.
             if let Some(never_like) = NeverLike::from_expr(left, checker.semantic()) {
                 let mut diagnostic = checker.report_diagnostic(
@@ -106,7 +104,7 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                 if !is_pep604_union_with_bare_none(checker.semantic()) {
                     diagnostic.set_fix(Fix::applicable_edit(
                         Edit::range_replacement(
-                            checker.locator().slice(right.as_ref()).to_string(),
+                            checker.locator().slice(right).to_string(),
                             expr.range(),
                         ),
                         applicability,
@@ -126,7 +124,7 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                 if !is_pep604_union_with_bare_none(checker.semantic()) {
                     diagnostic.set_fix(Fix::applicable_edit(
                         Edit::range_replacement(
-                            checker.locator().slice(left.as_ref()).to_string(),
+                            checker.locator().slice(left).to_string(),
                             expr.range(),
                         ),
                         applicability,
@@ -136,14 +134,15 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
         }
 
         // Ex) `typing.Union[typing.NoReturn, int]`
-        Expr::Subscript(ast::ExprSubscript {
-            value,
-            slice,
-            ctx: _,
-            range: _,
-            node_index: _,
-        }) if checker.semantic().match_typing_expr(value, "Union") => {
-            let Expr::Tuple(tuple_slice) = &**slice else {
+        flat::ExprKind::Subscript(expr_subscript)
+            if checker
+                .semantic()
+                .match_typing_expr(expr_subscript.value(), "Union") =>
+        {
+            let value = expr_subscript.value();
+            let slice = expr_subscript.slice();
+
+            let flat::ExprKind::Tuple(tuple_slice) = slice.classify() else {
                 return;
             };
 
@@ -154,7 +153,7 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                     let rest: Vec<Expr> = tuple_slice
                         .iter()
                         .filter(|other| *other != elt)
-                        .cloned()
+                        .map(flat::View::to_owned_node)
                         .collect();
 
                     // Ignore, e.g., `typing.Union[typing.NoReturn]`.
@@ -185,17 +184,17 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                                 checker
                                     .generator()
                                     .expr(&Expr::Subscript(ast::ExprSubscript {
-                                        value: value.clone(),
+                                        value: Box::new(value.to_owned_node()),
                                         slice: Box::new(Expr::Tuple(ast::ExprTuple {
                                             elts: rest,
                                             ctx: ast::ExprContext::Load,
                                             range: TextRange::default(),
-                                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                                            node_index: ruff_python_ast::NodeIndex::NONE,
                                             parenthesized: true,
                                         })),
                                         ctx: ast::ExprContext::Load,
                                         range: TextRange::default(),
-                                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                                        node_index: ruff_python_ast::NodeIndex::NONE,
                                     }))
                             },
                             expr.range(),
@@ -227,7 +226,7 @@ enum NeverLike {
 }
 
 impl NeverLike {
-    fn from_expr(expr: &Expr, semantic: &SemanticModel) -> Option<Self> {
+    fn from_expr(expr: flat::View<'_, Expr>, semantic: &SemanticModel) -> Option<Self> {
         let qualified_name = semantic.resolve_qualified_name(expr)?;
         if semantic.match_typing_qualified_name(&qualified_name, "NoReturn") {
             Some(NeverLike::NoReturn)
@@ -261,8 +260,8 @@ fn is_pep604_union_with_bare_none(semantic: &SemanticModel) -> bool {
         .skip(1)
         .take_while(|expr| {
             matches!(
-                expr,
-                Expr::BinOp(ExprBinOp {
+                expr.fields(),
+                fields::Expr::BinOp(fields::ExprBinOp {
                     op: Operator::BitOr,
                     ..
                 })
@@ -278,7 +277,7 @@ fn is_pep604_union_with_bare_none(semantic: &SemanticModel) -> bool {
 
     traverse_union(
         &mut |expr, _| {
-            if matches!(expr, Expr::NoneLiteral(_)) {
+            if matches!(expr.classify(), flat::ExprKind::NoneLiteral(_)) {
                 union_contains_bare_none = true;
             }
         },

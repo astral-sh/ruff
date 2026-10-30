@@ -1,4 +1,5 @@
 use ruff_python_ast::Stmt;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
@@ -53,7 +54,7 @@ impl Violation for DunderFunctionName {
 pub(crate) fn dunder_function_name(
     checker: &Checker,
     scope: &Scope,
-    stmt: &Stmt,
+    stmt: flat::View<'_, Stmt>,
     name: &str,
     ignore_names: &IgnoreNames,
 ) {

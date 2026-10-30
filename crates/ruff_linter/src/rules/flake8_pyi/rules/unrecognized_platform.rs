@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, CmpOp, Expr};
+use ruff_python_ast::{CmpOp, Expr, flat};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -100,8 +100,8 @@ impl Violation for UnrecognizedPlatformName {
 }
 
 /// PYI007, PYI008
-pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
-    let Expr::Compare(compare) = test else {
+pub(crate) fn unrecognized_platform(checker: &Checker, test: flat::View<'_, Expr>) {
+    let flat::ExprKind::Compare(compare) = test.classify() else {
         return;
     };
 
@@ -123,7 +123,8 @@ pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
         return;
     }
 
-    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = right {
+    if let flat::ExprKind::StringLiteral(string_literal) = right.classify() {
+        let value = string_literal.value();
         // Other values are possible but we don't need them right now.
         // This protects against typos.
         if checker.is_rule_enabled(Rule::UnrecognizedPlatformName) {

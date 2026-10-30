@@ -6,7 +6,8 @@ use crate::rules::airflow::helpers::{
 };
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Arguments, Expr, ExprAttribute, ExprCall, ExprName, name::QualifiedName};
+use ruff_python_ast::flat;
+use ruff_python_ast::{Arguments, Expr, name::QualifiedName};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
@@ -87,29 +88,29 @@ impl Violation for Airflow3SuggestedUpdate {
 }
 
 /// AIR311
-pub(crate) fn airflow_3_0_suggested_update_expr(checker: &Checker, expr: &Expr) {
+pub(crate) fn airflow_3_0_suggested_update_expr(checker: &Checker, &expr: &flat::View<'_, Expr>) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
 
-    match expr {
-        Expr::Call(ExprCall {
-            func, arguments, ..
-        }) => {
+    match expr.classify() {
+        flat::ExprKind::Call(expr_call) => {
+            let func = expr_call.func();
+            let arguments = expr_call.arguments();
+
             if let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) {
                 check_call_arguments(checker, &qualified_name, arguments);
             }
         }
-        Expr::Attribute(ExprAttribute { attr, .. }) => {
+        flat::ExprKind::Attribute(expr_attribute) => {
+            let attr = expr_attribute.attr();
+
             check_name(checker, expr, attr.range());
         }
-        Expr::Name(ExprName {
-            id: _,
-            ctx: _,
-            range,
-            node_index: _,
-        }) => {
-            check_name(checker, expr, *range);
+        flat::ExprKind::Name(expr_name) => {
+            let range = expr_name.range();
+
+            check_name(checker, expr, range);
         }
         _ => {}
     }
@@ -119,7 +120,7 @@ pub(crate) fn airflow_3_0_suggested_update_expr(checker: &Checker, expr: &Expr) 
 /// with a possible `replacement`.
 fn diagnostic_for_argument(
     checker: &Checker,
-    arguments: &Arguments,
+    arguments: flat::View<'_, Arguments>,
     deprecated: &str,
     replacement: Option<&'static str>,
 ) {
@@ -127,9 +128,8 @@ fn diagnostic_for_argument(
         return;
     };
     let range = keyword
-        .arg
-        .as_ref()
-        .map_or_else(|| keyword.range(), Ranged::range);
+        .arg()
+        .map_or_else(|| keyword.range(), |node| node.range());
     let mut diagnostic = checker.report_diagnostic(
         Airflow3SuggestedUpdate {
             deprecated: deprecated.to_string(),
@@ -157,7 +157,11 @@ fn diagnostic_for_argument(
 ///
 /// DAG(sla="@daily")
 /// ```
-fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, arguments: &Arguments) {
+fn check_call_arguments(
+    checker: &Checker,
+    qualified_name: &QualifiedName,
+    arguments: flat::View<'_, Arguments>,
+) {
     match qualified_name.segments() {
         ["airflow", .., "DAG" | "dag"] => {
             diagnostic_for_argument(checker, arguments, "sla_miss_callback", None);
@@ -187,7 +191,7 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
 /// # Or, directly
 /// Dataset()
 /// ```
-fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
+fn check_name(checker: &Checker, expr: flat::View<'_, Expr>, range: TextRange) {
     let semantic = checker.semantic();
 
     let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {

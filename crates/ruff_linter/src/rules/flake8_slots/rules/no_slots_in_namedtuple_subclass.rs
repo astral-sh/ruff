@@ -1,7 +1,11 @@
 use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt, StmtClassDef, identifier::Identifier};
+use ruff_python_ast::{
+    Expr, Stmt,
+    flat::{self, fields as ast},
+    identifier::Identifier,
+};
 use ruff_python_semantic::SemanticModel;
 
 use crate::Violation;
@@ -77,19 +81,22 @@ impl fmt::Display for NamedTupleKind {
 /// SLOT002
 pub(crate) fn no_slots_in_namedtuple_subclass(
     checker: &Checker,
-    stmt: &Stmt,
-    class: &StmtClassDef,
+    stmt: flat::View<'_, Stmt>,
+    class: &ast::StmtClassDef<'_>,
 ) {
     // https://github.com/astral-sh/ruff/issues/14535
     if checker.source_type.is_stub() {
         return;
     }
-    let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
+    let Some(ast::Arguments { args: bases, .. }) = class
+        .arguments
+        .map(flat::View::<ruff_python_ast::Arguments>::fields)
+    else {
         return;
     };
 
     if let Some(namedtuple_kind) = namedtuple_base(bases, checker.semantic()) {
-        if !has_slots(&class.body) {
+        if !has_slots(class.body) {
             checker.report_diagnostic(
                 NoSlotsInNamedtupleSubclass(namedtuple_kind),
                 stmt.identifier(),
@@ -100,10 +107,14 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
 
 /// If the class's bases consist solely of named tuples, return the kind of named tuple
 /// (either `collections.namedtuple()`, or `typing.NamedTuple()`). Otherwise, return `None`.
-fn namedtuple_base(bases: &[Expr], semantic: &SemanticModel) -> Option<NamedTupleKind> {
+fn namedtuple_base(
+    bases: flat::NodeList<'_, Expr>,
+    semantic: &SemanticModel,
+) -> Option<NamedTupleKind> {
     let mut kind = None;
     for base in bases {
-        if let Expr::Call(ast::ExprCall { func, .. }) = base {
+        if let flat::ExprKind::Call(call_node) = base.classify() {
+            let func = call_node.func();
             // Ex) `collections.namedtuple()`
             let qualified_name = semantic.resolve_qualified_name(func)?;
             match qualified_name.segments() {

@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_ast::flat;
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -56,15 +57,13 @@ impl Violation for RaiseVanillaArgs {
 }
 
 /// TRY003
-pub(crate) fn raise_vanilla_args(checker: &Checker, expr: &Expr) {
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, .. },
-        ..
-    }) = expr
-    else {
+pub(crate) fn raise_vanilla_args(checker: &Checker, expr: flat::View<'_, Expr>) {
+    let flat::ExprKind::Call(call) = expr.classify() else {
         return;
     };
+    let func = call.func();
+    let arguments = call.arguments();
+    let args = arguments.args();
 
     let Some(arg) = args.first() else {
         return;
@@ -86,18 +85,20 @@ pub(crate) fn raise_vanilla_args(checker: &Checker, expr: &Expr) {
 
 /// Returns `true` if an expression appears to be an exception message (i.e., a string with
 /// some whitespace).
-fn contains_message(expr: &Expr) -> bool {
-    match expr {
-        Expr::FString(ast::ExprFString { value, .. }) => {
+fn contains_message(expr: flat::View<'_, Expr>) -> bool {
+    match expr.classify() {
+        flat::ExprKind::FString(expr_f_string) => {
+            let value = expr_f_string.value();
+
             for f_string_part in value {
                 match f_string_part {
-                    ast::FStringPartRef::Literal(literal) => {
+                    ast::flat::FStringPartView::Literal(literal) => {
                         if literal.chars().any(char::is_whitespace) {
                             return true;
                         }
                     }
-                    ast::FStringPartRef::FString(f_string) => {
-                        for literal in f_string.elements.literals() {
+                    ast::flat::FStringPartView::FString(f_string) => {
+                        for literal in f_string.elements().literals() {
                             if literal.chars().any(char::is_whitespace) {
                                 return true;
                             }
@@ -106,8 +107,8 @@ fn contains_message(expr: &Expr) -> bool {
                 }
             }
         }
-        Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
-            if value.chars().any(char::is_whitespace) =>
+        flat::ExprKind::StringLiteral(expr_string_literal)
+            if expr_string_literal.value().chars().any(char::is_whitespace) =>
         {
             return true;
         }

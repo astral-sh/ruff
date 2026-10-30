@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
+use ruff_python_ast::flat;
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
@@ -48,6 +49,6 @@ impl Violation for Assert {
 }
 
 /// S101
-pub(crate) fn assert_used(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn assert_used(checker: &Checker, stmt: flat::View<'_, Stmt>) {
     checker.report_diagnostic(Assert, TextRange::at(stmt.start(), "assert".text_len()));
 }

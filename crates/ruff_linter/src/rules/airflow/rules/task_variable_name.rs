@@ -1,8 +1,8 @@
 use crate::Violation;
 use crate::codes::Category;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -47,26 +47,30 @@ impl Violation for AirflowVariableNameTaskIdMismatch {
 }
 
 /// AIR001
-pub(crate) fn variable_name_task_id(checker: &Checker, targets: &[Expr], value: &Expr) {
+pub(crate) fn variable_name_task_id(
+    checker: &Checker,
+    targets: flat::NodeList<'_, Expr>,
+    value: flat::View<'_, Expr>,
+) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
 
     // If we have more than one target, we can't do anything.
-    let [target] = targets else {
+    let Some([target]) = targets.as_array() else {
         return;
     };
-    let Expr::Name(ast::ExprName { id, .. }) = target else {
+    let flat::ExprKind::Name(name_node) = target.classify() else {
         return;
     };
+    let id = name_node.id();
 
     // If the value is not a call, we can't do anything.
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = value
-    else {
+    let flat::ExprKind::Call(call_node) = value.classify() else {
         return;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
     // If the function doesn't come from Airflow's operators module (builtin or providers), we
     // can't do anything.
@@ -101,8 +105,10 @@ pub(crate) fn variable_name_task_id(checker: &Checker, targets: &[Expr], value: 
     };
 
     // If the keyword argument is not a string, we can't do anything.
-    let Some(ast::ExprStringLiteral { value: task_id, .. }) =
-        keyword.value.as_string_literal_expr()
+    let Some(ast::ExprStringLiteral { value: task_id, .. }) = keyword
+        .value()
+        .as_string_literal_expr()
+        .map(flat::View::<ruff_python_ast::ExprStringLiteral>::fields)
     else {
         return;
     };

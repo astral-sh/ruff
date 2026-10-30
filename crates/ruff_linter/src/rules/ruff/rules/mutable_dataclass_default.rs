@@ -1,4 +1,7 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{
+    StmtClassDef,
+    flat::{self, fields as ast},
+};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
@@ -72,32 +75,35 @@ impl Violation for MutableDataclassDefault {
 }
 
 /// RUF008
-pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn mutable_dataclass_default(
+    checker: &Checker,
+    class_def: flat::View<'_, StmtClassDef>,
+) {
     let semantic = checker.semantic();
 
     let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic) else {
         return;
     };
 
-    for statement in &class_def.body {
-        let Stmt::AnnAssign(ast::StmtAnnAssign {
+    for statement in class_def.body() {
+        let ast::Stmt::AnnAssign(ast::StmtAnnAssign {
             annotation,
             value: Some(value),
             ..
-        }) = statement
+        }) = statement.fields()
         else {
             continue;
         };
 
-        let value = match &**value {
-            Expr::Call(ast::ExprCall {
+        let value = match value.fields() {
+            ast::Expr::Call(ast::ExprCall {
                 func, arguments, ..
             }) if is_mutable_default_in_dataclass_field_enabled(checker.settings())
                 && is_dataclass_field(func, checker.semantic(), dataclass_kind) =>
             {
                 arguments.find_argument_value("default", 0)
             }
-            value => Some(value),
+            value => Some(value.view()),
         };
 
         let Some(value) = value else {

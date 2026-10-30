@@ -1,10 +1,10 @@
 use std::cmp::Reverse;
 
-use ruff_python_ast::helpers::{map_callable, map_subscript};
+use ruff_python_ast::flat::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::transformer::{Transformer, walk_expr};
-use ruff_python_ast::{self as ast, Decorator, Expr, StringLiteralFlags};
+use ruff_python_ast::{self as ast, Decorator, Expr, StringLiteralFlags, flat};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{
@@ -127,16 +127,16 @@ pub(crate) fn is_valid_runtime_import(
 
 /// Returns the desired `RuntimeSemantics` for a function's annotations
 pub(crate) fn function_annotation_runtime_semantics(
-    function_def: &ast::StmtFunctionDef,
+    function_def: flat::View<'_, ast::StmtFunctionDef>,
     semantic: &SemanticModel,
     settings: &LinterSettings,
 ) -> RuntimeSemantics {
-    decorator_runtime_semantics(&function_def.decorator_list, semantic, settings)
+    decorator_runtime_semantics(function_def.decorator_list(), semantic, settings)
 }
 
 /// Returns the desired `RuntimeSemantics` for a class's annotations
 pub(crate) fn class_annotation_runtime_semantics(
-    class_def: &ast::StmtClassDef,
+    class_def: flat::View<'_, ast::StmtClassDef>,
     semantic: &SemanticModel,
     settings: &LinterSettings,
 ) -> RuntimeSemantics {
@@ -145,7 +145,7 @@ pub(crate) fn class_annotation_runtime_semantics(
         return semantics;
     }
     semantics.combine(decorator_runtime_semantics(
-        &class_def.decorator_list,
+        class_def.decorator_list(),
         semantic,
         settings,
     ))
@@ -153,7 +153,7 @@ pub(crate) fn class_annotation_runtime_semantics(
 
 /// Returns `RuntimeSemantics` based on a class's base class.
 fn base_class_runtime_semantics(
-    class_def: &ast::StmtClassDef,
+    class_def: flat::View<'_, ast::StmtClassDef>,
     semantic: &SemanticModel,
     settings: &LinterSettings,
 ) -> RuntimeSemantics {
@@ -184,7 +184,7 @@ fn base_class_runtime_semantics(
 }
 
 fn decorator_runtime_semantics(
-    decorator_list: &[Decorator],
+    decorator_list: flat::NodeList<'_, Decorator>,
     semantic: &SemanticModel,
     settings: &LinterSettings,
 ) -> RuntimeSemantics {
@@ -194,7 +194,7 @@ fn decorator_runtime_semantics(
     }
     let mut result = RuntimeSemantics::Default;
     for decorator in decorator_list {
-        let expression = map_callable(&decorator.expression);
+        let expression = map_callable(decorator.expression());
         match semantic
             // First try to resolve the qualified name normally for cases like:
             // ```python
@@ -238,16 +238,19 @@ fn decorator_runtime_semantics(
 /// `typing.ClassVar` within a `@dataclass` class definition.
 ///
 /// See: <https://docs.python.org/3/library/dataclasses.html#init-only-variables>
-pub(crate) fn is_dataclass_meta_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+pub(crate) fn is_dataclass_meta_annotation(
+    annotation: flat::View<'_, Expr>,
+    semantic: &SemanticModel,
+) -> bool {
     if !semantic.seen_module(Modules::DATACLASSES) {
         return false;
     }
 
     // Determine whether the assignment is in a `@dataclass` class definition.
     if let ScopeKind::Class(class_def) = semantic.current_scope().kind {
-        if class_def.decorator_list.iter().any(|decorator| {
+        if class_def.decorator_list().iter().any(|decorator| {
             semantic
-                .resolve_qualified_name(map_callable(&decorator.expression))
+                .resolve_qualified_name(map_callable(decorator.expression()))
                 .is_some_and(|qualified_name| {
                     matches!(qualified_name.segments(), ["dataclasses", "dataclass"])
                 })
@@ -279,12 +282,12 @@ pub(crate) fn is_dataclass_meta_annotation(annotation: &Expr, semantic: &Semanti
 ///     ...
 /// ```
 fn is_singledispatch_interface(
-    function_def: &ast::StmtFunctionDef,
+    function_def: flat::View<'_, ast::StmtFunctionDef>,
     semantic: &SemanticModel,
 ) -> bool {
-    function_def.decorator_list.iter().any(|decorator| {
+    function_def.decorator_list().iter().any(|decorator| {
         semantic
-            .resolve_qualified_name(&decorator.expression)
+            .resolve_qualified_name(decorator.expression())
             .is_some_and(|qualified_name| {
                 matches!(
                     qualified_name.segments(),
@@ -310,19 +313,19 @@ fn is_singledispatch_interface(
 ///     ...
 /// ```
 pub(crate) fn is_singledispatch_implementation(
-    function_def: &ast::StmtFunctionDef,
+    function_def: flat::View<'_, ast::StmtFunctionDef>,
     semantic: &SemanticModel,
 ) -> bool {
-    function_def.decorator_list.iter().any(|decorator| {
-        let Expr::Attribute(attribute) = &decorator.expression else {
+    function_def.decorator_list().iter().any(|decorator| {
+        let flat::ExprKind::Attribute(attribute) = decorator.expression().classify() else {
             return false;
         };
 
-        if attribute.attr.as_str() != "register" {
+        if attribute.attr().as_str() != "register" {
             return false;
         }
 
-        let Some(id) = semantic.lookup_attribute(attribute.value.as_ref()) else {
+        let Some(id) = semantic.lookup_attribute(attribute.value()) else {
             return false;
         };
 
@@ -336,7 +339,7 @@ pub(crate) fn is_singledispatch_implementation(
             return false;
         };
 
-        is_singledispatch_interface(function_def, semantic)
+        is_singledispatch_interface(*function_def, semantic)
     })
 }
 
@@ -358,26 +361,29 @@ pub(crate) fn quote_annotation(
 ) -> Edit {
     let expr = semantic.expression(node_id).expect("Expression not found");
     if let Some(parent_id) = semantic.parent_expression_id(node_id) {
-        match semantic.expression(parent_id) {
-            Some(Expr::Subscript(parent)) if expr == parent.value.as_ref() => {
+        match semantic
+            .expression(parent_id)
+            .map(flat::View::<Expr>::classify)
+        {
+            Some(flat::ExprKind::Subscript(parent)) if expr == parent.value() => {
                 // If we're quoting the value of a subscript, we need to quote the entire
                 // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
                 // should generate `"DataFrame[int]"`.
                 return quote_annotation(parent_id, semantic, stylist, locator, flags);
             }
-            Some(Expr::Attribute(parent)) if expr == parent.value.as_ref() => {
+            Some(flat::ExprKind::Attribute(parent)) if expr == parent.value() => {
                 // If we're quoting the value of an attribute, we need to quote the entire
                 // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
                 // should generate `"pd.DataFrame"`.
                 return quote_annotation(parent_id, semantic, stylist, locator, flags);
             }
-            Some(Expr::Call(parent)) if expr == parent.func.as_ref() => {
+            Some(flat::ExprKind::Call(parent)) if expr == parent.func() => {
                 // If we're quoting the function of a call, we need to quote the entire
                 // expression. For example, when quoting `DataFrame` in `DataFrame()`, we
                 // should generate `"DataFrame()"`.
                 return quote_annotation(parent_id, semantic, stylist, locator, flags);
             }
-            Some(Expr::BinOp(parent)) if parent.op.is_bit_or() => {
+            Some(flat::ExprKind::BinOp(parent)) if parent.op().is_bit_or() => {
                 // If we're quoting the left or right side of a binary operation, we need to
                 // quote the entire expression. For example, when quoting `DataFrame` in
                 // `DataFrame | Series`, we should generate `"DataFrame | Series"`.
@@ -399,7 +405,7 @@ pub(crate) fn quote_annotation(
 /// In most cases you want to call [`quote_annotation`] instead, which provides
 /// that guarantee by expanding the expression before calling into this function.
 pub(crate) fn quote_type_expression(
-    expr: &Expr,
+    expr: flat::View<'_, Expr>,
     semantic: &SemanticModel,
     stylist: &Stylist,
     locator: &Locator,
@@ -453,8 +459,8 @@ impl<'a> QuoteAnnotator<'a> {
         }
     }
 
-    fn into_annotation(self, expr: &Expr) -> String {
-        let mut expr_without_forward_references = expr.clone();
+    fn into_annotation(self, expr: flat::View<'_, Expr>) -> String {
+        let mut expr_without_forward_references = expr.to_owned_node();
         self.visit_expr(&mut expr_without_forward_references);
         let generator = Generator::from(self.stylist);
         // we first generate the annotation with the inverse quote, so we can
@@ -463,7 +469,7 @@ impl<'a> QuoteAnnotator<'a> {
         let annotation = subgenerator.expr(&expr_without_forward_references);
         generator.expr(&Expr::from(ast::StringLiteral {
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
             value: annotation.into_boxed_str(),
             flags: self.flags,
         }))
@@ -490,7 +496,8 @@ impl Transformer for QuoteAnnotator<'_> {
     fn visit_expr(&self, expr: &mut Expr) {
         match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-                if let Some(qualified_name) = self.semantic.resolve_qualified_name(value) {
+                let value = flat::Tree::from(value.as_ref());
+                if let Some(qualified_name) = self.semantic.resolve_qualified_name(value.root()) {
                     if self
                         .semantic
                         .match_typing_qualified_name(&qualified_name, "Literal")
@@ -514,8 +521,11 @@ impl Transformer for QuoteAnnotator<'_> {
                 // literal node with the parsed expression, if we fail to
                 // parse the forward reference, we just keep treating this
                 // like a regular string literal
-                if let Ok(annotation) = parse_type_annotation(literal, self.locator.contents()) {
-                    *expr = annotation.expression().clone();
+                let literal = flat::Tree::from(&*literal);
+                if let Ok(annotation) =
+                    parse_type_annotation(literal.root(), self.locator.contents())
+                {
+                    *expr = annotation.expression().to_owned_node();
                     // we need to visit the parsed expression too
                     // since it may contain forward references itself
                     self.visit_expr(expr);

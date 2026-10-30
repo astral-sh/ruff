@@ -1,6 +1,7 @@
 use ruff_diagnostics::Applicability;
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{BoolOp, CmpOp, Expr};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::side_effect;
@@ -50,26 +51,26 @@ impl AlwaysFixableViolation for UnnecessaryKeyCheck {
 }
 
 /// RUF019
-pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
+pub(crate) fn unnecessary_key_check(checker: &Checker, &expr: &flat::View<'_, Expr>) {
     if !checker.semantic().in_boolean_test() {
         return;
     }
 
-    let Expr::BoolOp(ast::ExprBoolOp {
+    let ast::Expr::BoolOp(ast::ExprBoolOp {
         op: BoolOp::And,
         values,
         ..
-    }) = expr
+    }) = expr.fields()
     else {
         return;
     };
 
-    let [left, right] = values.as_slice() else {
+    let Some([left, right]) = values.as_array() else {
         return;
     };
 
     // Left should be, e.g., `key in dct`.
-    let Expr::Compare(compare) = left else {
+    let flat::ExprKind::Compare(compare) = left.classify() else {
         return;
     };
 
@@ -78,14 +79,11 @@ pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
     };
 
     // Right should be, e.g., `dct[key]`.
-    let Expr::Subscript(ast::ExprSubscript {
-        value: obj_right,
-        slice: key_right,
-        ..
-    }) = right
-    else {
+    let flat::ExprKind::Subscript(subscript) = right.classify() else {
         return;
     };
+    let obj_right = subscript.value();
+    let key_right = subscript.slice();
 
     if ComparableExpr::from(obj_left) != ComparableExpr::from(obj_right)
         || ComparableExpr::from(key_left) != ComparableExpr::from(key_right)
@@ -114,11 +112,11 @@ pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
             format!(
                 "{}.get({})",
                 checker.locator().slice(
-                    parenthesized_range(obj_right.into(), right.into(), checker.tokens(),)
+                    parenthesized_range(obj_right, right.into(), checker.tokens(),)
                         .unwrap_or(obj_right.range())
                 ),
                 checker.locator().slice(
-                    parenthesized_range(key_right.into(), right.into(), checker.tokens(),)
+                    parenthesized_range(key_right, right.into(), checker.tokens(),)
                         .unwrap_or(key_right.range())
                 ),
             ),

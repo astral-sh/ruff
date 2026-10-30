@@ -4,7 +4,8 @@ use std::str::FromStr;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
-    BytesLiteral, Expr, ExprBytesLiteral, ExprCall, ExprStringLiteral, PythonVersion, StringLiteral,
+    BytesLiteral, Expr, PythonVersion, StringLiteral,
+    flat::{self, fields as ast},
 };
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
@@ -133,24 +134,29 @@ enum PatternKind {
 }
 
 /// RUF039
-pub(crate) fn unraw_re_pattern(checker: &Checker, call: &ExprCall) {
+pub(crate) fn unraw_re_pattern(checker: &Checker, call: &ast::ExprCall<'_>) {
     let semantic = checker.semantic();
 
     if !semantic.seen_module(Modules::RE) && !semantic.seen_module(Modules::REGEX) {
         return;
     }
 
-    let Some((module, func)) = regex_module_and_func(semantic, call.func.as_ref()) else {
+    let Some((module, func)) = regex_module_and_func(semantic, call.func) else {
         return;
     };
 
-    match call.arguments.args.as_ref().first() {
-        Some(Expr::StringLiteral(ExprStringLiteral { value, .. })) => {
+    match call
+        .arguments
+        .args()
+        .first()
+        .map(flat::View::<Expr>::fields)
+    {
+        Some(ast::Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) => {
             value
                 .iter()
                 .for_each(|part| check_string(checker, part, module, func));
         }
-        Some(Expr::BytesLiteral(ExprBytesLiteral { value, .. })) => {
+        Some(ast::Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. })) => {
             value
                 .iter()
                 .for_each(|part| check_bytes(checker, part, module, func));
@@ -161,7 +167,7 @@ pub(crate) fn unraw_re_pattern(checker: &Checker, call: &ExprCall) {
 
 fn regex_module_and_func<'model>(
     semantic: &SemanticModel<'model>,
-    expr: &'model Expr,
+    expr: flat::View<'model, Expr>,
 ) -> Option<(RegexModule, &'model str)> {
     let qualified_name = semantic.resolve_qualified_name(expr)?;
 
@@ -178,14 +184,19 @@ fn regex_module_and_func<'model>(
     None
 }
 
-fn check_string(checker: &Checker, literal: &StringLiteral, module: RegexModule, func: &str) {
-    if literal.flags.prefix().is_raw() {
+fn check_string(
+    checker: &Checker,
+    literal: flat::View<'_, StringLiteral>,
+    module: RegexModule,
+    func: &str,
+) {
+    if literal.flags().prefix().is_raw() {
         return;
     }
 
     let kind = PatternKind::String;
     let func = func.to_string();
-    let range = literal.range;
+    let range = literal.range();
     let mut diagnostic = checker.report_diagnostic(UnrawRePattern { module, func, kind }, range);
 
     let Some(applicability) = raw_string_applicability(checker, literal) else {
@@ -203,8 +214,11 @@ fn check_string(checker: &Checker, literal: &StringLiteral, module: RegexModule,
 /// ## Returns
 ///  * `None` if the prefix cannot be added,
 ///  * `Some(a)` if it can be added with applicability `a`.
-fn raw_string_applicability(checker: &Checker, literal: &StringLiteral) -> Option<Applicability> {
-    if literal.flags.prefix().is_unicode() {
+fn raw_string_applicability(
+    checker: &Checker,
+    literal: flat::View<'_, StringLiteral>,
+) -> Option<Applicability> {
+    if literal.flags().prefix().is_unicode() {
         // The (no-op) `u` prefix is a syntax error when combined with `r`
         return None;
     }
@@ -228,14 +242,19 @@ fn raw_string_applicability(checker: &Checker, literal: &StringLiteral) -> Optio
     // re.compile("\a\f\n\N{Partial Differential}\r\t\u27F2\U0001F0A1\v\x41")  # with unsafe fix
 }
 
-fn check_bytes(checker: &Checker, literal: &BytesLiteral, module: RegexModule, func: &str) {
-    if literal.flags.prefix().is_raw() {
+fn check_bytes(
+    checker: &Checker,
+    literal: flat::View<'_, BytesLiteral>,
+    module: RegexModule,
+    func: &str,
+) {
+    if literal.flags().prefix().is_raw() {
         return;
     }
 
     let kind = PatternKind::Bytes;
     let func = func.to_string();
-    let range = literal.range;
+    let range = literal.range();
     let mut diagnostic = checker.report_diagnostic(UnrawRePattern { module, func, kind }, range);
 
     let Some(applicability) = raw_byte_applicability(checker, literal) else {
@@ -253,7 +272,10 @@ fn check_bytes(checker: &Checker, literal: &BytesLiteral, module: RegexModule, f
 /// ## Returns
 ///  * `None` if the prefix cannot be added,
 ///  * `Some(a)` if it can be added with applicability `a`.
-fn raw_byte_applicability(checker: &Checker, literal: &BytesLiteral) -> Option<Applicability> {
+fn raw_byte_applicability(
+    checker: &Checker,
+    literal: flat::View<'_, BytesLiteral>,
+) -> Option<Applicability> {
     raw_applicability(checker, literal.range(), |escaped| {
         matches!(escaped, Some('a' | 'f' | 'n' | 'r' | 't' | 'v' | 'x'))
     })

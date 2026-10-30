@@ -1,5 +1,5 @@
-use ruff_python_ast::{self as ast};
-use ruff_python_ast::{ExceptHandler, Expr};
+use ruff_python_ast::ExceptHandler;
+use ruff_python_ast::flat::{self, fields as ast};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -56,22 +56,26 @@ impl Violation for ExceptWithEmptyTuple {
 }
 
 /// B029
-pub(crate) fn except_with_empty_tuple(checker: &Checker, except_handler: &ExceptHandler) {
-    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) =
-        except_handler;
+pub(crate) fn except_with_empty_tuple(
+    checker: &Checker,
+    except_handler: flat::View<'_, ExceptHandler>,
+) {
+    let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) =
+        except_handler.fields();
     let Some(type_) = type_ else {
         return;
     };
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = type_.as_ref() else {
+    let flat::ExprKind::Tuple(tuple_node) = type_.classify() else {
         return;
     };
+    let elts = tuple_node.elts();
 
     if elts.is_empty() {
         let is_star = checker
             .semantic()
             .current_statement()
             .as_try_stmt()
-            .is_some_and(|try_stmt| try_stmt.is_star);
+            .is_some_and(flat::View::is_star);
         checker.report_diagnostic(ExceptWithEmptyTuple { is_star }, except_handler.range());
     }
 }

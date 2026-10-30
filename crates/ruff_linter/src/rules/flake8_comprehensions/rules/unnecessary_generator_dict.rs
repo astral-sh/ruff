@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, Keyword};
+use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -7,8 +8,6 @@ use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Fix};
 
 use crate::rules::flake8_comprehensions::fixes;
-
-use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for unnecessary generators that can be rewritten as dict
@@ -50,26 +49,20 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorDict {
 /// C402 (`dict((x, y) for x, y in iterable)`)
 pub(crate) fn unnecessary_generator_dict(
     checker: &Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
+    expr: flat::View<'_, Expr>,
+    argument: flat::View<'_, Expr>,
 ) {
-    let Some(argument) =
-        helpers::exactly_one_argument_with_matching_function("dict", func, args, keywords)
-    else {
+    let flat::ExprKind::Generator(generator_node) = argument.classify() else {
         return;
     };
-    let Expr::Generator(ast::ExprGenerator { elt, .. }) = argument else {
+    let elt = generator_node.elt();
+    let flat::ExprKind::Tuple(tuple) = elt.classify() else {
         return;
     };
-    let Expr::Tuple(tuple) = &**elt else {
-        return;
-    };
-    if tuple.len() != 2 {
+    if tuple.elts().len() != 2 {
         return;
     }
-    if tuple.iter().any(Expr::is_starred_expr) {
+    if tuple.iter().any(flat::View::is_starred_expr) {
         return;
     }
     let mut diagnostic = checker.report_diagnostic(UnnecessaryGeneratorDict, expr.range());

@@ -1,6 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprSubscript, PythonVersion};
+use ruff_python_ast::flat;
+use ruff_python_ast::{ExprSubscript, PythonVersion};
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -58,7 +60,7 @@ impl Violation for NonPEP646Unpack {
 }
 
 /// UP044
-pub(crate) fn use_pep646_unpack(checker: &Checker, expr: &ExprSubscript) {
+pub(crate) fn use_pep646_unpack(checker: &Checker, expr: flat::View<'_, ExprSubscript>) {
     if checker.target_version() < PythonVersion::PY311 {
         return;
     }
@@ -67,12 +69,9 @@ pub(crate) fn use_pep646_unpack(checker: &Checker, expr: &ExprSubscript) {
         return;
     }
 
-    let ExprSubscript {
-        range,
-        value,
-        slice,
-        ..
-    } = expr;
+    let range = expr.range();
+    let value = expr.value();
+    let slice = expr.slice();
 
     // Skip semantically invalid subscript calls (e.g. `Unpack[str | num]`).
     if !(slice.is_name_expr() || slice.is_subscript_expr() || slice.is_attribute_expr()) {
@@ -94,19 +93,19 @@ pub(crate) fn use_pep646_unpack(checker: &Checker, expr: &ExprSubscript) {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(NonPEP646Unpack, *range);
+    let mut diagnostic = checker.report_diagnostic(NonPEP646Unpack, range);
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        format!("*{}", checker.locator().slice(slice.as_ref())),
-        *range,
+        format!("*{}", checker.locator().slice(slice)),
+        range,
     )));
 }
 
 /// Determine whether the [`ExprSubscript`] is in a subscript index (e.g., `Generic[Unpack[int]]`).
-fn in_subscript_index(expr: &ExprSubscript, semantic: &SemanticModel) -> bool {
+fn in_subscript_index(expr: flat::View<'_, ExprSubscript>, semantic: &SemanticModel) -> bool {
     let parent = semantic
         .current_expressions()
         .skip(1)
-        .find_map(|expr| expr.as_subscript_expr());
+        .find_map(flat::View::as_subscript_expr);
 
     let Some(parent) = parent else {
         return false;
@@ -114,7 +113,7 @@ fn in_subscript_index(expr: &ExprSubscript, semantic: &SemanticModel) -> bool {
 
     // E.g., `Generic[Unpack[int]]`.
     if parent
-        .slice
+        .slice()
         .as_subscript_expr()
         .is_some_and(|slice| slice == expr)
     {
@@ -122,9 +121,9 @@ fn in_subscript_index(expr: &ExprSubscript, semantic: &SemanticModel) -> bool {
     }
 
     // E.g., `Generic[DType, Unpack[int]]`.
-    if parent.slice.as_tuple_expr().is_some_and(|slice| {
+    if parent.slice().as_tuple_expr().is_some_and(|slice| {
         slice
-            .elts
+            .elts()
             .iter()
             .any(|elt| elt.as_subscript_expr().is_some_and(|elt| elt == expr))
     }) {
@@ -136,7 +135,7 @@ fn in_subscript_index(expr: &ExprSubscript, semantic: &SemanticModel) -> bool {
 
 /// Determine whether the [`ExprSubscript`] is attached to a variadic argument in a function
 /// definition (e.g., `def f(*args: Unpack[int])`).
-fn in_vararg(expr: &ExprSubscript, semantic: &SemanticModel) -> bool {
+fn in_vararg(expr: flat::View<'_, ExprSubscript>, semantic: &SemanticModel) -> bool {
     let parent = semantic.current_statement().as_function_def_stmt();
 
     let Some(parent) = parent else {
@@ -144,10 +143,9 @@ fn in_vararg(expr: &ExprSubscript, semantic: &SemanticModel) -> bool {
     };
 
     parent
-        .parameters
-        .vararg
-        .as_ref()
-        .and_then(|vararg| vararg.annotation())
-        .and_then(Expr::as_subscript_expr)
+        .parameters()
+        .vararg()
+        .and_then(flat::View::<ruff_python_ast::Parameter>::annotation)
+        .and_then(flat::View::as_subscript_expr)
         == Some(expr)
 }

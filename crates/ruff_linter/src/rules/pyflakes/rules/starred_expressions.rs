@@ -1,4 +1,5 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 use ruff_text_size::TextRange;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -59,7 +60,7 @@ impl Violation for MultipleStarredExpressions {
 /// F621
 pub(crate) fn starred_expressions(
     checker: &Checker,
-    elts: &[Expr],
+    elts: flat::NodeList<'_, Expr>,
     check_too_many_expressions: bool,
     location: TextRange,
 ) {

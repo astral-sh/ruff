@@ -1,4 +1,5 @@
 use memchr::memchr2_iter;
+use ruff_python_ast::flat;
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -82,7 +83,10 @@ impl AlwaysFixableViolation for MissingFStringSyntax {
 }
 
 /// RUF027
-pub(crate) fn missing_fstring_syntax(checker: &Checker, literal: &ast::StringLiteral) {
+pub(crate) fn missing_fstring_syntax(
+    checker: &Checker,
+    literal: flat::View<'_, ast::StringLiteral>,
+) {
     let semantic = checker.semantic();
 
     // fstrings are never correct as type definitions
@@ -92,9 +96,10 @@ pub(crate) fn missing_fstring_syntax(checker: &Checker, literal: &ast::StringLit
 
     // we want to avoid statement expressions that are just a string literal.
     // there's no reason to have standalone f-strings and this lets us avoid docstrings too
-    if let ast::Stmt::Expr(ast::StmtExpr { value, .. }) = semantic.current_statement() {
-        match value.as_ref() {
-            ast::Expr::StringLiteral(_) | ast::Expr::FString(_) => return,
+    if let flat::StmtKind::Expr(expr_node) = semantic.current_statement().classify() {
+        let value = expr_node.value();
+        match value.classify() {
+            flat::ExprKind::StringLiteral(_) | flat::ExprKind::FString(_) => return,
             _ => {}
         }
     }
@@ -110,11 +115,11 @@ pub(crate) fn missing_fstring_syntax(checker: &Checker, literal: &ast::StringLit
     // - Expressions where a method is immediately called on the string literal
     if semantic
         .current_expressions()
-        .filter_map(ast::Expr::as_call_expr)
+        .filter_map(flat::View::as_call_expr)
         .any(|call_expr| {
             is_method_call_on_literal(call_expr, literal)
                 || is_gettext(call_expr, semantic)
-                || is_logger_candidate(&call_expr.func, semantic, logger_objects)
+                || is_logger_candidate(call_expr.func(), semantic, logger_objects)
                 || (fastapi_seen && is_fastapi_route_call(call_expr, semantic))
         })
     {
@@ -143,13 +148,17 @@ pub(crate) fn missing_fstring_syntax(checker: &Checker, literal: &ast::StringLit
 /// and replace the original string with its translated counterpart. If the
 /// string contains variable placeholders or formatting, it can complicate the
 /// translation process, lead to errors or incorrect translations.
-fn is_gettext(call_expr: &ast::ExprCall, semantic: &SemanticModel) -> bool {
-    let func = &*call_expr.func;
-    let short_circuit = match func {
-        ast::Expr::Name(ast::ExprName { id, .. }) => {
+fn is_gettext(call_expr: flat::View<'_, ast::ExprCall>, semantic: &SemanticModel) -> bool {
+    let func = call_expr.func();
+    let short_circuit = match func.classify() {
+        flat::ExprKind::Name(expr_name) => {
+            let id = expr_name.id();
+
             matches!(id.as_str(), "gettext" | "ngettext" | "_")
         }
-        ast::Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+        flat::ExprKind::Attribute(expr_attribute) => {
+            let attr = expr_attribute.attr();
+
             matches!(attr.as_str(), "gettext" | "ngettext")
         }
         _ => false,
@@ -174,25 +183,30 @@ fn is_gettext(call_expr: &ast::ExprCall, semantic: &SemanticModel) -> bool {
 ///
 /// For example: `expr` is a node representing the expression `"{foo}".format(foo="bar")`,
 /// and `literal` is the node representing the string literal `"{foo}"`.
-fn is_method_call_on_literal(call_expr: &ast::ExprCall, literal: &ast::StringLiteral) -> bool {
-    let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = &*call_expr.func else {
+fn is_method_call_on_literal(
+    call_expr: flat::View<'_, ast::ExprCall>,
+    literal: flat::View<'_, ast::StringLiteral>,
+) -> bool {
+    let flat::ExprKind::Attribute(attribute) = call_expr.func().classify() else {
         return false;
     };
-    let ast::Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &**value else {
+    let value = attribute.value();
+    let flat::ExprKind::StringLiteral(string_literal) = value.classify() else {
         return false;
     };
-    value.as_slice().contains(literal)
+    let value = string_literal.value();
+    value.iter().any(|part| part.is_same_node(literal))
 }
 
 /// Returns `true` if `literal` is likely an f-string with a missing `f` prefix.
 /// See [`MissingFStringSyntax`] for the validation criteria.
 fn should_be_fstring(
-    literal: &ast::StringLiteral,
+    literal: flat::View<'_, ast::StringLiteral>,
     locator: &Locator,
     semantic: &SemanticModel,
     target_version: PythonVersion,
 ) -> bool {
-    if !has_brackets(&literal.value) {
+    if !has_brackets(literal.value()) {
         return false;
     }
 
@@ -214,23 +228,27 @@ fn should_be_fstring(
     }
 
     // Note: Range offsets for `value` are based on `fstring_expr`
-    let ast::Expr::FString(ast::ExprFString { value, .. }) = parsed.expr() else {
+    let flat::ExprKind::FString(f_string_node) = parsed.expr().classify() else {
         return false;
     };
+    let value = f_string_node.value();
 
     let mut arg_names = FxHashSet::default();
     for expr in semantic
         .current_expressions()
-        .filter_map(ast::Expr::as_call_expr)
+        .filter_map(flat::View::as_call_expr)
     {
-        let ast::Arguments { keywords, args, .. } = &expr.arguments;
+        let arguments_node = expr.arguments();
+        let keywords = arguments_node.keywords();
+        let args = arguments_node.args();
         for keyword in keywords {
-            if let Some(ident) = keyword.arg.as_ref() {
-                arg_names.insert(&ident.id);
+            if let Some(ident) = keyword.arg() {
+                arg_names.insert(ident.id());
             }
         }
         for arg in args {
-            if let ast::Expr::Name(ast::ExprName { id, .. }) = arg {
+            if let flat::ExprKind::Name(name_node) = arg.classify() {
+                let id = name_node.id();
                 arg_names.insert(id);
             }
         }
@@ -238,8 +256,9 @@ fn should_be_fstring(
 
     for f_string in value.f_strings() {
         let mut has_name = false;
-        for element in f_string.elements.interpolations() {
-            if let ast::Expr::Name(ast::ExprName { id, .. }) = element.expression.as_ref() {
+        for element in f_string.elements().interpolations() {
+            if let flat::ExprKind::Name(name_node) = element.expression().classify() {
+                let id = name_node.id();
                 if arg_names.contains(id) {
                     return false;
                 }
@@ -259,7 +278,7 @@ fn should_be_fstring(
                 }
                 has_name = true;
             }
-            if let Some(spec) = &element.format_spec {
+            if let Some(spec) = element.format_spec() {
                 let spec = &fstring_expr[spec.range()];
                 if FormatSpec::parse(spec).is_err() {
                     return false;

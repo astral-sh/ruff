@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_python_ast::ExprGenerator;
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::flat;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -9,8 +9,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
-
-use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for unnecessary generators that can be rewritten as list
@@ -68,35 +66,30 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorList {
 }
 
 /// C400 (`list(generator)`)
-pub(crate) fn unnecessary_generator_list(checker: &Checker, call: &ast::ExprCall) {
-    let Some(argument) = helpers::exactly_one_argument_with_matching_function(
-        "list",
-        &call.func,
-        &call.arguments.args,
-        &call.arguments.keywords,
-    ) else {
+pub(crate) fn unnecessary_generator_list(
+    checker: &Checker,
+    call: flat::View<'_, ast::ExprCall>,
+    argument: flat::View<'_, ast::Expr>,
+) {
+    let flat::ExprKind::Generator(generator_node) = argument.classify() else {
         return;
     };
-
-    let ast::Expr::Generator(ExprGenerator {
-        elt,
-        generators,
-        parenthesized,
-        ..
-    }) = argument
-    else {
-        return;
-    };
+    let elt = generator_node.elt();
+    let generators = generator_node.generators();
+    let parenthesized = generator_node.parenthesized();
 
     if !checker.semantic().has_builtin_binding("list") {
         return;
     }
 
     // Short-circuit: given `list(x for x in y)`, generate `list(y)` (in lieu of `[x for x in y]`).
-    if let [generator] = generators.as_slice() {
-        if generator.ifs.is_empty() && !generator.is_async {
-            if ComparableExpr::from(elt) == ComparableExpr::from(&generator.target) {
-                let iterator = format!("list({})", checker.locator().slice(generator.iter.range()));
+    if let Some([generator]) = generators.as_array() {
+        if generator.ifs().is_empty() && !generator.is_async() {
+            if ComparableExpr::from(elt) == ComparableExpr::from(generator.target()) {
+                let iterator = format!(
+                    "list({})",
+                    checker.locator().slice(generator.iter().range())
+                );
                 let fix = Fix::unsafe_edit(Edit::range_replacement(iterator, call.range()));
                 checker
                     .report_diagnostic(
@@ -123,7 +116,7 @@ pub(crate) fn unnecessary_generator_list(checker: &Checker, call: &ast::ExprCall
         let call_start = Edit::replacement(
             "[".to_string(),
             call.start(),
-            call.arguments.start() + TextSize::from(1),
+            call.arguments().start() + TextSize::from(1),
         );
 
         // Replace `)` with `]`.
@@ -134,21 +127,20 @@ pub(crate) fn unnecessary_generator_list(checker: &Checker, call: &ast::ExprCall
         let right_bracket_loc = after_arg_tokens
             .iter()
             .find(|token| token.kind() == TokenKind::Comma)
-            .map_or(call.arguments.end(), Ranged::end)
+            .map_or(call.arguments().end(), Ranged::end)
             - TextSize::from(1);
         let call_end = Edit::replacement("]".to_string(), right_bracket_loc, call.end());
 
         // Remove the inner parentheses, if the expression is a generator. The easiest way to do
         // this reliably is to use the printer.
-        if *parenthesized {
+        if parenthesized {
             // The generator's range will include the innermost parentheses, but it could be
             // surrounded by additional parentheses.
-            let range =
-                parenthesized_range(argument.into(), (&call.arguments).into(), checker.tokens())
-                    .unwrap_or(argument.range());
+            let range = parenthesized_range(argument, (call.arguments()).into(), checker.tokens())
+                .unwrap_or(argument.range());
 
             // The generator always parenthesizes the expression; trim the parentheses.
-            let generator = checker.generator().expr(argument);
+            let generator = checker.generator().expr_view(argument);
             let generator = generator[1..generator.len() - 1].to_string();
 
             let replacement = Edit::range_replacement(generator, range);

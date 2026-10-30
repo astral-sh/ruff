@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Decorator;
+use ruff_python_ast::flat;
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -46,7 +47,10 @@ impl AlwaysFixableViolation for WhitespaceAfterDecorator {
 }
 
 /// E204
-pub(crate) fn whitespace_after_decorator(checker: &Checker, decorator_list: &[Decorator]) {
+pub(crate) fn whitespace_after_decorator(
+    checker: &Checker,
+    decorator_list: flat::NodeList<'_, Decorator>,
+) {
     for decorator in decorator_list {
         let decorator_text = checker.locator().slice(decorator);
 

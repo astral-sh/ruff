@@ -1,5 +1,6 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::Expr;
+use ruff_python_ast::flat::{self, fields as ast};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{Ranged, TextRange};
@@ -76,18 +77,22 @@ impl Violation for StripWithMultiCharacters {
 /// B005
 pub(crate) fn strip_with_multi_characters(
     checker: &Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
+    &expr: &flat::View<'_, Expr>,
+    func: flat::View<'_, Expr>,
+    args: flat::NodeList<'_, Expr>,
 ) {
-    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func else {
+    let flat::ExprKind::Attribute(attribute) = func.classify() else {
         return;
     };
+    let attr = attribute.attr();
     let Some(strip) = StripKind::from_str(attr.as_str()) else {
         return;
     };
 
-    let [Expr::StringLiteral(ast::ExprStringLiteral { value, .. })] = args else {
+    let Some([ast::Expr::StringLiteral(ast::ExprStringLiteral { value, .. })]) = args
+        .as_array()
+        .map(|items| items.map(flat::View::<Expr>::fields))
+    else {
         return;
     };
 

@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::open_mode::OpenMode;
@@ -52,8 +53,8 @@ impl Violation for BadOpenMode {
 }
 
 /// PLW1501
-pub(crate) fn bad_open_mode(checker: &Checker, call: &ast::ExprCall) {
-    let Some(kind) = is_open(call.func.as_ref(), checker.semantic()) else {
+pub(crate) fn bad_open_mode(checker: &Checker, call: flat::View<'_, ast::ExprCall>) {
+    let Some(kind) = is_open(call.func(), checker.semantic()) else {
         return;
     };
 
@@ -61,9 +62,10 @@ pub(crate) fn bad_open_mode(checker: &Checker, call: &ast::ExprCall) {
         return;
     };
 
-    let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = mode else {
+    let flat::ExprKind::StringLiteral(string_literal) = mode.classify() else {
         return;
     };
+    let value = string_literal.value();
 
     if OpenMode::from_chars(value.chars()).is_ok() {
         return;
@@ -86,20 +88,21 @@ enum Kind {
 }
 
 /// If a function is a call to `open`, returns the kind of `open` call.
-fn is_open(func: &Expr, semantic: &SemanticModel) -> Option<Kind> {
+fn is_open(func: flat::View<'_, Expr>, semantic: &SemanticModel) -> Option<Kind> {
     // Ex) `open(...)`
     if semantic.match_builtin_expr(func, "open") {
         return Some(Kind::Builtin);
     }
 
     // Ex) `pathlib.Path(...).open(...)`
-    let ast::ExprAttribute { attr, value, .. } = func.as_attribute_expr()?;
+    let expr_attribute = func.as_attribute_expr()?;
+    let attr = expr_attribute.attr();
+    let value = expr_attribute.value();
     if attr != "open" {
         return None;
     }
-    let ast::ExprCall {
-        func: value_func, ..
-    } = value.as_call_expr()?;
+    let expr_call = value.as_call_expr()?;
+    let value_func = expr_call.func();
     let qualified_name = semantic.resolve_qualified_name(value_func)?;
     match qualified_name.segments() {
         ["pathlib", "Path"] => Some(Kind::Pathlib),
@@ -108,9 +111,9 @@ fn is_open(func: &Expr, semantic: &SemanticModel) -> Option<Kind> {
 }
 
 /// Returns the mode argument, if present.
-fn extract_mode(call: &ast::ExprCall, kind: Kind) -> Option<&Expr> {
+fn extract_mode(call: flat::View<'_, ast::ExprCall>, kind: Kind) -> Option<flat::View<'_, Expr>> {
     match kind {
-        Kind::Builtin => call.arguments.find_argument_value("mode", 1),
-        Kind::Pathlib => call.arguments.find_argument_value("mode", 0),
+        Kind::Builtin => call.arguments().find_argument_value("mode", 1),
+        Kind::Pathlib => call.arguments().find_argument_value("mode", 0),
     }
 }

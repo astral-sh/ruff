@@ -1,9 +1,10 @@
 use anyhow::Result;
+use ruff_python_ast::flat::{self, fields as ast};
 
-use ast::whitespace::indentation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Stmt;
 use ruff_python_ast::identifier;
-use ruff_python_ast::{self as ast, ExceptHandler, MatchCase, Stmt};
+use ruff_python_ast::whitespace::indentation;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::CommentRanges;
@@ -72,7 +73,12 @@ impl Violation for UselessElseOnLoop {
 }
 
 /// PLW0120
-pub(crate) fn useless_else_on_loop(checker: &Checker, stmt: &Stmt, body: &[Stmt], orelse: &[Stmt]) {
+pub(crate) fn useless_else_on_loop(
+    checker: &Checker,
+    stmt: flat::View<'_, Stmt>,
+    body: flat::Suite<'_>,
+    orelse: flat::Suite<'_>,
+) {
     if orelse.is_empty() || loop_exits_early(body) {
         return;
     }
@@ -94,9 +100,9 @@ pub(crate) fn useless_else_on_loop(checker: &Checker, stmt: &Stmt, body: &[Stmt]
 }
 
 /// Returns `true` if the given body contains a `break` statement.
-fn loop_exits_early(body: &[Stmt]) -> bool {
-    body.iter().any(|stmt| match stmt {
-        Stmt::If(ast::StmtIf {
+fn loop_exits_early(body: flat::Suite<'_>) -> bool {
+    body.iter().any(|stmt| match stmt.fields() {
+        ast::Stmt::If(ast::StmtIf {
             body,
             elif_else_clauses,
             ..
@@ -104,13 +110,14 @@ fn loop_exits_early(body: &[Stmt]) -> bool {
             loop_exits_early(body)
                 || elif_else_clauses
                     .iter()
-                    .any(|clause| loop_exits_early(&clause.body))
+                    .any(|clause| loop_exits_early(clause.body()))
         }
-        Stmt::With(ast::StmtWith { body, .. }) => loop_exits_early(body),
-        Stmt::Match(ast::StmtMatch { cases, .. }) => cases
-            .iter()
-            .any(|MatchCase { body, .. }| loop_exits_early(body)),
-        Stmt::Try(ast::StmtTry {
+        ast::Stmt::With(ast::StmtWith { body, .. }) => loop_exits_early(body),
+        ast::Stmt::Match(ast::StmtMatch { cases, .. }) => cases.iter().any(|match_case| {
+            let body = match_case.body();
+            loop_exits_early(body)
+        }),
+        ast::Stmt::Try(ast::StmtTry {
             body,
             handlers,
             orelse,
@@ -120,24 +127,24 @@ fn loop_exits_early(body: &[Stmt]) -> bool {
             loop_exits_early(body)
                 || loop_exits_early(orelse)
                 || loop_exits_early(finalbody)
-                || handlers.iter().any(|handler| match handler {
-                    ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                        body, ..
-                    }) => loop_exits_early(body),
+                || handlers.iter().any(|handler| match handler.classify() {
+                    flat::ExceptHandlerKind::ExceptHandler(except_handler_except_handler) => {
+                        let body = except_handler_except_handler.body();
+                        loop_exits_early(body)
+                    }
                 })
         }
-        Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
-            loop_exits_early(orelse)
-        }
-        Stmt::Break(_) => true,
+        ast::Stmt::For(ast::StmtFor { orelse, .. })
+        | ast::Stmt::While(ast::StmtWhile { orelse, .. }) => loop_exits_early(orelse),
+        ast::Stmt::Break(_) => true,
         _ => false,
     })
 }
 
 /// Generate a [`Fix`] to remove the `else` clause from the given statement.
 fn remove_else(
-    stmt: &Stmt,
-    orelse: &[Stmt],
+    stmt: flat::View<'_, Stmt>,
+    orelse: flat::Suite<'_>,
     else_range: TextRange,
     locator: &Locator,
     indexer: &Indexer,
@@ -151,7 +158,7 @@ fn remove_else(
         return Err(anyhow::anyhow!("Empty `else` clause"));
     };
 
-    let start_indentation = indentation(locator.contents(), start);
+    let start_indentation = indentation(locator.contents(), &start);
     if start_indentation.is_none() {
         // Inline `else` block (e.g., `else: x = 1`).
         Ok(Fix::safe_edit(Edit::deletion(
@@ -160,7 +167,7 @@ fn remove_else(
         )))
     } else {
         // Identify the indentation of the loop itself (e.g., the `while` or `for`).
-        let Some(desired_indentation) = indentation(locator.contents(), stmt) else {
+        let Some(desired_indentation) = indentation(locator.contents(), &stmt) else {
             return Err(anyhow::anyhow!("Compound statement cannot be inlined"));
         };
 

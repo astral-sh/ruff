@@ -1,6 +1,7 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
+use ruff_python_ast::flat;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -64,14 +65,14 @@ impl Violation for OsRmdir {
 }
 
 /// PTH106
-pub(crate) fn os_rmdir(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_rmdir(checker: &Checker, call: flat::View<'_, ExprCall>, segments: &[&str]) {
     // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
     // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.rmdir)
     // ```text
     //            0         1
     // os.rmdir(path, *, dir_fd=None)
     // ```
-    if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
+    if is_keyword_only_argument_non_default(call.arguments(), "dir_fd") {
         return;
     }
 

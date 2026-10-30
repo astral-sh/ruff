@@ -1,5 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Alias;
+use ruff_python_ast::flat;
+use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -56,8 +58,8 @@ impl Violation for BuiltinImportShadowing {
 }
 
 /// A004
-pub(crate) fn builtin_import_shadowing(checker: &Checker, alias: &Alias) {
-    let name = alias.asname.as_ref().unwrap_or(&alias.name);
+pub(crate) fn builtin_import_shadowing(checker: &Checker, alias: flat::View<'_, Alias>) {
+    let name = alias.asname().unwrap_or(alias.name());
     if shadows_builtin(
         name.as_str(),
         checker.source_type,
@@ -68,7 +70,7 @@ pub(crate) fn builtin_import_shadowing(checker: &Checker, alias: &Alias) {
             BuiltinImportShadowing {
                 name: name.to_string(),
             },
-            name.range,
+            name.range(),
         );
     }
 }

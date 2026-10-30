@@ -1,6 +1,7 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Locator;
@@ -74,17 +75,16 @@ impl AlwaysFixableViolation for FStringMissingPlaceholders {
 }
 
 /// F541
-pub(crate) fn f_string_missing_placeholders(checker: &Checker, expr: &ast::ExprFString) {
-    if expr.value.f_strings().any(|f_string| {
-        f_string
-            .elements
-            .iter()
-            .any(ast::InterpolatedStringElement::is_interpolation)
-    }) {
+pub(crate) fn f_string_missing_placeholders(checker: &Checker, expr: &fields::ExprFString<'_>) {
+    if expr
+        .value
+        .f_strings()
+        .any(|f_string| f_string.elements().iter().any(flat::View::is_interpolation))
+    {
         return;
     }
 
-    let applicability = if checker.in_docstring_position(expr.range()) {
+    let applicability = if checker.in_docstring_position(expr.range) {
         Applicability::Unsafe
     } else {
         Applicability::Safe

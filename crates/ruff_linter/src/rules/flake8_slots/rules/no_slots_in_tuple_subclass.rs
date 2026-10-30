@@ -1,7 +1,10 @@
-use ruff_python_ast::{Arguments, Stmt, StmtClassDef};
+use ruff_python_ast::{
+    Stmt,
+    flat::{self, fields as ast},
+};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::map_subscript;
+use ruff_python_ast::flat::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
 
 use crate::Violation;
@@ -52,12 +55,19 @@ impl Violation for NoSlotsInTupleSubclass {
 }
 
 /// SLOT001
-pub(crate) fn no_slots_in_tuple_subclass(checker: &Checker, stmt: &Stmt, class: &StmtClassDef) {
+pub(crate) fn no_slots_in_tuple_subclass(
+    checker: &Checker,
+    stmt: flat::View<'_, Stmt>,
+    class: &ast::StmtClassDef<'_>,
+) {
     // https://github.com/astral-sh/ruff/issues/14535
     if checker.source_type.is_stub() {
         return;
     }
-    let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
+    let Some(ast::Arguments { args: bases, .. }) = class
+        .arguments
+        .map(flat::View::<ruff_python_ast::Arguments>::fields)
+    else {
         return;
     };
 
@@ -67,7 +77,7 @@ pub(crate) fn no_slots_in_tuple_subclass(checker: &Checker, stmt: &Stmt, class: 
         let base = map_subscript(base);
         semantic.match_builtin_expr(base, "tuple") || semantic.match_typing_expr(base, "Tuple")
     }) {
-        if !has_slots(&class.body) {
+        if !has_slots(class.body) {
             checker.report_diagnostic(NoSlotsInTupleSubclass, stmt.identifier());
         }
     }

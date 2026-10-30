@@ -1,13 +1,13 @@
 use crate::checkers::ast::Checker;
 use crate::fix::edits::remove_unused_imports;
 use crate::importer::ImportRequest;
-use crate::rules::numpy::helpers::{AttributeSearcher, ImportSearcher};
+use crate::rules::numpy::helpers::{ImportSearcher, body_contains_attribute};
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
-use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{Expr, ExprAttribute, ExprName, Stmt, StmtFunctionDef, StmtTry};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::helpers::map_callable;
+use ruff_python_ast::flat::statement_visitor::StatementVisitor;
+use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::{Expr, ExprName, StmtFunctionDef, StmtTry};
 use ruff_python_semantic::Exceptions;
 use ruff_python_semantic::ScopeKind;
 use ruff_python_semantic::SemanticModel;
@@ -78,19 +78,19 @@ pub(crate) enum FunctionSignatureChange {
 }
 
 pub(crate) fn is_guarded_by_try_except(
-    expr: &Expr,
+    expr: flat::View<'_, Expr>,
     module: &str,
     name: &str,
     semantic: &SemanticModel,
 ) -> bool {
-    match expr {
-        Expr::Attribute(_) => {
+    match expr.classify() {
+        flat::ExprKind::Attribute(_) => {
             if !semantic.in_exception_handler() {
                 return false;
             }
             let Some(try_node) = semantic
                 .current_statements()
-                .find_map(|stmt| stmt.as_try_stmt())
+                .find_map(flat::View::as_try_stmt)
             else {
                 return false;
             };
@@ -98,9 +98,11 @@ pub(crate) fn is_guarded_by_try_except(
             if !suspended_exceptions.contains(Exceptions::ATTRIBUTE_ERROR) {
                 return false;
             }
-            try_block_contains_undeprecated_attribute(try_node, module, name, semantic)
+            body_contains_attribute(try_node.body(), module, name, semantic)
         }
-        Expr::Name(ExprName { id, .. }) => {
+        flat::ExprKind::Name(expr_name) => {
+            let id = expr_name.id();
+
             let Some(binding_id) = semantic.lookup_symbol(id.as_str()).binding_id() else {
                 return false;
             };
@@ -114,7 +116,7 @@ pub(crate) fn is_guarded_by_try_except(
             let Some(try_node) = binding.source.and_then(|import_id| {
                 semantic
                     .statements(import_id)
-                    .find_map(|stmt| stmt.as_try_stmt())
+                    .find_map(flat::View::as_try_stmt)
             }) else {
                 return false;
             };
@@ -131,33 +133,15 @@ pub(crate) fn is_guarded_by_try_except(
 }
 
 /// Given an [`ast::StmtTry`] node, does the `try` branch of that node
-/// contain any [`ast::ExprAttribute`] nodes that indicate the airflow
-/// member is being accessed from the non-deprecated location?
-fn try_block_contains_undeprecated_attribute(
-    try_node: &StmtTry,
-    module: &str,
-    name: &str,
-    semantic: &SemanticModel,
-) -> bool {
-    let undeprecated_qualified_name = {
-        let mut builder = QualifiedNameBuilder::default();
-        for part in module.split('.') {
-            builder.push(part);
-        }
-        builder.push(name);
-        builder.build()
-    };
-    let mut attribute_searcher = AttributeSearcher::new(undeprecated_qualified_name, semantic);
-    attribute_searcher.visit_body(&try_node.body);
-    attribute_searcher.found_attribute
-}
-
-/// Given an [`ast::StmtTry`] node, does the `try` branch of that node
 /// contain any [`ast::StmtImportFrom`] nodes that indicate the airflow
 /// member is being imported from the non-deprecated location?
-fn try_block_contains_undeprecated_import(try_node: &StmtTry, module: &str, name: &str) -> bool {
+fn try_block_contains_undeprecated_import(
+    try_node: flat::View<'_, StmtTry>,
+    module: &str,
+    name: &str,
+) -> bool {
     let mut import_searcher = ImportSearcher::new(module, name);
-    import_searcher.visit_body(&try_node.body);
+    import_searcher.visit_body(try_node.body());
     import_searcher.found_import
 }
 
@@ -204,10 +188,14 @@ pub(crate) fn is_airflow_builtin_or_provider(
 }
 
 /// Return the [`ast::ExprName`] at the head of the expression, if any.
-fn match_head(value: &Expr) -> Option<&ExprName> {
-    match value {
-        Expr::Attribute(ExprAttribute { value, .. }) => value.as_name_expr(),
-        Expr::Name(name) => Some(name),
+fn match_head(value: flat::View<'_, Expr>) -> Option<flat::View<'_, ExprName>> {
+    match value.classify() {
+        flat::ExprKind::Attribute(expr_attribute) => {
+            let value = expr_attribute.value();
+
+            value.as_name_expr()
+        }
+        flat::ExprKind::Name(name) => Some(name),
         _ => None,
     }
 }
@@ -216,7 +204,7 @@ fn match_head(value: &Expr) -> Option<&ExprName> {
 /// This is used for cases that member name has changed.
 /// (e.g., `airflow.datasets.Dataset` to `airflow.sdk.Asset`)
 pub(crate) fn generate_import_edit(
-    expr: &Expr,
+    expr: flat::View<'_, Expr>,
     checker: &Checker,
     module: &str,
     name: &str,
@@ -238,7 +226,7 @@ pub(crate) fn generate_import_edit(
 /// This is used for cases that member name has not changed.
 /// (e.g., `airflow.operators.pig_operator.PigOperator` to `airflow.providers.apache.pig.hooks.pig.PigCliHook`)
 pub(crate) fn generate_remove_and_runtime_import_edit(
-    expr: &Expr,
+    expr: flat::View<'_, Expr>,
     checker: &Checker,
     module: &str,
     name: &str,
@@ -247,7 +235,7 @@ pub(crate) fn generate_remove_and_runtime_import_edit(
     let semantic = checker.semantic();
     let binding = semantic
         .resolve_name(head)
-        .or_else(|| checker.semantic().lookup_symbol(&head.id).binding_id())
+        .or_else(|| checker.semantic().lookup_symbol(head.id()).binding_id())
         .map(|id| checker.semantic().binding(id))?;
     let stmt = binding.statement(semantic)?;
     let remove_edit = remove_unused_imports(
@@ -259,9 +247,9 @@ pub(crate) fn generate_remove_and_runtime_import_edit(
         checker.indexer(),
     )
     .ok()?;
-    let is_lazy = match stmt {
-        Stmt::Import(import) => import.is_lazy,
-        Stmt::ImportFrom(import) => import.is_lazy,
+    let is_lazy = match stmt.classify() {
+        flat::StmtKind::Import(import) => import.is_lazy(),
+        flat::StmtKind::ImportFrom(import) => import.is_lazy(),
         _ => false,
     };
     let import_edit = checker.importer().add_import(
@@ -279,7 +267,7 @@ pub(crate) fn generate_remove_and_runtime_import_edit(
 /// This is a helper function to check if the given function definition is a method
 /// that inherits from a base class.
 pub(crate) fn is_method_in_subclass<F>(
-    function_def: &StmtFunctionDef,
+    function_def: flat::View<'_, StmtFunctionDef>,
     semantic: &SemanticModel,
     method_name: &str,
     is_base_class: F,
@@ -287,7 +275,7 @@ pub(crate) fn is_method_in_subclass<F>(
 where
     F: Fn(QualifiedName) -> bool,
 {
-    if function_def.name.as_str() != method_name {
+    if function_def.name().as_str() != method_name {
         return false;
     }
 
@@ -303,16 +291,19 @@ where
 pub(crate) fn in_airflow_task_function(semantic: &SemanticModel) -> bool {
     semantic
         .current_statements()
-        .find_map(|stmt| stmt.as_function_def_stmt())
+        .find_map(flat::View::as_function_def_stmt)
         .is_some_and(|function_def| is_airflow_task(function_def, semantic))
 }
 
 /// Returns `true` if the given function is decorated with `@airflow.decorators.task`
 /// (or `@airflow.sdk.task`), including variant forms like `@task.branch` and
 /// `@task.short_circuit`.
-pub(crate) fn is_airflow_task(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool {
-    function_def.decorator_list.iter().any(|decorator| {
-        let expr = map_callable(&decorator.expression);
+pub(crate) fn is_airflow_task(
+    function_def: flat::View<'_, StmtFunctionDef>,
+    semantic: &SemanticModel,
+) -> bool {
+    function_def.decorator_list().iter().any(|decorator| {
+        let expr = map_callable(decorator.expression());
 
         // Match `@task` and `@task()` directly.
         if semantic
@@ -323,7 +314,8 @@ pub(crate) fn is_airflow_task(function_def: &StmtFunctionDef, semantic: &Semanti
         }
 
         // Match `@task.<variant>` (e.g., `@task.branch`, `@task.short_circuit`).
-        if let Expr::Attribute(ExprAttribute { value, .. }) = expr {
+        if let flat::ExprKind::Attribute(attribute_node) = expr.classify() {
+            let value = attribute_node.value();
             return semantic.resolve_qualified_name(value).is_some_and(|qn| {
                 matches!(qn.segments(), ["airflow", "decorators" | "sdk", "task"])
             });
@@ -336,13 +328,15 @@ pub(crate) fn is_airflow_task(function_def: &StmtFunctionDef, semantic: &Semanti
 /// Returns `true` if the given function is decorated with a specific `@task.<variant>`
 /// form (e.g., `@task.branch` or `@task.short_circuit`).
 pub(crate) fn is_airflow_task_variant(
-    function_def: &StmtFunctionDef,
+    function_def: flat::View<'_, StmtFunctionDef>,
     semantic: &SemanticModel,
     variant: &str,
 ) -> bool {
-    function_def.decorator_list.iter().any(|decorator| {
-        let expr = map_callable(&decorator.expression);
-        if let Expr::Attribute(ExprAttribute { value, attr, .. }) = expr {
+    function_def.decorator_list().iter().any(|decorator| {
+        let expr = map_callable(decorator.expression());
+        if let flat::ExprKind::Attribute(attribute_node) = expr.classify() {
+            let value = attribute_node.value();
+            let attr = attribute_node.attr();
             attr.as_str() == variant
                 && semantic.resolve_qualified_name(value).is_some_and(|qn| {
                     matches!(qn.segments(), ["airflow", "decorators" | "sdk", "task"])

@@ -1,9 +1,10 @@
 use itertools::Itertools;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{Alias, StmtImportFrom, StmtRef};
+use ruff_python_ast::{Alias, StmtImportFrom};
 use ruff_python_codegen::Stylist;
 use ruff_text_size::Ranged;
 
@@ -425,7 +426,7 @@ const TYPING_EXTENSIONS_TO_WARNINGS_313: &[&str] = &["deprecated"];
 const TYPING_EXTENSIONS_TO_TYPING_315: &[&str] = &["TypeForm"];
 
 struct ImportReplacer<'a> {
-    import_from_stmt: &'a StmtImportFrom,
+    import_from_stmt: flat::View<'a, StmtImportFrom>,
     module: &'a str,
     locator: &'a Locator<'a>,
     stylist: &'a Stylist<'a>,
@@ -436,7 +437,7 @@ struct ImportReplacer<'a> {
 
 impl<'a> ImportReplacer<'a> {
     const fn new(
-        import_from_stmt: &'a StmtImportFrom,
+        import_from_stmt: flat::View<'a, StmtImportFrom>,
         module: &'a str,
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,
@@ -460,16 +461,16 @@ impl<'a> ImportReplacer<'a> {
         let mut operations = vec![];
         if self.module == "typing" {
             if self.version >= PythonVersion::PY39 {
-                for member in &self.import_from_stmt.names {
+                for member in self.import_from_stmt.names() {
                     if is_import_required_by_isort(
                         self.required_imports,
-                        StmtRef::ImportFrom(self.import_from_stmt),
+                        self.import_from_stmt.into(),
                         member,
                     ) {
                         continue;
                     }
                     if let Some(target) = TYPING_TO_RENAME_PY39.iter().find_map(|(name, target)| {
-                        if &member.name == *name {
+                        if member.name() == *name {
                             Some(*target)
                         } else {
                             None
@@ -477,7 +478,7 @@ impl<'a> ImportReplacer<'a> {
                     }) {
                         operations.push(WithRename {
                             module: "typing".to_string(),
-                            member: member.name.to_string(),
+                            member: member.name().to_string(),
                             target: target.to_string(),
                         });
                     }
@@ -660,14 +661,14 @@ impl<'a> ImportReplacer<'a> {
                 target: target.to_string(),
                 members: matched_names
                     .iter()
-                    .map(|name| name.name.to_string())
+                    .map(|name| name.name().to_string())
                     .collect(),
                 fixable: true,
             };
             let fix = Some(matched);
             Some((operation, fix))
         } else {
-            let indentation = indentation(self.locator.contents(), self.import_from_stmt);
+            let indentation = indentation(self.locator.contents(), &self.import_from_stmt);
 
             // If we have matched _and_ unmatched names, but the import is not on its own
             // line, we can't add a statement after it. For example, if we have
@@ -677,7 +678,7 @@ impl<'a> ImportReplacer<'a> {
                     target: target.to_string(),
                     members: matched_names
                         .iter()
-                        .map(|name| name.name.to_string())
+                        .map(|name| name.name().to_string())
                         .collect(),
                     fixable: false,
                 };
@@ -692,7 +693,7 @@ impl<'a> ImportReplacer<'a> {
                 self.tokens,
                 &matched_names
                     .iter()
-                    .map(|name| name.name.as_str())
+                    .map(|name| name.name().as_str())
                     .collect::<Vec<_>>(),
             );
 
@@ -700,7 +701,7 @@ impl<'a> ImportReplacer<'a> {
                 target: target.to_string(),
                 members: matched_names
                     .iter()
-                    .map(|name| name.name.to_string())
+                    .map(|name| name.name().to_string())
                     .collect(),
                 fixable: true,
             };
@@ -714,17 +715,20 @@ impl<'a> ImportReplacer<'a> {
     }
 
     /// Partitions imports into matched and unmatched names.
-    fn partition_imports(&self, candidates: &[&str]) -> (Vec<&Alias>, Vec<&Alias>) {
+    fn partition_imports(
+        &self,
+        candidates: &[&str],
+    ) -> (Vec<flat::View<'_, Alias>>, Vec<flat::View<'_, Alias>>) {
         let mut matched_names = vec![];
         let mut unmatched_names = vec![];
-        for name in &self.import_from_stmt.names {
+        for name in self.import_from_stmt.names() {
             if is_import_required_by_isort(
                 self.required_imports,
-                StmtRef::ImportFrom(self.import_from_stmt),
+                self.import_from_stmt.into(),
                 name,
             ) {
                 unmatched_names.push(name);
-            } else if candidates.contains(&name.name.as_str()) {
+            } else if candidates.contains(&name.name().as_str()) {
                 matched_names.push(name);
             } else {
                 unmatched_names.push(name);
@@ -735,17 +739,17 @@ impl<'a> ImportReplacer<'a> {
 
     /// Converts a list of names and a module into an `import from`-style
     /// import.
-    fn format_import_from(&self, names: &[&Alias], module: &str) -> String {
+    fn format_import_from(&self, names: &[flat::View<'_, Alias>], module: &str) -> String {
         // Construct the whitespace strings.
         // Generate the formatted names.
         let qualified_names: String = names
             .iter()
-            .map(|name| match &name.asname {
-                Some(asname) => format!("{} as {}", name.name, asname),
-                None => format!("{}", name.name),
+            .map(|name| match name.asname() {
+                Some(asname) => format!("{} as {}", name.name(), asname),
+                None => format!("{}", name.name()),
             })
             .join(", ");
-        let prefix = if self.import_from_stmt.is_lazy {
+        let prefix = if self.import_from_stmt.is_lazy() {
             "lazy "
         } else {
             ""
@@ -755,29 +759,32 @@ impl<'a> ImportReplacer<'a> {
 }
 
 /// UP035
-pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImportFrom) {
+pub(crate) fn deprecated_import(
+    checker: &Checker,
+    import_from_stmt: flat::View<'_, StmtImportFrom>,
+) {
     // Avoid relative and star imports.
-    if import_from_stmt.level > 0 {
+    if import_from_stmt.level() > 0 {
         return;
     }
     if import_from_stmt
-        .names
+        .names()
         .first()
-        .is_some_and(|name| &name.name == "*")
+        .is_some_and(|name| name.name() == "*")
     {
         return;
     }
-    let Some(module) = import_from_stmt.module.as_deref() else {
+    let Some(module) = import_from_stmt.module() else {
         return;
     };
 
-    if !is_relevant_module(module) {
+    if !is_relevant_module(module.as_str()) {
         return;
     }
 
     let fixer = ImportReplacer::new(
         import_from_stmt,
-        module,
+        module.as_str(),
         checker.locator(),
         checker.stylist(),
         checker.tokens(),
@@ -786,8 +793,8 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
     );
 
     for (operation, fix) in fixer.without_renames() {
-        let preserves_laziness = import_from_stmt.is_lazy
-            || checker.import_rewrite_preserves_laziness(module, &operation.target);
+        let preserves_laziness = import_from_stmt.is_lazy()
+            || checker.import_rewrite_preserves_laziness(module.as_str(), &operation.target);
         let mut diagnostic = checker.report_diagnostic(
             DeprecatedImport {
                 deprecation: Deprecation::WithoutRename(operation),

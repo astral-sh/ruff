@@ -4,7 +4,9 @@ use std::str::FromStr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{self as ast, AnyStringFlags, Expr, StringFlags, whitespace::indentation};
+use ruff_python_ast::{
+    self as ast, AnyStringFlags, Expr, StringFlags, flat, whitespace::indentation,
+};
 use ruff_python_codegen::Stylist;
 use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
@@ -208,9 +210,9 @@ fn percent_to_format(format_string: &CFormatString) -> String {
 }
 
 /// If a tuple has one argument, remove the comma; otherwise, return it as-is.
-fn clean_params_tuple<'a>(right: &Expr, locator: &Locator<'a>) -> Cow<'a, str> {
-    if let Expr::Tuple(tuple) = &right {
-        if tuple.len() == 1 {
+fn clean_params_tuple<'a>(right: flat::View<'_, Expr>, locator: &Locator<'a>) -> Cow<'a, str> {
+    if let flat::ExprKind::Tuple(tuple) = right.classify() {
+        if tuple.elts().len() == 1 {
             if !locator.contains_line_break(right.range()) {
                 let mut contents = locator.slice(right).to_string();
                 for (i, character) in contents.chars().rev().enumerate() {
@@ -230,24 +232,22 @@ fn clean_params_tuple<'a>(right: &Expr, locator: &Locator<'a>) -> Cow<'a, str> {
 
 /// Converts a dictionary to a function call while preserving as much styling as
 /// possible.
-fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -> Option<String> {
+fn clean_params_dictionary(
+    right: flat::View<'_, Expr>,
+    locator: &Locator,
+    stylist: &Stylist,
+) -> Option<String> {
     let is_multi_line = locator.contains_line_break(right.range());
     let mut contents = String::new();
-    if let Expr::Dict(ast::ExprDict {
-        items,
-        range: _,
-        node_index: _,
-    }) = &right
-    {
+    if let flat::ExprKind::Dict(dict_node) = right.classify() {
+        let items = dict_node.items();
         let mut arguments: Vec<String> = vec![];
         let mut seen: Vec<&str> = vec![];
         let mut indent = None;
-        for ast::DictItem { key, value } in items {
+        for flat::DictItemView { key, value } in items {
             if let Some(key) = key {
-                if let Expr::StringLiteral(ast::ExprStringLiteral {
-                    value: key_string, ..
-                }) = key
-                {
+                if let flat::ExprKind::StringLiteral(string_literal_node) = key.classify() {
+                    let key_string = string_literal_node.value();
                     // If the dictionary key is not a valid variable name, abort.
                     if !is_identifier(key_string.to_str()) {
                         return None;
@@ -259,7 +259,7 @@ fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -
                     seen.push(key_string.to_str());
                     if is_multi_line {
                         if indent.is_none() {
-                            indent = indentation(locator.contents(), key);
+                            indent = indentation(locator.contents(), &key);
                         }
                     }
 
@@ -308,7 +308,7 @@ fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -
 
 /// Returns `true` if the sequence of [`PercentFormatPart`] indicate that an
 /// [`Expr`] can be converted.
-fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
+fn convertible(format_string: &CFormatString, params: flat::View<'_, Expr>) -> bool {
     for (.., format_part) in format_string.iter() {
         let CFormatPart::Spec(fmt) = format_part else {
             continue;
@@ -358,7 +358,7 @@ fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
         }
 
         // All dict substitutions must be named.
-        if let Expr::Dict(_) = &params {
+        if let flat::ExprKind::Dict(_) = params.classify() {
             if fmt.mapping_key.is_none() {
                 return false;
             }
@@ -370,20 +370,20 @@ fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
 /// UP031
 pub(crate) fn printf_string_formatting(
     checker: &Checker,
-    bin_op: &ast::ExprBinOp,
-    string_expr: &ast::ExprStringLiteral,
+    bin_op: flat::View<'_, ast::ExprBinOp>,
+    string_expr: flat::View<'_, ast::ExprStringLiteral>,
 ) {
-    let right = &*bin_op.right;
+    let right = bin_op.right();
 
     let mut num_positional_arguments = 0;
     let mut num_keyword_arguments = 0;
     let mut format_strings: Vec<(TextRange, String)> =
-        Vec::with_capacity(string_expr.value.as_slice().len());
+        Vec::with_capacity(string_expr.value().as_slice().len());
 
     // Parse each string segment.
-    for string_literal in &string_expr.value {
+    for string_literal in string_expr.value() {
         let string = checker.locator().slice(string_literal);
-        let flags = AnyStringFlags::from(string_literal.flags);
+        let flags = AnyStringFlags::from(string_literal.flags());
         let string = &string
             [usize::from(flags.opener_len())..(string.len() - usize::from(flags.closer_len()))];
 
@@ -418,15 +418,18 @@ pub(crate) fn printf_string_formatting(
     }
 
     // Parse the parameters.
-    let params_string = match right {
-        Expr::StringLiteral(_)
-        | Expr::BytesLiteral(_)
-        | Expr::NumberLiteral(_)
-        | Expr::BooleanLiteral(_)
-        | Expr::NoneLiteral(_)
-        | Expr::EllipsisLiteral(_)
-        | Expr::FString(_) => Cow::Owned(format!("({})", checker.locator().slice(right))),
-        Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_) => {
+    let params_string = match right.classify() {
+        flat::ExprKind::StringLiteral(_)
+        | flat::ExprKind::BytesLiteral(_)
+        | flat::ExprKind::NumberLiteral(_)
+        | flat::ExprKind::BooleanLiteral(_)
+        | flat::ExprKind::NoneLiteral(_)
+        | flat::ExprKind::EllipsisLiteral(_)
+        | flat::ExprKind::FString(_) => Cow::Owned(format!("({})", checker.locator().slice(right))),
+        flat::ExprKind::Name(_)
+        | flat::ExprKind::Attribute(_)
+        | flat::ExprKind::Subscript(_)
+        | flat::ExprKind::Call(_) => {
             if num_keyword_arguments > 0 {
                 // If we have _any_ named fields, assume the right-hand side is a mapping.
                 Cow::Owned(format!("(**{})", checker.locator().slice(right)))
@@ -448,8 +451,8 @@ pub(crate) fn printf_string_formatting(
                 Cow::Owned(format!("({})", checker.locator().slice(right)))
             }
         }
-        Expr::Tuple(_) => clean_params_tuple(right, checker.locator()),
-        Expr::Dict(_) => {
+        flat::ExprKind::Tuple(_) => clean_params_tuple(right, checker.locator()),
+        flat::ExprKind::Dict(_) => {
             let Some(params_string) =
                 clean_params_dictionary(right, checker.locator(), checker.stylist())
             else {

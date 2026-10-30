@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, ExceptHandler, ExceptHandlerExceptHandler, Expr, Stmt};
+use ruff_python_ast::ExceptHandler;
+use ruff_python_ast::flat::{self, fields as ast};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -41,19 +42,24 @@ impl Violation for UselessTryExcept {
 }
 
 /// TRY203 (previously TRY302)
-pub(crate) fn useless_try_except(checker: &Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn useless_try_except(checker: &Checker, handlers: flat::NodeList<'_, ExceptHandler>) {
     if handlers.iter().all(|handler| {
-        let ExceptHandler::ExceptHandler(ExceptHandlerExceptHandler { name, body, .. }) = handler;
-        let Some(Stmt::Raise(ast::StmtRaise {
+        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+            name, body, ..
+        }) = handler.fields();
+        let Some(ast::Stmt::Raise(ast::StmtRaise {
             exc, cause: None, ..
-        })) = &body.first()
+        })) = body
+            .first()
+            .map(flat::View::<ruff_python_ast::Stmt>::fields)
         else {
             return false;
         };
         if let Some(expr) = exc {
             // E.g., `except ... as e: raise e`
-            if let Expr::Name(ast::ExprName { id, .. }) = expr.as_ref() {
-                if name.as_ref().is_some_and(|name| name.as_str() == id) {
+            if let flat::ExprKind::Name(name_node) = expr.classify() {
+                let id = name_node.id();
+                if name.is_some_and(|name| name.as_str() == id) {
                     return true;
                 }
             }

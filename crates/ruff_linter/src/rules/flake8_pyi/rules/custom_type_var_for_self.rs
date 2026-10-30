@@ -1,8 +1,9 @@
 use anyhow::{Context, bail};
 use itertools::Itertools;
+use ruff_python_ast::flat;
+use ruff_python_ast::{Expr, ExprName, ParameterWithDefault, StmtFunctionDef, TypeParams};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
 use ruff_python_semantic::analyze::class::is_metaclass;
 use ruff_python_semantic::analyze::function_type::{self, FunctionType};
@@ -120,7 +121,7 @@ pub(crate) fn custom_type_var_instead_of_self(checker: &Checker, binding: &Bindi
     let current_scope = &semantic.scopes[binding.scope];
     let Some(function_def) = binding
         .statement(semantic)
-        .and_then(|stmt| stmt.as_function_def_stmt())
+        .and_then(flat::View::as_function_def_stmt)
     else {
         return;
     };
@@ -128,19 +129,14 @@ pub(crate) fn custom_type_var_instead_of_self(checker: &Checker, binding: &Bindi
         return;
     };
 
-    let ast::StmtFunctionDef {
-        name: function_name,
-        parameters,
-        returns,
-        decorator_list,
-        type_params,
-        ..
-    } = function_def;
-
-    let type_params = type_params.as_deref();
+    let parameters = function_def.parameters();
 
     // Given, e.g., `def foo(self: _S, arg: bytes)`, extract `_S`.
-    let Some(self_or_cls_parameter) = parameters.posonlyargs.iter().chain(&parameters.args).next()
+    let Some(self_or_cls_parameter) = parameters
+        .posonlyargs()
+        .iter()
+        .chain(parameters.args())
+        .next()
     else {
         return;
     };
@@ -148,8 +144,8 @@ pub(crate) fn custom_type_var_instead_of_self(checker: &Checker, binding: &Bindi
     let Some(self_or_cls_annotation_unchecked) = self_or_cls_parameter.annotation() else {
         return;
     };
-    let self_or_cls_annotation = match self_or_cls_annotation_unchecked {
-        ast::Expr::StringLiteral(literal_expr) => {
+    let self_or_cls_annotation = match self_or_cls_annotation_unchecked.classify() {
+        flat::ExprKind::StringLiteral(literal_expr) => {
             let Ok(parsed_expr) = checker.parse_type_annotation(literal_expr) else {
                 return;
             };
@@ -163,15 +159,17 @@ pub(crate) fn custom_type_var_instead_of_self(checker: &Checker, binding: &Bindi
 
     // Skip any abstract/static/overloaded methods,
     // and any methods in metaclasses
+    let decorator_list = function_def.decorator_list();
     if is_abstract(decorator_list, semantic)
         || is_overload(decorator_list, semantic)
-        || is_metaclass(parent_class, semantic).is_yes()
+        || is_metaclass(*parent_class, semantic).is_yes()
     {
         return;
     }
 
+    let function_name = function_def.name();
     let function_kind = function_type::classify(
-        function_name,
+        function_name.as_str(),
         decorator_list,
         current_scope,
         semantic,
@@ -179,6 +177,7 @@ pub(crate) fn custom_type_var_instead_of_self(checker: &Checker, binding: &Bindi
         &checker.settings().pep8_naming.staticmethod_decorators,
     );
 
+    let type_params = function_def.type_params();
     let method = match function_kind {
         FunctionType::ClassMethod | FunctionType::NewMethod => Method::Class(ClassMethod {
             cls_annotation: self_or_cls_annotation,
@@ -195,9 +194,9 @@ pub(crate) fn custom_type_var_instead_of_self(checker: &Checker, binding: &Bindi
         return;
     };
 
-    let function_header_end = returns
-        .as_deref()
-        .map(Ranged::end)
+    let function_header_end = function_def
+        .returns()
+        .map(|node| node.end())
         .unwrap_or_else(|| parameters.end());
 
     let mut diagnostic = checker.report_diagnostic(
@@ -240,8 +239,8 @@ impl Method<'_> {
 
 #[derive(Debug)]
 struct ClassMethod<'a> {
-    cls_annotation: &'a ast::Expr,
-    type_params: Option<&'a ast::TypeParams>,
+    cls_annotation: flat::View<'a, Expr>,
+    type_params: Option<flat::View<'a, TypeParams>>,
 }
 
 impl ClassMethod<'_> {
@@ -252,15 +251,14 @@ impl ClassMethod<'_> {
         semantic: &'a SemanticModel<'a>,
         scope: ScopeId,
     ) -> Option<TypeVar<'a>> {
-        let ast::ExprSubscript {
-            value: cls_annotation_value,
-            slice: cls_annotation_typevar,
-            ..
-        } = self.cls_annotation.as_subscript_expr()?;
+        let expr_subscript = self.cls_annotation.as_subscript_expr()?;
+        let cls_annotation_value = expr_subscript.value();
+        let cls_annotation_typevar = expr_subscript.slice();
 
         let cls_annotation_typevar = cls_annotation_typevar.as_name_expr()?;
 
-        let ast::ExprName { id, .. } = cls_annotation_value.as_name_expr()?;
+        let expr_name = cls_annotation_value.as_name_expr()?;
+        let id = expr_name.id();
         if id != "type" {
             return None;
         }
@@ -274,8 +272,8 @@ impl ClassMethod<'_> {
 
 #[derive(Debug)]
 struct InstanceMethod<'a> {
-    self_annotation: &'a ast::Expr,
-    type_params: Option<&'a ast::TypeParams>,
+    self_annotation: flat::View<'a, Expr>,
+    type_params: Option<flat::View<'a, TypeParams>>,
 }
 
 impl InstanceMethod<'_> {
@@ -292,8 +290,8 @@ impl InstanceMethod<'_> {
 
 /// Returns `Some(TypeVar)` if `typevar_expr` refers to a `TypeVar` binding
 fn custom_typevar<'a>(
-    typevar_expr: &'a ast::ExprName,
-    type_params: Option<&ast::TypeParams>,
+    typevar_expr: flat::View<'a, ExprName>,
+    type_params: Option<flat::View<'_, TypeParams>>,
     semantic: &'a SemanticModel<'a>,
 ) -> Option<TypeVar<'a>> {
     let binding = semantic
@@ -308,8 +306,8 @@ fn custom_typevar<'a>(
     if binding.kind.is_type_param() {
         return type_params?
             .iter()
-            .filter_map(ast::TypeParam::as_type_var)
-            .any(|ast::TypeParamTypeVar { name, .. }| name.id == typevar_expr.id)
+            .filter_map(flat::View::as_type_var)
+            .any(|param| param.name().id() == typevar_expr.id())
             .then_some(TypeVar(binding));
     }
 
@@ -326,10 +324,10 @@ fn custom_typevar<'a>(
         return None;
     }
     let statement = binding.source.map(|node_id| semantic.statement(node_id))?;
-    let rhs_function = statement.as_assign_stmt()?.value.as_call_expr()?;
+    let rhs_function = statement.as_assign_stmt()?.value().as_call_expr()?;
 
     semantic
-        .match_typing_expr(&rhs_function.func, "TypeVar")
+        .match_typing_expr(rhs_function.func(), "TypeVar")
         .then_some(TypeVar(binding))
 }
 
@@ -342,10 +340,10 @@ fn custom_typevar<'a>(
 fn replace_custom_typevar_with_self(
     checker: &Checker,
     importer: &TypingImporter,
-    function_def: &ast::StmtFunctionDef,
+    function_def: flat::View<'_, StmtFunctionDef>,
     custom_typevar: TypeVar,
-    self_or_cls_parameter: &ast::ParameterWithDefault,
-    self_or_cls_annotation: &ast::Expr,
+    self_or_cls_parameter: flat::View<'_, ParameterWithDefault>,
+    self_or_cls_annotation: flat::View<'_, Expr>,
 ) -> anyhow::Result<Fix> {
     // (1) Import `Self` (if necessary)
     let (import_edit, self_symbol_binding) = importer.import(function_def.start())?;
@@ -358,7 +356,7 @@ fn replace_custom_typevar_with_self(
 
     // (3) If it was a PEP-695 type variable, remove that `TypeVar` from the PEP-695 type-parameter list
     if custom_typevar.is_pep695_typevar() {
-        let type_params = function_def.type_params.as_deref().context(
+        let type_params = function_def.type_params().context(
             "Should not be possible to have a type parameter without a type parameter list",
         )?;
         let deletion_edit = remove_pep695_typevar_declaration(type_params, custom_typevar)
@@ -439,12 +437,12 @@ fn replace_typevar_usages_with_self<'a>(
 ///
 /// Return `None` if we fail to find a `TypeVar` that matches the range of `typevar_binding`.
 fn remove_pep695_typevar_declaration(
-    type_params: &ast::TypeParams,
+    type_params: flat::View<'_, TypeParams>,
     custom_typevar: TypeVar,
 ) -> Option<Edit> {
-    if let [sole_typevar] = &**type_params {
+    if let Some([sole_typevar]) = type_params.type_params().as_array() {
         return (sole_typevar.name().range() == custom_typevar.range())
-            .then(|| Edit::range_deletion(type_params.range));
+            .then(|| Edit::range_deletion(type_params.range()));
     }
 
     // `custom_typevar.range()` will return the range of the name of the typevar binding.
@@ -454,19 +452,22 @@ fn remove_pep695_typevar_declaration(
         .iter()
         .find_position(|param| param.name().range() == custom_typevar.range())?;
 
-    let last_index = type_params.len() - 1;
+    let last_index = type_params.iter().len() - 1;
 
     let deletion_range = if tvar_index < last_index {
         // def f[A, B, C](): ...
         //       ^^^ Remove this
         TextRange::new(
             tvar_declaration.start(),
-            type_params[tvar_index + 1].start(),
+            type_params.type_params().at(tvar_index + 1).start(),
         )
     } else {
         // def f[A, B, C](): ...
         //           ^^^ Remove this
-        TextRange::new(type_params[tvar_index - 1].end(), tvar_declaration.end())
+        TextRange::new(
+            type_params.type_params().at(tvar_index - 1).end(),
+            tvar_declaration.end(),
+        )
     };
 
     Some(Edit::range_deletion(deletion_range))

@@ -1,7 +1,10 @@
 use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr, WithItem};
+use ruff_python_ast::{
+    Arguments, Expr, WithItem,
+    flat::{self, fields as ast},
+};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -60,12 +63,12 @@ impl fmt::Display for ExceptionKind {
 
 fn detect_blind_exception(
     semantic: &ruff_python_semantic::SemanticModel<'_>,
-    func: &Expr,
-    arguments: &Arguments,
+    func: flat::View<'_, Expr>,
+    arguments: flat::View<'_, Arguments>,
 ) -> Option<ExceptionKind> {
     let is_assert_raises = matches!(
-        func,
-        &Expr::Attribute(ast::ExprAttribute { ref attr, .. }) if attr.as_str() == "assertRaises"
+        func.fields(),
+        ast::Expr::Attribute(ast::ExprAttribute { attr, .. }) if attr.as_str() == "assertRaises"
     );
 
     let is_pytest_raises = semantic
@@ -81,10 +84,12 @@ fn detect_blind_exception(
             return None;
         }
 
-        if arguments
-            .find_positional(1)
-            .is_some_and(|arg| matches!(arg, Expr::StringLiteral(_) | Expr::BytesLiteral(_)))
-        {
+        if arguments.find_positional(1).is_some_and(|arg| {
+            matches!(
+                arg.classify(),
+                flat::ExprKind::StringLiteral(_) | flat::ExprKind::BytesLiteral(_)
+            )
+        }) {
             return None;
         }
     }
@@ -106,45 +111,35 @@ fn detect_blind_exception(
 }
 
 /// B017
-pub(crate) fn assert_raises_exception(checker: &Checker, items: &[WithItem]) {
+pub(crate) fn assert_raises_exception(checker: &Checker, items: flat::NodeList<'_, WithItem>) {
     for item in items {
-        let Expr::Call(ast::ExprCall {
-            func,
-            arguments,
-            range_start: _,
-            node_index: _,
-        }) = &item.context_expr
-        else {
+        let flat::ExprKind::Call(call_node) = item.context_expr().classify() else {
             continue;
         };
+        let func = call_node.func();
+        let arguments = call_node.arguments();
 
-        if item.optional_vars.is_some() {
+        if item.optional_vars().is_some() {
             continue;
         }
 
-        if let Some(exception) =
-            detect_blind_exception(checker.semantic(), func.as_ref(), arguments)
-        {
+        if let Some(exception) = detect_blind_exception(checker.semantic(), func, arguments) {
             checker.report_diagnostic(AssertRaisesException { exception }, item.range());
         }
     }
 }
 
 /// B017 (call form)
-pub(crate) fn assert_raises_exception_call(checker: &Checker, call: &ast::ExprCall) {
-    let ast::ExprCall {
-        func,
-        arguments,
-        range_start: _,
-        node_index: _,
-    } = call;
+pub(crate) fn assert_raises_exception_call(checker: &Checker, call: &ast::ExprCall<'_>) {
+    let func = call.func;
+    let arguments = call.arguments;
     let semantic = checker.semantic();
 
-    if arguments.args.len() < 2 && arguments.find_argument("func", 1).is_none() {
+    if arguments.args().len() < 2 && arguments.find_argument("func", 1).is_none() {
         return;
     }
 
-    if let Some(exception) = detect_blind_exception(semantic, func.as_ref(), arguments) {
-        checker.report_diagnostic(AssertRaisesException { exception }, call.range());
+    if let Some(exception) = detect_blind_exception(semantic, func, arguments) {
+        checker.report_diagnostic(AssertRaisesException { exception }, call.range);
     }
 }

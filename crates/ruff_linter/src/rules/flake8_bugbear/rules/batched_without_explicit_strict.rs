@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
 use ruff_python_ast::PythonVersion;
-use ruff_text_size::Ranged;
+use ruff_python_ast::flat::fields as ast;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -68,13 +67,13 @@ impl Violation for BatchedWithoutExplicitStrict {
 }
 
 /// B911
-pub(crate) fn batched_without_explicit_strict(checker: &Checker, call: &ExprCall) {
+pub(crate) fn batched_without_explicit_strict(checker: &Checker, call: &ast::ExprCall<'_>) {
     if checker.target_version() < PythonVersion::PY313 {
         return;
     }
 
     let semantic = checker.semantic();
-    let (func, arguments) = (&call.func, &call.arguments);
+    let (func, arguments) = (call.func, call.arguments);
 
     let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
         return;
@@ -96,5 +95,5 @@ pub(crate) fn batched_without_explicit_strict(checker: &Checker, call: &ExprCall
         return;
     }
 
-    checker.report_diagnostic(BatchedWithoutExplicitStrict, call.range());
+    checker.report_diagnostic(BatchedWithoutExplicitStrict, call.range);
 }

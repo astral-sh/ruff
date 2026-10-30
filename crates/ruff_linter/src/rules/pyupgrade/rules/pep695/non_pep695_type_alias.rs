@@ -1,10 +1,11 @@
 use itertools::Itertools;
+use ruff_python_ast::flat::{self, fields as ast};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat::visitor::Visitor;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssign, StmtRef};
+use ruff_python_ast::{Stmt, StmtAnnAssign, StmtAssign};
 use ruff_python_edits::unwrapped_call_argument;
 use ruff_text_size::Ranged;
 
@@ -126,59 +127,67 @@ impl Violation for NonPEP695TypeAlias {
 }
 
 /// UP040
-pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
+pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: flat::View<'_, StmtAssign>) {
     if checker.target_version() < PythonVersion::PY312 {
         return;
     }
 
-    let StmtAssign { targets, value, .. } = stmt;
+    let targets = stmt.targets();
+    let value = stmt.value();
 
-    let Expr::Call(
-        call @ ExprCall {
-            func, arguments, ..
-        },
-    ) = value.as_ref()
+    let flat::ExprKind::Call(call) = value.classify() else {
+        return;
+    };
+    let func = call.func();
+    let arguments = call.arguments();
+
+    let Some([flat::ExprKind::Name(target_name)]) = targets
+        .as_array()
+        .map(|items| items.map(flat::View::<ruff_python_ast::Expr>::classify))
     else {
         return;
     };
 
-    let [Expr::Name(target_name)] = targets.as_slice() else {
+    let Some([flat::ExprKind::StringLiteral(name), value]) = arguments
+        .args()
+        .as_array()
+        .map(|items| items.map(flat::View::<ruff_python_ast::Expr>::classify))
+    else {
         return;
     };
 
-    let [Expr::StringLiteral(name), value] = arguments.args.as_ref() else {
-        return;
-    };
-
-    if &name.value != target_name.id.as_str() {
+    if name.value() != target_name.id().as_str() {
         return;
     }
 
-    let type_params = match arguments.keywords.as_ref() {
-        [] => &[],
-        [
-            Keyword {
-                arg: Some(name),
-                value: Expr::Tuple(type_params),
-                ..
-            },
-        ] if name.as_str() == "type_params" => type_params.elts.as_slice(),
+    let type_params = match arguments.keywords() {
+        keywords if keywords.is_empty() => None,
+        keywords
+            if let Some([keyword]) = keywords.as_array()
+                && let ast::Keyword {
+                    arg: Some(name),
+                    value,
+                    ..
+                } = keyword.fields()
+                && let flat::ExprKind::Tuple(type_params) = value.classify()
+                && name.as_str() == "type_params" =>
+        {
+            Some(type_params.elts())
+        }
         _ => return,
     };
 
-    if !checker
-        .semantic()
-        .match_typing_expr(func.as_ref(), "TypeAliasType")
-    {
+    if !checker.semantic().match_typing_expr(func, "TypeAliasType") {
         return;
     }
 
     let Some(vars) = type_params
-        .iter()
+        .into_iter()
+        .flatten()
         .map(|expr| {
             expr.as_name_expr().map(|name| {
                 expr_name_to_type_var(checker.semantic(), name).unwrap_or(TypeVar {
-                    name: &name.id,
+                    name: name.id(),
                     restriction: None,
                     kind: TypeParamKind::TypeVar,
                     default: None,
@@ -193,12 +202,12 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
     create_diagnostic(
         checker,
         stmt.into(),
-        &target_name.id,
+        target_name.id(),
         &vars,
         TypeAliasKind::TypeAliasType,
         &unwrapped_call_argument(
             call,
-            value,
+            value.view(),
             Some(stmt.into()),
             checker.tokens(),
             checker.source(),
@@ -207,17 +216,14 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
 }
 
 /// UP040
-pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
+pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: flat::View<'_, StmtAnnAssign>) {
     if checker.target_version() < PythonVersion::PY312 {
         return;
     }
 
-    let StmtAnnAssign {
-        target,
-        annotation,
-        value,
-        ..
-    } = stmt;
+    let target = stmt.target();
+    let annotation = stmt.annotation();
+    let value = stmt.value();
 
     if !checker
         .semantic()
@@ -226,9 +232,10 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
         return;
     }
 
-    let Expr::Name(ExprName { id: name, .. }) = target.as_ref() else {
+    let flat::ExprKind::Name(name_node) = target.classify() else {
         return;
     };
+    let name = name_node.id();
 
     let Some(value) = value else {
         return;
@@ -251,7 +258,7 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
         .collect::<Vec<_>>();
 
     let range_with_parentheses =
-        parenthesized_range(value.into(), stmt.into(), checker.tokens()).unwrap_or(value.range());
+        parenthesized_range(value, stmt.into(), checker.tokens()).unwrap_or(value.range());
 
     create_diagnostic(
         checker,
@@ -266,7 +273,7 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
 /// Generate a [`Diagnostic`] for a non-PEP 695 type alias or type alias type.
 fn create_diagnostic(
     checker: &Checker,
-    stmt: StmtRef,
+    stmt: flat::View<'_, Stmt>,
     name: &Name,
     type_vars: &[TypeVar],
     type_alias_kind: TypeAliasKind,

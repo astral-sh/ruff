@@ -4,7 +4,8 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
-use ruff_python_ast::helpers::map_subscript;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze;
 use ruff_python_semantic::analyze::class::might_be_generic;
@@ -148,12 +149,12 @@ impl Violation for NonSelfReturnType {
 /// PYI034
 pub(crate) fn non_self_return_type(
     checker: &Checker,
-    stmt: &ast::Stmt,
+    stmt: flat::View<'_, ast::Stmt>,
     is_async: bool,
     name: &str,
-    decorator_list: &[ast::Decorator],
-    returns: Option<&ast::Expr>,
-    parameters: &ast::Parameters,
+    decorator_list: flat::NodeList<'_, ast::Decorator>,
+    returns: Option<flat::View<'_, ast::Expr>>,
+    parameters: flat::View<'_, ast::Parameters>,
 ) {
     let semantic = checker.semantic();
 
@@ -161,7 +162,7 @@ pub(crate) fn non_self_return_type(
         return;
     };
 
-    if parameters.args.is_empty() && parameters.posonlyargs.is_empty() {
+    if parameters.args().is_empty() && parameters.posonlyargs().is_empty() {
         return;
     }
 
@@ -184,8 +185,8 @@ pub(crate) fn non_self_return_type(
 
     if is_async {
         if name == "__aenter__"
-            && is_name_or_stringized_name(returns, &class_def.name, checker)
-            && !is_final(&class_def.decorator_list, semantic)
+            && is_name_or_stringized_name(returns, class_def.name().as_str(), checker)
+            && !is_final(class_def.decorator_list(), semantic)
         {
             add_diagnostic(checker, stmt, returns, class_def, name);
         }
@@ -194,14 +195,15 @@ pub(crate) fn non_self_return_type(
 
     // In-place methods that are expected to return `Self`.
     if is_inplace_bin_op(name) {
-        if is_name_or_stringized_name(returns, &class_def.name, checker) {
+        if is_name_or_stringized_name(returns, class_def.name().as_str(), checker) {
             add_diagnostic(checker, stmt, returns, class_def, name);
         }
         return;
     }
 
-    if is_name_or_stringized_name(returns, &class_def.name, checker) {
-        if matches!(name, "__enter__" | "__new__") && !is_final(&class_def.decorator_list, semantic)
+    if is_name_or_stringized_name(returns, class_def.name().as_str(), checker) {
+        if matches!(name, "__enter__" | "__new__")
+            && !is_final(class_def.decorator_list(), semantic)
         {
             add_diagnostic(checker, stmt, returns, class_def, name);
         }
@@ -228,9 +230,9 @@ pub(crate) fn non_self_return_type(
 /// Add a diagnostic for the given method.
 fn add_diagnostic(
     checker: &Checker,
-    stmt: &ast::Stmt,
-    returns: &ast::Expr,
-    class_def: &ast::StmtClassDef,
+    stmt: flat::View<'_, ast::Stmt>,
+    returns: flat::View<'_, ast::Expr>,
+    class_def: flat::View<'_, ast::StmtClassDef>,
     method_name: &str,
 ) {
     let Some(importer) = checker.typing_importer("Self", PythonVersion::PY311) else {
@@ -239,7 +241,7 @@ fn add_diagnostic(
 
     let mut diagnostic = checker.report_diagnostic(
         NonSelfReturnType {
-            class_name: class_def.name.to_string(),
+            class_name: class_def.name().to_string(),
             method_name: method_name.to_string(),
         },
         stmt.identifier(),
@@ -253,20 +255,21 @@ fn add_diagnostic(
 fn replace_with_self_fix(
     semantic: &SemanticModel,
     importer: &TypingImporter,
-    stmt: &ast::Stmt,
-    returns: &ast::Expr,
-    class_def: &ast::StmtClassDef,
+    stmt: flat::View<'_, ast::Stmt>,
+    returns: flat::View<'_, ast::Expr>,
+    class_def: flat::View<'_, ast::StmtClassDef>,
 ) -> anyhow::Result<Fix> {
     let (self_import, self_binding) = importer.import(returns.start())?;
 
     let mut others = Vec::with_capacity(2);
 
     let remove_first_argument_type_hint = || -> Option<Edit> {
-        let ast::StmtFunctionDef { parameters, .. } = stmt.as_function_def_stmt()?;
+        let stmt_function_def = stmt.as_function_def_stmt()?;
+        let parameters = stmt_function_def.parameters();
         let first = parameters.iter().next()?;
         let annotation = first.annotation()?;
 
-        is_class_reference(semantic, annotation, &class_def.name)
+        is_class_reference(semantic, annotation, class_def.name().as_str())
             .then(|| Edit::deletion(first.name().end(), annotation.end()))
     };
 
@@ -283,14 +286,20 @@ fn replace_with_self_fix(
 }
 
 /// Return true if `annotation` is either `ClassName` or `type[ClassName]`
-fn is_class_reference(semantic: &SemanticModel, annotation: &ast::Expr, expected: &str) -> bool {
+fn is_class_reference(
+    semantic: &SemanticModel,
+    annotation: flat::View<'_, ast::Expr>,
+    expected: &str,
+) -> bool {
     if is_name(annotation, expected) {
         return true;
     }
 
-    let ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = annotation else {
+    let flat::ExprKind::Subscript(subscript) = annotation.classify() else {
         return false;
     };
+    let value = subscript.value();
+    let slice = subscript.slice();
 
     if !semantic.match_builtin_expr(value, "type") && !semantic.match_typing_expr(value, "Type") {
         return false;
@@ -320,20 +329,28 @@ fn is_inplace_bin_op(name: &str) -> bool {
 }
 
 /// Return `true` if the given expression resolves to the given name.
-fn is_name(expr: &ast::Expr, name: &str) -> bool {
-    let ast::Expr::Name(ast::ExprName { id, .. }) = expr else {
+fn is_name(expr: flat::View<'_, ast::Expr>, name: &str) -> bool {
+    let flat::ExprKind::Name(name_node) = expr.classify() else {
         return false;
     };
+    let id = name_node.id();
     id.as_str() == name
 }
 
 /// Return `true` if the given expression resolves to the given name,
-fn is_name_or_stringized_name(expr: &ast::Expr, name: &str, checker: &Checker) -> bool {
+fn is_name_or_stringized_name(
+    expr: flat::View<'_, ast::Expr>,
+    name: &str,
+    checker: &Checker,
+) -> bool {
     checker.match_maybe_stringized_annotation(expr, |expr| is_name(expr, name))
 }
 
 /// Return `true` if the given class extends `collections.abc.Iterator`.
-fn subclasses_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+fn subclasses_iterator(
+    class_def: flat::View<'_, ast::StmtClassDef>,
+    semantic: &SemanticModel,
+) -> bool {
     analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
         matches!(
             qualified_name.segments(),
@@ -343,7 +360,7 @@ fn subclasses_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticModel) 
 }
 
 /// Return `true` if the given expression resolves to `collections.abc.Iterable` or `collections.abc.Iterator`.
-fn is_iterable_or_iterator(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
+fn is_iterable_or_iterator(expr: flat::View<'_, ast::Expr>, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(map_subscript(expr))
         .is_some_and(|qualified_name| {
@@ -356,7 +373,10 @@ fn is_iterable_or_iterator(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// Return `true` if the given class extends `collections.abc.AsyncIterator`.
-fn subclasses_async_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+fn subclasses_async_iterator(
+    class_def: flat::View<'_, ast::StmtClassDef>,
+    semantic: &SemanticModel,
+) -> bool {
     analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
         matches!(
             qualified_name.segments(),
@@ -366,7 +386,10 @@ fn subclasses_async_iterator(class_def: &ast::StmtClassDef, semantic: &SemanticM
 }
 
 /// Return `true` if the given expression resolves to `collections.abc.AsyncIterable` or `collections.abc.AsyncIterator`.
-fn is_async_iterable_or_iterator(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
+fn is_async_iterable_or_iterator(
+    expr: flat::View<'_, ast::Expr>,
+    semantic: &SemanticModel,
+) -> bool {
     semantic
         .resolve_qualified_name(map_subscript(expr))
         .is_some_and(|qualified_name| {

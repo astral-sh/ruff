@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::helpers::resolve_imported_module_path;
-use ruff_python_ast::{Alias, AnyNodeRef, Stmt, StmtImport, StmtImportFrom};
+use ruff_python_ast::{Alias, Stmt, StmtImport, StmtImportFrom, flat::AnyNodeRef};
 use ruff_text_size::Ranged;
 use std::borrow::Cow;
 
@@ -58,7 +59,7 @@ impl Violation for BannedModuleLevelImports {
 }
 
 /// TID253
-pub(crate) fn banned_module_level_imports(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn banned_module_level_imports(checker: &Checker, stmt: flat::View<'_, Stmt>) {
     if !checker.semantic().at_top_level() {
         return;
     }
@@ -81,22 +82,25 @@ pub(crate) fn banned_module_level_imports(checker: &Checker, stmt: &Stmt) {
 }
 
 pub(crate) enum BannedModuleImportPolicies<'a> {
-    Import(&'a StmtImport),
+    Import(flat::View<'a, StmtImport>),
     ImportFrom {
         module: Option<Cow<'a, str>>,
-        node: &'a StmtImportFrom,
+        node: flat::View<'a, StmtImportFrom>,
     },
     NonImport,
 }
 
 impl<'a> BannedModuleImportPolicies<'a> {
-    pub(crate) fn new(stmt: &'a Stmt, checker: &Checker) -> Self {
-        match stmt {
-            Stmt::Import(import) => Self::Import(import),
-            Stmt::ImportFrom(import @ StmtImportFrom { module, level, .. }) => {
+    pub(crate) fn new(stmt: flat::View<'a, Stmt>, checker: &Checker) -> Self {
+        match stmt.classify() {
+            flat::StmtKind::Import(import) => Self::Import(import),
+            flat::StmtKind::ImportFrom(import) => {
+                let module = import.module();
+                let level = import.level();
+
                 let module = resolve_imported_module_path(
-                    *level,
-                    module.as_deref(),
+                    level,
+                    module.map(flat::View::<ruff_python_ast::Identifier>::as_str),
                     checker.module.qualified_name(),
                 );
 
@@ -117,13 +121,13 @@ impl<'a> IntoIterator for &'a BannedModuleImportPolicies<'a> {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             BannedModuleImportPolicies::Import(import) => {
-                BannedModuleImportPoliciesIter::Import(import.names.iter())
+                BannedModuleImportPoliciesIter::Import(import.names().iter())
             }
             BannedModuleImportPolicies::ImportFrom { module, node } => {
                 BannedModuleImportPoliciesIter::ImportFrom {
                     module: module.as_deref(),
-                    names: node.names.iter(),
-                    import: Some(node),
+                    names: node.names().iter(),
+                    import: Some(*node),
                 }
             }
             BannedModuleImportPolicies::NonImport => BannedModuleImportPoliciesIter::NonImport,
@@ -132,11 +136,11 @@ impl<'a> IntoIterator for &'a BannedModuleImportPolicies<'a> {
 }
 
 pub(crate) enum BannedModuleImportPoliciesIter<'a> {
-    Import(std::slice::Iter<'a, Alias>),
+    Import(flat::ListIter<'a, flat::Handle<Alias>>),
     ImportFrom {
         module: Option<&'a str>,
-        names: std::slice::Iter<'a, Alias>,
-        import: Option<&'a StmtImportFrom>,
+        names: flat::ListIter<'a, flat::Handle<Alias>>,
+        import: Option<flat::View<'a, StmtImportFrom>>,
     },
     NonImport,
 }
@@ -149,7 +153,9 @@ impl<'a> Iterator for BannedModuleImportPoliciesIter<'a> {
             Self::Import(names) => {
                 let name = names.next()?;
                 Some((
-                    NameMatchPolicy::MatchNameOrParent(MatchNameOrParent { module: &name.name }),
+                    NameMatchPolicy::MatchNameOrParent(MatchNameOrParent {
+                        module: name.name().as_str(),
+                    }),
                     name.into(),
                 ))
             }
@@ -169,14 +175,14 @@ impl<'a> Iterator for BannedModuleImportPoliciesIter<'a> {
 
                 loop {
                     let alias = names.next()?;
-                    if &alias.name == "*" {
+                    if alias.name() == "*" {
                         continue;
                     }
 
                     break Some((
                         NameMatchPolicy::MatchName(MatchName {
                             module,
-                            member: &alias.name,
+                            member: alias.name().as_str(),
                         }),
                         alias.into(),
                     ));

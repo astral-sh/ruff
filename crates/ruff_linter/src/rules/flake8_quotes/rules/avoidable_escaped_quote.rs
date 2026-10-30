@@ -1,8 +1,11 @@
 use flake8_quotes::helpers::{contains_escaped_quote, raw_contents, unescape_string};
 use flake8_quotes::settings::Quote;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::visitor::{Visitor, walk_f_string, walk_t_string};
-use ruff_python_ast::{self as ast, AnyStringFlags, PythonVersion, StringFlags, StringLike};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::visitor::{Visitor, walk_f_string, walk_t_string};
+use ruff_python_ast::{
+    self as ast, AnyStringFlags, NodeKind, PythonVersion, StringFlags, flat::StringLike,
+};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -72,15 +75,19 @@ pub(crate) fn avoidable_escaped_quote(checker: &Checker, string_like: StringLike
     let mut rule_checker = AvoidableEscapedQuoteChecker::new(checker, checker.target_version());
 
     for part in string_like.parts() {
-        match part {
-            ast::StringLikePart::String(string_literal) => {
+        match part.classify() {
+            ast::flat::StringLikePartKind::String(string_literal) => {
                 rule_checker.visit_string_literal(string_literal);
             }
-            ast::StringLikePart::Bytes(bytes_literal) => {
+            ast::flat::StringLikePartKind::Bytes(bytes_literal) => {
                 rule_checker.visit_bytes_literal(bytes_literal);
             }
-            ast::StringLikePart::FString(f_string) => rule_checker.visit_f_string(f_string),
-            ast::StringLikePart::TString(t_string) => rule_checker.visit_t_string(t_string),
+            ast::flat::StringLikePartKind::FString(f_string) => {
+                rule_checker.visit_f_string(f_string);
+            }
+            ast::flat::StringLikePartKind::TString(t_string) => {
+                rule_checker.visit_t_string(t_string);
+            }
         }
     }
 }
@@ -103,25 +110,25 @@ impl<'a, 'b> AvoidableEscapedQuoteChecker<'a, 'b> {
 }
 
 impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_, '_> {
-    fn visit_string_literal(&mut self, string_literal: &ast::StringLiteral) {
+    fn visit_string_literal(&mut self, string_literal: flat::View<'_, ast::StringLiteral>) {
         check_string_or_bytes(
             self.checker,
             self.quotes_settings,
             string_literal.range(),
-            AnyStringFlags::from(string_literal.flags),
+            AnyStringFlags::from(string_literal.flags()),
         );
     }
 
-    fn visit_bytes_literal(&mut self, bytes_literal: &ast::BytesLiteral) {
+    fn visit_bytes_literal(&mut self, bytes_literal: flat::View<'_, ast::BytesLiteral>) {
         check_string_or_bytes(
             self.checker,
             self.quotes_settings,
             bytes_literal.range(),
-            AnyStringFlags::from(bytes_literal.flags),
+            AnyStringFlags::from(bytes_literal.flags()),
         );
     }
 
-    fn visit_f_string(&mut self, f_string: &'_ ast::FString) {
+    fn visit_f_string(&mut self, f_string: flat::View<'_, ast::FString>) {
         // If the target version doesn't support PEP 701, skip this entire f-string if it contains
         // any string literal in any of the expression element. For example:
         //
@@ -138,17 +145,18 @@ impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_, '_> {
         //
         // Note that this check needs to be done globally to ignore the entire f-string. It is
         // implicitly global in that we avoid recursing into this f-string if this is the case.
-        if !self.supports_pep701 {
-            let contains_any_string = {
-                let mut visitor = ContainsAnyString::default();
-                // We need to use the `walk_f_string` instead of `visit_f_string` to avoid
-                // considering the top level f-string.
-                walk_f_string(&mut visitor, f_string);
-                visitor.result
-            };
-            if contains_any_string {
-                return;
-            }
+        if !self.supports_pep701
+            && f_string.descendants().skip(1).any(|node| {
+                matches!(
+                    node.kind(),
+                    NodeKind::StringLiteral
+                        | NodeKind::BytesLiteral
+                        | NodeKind::FString
+                        | NodeKind::TString
+                )
+            })
+        {
+            return;
         }
 
         let opposite_quote_char = self.quotes_settings.inline_quotes.opposite().as_char();
@@ -186,23 +194,23 @@ impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_, '_> {
         // f"'normal' {f'\'nested\' {x} "double quotes"'} normal"
         // ```
         if !f_string
-            .elements
+            .elements()
             .literals()
-            .any(|literal| contains_quote(literal, opposite_quote_char))
+            .any(|literal| contains_quote(literal.value(), opposite_quote_char))
         {
             check_interpolated_string(
                 self.checker,
                 self.quotes_settings,
-                AnyStringFlags::from(f_string.flags),
-                &f_string.elements,
-                f_string.range,
+                AnyStringFlags::from(f_string.flags()),
+                f_string.elements(),
+                f_string.range(),
             );
         }
 
         walk_f_string(self, f_string);
     }
 
-    fn visit_t_string(&mut self, t_string: &'_ ast::TString) {
+    fn visit_t_string(&mut self, t_string: flat::View<'_, ast::TString>) {
         let opposite_quote_char = self.quotes_settings.inline_quotes.opposite().as_char();
 
         // If any literal part of this t-string contains the quote character which is opposite to
@@ -225,16 +233,16 @@ impl Visitor<'_> for AvoidableEscapedQuoteChecker<'_, '_> {
         // The check is local to this t-string and it shouldn't check for any literal parts of any
         // nested t-string.
         if !t_string
-            .elements
+            .elements()
             .literals()
-            .any(|literal| contains_quote(literal, opposite_quote_char))
+            .any(|literal| contains_quote(literal.value(), opposite_quote_char))
         {
             check_interpolated_string(
                 self.checker,
                 self.quotes_settings,
-                AnyStringFlags::from(t_string.flags),
-                &t_string.elements,
-                t_string.range,
+                AnyStringFlags::from(t_string.flags()),
+                t_string.elements(),
+                t_string.range(),
             );
         }
 
@@ -292,7 +300,7 @@ fn check_interpolated_string(
     checker: &Checker,
     quotes_settings: &flake8_quotes::settings::Settings,
     flags: ast::AnyStringFlags,
-    elements: &ast::InterpolatedStringElements,
+    elements: flat::InterpolatedStringElements<'_>,
     range: TextRange,
 ) {
     if flags.is_triple_quoted() || flags.prefix().is_raw() {
@@ -344,7 +352,7 @@ fn check_interpolated_string(
             // element (e.g., `f"hello"`).
             elements
                 .last()
-                .map_or_else(|| start_edit.end(), Ranged::end),
+                .map_or_else(|| start_edit.end(), |part| part.end()),
             // Quote char
             TextSize::new(1),
         ),
@@ -353,31 +361,6 @@ fn check_interpolated_string(
     checker
         .report_diagnostic(AvoidableEscapedQuote, range)
         .set_fix(Fix::safe_edits(start_edit, edits));
-}
-
-#[derive(Debug, Default)]
-struct ContainsAnyString {
-    result: bool,
-}
-
-impl Visitor<'_> for ContainsAnyString {
-    fn visit_string_literal(&mut self, _: &'_ ast::StringLiteral) {
-        self.result = true;
-    }
-
-    fn visit_bytes_literal(&mut self, _: &'_ ast::BytesLiteral) {
-        self.result = true;
-    }
-
-    fn visit_f_string(&mut self, _: &'_ ast::FString) {
-        self.result = true;
-        // We don't need to recurse into this f-string now that we already know the result.
-    }
-
-    fn visit_t_string(&mut self, _: &'_ ast::TString) {
-        self.result = true;
-        // We don't need to recurse into this t-string now that we already know the result.
-    }
 }
 
 /// Return `true` if the haystack contains the quote.

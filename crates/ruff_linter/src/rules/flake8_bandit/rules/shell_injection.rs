@@ -1,8 +1,9 @@
 //! Checks relating to shell injection.
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_ast::{Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -309,9 +310,9 @@ impl Violation for UnixCommandWildcardInjection {
 
 /// Check if a single expression element is trusted input.
 /// String literals and `sys.executable` are considered trusted.
-fn is_trusted_element(expr: &Expr, semantic: &SemanticModel) -> bool {
-    match expr {
-        Expr::StringLiteral(_) => true,
+fn is_trusted_element(expr: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
+    match expr.classify() {
+        flat::ExprKind::StringLiteral(_) => true,
         _ => semantic
             .resolve_qualified_name(expr)
             .is_some_and(|name| matches!(name.segments(), ["sys", "executable"])),
@@ -321,23 +322,26 @@ fn is_trusted_element(expr: &Expr, semantic: &SemanticModel) -> bool {
 /// Check if an expression is a trusted input for subprocess calls.
 /// We assume that any str, list[str] or tuple[str] literal can be trusted,
 /// as well as `sys.executable`.
-fn is_trusted_input(arg: &Expr, semantic: &SemanticModel) -> bool {
-    match arg {
-        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+fn is_trusted_input(arg: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
+    match arg.fields() {
+        ast::Expr::List(ast::ExprList { elts, .. })
+        | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             elts.iter().all(|elt| is_trusted_element(elt, semantic))
         }
-        Expr::Named(named) => is_trusted_input(&named.value, semantic),
+        ast::Expr::Named(ast::ExprNamed { node: named, .. }) => {
+            is_trusted_input(named.value(), semantic)
+        }
         _ => is_trusted_element(arg, semantic),
     }
 }
 
 /// S602, S603, S604, S605, S606, S607, S609
-pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
-    let call_kind = get_call_kind(&call.func, checker.semantic());
-    let shell_keyword = find_shell_keyword(&call.arguments, checker.semantic());
+pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall<'_>) {
+    let call_kind = get_call_kind(call.func, checker.semantic());
+    let shell_keyword = find_shell_keyword(call.arguments, checker.semantic());
     let command_argument = match call_kind {
-        Some(CallKind::Subprocess) => find_subprocess_argument(&call.arguments),
-        Some(CallKind::Shell | CallKind::NoShell) => call.arguments.args.first(),
+        Some(CallKind::Subprocess) => find_subprocess_argument(call.arguments),
+        Some(CallKind::Shell | CallKind::NoShell) => call.arguments.args().first(),
         None => None,
     };
 
@@ -383,7 +387,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     // S605
     if checker.is_rule_enabled(Rule::StartProcessWithAShell) {
         if matches!(call_kind, Some(CallKind::Shell)) {
-            if let Some(arg) = call.arguments.args.first() {
+            if let Some(arg) = call.arguments.args().first() {
                 checker.report_diagnostic(
                     StartProcessWithAShell {
                         safety: Safety::from(arg),
@@ -433,12 +437,12 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
 }
 
 /// Return the command argument to a `subprocess` call.
-fn find_subprocess_argument(arguments: &Arguments) -> Option<&Expr> {
+fn find_subprocess_argument(arguments: flat::View<'_, Arguments>) -> Option<flat::View<'_, Expr>> {
     arguments.find_argument_value("args", 0).or_else(|| {
         // A starred first argument (`subprocess.run(*cmd)`) prevents us from locating the
         // command with `find_argument_value`; treat it as untrusted input.
         arguments
-            .args
+            .args()
             .first()
             .filter(|argument| argument.is_starred_expr())
     })
@@ -452,7 +456,7 @@ enum CallKind {
 }
 
 /// Return the [`CallKind`] of the given function call.
-fn get_call_kind(func: &Expr, semantic: &SemanticModel) -> Option<CallKind> {
+fn get_call_kind(func: flat::View<'_, Expr>, semantic: &SemanticModel) -> Option<CallKind> {
     semantic
         .resolve_qualified_name(func)
         .and_then(|qualified_name| match qualified_name.segments() {
@@ -492,9 +496,12 @@ struct ShellKeyword {
 }
 
 /// Return the `shell` keyword argument to the given function call, if any.
-fn find_shell_keyword(arguments: &Arguments, semantic: &SemanticModel) -> Option<ShellKeyword> {
+fn find_shell_keyword(
+    arguments: flat::View<'_, Arguments>,
+    semantic: &SemanticModel,
+) -> Option<ShellKeyword> {
     arguments.find_keyword("shell").map(|keyword| ShellKeyword {
-        truthiness: Truthiness::from_expr(&keyword.value, |id| semantic.has_builtin_binding(id)),
+        truthiness: Truthiness::from_expr(keyword.value(), |id| semantic.has_builtin_binding(id)),
     })
 }
 
@@ -504,10 +511,10 @@ enum Safety {
     Unknown,
 }
 
-impl From<&Expr> for Safety {
+impl From<flat::View<'_, Expr>> for Safety {
     /// Return the [`Safety`] level for the [`Expr`]. This is based on Bandit's definition: string
     /// literals are considered okay, but dynamically-computed values are not.
-    fn from(expr: &Expr) -> Self {
+    fn from(expr: flat::View<'_, Expr>) -> Self {
         if expr.is_string_literal_expr() {
             Self::SeemsSafe
         } else {
@@ -552,11 +559,10 @@ fn is_full_path(text: &str) -> bool {
 
 /// Return `true` if the [`Expr`] is a string literal or list of string literals that starts with a
 /// partial path.
-fn is_partial_path(expr: &Expr) -> bool {
-    let string_literal = match expr {
-        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            elts.first().and_then(string_literal)
-        }
+fn is_partial_path(expr: flat::View<'_, Expr>) -> bool {
+    let string_literal = match expr.fields() {
+        ast::Expr::List(ast::ExprList { elts, .. })
+        | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.first().and_then(string_literal),
         _ => string_literal(expr),
     };
     string_literal.is_some_and(|text| !is_full_path(text))
@@ -571,11 +577,11 @@ fn is_partial_path(expr: &Expr) -> bool {
 /// subprocess.Popen("/bin/chown root: *", shell=True)
 /// subprocess.Popen(["/usr/local/bin/rsync", "*", "some_where:"], shell=True)
 /// ```
-fn is_wildcard_command(expr: &Expr) -> bool {
-    if let Expr::List(list) = expr {
+fn is_wildcard_command(expr: flat::View<'_, Expr>) -> bool {
+    if let flat::ExprKind::List(list) = expr.classify() {
         let mut has_star = false;
         let mut has_command = false;
-        for item in list {
+        for item in list.elts() {
             if let Some(text) = string_literal(item) {
                 has_star |= text.contains('*');
                 has_command |= text.contains("chown")

@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use ruff_python_ast::{self as ast, Expr, StringFlags, StringLiteral};
+use ruff_python_ast::{self as ast, Expr, StringFlags, flat};
 use ruff_python_literal::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
@@ -118,13 +118,14 @@ fn collect_specs(formats: &[CFormatStrOrBytes<String>]) -> Vec<&CFormatSpec> {
 }
 
 /// Return `true` if the format string is equivalent to the constant type
-fn equivalent(format: &CFormatSpec, value: &Expr) -> bool {
+fn equivalent(format: &CFormatSpec, value: flat::View<'_, Expr>) -> bool {
     let format_type = FormatType::from(format.format_char);
     match ResolvedPythonType::from(value) {
         ResolvedPythonType::Atom(atom) => {
             // Special case where `%c` allows single character strings to be formatted
             if format.format_char == 'c' {
-                if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = value {
+                if let flat::ExprKind::StringLiteral(string_literal_node) = value.classify() {
+                    let value = string_literal_node.value();
                     let mut chars = value.chars();
                     if chars.next().is_some() && chars.next().is_none() {
                         return true;
@@ -142,7 +143,7 @@ fn equivalent(format: &CFormatSpec, value: &Expr) -> bool {
 }
 
 /// Return `true` if the [`Constant`] aligns with the format type.
-fn is_valid_constant(formats: &[CFormatStrOrBytes<String>], value: &Expr) -> bool {
+fn is_valid_constant(formats: &[CFormatStrOrBytes<String>], value: flat::View<'_, Expr>) -> bool {
     let formats = collect_specs(formats);
     // If there is more than one format, this is not valid Python and we should
     // return true so that no error is reported.
@@ -153,7 +154,7 @@ fn is_valid_constant(formats: &[CFormatStrOrBytes<String>], value: &Expr) -> boo
 }
 
 /// Return `true` if the tuple elements align with the format types.
-fn is_valid_tuple(formats: &[CFormatStrOrBytes<String>], elts: &[Expr]) -> bool {
+fn is_valid_tuple(formats: &[CFormatStrOrBytes<String>], elts: flat::NodeList<'_, Expr>) -> bool {
     let formats = collect_specs(formats);
 
     // If there are more formats that values, the statement is invalid. Avoid
@@ -171,7 +172,10 @@ fn is_valid_tuple(formats: &[CFormatStrOrBytes<String>], elts: &[Expr]) -> bool 
 }
 
 /// Return `true` if the dictionary values align with the format types.
-fn is_valid_dict(formats: &[CFormatStrOrBytes<String>], items: &[ast::DictItem]) -> bool {
+fn is_valid_dict(
+    formats: &[CFormatStrOrBytes<String>],
+    items: flat::List<'_, ast::DictItem>,
+) -> bool {
     let formats = collect_specs(formats);
 
     // If there are more formats that values, the statement is invalid. Avoid
@@ -189,14 +193,12 @@ fn is_valid_dict(formats: &[CFormatStrOrBytes<String>], items: &[ast::DictItem])
                 .map(|mapping_key| (mapping_key.as_str(), format))
         })
         .collect();
-    for ast::DictItem { key, value } in items {
+    for flat::DictItemView { key, value } in items {
         let Some(key) = key else {
             return true;
         };
-        if let Expr::StringLiteral(ast::ExprStringLiteral {
-            value: mapping_key, ..
-        }) = key
-        {
+        if let flat::ExprKind::StringLiteral(string_literal_node) = key.classify() {
+            let mapping_key = string_literal_node.value();
             let Some(format) = formats_hash.get(mapping_key.to_str()) else {
                 return true;
             };
@@ -214,18 +216,14 @@ fn is_valid_dict(formats: &[CFormatStrOrBytes<String>], items: &[ast::DictItem])
 /// PLE1307
 pub(crate) fn bad_string_format_type(
     checker: &Checker,
-    bin_op: &ast::ExprBinOp,
-    format_string: &ast::ExprStringLiteral,
+    bin_op: flat::View<'_, ast::ExprBinOp>,
+    format_string: flat::View<'_, ast::ExprStringLiteral>,
 ) {
     // Parse each string segment.
     let mut format_strings = vec![];
-    for StringLiteral {
-        value: _,
-        node_index: _,
-        range,
-        flags,
-    } in &format_string.value
-    {
+    for string_literal in format_string.value() {
+        let range = string_literal.range();
+        let flags = string_literal.flags();
         let string = checker.locator().slice(range);
         let string = &string
             [usize::from(flags.opener_len())..(string.len() - usize::from(flags.closer_len()))];
@@ -237,14 +235,17 @@ pub(crate) fn bad_string_format_type(
     }
 
     // Parse the parameters.
-    let is_valid = match &*bin_op.right {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => is_valid_tuple(&format_strings, elts),
-        Expr::Dict(ast::ExprDict {
-            items,
-            range: _,
-            node_index: _,
-        }) => is_valid_dict(&format_strings, items),
-        _ => is_valid_constant(&format_strings, &bin_op.right),
+    let is_valid = match bin_op.right().classify() {
+        flat::ExprKind::Tuple(expr_tuple) => {
+            let elts = expr_tuple.elts();
+
+            is_valid_tuple(&format_strings, elts)
+        }
+        flat::ExprKind::Dict(expr_dict) => {
+            let items = expr_dict.items();
+            is_valid_dict(&format_strings, items)
+        }
+        _ => is_valid_constant(&format_strings, bin_op.right()),
     };
     if !is_valid {
         checker.report_diagnostic(BadStringFormatType, bin_op.range());

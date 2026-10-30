@@ -1,4 +1,5 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
@@ -85,7 +86,11 @@ impl Violation for NonPEP585Annotation {
 }
 
 /// UP006
-pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement: &ModuleMember) {
+pub(crate) fn use_pep585_annotation(
+    checker: &Checker,
+    &expr: &flat::View<'_, Expr>,
+    replacement: &ModuleMember,
+) {
     let Some(from) = UnqualifiedName::from_expr(expr) else {
         return;
     };

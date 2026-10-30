@@ -1,8 +1,9 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{
     self as ast, Expr, Stmt,
-    visitor::{self, Visitor},
+    flat::visitor::{self, Visitor},
 };
 use ruff_text_size::Ranged;
 
@@ -81,9 +82,9 @@ impl Violation for WriteWholeFile<'_> {
 }
 
 /// FURB103
-pub(crate) fn write_whole_file(checker: &Checker, with: &ast::StmtWith) {
+pub(crate) fn write_whole_file(checker: &Checker, with: flat::View<'_, ast::StmtWith>) {
     // `async` check here is more of a precaution.
-    if with.is_async {
+    if with.is_async() {
         return;
     }
 
@@ -95,7 +96,7 @@ pub(crate) fn write_whole_file(checker: &Checker, with: &ast::StmtWith) {
 
     // Then we need to match each `open` operation with exactly one `write` call.
     let mut matcher = WriteMatcher::new(checker, candidates, with);
-    visitor::walk_body(&mut matcher, &with.body);
+    visitor::walk_body(&mut matcher, with.body());
 }
 
 /// AST visitor that matches `open` operations with the corresponding `write` calls.
@@ -103,14 +104,14 @@ struct WriteMatcher<'a, 'b> {
     checker: &'a Checker<'b>,
     candidates: Vec<FileOpen<'a>>,
     loop_counter: u32,
-    with_stmt: &'a ast::StmtWith,
+    with_stmt: flat::View<'a, ast::StmtWith>,
 }
 
 impl<'a, 'b> WriteMatcher<'a, 'b> {
     fn new(
         checker: &'a Checker<'b>,
         candidates: Vec<FileOpen<'a>>,
-        with_stmt: &'a ast::StmtWith,
+        with_stmt: flat::View<'a, ast::StmtWith>,
     ) -> Self {
         Self {
             checker,
@@ -122,8 +123,11 @@ impl<'a, 'b> WriteMatcher<'a, 'b> {
 }
 
 impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        if matches!(stmt, Stmt::While(_) | Stmt::For(_)) {
+    fn visit_stmt(&mut self, stmt: flat::View<'a, Stmt>) {
+        if matches!(
+            stmt.classify(),
+            flat::StmtKind::While(_) | flat::StmtKind::For(_)
+        ) {
             self.loop_counter += 1;
             visitor::walk_stmt(self, stmt);
             self.loop_counter -= 1;
@@ -132,7 +136,7 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: flat::View<'a, Expr>) {
         if let Some((write_to, content)) = match_write_call(expr) {
             if let Some(open) = self
                 .candidates
@@ -167,24 +171,26 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
 }
 
 /// Match `x.write(foo)` expression and return expression `x` and `foo` on success.
-fn match_write_call(expr: &Expr) -> Option<(&Expr, &Expr)> {
+fn match_write_call(
+    expr: flat::View<'_, Expr>,
+) -> Option<(flat::View<'_, Expr>, flat::View<'_, Expr>)> {
     let call = expr.as_call_expr()?;
-    let attr = call.func.as_attribute_expr()?;
-    let method_name = &attr.attr;
+    let attr = call.func().as_attribute_expr()?;
+    let method_name = attr.attr();
 
     if method_name != "write"
-        || !attr.value.is_name_expr()
-        || call.arguments.args.len() != 1
-        || !call.arguments.keywords.is_empty()
+        || !attr.value().is_name_expr()
+        || call.arguments().args().len() != 1
+        || !call.arguments().keywords().is_empty()
     {
         return None;
     }
 
     // `write` only takes in a single positional argument.
-    Some((&*attr.value, call.arguments.args.first()?))
+    Some((attr.value(), call.arguments().args().first()?))
 }
 
-fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, locator: &Locator) -> String {
+fn make_suggestion(open: &FileOpen<'_>, arg: flat::View<'_, Expr>, locator: &Locator) -> String {
     let method_name = open.mode.pathlib_method();
     let arg_code = locator.slice(arg.range());
 
@@ -204,10 +210,18 @@ fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, locator: &Locator) -> String
 fn generate_fix(
     checker: &Checker,
     open: &FileOpen,
-    with_stmt: &ast::StmtWith,
+    with_stmt: flat::View<'_, ast::StmtWith>,
     suggestion: &str,
 ) -> Option<Fix> {
-    if !(with_stmt.items.len() == 1 && matches!(with_stmt.body.as_slice(), [Stmt::Expr(_)])) {
+    if !(with_stmt.items().len() == 1
+        && matches!(
+            with_stmt
+                .body()
+                .as_array()
+                .map(|items| items.map(flat::View::<Stmt>::classify)),
+            Some([flat::StmtKind::Expr(_)])
+        ))
+    {
         return None;
     }
 

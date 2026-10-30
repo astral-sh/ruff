@@ -2,8 +2,11 @@ use std::iter::Peekable;
 use std::slice;
 
 use ruff_notebook::CellOffsets;
-use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::{self as ast, ElifElseClause, ExceptHandler, MatchCase, Stmt};
+use ruff_python_ast::flat::statement_visitor::StatementVisitor;
+use ruff_python_ast::{
+    ElifElseClause, ExceptHandler, MatchCase, Stmt,
+    flat::{self, fields as ast},
+};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Locator;
@@ -14,7 +17,7 @@ use crate::rules::isort::helpers;
 #[derive(Debug, Default)]
 pub(crate) struct Block<'a> {
     pub(crate) nested: bool,
-    pub(crate) imports: Vec<&'a Stmt>,
+    pub(crate) imports: Vec<flat::View<'a, Stmt>>,
     pub(crate) trailer: Option<Trailer>,
 }
 
@@ -55,13 +58,13 @@ impl<'a> BlockBuilder<'a> {
         }
     }
 
-    fn track_import(&mut self, stmt: &'a Stmt) {
+    fn track_import(&mut self, stmt: flat::View<'a, Stmt>) {
         let index = self.blocks.len() - 1;
         self.blocks[index].imports.push(stmt);
         self.blocks[index].nested = self.nested;
     }
 
-    fn trailer_for(&self, stmt: &'a Stmt) -> Option<Trailer> {
+    fn trailer_for(&self, stmt: flat::View<'a, Stmt>) -> Option<Trailer> {
         // No need to compute trailers if we won't be finalizing anything.
         let index = self.blocks.len() - 1;
         if self.blocks[index].imports.is_empty() {
@@ -84,15 +87,15 @@ impl<'a> BlockBuilder<'a> {
             // least one blank line. In that case, we treat it as a regular
             // sibling (i.e., as if the comment is the next statement, as
             // opposed to the class or function).
-            match stmt {
-                Stmt::FunctionDef(_) => {
+            match stmt.classify() {
+                flat::StmtKind::FunctionDef(_) => {
                     if helpers::has_comment_break(stmt, self.locator) {
                         Trailer::Sibling
                     } else {
                         Trailer::FunctionDef
                     }
                 }
-                Stmt::ClassDef(_) => {
+                flat::StmtKind::ClassDef(_) => {
                     if helpers::has_comment_break(stmt, self.locator) {
                         Trailer::Sibling
                     } else {
@@ -121,7 +124,7 @@ impl<'a> BlockBuilder<'a> {
 }
 
 impl<'a> StatementVisitor<'a> for BlockBuilder<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+    fn visit_stmt(&mut self, stmt: flat::View<'a, Stmt>) {
         // Track manual splits (e.g., `# isort: split`).
         if self
             .splits
@@ -168,11 +171,13 @@ impl<'a> StatementVisitor<'a> for BlockBuilder<'a> {
         }
 
         // Track imports.
-        if matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_))
-            && !self
-                .exclusions
-                .iter()
-                .any(|exclusion| exclusion.contains(stmt.start()))
+        if matches!(
+            stmt.classify(),
+            flat::StmtKind::Import(_) | flat::StmtKind::ImportFrom(_)
+        ) && !self
+            .exclusions
+            .iter()
+            .any(|exclusion| exclusion.contains(stmt.start()))
         {
             self.track_import(stmt);
         } else {
@@ -182,20 +187,27 @@ impl<'a> StatementVisitor<'a> for BlockBuilder<'a> {
         // Track scope.
         let prev_nested = self.nested;
         self.nested = true;
-        match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
+        match stmt.classify() {
+            flat::StmtKind::FunctionDef(stmt_function_def) => {
+                let body = stmt_function_def.body();
+
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            Stmt::ClassDef(ast::StmtClassDef { body, .. }) => {
+            flat::StmtKind::ClassDef(stmt_class_def) => {
+                let body = stmt_class_def.body();
+
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            Stmt::For(ast::StmtFor { body, orelse, .. }) => {
+            flat::StmtKind::For(stmt_for) => {
+                let body = stmt_for.body();
+                let orelse = stmt_for.orelse();
+
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
@@ -206,7 +218,10 @@ impl<'a> StatementVisitor<'a> for BlockBuilder<'a> {
                 }
                 self.finalize(None);
             }
-            Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+            flat::StmtKind::While(stmt_while) => {
+                let body = stmt_while.body();
+                let orelse = stmt_while.orelse();
+
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
@@ -217,11 +232,10 @@ impl<'a> StatementVisitor<'a> for BlockBuilder<'a> {
                 }
                 self.finalize(None);
             }
-            Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                ..
-            }) => {
+            flat::StmtKind::If(stmt_if) => {
+                let body = stmt_if.body();
+                let elif_else_clauses = stmt_if.elif_else_clauses();
+
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
@@ -231,24 +245,27 @@ impl<'a> StatementVisitor<'a> for BlockBuilder<'a> {
                     self.visit_elif_else_clause(clause);
                 }
             }
-            Stmt::With(ast::StmtWith { body, .. }) => {
+            flat::StmtKind::With(stmt_with) => {
+                let body = stmt_with.body();
+
                 for stmt in body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            Stmt::Match(ast::StmtMatch { cases, .. }) => {
+            flat::StmtKind::Match(stmt_match) => {
+                let cases = stmt_match.cases();
+
                 for match_case in cases {
                     self.visit_match_case(match_case);
                 }
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
+            flat::StmtKind::Try(stmt_try) => {
+                let body = stmt_try.body();
+                let handlers = stmt_try.handlers();
+                let orelse = stmt_try.orelse();
+                let finalbody = stmt_try.finalbody();
+
                 for except_handler in handlers {
                     self.visit_except_handler(except_handler);
                 }
@@ -273,12 +290,12 @@ impl<'a> StatementVisitor<'a> for BlockBuilder<'a> {
         self.nested = prev_nested;
     }
 
-    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
+    fn visit_except_handler(&mut self, except_handler: flat::View<'a, ExceptHandler>) {
         let prev_nested = self.nested;
         self.nested = true;
 
-        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) =
-            except_handler;
+        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) =
+            except_handler.fields();
         for stmt in body {
             self.visit_stmt(stmt);
         }
@@ -287,15 +304,15 @@ impl<'a> StatementVisitor<'a> for BlockBuilder<'a> {
         self.nested = prev_nested;
     }
 
-    fn visit_match_case(&mut self, match_case: &'a MatchCase) {
-        for stmt in &match_case.body {
+    fn visit_match_case(&mut self, match_case: flat::View<'a, MatchCase>) {
+        for stmt in match_case.body() {
             self.visit_stmt(stmt);
         }
         self.finalize(None);
     }
 
-    fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
-        for stmt in &elif_else_clause.body {
+    fn visit_elif_else_clause(&mut self, elif_else_clause: flat::View<'a, ElifElseClause>) {
+        for stmt in elif_else_clause.body() {
             self.visit_stmt(stmt);
         }
         self.finalize(None);

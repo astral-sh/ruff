@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::QualifiedNameBuilder;
-use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::statement_visitor::StatementVisitor;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{Exceptions, Modules, SemanticModel};
 use ruff_text_size::Ranged;
@@ -9,7 +8,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::importer::ImportRequest;
-use crate::rules::numpy::helpers::{AttributeSearcher, ImportSearcher};
+use crate::rules::numpy::helpers::{ImportSearcher, body_contains_attribute};
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -159,7 +158,7 @@ enum Compatibility {
 }
 
 /// NPY201
-pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
+pub(crate) fn numpy_2_0_deprecation(checker: &Checker, &expr: &flat::View<'_, Expr>) {
     let semantic = checker.semantic();
 
     if !semantic.seen_module(Modules::NUMPY) {
@@ -752,18 +751,18 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
 /// x = ComplexWarning()  # Okay
 /// ```
 fn is_guarded_by_try_except(
-    expr: &Expr,
+    expr: flat::View<'_, Expr>,
     replacement: &Replacement,
     semantic: &SemanticModel,
 ) -> bool {
-    match expr {
-        Expr::Attribute(_) => {
+    match expr.classify() {
+        flat::ExprKind::Attribute(_) => {
             if !semantic.in_exception_handler() {
                 return false;
             }
             let Some(try_node) = semantic
                 .current_statements()
-                .find_map(|stmt| stmt.as_try_stmt())
+                .find_map(flat::View::as_try_stmt)
             else {
                 return false;
             };
@@ -773,7 +772,9 @@ fn is_guarded_by_try_except(
             }
             try_block_contains_undeprecated_attribute(try_node, &replacement.details, semantic)
         }
-        Expr::Name(ast::ExprName { id, .. }) => {
+        flat::ExprKind::Name(expr_name) => {
+            let id = expr_name.id();
+
             let Some(binding_id) = semantic.lookup_symbol(id.as_str()).binding_id() else {
                 return false;
             };
@@ -787,7 +788,7 @@ fn is_guarded_by_try_except(
             let Some(try_node) = binding.source.and_then(|import_id| {
                 semantic
                     .statements(import_id)
-                    .find_map(|stmt| stmt.as_try_stmt())
+                    .find_map(flat::View::as_try_stmt)
             }) else {
                 return false;
             };
@@ -807,7 +808,7 @@ fn is_guarded_by_try_except(
 /// contain any [`ast::ExprAttribute`] nodes that indicate the numpy
 /// member is being accessed from the non-deprecated location?
 fn try_block_contains_undeprecated_attribute(
-    try_node: &ast::StmtTry,
+    try_node: flat::View<'_, ast::StmtTry>,
     replacement_details: &Details,
     semantic: &SemanticModel,
 ) -> bool {
@@ -819,24 +820,14 @@ fn try_block_contains_undeprecated_attribute(
     else {
         return false;
     };
-    let undeprecated_qualified_name = {
-        let mut builder = QualifiedNameBuilder::default();
-        for part in path.split('.') {
-            builder.push(part);
-        }
-        builder.push(name);
-        builder.build()
-    };
-    let mut attribute_searcher = AttributeSearcher::new(undeprecated_qualified_name, semantic);
-    attribute_searcher.visit_body(&try_node.body);
-    attribute_searcher.found_attribute
+    body_contains_attribute(try_node.body(), path, name, semantic)
 }
 
 /// Given an [`ast::StmtTry`] node, does the `try` branch of that node
 /// contain any [`ast::StmtImportFrom`] nodes that indicate the numpy
 /// member is being imported from the non-deprecated location?
 fn try_block_contains_undeprecated_import(
-    try_node: &ast::StmtTry,
+    try_node: flat::View<'_, ast::StmtTry>,
     replacement_details: &Details,
 ) -> bool {
     let Details::AutoImport {
@@ -848,6 +839,6 @@ fn try_block_contains_undeprecated_import(
         return false;
     };
     let mut import_searcher = ImportSearcher::new(path, name);
-    import_searcher.visit_body(&try_node.body);
+    import_searcher.visit_body(try_node.body());
     import_searcher.found_import
 }

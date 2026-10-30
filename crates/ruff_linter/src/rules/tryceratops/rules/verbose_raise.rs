@@ -1,7 +1,10 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, Stmt};
+use ruff_python_ast::{
+    ExceptHandler, Stmt, StmtRaise,
+    flat::{self, fields as ast},
+};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
+use ruff_python_ast::flat::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -52,14 +55,14 @@ impl AlwaysFixableViolation for VerboseRaise {
 }
 
 /// TRY201
-pub(crate) fn verbose_raise(checker: &Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn verbose_raise(checker: &Checker, handlers: flat::NodeList<'_, ExceptHandler>) {
     for handler in handlers {
         // If the handler assigned a name to the exception...
-        if let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+        if let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
             name: Some(exception_name),
             body,
             ..
-        }) = handler
+        }) = handler.fields()
         {
             let raises = {
                 let mut visitor = RaiseStatementVisitor::default();
@@ -67,12 +70,13 @@ pub(crate) fn verbose_raise(checker: &Checker, handlers: &[ExceptHandler]) {
                 visitor.raises
             };
             for raise in raises {
-                if raise.cause.is_some() {
+                if raise.cause().is_some() {
                     continue;
                 }
-                if let Some(exc) = raise.exc.as_ref() {
+                if let Some(exc) = raise.exc() {
                     // ...and the raised object is bound to the same name...
-                    if let Expr::Name(ast::ExprName { id, .. }) = exc.as_ref() {
+                    if let flat::ExprKind::Name(name_node) = exc.classify() {
+                        let id = name_node.id();
                         if id == exception_name.as_str() {
                             let mut diagnostic =
                                 checker.report_diagnostic(VerboseRaise, exc.range());
@@ -90,18 +94,19 @@ pub(crate) fn verbose_raise(checker: &Checker, handlers: &[ExceptHandler]) {
 
 #[derive(Default)]
 struct RaiseStatementVisitor<'a> {
-    raises: Vec<&'a ast::StmtRaise>,
+    raises: Vec<flat::View<'a, StmtRaise>>,
 }
 
 impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::Raise(raise @ ast::StmtRaise { .. }) => {
+    fn visit_stmt(&mut self, stmt: flat::View<'a, Stmt>) {
+        match stmt.classify() {
+            flat::StmtKind::Raise(raise) => {
                 self.raises.push(raise);
             }
-            Stmt::Try(ast::StmtTry {
-                body, finalbody, ..
-            }) => {
+            flat::StmtKind::Try(stmt_try) => {
+                let body = stmt_try.body();
+                let finalbody = stmt_try.finalbody();
+
                 for stmt in body.iter().chain(finalbody) {
                     walk_stmt(self, stmt);
                 }

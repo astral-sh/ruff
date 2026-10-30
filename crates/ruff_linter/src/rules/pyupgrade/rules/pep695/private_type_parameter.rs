@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Stmt;
+use ruff_python_ast::flat;
 use ruff_python_semantic::Binding;
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::Ranged;
@@ -112,9 +112,9 @@ pub(crate) fn private_type_parameter(checker: &Checker, binding: &Binding) {
         return;
     }
 
-    let kind = match stmt {
-        Stmt::FunctionDef(_) => ParamKind::Function,
-        Stmt::ClassDef(_) => ParamKind::Class,
+    let kind = match stmt.classify() {
+        flat::StmtKind::FunctionDef(_) => ParamKind::Function,
+        flat::StmtKind::ClassDef(_) => ParamKind::Class,
         _ => return,
     };
 

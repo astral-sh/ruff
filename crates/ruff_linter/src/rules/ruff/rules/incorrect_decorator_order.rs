@@ -2,8 +2,11 @@ use std::fmt;
 
 use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::{self as ast, Decorator, Expr, PythonVersion};
+use ruff_python_ast::flat::helpers::map_callable;
+use ruff_python_ast::{
+    Decorator, PythonVersion,
+    flat::{self, fields as ast},
+};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -63,7 +66,10 @@ impl Violation for IncorrectDecoratorOrder {
 }
 
 /// RUF074
-pub(crate) fn incorrect_decorator_order(checker: &Checker, decorator_list: &[Decorator]) {
+pub(crate) fn incorrect_decorator_order(
+    checker: &Checker,
+    decorator_list: flat::NodeList<'_, Decorator>,
+) {
     for (outer_decorator, inner_decorator) in decorator_list.iter().tuple_windows() {
         let (Some(outer), Some(inner)) = (
             classify_decorator(checker, outer_decorator),
@@ -112,11 +118,14 @@ impl fmt::Display for KnownDecorator {
     }
 }
 
-fn classify_decorator(checker: &Checker, decorator: &Decorator) -> Option<KnownDecorator> {
-    let callable = map_callable(&decorator.expression);
+fn classify_decorator(
+    checker: &Checker,
+    decorator: flat::View<'_, Decorator>,
+) -> Option<KnownDecorator> {
+    let callable = map_callable(decorator.expression());
 
     // `@x.setter` / `.getter` / `.deleter` return a `property` object.
-    if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = callable
+    if let ast::Expr::Attribute(ast::ExprAttribute { attr, .. }) = callable.fields()
         && matches!(attr.as_str(), "setter" | "getter" | "deleter")
     {
         return Some(KnownDecorator::Property);

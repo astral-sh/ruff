@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{Expr, ExprName, StmtDelete};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::is_list;
 use ruff_text_size::Ranged;
@@ -57,17 +58,17 @@ impl Violation for DeleteFullSlice {
 }
 
 /// FURB131
-pub(crate) fn delete_full_slice(checker: &Checker, delete: &ast::StmtDelete) {
-    for target in &delete.targets {
+pub(crate) fn delete_full_slice(checker: &Checker, delete: flat::View<'_, StmtDelete>) {
+    for target in delete.targets() {
         let Some(name) = match_full_slice(target, checker.semantic()) else {
             continue;
         };
 
-        let mut diagnostic = checker.report_diagnostic(DeleteFullSlice, delete.range);
+        let mut diagnostic = checker.report_diagnostic(DeleteFullSlice, delete.range());
 
         // Fix is only supported for single-target deletions.
-        if delete.targets.len() == 1 {
-            let replacement = generate_method_call(name.id.clone(), "clear", checker.generator());
+        if delete.targets().len() == 1 {
+            let replacement = generate_method_call(name.id().clone(), "clear", checker.generator());
             diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                 replacement,
                 delete.start(),
@@ -78,26 +79,29 @@ pub(crate) fn delete_full_slice(checker: &Checker, delete: &ast::StmtDelete) {
 }
 
 /// Match `del expr[:]` where `expr` is a list.
-fn match_full_slice<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a ast::ExprName> {
+fn match_full_slice<'a>(
+    expr: flat::View<'a, Expr>,
+    semantic: &SemanticModel,
+) -> Option<flat::View<'a, ExprName>> {
     // Check that it is `del expr[...]`.
     let subscript = expr.as_subscript_expr()?;
 
     // Check that it is` `del expr[:]`.
     if !matches!(
-        subscript.slice.as_ref(),
-        Expr::Slice(ast::ExprSlice {
+        subscript.slice().fields(),
+        ast::Expr::Slice(ast::ExprSlice {
             lower: None,
             upper: None,
             step: None,
             range: _,
-            node_index: _,
+            node: _,
         })
     ) {
         return None;
     }
 
     // It should only apply to variables that are known to be lists.
-    let name = subscript.value.as_name_expr()?;
+    let name = subscript.value().as_name_expr()?;
     let binding = semantic.binding(semantic.only_binding(name)?);
     if !is_list(binding, semantic) {
         return None;

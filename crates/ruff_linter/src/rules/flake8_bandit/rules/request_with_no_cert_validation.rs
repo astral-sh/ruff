@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
-use ruff_python_ast::helpers::is_const_false;
+use ruff_python_ast::flat::fields;
+use ruff_python_ast::flat::helpers::is_const_false;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -48,10 +48,10 @@ impl Violation for RequestWithNoCertValidation {
 }
 
 /// S501
-pub(crate) fn request_with_no_cert_validation(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn request_with_no_cert_validation(checker: &Checker, call: &fields::ExprCall<'_>) {
     if let Some(target) = checker
         .semantic()
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func)
         .and_then(|qualified_name| match qualified_name.segments() {
             [
                 "requests",
@@ -66,7 +66,7 @@ pub(crate) fn request_with_no_cert_validation(checker: &Checker, call: &ast::Exp
         })
     {
         if let Some(keyword) = call.arguments.find_keyword("verify") {
-            if is_const_false(&keyword.value) {
+            if is_const_false(keyword.value()) {
                 checker.report_diagnostic(
                     RequestWithNoCertValidation {
                         string: target.to_string(),

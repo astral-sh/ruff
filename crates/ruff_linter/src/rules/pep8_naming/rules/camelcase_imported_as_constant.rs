@@ -1,4 +1,4 @@
-use ruff_python_ast::{Alias, Stmt};
+use ruff_python_ast::{Alias, Stmt, flat};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_stdlib::str::{self};
@@ -71,8 +71,8 @@ pub(crate) fn camelcase_imported_as_constant(
     checker: &Checker,
     name: &str,
     asname: &str,
-    alias: &Alias,
-    stmt: &Stmt,
+    alias: flat::View<'_, Alias>,
+    stmt: flat::View<'_, Stmt>,
     ignore_names: &IgnoreNames,
 ) {
     // Single-character names are ambiguous. It could be a class or a constant.

@@ -1,4 +1,5 @@
-use ruff_python_ast::{Expr, StmtAssign};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields as ast;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
@@ -54,8 +55,13 @@ impl Violation for ComplexAssignmentInStub {
 }
 
 /// PYI017
-pub(crate) fn complex_assignment_in_stub(checker: &Checker, stmt: &StmtAssign) {
-    if matches!(stmt.targets.as_slice(), [Expr::Name(_)]) {
+pub(crate) fn complex_assignment_in_stub(checker: &Checker, stmt: &ast::StmtAssign<'_>) {
+    if matches!(
+        stmt.targets
+            .as_array()
+            .map(|items| items.map(flat::View::<ruff_python_ast::Expr>::classify)),
+        Some([flat::ExprKind::Name(_)])
+    ) {
         return;
     }
     checker.report_diagnostic(ComplexAssignmentInStub, stmt.range);

@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
+use ruff_python_ast::flat;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -65,7 +66,7 @@ impl Violation for ImportOutsideTopLevel {
 }
 
 /// PLC0415
-pub(crate) fn import_outside_top_level(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn import_outside_top_level(checker: &Checker, stmt: flat::View<'_, Stmt>) {
     if checker.semantic().current_scope().kind.is_module() {
         // "Top-level" imports are allowed
         return;

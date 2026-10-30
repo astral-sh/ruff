@@ -2,7 +2,8 @@ use ast::ExprName;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprCall, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -76,9 +77,9 @@ impl Violation for UnnecessaryDictComprehensionForIterable {
 /// C420
 pub(crate) fn unnecessary_dict_comprehension_for_iterable(
     checker: &Checker,
-    dict_comp: &ast::ExprDictComp,
+    dict_comp: flat::View<'_, ast::ExprDictComp>,
 ) {
-    let [generator] = dict_comp.generators.as_ref() else {
+    let Some([generator]) = dict_comp.generators().as_array() else {
         return;
     };
 
@@ -86,37 +87,37 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
     // - async generator expressions, because `dict.fromkeys` is not async.
     // - nested generator expressions, because `dict.fromkeys` might be error-prone option at least for fixing.
     // - generator expressions with `if` clauses, because `dict.fromkeys` might not be valid option.
-    if !generator.ifs.is_empty() {
+    if !generator.ifs().is_empty() {
         return;
     }
-    if generator.is_async {
+    if generator.is_async() {
         return;
     }
 
-    let Some(key) = dict_comp.key.as_deref() else {
+    let Some(key) = dict_comp.key() else {
         return;
     };
 
     // Don't suggest `dict.keys` if the target is not the same as the key.
-    if ComparableExpr::from(&generator.target) != ComparableExpr::from(key) {
+    if ComparableExpr::from(generator.target()) != ComparableExpr::from(key) {
         return;
     }
 
     // Don't suggest `dict.fromkeys` if the target contains side-effecting expressions
     // (attributes, subscripts, or slices).
-    if contains_side_effecting_sub_expression(&generator.target) {
+    if contains_side_effecting_sub_expression(generator.target()) {
         return;
     }
 
     // Don't suggest `dict.fromkeys` if the value is not a constant or constant-like.
-    if !is_constant_like(dict_comp.value.as_ref()) {
+    if !is_constant_like(dict_comp.value()) {
         return;
     }
 
     // Don't suggest `dict.fromkeys` if any of the expressions in the value are defined within
     // the comprehension (e.g., by the target).
-    let self_referential = any_over_expr(dict_comp.value.as_ref(), |expr| {
-        let Expr::Name(name) = expr else {
+    let self_referential = any_over_expr(dict_comp.value(), |expr| {
+        let flat::ExprKind::Name(name) = expr.classify() else {
             return false;
         };
 
@@ -142,7 +143,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
 
     let mut diagnostic = checker.report_diagnostic(
         UnnecessaryDictComprehensionForIterable {
-            is_value_none_literal: dict_comp.value.is_none_literal_expr(),
+            is_value_none_literal: dict_comp.value().is_none_literal_expr(),
         },
         dict_comp.range(),
     );
@@ -153,7 +154,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
                 checker
                     .generator()
                     .expr(&fix_unnecessary_dict_comprehension(
-                        dict_comp.value.as_ref(),
+                        dict_comp.value(),
                         generator,
                     )),
                 dict_comp.start(),
@@ -179,23 +180,23 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
 /// contains, e.g., a function call, it cannot be shared, as the function might have side effects.
 /// Similarly, if the value contains a list comprehension, it cannot be shared, as `dict.fromkeys`
 /// would leave each value with a reference to the same list.
-fn is_constant_like(expr: &Expr) -> bool {
+fn is_constant_like(expr: flat::View<'_, Expr>) -> bool {
     !any_over_expr(expr, |expr| {
         matches!(
-            expr,
-            Expr::Lambda(_)
-                | Expr::List(_)
-                | Expr::Dict(_)
-                | Expr::Set(_)
-                | Expr::ListComp(_)
-                | Expr::SetComp(_)
-                | Expr::DictComp(_)
-                | Expr::Generator(_)
-                | Expr::Await(_)
-                | Expr::Yield(_)
-                | Expr::YieldFrom(_)
-                | Expr::Call(_)
-                | Expr::Named(_)
+            expr.classify(),
+            flat::ExprKind::Lambda(_)
+                | flat::ExprKind::List(_)
+                | flat::ExprKind::Dict(_)
+                | flat::ExprKind::Set(_)
+                | flat::ExprKind::ListComp(_)
+                | flat::ExprKind::SetComp(_)
+                | flat::ExprKind::DictComp(_)
+                | flat::ExprKind::Generator(_)
+                | flat::ExprKind::Await(_)
+                | flat::ExprKind::Yield(_)
+                | flat::ExprKind::YieldFrom(_)
+                | flat::ExprKind::Call(_)
+                | flat::ExprKind::Named(_)
         )
     })
 }
@@ -205,36 +206,39 @@ fn is_constant_like(expr: &Expr) -> bool {
 /// For example:
 /// - Given `{n: None for n in [1,2,3]}`, generate `dict.fromkeys([1,2,3])`.
 /// - Given `{n: 1 for n in [1,2,3]}`, generate `dict.fromkeys([1,2,3], 1)`.
-fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -> Expr {
-    let iterable = generator.iter.clone();
+fn fix_unnecessary_dict_comprehension(
+    value: flat::View<'_, Expr>,
+    generator: flat::View<'_, Comprehension>,
+) -> Expr {
+    let iterable = generator.iter();
     let args = Arguments {
         args: if value.is_none_literal_expr() {
-            [iterable].into()
+            [iterable].map(flat::View::to_owned_node).into()
         } else {
-            [iterable, value.clone()].into()
+            [iterable, value].map(flat::View::to_owned_node).into()
         },
         keywords: std::iter::empty().collect(),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     Expr::Call(ExprCall {
         func: Box::new(Expr::Name(ExprName {
             id: "dict.fromkeys".into(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         })),
         arguments: args,
         range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     })
 }
 
-fn contains_side_effecting_sub_expression(target: &Expr) -> bool {
+fn contains_side_effecting_sub_expression(target: flat::View<'_, Expr>) -> bool {
     any_over_expr(target, |expr| {
         matches!(
-            expr,
-            Expr::Attribute(_) | Expr::Subscript(_) | Expr::Slice(_)
+            expr.classify(),
+            flat::ExprKind::Attribute(_) | flat::ExprKind::Subscript(_) | flat::ExprKind::Slice(_)
         )
     })
 }

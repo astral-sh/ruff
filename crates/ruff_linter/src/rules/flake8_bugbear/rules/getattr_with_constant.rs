@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
@@ -69,16 +70,22 @@ impl AlwaysFixableViolation for GetAttrWithConstant {
 }
 
 /// B009
-pub(crate) fn getattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
-    let [obj, arg] = args else {
+pub(crate) fn getattr_with_constant(
+    checker: &Checker,
+    &expr: &flat::View<'_, Expr>,
+    func: flat::View<'_, Expr>,
+    args: flat::NodeList<'_, Expr>,
+) {
+    let Some([obj, arg]) = args.as_array() else {
         return;
     };
     if obj.is_starred_expr() {
         return;
     }
-    let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = arg else {
+    let flat::ExprKind::StringLiteral(string_literal) = arg.classify() else {
         return;
     };
+    let value = string_literal.value();
     if !is_identifier(value.to_str()) {
         return;
     }
@@ -100,8 +107,11 @@ pub(crate) fn getattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     let edit = Edit::range_replacement(
         pad(
             if matches!(
-                obj,
-                Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_)
+                obj.classify(),
+                flat::ExprKind::Name(_)
+                    | flat::ExprKind::Attribute(_)
+                    | flat::ExprKind::Subscript(_)
+                    | flat::ExprKind::Call(_)
             ) && !checker.locator().contains_line_break(obj.range())
             {
                 format!("{}.{}", checker.locator().slice(obj), value)

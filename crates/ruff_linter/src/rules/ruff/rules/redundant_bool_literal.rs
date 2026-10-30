@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 use ruff_python_semantic::analyze::typing::traverse_literal;
 use ruff_text_size::Ranged;
 
@@ -83,17 +84,17 @@ impl Violation for RedundantBoolLiteral {
 }
 
 /// RUF038
-pub(crate) fn redundant_bool_literal<'a>(checker: &Checker, literal_expr: &'a Expr) {
+pub(crate) fn redundant_bool_literal<'a>(checker: &Checker, &literal_expr: &flat::View<'a, Expr>) {
     if !checker.semantic().seen_typing() {
         return;
     }
 
     let mut seen_expr = BooleanLiteral::empty();
 
-    let mut find_bools = |expr: &'a Expr, _parent: &'a Expr| {
-        let expr_type = match expr {
-            Expr::BooleanLiteral(boolean_expr) => {
-                if boolean_expr.value {
+    let mut find_bools = |expr: flat::View<'a, Expr>, _parent: flat::View<'a, Expr>| {
+        let expr_type = match expr.classify() {
+            flat::ExprKind::BooleanLiteral(boolean_expr) => {
+                if boolean_expr.value() {
                     BooleanLiteral::TRUE
                 } else {
                     BooleanLiteral::FALSE

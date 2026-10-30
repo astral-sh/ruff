@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{self as ast};
 use ruff_text_size::TextRange;
 
@@ -60,7 +61,7 @@ pub(crate) fn mixed_case_variable_in_class_scope(
     checker: &Checker,
     range: TextRange,
     name: &str,
-    class_def: &ast::StmtClassDef,
+    class_def: flat::View<'_, ast::StmtClassDef>,
 ) {
     if !helpers::is_mixed_case(name) {
         return;

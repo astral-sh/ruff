@@ -1,4 +1,5 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
@@ -58,7 +59,7 @@ pub(crate) fn banned_api<T: Ranged>(checker: &Checker, policy: &NameMatchPolicy,
 }
 
 /// TID251
-pub(crate) fn banned_attribute_access(checker: &Checker, expr: &Expr) {
+pub(crate) fn banned_attribute_access(checker: &Checker, &expr: &flat::View<'_, Expr>) {
     let banned_api = &checker.settings().flake8_tidy_imports.banned_api;
     if banned_api.is_empty() {
         return;

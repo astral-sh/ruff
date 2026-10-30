@@ -1,5 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields;
+use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::codes::Category;
@@ -62,10 +64,10 @@ impl AlwaysFixableViolation for NoExplicitStacklevel {
 }
 
 /// B028
-pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &fields::ExprCall<'_>) {
     if !checker
         .semantic()
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["warnings", "warn"]))
     {
         return;
@@ -82,34 +84,34 @@ pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCall) {
         .arguments
         .find_argument_value("stacklevel", 2)
         .is_some()
-        || is_skip_file_prefixes_param_set(&call.arguments)
+        || is_skip_file_prefixes_param_set(call.arguments)
         || call
             .arguments
-            .args
+            .args()
             .iter()
-            .any(ruff_python_ast::Expr::is_starred_expr)
+            .any(flat::View::is_starred_expr)
         || call
             .arguments
-            .keywords
+            .keywords()
             .iter()
-            .any(|keyword| keyword.arg.is_none())
+            .any(|keyword| keyword.arg().is_none())
     {
         return;
     }
     let mut diagnostic = checker.report_diagnostic(NoExplicitStacklevel, call.func.range());
 
-    let edit = add_argument("stacklevel=2", &call.arguments, checker.tokens());
+    let edit = add_argument("stacklevel=2", call.arguments, checker.tokens());
 
     diagnostic.set_fix(Fix::unsafe_edit(edit));
 }
 
 /// Returns `true` if `skip_file_prefixes` is set to its non-default value.
 /// The default value of `skip_file_prefixes` is an empty tuple.
-fn is_skip_file_prefixes_param_set(arguments: &ast::Arguments) -> bool {
+fn is_skip_file_prefixes_param_set(arguments: flat::View<'_, ast::Arguments>) -> bool {
     arguments
         .find_keyword("skip_file_prefixes")
-        .is_some_and(|keyword| match &keyword.value {
-            Expr::Tuple(tuple) => !tuple.elts.is_empty(),
+        .is_some_and(|keyword| match keyword.value().classify() {
+            flat::ExprKind::Tuple(tuple) => !tuple.elts().is_empty(),
             _ => true,
         })
 }

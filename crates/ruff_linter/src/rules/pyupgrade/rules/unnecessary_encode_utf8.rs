@@ -2,7 +2,7 @@ use std::fmt::Write as _;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::{TokenKind, Tokens};
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, StringLiteral, StringLiteralValue};
+use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, StringLiteral, flat};
 use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
@@ -68,23 +68,21 @@ enum Reason {
 
 const UTF8_LITERALS: &[&str] = &["utf-8", "utf8", "utf_8", "u8", "utf", "cp65001"];
 
-fn match_encoded_variable(func: &Expr) -> Option<&Expr> {
-    let Expr::Attribute(ast::ExprAttribute {
-        value: variable,
-        attr,
-        ..
-    }) = func
-    else {
+fn match_encoded_variable(func: flat::View<'_, Expr>) -> Option<flat::View<'_, Expr>> {
+    let flat::ExprKind::Attribute(attribute) = func.classify() else {
         return None;
     };
+    let variable = attribute.value();
+    let attr = attribute.attr();
     if attr != "encode" {
         return None;
     }
     Some(variable)
 }
 
-fn is_utf8_encoding_arg(arg: &Expr) -> bool {
-    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &arg {
+fn is_utf8_encoding_arg(arg: flat::View<'_, Expr>) -> bool {
+    if let flat::ExprKind::StringLiteral(string_literal) = arg.classify() {
+        let value = string_literal.value();
         UTF8_LITERALS.contains(&value.to_str().to_lowercase().as_str())
     } else {
         false
@@ -96,25 +94,33 @@ enum EncodingArg<'a> {
     /// Ex) `"".encode()`
     Empty,
     /// Ex) `"".encode("utf-8")`
-    Positional(&'a Expr),
+    Positional(flat::View<'a, Expr>),
     /// Ex) `"".encode(encoding="utf-8")`
-    Keyword(&'a Keyword),
+    Keyword(flat::View<'a, Keyword>),
 }
 
 /// Return the encoding argument to an `encode` call, if it can be determined to be a
 /// UTF-8-equivalent encoding.
-fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg<'_>> {
-    match (&*arguments.args, &*arguments.keywords) {
+fn match_encoding_arg(arguments: flat::View<'_, Arguments>) -> Option<EncodingArg<'_>> {
+    match (arguments.args(), arguments.keywords()) {
         // Ex `"".encode()`
-        ([], []) => return Some(EncodingArg::Empty),
+        (args, keywords) if args.is_empty() && keywords.is_empty() => {
+            return Some(EncodingArg::Empty);
+        }
         // Ex `"".encode(encoding)`
-        ([arg], []) if is_utf8_encoding_arg(arg) => {
+        (args, keywords)
+            if let Some([arg]) = args.as_array()
+                && keywords.is_empty()
+                && is_utf8_encoding_arg(arg) =>
+        {
             return Some(EncodingArg::Positional(arg));
         }
         // Ex `"".encode(kwarg=kwarg)`
-        ([], [keyword])
-            if keyword.arg.as_ref().is_some_and(|arg| arg == "encoding")
-                && is_utf8_encoding_arg(&keyword.value) =>
+        (args, keywords)
+            if args.is_empty()
+                && let Some([keyword]) = keywords.as_array()
+                && keyword.arg().is_some_and(|arg| arg == "encoding")
+                && is_utf8_encoding_arg(keyword.value()) =>
         {
             return Some(EncodingArg::Keyword(keyword));
         }
@@ -125,7 +131,11 @@ fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg<'_>> {
 }
 
 /// Return a [`Fix`] replacing the call to encode with a byte string.
-fn replace_with_bytes_literal(locator: &Locator, call: &ast::ExprCall, tokens: &Tokens) -> Fix {
+fn replace_with_bytes_literal(
+    locator: &Locator,
+    call: flat::View<'_, ast::ExprCall>,
+    tokens: &Tokens,
+) -> Fix {
     // Build up a replacement string by prefixing all string tokens with `b`.
     let mut replacement = String::with_capacity(call.range().len().to_usize() + 1);
     let mut prev = call.start();
@@ -155,18 +165,20 @@ fn replace_with_bytes_literal(locator: &Locator, call: &ast::ExprCall, tokens: &
 }
 
 /// UP012
-pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
-    let Some(variable) = match_encoded_variable(&call.func) else {
+pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: flat::View<'_, ast::ExprCall>) {
+    let Some(variable) = match_encoded_variable(call.func()) else {
         return;
     };
-    match variable {
-        Expr::StringLiteral(ast::ExprStringLiteral { value: literal, .. }) => {
+    match variable.classify() {
+        flat::ExprKind::StringLiteral(expr_string_literal) => {
+            let literal = expr_string_literal.value();
+
             if string_contains_string_only_escapes(literal, checker.locator()) {
                 return;
             }
 
             // Ex) `"str".encode()`, `"str".encode("utf-8")`
-            if let Some(encoding_arg) = match_encoding_arg(&call.arguments) {
+            if let Some(encoding_arg) = match_encoding_arg(call.arguments()) {
                 if literal.to_str().is_ascii() {
                     // Ex) Convert `"foo".encode()` to `b"foo"`.
                     let mut diagnostic = checker.report_diagnostic(
@@ -191,8 +203,8 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                     );
                     diagnostic.try_set_fix(|| {
                         remove_argument(
-                            kwarg,
-                            &call.arguments,
+                            &kwarg,
+                            call.arguments(),
                             Parentheses::Preserve,
                             checker.locator().contents(),
                             checker.tokens(),
@@ -209,8 +221,8 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                     );
                     diagnostic.try_set_fix(|| {
                         remove_argument(
-                            arg,
-                            &call.arguments,
+                            &arg,
+                            call.arguments(),
                             Parentheses::Preserve,
                             checker.locator().contents(),
                             checker.tokens(),
@@ -221,8 +233,8 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
             }
         }
         // Ex) `f"foo{bar}".encode("utf-8")`
-        Expr::FString(_) => {
-            if let Some(encoding_arg) = match_encoding_arg(&call.arguments) {
+        flat::ExprKind::FString(_) => {
+            if let Some(encoding_arg) = match_encoding_arg(call.arguments()) {
                 if let EncodingArg::Keyword(kwarg) = encoding_arg {
                     // Ex) Convert `f"unicode text©".encode(encoding="utf-8")` to
                     // `f"unicode text©".encode()`.
@@ -234,8 +246,8 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                     );
                     diagnostic.try_set_fix(|| {
                         remove_argument(
-                            kwarg,
-                            &call.arguments,
+                            &kwarg,
+                            call.arguments(),
                             Parentheses::Preserve,
                             checker.locator().contents(),
                             checker.tokens(),
@@ -252,8 +264,8 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                     );
                     diagnostic.try_set_fix(|| {
                         remove_argument(
-                            arg,
-                            &call.arguments,
+                            &arg,
+                            call.arguments(),
                             Parentheses::Preserve,
                             checker.locator().contents(),
                             checker.tokens(),
@@ -285,9 +297,9 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
 /// Reference: [Lexical analysis &sect; 2.4.1.1. Escape sequences][escape-sequences]
 ///
 /// [escape-sequences]: https://docs.python.org/3/reference/lexical_analysis.html#escape-sequences
-fn string_contains_string_only_escapes(string: &StringLiteralValue, locator: &Locator) -> bool {
+fn string_contains_string_only_escapes(string: flat::StringValue<'_>, locator: &Locator) -> bool {
     for literal in string {
-        let flags = literal.flags;
+        let flags = literal.flags();
 
         if flags.prefix().is_raw() {
             continue;
@@ -303,7 +315,10 @@ fn string_contains_string_only_escapes(string: &StringLiteralValue, locator: &Lo
     false
 }
 
-fn literal_contains_string_only_escapes(literal: &StringLiteral, locator: &Locator) -> bool {
+fn literal_contains_string_only_escapes(
+    literal: flat::View<'_, StringLiteral>,
+    locator: &Locator,
+) -> bool {
     let inner_in_source = locator.slice(literal.content_range());
 
     let mut cursor = Cursor::new(inner_in_source);

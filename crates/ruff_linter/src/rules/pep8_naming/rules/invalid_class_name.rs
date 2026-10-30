@@ -1,4 +1,5 @@
 use ruff_python_ast::Stmt;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
@@ -58,7 +59,7 @@ impl Violation for InvalidClassName {
 /// N801
 pub(crate) fn invalid_class_name(
     checker: &Checker,
-    class_def: &Stmt,
+    class_def: flat::View<'_, Stmt>,
     name: &str,
     ignore_names: &IgnoreNames,
 ) {

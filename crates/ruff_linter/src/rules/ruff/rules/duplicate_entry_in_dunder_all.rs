@@ -1,3 +1,5 @@
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ruff_diagnostics::{Applicability, Fix};
@@ -68,9 +70,10 @@ impl Violation for DuplicateEntryInDunderAll {
 /// Apply RUF068 to `StmtAssign` AST node. For example: `__all__ = ["a", "b", "a"]`.
 pub(crate) fn duplicate_entry_in_dunder_all_assign(
     checker: &Checker,
-    ast::StmtAssign { value, targets, .. }: &ast::StmtAssign,
+    stmt: &fields::StmtAssign<'_>,
 ) {
-    if let [expr] = targets.as_slice() {
+    let value = stmt.value;
+    if let Some([expr]) = stmt.targets.as_array() {
         duplicate_entry_in_dunder_all(checker, expr, value);
     }
 }
@@ -78,28 +81,30 @@ pub(crate) fn duplicate_entry_in_dunder_all_assign(
 /// Apply RUF068 to `StmtAugAssign` AST node. For example: `__all__ += ["a", "b", "a"]`.
 pub(crate) fn duplicate_entry_in_dunder_all_aug_assign(
     checker: &Checker,
-    node: &ast::StmtAugAssign,
+    node: &fields::StmtAugAssign<'_>,
 ) {
     if node.op.is_add() {
-        duplicate_entry_in_dunder_all(checker, &node.target, &node.value);
+        duplicate_entry_in_dunder_all(checker, node.target, node.value);
     }
 }
 
 /// Apply RUF068 to `__all__.extend()`.
 pub(crate) fn duplicate_entry_in_dunder_all_extend_call(
     checker: &Checker,
-    ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
-    }: &ast::ExprCall,
+    call: &fields::ExprCall<'_>,
 ) {
-    let ([value_passed], []) = (&**args, &**keywords) else {
+    let func = call.func;
+    let (Some([value_passed]), true) = (
+        call.arguments.args().as_array(),
+        call.arguments.keywords().is_empty(),
+    ) else {
         return;
     };
-    let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = &**func else {
+    let flat::ExprKind::Attribute(attribute) = func.classify() else {
         return;
     };
+    let value = attribute.value();
+    let attr = attribute.attr();
     if attr == "extend" {
         duplicate_entry_in_dunder_all(checker, value, value_passed);
     }
@@ -109,20 +114,25 @@ pub(crate) fn duplicate_entry_in_dunder_all_extend_call(
 /// For example: `__all__: list[str] = ["a", "b", "a"]`.
 pub(crate) fn duplicate_entry_in_dunder_all_ann_assign(
     checker: &Checker,
-    node: &ast::StmtAnnAssign,
+    node: &fields::StmtAnnAssign<'_>,
 ) {
-    if let Some(value) = &node.value {
-        duplicate_entry_in_dunder_all(checker, &node.target, value);
+    if let Some(value) = node.value {
+        duplicate_entry_in_dunder_all(checker, node.target, value);
     }
 }
 
 /// RUF068
 /// This routine checks whether `__all__` contains duplicated entries, and emits
 /// a violation if it does.
-fn duplicate_entry_in_dunder_all(checker: &Checker, target: &ast::Expr, value: &ast::Expr) {
-    let ast::Expr::Name(ast::ExprName { id, .. }) = target else {
+fn duplicate_entry_in_dunder_all(
+    checker: &Checker,
+    target: flat::View<'_, ast::Expr>,
+    value: flat::View<'_, ast::Expr>,
+) {
+    let flat::ExprKind::Name(name_node) = target.classify() else {
         return;
     };
+    let id = name_node.id();
 
     if id != "__all__" {
         return;
@@ -133,9 +143,9 @@ fn duplicate_entry_in_dunder_all(checker: &Checker, target: &ast::Expr, value: &
         return;
     }
 
-    let elts = match value {
-        ast::Expr::List(ast::ExprList { elts, .. }) => elts,
-        ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => elts,
+    let elts = match value.classify() {
+        flat::ExprKind::List(expr_list) => expr_list.elts(),
+        flat::ExprKind::Tuple(expr_tuple) => expr_tuple.elts(),
         _ => return,
     };
 
@@ -154,7 +164,7 @@ fn duplicate_entry_in_dunder_all(checker: &Checker, target: &ast::Expr, value: &
             continue;
         };
 
-        let name = string_value.value.to_str();
+        let name = string_value.value().to_str();
 
         if let Some(previous_expr) = deduplicated_elts.insert(name, expr) {
             let mut diagnostic = checker.report_diagnostic(DuplicateEntryInDunderAll, expr.range());

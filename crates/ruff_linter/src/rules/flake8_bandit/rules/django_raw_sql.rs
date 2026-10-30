@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -37,14 +38,14 @@ impl Violation for DjangoRawSql {
 }
 
 /// S611
-pub(crate) fn django_raw_sql(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn django_raw_sql(checker: &Checker, call: &fields::ExprCall<'_>) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
 
     if checker
         .semantic()
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func)
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
@@ -55,7 +56,7 @@ pub(crate) fn django_raw_sql(checker: &Checker, call: &ast::ExprCall) {
         if !call
             .arguments
             .find_argument_value("sql", 0)
-            .is_some_and(Expr::is_string_literal_expr)
+            .is_some_and(flat::View::is_string_literal_expr)
         {
             checker.report_diagnostic(DjangoRawSql, call.func.range());
         }

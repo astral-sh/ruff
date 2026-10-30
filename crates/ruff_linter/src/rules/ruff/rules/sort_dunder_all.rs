@@ -1,6 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::Expr;
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_source_file::LineRanges;
+use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
@@ -117,53 +119,42 @@ const SORTING_STYLE: SortingStyle = SortingStyle::Isort;
 
 /// Sort an `__all__` definition represented by a `StmtAssign` AST node.
 /// For example: `__all__ = ["b", "c", "a"]`.
-pub(crate) fn sort_dunder_all_assign(
-    checker: &Checker,
-    ast::StmtAssign { value, targets, .. }: &ast::StmtAssign,
-) {
-    if let [expr] = targets.as_slice() {
+pub(crate) fn sort_dunder_all_assign(checker: &Checker, stmt: &ast::StmtAssign<'_>) {
+    let value = stmt.value;
+    if let Some([expr]) = stmt.targets.as_array() {
         sort_dunder_all(checker, expr, value);
     }
 }
 
 /// Sort an `__all__` mutation represented by a `StmtAugAssign` AST node.
 /// For example: `__all__ += ["b", "c", "a"]`.
-pub(crate) fn sort_dunder_all_aug_assign(checker: &Checker, node: &ast::StmtAugAssign) {
+pub(crate) fn sort_dunder_all_aug_assign(checker: &Checker, node: &ast::StmtAugAssign<'_>) {
     if node.op.is_add() {
-        sort_dunder_all(checker, &node.target, &node.value);
+        sort_dunder_all(checker, node.target, node.value);
     }
 }
 
 /// Sort a tuple or list passed to `__all__.extend()`.
-pub(crate) fn sort_dunder_all_extend_call(
-    checker: &Checker,
-    ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
-    }: &ast::ExprCall,
-) {
-    let ([value_passed], []) = (&**args, &**keywords) else {
+pub(crate) fn sort_dunder_all_extend_call(checker: &Checker, call: &ast::ExprCall<'_>) {
+    let func = call.func;
+    let (Some([value_passed]), true) = (
+        call.arguments.args().as_array(),
+        call.arguments.keywords().is_empty(),
+    ) else {
         return;
     };
-    let ast::Expr::Attribute(ast::ExprAttribute {
-        ref value,
-        ref attr,
-        ..
-    }) = **func
-    else {
-        return;
-    };
-    if attr == "extend" {
-        sort_dunder_all(checker, value, value_passed);
+    if let Some(attribute) = func.as_attribute_expr()
+        && attribute.attr() == "extend"
+    {
+        sort_dunder_all(checker, attribute.value(), value_passed);
     }
 }
 
 /// Sort an `__all__` definition represented by a `StmtAnnAssign` AST node.
 /// For example: `__all__: list[str] = ["b", "c", "a"]`.
-pub(crate) fn sort_dunder_all_ann_assign(checker: &Checker, node: &ast::StmtAnnAssign) {
-    if let Some(value) = &node.value {
-        sort_dunder_all(checker, &node.target, value);
+pub(crate) fn sort_dunder_all_ann_assign(checker: &Checker, node: &ast::StmtAnnAssign<'_>) {
+    if let Some(value) = node.value {
+        sort_dunder_all(checker, node.target, value);
     }
 }
 
@@ -173,10 +164,11 @@ pub(crate) fn sort_dunder_all_ann_assign(checker: &Checker, node: &ast::StmtAnnA
 /// This routine checks whether the tuple or list is sorted, and emits a
 /// violation if it is not sorted. If the tuple/list was not sorted,
 /// it attempts to set a `Fix` on the violation.
-fn sort_dunder_all(checker: &Checker, target: &ast::Expr, node: &ast::Expr) {
-    let ast::Expr::Name(ast::ExprName { id, .. }) = target else {
+fn sort_dunder_all(checker: &Checker, target: flat::View<'_, Expr>, node: flat::View<'_, Expr>) {
+    let flat::ExprKind::Name(name) = target.classify() else {
         return;
     };
+    let id = name.id();
 
     if id != "__all__" {
         return;
@@ -187,20 +179,19 @@ fn sort_dunder_all(checker: &Checker, target: &ast::Expr, node: &ast::Expr) {
         return;
     }
 
-    let (elts, range, kind) = match node {
-        ast::Expr::List(ast::ExprList { elts, range, .. }) => (elts, *range, SequenceKind::List),
-        ast::Expr::Tuple(ast::ExprTuple {
-            elts,
-            range,
-            parenthesized,
-            ..
-        }) => (
-            elts,
-            *range,
-            SequenceKind::Tuple {
-                parenthesized: *parenthesized,
-            },
-        ),
+    let (elts, range, kind) = match node.classify() {
+        flat::ExprKind::List(expr_list) => {
+            let elts = expr_list.elts();
+            let range = expr_list.range();
+
+            (elts, range, SequenceKind::List)
+        }
+        flat::ExprKind::Tuple(expr_tuple) => {
+            let elts = expr_tuple.elts();
+            let range = expr_tuple.range();
+            let parenthesized = expr_tuple.parenthesized();
+            (elts, range, SequenceKind::Tuple { parenthesized })
+        }
         _ => return,
     };
 
@@ -229,7 +220,7 @@ fn sort_dunder_all(checker: &Checker, target: &ast::Expr, node: &ast::Expr) {
 /// is unfixable in this instance.
 fn create_fix(
     range: TextRange,
-    elts: &[ast::Expr],
+    elts: flat::NodeList<'_, Expr>,
     string_items: &[&str],
     kind: SequenceKind,
     checker: &Checker,

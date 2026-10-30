@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::flat;
 use ruff_python_semantic::{BindingKind, Scope, ScopeId};
 use ruff_source_file::SourceRow;
 use ruff_text_size::Ranged;
@@ -84,7 +85,7 @@ pub(crate) fn builtin_attribute_shadowing(
     checker: &Checker,
     scope_id: ScopeId,
     scope: &Scope,
-    class_def: &ast::StmtClassDef,
+    class_def: flat::View<'_, ast::StmtClassDef>,
 ) {
     for (name, binding_id) in scope.all_bindings() {
         let binding = checker.semantic().binding(binding_id);
@@ -103,10 +104,10 @@ pub(crate) fn builtin_attribute_shadowing(
             checker.target_version(),
         ) {
             // Ignore explicit overrides.
-            if class_def.decorator_list.iter().any(|decorator| {
+            if class_def.decorator_list().iter().any(|decorator| {
                 checker
                     .semantic()
-                    .match_typing_expr(&decorator.expression, "override")
+                    .match_typing_expr(decorator.expression(), "override")
             }) {
                 return;
             }

@@ -1,4 +1,5 @@
 use anyhow::{Result, anyhow, bail};
+use ruff_python_ast::flat;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, Arguments, CmpOp, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
@@ -161,21 +162,21 @@ impl TryFrom<&str> for UnittestAssert {
     }
 }
 
-fn assert(expr: &Expr, msg: Option<&Expr>) -> Stmt {
+fn assert(expr: Expr, msg: Option<flat::View<'_, Expr>>) -> Stmt {
     Stmt::Assert(ast::StmtAssert {
-        test: Box::new(expr.clone()),
-        msg: msg.map(|msg| Box::new(msg.clone())),
+        test: Box::new(expr),
+        msg: msg.map(|msg| Box::new(msg.to_owned_node())),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     })
 }
 
-fn compare(left: &Expr, cmp_op: CmpOp, right: &Expr) -> Expr {
+fn compare(left: Expr, cmp_op: CmpOp, right: Expr) -> Expr {
     Expr::Compare(ast::ExprCompare {
         ops: [cmp_op].into(),
-        operands: Box::from([left.clone(), right.clone()]),
+        operands: Box::from([left, right]),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     })
 }
 
@@ -229,11 +230,13 @@ impl UnittestAssert {
     /// Create a map from argument name to value.
     fn args_map<'a>(
         &'a self,
-        args: &'a [Expr],
-        keywords: &'a [Keyword],
-    ) -> Result<FxHashMap<&'a str, &'a Expr>> {
+        args: flat::NodeList<'a, Expr>,
+        keywords: flat::NodeList<'a, Keyword>,
+    ) -> Result<FxHashMap<&'a str, flat::View<'a, Expr>>> {
         // If we have variable-length arguments, abort.
-        if args.iter().any(Expr::is_starred_expr) || keywords.iter().any(|kw| kw.arg.is_none()) {
+        if args.iter().any(flat::View::is_starred_expr)
+            || keywords.iter().any(|kw| kw.arg().is_none())
+        {
             bail!("Variable-length arguments are not supported");
         }
 
@@ -241,15 +244,14 @@ impl UnittestAssert {
 
         // If any of the keyword arguments are not in the argument spec, abort.
         if keywords.iter().any(|kw| {
-            kw.arg
-                .as_ref()
+            kw.arg()
                 .is_some_and(|kwarg_name| !arg_spec.contains(&kwarg_name.as_str()))
         }) {
             bail!("Unknown keyword argument");
         }
 
         // Generate a map from argument name to value.
-        let mut args_map: FxHashMap<&str, &Expr> =
+        let mut args_map: FxHashMap<&str, flat::View<'_, Expr>> =
             FxHashMap::with_capacity_and_hasher(args.len() + keywords.len(), FxBuildHasher);
 
         // Process positional arguments.
@@ -261,11 +263,10 @@ impl UnittestAssert {
         for arg_name in arg_spec.iter().skip(args.len()) {
             if let Some(value) = keywords.iter().find_map(|keyword| {
                 if keyword
-                    .arg
-                    .as_ref()
-                    .is_some_and(|kwarg_name| &kwarg_name == arg_name)
+                    .arg()
+                    .is_some_and(|kwarg_name| kwarg_name == *arg_name)
                 {
-                    Some(&keyword.value)
+                    Some(keyword.value())
                 } else {
                     None
                 }
@@ -277,30 +278,34 @@ impl UnittestAssert {
         Ok(args_map)
     }
 
-    pub(crate) fn generate_assert(self, args: &[Expr], keywords: &[Keyword]) -> Result<Stmt> {
+    pub(crate) fn generate_assert(
+        self,
+        args: flat::NodeList<'_, Expr>,
+        keywords: flat::NodeList<'_, Keyword>,
+    ) -> Result<Stmt> {
         let args = self.args_map(args, keywords)?;
         match self {
             UnittestAssert::True
             | UnittestAssert::False
             | UnittestAssert::FailUnless
             | UnittestAssert::FailIf => {
-                let expr = *args
+                let expr = args
                     .get("expr")
                     .ok_or_else(|| anyhow!("Missing argument `expr`"))?;
                 let msg = args.get("msg").copied();
                 Ok(
                     if matches!(self, UnittestAssert::False | UnittestAssert::FailIf) {
                         assert(
-                            &Expr::UnaryOp(ast::ExprUnaryOp {
+                            Expr::UnaryOp(ast::ExprUnaryOp {
                                 op: UnaryOp::Not,
-                                operand: Box::new(expr.clone()),
+                                operand: Box::new(expr.to_owned_node()),
                                 range: TextRange::default(),
-                                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                                node_index: ruff_python_ast::NodeIndex::NONE,
                             }),
                             msg,
                         )
                     } else {
-                        assert(expr, msg)
+                        assert(expr.to_owned_node(), msg)
                     },
                 )
             }
@@ -338,8 +343,8 @@ impl UnittestAssert {
                     UnittestAssert::IsNot => CmpOp::IsNot,
                     _ => unreachable!(),
                 };
-                let expr = compare(first, cmp_op, second);
-                Ok(assert(&expr, msg))
+                let expr = compare(first.to_owned_node(), cmp_op, second.to_owned_node());
+                Ok(assert(expr, msg))
             }
             UnittestAssert::In | UnittestAssert::NotIn => {
                 let member = args
@@ -354,8 +359,8 @@ impl UnittestAssert {
                 } else {
                     CmpOp::NotIn
                 };
-                let expr = compare(member, cmp_op, container);
-                Ok(assert(&expr, msg))
+                let expr = compare(member.to_owned_node(), cmp_op, container.to_owned_node());
+                Ok(assert(expr, msg))
             }
             UnittestAssert::IsNone | UnittestAssert::IsNotNone => {
                 let expr = args
@@ -369,10 +374,10 @@ impl UnittestAssert {
                 };
                 let node = Expr::NoneLiteral(ast::ExprNoneLiteral {
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                 });
-                let expr = compare(expr, cmp_op, &node);
-                Ok(assert(&expr, msg))
+                let expr = compare(expr.to_owned_node(), cmp_op, node);
+                Ok(assert(expr, msg))
             }
             UnittestAssert::IsInstance | UnittestAssert::NotIsInstance => {
                 let obj = args
@@ -386,31 +391,31 @@ impl UnittestAssert {
                     id: Name::new_static("isinstance"),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                 };
                 let node1 = ast::ExprCall {
                     func: Box::new(node.into()),
                     arguments: Arguments {
-                        args: [(**obj).clone(), (**cls).clone()].into(),
+                        args: [obj.to_owned_node(), cls.to_owned_node()].into(),
                         keywords: std::iter::empty().collect(),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                        node_index: ruff_python_ast::NodeIndex::NONE,
                     },
                     range_start: ruff_text_size::TextSize::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                 };
                 let isinstance = node1.into();
                 if matches!(self, UnittestAssert::IsInstance) {
-                    Ok(assert(&isinstance, msg))
+                    Ok(assert(isinstance, msg))
                 } else {
                     let node = ast::ExprUnaryOp {
                         op: UnaryOp::Not,
                         operand: Box::new(isinstance),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                        node_index: ruff_python_ast::NodeIndex::NONE,
                     };
                     let expr = node.into();
-                    Ok(assert(&expr, msg))
+                    Ok(assert(expr, msg))
                 }
             }
             UnittestAssert::Regex
@@ -428,37 +433,37 @@ impl UnittestAssert {
                     id: Name::new_static("re"),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                 };
                 let node1 = ast::ExprAttribute {
                     value: Box::new(node.into()),
                     attr: Identifier::new("search".to_string(), TextRange::default()),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                 };
                 let node2 = ast::ExprCall {
                     func: Box::new(node1.into()),
                     arguments: Arguments {
-                        args: [(**regex).clone(), (**text).clone()].into(),
+                        args: [regex.to_owned_node(), text.to_owned_node()].into(),
                         keywords: std::iter::empty().collect(),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                        node_index: ruff_python_ast::NodeIndex::NONE,
                     },
                     range_start: ruff_text_size::TextSize::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                 };
                 let re_search = node2.into();
                 if matches!(self, UnittestAssert::Regex | UnittestAssert::RegexpMatches) {
-                    Ok(assert(&re_search, msg))
+                    Ok(assert(re_search, msg))
                 } else {
                     let node = ast::ExprUnaryOp {
                         op: UnaryOp::Not,
                         operand: Box::new(re_search),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                        node_index: ruff_python_ast::NodeIndex::NONE,
                     };
-                    Ok(assert(&node.into(), msg))
+                    Ok(assert(node.into(), msg))
                 }
             }
             _ => bail!("Cannot fix `{self}`"),

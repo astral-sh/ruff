@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -76,21 +77,17 @@ impl AlwaysFixableViolation for UnnecessaryDefaultTypeArgs {
 }
 
 /// UP043
-pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
-    let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr else {
+pub(crate) fn unnecessary_default_type_args(checker: &Checker, &expr: &flat::View<'_, Expr>) {
+    let flat::ExprKind::Subscript(subscript) = expr.classify() else {
         return;
     };
+    let value = subscript.value();
+    let slice = subscript.slice();
 
-    let Expr::Tuple(ast::ExprTuple {
-        elts,
-        ctx: _,
-        range: _,
-        node_index: _,
-        parenthesized: _,
-    }) = slice.as_ref()
-    else {
+    let flat::ExprKind::Tuple(tuple) = slice.classify() else {
         return;
     };
+    let elts = tuple.elts();
 
     // The type annotation must be `Generator` or `AsyncGenerator`.
     let Some(type_annotation) = DefaultedTypeAnnotation::from_expr(value, checker.semantic())
@@ -101,7 +98,7 @@ pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
     let valid_elts = type_annotation.trim_unnecessary_defaults(elts);
 
     // If we didn't trim any elements, then the default type arguments are necessary.
-    if *elts == valid_elts {
+    if elts == valid_elts {
         return;
     }
 
@@ -109,7 +106,7 @@ pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
 
     let applicability = if checker
         .comment_ranges()
-        .has_comments(expr, checker.source())
+        .has_comments(&expr, checker.source())
     {
         Applicability::Unsafe
     } else {
@@ -121,21 +118,21 @@ pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
             checker
                 .generator()
                 .expr(&Expr::Subscript(ast::ExprSubscript {
-                    value: value.clone(),
-                    slice: Box::new(if let [elt] = valid_elts.as_slice() {
-                        elt.clone()
+                    value: Box::new(value.to_owned_node()),
+                    slice: Box::new(if let Some([elt]) = valid_elts.as_array() {
+                        elt.to_owned_node()
                     } else {
                         Expr::Tuple(ast::ExprTuple {
-                            elts: valid_elts,
+                            elts: valid_elts.iter().map(flat::View::to_owned_node).collect(),
                             ctx: ast::ExprContext::Load,
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                            node_index: ruff_python_ast::NodeIndex::NONE,
                             parenthesized: true,
                         })
                     }),
                     ctx: ast::ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                 })),
             expr.range(),
         ),
@@ -146,10 +143,10 @@ pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
 /// Trim trailing `None` literals from the given elements.
 ///
 /// For example, given `[int, None, None]`, return `[int]`.
-fn trim_trailing_none(elts: &[Expr]) -> &[Expr] {
+fn trim_trailing_none(elts: flat::NodeList<'_, Expr>) -> flat::NodeList<'_, Expr> {
     match elts.iter().rposition(|elt| !elt.is_none_literal_expr()) {
-        Some(trimmed_last_index) => elts[..=trimmed_last_index].as_ref(),
-        None => &[],
+        Some(trimmed_last_index) => elts.slice(..=trimmed_last_index),
+        None => elts.slice(..0),
     }
 }
 
@@ -165,7 +162,10 @@ enum DefaultedTypeAnnotation {
 impl DefaultedTypeAnnotation {
     /// Returns the [`DefaultedTypeAnnotation`], if the given expression is a type annotation that
     /// includes default type arguments.
-    fn from_expr(expr: &Expr, semantic: &ruff_python_semantic::SemanticModel) -> Option<Self> {
+    fn from_expr(
+        expr: flat::View<'_, Expr>,
+        semantic: &ruff_python_semantic::SemanticModel,
+    ) -> Option<Self> {
         let qualified_name = semantic.resolve_qualified_name(expr)?;
 
         if semantic.match_typing_qualified_name(&qualified_name, "Generator")
@@ -188,30 +188,13 @@ impl DefaultedTypeAnnotation {
     }
 
     /// Trim any unnecessary default type arguments from the given elements.
-    fn trim_unnecessary_defaults(self, elts: &[Expr]) -> Vec<Expr> {
-        match self {
-            Self::Generator => {
-                // Check only if the number of elements is 2 or 3 (e.g., `Generator[int, None]` or `Generator[int, None, None]`).
-                // Otherwise, ignore (e.g., `Generator[]`, `Generator[int]`, `Generator[int, None, None, None]`)
-                if elts.len() != 2 && elts.len() != 3 {
-                    return elts.to_vec();
-                }
-
-                std::iter::once(elts[0].clone())
-                    .chain(trim_trailing_none(&elts[1..]).iter().cloned())
-                    .collect::<Vec<_>>()
+    fn trim_unnecessary_defaults(self, elts: flat::NodeList<'_, Expr>) -> flat::NodeList<'_, Expr> {
+        match (self, elts.len()) {
+            (Self::Generator, 2 | 3) | (Self::AsyncGenerator, 2) => {
+                let remaining = trim_trailing_none(elts.slice(1..));
+                elts.slice(..=remaining.len())
             }
-            Self::AsyncGenerator => {
-                // Check only if the number of elements is 2 (e.g., `AsyncGenerator[int, None]`).
-                // Otherwise, ignore (e.g., `AsyncGenerator[]`, `AsyncGenerator[int]`, `AsyncGenerator[int, None, None]`)
-                if elts.len() != 2 {
-                    return elts.to_vec();
-                }
-
-                std::iter::once(elts[0].clone())
-                    .chain(trim_trailing_none(&elts[1..]).iter().cloned())
-                    .collect::<Vec<_>>()
-            }
+            _ => elts,
         }
     }
 }

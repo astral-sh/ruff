@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, StmtFunctionDef};
+use ruff_python_ast::flat;
+use ruff_python_ast::{Expr, StmtFunctionDef};
 use ruff_python_semantic::analyze::class::any_qualified_base_class;
 use ruff_python_semantic::{Imported, Modules, ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
@@ -76,14 +77,15 @@ impl Violation for AirflowVariableGetOutsideTask {
 }
 
 /// AIR003
-pub(crate) fn variable_get_outside_task(checker: &Checker, expr: &Expr) {
+pub(crate) fn variable_get_outside_task(checker: &Checker, &expr: &flat::View<'_, Expr>) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
 
-    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+    let flat::ExprKind::Call(call) = expr.classify() else {
         return;
     };
+    let func = call.func();
 
     if !is_variable_get(func, checker.semantic()) {
         return;
@@ -122,7 +124,7 @@ fn is_dag_file(semantic: &SemanticModel) -> bool {
 }
 
 /// Returns `true` if `func` resolves to `Variable.get`.
-fn is_variable_get(func: &Expr, semantic: &SemanticModel) -> bool {
+fn is_variable_get(func: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| {
@@ -138,7 +140,7 @@ fn is_variable_get(func: &Expr, semantic: &SemanticModel) -> bool {
 fn in_task_execution_context(semantic: &SemanticModel) -> bool {
     semantic
         .current_statements()
-        .find_map(|stmt| stmt.as_function_def_stmt())
+        .find_map(flat::View::as_function_def_stmt)
         .is_some_and(|function_def| {
             is_airflow_task(function_def, semantic)
                 || is_operator_task_method(function_def, semantic)
@@ -153,9 +155,12 @@ fn in_task_execution_context(semantic: &SemanticModel) -> bool {
 /// directly because we're called from inside the function body (need to walk up
 /// to the parent class scope), whereas `is_method_in_subclass` expects to already
 /// be at the class scope.
-fn is_operator_task_method(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool {
+fn is_operator_task_method(
+    function_def: flat::View<'_, StmtFunctionDef>,
+    semantic: &SemanticModel,
+) -> bool {
     if !matches!(
-        function_def.name.as_str(),
+        function_def.name().as_str(),
         "execute" | "pre_execute" | "post_execute"
     ) {
         return false;

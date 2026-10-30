@@ -1,5 +1,5 @@
 use anyhow::bail;
-use ast::Expr;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Stmt, WithItem};
@@ -84,16 +84,16 @@ impl Violation for MultipleWithStatements {
 ///     with resource1(), resource2():
 ///         ...
 /// ```
-fn explicit_with_items(checker: &Checker, with_items: &[WithItem]) -> bool {
-    let [with_item] = with_items else {
+fn explicit_with_items(checker: &Checker, with_items: flat::NodeList<'_, WithItem>) -> bool {
+    let Some([with_item]) = with_items.as_array() else {
         return false;
     };
-    let Expr::Call(expr_call) = &with_item.context_expr else {
+    let flat::ExprKind::Call(expr_call) = with_item.context_expr().classify() else {
         return false;
     };
     checker
         .semantic()
-        .resolve_qualified_name(&expr_call.func)
+        .resolve_qualified_name(expr_call.func())
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
@@ -110,22 +110,29 @@ fn explicit_with_items(checker: &Checker, with_items: &[WithItem]) -> bool {
 /// Returns the nested `with` when it is the sole body statement and can be
 /// merged with `outer` (same async/sync, neither side an exempt standalone
 /// manager).
-fn mergeable_child<'a>(checker: &Checker, outer: &'a ast::StmtWith) -> Option<&'a ast::StmtWith> {
-    let [Stmt::With(inner)] = outer.body.as_slice() else {
+fn mergeable_child<'a>(
+    checker: &Checker,
+    outer: flat::View<'a, ast::StmtWith>,
+) -> Option<flat::View<'a, ast::StmtWith>> {
+    let Some([flat::StmtKind::With(inner)]) = outer
+        .body()
+        .as_array()
+        .map(|items| items.map(flat::View::<Stmt>::classify))
+    else {
         return None;
     };
 
-    (outer.is_async == inner.is_async
-        && !explicit_with_items(checker, &outer.items)
-        && !explicit_with_items(checker, &inner.items))
+    (outer.is_async() == inner.is_async()
+        && !explicit_with_items(checker, outer.items())
+        && !explicit_with_items(checker, inner.items()))
     .then_some(inner)
 }
 
 /// SIM117
 pub(crate) fn multiple_with_statements(
     checker: &Checker,
-    with_stmt: &ast::StmtWith,
-    with_parent: Option<&Stmt>,
+    with_stmt: flat::View<'_, ast::StmtWith>,
+    with_parent: Option<flat::View<'_, Stmt>>,
 ) {
     // Make sure we fix from top to bottom for nested with statements, e.g. for
     // ```python
@@ -156,7 +163,7 @@ pub(crate) fn multiple_with_statements(
     //         async with async_cm2():
     //             ...
     // ```
-    if let Some(Stmt::With(parent_with)) = with_parent {
+    if let Some(flat::StmtKind::With(parent_with)) = with_parent.map(flat::View::<Stmt>::classify) {
         // Parent will report SIM117 for this nesting; fix top-to-bottom.
         if mergeable_child(checker, parent_with).is_some() {
             return;
@@ -167,7 +174,7 @@ pub(crate) fn multiple_with_statements(
         return;
     };
 
-    let Some(colon) = inner.items.last().and_then(|item| {
+    let Some(colon) = inner.items().last().and_then(|item| {
         SimpleTokenizer::starts_at(item.end(), checker.locator().contents())
             .skip_trivia()
             .find(|token| token.kind == SimpleTokenKind::Colon)
@@ -179,10 +186,10 @@ pub(crate) fn multiple_with_statements(
         MultipleWithStatements,
         TextRange::new(with_stmt.start(), colon.end()),
     );
-    if !checker
-        .comment_ranges()
-        .intersects(TextRange::new(with_stmt.start(), with_stmt.body[0].start()))
-    {
+    if !checker.comment_ranges().intersects(TextRange::new(
+        with_stmt.start(),
+        with_stmt.body().at(0).start(),
+    )) {
         diagnostic.try_set_optional_fix(|| {
             match fix_with::fix_multiple_with_statements(
                 checker.locator(),

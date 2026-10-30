@@ -1,4 +1,5 @@
 use ruff_python_ast::Identifier;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -39,8 +40,8 @@ impl Violation for AmbiguousFunctionName {
 }
 
 /// E743
-pub(crate) fn ambiguous_function_name(checker: &Checker, name: &Identifier) {
-    if is_ambiguous_name(name) {
+pub(crate) fn ambiguous_function_name(checker: &Checker, name: flat::View<'_, Identifier>) {
+    if is_ambiguous_name(name.as_str()) {
         checker.report_diagnostic(AmbiguousFunctionName(name.to_string()), name.range());
     }
 }

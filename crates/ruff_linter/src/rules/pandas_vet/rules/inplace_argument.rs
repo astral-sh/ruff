@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::is_const_true;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::helpers::is_const_true;
 use ruff_python_ast::token::{Tokens, parenthesized_range};
 use ruff_python_ast::{self as ast, Keyword, Stmt};
 use ruff_text_size::Ranged;
@@ -58,28 +59,28 @@ impl Violation for PandasUseOfInplaceArgument {
 }
 
 /// PD002
-pub(crate) fn inplace_argument(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn inplace_argument(checker: &Checker, call: flat::View<'_, ast::ExprCall>) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
 
     // If the function doesn't take an `inplace` argument, abort.
     if !call
-        .func
+        .func()
         .as_attribute_expr()
-        .is_some_and(|func| accepts_inplace_argument(&func.attr))
+        .is_some_and(|func| accepts_inplace_argument(func.attr().as_str()))
     {
         return;
     }
 
     let mut seen_star = false;
-    for keyword in call.arguments.keywords.iter().rev() {
-        let Some(arg) = &keyword.arg else {
+    for keyword in call.arguments().keywords().iter().rev() {
+        let Some(arg) = keyword.arg() else {
             seen_star = true;
             continue;
         };
         if arg == "inplace" {
-            if is_const_true(&keyword.value) {
+            if is_const_true(keyword.value()) {
                 let mut diagnostic =
                     checker.report_diagnostic(PandasUseOfInplaceArgument, keyword.range());
                 // Avoid applying the fix if:
@@ -113,16 +114,16 @@ pub(crate) fn inplace_argument(checker: &Checker, call: &ast::ExprCall) {
 /// Remove the `inplace` argument from a function call and replace it with an
 /// assignment.
 fn convert_inplace_argument_to_assignment(
-    call: &ast::ExprCall,
-    keyword: &Keyword,
-    statement: &Stmt,
+    call: flat::View<'_, ast::ExprCall>,
+    keyword: flat::View<'_, Keyword>,
+    statement: flat::View<'_, Stmt>,
     tokens: &Tokens,
     locator: &Locator,
 ) -> Option<Fix> {
     // Add the assignment.
-    let attr = call.func.as_attribute_expr()?;
+    let attr = call.func().as_attribute_expr()?;
     let insert_assignment = Edit::insertion(
-        format!("{name} = ", name = locator.slice(attr.value.range())),
+        format!("{name} = ", name = locator.slice(attr.value().range())),
         parenthesized_range(call.into(), statement.into(), tokens)
             .unwrap_or(call.range())
             .start(),
@@ -130,8 +131,8 @@ fn convert_inplace_argument_to_assignment(
 
     // Remove the `inplace` argument.
     let remove_argument = remove_argument(
-        keyword,
-        &call.arguments,
+        &keyword,
+        call.arguments(),
         Parentheses::Preserve,
         locator.contents(),
         tokens,

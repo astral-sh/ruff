@@ -1,8 +1,8 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt, flat};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::is_const_false;
+use ruff_python_ast::flat::helpers::is_const_false;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -51,36 +51,41 @@ impl AlwaysFixableViolation for AssertFalse {
     }
 }
 
-fn assertion_error(msg: Option<&Expr>) -> Stmt {
+fn assertion_error(msg: Option<flat::View<'_, Expr>>) -> Stmt {
     Stmt::Raise(ast::StmtRaise {
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
         exc: Some(Box::new(Expr::Call(ast::ExprCall {
             func: Box::new(Expr::Name(ast::ExprName {
                 id: "AssertionError".into(),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
             })),
             arguments: Arguments {
                 args: if let Some(msg) = msg {
-                    [msg.clone()].into()
+                    [msg].map(flat::View::to_owned_node).into()
                 } else {
                     [].into()
                 },
                 keywords: std::iter::empty().collect(),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
             },
             range_start: ruff_text_size::TextSize::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         }))),
         cause: None,
     })
 }
 
 /// B011
-pub(crate) fn assert_false(checker: &Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
+pub(crate) fn assert_false(
+    checker: &Checker,
+    stmt: flat::View<'_, Stmt>,
+    test: flat::View<'_, Expr>,
+    msg: Option<flat::View<'_, Expr>>,
+) {
     if !is_const_false(test) {
         return;
     }

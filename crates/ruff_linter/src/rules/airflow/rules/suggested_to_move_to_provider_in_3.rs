@@ -6,8 +6,9 @@ use crate::rules::airflow::helpers::{
 };
 use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{Expr, ExprAttribute};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
@@ -111,21 +112,23 @@ impl Violation for Airflow3SuggestedToMoveToProvider<'_> {
 }
 
 // AIR312
-pub(crate) fn suggested_to_move_to_provider_in_3(checker: &Checker, expr: &Expr) {
+pub(crate) fn suggested_to_move_to_provider_in_3(checker: &Checker, &expr: &flat::View<'_, Expr>) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
 
-    match expr {
-        Expr::Attribute(ExprAttribute { attr, .. }) => {
+    match expr.classify() {
+        flat::ExprKind::Attribute(expr_attribute) => {
+            let attr = expr_attribute.attr();
+
             check_names_moved_to_provider(checker, expr, attr.range());
         }
-        Expr::Name(_) => check_names_moved_to_provider(checker, expr, expr.range()),
+        flat::ExprKind::Name(_) => check_names_moved_to_provider(checker, expr, expr.range()),
         _ => {}
     }
 }
 
-fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRange) {
+fn check_names_moved_to_provider(checker: &Checker, expr: flat::View<'_, Expr>, ranged: TextRange) {
     let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) else {
         return;
     };

@@ -1,4 +1,7 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{
+    Expr, Stmt, StmtClassDef,
+    flat::{self, fields as ast},
+};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
@@ -81,7 +84,7 @@ impl Violation for FunctionCallInDataclassDefaultArgument {
 /// RUF009
 pub(crate) fn function_call_in_dataclass_default(
     checker: &Checker,
-    class_def: &ast::StmtClassDef,
+    class_def: flat::View<'_, StmtClassDef>,
     scope_id: ScopeId,
 ) {
     let semantic = checker.semantic();
@@ -97,7 +100,7 @@ pub(crate) fn function_call_in_dataclass_default(
             AttrsAutoAttribs::Unknown => return,
 
             AttrsAutoAttribs::None => {
-                if any_annotated(&class_def.body) {
+                if any_annotated(class_def.body()) {
                     Some(AttrsAutoAttribs::True)
                 } else {
                     Some(AttrsAutoAttribs::False)
@@ -121,18 +124,19 @@ pub(crate) fn function_call_in_dataclass_default(
         .map(|target| QualifiedName::from_dotted_name(target))
         .collect();
 
-    for statement in &class_def.body {
-        let Stmt::AnnAssign(ast::StmtAnnAssign {
+    for statement in class_def.body() {
+        let ast::Stmt::AnnAssign(ast::StmtAnnAssign {
             annotation,
             value: Some(expr),
             ..
-        }) = statement
+        }) = statement.fields()
         else {
             continue;
         };
-        let Expr::Call(ast::ExprCall { func, .. }) = expr.as_ref() else {
+        let flat::ExprKind::Call(call_node) = expr.classify() else {
             continue;
         };
+        let func = call_node.func();
 
         let is_field = is_dataclass_field(func, checker.semantic(), dataclass_kind);
 
@@ -163,16 +167,16 @@ pub(crate) fn function_call_in_dataclass_default(
 }
 
 #[inline]
-fn any_annotated(class_body: &[Stmt]) -> bool {
+fn any_annotated(class_body: flat::Suite<'_>) -> bool {
     class_body
         .iter()
-        .any(|stmt| matches!(stmt, Stmt::AnnAssign(..)))
+        .any(|stmt| matches!(stmt.classify(), flat::StmtKind::AnnAssign(..)))
 }
 
 /// Checks that the passed function is an instantiation of the class,
 /// retrieves the ``StmtClassDef`` and verifies that it is a frozen dataclass
 fn is_frozen_dataclass_instantiation(
-    func: &Expr,
+    func: flat::View<'_, Expr>,
     semantic: &SemanticModel,
     scope_id: ScopeId,
 ) -> bool {
@@ -180,7 +184,10 @@ fn is_frozen_dataclass_instantiation(
         .lookup_attribute_in_scope(func, scope_id)
         .is_some_and(|id| {
             let binding = &semantic.binding(id);
-            let Some(Stmt::ClassDef(class_def)) = binding.statement(semantic) else {
+            let Some(flat::StmtKind::ClassDef(class_def)) = binding
+                .statement(semantic)
+                .map(flat::View::<Stmt>::classify)
+            else {
                 return false;
             };
 

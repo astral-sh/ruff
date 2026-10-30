@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use ruff_python_ast::flat;
 use ruff_python_ast::{Alias, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -68,9 +69,9 @@ impl AlwaysFixableViolation for UnnecessaryBuiltinImport {
 /// UP029
 pub(crate) fn unnecessary_builtin_import(
     checker: &Checker,
-    stmt: &Stmt,
+    stmt: flat::View<'_, Stmt>,
     module: &str,
-    names: &[Alias],
+    names: flat::NodeList<'_, Alias>,
     level: u32,
 ) {
     // Ignore relative imports (they're importing from local modules, not Python's builtins).
@@ -89,19 +90,15 @@ pub(crate) fn unnecessary_builtin_import(
     let semantic = checker.semantic();
 
     // Identify unaliased, builtin imports.
-    let unused_imports: Vec<&Alias> = names
+    let unused_imports: Vec<flat::View<'_, Alias>> = names
         .iter()
         .filter(|alias| {
-            !is_import_required_by_isort(
-                &checker.settings().isort.required_imports,
-                stmt.into(),
-                alias,
-            )
+            !is_import_required_by_isort(&checker.settings().isort.required_imports, stmt, *alias)
         })
-        .filter(|alias| alias.asname.is_none())
+        .filter(|alias| alias.asname().is_none())
         .filter(|alias| {
             matches!(
-                (module, alias.name.as_str()),
+                (module, alias.name().as_str()),
                 (
                     "builtins" | "six.moves.builtins",
                     "*" | "ascii"
@@ -135,10 +132,11 @@ pub(crate) fn unnecessary_builtin_import(
         // Check that the import isn't shadowing a non-builtin value.
         .filter(|alias| {
             // Always flag `*` imports.
-            if &alias.name == "*" {
+            if alias.name() == "*" {
                 return true;
             }
-            let Some(binding_id) = semantic.lookup_symbol(alias.name.as_str()).binding_id() else {
+            let Some(binding_id) = semantic.lookup_symbol(alias.name().as_str()).binding_id()
+            else {
                 return false;
             };
             let binding = semantic.binding(binding_id);
@@ -160,7 +158,7 @@ pub(crate) fn unnecessary_builtin_import(
         UnnecessaryBuiltinImport {
             names: unused_imports
                 .iter()
-                .map(|alias| alias.name.to_string())
+                .map(|alias| alias.name().to_string())
                 .sorted()
                 .collect(),
         },
@@ -172,8 +170,8 @@ pub(crate) fn unnecessary_builtin_import(
         let edit = fix::edits::remove_unused_imports(
             unused_imports
                 .iter()
-                .map(|alias| &alias.name)
-                .map(ruff_python_ast::Identifier::as_str),
+                .map(|alias| alias.name())
+                .map(flat::View::<ruff_python_ast::Identifier>::as_str),
             statement,
             parent,
             checker.locator(),

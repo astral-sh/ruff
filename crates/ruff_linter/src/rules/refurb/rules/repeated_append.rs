@@ -1,9 +1,9 @@
 use rustc_hash::FxHashMap;
 
-use ast::traversal;
+use ast::flat::traversal;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::traversal::EnclosingSuite;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::flat::traversal::EnclosingSuite;
+use ruff_python_ast::{self as ast, Expr, Stmt, flat};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::is_list;
 use ruff_python_semantic::{Binding, BindingId, SemanticModel};
@@ -78,7 +78,7 @@ impl Violation for RepeatedAppend {
 }
 
 /// FURB113
-pub(crate) fn repeated_append(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn repeated_append(checker: &Checker, stmt: flat::View<'_, Stmt>) {
     let Some(appends) = match_consecutive_appends(stmt, checker.semantic()) else {
         return;
     };
@@ -127,15 +127,15 @@ pub(crate) fn repeated_append(checker: &Checker, stmt: &Stmt) {
 #[derive(Debug, Clone)]
 struct Append<'a> {
     /// Receiver of the `append` call (aka `self` argument).
-    receiver: &'a ast::ExprName,
+    receiver: flat::View<'a, ast::ExprName>,
     /// [`BindingId`] that the receiver references.
     binding_id: BindingId,
     /// [`Binding`] that the receiver references.
     binding: &'a Binding<'a>,
     /// [`Expr`] serving as a sole argument to `append`.
-    argument: &'a Expr,
+    argument: flat::View<'a, Expr>,
     /// The statement containing the `append` call.
-    stmt: &'a Stmt,
+    stmt: flat::View<'a, Stmt>,
 }
 
 #[derive(Debug)]
@@ -150,7 +150,7 @@ struct AppendGroup<'a> {
 impl AppendGroup<'_> {
     fn name(&self) -> &str {
         assert!(!self.appends.is_empty());
-        &self.appends.first().unwrap().receiver.id
+        self.appends.first().unwrap().receiver.id()
     }
 }
 
@@ -166,7 +166,7 @@ impl Ranged for AppendGroup<'_> {
 
 /// Match consecutive calls to `append` on list variables starting from the given statement.
 fn match_consecutive_appends<'a>(
-    stmt: &'a Stmt,
+    stmt: flat::View<'a, Stmt>,
     semantic: &'a SemanticModel,
 ) -> Option<Vec<Append<'a>>> {
     // Match the current statement, to see if it's an append.
@@ -262,37 +262,38 @@ fn get_or_add<'a, 'b>(
 }
 
 /// Matches that the given statement is a call to `append` on a list variable.
-fn match_append<'a>(semantic: &'a SemanticModel, stmt: &'a Stmt) -> Option<Append<'a>> {
-    let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
+fn match_append<'a>(semantic: &'a SemanticModel, stmt: flat::View<'a, Stmt>) -> Option<Append<'a>> {
+    let flat::StmtKind::Expr(expr) = stmt.classify() else {
         return None;
     };
+    let value = expr.value();
 
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = value.as_ref()
-    else {
+    let flat::ExprKind::Call(call_node) = value.classify() else {
         return None;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
     // `append` should have just one argument, an element to be added.
-    let [argument] = &*arguments.args else {
-        return None;
-    };
+    let [argument] = arguments.args().as_array()?;
 
     // The called function should be an attribute, ie `value.attr`.
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+    let flat::ExprKind::Attribute(attribute_node) = func.classify() else {
         return None;
     };
+    let value = attribute_node.value();
+    let attr = attribute_node.attr();
 
     // `attr` should be `append` and it shouldn't have any keyword arguments.
-    if attr != "append" || !arguments.keywords.is_empty() {
+    if attr != "append" || !arguments.keywords().is_empty() {
         return None;
     }
 
     // We match only variable references, i.e. `value` should be a name expression.
-    let Expr::Name(receiver @ ast::ExprName { id: name, .. }) = value.as_ref() else {
+    let flat::ExprKind::Name(receiver) = value.classify() else {
         return None;
     };
+    let name = receiver.id();
 
     // Now we need to find what is this variable bound to...
     let scope = semantic.current_scope();
@@ -337,24 +338,24 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
     // Each eltK comes from an individual `var.append(eltK)`.
     let elts: Vec<Expr> = appends
         .iter()
-        .map(|append| append.argument.clone())
+        .map(|append| append.argument.to_owned_node())
         .collect();
     // Join all elements into a tuple: `(elt1, elt2, ..., eltN)`
     let tuple = ast::ExprTuple {
         elts,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
         parenthesized: true,
     };
     // Make `var.extend`.
     // NOTE: receiver is the same for all appends and that's why we can take the first.
     let attr = ast::ExprAttribute {
-        value: Box::new(first.receiver.clone().into()),
+        value: Box::new(first.receiver.to_owned_node().into()),
         attr: ast::Identifier::new("extend".to_string(), TextRange::default()),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     // Make the actual call `var.extend((elt1, elt2, ..., eltN))`
     let call = ast::ExprCall {
@@ -363,16 +364,16 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
             args: [tuple.into()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         },
         range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(call.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     generator.stmt(&stmt.into())
 }

@@ -1,5 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::Keyword;
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -81,31 +83,38 @@ impl Violation for PytestRaisesAmbiguousPattern {
 }
 
 /// RUF043
-pub(crate) fn pytest_raises_ambiguous_pattern(checker: &Checker, call: &ast::ExprCall) {
-    if !is_pytest_raises(&call.func, checker.semantic()) {
+pub(crate) fn pytest_raises_ambiguous_pattern(checker: &Checker, call: &ast::ExprCall<'_>) {
+    if !is_pytest_raises(call.func, checker.semantic()) {
         return;
     }
 
     // It *can* be passed as a positional argument if you try very hard,
     // but pytest only documents it as a keyword argument, and it's quite hard pass it positionally
-    let Some(ast::Keyword { value, .. }) = call.arguments.find_keyword("match") else {
+    let Some(ast::Keyword { value, .. }) = call
+        .arguments
+        .find_keyword("match")
+        .map(flat::View::<Keyword>::fields)
+    else {
         return;
     };
 
-    let ast::Expr::StringLiteral(string) = value else {
+    let flat::ExprKind::StringLiteral(string) = value.classify() else {
         return;
     };
 
-    let any_part_is_raw = string.value.iter().any(|part| part.flags.prefix().is_raw());
+    let any_part_is_raw = string
+        .value()
+        .iter()
+        .any(|part| part.flags().prefix().is_raw());
 
-    if any_part_is_raw || !string_has_unescaped_metacharacters(&string.value) {
+    if any_part_is_raw || !string_has_unescaped_metacharacters(string.value()) {
         return;
     }
 
-    checker.report_diagnostic(PytestRaisesAmbiguousPattern, string.range);
+    checker.report_diagnostic(PytestRaisesAmbiguousPattern, string.range());
 }
 
-fn string_has_unescaped_metacharacters(value: &ast::StringLiteralValue) -> bool {
+fn string_has_unescaped_metacharacters(value: flat::StringValue<'_>) -> bool {
     let mut escaped = false;
 
     for character in value.chars() {

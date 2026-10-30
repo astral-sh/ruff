@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableKeyword;
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
+use ruff_python_ast::flat;
+use ruff_python_ast::{Expr, Keyword};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -71,24 +72,20 @@ impl AlwaysFixableViolation for UnnecessaryDoubleCastOrProcess {
 /// C414
 pub(crate) fn unnecessary_double_cast_or_process(
     checker: &Checker,
-    expr: &Expr,
-    outer_func: &Expr,
-    args: &[Expr],
-    outer_kw: &[Keyword],
+    &expr: &flat::View<'_, Expr>,
+    outer_func: flat::View<'_, Expr>,
+    args: flat::NodeList<'_, Expr>,
+    outer_kw: flat::NodeList<'_, Keyword>,
 ) {
     let Some(arg) = args.first() else {
         return;
     };
-    let Expr::Call(ast::ExprCall {
-        func: inner_func,
-        arguments: Arguments {
-            keywords: inner_kw, ..
-        },
-        ..
-    }) = arg
-    else {
+    let flat::ExprKind::Call(call_node) = arg.classify() else {
         return;
     };
+    let inner_func = call_node.func();
+    let arguments = call_node.arguments();
+    let inner_kw = arguments.keywords();
     let semantic = checker.semantic();
     let Some(outer_func_name) = semantic.resolve_builtin_symbol(outer_func) else {
         return;

@@ -1,7 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::WithItem;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields as ast;
+use ruff_python_ast::flat::visitor::Visitor;
 use ruff_python_ast::helpers::{AwaitVisitor, any_over_body};
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{Expr, StmtWith, WithItem};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -64,17 +66,15 @@ impl Violation for CancelScopeNoCheckpoint {
 /// ASYNC100
 pub(crate) fn cancel_scope_no_checkpoint(
     checker: &Checker,
-    with_stmt: &StmtWith,
-    with_items: &[WithItem],
+    with_stmt: &ast::StmtWith<'_>,
+    with_items: flat::NodeList<'_, WithItem>,
 ) {
     let Some((with_item_pos, method_name)) = with_items
         .iter()
         .enumerate()
         .filter_map(|(pos, item)| {
-            let call = item.context_expr.as_call_expr()?;
-            let qualified_name = checker
-                .semantic()
-                .resolve_qualified_name(call.func.as_ref())?;
+            let call = item.context_expr().as_call_expr()?;
+            let qualified_name = checker.semantic().resolve_qualified_name(call.func())?;
             let method_name = MethodName::try_from(&qualified_name)?;
             if method_name.is_timeout_context() {
                 Some((pos, method_name))
@@ -97,13 +97,13 @@ pub(crate) fn cancel_scope_no_checkpoint(
     // in the caller yielded to.
     // See: https://flake8-async.readthedocs.io/en/latest/rules.html#async100
     // See: https://github.com/astral-sh/ruff/issues/12873
-    if any_over_body(&with_stmt.body, &Expr::is_yield_expr) {
+    if any_over_body(with_stmt.body, flat::View::is_yield_expr) {
         return;
     }
 
     // If the body contains an `await` statement, the context manager is used correctly.
     let mut visitor = AwaitVisitor::default();
-    visitor.visit_body(&with_stmt.body);
+    visitor.visit_body(with_stmt.body);
     if visitor.seen_await {
         return;
     }

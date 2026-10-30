@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::flat::fields;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -69,14 +69,14 @@ impl Violation for SubprocessRunWithoutCheck {
 }
 
 /// PLW1510
-pub(crate) fn subprocess_run_without_check(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn subprocess_run_without_check(checker: &Checker, call: &fields::ExprCall<'_>) {
     if !checker.semantic().seen_module(Modules::SUBPROCESS) {
         return;
     }
 
     if checker
         .semantic()
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["subprocess", "run"]))
     {
         if call.arguments.find_keyword("check").is_none() {
@@ -84,7 +84,7 @@ pub(crate) fn subprocess_run_without_check(checker: &Checker, call: &ast::ExprCa
                 checker.report_diagnostic(SubprocessRunWithoutCheck, call.func.range());
             diagnostic.set_fix(Fix::display_only_edit(add_argument(
                 "check=False",
-                &call.arguments,
+                call.arguments,
                 checker.tokens(),
             )));
         }

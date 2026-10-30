@@ -1,4 +1,5 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 use std::fmt::{Display, Formatter};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -51,7 +52,7 @@ impl Violation for TypingTextStrAlias {
 }
 
 /// UP019
-pub(crate) fn typing_text_str_alias(checker: &Checker, expr: &Expr) {
+pub(crate) fn typing_text_str_alias(checker: &Checker, &expr: &flat::View<'_, Expr>) {
     if !checker
         .semantic()
         .seen_module(Modules::TYPING | Modules::TYPING_EXTENSIONS)

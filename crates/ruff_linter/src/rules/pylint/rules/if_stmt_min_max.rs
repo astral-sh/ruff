@@ -1,7 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::CmpOp;
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::flat::fields as ast;
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{self as ast, CmpOp, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -83,30 +84,23 @@ impl Violation for IfStmtMinMax {
 }
 
 /// PLR1730, PLR1731
-pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
-    let ast::StmtIf {
-        test,
-        body,
-        elif_else_clauses,
-        range: _,
-        node_index: _,
-    } = stmt_if;
+pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf<'_>) {
+    let test = stmt_if.test;
+    let body = stmt_if.body;
+    let elif_else_clauses = stmt_if.elif_else_clauses;
 
     if !elif_else_clauses.is_empty() {
         return;
     }
 
-    let [
-        body @ Stmt::Assign(ast::StmtAssign {
-            targets: body_targets,
-            value: body_value,
-            ..
-        }),
-    ] = body.as_slice()
-    else {
+    let Some([body]) = body.as_array() else {
         return;
     };
-    let [body_target] = body_targets.as_slice() else {
+    let Some(assign) = body.as_assign_stmt() else {
+        return;
+    };
+    let body_value = assign.value();
+    let Some([body_target]) = assign.targets().as_array() else {
         return;
     };
 
@@ -158,7 +152,7 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
     let replacement = format!(
         "{} = {min_max}({}, {})",
         checker.locator().slice(
-            parenthesized_range(body_target.into(), body.into(), checker.tokens())
+            parenthesized_range(body_target, body.into(), checker.tokens())
                 .unwrap_or(body_target.range())
         ),
         checker.locator().slice(arg1),
@@ -170,10 +164,10 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
             min_max,
             replacement: SourceCodeSnippet::from_str(replacement.as_str()),
         },
-        stmt_if.range(),
+        stmt_if.range,
     );
 
-    let range_replacement = stmt_if.range();
+    let range_replacement = stmt_if.range;
     let applicability = if checker.comment_ranges().intersects(range_replacement) {
         Applicability::Unsafe
     } else {

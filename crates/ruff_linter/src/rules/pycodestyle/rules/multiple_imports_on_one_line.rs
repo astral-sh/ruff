@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Alias, Stmt};
@@ -49,7 +50,11 @@ impl Violation for MultipleImportsOnOneLine {
 }
 
 /// E401
-pub(crate) fn multiple_imports_on_one_line(checker: &Checker, stmt: &Stmt, names: &[Alias]) {
+pub(crate) fn multiple_imports_on_one_line(
+    checker: &Checker,
+    stmt: flat::View<'_, Stmt>,
+    names: flat::NodeList<'_, Alias>,
+) {
     if names.len() > 1 {
         let mut diagnostic = checker.report_diagnostic(MultipleImportsOnOneLine, stmt.range());
         diagnostic.set_fix(split_imports(
@@ -64,8 +69,8 @@ pub(crate) fn multiple_imports_on_one_line(checker: &Checker, stmt: &Stmt, names
 
 /// Generate a [`Fix`] to split the imports across multiple statements.
 fn split_imports(
-    stmt: &Stmt,
-    names: &[Alias],
+    stmt: flat::View<'_, Stmt>,
+    names: flat::NodeList<'_, Alias>,
     locator: &Locator,
     indexer: &Indexer,
     stylist: &Stylist,
@@ -75,12 +80,8 @@ fn split_imports(
         let replacement = names
             .iter()
             .map(|alias| {
-                let Alias {
-                    range: _,
-                    node_index: _,
-                    name,
-                    asname,
-                } = alias;
+                let name = alias.name();
+                let asname = alias.asname();
 
                 if let Some(asname) = asname {
                     format!("import {name} as {asname}")
@@ -100,12 +101,8 @@ fn split_imports(
         let replacement = names
             .iter()
             .map(|alias| {
-                let Alias {
-                    range: _,
-                    node_index: _,
-                    name,
-                    asname,
-                } = alias;
+                let name = alias.name();
+                let asname = alias.asname();
 
                 if let Some(asname) = asname {
                     format!("{indentation}import {name} as {asname}")

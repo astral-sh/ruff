@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{Expr, Stmt, flat};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -47,20 +47,18 @@ impl AlwaysFixableViolation for UselessMetaclassType {
 /// UP001
 pub(crate) fn useless_metaclass_type(
     checker: &Checker,
-    stmt: &Stmt,
-    value: &Expr,
-    targets: &[Expr],
+    stmt: flat::View<'_, Stmt>,
+    value: flat::View<'_, Expr>,
+    targets: flat::NodeList<'_, Expr>,
 ) {
-    let [Expr::Name(ast::ExprName { id, .. })] = targets else {
+    let Some([target]) = targets.as_array() else {
         return;
     };
-    if id != "__metaclass__" {
-        return;
-    }
-    let Expr::Name(ast::ExprName { id, .. }) = value else {
-        return;
-    };
-    if id != "type" {
+    if target
+        .as_name_expr()
+        .is_none_or(|name| name.id() != "__metaclass__")
+        || value.as_name_expr().is_none_or(|name| name.id() != "type")
+    {
         return;
     }
 

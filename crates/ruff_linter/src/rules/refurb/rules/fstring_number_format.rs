@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprCall, Number, PythonVersion, UnaryOp};
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{Expr, Number, PythonVersion, UnaryOp};
 use ruff_source_file::find_newline;
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -71,22 +71,22 @@ impl Violation for FStringNumberFormat {
 }
 
 /// FURB116
-pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubscript) {
+pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubscript<'_>) {
     // The slice must be exactly `[2:]`.
-    let Expr::Slice(ast::ExprSlice {
+    let ast::Expr::Slice(ast::ExprSlice {
         lower: Some(lower),
         upper: None,
         step: None,
         ..
-    }) = subscript.slice.as_ref()
+    }) = subscript.slice.fields()
     else {
         return;
     };
 
-    let Expr::NumberLiteral(ast::ExprNumberLiteral {
+    let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
         value: Number::Int(int),
         ..
-    }) = lower.as_ref()
+    }) = lower.fields()
     else {
         return;
     };
@@ -96,18 +96,17 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
     }
 
     // The call must be exactly `hex(...)`, `bin(...)`, or `oct(...)`.
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = subscript.value.as_ref()
-    else {
+    let flat::ExprKind::Call(call_node) = subscript.value.classify() else {
         return;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
-    if !arguments.keywords.is_empty() {
+    if !arguments.keywords().is_empty() {
         return;
     }
 
-    let [arg] = &*arguments.args else {
+    let Some([arg]) = arguments.args().as_array() else {
         return;
     };
 
@@ -121,8 +120,8 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
 
     // float and complex numbers are false positives, ignore them.
     if matches!(
-        arg,
-        Expr::NumberLiteral(ast::ExprNumberLiteral {
+        arg.fields(),
+        ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: Number::Float(_) | Number::Complex { .. },
             ..
         })
@@ -132,16 +131,16 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
 
     let maybe_number = if let Some(maybe_number) = arg
         .as_unary_op_expr()
-        .filter(|unary_expr| unary_expr.op == UnaryOp::UAdd)
-        .map(|unary_expr| &unary_expr.operand)
+        .filter(|unary_expr| unary_expr.op() == UnaryOp::UAdd)
+        .map(flat::View::operand)
     {
         maybe_number
     } else {
         arg
     };
 
-    let applicability = if matches!(maybe_number, Expr::NumberLiteral(_)) {
-        if checker.comment_ranges().intersects(subscript.range()) {
+    let applicability = if matches!(maybe_number.classify(), flat::ExprKind::NumberLiteral(_)) {
+        if checker.comment_ranges().intersects(subscript.range) {
             Applicability::Unsafe
         } else {
             Applicability::Safe
@@ -157,20 +156,27 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
             replacement: replacement.as_deref().map(SourceCodeSnippet::from_str),
             base,
         },
-        subscript.range(),
+        subscript.range,
     );
 
     if let Some(replacement) = replacement {
-        let edit = Edit::range_replacement(replacement, subscript.range());
+        let edit = Edit::range_replacement(replacement, subscript.range);
         diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
     }
 }
 
 /// Generate a replacement, if possible.
-fn try_create_replacement(checker: &Checker, arg: &Expr, base: Base) -> Option<String> {
+fn try_create_replacement(
+    checker: &Checker,
+    arg: flat::View<'_, Expr>,
+    base: Base,
+) -> Option<String> {
     if !matches!(
-        arg,
-        Expr::NumberLiteral(_) | Expr::Name(_) | Expr::Attribute(_) | Expr::UnaryOp(_)
+        arg.classify(),
+        flat::ExprKind::NumberLiteral(_)
+            | flat::ExprKind::Name(_)
+            | flat::ExprKind::Attribute(_)
+            | flat::ExprKind::UnaryOp(_)
     ) {
         return None;
     }

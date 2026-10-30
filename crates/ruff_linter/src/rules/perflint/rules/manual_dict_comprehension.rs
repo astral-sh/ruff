@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{
-    self as ast, Expr, Stmt, comparable::ComparableExpr, helpers::any_over_expr,
-};
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{Expr, Stmt, StmtFor, comparable::ComparableExpr, helpers::any_over_expr};
 use ruff_python_semantic::{Binding, analyze::typing::is_dict};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -84,33 +83,36 @@ impl Violation for ManualDictComprehension {
 }
 
 /// PERF403
-pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtFor) {
-    let ast::StmtFor {
-        body, target, iter, ..
-    } = for_stmt;
+pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: flat::View<'_, StmtFor>) {
+    let body = for_stmt.body();
+    let target = for_stmt.target();
+    let iter = for_stmt.iter();
 
-    let body = body.as_slice();
-    let target = target.as_ref();
-    let (stmt, if_test) = match body {
+    let (stmt, if_test) = match body
+        .as_array()
+        .map(|items| items.map(flat::View::<Stmt>::fields))
+    {
         // ```python
         // for idx, name in enumerate(names):
         //     if idx % 2 == 0:
         //         result[name] = idx
         // ```
-        [
-            Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                test,
-                ..
-            }),
-        ] => {
+        Some(
+            [
+                ast::Stmt::If(ast::StmtIf {
+                    body,
+                    elif_else_clauses,
+                    test,
+                    ..
+                }),
+            ],
+        ) => {
             // TODO(charlie): If there's an `else` clause, verify that the `else` has the
             // same structure.
             if !elif_else_clauses.is_empty() {
                 return;
             }
-            let [stmt] = body.as_slice() else {
+            let Some([stmt]) = body.as_array() else {
                 return;
             };
             (stmt, Some(test))
@@ -119,34 +121,35 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         // for idx, name in enumerate(names):
         //     result[name] = idx
         // ```
-        [stmt] => (stmt, None),
+        Some([stmt]) => (stmt.view(), None),
         _ => return,
     };
 
-    let Stmt::Assign(ast::StmtAssign {
-        targets,
-        value,
-        range,
-        node_index: _,
-    }) = stmt
-    else {
+    let flat::StmtKind::Assign(assign_node) = stmt.classify() else {
         return;
     };
+    let targets = assign_node.targets();
+    let value = assign_node.value();
+    let range = assign_node.range();
 
-    let [
-        Expr::Subscript(ast::ExprSubscript {
-            value: subscript_value,
-            slice: key,
-            ..
-        }),
-    ] = targets.as_slice()
+    let Some(
+        [
+            ast::Expr::Subscript(ast::ExprSubscript {
+                value: subscript_value,
+                slice: key,
+                ..
+            }),
+        ],
+    ) = targets
+        .as_array()
+        .map(|items| items.map(flat::View::<Expr>::fields))
     else {
         return;
     };
 
     // An assignment expression is a syntax error anywhere in a comprehension's iterable, even
     // when parenthesized (e.g., `{k: v for k, v in (y := z)}`), so the loop can't be converted.
-    if any_over_expr(iter, &Expr::is_named_expr) {
+    if any_over_expr(iter, flat::View::is_named_expr) {
         return;
     }
 
@@ -157,8 +160,8 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         return;
     }
 
-    match target {
-        Expr::Tuple(tuple) => {
+    match target.classify() {
+        flat::ExprKind::Tuple(tuple) => {
             if !tuple
                 .iter()
                 .any(|element| ComparableExpr::from(key) == ComparableExpr::from(element))
@@ -172,7 +175,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
                 return;
             }
         }
-        Expr::Name(_) => {
+        flat::ExprKind::Name(_) => {
             if ComparableExpr::from(key) != ComparableExpr::from(target) {
                 return;
             }
@@ -184,7 +187,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     }
 
     // Exclude non-dictionary value.
-    let Expr::Name(name) = &**subscript_value else {
+    let flat::ExprKind::Name(name) = subscript_value.classify() else {
         return;
     };
     let Some(binding) = checker
@@ -222,25 +225,25 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
 
     if is_fix_manual_dict_comprehension_enabled(checker.settings()) {
         let binding_stmt = binding.statement(checker.semantic());
-        let binding_value = binding_stmt.and_then(|binding_stmt| match binding_stmt {
-            ast::Stmt::AnnAssign(assign) => assign.value.as_deref(),
-            ast::Stmt::Assign(assign) => Some(&assign.value),
+        let binding_value = binding_stmt.and_then(|binding_stmt| match binding_stmt.classify() {
+            flat::StmtKind::AnnAssign(assign) => assign.value(),
+            flat::StmtKind::Assign(assign) => Some(assign.value()),
             _ => None,
         });
 
         // If the variable is an empty dict literal, then we might be able to replace it with a full dict comprehension.
         // otherwise, it has to be replaced with a `dict.update`
         let binding_is_empty_dict =
-            binding_value.is_some_and(|binding_value| match binding_value {
+            binding_value.is_some_and(|binding_value| match binding_value.classify() {
                 // value = {}
-                Expr::Dict(dict_expr) => dict_expr.is_empty(),
+                flat::ExprKind::Dict(dict_expr) => dict_expr.items().is_empty(),
                 // value = dict()
-                Expr::Call(call) => {
+                flat::ExprKind::Call(call) => {
                     checker
                         .semantic()
-                        .resolve_builtin_symbol(&call.func)
+                        .resolve_builtin_symbol(call.func())
                         .is_some_and(|name| name == "dict")
-                        && call.arguments.is_empty()
+                        && call.arguments().is_empty()
                 }
                 _ => false,
             });
@@ -252,11 +255,12 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         });
         // If the binding is not a single name expression, it could be replaced with a dict comprehension,
         // but not necessarily, so this needs to be manually fixed. This does not apply when using an update.
-        let binding_has_one_target = binding_stmt.is_some_and(|binding_stmt| match binding_stmt {
-            ast::Stmt::AnnAssign(_) => true,
-            ast::Stmt::Assign(assign) => assign.targets.len() == 1,
-            _ => false,
-        });
+        let binding_has_one_target =
+            binding_stmt.is_some_and(|binding_stmt| match binding_stmt.classify() {
+                flat::StmtKind::AnnAssign(_) => true,
+                flat::StmtKind::Assign(assign) => assign.targets().len() == 1,
+                _ => false,
+            });
         // If the binding gets used in between the assignment and the for loop, a comprehension is no longer safe
 
         // If the binding is after the for loop, then it can't be fixed, and this check would panic,
@@ -285,28 +289,22 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         let mut diagnostic = checker.report_diagnostic(
             ManualDictComprehension {
                 fix_type,
-                is_async: for_stmt.is_async,
+                is_async: for_stmt.is_async(),
             },
-            *range,
+            range,
         );
         diagnostic.try_set_optional_fix(|| {
             Ok(convert_to_dict_comprehension(
-                fix_type,
-                binding,
-                for_stmt,
-                if_test.map(std::convert::AsRef::as_ref),
-                key.as_ref(),
-                value.as_ref(),
-                checker,
+                fix_type, binding, for_stmt, if_test, key, value, checker,
             ))
         });
     } else {
         checker.report_diagnostic(
             ManualDictComprehension {
                 fix_type: DictComprehensionType::Comprehension,
-                is_async: for_stmt.is_async,
+                is_async: for_stmt.is_async(),
             },
-            *range,
+            range,
         );
     }
 }
@@ -314,10 +312,10 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
 fn convert_to_dict_comprehension(
     fix_type: DictComprehensionType,
     binding: &Binding,
-    for_stmt: &ast::StmtFor,
-    if_test: Option<&ast::Expr>,
-    key: &Expr,
-    value: &Expr,
+    for_stmt: flat::View<'_, StmtFor>,
+    if_test: Option<flat::View<'_, Expr>>,
+    key: flat::View<'_, Expr>,
+    value: flat::View<'_, Expr>,
     checker: &Checker,
 ) -> Option<Fix> {
     let locator = checker.locator();
@@ -332,8 +330,8 @@ fn convert_to_dict_comprehension(
             // since if the assignment expression appears
             // internally (e.g. as an operand in a boolean
             // operation) then it will already be parenthesized.
-            match test {
-                Expr::Named(_) | Expr::If(_) | Expr::Lambda(_) => {
+            match test.classify() {
+                flat::ExprKind::Named(_) | flat::ExprKind::If(_) | flat::ExprKind::Lambda(_) => {
                     format!(" if ({})", locator.slice(test.range()))
                 }
                 _ => format!(" if {}", locator.slice(test.range())),
@@ -345,23 +343,20 @@ fn convert_to_dict_comprehension(
     let (iter_str, iter_range) =
         parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension);
 
-    let target_str = locator.slice(for_stmt.target.range());
-    let for_type = if for_stmt.is_async {
+    let target_str = locator.slice(for_stmt.target().range());
+    let for_type = if for_stmt.is_async() {
         "async for"
     } else {
         "for"
     };
     // Handles the case where `key` has a trailing comma, e.g, `dict[x,] = y`
-    let key_str = if let Expr::Tuple(ast::ExprTuple {
-        elts,
-        parenthesized,
-        ..
-    }) = key
-    {
+    let key_str = if let flat::ExprKind::Tuple(tuple_node) = key.classify() {
+        let elts = tuple_node.elts();
+        let parenthesized = tuple_node.parenthesized();
         if elts.len() != 1 {
             return None;
         }
-        if *parenthesized {
+        if parenthesized {
             locator.slice(key).to_string()
         } else {
             format!("({})", locator.slice(key))
@@ -371,10 +366,10 @@ fn convert_to_dict_comprehension(
     };
 
     // If the value is a tuple without parentheses, add them
-    let value_str = if let Expr::Tuple(ast::ExprTuple {
+    let value_str = if let ast::Expr::Tuple(ast::ExprTuple {
         parenthesized: false,
         ..
-    }) = value
+    }) = value.fields()
     {
         format!("({})", locator.slice(value))
     } else {
@@ -388,19 +383,19 @@ fn convert_to_dict_comprehension(
         key.range(),
         value.range(),
         iter_range,
-        for_stmt.target.range(),
+        for_stmt.target().range(),
     ];
     if let Some(test) = if_test {
         ranges_to_ignore.push(test.range());
     }
     let for_loop_inline_comments =
-        comment_strings_in_range(checker, for_stmt.range, &ranges_to_ignore);
+        comment_strings_in_range(checker, for_stmt.range(), &ranges_to_ignore);
 
     let newline = checker.stylist().line_ending().as_str();
 
     let indent = locator.slice(TextRange::new(
-        locator.line_start(for_stmt.range.start()),
-        for_stmt.range.start(),
+        locator.line_start(for_stmt.range().start()),
+        for_stmt.range().start(),
     ));
 
     let variable_name = locator.slice(binding);
@@ -421,7 +416,7 @@ fn convert_to_dict_comprehension(
 
             Some(Fix::unsafe_edit(Edit::range_replacement(
                 text_to_replace,
-                for_stmt.range,
+                for_stmt.range(),
             )))
         }
         DictComprehensionType::Comprehension => {
@@ -435,7 +430,7 @@ fn convert_to_dict_comprehension(
             let binding_stmt_range = binding_stmt.range();
 
             let annotations = match binding_stmt.as_ann_assign_stmt() {
-                Some(assign) => format!(": {}", locator.slice(assign.annotation.range())),
+                Some(assign) => format!(": {}", locator.slice(assign.annotation().range())),
                 None => String::new(),
             };
 
@@ -464,7 +459,10 @@ fn convert_to_dict_comprehension(
                 format!("{leading_comments}{variable_name}{annotations} = {comprehension_str}");
             Some(Fix::unsafe_edits(
                 Edit::range_deletion(binding_stmt_deletion_range),
-                [Edit::range_replacement(comprehension_body, for_stmt.range)],
+                [Edit::range_replacement(
+                    comprehension_body,
+                    for_stmt.range(),
+                )],
             ))
         }
     }
@@ -476,12 +474,18 @@ enum DictComprehensionType {
     Comprehension,
 }
 
-fn has_post_loop_references(checker: &Checker, expr: &Expr, loop_end: TextSize) -> bool {
-    any_over_expr(expr, |expr| match expr {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
-            .iter()
-            .any(|expr| has_post_loop_references(checker, expr, loop_end)),
-        Expr::Name(name) => {
+fn has_post_loop_references(
+    checker: &Checker,
+    expr: flat::View<'_, Expr>,
+    loop_end: TextSize,
+) -> bool {
+    any_over_expr(expr, |expr| match expr.classify() {
+        flat::ExprKind::Tuple(expr_tuple) => {
+            let elts = expr_tuple.elts();
+            elts.iter()
+                .any(|expr| has_post_loop_references(checker, expr, loop_end))
+        }
+        flat::ExprKind::Name(name) => {
             let Some(target_binding) = checker
                 .semantic()
                 .bindings

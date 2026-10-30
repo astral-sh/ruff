@@ -1,9 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::flat::{self, fields};
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::{
-    self as ast, Arguments, CmpOp, ElifElseClause, Expr, ExprContext, Identifier, Stmt,
-};
+use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, ExprContext, Identifier};
 use ruff_python_semantic::analyze::typing::{
     is_known_to_be_of_type_dict, is_sys_version_block, is_type_checking_block,
 };
@@ -83,54 +82,49 @@ impl Violation for IfElseBlockInsteadOfDictGet {
 }
 
 /// SIM401
-pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast::StmtIf) {
-    let ast::StmtIf {
-        test,
-        body,
-        elif_else_clauses,
-        ..
-    } = stmt_if;
+pub(crate) fn if_else_block_instead_of_dict_get(
+    checker: &Checker,
+    stmt_if: flat::View<'_, ast::StmtIf>,
+) {
+    let test = stmt_if.test();
+    let body = stmt_if.body();
+    let elif_else_clauses = stmt_if.elif_else_clauses();
 
-    let [body_stmt] = body.as_slice() else {
+    let Some([body_stmt]) = body.as_array() else {
         return;
     };
-    let [
-        ElifElseClause {
-            body: else_body,
-            test: None,
-            ..
-        },
-    ] = elif_else_clauses.as_slice()
-    else {
+    let Some([elif_else_clause]) = elif_else_clauses.as_array() else {
         return;
     };
-    let [else_body_stmt] = else_body.as_slice() else {
-        return;
-    };
-    let Stmt::Assign(ast::StmtAssign {
-        targets: body_var,
-        value: body_value,
+    let fields::ElifElseClause {
+        body: else_body,
+        test: None,
         ..
-    }) = &body_stmt
+    } = elif_else_clause.fields()
     else {
         return;
     };
-    let [body_var] = body_var.as_slice() else {
+    let Some([else_body_stmt]) = else_body.as_array() else {
         return;
     };
-    let Stmt::Assign(ast::StmtAssign {
-        targets: orelse_var,
-        value: orelse_value,
-        ..
-    }) = &else_body_stmt
-    else {
+    let flat::StmtKind::Assign(assign_node) = body_stmt.classify() else {
         return;
     };
-    let [orelse_var] = orelse_var.as_slice() else {
+    let body_var = assign_node.targets();
+    let body_value = assign_node.value();
+    let Some([body_var]) = body_var.as_array() else {
+        return;
+    };
+    let flat::StmtKind::Assign(assign_node) = else_body_stmt.classify() else {
+        return;
+    };
+    let orelse_var = assign_node.targets();
+    let orelse_value = assign_node.value();
+    let Some([orelse_var]) = orelse_var.as_array() else {
         return;
     };
 
-    let Expr::Compare(compare) = &**test else {
+    let flat::ExprKind::Compare(compare) = test.classify() else {
         return;
     };
     let Some((test_key, op, test_dict)) = compare.as_single() else {
@@ -145,20 +139,17 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
     }
 
     let (expected_var, expected_value, default_var, default_value) = match op {
-        CmpOp::In => (body_var, body_value, orelse_var, orelse_value.as_ref()),
-        CmpOp::NotIn => (orelse_var, orelse_value, body_var, body_value.as_ref()),
+        CmpOp::In => (body_var, body_value, orelse_var, orelse_value),
+        CmpOp::NotIn => (orelse_var, orelse_value, body_var, body_value),
         _ => {
             return;
         }
     };
-    let Expr::Subscript(ast::ExprSubscript {
-        value: expected_subscript,
-        slice: expected_slice,
-        ..
-    }) = expected_value.as_ref()
-    else {
+    let flat::ExprKind::Subscript(subscript) = expected_value.classify() else {
         return;
     };
+    let expected_subscript = subscript.value();
+    let expected_slice = subscript.slice();
 
     // Check that the dictionary key, target variables, and dictionary name are all
     // equivalent.
@@ -186,32 +177,32 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
         return;
     }
 
-    let node = default_value.clone();
-    let node1 = test_key.clone();
+    let node = default_value;
+    let node1 = test_key;
     let node2 = ast::ExprAttribute {
-        value: expected_subscript.clone(),
+        value: Box::new(expected_subscript.to_owned_node()),
         attr: Identifier::new("get".to_string(), TextRange::default()),
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     let node3 = ast::ExprCall {
         func: Box::new(node2.into()),
         arguments: Arguments {
-            args: [node1, node].into(),
+            args: [node1, node].map(flat::View::to_owned_node).into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         },
         range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
-    let node4 = expected_var.clone();
+    let node4 = expected_var;
     let node5 = ast::StmtAssign {
-        targets: vec![node4],
+        targets: vec![node4.to_owned_node()],
         value: Box::new(node3.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     let contents = checker.generator().stmt(&node5.into());
 
@@ -234,7 +225,7 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
     );
     if !checker
         .comment_ranges()
-        .has_comments(stmt_if, checker.source())
+        .has_comments(&stmt_if, checker.source())
     {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             contents,
@@ -246,12 +237,12 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
 /// SIM401
 pub(crate) fn if_exp_instead_of_dict_get(
     checker: &Checker,
-    expr: &Expr,
-    test: &Expr,
-    body: &Expr,
-    orelse: &Expr,
+    &expr: &flat::View<'_, Expr>,
+    test: flat::View<'_, Expr>,
+    body: flat::View<'_, Expr>,
+    orelse: flat::View<'_, Expr>,
 ) {
-    let Expr::Compare(compare) = test else {
+    let flat::ExprKind::Compare(compare) = test.classify() else {
         return;
     };
     let Some((test_key, op, test_dict)) = compare.as_single() else {
@@ -266,14 +257,11 @@ pub(crate) fn if_exp_instead_of_dict_get(
         }
     };
 
-    let Expr::Subscript(ast::ExprSubscript {
-        value: expected_subscript,
-        slice: expected_slice,
-        ..
-    }) = body
-    else {
+    let flat::ExprKind::Subscript(subscript) = body.classify() else {
         return;
     };
+    let expected_subscript = subscript.value();
+    let expected_slice = subscript.slice();
 
     if ComparableExpr::from(expected_slice) != ComparableExpr::from(test_key)
         || ComparableExpr::from(test_dict) != ComparableExpr::from(expected_subscript)
@@ -288,25 +276,27 @@ pub(crate) fn if_exp_instead_of_dict_get(
         return;
     }
 
-    let default_value_node = default_value.clone();
-    let dict_key_node = test_key.clone();
+    let default_value_node = default_value;
+    let dict_key_node = test_key;
     let dict_get_node = ast::ExprAttribute {
-        value: expected_subscript.clone(),
+        value: Box::new(expected_subscript.to_owned_node()),
         attr: Identifier::new("get".to_string(), TextRange::default()),
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     let fixed_node = ast::ExprCall {
         func: Box::new(dict_get_node.into()),
         arguments: Arguments {
-            args: [dict_key_node, default_value_node].into(),
+            args: [dict_key_node, default_value_node]
+                .map(flat::View::to_owned_node)
+                .into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         },
         range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
 
     let contents = checker.generator().expr(&fixed_node.into());
@@ -319,7 +309,7 @@ pub(crate) fn if_exp_instead_of_dict_get(
     );
     if !checker
         .comment_ranges()
-        .has_comments(expr, checker.source())
+        .has_comments(&expr, checker.source())
     {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             contents,

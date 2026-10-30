@@ -1,8 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{Expr, StmtFunctionDef};
 use ruff_python_semantic::Definition;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType};
 use ruff_python_semantic::analyze::visibility;
@@ -546,11 +546,10 @@ impl Violation for AnyType {
         format!("Dynamically typed expressions (typing.Any) are disallowed in `{name}`")
     }
 }
-fn is_none_returning(body: &[Stmt]) -> bool {
-    let mut visitor = ReturnStatementVisitor::default();
-    visitor.visit_body(body);
+fn is_none_returning(function: flat::View<'_, StmtFunctionDef>) -> bool {
+    let visitor = ReturnStatementVisitor::for_function(function);
     for stmt in visitor.returns {
-        if let Some(value) = stmt.value.as_deref() {
+        if let Some(value) = stmt.value() {
             if !value.is_none_literal_expr() {
                 return false;
             }
@@ -562,13 +561,13 @@ fn is_none_returning(body: &[Stmt]) -> bool {
 /// ANN401
 fn check_dynamically_typed<'a, 'b, F>(
     checker: &'a Checker<'b>,
-    annotation: &Expr,
+    annotation: flat::View<'_, Expr>,
     func: F,
     context: &mut Vec<DiagnosticGuard<'a, 'b>>,
 ) where
     F: FnOnce() -> String,
 {
-    if let Expr::StringLiteral(string_expr) = annotation {
+    if let Some(string_expr) = annotation.as_string_literal_expr() {
         // Quoted annotations
         if let Ok(parsed_annotation) = checker.parse_type_annotation(string_expr) {
             if type_hint_resolves_to_any(
@@ -588,23 +587,24 @@ fn check_dynamically_typed<'a, 'b, F>(
 }
 
 /// Return `true` if a function appears to be a stub.
-fn is_stub_function(function_def: &ast::StmtFunctionDef, checker: &Checker) -> bool {
+fn is_stub_function(function_def: flat::View<'_, StmtFunctionDef>, checker: &Checker) -> bool {
     /// Returns `true` if a function has an empty body.
-    fn is_empty_body(function_def: &ast::StmtFunctionDef) -> bool {
-        function_def.body.iter().all(|stmt| match stmt {
-            Stmt::Pass(_) => true,
-            Stmt::Expr(ast::StmtExpr {
-                value,
-                range: _,
-                node_index: _,
-            }) => {
-                matches!(
-                    value.as_ref(),
-                    Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
-                )
-            }
-            _ => false,
-        })
+    fn is_empty_body(function_def: flat::View<'_, StmtFunctionDef>) -> bool {
+        function_def
+            .body()
+            .iter()
+            .all(|stmt| match stmt.classify() {
+                flat::StmtKind::Pass(_) => true,
+                flat::StmtKind::Expr(stmt_expr) => {
+                    let value = stmt_expr.value();
+
+                    matches!(
+                        value.classify(),
+                        flat::ExprKind::StringLiteral(_) | flat::ExprKind::EllipsisLiteral(_)
+                    )
+                }
+                _ => false,
+            })
     }
 
     // Ignore functions with empty bodies in...
@@ -615,12 +615,12 @@ fn is_stub_function(function_def: &ast::StmtFunctionDef, checker: &Checker) -> b
         }
 
         // Abstract methods...
-        if visibility::is_abstract(&function_def.decorator_list, checker.semantic()) {
+        if visibility::is_abstract(function_def.decorator_list(), checker.semantic()) {
             return true;
         }
 
         // Overload definitions...
-        if visibility::is_overload(&function_def.decorator_list, checker.semantic()) {
+        if visibility::is_overload(function_def.decorator_list(), checker.semantic()) {
             return true;
         }
     }
@@ -641,15 +641,15 @@ pub(crate) fn definition(
 
     let ast::StmtFunctionDef {
         range: _,
-        node_index: _,
+        node: _,
         is_async: _,
         decorator_list,
         name,
         type_params: _,
         parameters,
         returns,
-        body,
-    } = function;
+        body: _,
+    } = function.fields();
 
     let is_method = definition.is_method();
 
@@ -683,14 +683,14 @@ pub(crate) fn definition(
                 && checker
                     .settings()
                     .dummy_variable_rgx
-                    .is_match(parameter.name()))
+                    .is_match(parameter.name().as_str()))
             {
                 if checker.is_rule_enabled(Rule::MissingTypeFunctionArgument) {
                     diagnostics.push(checker.report_diagnostic(
                         MissingTypeFunctionArgument {
                             name: parameter.name().to_string(),
                         },
-                        parameter.parameter.range(),
+                        parameter.parameter().range(),
                     ));
                 }
             }
@@ -698,23 +698,26 @@ pub(crate) fn definition(
     }
 
     // ANN002, ANN401
-    if let Some(arg) = &parameters.vararg {
-        if let Some(expr) = &arg.annotation {
+    if let Some(arg) = parameters.vararg() {
+        if let Some(expr) = arg.annotation() {
             has_any_typed_arg = true;
             if !checker.settings().flake8_annotations.allow_star_arg_any {
                 if checker.is_rule_enabled(Rule::AnyType) && !is_overridden {
-                    let name = &arg.name;
+                    let name = arg.name();
                     check_dynamically_typed(checker, expr, || format!("*{name}"), &mut diagnostics);
                 }
             }
         } else {
             if !(checker.settings().flake8_annotations.suppress_dummy_args
-                && checker.settings().dummy_variable_rgx.is_match(&arg.name))
+                && checker
+                    .settings()
+                    .dummy_variable_rgx
+                    .is_match(arg.name().as_str()))
             {
                 if checker.is_rule_enabled(Rule::MissingTypeArgs) {
                     diagnostics.push(checker.report_diagnostic(
                         MissingTypeArgs {
-                            name: arg.name.to_string(),
+                            name: arg.name().to_string(),
                         },
                         arg.range(),
                     ));
@@ -724,12 +727,12 @@ pub(crate) fn definition(
     }
 
     // ANN003, ANN401
-    if let Some(arg) = &parameters.kwarg {
-        if let Some(expr) = &arg.annotation {
+    if let Some(arg) = parameters.kwarg() {
+        if let Some(expr) = arg.annotation() {
             has_any_typed_arg = true;
             if !checker.settings().flake8_annotations.allow_star_arg_any {
                 if checker.is_rule_enabled(Rule::AnyType) && !is_overridden {
-                    let name = &arg.name;
+                    let name = arg.name();
                     check_dynamically_typed(
                         checker,
                         expr,
@@ -740,12 +743,15 @@ pub(crate) fn definition(
             }
         } else {
             if !(checker.settings().flake8_annotations.suppress_dummy_args
-                && checker.settings().dummy_variable_rgx.is_match(&arg.name))
+                && checker
+                    .settings()
+                    .dummy_variable_rgx
+                    .is_match(arg.name().as_str()))
             {
                 if checker.is_rule_enabled(Rule::MissingTypeKwargs) {
                     diagnostics.push(checker.report_diagnostic(
                         MissingTypeKwargs {
-                            name: arg.name.to_string(),
+                            name: arg.name().to_string(),
                         },
                         arg.range(),
                     ));
@@ -755,7 +761,7 @@ pub(crate) fn definition(
     }
 
     // ANN201, ANN202, ANN401
-    if let Some(expr) = &returns {
+    if let Some(expr) = returns {
         has_typed_return = true;
         if checker.is_rule_enabled(Rule::AnyType) && !is_overridden {
             check_dynamically_typed(checker, expr, || name.to_string(), &mut diagnostics);
@@ -767,7 +773,7 @@ pub(crate) fn definition(
             .settings()
             .flake8_annotations
             .suppress_none_returning
-            && is_none_returning(body)
+            && is_none_returning(function)
     ) {
         // ANN206
         if is_method && visibility::is_classmethod(decorator_list, checker.semantic()) {
@@ -777,7 +783,7 @@ pub(crate) fn definition(
                 } else {
                     auto_return_type(function, checker.semantic())
                         .and_then(|return_type| {
-                            return_type.into_expression(checker, function.parameters.start())
+                            return_type.into_expression(checker, function.parameters().start())
                         })
                         .map(|(return_type, edits)| (checker.generator().expr(&return_type), edits))
                 };
@@ -790,7 +796,7 @@ pub(crate) fn definition(
                 );
                 if let Some((return_type, edits)) = return_type {
                     diagnostic.set_fix(Fix::unsafe_edits(
-                        Edit::insertion(format!(" -> {return_type}"), function.parameters.end()),
+                        Edit::insertion(format!(" -> {return_type}"), function.parameters().end()),
                         edits,
                     ));
                 }
@@ -804,7 +810,7 @@ pub(crate) fn definition(
                 } else {
                     auto_return_type(function, checker.semantic())
                         .and_then(|return_type| {
-                            return_type.into_expression(checker, function.parameters.start())
+                            return_type.into_expression(checker, function.parameters().start())
                         })
                         .map(|(return_type, edits)| (checker.generator().expr(&return_type), edits))
                 };
@@ -817,13 +823,13 @@ pub(crate) fn definition(
                 );
                 if let Some((return_type, edits)) = return_type {
                     diagnostic.set_fix(Fix::unsafe_edits(
-                        Edit::insertion(format!(" -> {return_type}"), function.parameters.end()),
+                        Edit::insertion(format!(" -> {return_type}"), function.parameters().end()),
                         edits,
                     ));
                 }
                 diagnostics.push(diagnostic);
             }
-        } else if is_method && visibility::is_init(name) {
+        } else if is_method && visibility::is_init(name.as_str()) {
             // ANN204
             // Allow omission of return annotation in `__init__` functions, as long as at
             // least one argument is typed.
@@ -838,14 +844,14 @@ pub(crate) fn definition(
                     );
                     diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
                         " -> None".to_string(),
-                        function.parameters.end(),
+                        function.parameters().end(),
                     )));
                     diagnostics.push(diagnostic);
                 }
             }
-        } else if is_method && visibility::is_magic(name) {
+        } else if is_method && visibility::is_magic(name.as_str()) {
             if checker.is_rule_enabled(Rule::MissingReturnTypeSpecialMethod) {
-                let return_type = simple_magic_return_type(name);
+                let return_type = simple_magic_return_type(name.as_str());
                 let mut diagnostic = checker.report_diagnostic(
                     MissingReturnTypeSpecialMethod {
                         name: name.to_string(),
@@ -867,13 +873,13 @@ pub(crate) fn definition(
                     };
 
                     if let Some((expr, edits)) =
-                        type_expr(python_type, checker, function.parameters.start())
+                        type_expr(python_type, checker, function.parameters().start())
                     {
                         let return_type_expr = checker.generator().expr(&expr);
                         diagnostic.set_fix(Fix::unsafe_edits(
                             Edit::insertion(
                                 format!(" -> {return_type_expr}"),
-                                function.parameters.end(),
+                                function.parameters().end(),
                             ),
                             edits,
                         ));
@@ -891,7 +897,7 @@ pub(crate) fn definition(
                             auto_return_type(function, checker.semantic())
                                 .and_then(|return_type| {
                                     return_type
-                                        .into_expression(checker, function.parameters.start())
+                                        .into_expression(checker, function.parameters().start())
                                 })
                                 .map(|(return_type, edits)| {
                                     (checker.generator().expr(&return_type), edits)
@@ -910,7 +916,7 @@ pub(crate) fn definition(
                             diagnostic.set_fix(Fix::unsafe_edits(
                                 Edit::insertion(
                                     format!(" -> {return_type}"),
-                                    function.parameters.end(),
+                                    function.parameters().end(),
                                 ),
                                 edits,
                             ));
@@ -926,7 +932,7 @@ pub(crate) fn definition(
                             auto_return_type(function, checker.semantic())
                                 .and_then(|return_type| {
                                     return_type
-                                        .into_expression(checker, function.parameters.start())
+                                        .into_expression(checker, function.parameters().start())
                                 })
                                 .map(|(return_type, edits)| {
                                     (checker.generator().expr(&return_type), edits)
@@ -945,7 +951,7 @@ pub(crate) fn definition(
                             diagnostic.set_fix(Fix::unsafe_edits(
                                 Edit::insertion(
                                     format!(" -> {return_type}"),
-                                    function.parameters.end(),
+                                    function.parameters().end(),
                                 ),
                                 edits,
                             ));
@@ -965,9 +971,9 @@ pub(crate) fn definition(
         || (is_method
             && !visibility::is_staticmethod(decorator_list, checker.semantic())
             && parameters
-                .posonlyargs
+                .posonlyargs()
                 .first()
-                .or_else(|| parameters.args.first())
+                .or_else(|| parameters.args().first())
                 .is_some_and(|first_param| first_param.annotation().is_some()));
 
     if !diagnostics_enabled {

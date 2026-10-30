@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{
-    ExprName, PySourceType, PythonVersion, Stmt, StmtImport, StmtImportFrom, helpers,
+    ExprName, PySourceType, PythonVersion, Stmt, helpers,
     token::{TokenKind, Tokens},
 };
 use ruff_python_semantic::{GeneratorKind, ScopeKind, SemanticModel};
@@ -90,30 +91,26 @@ impl Violation for LazyImportImmediatelyResolved {
 
 /// TID255
 /// Check whether a name load forces a lazy import during module import execution.
-pub(crate) fn lazy_import_immediately_resolved(checker: &Checker, name: &ExprName) {
+pub(crate) fn lazy_import_immediately_resolved(checker: &Checker, name: flat::View<'_, ExprName>) {
     let semantic = checker.semantic();
-
-    if !is_immediate_resolution_context(semantic, checker.source_type) {
-        return;
-    }
 
     let Some(binding_id) = semantic.resolve_name(name) else {
         return;
     };
 
     let binding = semantic.binding(binding_id);
-    if !binding.is_lazy() {
+    if !binding.is_lazy() || !is_immediate_resolution_context(semantic, checker.source_type) {
         return;
     }
     let Some(import) = binding.statement(semantic) else {
         return;
     };
     if checker.target_version() < PythonVersion::PY315
-        && matches!(
-            import,
-            Stmt::Import(StmtImport { is_lazy: true, .. })
-                | Stmt::ImportFrom(StmtImportFrom { is_lazy: true, .. })
-        )
+        && match import.classify() {
+            flat::StmtKind::Import(import) => import.is_lazy(),
+            flat::StmtKind::ImportFrom(import) => import.is_lazy(),
+            _ => false,
+        }
     {
         return;
     }
@@ -139,7 +136,7 @@ pub(crate) fn lazy_import_immediately_resolved(checker: &Checker, name: &ExprNam
 
     let mut diagnostic = checker.report_diagnostic(
         LazyImportImmediatelyResolved {
-            name: name.id.to_string(),
+            name: name.id().to_string(),
             fixable: fix_range.is_some(),
         },
         name.range(),
@@ -150,17 +147,19 @@ pub(crate) fn lazy_import_immediately_resolved(checker: &Checker, name: &ExprNam
 }
 
 /// Return `true` if changing `lazy` affects only one imported name.
-fn is_single_member_import(stmt: &Stmt) -> bool {
-    match stmt {
-        Stmt::Import(StmtImport { names, .. }) | Stmt::ImportFrom(StmtImportFrom { names, .. }) => {
-            names.len() == 1
-        }
+fn is_single_member_import(stmt: flat::View<'_, Stmt>) -> bool {
+    match stmt.classify() {
+        flat::StmtKind::Import(import) => import.names().len() == 1,
+        flat::StmtKind::ImportFrom(import) => import.names().len() == 1,
         _ => false,
     }
 }
 
 /// Return the range from `lazy` through the whitespace before `import` or `from`.
-fn lazy_import_prefix_range(stmt: &Stmt, source_tokens: &Tokens) -> Option<TextRange> {
+fn lazy_import_prefix_range(
+    stmt: flat::View<'_, Stmt>,
+    source_tokens: &Tokens,
+) -> Option<TextRange> {
     let mut tokens = source_tokens.after(stmt.start()).iter();
     let lazy = tokens.find(|token| !token.kind().is_trivia())?;
     if lazy.kind() != TokenKind::Lazy {

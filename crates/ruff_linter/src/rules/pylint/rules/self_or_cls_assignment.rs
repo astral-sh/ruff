@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::Expr;
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_semantic::ScopeKind;
 use ruff_python_semantic::analyze::function_type::{self as function_type, FunctionType};
 use ruff_text_size::Ranged;
@@ -74,16 +75,13 @@ impl Violation for SelfOrClsAssignment {
 }
 
 /// PLW0642
-pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
-    let ScopeKind::Function(ast::StmtFunctionDef {
-        name,
-        decorator_list,
-        parameters,
-        ..
-    }) = checker.semantic().current_scope().kind
-    else {
+pub(crate) fn self_or_cls_assignment(checker: &Checker, target: flat::View<'_, Expr>) {
+    let ScopeKind::Function(stmt_function_def) = checker.semantic().current_scope().kind else {
         return;
     };
+    let name = stmt_function_def.name();
+    let decorator_list = stmt_function_def.decorator_list();
+    let parameters = stmt_function_def.parameters();
 
     let Some(parent) = &checker
         .semantic()
@@ -93,15 +91,15 @@ pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
     };
 
     let Some(self_or_cls) = parameters
-        .posonlyargs
+        .posonlyargs()
         .first()
-        .or_else(|| parameters.args.first())
+        .or_else(|| parameters.args().first())
     else {
         return;
     };
 
     let function_type = function_type::classify(
-        name,
+        &name,
         decorator_list,
         parent,
         checker.semantic(),
@@ -119,21 +117,25 @@ pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
     check_expr(checker, target, method_type);
 }
 
-fn check_expr(checker: &Checker, target: &Expr, method_type: MethodType) {
-    match target {
-        Expr::Name(_) => {
-            if let Expr::Name(ast::ExprName { id, .. }) = target {
+fn check_expr(checker: &Checker, target: flat::View<'_, Expr>, method_type: MethodType) {
+    match target.fields() {
+        ast::Expr::Name(_) => {
+            if let flat::ExprKind::Name(name_node) = target.classify() {
+                let id = name_node.id();
                 if id.as_str() == method_type.arg_name() {
                     checker.report_diagnostic(SelfOrClsAssignment { method_type }, target.range());
                 }
             }
         }
-        Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+        ast::Expr::Tuple(ast::ExprTuple { elts, .. })
+        | ast::Expr::List(ast::ExprList { elts, .. }) => {
             for element in elts {
                 check_expr(checker, element, method_type);
             }
         }
-        Expr::Starred(ast::ExprStarred { value, .. }) => check_expr(checker, value, method_type),
+        ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+            check_expr(checker, value, method_type);
+        }
         _ => {}
     }
 }

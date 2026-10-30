@@ -1,7 +1,7 @@
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Stmt;
+use ruff_python_ast::{Stmt, flat};
 use ruff_text_size::Ranged;
 
 use crate::codes::Category;
@@ -50,7 +50,7 @@ impl Violation for BannedImportFrom {
 /// ICN003
 pub(crate) fn banned_import_from(
     checker: &Checker,
-    stmt: &Stmt,
+    stmt: flat::View<'_, Stmt>,
     name: &str,
     banned_conventions: &FxHashSet<String>,
 ) {

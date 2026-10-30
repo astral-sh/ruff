@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, flat};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -48,9 +48,11 @@ impl Violation for AssertOnStringLiteral {
 }
 
 /// PLW0129
-pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
-    match test {
-        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+pub(crate) fn assert_on_string_literal(checker: &Checker, test: flat::View<'_, Expr>) {
+    match test.classify() {
+        flat::ExprKind::StringLiteral(expr_string_literal) => {
+            let value = expr_string_literal.value();
+
             checker.report_diagnostic(
                 AssertOnStringLiteral {
                     kind: if value.is_empty() {
@@ -62,7 +64,9 @@ pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
                 test.range(),
             );
         }
-        Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
+        flat::ExprKind::BytesLiteral(expr_bytes_literal) => {
+            let value = expr_bytes_literal.value();
+
             checker.report_diagnostic(
                 AssertOnStringLiteral {
                     kind: if value.is_empty() {
@@ -74,34 +78,45 @@ pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
                 test.range(),
             );
         }
-        Expr::FString(ast::ExprFString { value, .. }) => {
-            let kind = if value.iter().all(|f_string_part| match f_string_part {
-                ast::FStringPartRef::Literal(literal) => literal.is_empty(),
-                ast::FStringPartRef::FString(f_string) => {
-                    f_string.elements.iter().all(|element| match element {
-                        ast::InterpolatedStringElement::Literal(
-                            ast::InterpolatedStringLiteralElement { value, .. },
-                        ) => value.is_empty(),
-                        ast::InterpolatedStringElement::Interpolation(_) => false,
-                    })
-                }
-            }) {
-                Kind::Empty
-            } else if value.iter().any(|f_string_part| match f_string_part {
-                ast::FStringPartRef::Literal(literal) => !literal.is_empty(),
-                ast::FStringPartRef::FString(f_string) => {
-                    f_string.elements.iter().any(|element| match element {
-                        ast::InterpolatedStringElement::Literal(
-                            ast::InterpolatedStringLiteralElement { value, .. },
-                        ) => !value.is_empty(),
-                        ast::InterpolatedStringElement::Interpolation(_) => false,
-                    })
-                }
-            }) {
-                Kind::NonEmpty
-            } else {
-                Kind::Unknown
-            };
+        flat::ExprKind::FString(expr_f_string) => {
+            let value = expr_f_string.value();
+
+            let kind =
+                if value.iter().all(|f_string_part| match f_string_part {
+                    ast::flat::FStringPartView::Literal(literal) => literal.is_empty(),
+                    ast::flat::FStringPartView::FString(f_string) => f_string
+                        .elements()
+                        .iter()
+                        .all(|element| match element.classify() {
+                            flat::InterpolatedStringElementKind::Literal(
+                                interpolated_string_literal_element,
+                            ) => {
+                                let value = interpolated_string_literal_element.value();
+                                value.is_empty()
+                            }
+                            flat::InterpolatedStringElementKind::Interpolation(_) => false,
+                        }),
+                }) {
+                    Kind::Empty
+                } else if value.iter().any(|f_string_part| match f_string_part {
+                    ast::flat::FStringPartView::Literal(literal) => !literal.is_empty(),
+                    ast::flat::FStringPartView::FString(f_string) => f_string
+                        .elements()
+                        .iter()
+                        .any(|element| match element.classify() {
+                            flat::InterpolatedStringElementKind::Literal(
+                                interpolated_string_literal_element,
+                            ) => {
+                                let value = interpolated_string_literal_element.value();
+                                !value.is_empty()
+                            }
+                            flat::InterpolatedStringElementKind::Interpolation(_) => false,
+                        }),
+                }) {
+                    Kind::NonEmpty
+                } else {
+                    Kind::Unknown
+                };
             checker.report_diagnostic(AssertOnStringLiteral { kind }, test.range());
         }
         _ => {}

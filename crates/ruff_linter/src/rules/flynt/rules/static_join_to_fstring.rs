@@ -1,8 +1,9 @@
 use ast::FStringFlags;
 use itertools::Itertools;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr, StringFlags, str::Quote};
+use ruff_python_ast::{self as ast, Expr, StringFlags, str::Quote};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -66,19 +67,24 @@ impl AlwaysFixableViolation for StaticJoinToFString {
     }
 }
 
-fn is_static_length(elts: &[Expr]) -> bool {
+fn is_static_length(elts: flat::NodeList<'_, Expr>) -> bool {
     elts.iter().all(|e| !e.is_starred_expr())
 }
 
 /// Build an f-string consisting of `joinees` joined by `joiner` with `flags`.
-fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<Expr> {
+fn build_fstring(
+    joiner: &str,
+    joinees: flat::NodeList<'_, Expr>,
+    flags: FStringFlags,
+) -> Option<Expr> {
     // If all elements are string constants, join them into a single string.
-    if joinees.iter().all(Expr::is_string_literal_expr) {
+    if joinees.iter().all(flat::View::is_string_literal_expr) {
         let mut flags: Option<ast::StringLiteralFlags> = None;
         let content = joinees
             .iter()
             .filter_map(|expr| {
-                if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
+                if let flat::ExprKind::StringLiteral(string_literal) = expr.classify() {
+                    let value = string_literal.value();
                     if flags.is_none() {
                         // Take the flags from the first Expr
                         flags = Some(value.first_literal_flags());
@@ -111,7 +117,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
             value: content.into_boxed_str(),
             flags,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         };
         return Some(node.into());
     }
@@ -153,35 +159,36 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
     let node = ast::FString {
         elements: f_string_elements.into(),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
         flags: flags.with_quote_style(adjusted_quote),
     };
     Some(node.into())
 }
 
 /// FLY002
-pub(crate) fn static_join_to_fstring(checker: &Checker, expr: &Expr, joiner: &str) {
-    let Expr::Call(ast::ExprCall {
-        arguments: Arguments { args, keywords, .. },
-        ..
-    }) = expr
-    else {
+pub(crate) fn static_join_to_fstring(checker: &Checker, expr: flat::View<'_, Expr>, joiner: &str) {
+    let flat::ExprKind::Call(call_node) = expr.classify() else {
         return;
     };
+    let arguments = call_node.arguments();
+    let args = arguments.args();
+    let keywords = arguments.keywords();
 
     // If there are kwargs or more than one argument, this is some non-standard
     // string join call.
     if !keywords.is_empty() {
         return;
     }
-    let [arg] = &**args else {
+    let Some([arg]) = args.as_array() else {
         return;
     };
 
     // Get the elements to join; skip (e.g.) generators, sets, etc.
-    let joinees = match &arg {
-        Expr::List(ast::ExprList { elts, .. }) if is_static_length(elts) => elts,
-        Expr::Tuple(ast::ExprTuple { elts, .. }) if is_static_length(elts) => elts,
+    let joinees = match arg.classify() {
+        flat::ExprKind::List(expr_list) if is_static_length(expr_list.elts()) => expr_list.elts(),
+        flat::ExprKind::Tuple(expr_tuple) if is_static_length(expr_tuple.elts()) => {
+            expr_tuple.elts()
+        }
         _ => return,
     };
 

@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_ast::{Arguments, Stmt, flat};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
@@ -52,8 +52,8 @@ impl Violation for ErrorSuffixOnExceptionName {
 /// N818
 pub(crate) fn error_suffix_on_exception_name(
     checker: &Checker,
-    class_def: &Stmt,
-    arguments: Option<&Arguments>,
+    class_def: flat::View<'_, Stmt>,
+    arguments: Option<flat::View<'_, Arguments>>,
     name: &str,
     ignore_names: &IgnoreNames,
 ) {
@@ -62,8 +62,9 @@ pub(crate) fn error_suffix_on_exception_name(
     }
 
     if !arguments.is_some_and(|arguments| {
-        arguments.args.iter().any(|base| {
-            if let Expr::Name(ast::ExprName { id, .. }) = &base {
+        arguments.args().iter().any(|base| {
+            if let flat::ExprKind::Name(name_node) = base.classify() {
+                let id = name_node.id();
                 id == "Exception" || id.ends_with("Error")
             } else {
                 false

@@ -1,6 +1,7 @@
 //! Rules from [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/).
 mod fixes;
 mod helpers;
+pub(crate) use helpers::single_argument_collection_call;
 pub(crate) mod rules;
 pub mod settings;
 

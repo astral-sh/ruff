@@ -93,7 +93,7 @@ pub(crate) fn if_needed(checker: &Checker, docstring: &Docstring) {
     let Some(function) = docstring.definition.as_function_def() else {
         return;
     };
-    if is_overload(&function.decorator_list, checker.semantic()) {
+    if is_overload(function.decorator_list(), checker.semantic()) {
         checker.report_diagnostic(OverloadWithDocstring, function.identifier());
     }
 }

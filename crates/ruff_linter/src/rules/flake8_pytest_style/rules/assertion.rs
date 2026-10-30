@@ -9,13 +9,15 @@ use libcst_native::{
 };
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat::visitor::Visitor;
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
-    self as ast, AnyNodeRef, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Stmt, UnaryOp,
+    Arguments, BoolOp, ExceptHandler, Expr, ExprCall, Keyword, Stmt, StmtWith, UnaryOp,
+    flat::AnyNodeRef,
+    flat::{self, fields as ast},
 };
-use ruff_python_ast::{visitor, whitespace};
+use ruff_python_ast::{flat::visitor, whitespace};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::{Binding, BindingKind};
 use ruff_source_file::LineRanges;
@@ -239,7 +241,7 @@ struct ExceptionHandlerVisitor<'a, 'b> {
     ///
     /// This is set to `None` as soon as a diagnostic is reported, so that an `assert` that refers
     /// to the exception more than once is only reported once.
-    pending_assert: Option<&'a Stmt>,
+    pending_assert: Option<flat::View<'a, Stmt>>,
     checker: &'a Checker<'b>,
 }
 
@@ -254,9 +256,9 @@ impl<'a, 'b> ExceptionHandlerVisitor<'a, 'b> {
 }
 
 impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a, '_> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::Assert(_) => {
+    fn visit_stmt(&mut self, stmt: flat::View<'a, Stmt>) {
+        match stmt.classify() {
+            flat::StmtKind::Assert(_) => {
                 self.pending_assert = Some(stmt);
                 visitor::walk_stmt(self, stmt);
                 self.pending_assert = None;
@@ -265,9 +267,11 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a, '_> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Name(ast::ExprName { id, .. }) => {
+    fn visit_expr(&mut self, expr: flat::View<'a, Expr>) {
+        match expr.classify() {
+            flat::ExprKind::Name(expr_name) => {
+                let id = expr_name.id();
+
                 if let Some(pending_assert) = self.pending_assert
                     && id.as_str() == self.exception_name
                 {
@@ -285,7 +289,7 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a, '_> {
     }
 }
 
-fn check_assert_in_except(checker: &Checker, name: &str, body: &[Stmt]) {
+fn check_assert_in_except(checker: &Checker, name: &str, body: flat::Suite<'_>) {
     // Walk body to find assert statements that reference the exception name
     let mut visitor = ExceptionHandlerVisitor::new(checker, name);
     for stmt in body {
@@ -296,14 +300,15 @@ fn check_assert_in_except(checker: &Checker, name: &str, body: &[Stmt]) {
 /// PT009
 pub(crate) fn unittest_assertion(
     checker: &Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
+    &expr: &flat::View<'_, Expr>,
+    func: flat::View<'_, Expr>,
+    args: flat::NodeList<'_, Expr>,
+    keywords: flat::NodeList<'_, Keyword>,
 ) {
-    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func else {
+    let flat::ExprKind::Attribute(attribute) = func.classify() else {
         return;
     };
+    let attr = attribute.attr();
 
     let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) else {
         return;
@@ -326,7 +331,7 @@ pub(crate) fn unittest_assertion(
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.generator().stmt(&stmt),
                 parenthesized_range(
-                    expr.into(),
+                    expr,
                     checker.semantic().current_statement().into(),
                     checker.tokens(),
                 )
@@ -392,13 +397,14 @@ impl Violation for PytestUnittestRaisesAssertion {
 }
 
 /// PT027
-pub(crate) fn unittest_raises_assertion_call(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn unittest_raises_assertion_call(checker: &Checker, call: flat::View<'_, ExprCall>) {
     // Bindings in `with` statements are handled by `unittest_raises_assertion_bindings`.
-    if let Stmt::With(ast::StmtWith { items, .. }) = checker.semantic().current_statement() {
+    if let flat::StmtKind::With(with_node) = checker.semantic().current_statement().classify() {
+        let items = with_node.items();
         let call_ref = AnyNodeRef::from(call);
 
         if items.iter().any(|item| {
-            AnyNodeRef::from(&item.context_expr).ptr_eq(call_ref) && item.optional_vars.is_some()
+            AnyNodeRef::from(item.context_expr()).ptr_eq(call_ref) && item.optional_vars().is_some()
         }) {
             return;
         }
@@ -415,11 +421,16 @@ pub(crate) fn unittest_raises_assertion_binding(checker: &Checker, binding: &Bin
 
     let semantic = checker.semantic();
 
-    let Some(Stmt::With(with)) = binding.statement(semantic) else {
+    let Some(flat::StmtKind::With(with)) = binding
+        .statement(semantic)
+        .map(flat::View::<Stmt>::classify)
+    else {
         return;
     };
 
-    let Some(Expr::Call(call)) = corresponding_context_expr(binding, with) else {
+    let Some(flat::ExprKind::Call(call)) =
+        corresponding_context_expr(binding, with).map(flat::View::<Expr>::classify)
+    else {
         return;
     };
 
@@ -445,40 +456,48 @@ pub(crate) fn unittest_raises_assertion_binding(checker: &Checker, binding: &Bin
 
         let mut ancestors = semantic.expressions(node_id).skip(1);
 
-        let Some(Expr::Attribute(ast::ExprAttribute { attr, .. })) = ancestors.next() else {
+        let Some(ast::Expr::Attribute(ast::ExprAttribute { attr, .. })) =
+            ancestors.next().map(flat::View::<Expr>::fields)
+        else {
             continue;
         };
 
         if attr.as_str() == "exception" {
-            edits.push(Edit::range_replacement("value".to_string(), attr.range));
+            edits.push(Edit::range_replacement("value".to_string(), attr.range()));
         }
     }
 
     unittest_raises_assertion(call, edits, checker);
 }
 
-fn corresponding_context_expr<'a>(binding: &Binding, with: &'a ast::StmtWith) -> Option<&'a Expr> {
-    with.items.iter().find_map(|item| {
-        let Some(optional_var) = &item.optional_vars else {
+fn corresponding_context_expr<'a>(
+    binding: &Binding,
+    with: flat::View<'a, StmtWith>,
+) -> Option<flat::View<'a, Expr>> {
+    with.items().iter().find_map(|item| {
+        let optional_var = item.optional_vars()?;
+
+        let flat::ExprKind::Name(name) = optional_var.classify() else {
             return None;
         };
 
-        let Expr::Name(name) = optional_var.as_ref() else {
-            return None;
-        };
-
-        if name.range == binding.range {
-            Some(&item.context_expr)
+        if name.range() == binding.range {
+            Some(item.context_expr())
         } else {
             None
         }
     })
 }
 
-fn unittest_raises_assertion(call: &ast::ExprCall, extra_edits: Vec<Edit>, checker: &Checker) {
-    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = call.func.as_ref() else {
+fn unittest_raises_assertion(
+    call: flat::View<'_, ExprCall>,
+    extra_edits: Vec<Edit>,
+    checker: &Checker,
+) {
+    let flat::ExprKind::Attribute(attribute) = call.func().classify() else {
         return;
     };
+    let attr = attribute.attr();
 
     if !matches!(
         attr.as_str(),
@@ -491,18 +510,18 @@ fn unittest_raises_assertion(call: &ast::ExprCall, extra_edits: Vec<Edit>, check
         PytestUnittestRaisesAssertion {
             assertion: attr.to_string(),
         },
-        call.func.range(),
+        call.func().range(),
     );
 
     if !checker
         .comment_ranges()
-        .has_comments(call, checker.source())
+        .has_comments(&call, checker.source())
     {
-        if let Some(args) = to_pytest_raises_args(checker, attr.as_str(), &call.arguments) {
+        if let Some(args) = to_pytest_raises_args(checker, attr.as_str(), call.arguments()) {
             diagnostic.try_set_fix(|| {
                 let (import_pytest_raises, binding) = checker.importer().get_or_import_symbol(
                     &ImportRequest::import("pytest", "raises"),
-                    call.func.start(),
+                    call.func().start(),
                     checker.semantic(),
                 )?;
                 let replace_call =
@@ -520,78 +539,90 @@ fn unittest_raises_assertion(call: &ast::ExprCall, extra_edits: Vec<Edit>, check
 fn to_pytest_raises_args<'a>(
     checker: &Checker<'a>,
     attr: &str,
-    arguments: &Arguments,
+    arguments: flat::View<'_, Arguments>,
 ) -> Option<Cow<'a, str>> {
     let args = match attr {
         "assertRaises" | "failUnlessRaises" => {
-            match (&*arguments.args, &*arguments.keywords) {
+            match (arguments.args(), arguments.keywords()) {
                 // Ex) `assertRaises(Exception)`
-                ([arg], []) => Cow::Borrowed(checker.locator().slice(arg)),
-                // Ex) `assertRaises(expected_exception=Exception)`
-                ([], [kwarg])
-                    if kwarg
-                        .arg
-                        .as_ref()
-                        .is_some_and(|id| id.as_str() == "expected_exception") =>
+                (args, keywords)
+                    if let Some([arg]) = args.as_array()
+                        && keywords.is_empty() =>
                 {
-                    Cow::Borrowed(checker.locator().slice(kwarg.value.range()))
+                    Cow::Borrowed(checker.locator().slice(arg))
+                }
+                // Ex) `assertRaises(expected_exception=Exception)`
+                (args, keywords)
+                    if args.is_empty()
+                        && let Some([kwarg]) = keywords.as_array()
+                        && kwarg
+                            .arg()
+                            .is_some_and(|id| id.as_str() == "expected_exception") =>
+                {
+                    Cow::Borrowed(checker.locator().slice(kwarg.value().range()))
                 }
                 _ => return None,
             }
         }
         "assertRaisesRegex" | "assertRaisesRegexp" => {
-            match (&*arguments.args, &*arguments.keywords) {
+            match (arguments.args(), arguments.keywords()) {
                 // Ex) `assertRaisesRegex(Exception, regex)`
-                ([arg1, arg2], []) => Cow::Owned(format!(
-                    "{}, match={}",
-                    checker.locator().slice(arg1),
-                    checker.locator().slice(arg2)
-                )),
+                (args, keywords)
+                    if let Some([arg1, arg2]) = args.as_array()
+                        && keywords.is_empty() =>
+                {
+                    Cow::Owned(format!(
+                        "{}, match={}",
+                        checker.locator().slice(arg1),
+                        checker.locator().slice(arg2)
+                    ))
+                }
                 // Ex) `assertRaisesRegex(Exception, expected_regex=regex)`
-                ([arg], [kwarg])
-                    if kwarg
-                        .arg
-                        .as_ref()
-                        .is_some_and(|arg| arg.as_str() == "expected_regex") =>
+                (args, keywords)
+                    if let Some([arg]) = args.as_array()
+                        && let Some([kwarg]) = keywords.as_array()
+                        && kwarg
+                            .arg()
+                            .is_some_and(|arg| arg.as_str() == "expected_regex") =>
                 {
                     Cow::Owned(format!(
                         "{}, match={}",
                         checker.locator().slice(arg),
-                        checker.locator().slice(kwarg.value.range())
+                        checker.locator().slice(kwarg.value().range())
                     ))
                 }
                 // Ex) `assertRaisesRegex(expected_exception=Exception, expected_regex=regex)`
-                ([], [kwarg1, kwarg2])
-                    if kwarg1
-                        .arg
-                        .as_ref()
-                        .is_some_and(|id| id.as_str() == "expected_exception")
+                (args, keywords)
+                    if args.is_empty()
+                        && let Some([kwarg1, kwarg2]) = keywords.as_array()
+                        && kwarg1
+                            .arg()
+                            .is_some_and(|id| id.as_str() == "expected_exception")
                         && kwarg2
-                            .arg
-                            .as_ref()
+                            .arg()
                             .is_some_and(|id| id.as_str() == "expected_regex") =>
                 {
                     Cow::Owned(format!(
                         "{}, match={}",
-                        checker.locator().slice(kwarg1.value.range()),
-                        checker.locator().slice(kwarg2.value.range())
+                        checker.locator().slice(kwarg1.value().range()),
+                        checker.locator().slice(kwarg2.value().range())
                     ))
                 }
                 // Ex) `assertRaisesRegex(expected_regex=regex, expected_exception=Exception)`
-                ([], [kwarg1, kwarg2])
-                    if kwarg1
-                        .arg
-                        .as_ref()
-                        .is_some_and(|id| id.as_str() == "expected_regex")
+                (args, keywords)
+                    if args.is_empty()
+                        && let Some([kwarg1, kwarg2]) = keywords.as_array()
+                        && kwarg1
+                            .arg()
+                            .is_some_and(|id| id.as_str() == "expected_regex")
                         && kwarg2
-                            .arg
-                            .as_ref()
+                            .arg()
                             .is_some_and(|id| id.as_str() == "expected_exception") =>
                 {
                     Cow::Owned(format!(
                         "{}, match={}",
-                        checker.locator().slice(kwarg2.value.range()),
-                        checker.locator().slice(kwarg1.value.range())
+                        checker.locator().slice(kwarg2.value().range()),
+                        checker.locator().slice(kwarg1.value().range())
                     ))
                 }
                 _ => return None,
@@ -603,7 +634,11 @@ fn to_pytest_raises_args<'a>(
 }
 
 /// PT015
-pub(crate) fn assert_falsy(checker: &Checker, stmt: &Stmt, test: &Expr) {
+pub(crate) fn assert_falsy(
+    checker: &Checker,
+    stmt: flat::View<'_, Stmt>,
+    test: flat::View<'_, Expr>,
+) {
     let truthiness = Truthiness::from_expr(test, |id| checker.semantic().has_builtin_binding(id));
     if truthiness.into_bool() == Some(false) {
         checker.report_diagnostic(PytestAssertAlwaysFalse, stmt.range());
@@ -611,12 +646,16 @@ pub(crate) fn assert_falsy(checker: &Checker, stmt: &Stmt, test: &Expr) {
 }
 
 /// PT017
-pub(crate) fn assert_in_exception_handler(checker: &Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn assert_in_exception_handler(
+    checker: &Checker,
+    handlers: flat::NodeList<'_, ExceptHandler>,
+) {
     for handler in handlers {
-        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { name, body, .. }) =
-            handler;
+        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+            name, body, ..
+        }) = handler.fields();
         if let Some(name) = name {
-            check_assert_in_except(checker, name, body);
+            check_assert_in_except(checker, name.as_str(), body);
         }
     }
 }
@@ -636,31 +675,26 @@ enum CompositionKind {
 ///
 /// For example, `a and b` or `not (a or b)`. The latter is equivalent to
 /// `not a and not b` by De Morgan's laws.
-fn is_composite_condition(test: &Expr) -> CompositionKind {
-    match test {
-        Expr::BoolOp(ast::ExprBoolOp {
-            op: BoolOp::And, ..
-        }) => {
+fn is_composite_condition(test: flat::View<'_, Expr>) -> CompositionKind {
+    match test.classify() {
+        flat::ExprKind::BoolOp(expr_bool_op) if expr_bool_op.op() == BoolOp::And => {
             return CompositionKind::Simple;
         }
-        Expr::UnaryOp(ast::ExprUnaryOp {
-            op: UnaryOp::Not,
-            operand,
-            range: _,
-            node_index: _,
-        }) => {
-            if let Expr::BoolOp(ast::ExprBoolOp {
+        flat::ExprKind::UnaryOp(expr_unary_op) if expr_unary_op.op() == UnaryOp::Not => {
+            let operand = expr_unary_op.operand();
+
+            if let ast::Expr::BoolOp(ast::ExprBoolOp {
                 op: BoolOp::Or,
                 values,
                 range: _,
-                node_index: _,
-            }) = operand.as_ref()
+                node: _,
+            }) = operand.fields()
             {
                 // Only split cases without mixed `and` and `or`.
                 return if values.iter().all(|expr| {
                     !matches!(
-                        expr,
-                        Expr::BoolOp(ast::ExprBoolOp {
+                        expr.fields(),
+                        ast::Expr::BoolOp(ast::ExprBoolOp {
                             op: BoolOp::And,
                             ..
                         })
@@ -727,9 +761,13 @@ fn parenthesize<'a>(expression: &Expression<'a>, parent: &Expression<'a>) -> Exp
 
 /// Replace composite condition `assert a == "hello" and b == "world"` with two statements
 /// `assert a == "hello"` and `assert b == "world"`.
-fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) -> Result<Edit> {
+fn fix_composite_condition(
+    stmt: flat::View<'_, Stmt>,
+    locator: &Locator,
+    stylist: &Stylist,
+) -> Result<Edit> {
     // Infer the indentation of the outer block.
-    let outer_indent = whitespace::indentation(locator.contents(), stmt)
+    let outer_indent = whitespace::indentation(locator.contents(), &stmt)
         .context("Unable to fix multiline statement")?;
 
     // Extract the module text.
@@ -840,7 +878,12 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
 }
 
 /// PT018
-pub(crate) fn composite_condition(checker: &Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
+pub(crate) fn composite_condition(
+    checker: &Checker,
+    stmt: flat::View<'_, Stmt>,
+    test: flat::View<'_, Expr>,
+    msg: Option<flat::View<'_, Expr>>,
+) {
     let composite = is_composite_condition(test);
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
         let mut diagnostic = checker.report_diagnostic(PytestCompositeAssertion, stmt.range());

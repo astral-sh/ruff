@@ -1,10 +1,13 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+use ruff_python_ast::{
+    ExceptHandler, Stmt,
+    flat::{self, fields as ast},
+};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     comparable::ComparableExpr,
+    flat::statement_visitor::{StatementVisitor, walk_stmt},
     helpers::{self, map_callable},
-    statement_visitor::{StatementVisitor, walk_stmt},
 };
 use ruff_text_size::Ranged;
 
@@ -63,21 +66,25 @@ impl Violation for RaiseWithinTry {
 
 #[derive(Default)]
 struct RaiseStatementVisitor<'a> {
-    raises: Vec<&'a Stmt>,
+    raises: Vec<flat::View<'a, Stmt>>,
 }
 
 impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::Raise(_) => self.raises.push(stmt),
-            Stmt::Try(_) => (),
+    fn visit_stmt(&mut self, stmt: flat::View<'a, Stmt>) {
+        match stmt.classify() {
+            flat::StmtKind::Raise(_) => self.raises.push(stmt),
+            flat::StmtKind::Try(_) => (),
             _ => walk_stmt(self, stmt),
         }
     }
 }
 
 /// TRY301
-pub(crate) fn raise_within_try(checker: &Checker, body: &[Stmt], handlers: &[ExceptHandler]) {
+pub(crate) fn raise_within_try(
+    checker: &Checker,
+    body: flat::Suite<'_>,
+    handlers: flat::NodeList<'_, ExceptHandler>,
+) {
     if handlers.is_empty() {
         return;
     }
@@ -99,10 +106,10 @@ pub(crate) fn raise_within_try(checker: &Checker, body: &[Stmt], handlers: &[Exc
         .collect();
 
     for stmt in raises {
-        let Stmt::Raise(ast::StmtRaise {
+        let ast::Stmt::Raise(ast::StmtRaise {
             exc: Some(exception),
             ..
-        }) = stmt
+        }) = stmt.fields()
         else {
             continue;
         };
@@ -113,7 +120,7 @@ pub(crate) fn raise_within_try(checker: &Checker, body: &[Stmt], handlers: &[Exc
             || handled_exceptions.iter().any(|expr| {
                 checker
                     .semantic()
-                    .resolve_builtin_symbol(expr)
+                    .resolve_builtin_symbol(*expr)
                     .is_some_and(|builtin| matches!(builtin, "Exception" | "BaseException"))
             })
         {

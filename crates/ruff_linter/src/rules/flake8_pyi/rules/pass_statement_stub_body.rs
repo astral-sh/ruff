@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
+use ruff_python_ast::flat;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -41,8 +42,11 @@ impl AlwaysFixableViolation for PassStatementStubBody {
 }
 
 /// PYI009
-pub(crate) fn pass_statement_stub_body(checker: &Checker, body: &[Stmt]) {
-    let [Stmt::Pass(pass)] = body else {
+pub(crate) fn pass_statement_stub_body(checker: &Checker, body: flat::Suite<'_>) {
+    let Some([flat::StmtKind::Pass(pass)]) = body
+        .as_array()
+        .map(|items| items.map(flat::View::<Stmt>::classify))
+    else {
         return;
     };
 

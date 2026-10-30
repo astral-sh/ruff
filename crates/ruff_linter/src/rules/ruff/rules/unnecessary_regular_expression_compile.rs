@@ -1,7 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Arguments, Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields as ast;
+use ruff_python_ast::{Arguments, Expr};
 use ruff_python_semantic::{Modules, SemanticModel};
-use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -53,30 +54,29 @@ impl Violation for UnnecessaryRegularExpressionCompile {
 }
 
 /// `unnecessary-regular-expression-compile`
-pub(crate) fn unnecessary_regular_expression_compile(checker: &Checker, call: &ExprCall) {
+pub(crate) fn unnecessary_regular_expression_compile(checker: &Checker, call: &ast::ExprCall<'_>) {
     let semantic = checker.semantic();
     if !semantic.seen_module(Modules::RE) {
         return;
     }
 
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
+    let flat::ExprKind::Attribute(attribute) = call.func.classify() else {
         return;
     };
-    let Some(re_func) = reducible_re_method(attr.as_str(), &call.arguments) else {
+    let attr = attribute.attr();
+    let value = attribute.value();
+    let Some(re_func) = reducible_re_method(attr.as_str(), call.arguments) else {
         return;
     };
 
-    let Expr::Call(compile) = value.as_ref() else {
+    let flat::ExprKind::Call(compile) = value.classify() else {
         return;
     };
-    if !is_re_compile(&compile.func, semantic) {
+    if !is_re_compile(compile.func(), semantic) {
         return;
     }
 
-    checker.report_diagnostic(
-        UnnecessaryRegularExpressionCompile { re_func },
-        call.range(),
-    );
+    checker.report_diagnostic(UnnecessaryRegularExpressionCompile { re_func }, call.range);
 }
 
 /// If `pattern.<attr>(<arguments>)` is equivalent to a call to the top-level `re.<attr>(...)`,
@@ -87,16 +87,16 @@ pub(crate) fn unnecessary_regular_expression_compile(checker: &Checker, call: &E
 /// reduce when called with the single `string` argument. The parameters of `sub`, `subn`, and
 /// `split` are a positional prefix of the top-level functions', so any explicit argument shape
 /// reduces; unpacked (`*`/`**`) arguments have an unknown shape and never reduce.
-fn reducible_re_method(attr: &str, arguments: &Arguments) -> Option<&'static str> {
-    if arguments.args.iter().any(Expr::is_starred_expr)
+fn reducible_re_method(attr: &str, arguments: flat::View<'_, Arguments>) -> Option<&'static str> {
+    if arguments.args().iter().any(flat::View::is_starred_expr)
         || arguments
-            .keywords
+            .keywords()
             .iter()
-            .any(|keyword| keyword.arg.is_none())
+            .any(|keyword| keyword.arg().is_none())
     {
         return None;
     }
-    let only_string_argument = arguments.args.len() == 1 && arguments.keywords.is_empty();
+    let only_string_argument = arguments.args().len() == 1 && arguments.keywords().is_empty();
     Some(match attr {
         "search" if only_string_argument => "search",
         "match" if only_string_argument => "match",
@@ -111,7 +111,7 @@ fn reducible_re_method(attr: &str, arguments: &Arguments) -> Option<&'static str
 }
 
 /// Returns `true` if `func` resolves to `re.compile`.
-fn is_re_compile(func: &Expr, semantic: &SemanticModel) -> bool {
+fn is_re_compile(func: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["re", "compile"]))

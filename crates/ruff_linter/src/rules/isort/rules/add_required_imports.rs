@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::helpers::is_docstring_stmt;
-use ruff_python_ast::{self as ast, ModModule, PySourceType, Stmt};
+use ruff_python_ast::{ModModule, PySourceType, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::Parsed;
 use ruff_python_semantic::{FutureImport, NameImport};
@@ -57,40 +58,37 @@ impl AlwaysFixableViolation for MissingRequiredImport {
 }
 
 /// Return `true` if the [`Stmt`] includes the given [`AnyImportRef`].
-fn includes_import(stmt: &Stmt, target: &NameImport) -> bool {
+fn includes_import(stmt: flat::View<'_, Stmt>, target: &NameImport) -> bool {
     match target {
         NameImport::Import(target) => {
-            let Stmt::Import(ast::StmtImport {
-                names,
-                is_lazy: _,
-                range: _,
-                node_index: _,
-            }) = &stmt
-            else {
+            let flat::StmtKind::Import(import_stmt) = stmt.classify() else {
                 return false;
             };
+            let names = import_stmt.names();
             names.iter().any(|alias| {
-                alias.name == target.name.name
-                    && alias.asname.as_deref() == target.name.as_name.as_deref()
+                *alias.name() == *target.name.name
+                    && alias
+                        .asname()
+                        .map(flat::View::<ruff_python_ast::Identifier>::as_str)
+                        == target.name.as_name.as_deref()
             })
         }
         NameImport::ImportFrom(target) => {
-            let Stmt::ImportFrom(ast::StmtImportFrom {
-                module,
-                names,
-                level,
-                is_lazy: _,
-                range: _,
-                node_index: _,
-            }) = &stmt
-            else {
+            let flat::StmtKind::ImportFrom(import_from) = stmt.classify() else {
                 return false;
             };
-            module.as_deref() == target.module.as_deref()
-                && *level == target.level
+            let module = import_from.module();
+            let names = import_from.names();
+            let level = import_from.level();
+            module.map(flat::View::<ruff_python_ast::Identifier>::as_str)
+                == target.module.as_deref()
+                && level == target.level
                 && names.iter().any(|alias| {
-                    alias.name == target.name.name
-                        && alias.asname.as_deref() == target.name.as_name.as_deref()
+                    *alias.name() == *target.name.name
+                        && alias
+                            .asname()
+                            .map(flat::View::<ruff_python_ast::Identifier>::as_str)
+                            == target.name.as_name.as_deref()
                 })
         }
     }

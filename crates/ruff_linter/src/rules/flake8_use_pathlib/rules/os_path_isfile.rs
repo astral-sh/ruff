@@ -1,6 +1,7 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
+use ruff_python_ast::flat;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -63,7 +64,7 @@ impl Violation for OsPathIsfile {
 }
 
 /// PTH113
-pub(crate) fn os_path_isfile(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_path_isfile(checker: &Checker, call: flat::View<'_, ExprCall>, segments: &[&str]) {
     if segments != ["os", "path", "isfile"] {
         return;
     }

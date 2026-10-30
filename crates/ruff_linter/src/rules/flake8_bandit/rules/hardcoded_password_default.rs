@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, Parameter, Parameters};
+use ruff_python_ast::{Expr, Parameter, Parameters, flat};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -56,12 +56,16 @@ impl Violation for HardcodedPasswordDefault {
     }
 }
 
-fn check_password_kwarg(checker: &Checker, parameter: &Parameter, default: &Expr) {
+fn check_password_kwarg(
+    checker: &Checker,
+    parameter: flat::View<'_, Parameter>,
+    default: flat::View<'_, Expr>,
+) {
     if string_literal(default).is_none_or(str::is_empty) {
         return;
     }
-    let kwarg_name = &parameter.name;
-    if !matches_password_name(kwarg_name) {
+    let kwarg_name = parameter.name();
+    if !matches_password_name(kwarg_name.as_str()) {
         return;
     }
     checker.report_diagnostic(
@@ -73,11 +77,14 @@ fn check_password_kwarg(checker: &Checker, parameter: &Parameter, default: &Expr
 }
 
 /// S107
-pub(crate) fn hardcoded_password_default(checker: &Checker, parameters: &Parameters) {
+pub(crate) fn hardcoded_password_default(
+    checker: &Checker,
+    parameters: flat::View<'_, Parameters>,
+) {
     for parameter in parameters.iter_non_variadic_params() {
         let Some(default) = parameter.default() else {
             continue;
         };
-        check_password_kwarg(checker, &parameter.parameter, default);
+        check_password_kwarg(checker, parameter.parameter(), default);
     }
 }

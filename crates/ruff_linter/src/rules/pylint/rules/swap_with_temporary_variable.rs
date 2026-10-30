@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
+use ruff_python_ast::flat;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{Stmt, traversal};
+use ruff_python_ast::{Stmt, flat::traversal};
 use ruff_python_semantic::{BindingId, Scope, ScopeId, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -159,23 +160,19 @@ impl Ranged for VarToVarAssignment<'_> {
 }
 
 impl<'a> VarToVarAssignment<'a> {
-    fn from_stmt(stmt: &'a Stmt) -> Option<VarToVarAssignment<'a>> {
-        let (target, value) = match stmt {
-            Stmt::Assign(stmt_assign) => {
+    fn from_stmt(stmt: flat::View<'a, Stmt>) -> Option<VarToVarAssignment<'a>> {
+        let (target, value) = match stmt.classify() {
+            flat::StmtKind::Assign(stmt_assign) => {
                 // only one variable is expected for matching the pattern
-                let [target_variable] = stmt_assign.targets.as_slice() else {
-                    return None;
-                };
+                let [target_variable] = stmt_assign.targets().as_array()?;
 
-                (target_variable, &stmt_assign.value)
+                (target_variable, stmt_assign.value())
             }
-            Stmt::AnnAssign(stmt_ann_assign) => {
+            flat::StmtKind::AnnAssign(stmt_ann_assign) => {
                 // only assignments that actually assign a value are relevant here
-                let Some(value) = &stmt_ann_assign.value else {
-                    return None;
-                };
+                let value = stmt_ann_assign.value()?;
 
-                (&*stmt_ann_assign.target, value)
+                (stmt_ann_assign.target(), value)
             }
             // Stmt::AugAssign is not relevant because it modifies the content
             // of a variable based on its existing value, so it can't swap variables
@@ -186,8 +183,8 @@ impl<'a> VarToVarAssignment<'a> {
         if let (Some(target_expr), Some(value_expr)) = (target.as_name_expr(), value.as_name_expr())
         {
             Some(Self {
-                target: &target_expr.id,
-                value: &value_expr.id,
+                target: target_expr.id(),
+                value: value_expr.id(),
                 range: stmt.range(),
             })
         } else {

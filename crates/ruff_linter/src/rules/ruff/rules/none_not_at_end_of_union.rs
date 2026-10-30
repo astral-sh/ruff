@@ -1,7 +1,8 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::helpers::pep_604_union;
-use ruff_python_ast::{Expr, ExprBinOp, Operator};
+use ruff_python_ast::{Expr, Operator};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
@@ -57,16 +58,17 @@ impl Violation for NoneNotAtEndOfUnion {
 /// Only right-hand unions indicate actual nesting from parenthesization, e.g.
 /// `a | (b | c)`. For `typing.Union`, any tuple element that is itself a union
 /// is considered nested.
-fn has_nested_union(semantic: &SemanticModel, expr: &Expr) -> bool {
-    match expr {
-        Expr::BinOp(ExprBinOp {
-            op: Operator::BitOr,
-            left,
-            right,
-            ..
-        }) => is_union_expr(semantic, right) || has_nested_union(semantic, left),
-        Expr::Subscript(subscript) if semantic.match_typing_expr(&subscript.value, "Union") => {
-            if let Expr::Tuple(tuple) = &*subscript.slice {
+fn has_nested_union(semantic: &SemanticModel, expr: flat::View<'_, Expr>) -> bool {
+    match expr.classify() {
+        flat::ExprKind::BinOp(expr_bin_op) if expr_bin_op.op() == Operator::BitOr => {
+            let left = expr_bin_op.left();
+            let right = expr_bin_op.right();
+            is_union_expr(semantic, right) || has_nested_union(semantic, left)
+        }
+        flat::ExprKind::Subscript(subscript)
+            if semantic.match_typing_expr(subscript.value(), "Union") =>
+        {
+            if let flat::ExprKind::Tuple(tuple) = subscript.slice().classify() {
                 tuple.iter().any(|elt| is_union_expr(semantic, elt))
             } else {
                 false
@@ -78,37 +80,36 @@ fn has_nested_union(semantic: &SemanticModel, expr: &Expr) -> bool {
 
 /// Returns `true` if `expr` is itself a union type (PEP 604 `|` or
 /// `typing.Union[...]`).
-fn is_union_expr(semantic: &SemanticModel, expr: &Expr) -> bool {
-    match expr {
-        Expr::BinOp(ExprBinOp {
-            op: Operator::BitOr,
-            ..
-        }) => true,
-        Expr::Subscript(subscript) => semantic.match_typing_expr(&subscript.value, "Union"),
+fn is_union_expr(semantic: &SemanticModel, expr: flat::View<'_, Expr>) -> bool {
+    match expr.classify() {
+        flat::ExprKind::BinOp(expr_bin_op) if expr_bin_op.op() == Operator::BitOr => true,
+        flat::ExprKind::Subscript(subscript) => {
+            semantic.match_typing_expr(subscript.value(), "Union")
+        }
         _ => false,
     }
 }
 
 /// RUF036
-pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
+pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, &union: &flat::View<'a, Expr>) {
     let semantic = checker.semantic();
 
     if !semantic.in_type_definition() {
         return;
     }
 
-    let mut none_exprs: Vec<&Expr> = Vec::new();
-    let mut other_exprs: Vec<&Expr> = Vec::new();
+    let mut none_exprs: Vec<flat::View<'_, Expr>> = Vec::new();
+    let mut other_exprs: Vec<flat::View<'_, Expr>> = Vec::new();
 
-    let mut last_expr: Option<&Expr> = None;
+    let mut last_expr: Option<flat::View<'_, Expr>> = None;
     let mut is_pep604 = false;
 
-    let mut collect_members = |expr: &'a Expr, parent: &'a Expr| {
+    let mut collect_members = |expr: flat::View<'a, Expr>, parent: flat::View<'a, Expr>| {
         if !is_pep604 {
-            is_pep604 = matches!(parent, Expr::BinOp(_));
+            is_pep604 = matches!(parent.classify(), flat::ExprKind::BinOp(_));
         }
 
-        if matches!(expr, Expr::NoneLiteral(_)) {
+        if matches!(expr.classify(), flat::ExprKind::NoneLiteral(_)) {
             none_exprs.push(expr);
         } else {
             other_exprs.push(expr);
@@ -151,9 +152,9 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
 
 fn generate_fix(
     checker: &Checker,
-    other_exprs: &[&Expr],
-    none_exprs: &[&Expr],
-    annotation: &Expr,
+    other_exprs: &[flat::View<'_, Expr>],
+    none_exprs: &[flat::View<'_, Expr>],
+    annotation: flat::View<'_, Expr>,
     is_pep604: bool,
 ) -> Option<Fix> {
     let applicability = if checker.semantic().in_typing_only_annotation()
@@ -168,28 +169,28 @@ fn generate_fix(
         .iter()
         .chain(none_exprs)
         .copied()
-        .cloned()
+        .map(flat::View::to_owned_node)
         .collect();
 
     let new_expr = if is_pep604 {
-        pep_604_union(&reordered)
+        pep_604_union(reordered)
     } else {
         // Preserve the original subscript value (e.g., `Union`, `U`, `typing.Union`).
-        let Expr::Subscript(subscript) = annotation else {
+        let flat::ExprKind::Subscript(subscript) = annotation.classify() else {
             return None;
         };
         Expr::Subscript(ruff_python_ast::ExprSubscript {
-            value: subscript.value.clone(),
+            value: Box::new(subscript.value().to_owned_node()),
             slice: Box::new(Expr::Tuple(ruff_python_ast::ExprTuple {
                 elts: reordered,
                 ctx: ruff_python_ast::ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
                 parenthesized: false,
             })),
             ctx: ruff_python_ast::ExprContext::Load,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         })
     };
 

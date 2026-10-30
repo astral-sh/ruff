@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, flat};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -60,26 +60,30 @@ impl Violation for TypeParamNameMismatch {
 }
 
 /// PLC0132
-pub(crate) fn type_param_name_mismatch(checker: &Checker, value: &Expr, targets: &[Expr]) {
+pub(crate) fn type_param_name_mismatch(
+    checker: &Checker,
+    value: flat::View<'_, Expr>,
+    targets: flat::NodeList<'_, Expr>,
+) {
     // If the typing modules were never imported, we'll never match below.
     if !checker.semantic().seen_typing() {
         return;
     }
 
-    let [target] = targets else {
+    let Some([target]) = targets.as_array() else {
         return;
     };
 
-    let Expr::Name(ast::ExprName { id: var_name, .. }) = &target else {
+    let flat::ExprKind::Name(name_node) = target.classify() else {
         return;
     };
+    let var_name = name_node.id();
 
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = value
-    else {
+    let flat::ExprKind::Call(call) = value.classify() else {
         return;
     };
+    let func = call.func();
+    let arguments = call.arguments();
 
     let Some(param_name) = type_param_name(arguments) else {
         return;

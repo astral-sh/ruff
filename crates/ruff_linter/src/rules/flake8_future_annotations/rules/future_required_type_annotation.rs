@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Expr;
+use ruff_python_ast::{Expr, flat};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -85,7 +85,11 @@ impl AlwaysFixableViolation for FutureRequiredTypeAnnotation {
 }
 
 /// FA102
-pub(crate) fn future_required_type_annotation(checker: &Checker, expr: &Expr, reason: Reason) {
+pub(crate) fn future_required_type_annotation(
+    checker: &Checker,
+    &expr: &flat::View<'_, Expr>,
+    reason: Reason,
+) {
     checker
         .report_diagnostic(FutureRequiredTypeAnnotation { reason }, expr.range())
         .set_fix(Fix::unsafe_edit(checker.importer().add_future_import()));

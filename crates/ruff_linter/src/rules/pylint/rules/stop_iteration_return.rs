@@ -1,8 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{
     self as ast,
+    flat::visitor::{Visitor, walk_expr, walk_stmt},
     helpers::map_callable,
-    visitor::{Visitor, walk_expr, walk_stmt},
 };
 use ruff_text_size::Ranged;
 
@@ -54,14 +55,17 @@ impl Violation for StopIterationReturn {
 }
 
 /// PLR1708
-pub(crate) fn stop_iteration_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn stop_iteration_return(
+    checker: &Checker,
+    function_def: flat::View<'_, ast::StmtFunctionDef>,
+) {
     let mut analyzer = GeneratorAnalyzer {
         checker,
         has_yield: false,
         stop_iteration_raises: Vec::new(),
     };
 
-    analyzer.visit_body(&function_def.body);
+    analyzer.visit_body(function_def.body());
 
     if analyzer.has_yield {
         for raise_stmt in analyzer.stop_iteration_raises {
@@ -73,14 +77,14 @@ pub(crate) fn stop_iteration_return(checker: &Checker, function_def: &ast::StmtF
 struct GeneratorAnalyzer<'a, 'b> {
     checker: &'a Checker<'b>,
     has_yield: bool,
-    stop_iteration_raises: Vec<&'a ast::StmtRaise>,
+    stop_iteration_raises: Vec<flat::View<'a, ast::StmtRaise>>,
 }
 
 impl<'a> Visitor<'a> for GeneratorAnalyzer<'a, '_> {
-    fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
-        match stmt {
-            ast::Stmt::FunctionDef(_) => {}
-            ast::Stmt::Raise(raise @ ast::StmtRaise { exc: Some(exc), .. }) => {
+    fn visit_stmt(&mut self, stmt: flat::View<'a, ast::Stmt>) {
+        match stmt.classify() {
+            flat::StmtKind::FunctionDef(_) => {}
+            flat::StmtKind::Raise(raise) if let Some(exc) = raise.exc() => {
                 if self
                     .checker
                     .semantic()
@@ -94,10 +98,10 @@ impl<'a> Visitor<'a> for GeneratorAnalyzer<'a, '_> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'a ast::Expr) {
-        match expr {
-            ast::Expr::Lambda(_) => {}
-            ast::Expr::Yield(_) | ast::Expr::YieldFrom(_) => {
+    fn visit_expr(&mut self, expr: flat::View<'a, ast::Expr>) {
+        match expr.classify() {
+            flat::ExprKind::Lambda(_) => {}
+            flat::ExprKind::Yield(_) | flat::ExprKind::YieldFrom(_) => {
                 self.has_yield = true;
                 walk_expr(self, expr);
             }

@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, ExceptHandler, Expr};
+use ruff_python_ast::ExceptHandler;
+use ruff_python_ast::flat::visitor::Visitor;
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_semantic::analyze::logging::exc_info;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
@@ -74,9 +75,13 @@ impl Violation for ErrorInsteadOfException {
 }
 
 /// TRY400
-pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn error_instead_of_exception(
+    checker: &Checker,
+    handlers: flat::NodeList<'_, ExceptHandler>,
+) {
     for handler in handlers {
-        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) = handler;
+        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) =
+            handler.fields();
         let calls = {
             let mut visitor =
                 LoggerCandidateVisitor::new(checker.semantic(), &checker.settings().logger_objects);
@@ -85,19 +90,21 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
         };
         for (expr, logging_level) in calls {
             if matches!(logging_level, LoggingLevel::Error) {
-                if exc_info(&expr.arguments, checker.semantic()).is_none() {
+                if exc_info(expr.arguments(), checker.semantic()).is_none() {
                     let mut diagnostic =
                         checker.report_diagnostic(ErrorInsteadOfException, expr.range());
 
-                    match expr.func.as_ref() {
-                        Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+                    match expr.func().classify() {
+                        flat::ExprKind::Attribute(expr_attribute) => {
+                            let attr = expr_attribute.attr();
+
                             diagnostic.set_fix(Fix::applicable_edit(
                                 Edit::range_replacement("exception".to_string(), attr.range()),
                                 // When run against `logging.error`, the fix is safe; otherwise,
                                 // the object _may_ not be a logger.
                                 if checker
                                     .semantic()
-                                    .resolve_qualified_name(expr.func.as_ref())
+                                    .resolve_qualified_name(expr.func())
                                     .is_some_and(|qualified_name| {
                                         matches!(qualified_name.segments(), ["logging", "error"])
                                     })
@@ -108,7 +115,7 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
                                 },
                             ));
                         }
-                        Expr::Name(_) => {
+                        flat::ExprKind::Name(_) => {
                             diagnostic.try_set_fix(|| {
                                 let (import_edit, binding) =
                                     checker.importer().get_or_import_symbol(
@@ -116,7 +123,8 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
                                         expr.start(),
                                         checker.semantic(),
                                     )?;
-                                let name_edit = Edit::range_replacement(binding, expr.func.range());
+                                let name_edit =
+                                    Edit::range_replacement(binding, expr.func().range());
                                 Ok(Fix::applicable_edits(
                                     import_edit,
                                     [name_edit],
@@ -124,7 +132,7 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
                                     // the object _may_ not be a logger.
                                     if checker
                                         .semantic()
-                                        .resolve_qualified_name(expr.func.as_ref())
+                                        .resolve_qualified_name(expr.func())
                                         .is_some_and(|qualified_name| {
                                             matches!(
                                                 qualified_name.segments(),

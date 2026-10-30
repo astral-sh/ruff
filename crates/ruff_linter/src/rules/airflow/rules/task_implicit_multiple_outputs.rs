@@ -1,7 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::{ReturnStatementVisitor, map_callable};
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Decorator, Expr, ExprAttribute, Stmt, StmtFunctionDef};
+use ruff_python_ast::flat::helpers::map_callable;
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::helpers::ReturnStatementVisitor;
+use ruff_python_ast::{Decorator, Expr, StmtFunctionDef};
 use ruff_python_semantic::analyze;
 use ruff_python_semantic::{BindingKind, Modules, SemanticModel};
 use ruff_text_size::Ranged;
@@ -77,7 +78,10 @@ impl Violation for AirflowTaskImplicitMultipleOutputs {
 }
 
 /// AIR202
-pub(crate) fn task_implicit_multiple_outputs(checker: &Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn task_implicit_multiple_outputs(
+    checker: &Checker,
+    function_def: flat::View<'_, StmtFunctionDef>,
+) {
     let semantic = checker.semantic();
     if !semantic.seen_module(Modules::AIRFLOW) {
         return;
@@ -93,8 +97,7 @@ pub(crate) fn task_implicit_multiple_outputs(checker: &Checker, function_def: &S
     }
 
     let annotation_is_mapping = function_def
-        .returns
-        .as_deref()
+        .returns()
         .is_some_and(|annotation| annotation_resolves_to_mapping(annotation, semantic));
 
     if !annotation_is_mapping && !body_has_dict_return(function_def, semantic) {
@@ -113,17 +116,20 @@ pub(crate) fn task_implicit_multiple_outputs(checker: &Checker, function_def: &S
 /// Return the matched `@task` (or supported `@task.<variant>`) decorator on
 /// `function_def`, or `None` if there is none.
 fn matching_task_decorator<'a>(
-    function_def: &'a StmtFunctionDef,
+    function_def: flat::View<'a, StmtFunctionDef>,
     semantic: &SemanticModel,
-) -> Option<&'a Decorator> {
+) -> Option<flat::View<'a, Decorator>> {
     function_def
-        .decorator_list
+        .decorator_list()
         .iter()
-        .find(|decorator| is_supported_task_decorator(decorator, semantic))
+        .find(|decorator| is_supported_task_decorator(*decorator, semantic))
 }
 
-fn is_supported_task_decorator(decorator: &Decorator, semantic: &SemanticModel) -> bool {
-    let expr = map_callable(&decorator.expression);
+fn is_supported_task_decorator(
+    decorator: flat::View<'_, Decorator>,
+    semantic: &SemanticModel,
+) -> bool {
+    let expr = map_callable(decorator.expression());
 
     // `@task` or `@task()`.
     if semantic
@@ -135,7 +141,9 @@ fn is_supported_task_decorator(decorator: &Decorator, semantic: &SemanticModel) 
 
     // `@task.<variant>` or `@task.<variant>()`. `task.sensor` is intentionally
     // excluded because the sensor decorator hardcodes `multiple_outputs=False`.
-    if let Expr::Attribute(ExprAttribute { value, attr, .. }) = expr {
+    if let flat::ExprKind::Attribute(attribute) = expr.classify() {
+        let value = attribute.value();
+        let attr = attribute.attr();
         if !matches!(
             attr.as_str(),
             "python"
@@ -160,21 +168,24 @@ fn is_supported_task_decorator(decorator: &Decorator, semantic: &SemanticModel) 
 }
 
 /// Returns `true` if the decorator already specifies `multiple_outputs=...`.
-fn decorator_has_multiple_outputs(decorator: &Decorator) -> bool {
-    let Expr::Call(call) = &decorator.expression else {
+fn decorator_has_multiple_outputs(decorator: flat::View<'_, Decorator>) -> bool {
+    let flat::ExprKind::Call(call) = decorator.expression().classify() else {
         return false;
     };
-    call.arguments.find_keyword("multiple_outputs").is_some()
+    call.arguments().find_keyword("multiple_outputs").is_some()
 }
 
 /// Returns `true` if `annotation` (the return type expression) resolves to a
 /// subclass of `collections.abc.Mapping`, mirroring Airflow's
 /// `_infer_multiple_outputs` runtime check.
-fn annotation_resolves_to_mapping(annotation: &Expr, semantic: &SemanticModel) -> bool {
+fn annotation_resolves_to_mapping(
+    annotation: flat::View<'_, Expr>,
+    semantic: &SemanticModel,
+) -> bool {
     // Unwrap subscripts: `dict[str, int]` → `dict`.
-    let head = match annotation {
-        Expr::Subscript(ast::ExprSubscript { value, .. }) => value.as_ref(),
-        other => other,
+    let head = match annotation.fields() {
+        ast::Expr::Subscript(ast::ExprSubscript { value, .. }) => value,
+        other => other.view(),
     };
 
     if semantic.match_builtin_expr(head, "dict") {
@@ -216,13 +227,16 @@ fn annotation_resolves_to_mapping(annotation: &Expr, semantic: &SemanticModel) -
 
 /// Returns `true` if `annotation` is a `Name` referencing a class defined in
 /// this module whose base-class chain includes `typing.TypedDict`.
-fn annotation_is_typed_dict_subclass(annotation: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Name(name) = annotation else {
+fn annotation_is_typed_dict_subclass(
+    annotation: flat::View<'_, Expr>,
+    semantic: &SemanticModel,
+) -> bool {
+    let flat::ExprKind::Name(name) = annotation.classify() else {
         return false;
     };
     let Some(binding_id) = semantic
         .resolve_name(name)
-        .or_else(|| semantic.lookup_symbol(&name.id).binding_id())
+        .or_else(|| semantic.lookup_symbol(name.id()).binding_id())
     else {
         return false;
     };
@@ -230,7 +244,10 @@ fn annotation_is_typed_dict_subclass(annotation: &Expr, semantic: &SemanticModel
     if !matches!(binding.kind, BindingKind::ClassDefinition(_)) {
         return false;
     }
-    let Some(Stmt::ClassDef(class_def)) = binding.statement(semantic) else {
+    let Some(flat::StmtKind::ClassDef(class_def)) = binding
+        .statement(semantic)
+        .map(flat::View::<ruff_python_ast::Stmt>::classify)
+    else {
         return false;
     };
     analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
@@ -240,30 +257,36 @@ fn annotation_is_typed_dict_subclass(annotation: &Expr, semantic: &SemanticModel
 
 /// Returns `true` if any return statement in the function body returns an
 /// inline dict literal, a dict comprehension, or a `dict(...)` call.
-fn body_has_dict_return(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool {
-    let mut visitor = ReturnStatementVisitor::default();
-    visitor.visit_body(&function_def.body);
+fn body_has_dict_return(
+    function_def: flat::View<'_, StmtFunctionDef>,
+    semantic: &SemanticModel,
+) -> bool {
+    let visitor = ReturnStatementVisitor::for_function(function_def);
     visitor.returns.iter().any(|ret| {
-        let Some(value) = ret.value.as_deref() else {
+        let Some(value) = ret.value() else {
             return false;
         };
-        match value {
-            Expr::Dict(_) | Expr::DictComp(_) => true,
-            Expr::Call(call) => semantic.match_builtin_expr(&call.func, "dict"),
+        match value.classify() {
+            flat::ExprKind::Dict(_) | flat::ExprKind::DictComp(_) => true,
+            flat::ExprKind::Call(call) => semantic.match_builtin_expr(call.func(), "dict"),
             _ => false,
         }
     })
 }
 
-fn build_fix(decorator: &Decorator, annotation_is_mapping: bool, checker: &Checker) -> Fix {
+fn build_fix(
+    decorator: flat::View<'_, Decorator>,
+    annotation_is_mapping: bool,
+    checker: &Checker,
+) -> Fix {
     let kwarg = if annotation_is_mapping {
         "multiple_outputs=True"
     } else {
         "multiple_outputs=False"
     };
 
-    let edit = match &decorator.expression {
-        Expr::Call(call) => add_argument(kwarg, &call.arguments, checker.tokens()),
+    let edit = match decorator.expression().classify() {
+        flat::ExprKind::Call(call) => add_argument(kwarg, call.arguments(), checker.tokens()),
         // Bare `@task` / `@task.branch` — convert to call form.
         other => Edit::insertion(format!("({kwarg})"), other.range().end()),
     };

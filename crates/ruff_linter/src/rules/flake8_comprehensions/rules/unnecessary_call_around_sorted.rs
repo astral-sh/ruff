@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -64,14 +65,11 @@ impl AlwaysFixableViolation for UnnecessaryCallAroundSorted {
 /// C413
 pub(crate) fn unnecessary_call_around_sorted(
     checker: &Checker,
-    expr: &Expr,
-    outer_func: &Expr,
-    args: &[Expr],
+    &expr: &flat::View<'_, Expr>,
+    outer_func: flat::View<'_, Expr>,
+    args: flat::NodeList<'_, Expr>,
 ) {
-    let Some(Expr::Call(ast::ExprCall {
-        func: inner_func, ..
-    })) = args.first()
-    else {
+    let Some(inner_call) = args.first().and_then(flat::View::as_call_expr) else {
         return;
     };
     let semantic = checker.semantic();
@@ -81,7 +79,7 @@ pub(crate) fn unnecessary_call_around_sorted(
     let Some(unnecessary_function) = UnnecessaryFunction::try_from_str(outer_func_name) else {
         return;
     };
-    if !semantic.match_builtin_expr(inner_func, "sorted") {
+    if !semantic.match_builtin_expr(inner_call.func(), "sorted") {
         return;
     }
     let mut diagnostic = checker.report_diagnostic(

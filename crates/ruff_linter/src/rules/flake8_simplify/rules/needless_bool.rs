@@ -1,7 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat::traversal;
+use ruff_python_ast::flat::{self, fields};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::traversal;
-use ruff_python_ast::{self as ast, Arguments, ElifElseClause, Expr, ExprContext, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -91,17 +92,16 @@ impl Violation for NeedlessBool {
 }
 
 /// SIM103
-pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
-    let Stmt::If(stmt_if) = stmt else { return };
-    let ast::StmtIf {
-        test: if_test,
-        body: if_body,
-        elif_else_clauses,
-        ..
-    } = stmt_if;
+pub(crate) fn needless_bool(checker: &Checker, stmt: flat::View<'_, Stmt>) {
+    let flat::StmtKind::If(stmt_if) = stmt.classify() else {
+        return;
+    };
+    let if_test = stmt_if.test();
+    let if_body = stmt_if.body();
+    let elif_else_clauses = stmt_if.elif_else_clauses();
 
     // Extract an `if` or `elif` (that returns) followed by an else (that returns the same value)
-    let (if_test, if_body, else_body, range) = match elif_else_clauses.as_slice() {
+    let (if_test, if_body, else_body, range) = match elif_else_clauses {
         // if-else case:
         // ```python
         // if x > 0:
@@ -109,18 +109,21 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         // else:
         //     return False
         // ```
-        [
-            ElifElseClause {
-                body: else_body,
-                test: None,
-                ..
-            },
-        ] => (
-            if_test.as_ref(),
-            if_body,
-            else_body.as_slice(),
-            stmt_if.range(),
-        ),
+        items
+            if let Some([elif_else_clause]) = items.as_array()
+                && let fields::ElifElseClause {
+                    body: else_body,
+                    test: None,
+                    ..
+                } = elif_else_clause.fields() =>
+        {
+            (
+                if_test,
+                if_body,
+                is_one_line_return_bool(else_body),
+                stmt_if.range(),
+            )
+        }
         // elif-else case
         // ```python
         // if x > 0:
@@ -128,33 +131,35 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         // elif x < 0:
         //     return False
         // ```
-        [
-            ..,
-            ElifElseClause {
-                body: elif_body,
-                test: Some(elif_test),
-                range: elif_range,
-                node_index: _,
-            },
-            ElifElseClause {
-                body: else_body,
-                test: None,
-                range: else_range,
-                node_index: _,
-            },
-        ] => (
-            elif_test,
-            elif_body,
-            else_body.as_slice(),
-            TextRange::new(elif_range.start(), else_range.end()),
-        ),
+        items
+            if let Some((_, [elif_else_clause, else_clause])) = items.split_last_chunk()
+                && let fields::ElifElseClause {
+                    body: elif_body,
+                    test: Some(elif_test),
+                    range: elif_range,
+                    ..
+                } = elif_else_clause.fields()
+                && let fields::ElifElseClause {
+                    body: else_body,
+                    test: None,
+                    range: else_range,
+                    ..
+                } = else_clause.fields() =>
+        {
+            (
+                elif_test,
+                elif_body,
+                is_one_line_return_bool(else_body),
+                TextRange::new(elif_range.start(), else_range.end()),
+            )
+        }
         // if-implicit-else case:
         // ```python
         // if x > 0:
         //     return True
         // return False
         // ```
-        [] => {
+        items if items.is_empty() => {
             // Fetching the next sibling is expensive, so do some validation early.
             if is_one_line_return_bool(if_body).is_none() {
                 return;
@@ -176,9 +181,9 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
             }
 
             (
-                if_test.as_ref(),
+                if_test,
                 if_body,
-                std::slice::from_ref(next_stmt),
+                return_bool(next_stmt),
                 TextRange::new(stmt_if.start(), next_stmt.end()),
             )
         }
@@ -186,10 +191,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
     };
 
     // Both branches must be one-liners that return a boolean.
-    let (Some(if_return), Some(else_return)) = (
-        is_one_line_return_bool(if_body),
-        is_one_line_return_bool(else_body),
-    ) else {
+    let (Some(if_return), Some(else_return)) = (is_one_line_return_bool(if_body), else_body) else {
         return;
     };
 
@@ -227,60 +229,65 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
     } else {
         // If the return values are inverted, wrap the condition in a `not`.
         if inverted {
-            match if_test {
-                Expr::UnaryOp(ast::ExprUnaryOp {
-                    op: ast::UnaryOp::Not,
-                    operand,
-                    ..
-                }) => Some((**operand).clone()),
-
-                Expr::Compare(ast::ExprCompare { ops, operands, .. })
-                    if let [
-                        op @ (ast::CmpOp::Eq
-                        | ast::CmpOp::NotEq
-                        | ast::CmpOp::In
-                        | ast::CmpOp::NotIn
-                        | ast::CmpOp::Is
-                        | ast::CmpOp::IsNot),
-                    ] = ops.as_ref() =>
+            match if_test.classify() {
+                flat::ExprKind::UnaryOp(expr_unary_op)
+                    if expr_unary_op.op() == ast::UnaryOp::Not =>
                 {
+                    let operand = expr_unary_op.operand();
+                    Some(operand.to_owned_node())
+                }
+
+                flat::ExprKind::Compare(expr_compare)
+                    if let Some(
+                        [
+                            op @ (ast::CmpOp::Eq
+                            | ast::CmpOp::NotEq
+                            | ast::CmpOp::In
+                            | ast::CmpOp::NotIn
+                            | ast::CmpOp::Is
+                            | ast::CmpOp::IsNot),
+                        ],
+                    ) = expr_compare.ops().as_array() =>
+                {
+                    let operands = expr_compare.operands();
+
                     Some(Expr::Compare(ast::ExprCompare {
                         ops: [op.negate()].into(),
-                        operands: operands.clone(),
+                        operands: operands.iter().map(flat::View::to_owned_node).collect(),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                        node_index: ruff_python_ast::NodeIndex::NONE,
                     }))
                 }
 
                 _ => Some(Expr::UnaryOp(ast::ExprUnaryOp {
                     op: ast::UnaryOp::Not,
-                    operand: Box::new(if_test.clone()),
+                    operand: Box::new(if_test.to_owned_node()),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                 })),
             }
         } else if if_test.is_compare_expr() {
             // If the condition is a comparison, we can replace it with the condition, since we
             // know it's a boolean.
-            Some(if_test.clone())
+            Some(if_test.to_owned_node())
         } else if checker.semantic().has_builtin_binding("bool") {
             // Otherwise, we need to wrap the condition in a call to `bool`.
             let func_node = ast::ExprName {
                 id: Name::new_static("bool"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
             };
             let call_node = ast::ExprCall {
                 func: Box::new(func_node.into()),
                 arguments: Arguments {
-                    args: [if_test.clone()].into(),
+                    args: [if_test].map(flat::View::to_owned_node).into(),
                     keywords: std::iter::empty().collect(),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                 },
                 range_start: ruff_text_size::TextSize::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
             };
             Some(Expr::Call(call_node))
         } else {
@@ -293,17 +300,13 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         Stmt::Return(ast::StmtReturn {
             value: Some(Box::new(expr.clone())),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         })
     });
 
     // Generate source code.
-    let replacement = replacement
-        .as_ref()
-        .map(|stmt| checker.generator().stmt(stmt));
-    let condition = condition
-        .as_ref()
-        .map(|expr| checker.generator().expr(expr));
+    let replacement = replacement.map(|stmt| checker.generator().stmt(&stmt));
+    let condition = condition.map(|expr| checker.generator().expr(&expr));
 
     let mut diagnostic = checker.report_diagnostic(
         NeedlessBool {
@@ -332,20 +335,20 @@ impl From<bool> for Bool {
     }
 }
 
-fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
-    let [stmt] = stmts else {
+fn is_one_line_return_bool(stmts: flat::Suite<'_>) -> Option<Bool> {
+    let [stmt] = stmts.as_array()?;
+    return_bool(stmt)
+}
+
+fn return_bool(stmt: flat::View<'_, Stmt>) -> Option<Bool> {
+    let flat::StmtKind::Return(return_stmt) = stmt.classify() else {
         return None;
     };
-    let Stmt::Return(ast::StmtReturn {
-        value,
-        range: _,
-        node_index: _,
-    }) = stmt
+    let value = return_stmt.value();
+    let Some(fields::Expr::BooleanLiteral(fields::ExprBooleanLiteral { value, .. })) =
+        value.map(flat::View::<Expr>::fields)
     else {
         return None;
     };
-    let Some(Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. })) = value.as_deref() else {
-        return None;
-    };
-    Some((*value).into())
+    Some(value.into())
 }

@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::flat;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::function_type::is_subject_to_liskov_substitution_principle;
 use ruff_python_semantic::analyze::{function_type, visibility};
@@ -73,7 +74,10 @@ impl Violation for TooManyArguments {
 }
 
 /// PLR0913
-pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn too_many_arguments(
+    checker: &Checker,
+    function_def: flat::View<'_, ast::StmtFunctionDef>,
+) {
     // https://github.com/astral-sh/ruff/issues/14535
     if checker.source_type.is_stub() {
         return;
@@ -81,9 +85,14 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
     let semantic = checker.semantic();
 
     let num_arguments = function_def
-        .parameters
+        .parameters()
         .iter_non_variadic_params()
-        .filter(|param| !checker.settings().dummy_variable_rgx.is_match(param.name()))
+        .filter(|param| {
+            !checker
+                .settings()
+                .dummy_variable_rgx
+                .is_match(param.name().as_str())
+        })
         .count();
 
     if num_arguments <= checker.settings().pylint.max_args {
@@ -92,8 +101,8 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
 
     // Allow excessive arguments in `@override` or `@overload` methods, since they're required
     // to adhere to the parent signature.
-    if visibility::is_override(&function_def.decorator_list, checker.semantic())
-        || visibility::is_overload(&function_def.decorator_list, checker.semantic())
+    if visibility::is_override(function_def.decorator_list(), checker.semantic())
+        || visibility::is_overload(function_def.decorator_list(), checker.semantic())
     {
         return;
     }
@@ -101,8 +110,8 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
     // Check if the function is a method or class method.
     let num_arguments = if matches!(
         function_type::classify(
-            &function_def.name,
-            &function_def.decorator_list,
+            function_def.name().as_str(),
+            function_def.decorator_list(),
             semantic.current_scope(),
             semantic,
             &checker.settings().pep8_naming.classmethod_decorators,
@@ -131,8 +140,8 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
         function_def.identifier(),
     );
     if is_subject_to_liskov_substitution_principle(
-        &function_def.name,
-        &function_def.decorator_list,
+        function_def.name().as_str(),
+        function_def.decorator_list(),
         semantic.current_scope(),
         semantic,
         &checker.settings().pep8_naming.classmethod_decorators,

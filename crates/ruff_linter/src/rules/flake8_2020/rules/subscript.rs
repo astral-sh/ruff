@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat::{self, fields};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -173,20 +174,24 @@ impl Violation for SysVersionSlice1 {
 }
 
 /// YTT101, YTT102, YTT301, YTT303
-pub(crate) fn subscript(checker: &Checker, value: &Expr, slice: &Expr) {
+pub(crate) fn subscript(
+    checker: &Checker,
+    value: flat::View<'_, Expr>,
+    slice: flat::View<'_, Expr>,
+) {
     if is_sys(value, "version", checker.semantic()) {
-        match slice {
-            Expr::Slice(ast::ExprSlice {
+        match slice.fields() {
+            fields::Expr::Slice(fields::ExprSlice {
                 lower: None,
                 upper: Some(upper),
                 step: None,
                 range: _,
-                node_index: _,
+                node: _,
             }) => {
-                if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                if let fields::Expr::NumberLiteral(fields::ExprNumberLiteral {
                     value: ast::Number::Int(i),
                     ..
-                }) = upper.as_ref()
+                }) = upper.fields()
                 {
                     if *i == 1 && checker.is_rule_enabled(Rule::SysVersionSlice1) {
                         checker.report_diagnostic(SysVersionSlice1, value.range());
@@ -196,7 +201,7 @@ pub(crate) fn subscript(checker: &Checker, value: &Expr, slice: &Expr) {
                 }
             }
 
-            Expr::NumberLiteral(ast::ExprNumberLiteral {
+            fields::Expr::NumberLiteral(fields::ExprNumberLiteral {
                 value: ast::Number::Int(i),
                 ..
             }) => {

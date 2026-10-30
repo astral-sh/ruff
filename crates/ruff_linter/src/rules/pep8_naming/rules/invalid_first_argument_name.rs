@@ -1,8 +1,8 @@
 use anyhow::Result;
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{Parameter, ParameterWithDefault, Parameters};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
-use ruff_python_ast::ParameterWithDefault;
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::analyze::class::{IsMetaclass, is_metaclass};
 use ruff_python_semantic::analyze::function_type;
@@ -203,15 +203,12 @@ impl FunctionType {
 
 /// N804, N805
 pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
-    let ScopeKind::Function(ast::StmtFunctionDef {
-        name,
-        parameters,
-        decorator_list,
-        ..
-    }) = &scope.kind
-    else {
+    let ScopeKind::Function(stmt_function_def) = &scope.kind else {
         panic!("Expected ScopeKind::Function")
     };
+    let name = stmt_function_def.name();
+    let parameters = stmt_function_def.parameters();
+    let decorator_list = stmt_function_def.decorator_list();
 
     let semantic = checker.semantic();
 
@@ -224,7 +221,7 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
     };
 
     let function_type = match function_type::classify(
-        name,
+        name.as_str(),
         decorator_list,
         parent_scope,
         semantic,
@@ -249,29 +246,30 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
         return;
     }
 
-    let Some(ParameterWithDefault {
+    let Some(ast::ParameterWithDefault {
         parameter: self_or_cls,
         ..
     }) = parameters
-        .posonlyargs
+        .posonlyargs()
         .first()
-        .or_else(|| parameters.args.first())
+        .or_else(|| parameters.args().first())
+        .map(flat::View::<ParameterWithDefault>::fields)
     else {
         return;
     };
 
-    if &self_or_cls.name == function_type.valid_first_argument_name()
+    if self_or_cls.name() == function_type.valid_first_argument_name()
         || checker
             .settings()
             .pep8_naming
             .ignore_names
-            .matches(&self_or_cls.name)
+            .matches(self_or_cls.name().as_str())
     {
         return;
     }
 
     let mut diagnostic =
-        function_type.diagnostic_kind(checker, self_or_cls.name.to_string(), self_or_cls.range());
+        function_type.diagnostic_kind(checker, self_or_cls.name().to_string(), self_or_cls.range());
     diagnostic.try_set_optional_fix(|| {
         rename_parameter(
             checker,
@@ -289,8 +287,8 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
 fn rename_parameter(
     checker: &Checker,
     scope: &Scope<'_>,
-    self_or_cls: &ast::Parameter,
-    parameters: &ast::Parameters,
+    self_or_cls: flat::View<'_, Parameter>,
+    parameters: flat::View<'_, Parameters>,
     semantic: &SemanticModel<'_>,
     function_type: FunctionType,
     stylist: &Stylist,
@@ -304,7 +302,7 @@ fn rename_parameter(
         return Ok(None);
     }
     let binding = scope
-        .get(&self_or_cls.name)
+        .get(self_or_cls.name().as_str())
         .map(|binding_id| semantic.binding(binding_id))
         .unwrap();
 
@@ -315,7 +313,7 @@ fn rename_parameter(
     }
 
     let (edit, rest) = Renamer::rename(
-        &self_or_cls.name,
+        self_or_cls.name().as_str(),
         function_type.valid_first_argument_name(),
         scope,
         semantic,

@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{self as ast, CmpOp, Expr, helpers::is_empty_f_string};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -37,7 +38,7 @@ impl Violation for InEmptyCollection {
 }
 
 /// RUF060
-pub(crate) fn in_empty_collection(checker: &Checker, compare: &ast::ExprCompare) {
+pub(crate) fn in_empty_collection(checker: &Checker, compare: flat::View<'_, ast::ExprCompare>) {
     let Some((_, CmpOp::In | CmpOp::NotIn, right)) = compare.as_single() else {
         return;
     };
@@ -49,7 +50,7 @@ pub(crate) fn in_empty_collection(checker: &Checker, compare: &ast::ExprCompare)
     }
 }
 
-fn is_empty(expr: &Expr, semantic: &SemanticModel) -> bool {
+fn is_empty(expr: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
     let set_methods = ["set", "frozenset"];
     let collection_methods = [
         "list",
@@ -62,20 +63,38 @@ fn is_empty(expr: &Expr, semantic: &SemanticModel) -> bool {
         "str",
     ];
 
-    match expr {
-        Expr::List(ast::ExprList { elts, .. }) => elts.is_empty(),
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.is_empty(),
-        Expr::Set(ast::ExprSet { elts, .. }) => elts.is_empty(),
-        Expr::Dict(ast::ExprDict { items, .. }) => items.is_empty(),
-        Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.is_empty(),
-        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
-        Expr::FString(s) => is_empty_f_string(s),
-        Expr::Call(ast::ExprCall {
-            func,
-            arguments,
-            range_start: _,
-            node_index: _,
-        }) => {
+    match expr.classify() {
+        flat::ExprKind::List(expr_list) => {
+            let elts = expr_list.elts();
+            elts.is_empty()
+        }
+        flat::ExprKind::Tuple(expr_tuple) => {
+            let elts = expr_tuple.elts();
+            elts.is_empty()
+        }
+        flat::ExprKind::Set(expr_set) => {
+            let elts = expr_set.elts();
+            elts.is_empty()
+        }
+        flat::ExprKind::Dict(expr_dict) => {
+            let items = expr_dict.items();
+            items.is_empty()
+        }
+        flat::ExprKind::BytesLiteral(expr_bytes_literal) => {
+            let value = expr_bytes_literal.value();
+
+            value.is_empty()
+        }
+        flat::ExprKind::StringLiteral(expr_string_literal) => {
+            let value = expr_string_literal.value();
+
+            value.is_empty()
+        }
+        flat::ExprKind::FString(s) => is_empty_f_string(s),
+        flat::ExprKind::Call(expr_call) => {
+            let func = expr_call.func();
+            let arguments = expr_call.arguments();
+
             if arguments.is_empty() {
                 collection_methods
                     .iter()

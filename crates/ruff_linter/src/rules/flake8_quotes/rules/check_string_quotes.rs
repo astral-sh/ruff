@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::StringLike;
+use ruff_python_ast::flat::StringLike;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;

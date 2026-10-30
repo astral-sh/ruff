@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::helpers::map_callable;
 use ruff_python_semantic::Modules;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -106,7 +107,7 @@ impl Violation for FastApiNonAnnotatedDependency {
 /// FAST002
 pub(crate) fn fastapi_non_annotated_dependency(
     checker: &Checker,
-    function_def: &ast::StmtFunctionDef,
+    function_def: flat::View<'_, ast::StmtFunctionDef>,
 ) {
     if !checker.semantic().seen_module(Modules::FASTAPI)
         || !is_fastapi_route(function_def, checker.semantic())
@@ -119,14 +120,14 @@ pub(crate) fn fastapi_non_annotated_dependency(
     let mut seen_default = false;
 
     for parameter in function_def
-        .parameters
-        .args
+        .parameters()
+        .args()
         .iter()
-        .chain(&function_def.parameters.kwonlyargs)
+        .chain(function_def.parameters().kwonlyargs())
     {
         let (Some(annotation), Some(default)) = (parameter.annotation(), parameter.default())
         else {
-            seen_default |= parameter.default.is_some();
+            seen_default |= parameter.default().is_some();
             continue;
         };
 
@@ -136,8 +137,8 @@ pub(crate) fn fastapi_non_annotated_dependency(
                 annotation,
                 default,
                 kind: dependency,
-                name: parameter.name(),
-                range: parameter.range,
+                name: parameter.name().as_str(),
+                range: parameter.range(),
             };
             seen_default = create_diagnostic(
                 checker,
@@ -146,12 +147,15 @@ pub(crate) fn fastapi_non_annotated_dependency(
                 seen_default,
             );
         } else {
-            seen_default |= parameter.default.is_some();
+            seen_default |= parameter.default().is_some();
         }
     }
 }
 
-fn is_fastapi_dependency(checker: &Checker, expr: &ast::Expr) -> Option<FastApiDependency> {
+fn is_fastapi_dependency(
+    checker: &Checker,
+    expr: flat::View<'_, ast::Expr>,
+) -> Option<FastApiDependency> {
     checker
         .semantic()
         .resolve_qualified_name(map_callable(expr))
@@ -186,27 +190,27 @@ enum FastApiDependency {
 }
 
 struct DependencyParameter<'a> {
-    annotation: &'a ast::Expr,
-    default: &'a ast::Expr,
+    annotation: flat::View<'a, ast::Expr>,
+    default: flat::View<'a, ast::Expr>,
     range: TextRange,
     name: &'a str,
     kind: FastApiDependency,
 }
 
 struct DependencyCall<'a> {
-    default_argument: ast::ArgOrKeyword<'a>,
-    keyword_arguments: Vec<&'a ast::Keyword>,
+    default_argument: flat::ArgOrKeyword<'a>,
+    keyword_arguments: Vec<flat::View<'a, ast::Keyword>>,
 }
 
 impl<'a> DependencyCall<'a> {
-    fn from_expression(expr: &'a ast::Expr) -> Option<Self> {
+    fn from_expression(expr: flat::View<'a, ast::Expr>) -> Option<Self> {
         let call = expr.as_call_expr()?;
-        let default_argument = call.arguments.find_argument("default", 0)?;
+        let default_argument = call.arguments().find_argument("default", 0)?;
         let keyword_arguments = call
-            .arguments
-            .keywords
+            .arguments()
+            .keywords()
             .iter()
-            .filter(|kwarg| kwarg.arg.as_ref().is_some_and(|name| name != "default"))
+            .filter(|kwarg| kwarg.arg().is_some_and(|name| name != "default"))
             .collect();
 
         Some(Self {
@@ -279,8 +283,8 @@ fn create_diagnostic(
 
                 // Check if the default argument is ellipsis (...), which in FastAPI means "required"
                 let is_default_argument_ellipsis = matches!(
-                    dependency_call.default_argument.value(),
-                    ast::Expr::EllipsisLiteral(_)
+                    dependency_call.default_argument.value().classify(),
+                    flat::ExprKind::EllipsisLiteral(_)
                 );
 
                 if is_default_argument_ellipsis && seen_default {

@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{
-    self as ast, AnyStringFlags, InterpolatedStringElements, StringFlags, StringLike,
-};
+use ruff_python_ast::flat;
+use ruff_python_ast::{self as ast, AnyStringFlags, StringFlags, flat::StringLike};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -55,32 +54,28 @@ pub(crate) fn unnecessary_escaped_quote(checker: &Checker, string_like: StringLi
     }
 
     for part in string_like.parts() {
-        match part {
-            ast::StringLikePart::String(string_literal) => check_string_or_bytes(
+        match part.classify() {
+            ast::flat::StringLikePartKind::String(string_literal) => check_string_or_bytes(
                 checker,
                 string_literal.range(),
-                AnyStringFlags::from(string_literal.flags),
+                AnyStringFlags::from(string_literal.flags()),
             ),
-            ast::StringLikePart::Bytes(bytes_literal) => check_string_or_bytes(
+            ast::flat::StringLikePartKind::Bytes(bytes_literal) => check_string_or_bytes(
                 checker,
                 bytes_literal.range(),
-                AnyStringFlags::from(bytes_literal.flags),
+                AnyStringFlags::from(bytes_literal.flags()),
             ),
-            ast::StringLikePart::FString(ast::FString {
-                elements,
-                range,
-                node_index: _,
-                flags,
-            }) => {
-                check_interpolated_string(checker, AnyStringFlags::from(*flags), *range, elements);
+            ast::flat::StringLikePartKind::FString(fstring) => {
+                let elements = fstring.elements();
+                let range = fstring.range();
+                let flags = fstring.flags();
+                check_interpolated_string(checker, AnyStringFlags::from(flags), range, elements);
             }
-            ast::StringLikePart::TString(ast::TString {
-                elements,
-                range,
-                node_index: _,
-                flags,
-            }) => {
-                check_interpolated_string(checker, AnyStringFlags::from(*flags), *range, elements);
+            ast::flat::StringLikePartKind::TString(tstring) => {
+                let elements = tstring.elements();
+                let range = tstring.range();
+                let flags = tstring.flags();
+                check_interpolated_string(checker, AnyStringFlags::from(flags), range, elements);
             }
         }
     }
@@ -120,7 +115,7 @@ fn check_interpolated_string(
     checker: &Checker,
     flags: AnyStringFlags,
     range: TextRange,
-    elements: &InterpolatedStringElements,
+    elements: flat::InterpolatedStringElements<'_>,
 ) {
     if flags.is_triple_quoted() || flags.prefix().is_raw() {
         return;

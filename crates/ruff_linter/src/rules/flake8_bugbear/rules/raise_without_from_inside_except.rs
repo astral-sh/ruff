@@ -1,9 +1,9 @@
-use ruff_python_ast as ast;
-use ruff_python_ast::Stmt;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat::statement_visitor::StatementVisitor;
 use ruff_python_ast::helpers::RaiseStatementVisitor;
-use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -74,7 +74,7 @@ impl Violation for RaiseWithoutFromInsideExcept {
 pub(crate) fn raise_without_from_inside_except(
     checker: &Checker,
     name: Option<&str>,
-    body: &[Stmt],
+    body: flat::Suite<'_>,
 ) {
     let raises = {
         let mut visitor = RaiseStatementVisitor::default();
@@ -82,9 +82,10 @@ pub(crate) fn raise_without_from_inside_except(
         visitor.raises
     };
 
-    for (range, exc, cause) in raises {
-        if cause.is_none() {
-            if let Some(exc) = exc {
+    for raise in raises {
+        let range = raise.range();
+        if raise.cause().is_none() {
+            if let Some(exc) = raise.exc() {
                 // If the raised object is bound to the same name, it's a re-raise, which is
                 // allowed (but may be flagged by other diagnostics).
                 //
@@ -96,10 +97,10 @@ pub(crate) fn raise_without_from_inside_except(
                 //     raise exc
                 // ```
                 if let Some(name) = name {
-                    if exc
-                        .as_name_expr()
-                        .is_some_and(|ast::ExprName { id, .. }| name == id)
-                    {
+                    if exc.as_name_expr().is_some_and(|expr_name| {
+                        let id = expr_name.id();
+                        name == id
+                    }) {
                         continue;
                     }
                 }
@@ -108,7 +109,7 @@ pub(crate) fn raise_without_from_inside_except(
                     .semantic()
                     .current_statement()
                     .as_try_stmt()
-                    .is_some_and(|try_stmt| try_stmt.is_star);
+                    .is_some_and(flat::View::is_star);
 
                 checker.report_diagnostic(RaiseWithoutFromInsideExcept { is_star }, range);
             }
