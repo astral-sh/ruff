@@ -220,11 +220,10 @@ pub(crate) struct Comments<'a> {
 
 impl<'a> Comments<'a> {
     fn new(comments: CommentsMap<'a>) -> Self {
-        let nodes_with_comments = CommentNodeFilter::from_map(&comments);
         Self {
             data: Rc::new(CommentsData {
+                nodes_with_comments: CommentNodeFilter::from_map(&comments),
                 comments,
-                nodes_with_comments,
             }),
         }
     }
@@ -265,7 +264,7 @@ impl<'a> Comments<'a> {
     /// A false result guarantees that the node has none. A true result can also
     /// mean another node with comments set the same bit in the filter.
     #[inline]
-    pub(crate) fn may_have_comment(&self, node: impl Into<AnyNodeRef<'a>>) -> bool {
+    fn may_have_comment(&self, node: impl Into<AnyNodeRef<'a>>) -> bool {
         self.data.nodes_with_comments.might_contain(node.into())
     }
 
