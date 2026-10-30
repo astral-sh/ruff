@@ -368,7 +368,7 @@ jobs:
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
-    timeout-minutes: 30
+    timeout-minutes: 15
     env:
       RUSTUP_TOOLCHAIN: "1.99.0"
       RUSTC_BOOTSTRAP: "1"
@@ -377,7 +377,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: 737853207e9d7bbb3d111be560258804246aa0c7
       - name: Install Rust toolchain
         run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
       - name: Select weekly Hawk cache
@@ -393,11 +392,16 @@ jobs:
           prefix-key: hawk-workspace-${{ env.HAWK_VERSION }}
           key: ${{ steps.hawk-cache-week.outputs.week }}
           cache-bin: false
-          save-if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.number == 29837 }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Hawk"
         run: |
           curl --proto '=https' --tlsv1.2 -LsSf \
             "https://github.com/astral-sh/hawk/releases/download/${HAWK_VERSION}/cargo-hawk-installer.sh" | sh
+      - name: Verify the benchmark restored Hawk graph fragments
+        run: |
+          fragments=$(find target/hawk/hawk-fragments -type f -name '*.json' | wc -l)
+          test "$fragments" -gt 0
+          echo "Restored $fragments Hawk graph fragments"
       - name: "Hawk"
         run: cargo hawk check --target-dir target/hawk --color=always -D warnings
 
