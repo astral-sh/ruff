@@ -404,6 +404,7 @@ where
 }
 
 #[cfg(debug_assertions)]
+#[track_caller]
 fn debug_assert_no_newlines(text: &str) {
     debug_assert!(
         !text.contains('\r'),
