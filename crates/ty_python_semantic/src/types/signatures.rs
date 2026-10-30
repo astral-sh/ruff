@@ -952,6 +952,29 @@ impl<'db> Signature<'db> {
         }
     }
 
+    /// Registers a generated method's `Self` and connects class-scoped field annotations to it.
+    pub(super) fn with_inferable_self(
+        mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        self_typevar: BoundTypeVarInstance<'db>,
+    ) -> Self {
+        self.generic_context = Some(GenericContext::from_typevar_instances(
+            db,
+            env,
+            self.generic_context
+                .iter()
+                .flat_map(|context| context.variables(db))
+                .chain(std::iter::once(self_typevar)),
+        ));
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::BindSelf(SelfBinding::new(db, env, Type::TypeVar(self_typevar), None)),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::new(env),
+        )
+    }
+
     pub(super) fn into_paramspec_value(mut self) -> Self {
         self.return_ty = Type::unknown();
         if let Some(extras) = self.extras.as_mut() {
