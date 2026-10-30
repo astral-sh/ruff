@@ -65,6 +65,61 @@ class Slotted:
 reveal_type(Slotted().value)  # revealed: MemberDescriptorType
 ```
 
+## Writing an inherited slot initialized to `None`
+
+A subclass inherits the same writable slot as its base. The slot can hold bytes before the base
+method decodes them to a string.
+
+```py
+class Message:
+    __slots__ = ("body",)
+
+    def __init__(self):
+        self.body = None
+
+    def decode(self):
+        if isinstance(self.body, bytes):
+            self.body = self.body.decode()
+
+class Reply(Message): ...
+
+def populate(message: Message, reply: Reply):
+    message.body = b"hello"
+    reply.body = b"hello"  # no diagnostic
+```
+
+## Recursive slot values read through a metaclass
+
+Both the metaclass and the base class build lists from the same inherited slot. The nested value can
+be a list, so unwrapping it allows `append` and rejects `upper`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+class Meta(type):
+    def copy_children(cls, child: "Child"):
+        cls.children = [child.children]
+
+class Node(metaclass=Meta):
+    __slots__ = ("children",)
+
+    def set_children(self, other: "Node | None"):
+        self.children = [other.children] if other else []
+
+class Child(Node): ...
+
+def unpack[T = str](value: T | list[T]) -> T:
+    return value[0] if isinstance(value, list) else value
+
+def check(child: Child):
+    values = unpack(child.children)
+    values.append(1)
+    values.upper()  # error: [unresolved-attribute]
+```
+
 ## Assigning a bound method in a loop
 
 Loop narrowing preserves a bound method's receiver type when inferring an implicit attribute,

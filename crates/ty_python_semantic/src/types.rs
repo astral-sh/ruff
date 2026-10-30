@@ -5646,7 +5646,7 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         key: MemberLookupKey<'db>,
         receiver: Type<'db>,
-        fallback: impl FnOnce() -> MemberLookupResult<'db>,
+        fallback: MemberLookupResult<'db>,
         policy: InstanceFallbackShadowsNonDataDescriptor,
     ) -> MemberLookupResult<'db> {
         let meta_attr_plain =
@@ -5663,12 +5663,10 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         meta_attr_plain: PlaceAndQualifiers<'db>,
         receiver: Type<'db>,
-        fallback: impl FnOnce() -> MemberLookupResult<'db>,
+        fallback: MemberLookupResult<'db>,
         policy: InstanceFallbackShadowsNonDataDescriptor,
     ) -> MemberLookupResult<'db> {
-        let Some(meta_attr_ty) = meta_attr_plain.place.ignore_possibly_undefined() else {
-            return fallback();
-        };
+        let meta_attr_ty = meta_attr_plain.place.ignore_possibly_undefined();
         // Preserve the receiver's type variables and all its narrowed class constraints.
         let owner = receiver.to_meta_type(db, env);
         let (
@@ -5681,27 +5679,7 @@ impl<'db> Type<'db> {
         ) = Self::try_call_dunder_get_on_attribute(db, env, meta_attr_plain, Some(receiver), owner);
 
         let meta_attr_error = meta_attr_error.map(MemberLookupErrorKind::DescriptorGet);
-        let meta_properties = meta_attr_ty.property_deprecations(db);
-        // Only a slot needs the instance declaration even when its getter takes precedence.
-        if !matches!(meta_attr_ty, Type::SlotDescriptor(_))
-            && matches!(
-                meta_attr,
-                Place::Defined(DefinedPlace {
-                    definedness: Definedness::AlwaysDefined,
-                    ..
-                })
-            )
-            && matches!(meta_attr_kind, AttributeKind::DataDescriptor)
-        {
-            return member_lookup_result(
-                db,
-                meta_attr.with_qualifiers(meta_attr_qualifiers),
-                meta_attr_error,
-                meta_properties,
-            );
-        }
-
-        let fallback = fallback();
+        let meta_properties = meta_attr_ty.and_then(|ty| ty.property_deprecations(db));
         let fallback_error = fallback.err().map(|error| error.kind(db));
         let fallback_member = fallback.unwrap_or_else(|error| error.fallback_member(db));
         let fallback_properties = fallback_member.deprecated_properties(db);
@@ -5711,7 +5689,7 @@ impl<'db> Type<'db> {
         // Unlike an arbitrary data descriptor, its inherited getter must not hide a more precise
         // declaration established by the receiver's class.
         if matches!(meta_attr, Place::Defined(_))
-            && matches!(meta_attr_ty, Type::SlotDescriptor(_))
+            && matches!(meta_attr_ty, Some(Type::SlotDescriptor(_)))
             && !fallback_member.place.is_undefined()
         {
             return fallback;
@@ -6075,12 +6053,16 @@ impl<'db> Type<'db> {
                     .into();
                 }
 
+                // A slot descriptor's value type comes from instance storage. Looking up the
+                // descriptor first can change the inferred type of a self-referential slot.
+                let fallback = this.instance_member(db, env, name_str);
+
                 let result = Type::invoke_descriptor_protocol(
                     db,
                     env,
                     key,
                     receiver,
-                    || this.instance_member(db, env, name_str).into(),
+                    fallback.into(),
                     InstanceFallbackShadowsNonDataDescriptor::No,
                 );
 
@@ -6601,7 +6583,7 @@ impl<'db> Type<'db> {
                         env,
                         key,
                         receiver,
-                        || Place::Undefined.into(),
+                        Place::Undefined.into(),
                         InstanceFallbackShadowsNonDataDescriptor::No,
                     );
                     map_member_lookup_type(db, result, |ty| {
@@ -6788,14 +6770,12 @@ impl<'db> Type<'db> {
                         env,
                         key,
                         receiver,
-                        || {
-                            member_lookup_result(
-                                db,
-                                class_attr_fallback,
-                                class_attr_error.map(MemberLookupErrorKind::DescriptorGet),
-                                None,
-                            )
-                        },
+                        member_lookup_result(
+                            db,
+                            class_attr_fallback,
+                            class_attr_error.map(MemberLookupErrorKind::DescriptorGet),
+                            None,
+                        ),
                         InstanceFallbackShadowsNonDataDescriptor::Yes,
                     );
 
