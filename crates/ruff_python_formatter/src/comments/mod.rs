@@ -222,7 +222,7 @@ impl<'a> Comments<'a> {
     fn new(comments: CommentsMap<'a>) -> Self {
         Self {
             data: Rc::new(CommentsData {
-                nodes_with_comments: CommentNodeFilter::from_map(&comments),
+                bloom_filter: CommentNodeFilter::from_map(&comments),
                 comments,
             }),
         }
@@ -265,7 +265,7 @@ impl<'a> Comments<'a> {
     /// mean another node with comments set the same bit in the filter.
     #[inline]
     fn may_have_comment(&self, node: impl Into<AnyNodeRef<'a>>) -> bool {
-        self.data.nodes_with_comments.might_contain(node.into())
+        self.data.bloom_filter.might_contain(node.into())
     }
 
     #[inline]
@@ -499,7 +499,7 @@ impl LeadingDanglingTrailingComments<'_> {
 
 #[derive(Debug)]
 struct CommentsData<'a> {
-    nodes_with_comments: CommentNodeFilter,
+    bloom_filter: CommentNodeFilter,
     comments: CommentsMap<'a>,
 }
 
@@ -586,11 +586,11 @@ mod tests {
         let node = test_case.parsed.syntax();
 
         // Force a collision independently of where the allocator put the node.
-        let mut nodes_with_comments = CommentNodeFilter::default();
-        nodes_with_comments.0.fill(u64::MAX);
+        let mut bloom_filter = CommentNodeFilter::default();
+        bloom_filter.0.fill(u64::MAX);
         let comments = Comments {
             data: Rc::new(CommentsData {
-                nodes_with_comments,
+                bloom_filter,
                 comments: CommentsMap::new(),
             }),
         };
