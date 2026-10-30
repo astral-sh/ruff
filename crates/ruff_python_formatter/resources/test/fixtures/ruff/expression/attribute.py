@@ -2,6 +2,25 @@ from argparse import Namespace
 
 a = Namespace()
 
+# Attribute slices preserve source spelling, including NFKC-normalized identifiers.
+a.b
+𝓪.𝓫
+变量.属性
+obj.属性
+a .b
+a. b
+(a).b
+(𝓪).𝓫
+a\
+    .b
+a.\
+    b
+factory().attribute
+values[0].attribute
+"literal".attribute
+1 .real
+0x1.real
+
 (
     a
     # comment

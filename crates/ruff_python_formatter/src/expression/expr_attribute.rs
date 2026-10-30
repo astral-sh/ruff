@@ -2,7 +2,7 @@ use ruff_formatter::{FormatRuleWithOptions, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprAttribute, ExprNumberLiteral, Number};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, find_only_token_in_range};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::dangling_comments;
 use crate::expression::CallChainLayout;
@@ -35,6 +35,18 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
         } = item;
 
         let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
+
+        // Names and identifiers both preserve their source spelling. A contiguous `a.b`
+        // can therefore share one slice, provided no comments or fluent layout intervene.
+        if value.is_name_expr()
+            && !call_chain_layout.is_fluent()
+            && &f.context().source()[TextRange::new(value.end(), attr.start())] == "."
+            && !f.context().is_expression_parenthesized(value.into())
+            && !f.context().comments().has(value.as_ref())
+            && !f.context().comments().has_dangling(item)
+        {
+            return source_text_slice(item.range()).fmt(f);
+        }
 
         let format_inner = format_with(|f: &mut PyFormatter| {
             let parenthesize_value =
@@ -149,6 +161,13 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             // )
             // ```
             let dangling = comments.dangling(item);
+            let dot_start = attr.start() - TextSize::new(1);
+            if dangling.is_empty()
+                && f.context().source().as_bytes()[usize::from(dot_start)] == b'.'
+            {
+                return source_text_slice(TextRange::new(dot_start, attr.end())).fmt(f);
+            }
+
             let (before_dot, after_dot) = if dangling.is_empty() {
                 (dangling, dangling)
             } else {
