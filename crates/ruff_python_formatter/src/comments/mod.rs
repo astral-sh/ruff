@@ -220,11 +220,11 @@ pub(crate) struct Comments<'a> {
 
 impl<'a> Comments<'a> {
     fn new(comments: CommentsMap<'a>) -> Self {
-        let possible_nodes = CommentNodeFilter::from_map(&comments);
+        let nodes_with_comments = CommentNodeFilter::from_map(&comments);
         Self {
             data: Rc::new(CommentsData {
                 comments,
-                possible_nodes,
+                nodes_with_comments,
             }),
         }
     }
@@ -266,7 +266,7 @@ impl<'a> Comments<'a> {
     /// mean another node with comments set the same bit in the filter.
     #[inline]
     pub(crate) fn may_have_comment(&self, node: impl Into<AnyNodeRef<'a>>) -> bool {
-        self.data.possible_nodes.might_contain(node.into())
+        self.data.nodes_with_comments.might_contain(node.into())
     }
 
     #[inline]
@@ -500,7 +500,7 @@ impl LeadingDanglingTrailingComments<'_> {
 
 #[derive(Debug)]
 struct CommentsData<'a> {
-    possible_nodes: CommentNodeFilter,
+    nodes_with_comments: CommentNodeFilter,
     comments: CommentsMap<'a>,
 }
 
@@ -587,11 +587,11 @@ mod tests {
         let node = test_case.parsed.syntax();
 
         // Force a collision independently of where the allocator put the node.
-        let mut possible_nodes = CommentNodeFilter::default();
-        possible_nodes.0.fill(u64::MAX);
+        let mut nodes_with_comments = CommentNodeFilter::default();
+        nodes_with_comments.0.fill(u64::MAX);
         let comments = Comments {
             data: Rc::new(CommentsData {
-                possible_nodes,
+                nodes_with_comments,
                 comments: CommentsMap::new(),
             }),
         };
