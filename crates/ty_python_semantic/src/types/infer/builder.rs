@@ -152,7 +152,7 @@ use ty_python_core::definition::{
 use ty_python_core::expression::{Expression, ExpressionContext, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::node_key::NodeKey;
-use ty_python_core::place::{PlaceExpr, PlaceExprRef};
+use ty_python_core::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
 use ty_python_core::predicate::PatternPredicate;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
 use ty_python_core::symbol::ScopedSymbolId;
@@ -2663,6 +2663,221 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         .insert(self, symbol_ty);
     }
 
+    /// Recognize an integer recurrence fed by another local counter. Following its assignments
+    /// structurally avoids re-entering type inference for every path through the loop.
+    fn can_widen_loop_counter(&mut self, root: Definition<'db>) -> bool {
+        enum Work<'ast, 'db> {
+            Place(FileScopeId, ScopedPlaceId),
+            Definition(Definition<'db>),
+            Expression(FileScopeId, &'ast ast::Expr),
+        }
+
+        let db = self.db();
+        let index = self.index;
+        let module = self.module();
+        let root_scope = root.file_scope(db);
+        let root_place = root.place(db);
+        let loop_range = root.kind(db).target_range(module);
+        let mut work = vec![Work::Place(root_scope, root_place)];
+        let mut places = FxHashSet::default();
+        let mut definitions = FxHashSet::default();
+        let mut has_integer_literal = false;
+        let mut has_other_counter = false;
+        let mut has_counter_input = false;
+
+        while let Some(item) = work.pop() {
+            match item {
+                Work::Place(scope, place) => {
+                    if !places.insert((scope, place)) {
+                        continue;
+                    }
+                    let Some(symbol) = place.as_symbol() else {
+                        return false;
+                    };
+                    let symbol = index.place_table(scope).symbol(symbol);
+                    if index.scope(scope).kind() != ScopeKind::Function
+                        || !symbol.is_bound()
+                        || symbol.is_global()
+                        || symbol.is_nonlocal()
+                    {
+                        return false;
+                    }
+                    work.extend(
+                        index
+                            .use_def_map(scope)
+                            .definitions_with_usage()
+                            .filter(|(_, def, _)| {
+                                def.place(db) == place && !def.kind(db).is_loop_header()
+                            })
+                            .map(|(_, def, _)| Work::Definition(def)),
+                    );
+                }
+                Work::Definition(def) => {
+                    if !definitions.insert(def) {
+                        continue;
+                    }
+                    if definitions.len() > 128 {
+                        return false;
+                    }
+                    let scope = def.file_scope(db);
+                    let is_root = scope == root_scope && def.place(db) == root_place;
+                    match def.kind(db) {
+                        DefinitionKind::AugmentedAssignment(assignment) => {
+                            let stmt = assignment.node(module);
+                            if !matches!(stmt.op, ast::Operator::Add | ast::Operator::Sub) {
+                                return false;
+                            }
+                            has_other_counter |= scope == root_scope && !is_root;
+                            has_counter_input |=
+                                is_root && matches!(&*stmt.value, ast::Expr::Call(_));
+                            work.push(Work::Expression(scope, &stmt.value));
+                        }
+                        DefinitionKind::Assignment(assignment) if assignment.unpack().is_none() => {
+                            let value = assignment.value(module);
+                            if is_root && loop_range.contains_range(value.range()) {
+                                // A reset can keep a counter in a finite set of literal states.
+                                if matches!(
+                                    value,
+                                    ast::Expr::NumberLiteral(_) | ast::Expr::UnaryOp(_)
+                                ) {
+                                    return false;
+                                }
+                                has_counter_input |=
+                                    matches!(value, ast::Expr::Name(_) | ast::Expr::BinOp(_));
+                            }
+                            work.push(Work::Expression(scope, value));
+                        }
+                        DefinitionKind::NestedBindings(nested) => {
+                            work.extend(
+                                nested
+                                    .visible_binding_sources(index, scope)
+                                    .flatten()
+                                    .filter_map(|source| source.binding.definition())
+                                    .map(Work::Definition),
+                            );
+                        }
+                        DefinitionKind::LoopHeader(header) => {
+                            let map = index.use_def_map(scope);
+                            work.extend(
+                                map.loop_header(header.loop_header_id())
+                                    .bindings_for_place(header.place())
+                                    .filter_map(|edge| map.definition(edge.binding()).definition())
+                                    .map(Work::Definition),
+                            );
+                        }
+                        _ => return false,
+                    }
+                }
+                Work::Expression(scope, expression) => match expression {
+                    ast::Expr::NumberLiteral(number)
+                        if matches!(number.value, ast::Number::Int(_)) =>
+                    {
+                        has_integer_literal = true;
+                    }
+                    ast::Expr::UnaryOp(op)
+                        if matches!(op.op, ast::UnaryOp::UAdd | ast::UnaryOp::USub) =>
+                    {
+                        work.push(Work::Expression(scope, &op.operand));
+                    }
+                    ast::Expr::BinOp(op)
+                        if matches!(op.op, ast::Operator::Add | ast::Operator::Sub) =>
+                    {
+                        work.push(Work::Expression(scope, &op.left));
+                        work.push(Work::Expression(scope, &op.right));
+                    }
+                    ast::Expr::Name(name) => {
+                        let Some(symbol) = index.place_table(scope).symbol_id(&name.id) else {
+                            return false;
+                        };
+                        work.push(Work::Place(scope, symbol.into()));
+                    }
+                    ast::Expr::Call(call) if scope == self.scope().file_scope_id(db) => {
+                        let Some(name) = call.func.as_name_expr() else {
+                            return false;
+                        };
+                        if name.id != "len"
+                            || !self
+                                .infer_name_load(name)
+                                .as_function_literal()
+                                .is_some_and(|function| function.is_known(db, KnownFunction::Len))
+                        {
+                            return false;
+                        }
+                    }
+                    _ => return false,
+                },
+            }
+        }
+        has_integer_literal
+            && (has_other_counter && has_counter_input
+                || self.is_shared_unit_counter(root, &definitions))
+    }
+
+    /// A local and a nested function can both advance the same cursor. Only accept a literal
+    /// seed followed exclusively by unit increments. A guard that tests a finite set of values
+    /// can stop such an increment from producing arbitrary integers.
+    fn is_shared_unit_counter(
+        &self,
+        root: Definition<'db>,
+        definitions: &FxHashSet<Definition<'db>>,
+    ) -> bool {
+        use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
+        use ty_python_core::predicate::PredicateNode;
+        let db = self.db();
+        let module = self.module();
+        let root_scope = root.file_scope(db);
+        let root_place = root.place(db);
+        let mut local = false;
+        let mut nested = false;
+        for &definition in definitions {
+            let scope = definition.file_scope(db);
+            let place = definition.place(db);
+            match definition.kind(db) {
+                DefinitionKind::NestedBindings(_) | DefinitionKind::LoopHeader(_) => continue,
+                DefinitionKind::Assignment(a)
+                    if scope == root_scope
+                        && place == root_place
+                        && matches!(a.value(module), ast::Expr::NumberLiteral(_)) =>
+                {
+                    continue;
+                }
+                DefinitionKind::AugmentedAssignment(a) => {
+                    let step = a.node(module);
+                    if step.op != ast::Operator::Add
+                        || !matches!(&*step.value, ast::Expr::NumberLiteral(n) if matches!(&n.value, ast::Number::Int(i) if i.as_i64() == Some(1)))
+                    {
+                        return false;
+                    }
+                }
+                _ => return false,
+            }
+            if scope == root_scope {
+                if place != root_place {
+                    return false;
+                }
+                local = true;
+            } else {
+                nested = true;
+            }
+            let map = self.index.use_def_map(scope);
+            let evaluator = map.narrowing_evaluator(ScopedNarrowingConstraint::ALWAYS_TRUE);
+            let targets = evaluator.predicate_narrowing_targets();
+            if map.predicates().iter_enumerated().any(|(id, predicate)| {
+                if !targets.contains(id, place) { return false; }
+                let expression = match predicate.node {
+                    PredicateNode::Expression { expression, .. } | PredicateNode::Condition(expression) => expression,
+                    _ => return true,
+                };
+                !matches!(expression.node_ref(db).node(module), ast::Expr::Compare(c)
+                    if c.operands.iter().all(ast::Expr::is_name_expr)
+                       && c.ops.iter().all(|op| matches!(op, ast::CmpOp::Lt | ast::CmpOp::LtE | ast::CmpOp::Gt | ast::CmpOp::GtE)))
+            }) {
+                return false;
+            }
+        }
+        local && nested
+    }
+
     /// Infer the type for a loop header definition.
     ///
     /// The loop header sees all the bindings that originate in the loop and are visible at a
@@ -2678,7 +2893,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 4096;
         let db = self.db();
 
-        let loop_header = loop_header_reachability(self.db(), definition);
         let use_def = self
             .index
             .use_def_map(self.scope().file_scope_id(self.db()));
@@ -2686,15 +2900,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Loop-header types are an approximation point for loop fixpoint analysis. Inferring the
         // exact union of every visible loop-back binding can recursively force inference of large
         // boolean expressions and explode on real-world loops.
-        if use_def.reachability_constraints().used_interiors().len()
-            > MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES
-        {
+        let nodes = use_def.reachability_constraints().used_interiors().len();
+        if nodes > MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES {
             self.bindings.insert(definition, Type::unknown());
             return;
         }
 
         let place = loop_header_kind.place();
         let env = self.program_environment();
+        if nodes > crate::place::LOOP_SUMMARY_MIN_NODES
+            && use_def
+                .loop_header(loop_header_kind.loop_header_id())
+                .bindings_for_place(place)
+                .nth(1)
+                .is_some()
+            && crate::place::scope_has_branching_counter(db, definition.scope(db))
+            && self.can_widen_loop_counter(definition)
+        {
+            self.bindings
+                .insert(definition, KnownClass::Int.to_instance(db, env));
+            return;
+        }
+
+        let loop_header = loop_header_reachability(db, definition);
         let mut union = UnionBuilder::new(db, env).or_recursively_defined(RecursivelyDefined::Yes);
 
         for reachable_binding in &loop_header.reachable_bindings {

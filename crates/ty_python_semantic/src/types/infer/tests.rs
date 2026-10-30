@@ -484,6 +484,61 @@ fn simple_assignment_does_not_enter_salsa_cycle() {
     assert_eq!(cycles, Vec::<String>::new());
 }
 
+#[test]
+fn branching_loop_preserves_counter_and_literal_types() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let mut source = String::from(
+        r#"from typing import Literal, assert_type
+
+def require_zero(value: Literal[0]) -> None: ...
+
+def check(flags: list[bool]) -> None:
+    index = 0
+    position = -1
+    offset = -1
+    bounded = 0
+    sticky = 7
+    def disabled() -> Literal[False]:
+        return False
+    while index < len(flags):
+        assert_type(index, int)
+        assert_type(position, int)
+        assert_type(offset, int)
+        assert_type(bounded, Literal[0, 1, 2])
+        assert_type(sticky, Literal[7])
+        require_zero(index)
+        if disabled():
+            sticky = "unreachable"
+        index += 1
+        if bounded == 1:
+            bounded += 1
+        else:
+            bounded = 1
+"#,
+    );
+    // The first counter has too many assignments to summarize. The second fits the budget
+    // even though both are carried through the same large control-flow graph.
+    for i in 0..200 {
+        writeln!(
+            source,
+            "        if flags[{i}]:\n            position = index - 1"
+        )?;
+        if i < 12 {
+            source.push_str("            offset = index - 1\n");
+        }
+        source.push_str("            continue\n");
+    }
+    source.push_str("        offset -= len(flags)\n        position -= len(flags)\n");
+    db.write_file("/src/main.py", &source)?;
+
+    let file = system_path_to_file(&db, "/src/main.py")?;
+    let diagnostics = check_types(&db, program_file(&db, file));
+    assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+    assert_eq!(diagnostics[0].id().as_str(), "invalid-argument-type");
+    assert!(diagnostics[0].headline_message().contains("require_zero"));
+    Ok(())
+}
+
 /// Mutually dependent loop conditions must not select different fixed points depending on which
 /// imported variable is inferred first. Both inputs are `Never`, so neither conditional assignment
 /// can execute. Regression test for <https://github.com/astral-sh/ty/issues/4577>.

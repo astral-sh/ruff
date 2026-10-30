@@ -796,6 +796,85 @@ fn evaluate_finally_continuation<'db>(
     evaluate_reachability_constraint(db, scope, continuation)
 }
 
+/// Resolve literal boolean conditions without recursively asking for the types we are
+/// currently computing. All reaching assignments to a name must agree on its value.
+#[salsa::tracked(returns(deref), heap_size = get_size2::GetSize::get_heap_size)]
+fn loop_literal_conditions<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Box<[Option<bool>]> {
+    use ruff_python_ast::Expr;
+    use ty_python_core::definition::DefinitionKind;
+
+    let use_def = use_def_map(db, scope);
+    let file = scope.program_file(db);
+    let module = parsed_module(db, file.python_file(db)).load(db);
+    let index = ty_python_core::semantic_index(db, file);
+    use_def
+        .predicates()
+        .iter()
+        .map(|predicate| {
+            let expression = match predicate.node {
+                PredicateNode::Condition(expr)
+                | PredicateNode::Expression {
+                    expression: expr, ..
+                } if expr.scope(db) == scope => expr.node_ref(db).node(&module),
+                _ => return None,
+            };
+            let value = match expression {
+                Expr::BooleanLiteral(literal) => literal.value,
+                Expr::Name(_) => {
+                    let use_id = index.try_expression_use_id(expression.into())?;
+                    let mut value = None;
+                    for binding in use_def.bindings_at_use(use_id) {
+                        let def = binding.binding.definition()?;
+                        let rhs = match def.kind(db) {
+                            DefinitionKind::Assignment(a) if a.unpack().is_none() => {
+                                a.value(&module)
+                            }
+                            DefinitionKind::AnnotatedAssignment(a) => a.value(&module)?,
+                            _ => return None,
+                        };
+                        let Expr::BooleanLiteral(literal) = rhs else {
+                            return None;
+                        };
+                        if value.is_some_and(|previous| previous != literal.value) {
+                            return None;
+                        }
+                        value = Some(literal.value);
+                    }
+                    value?
+                }
+                _ => return None,
+            };
+            Some(value == predicate.is_positive)
+        })
+        .collect()
+}
+
+/// Follow one path through the ternary decision diagram. Unknown predicates take the
+/// ambiguous edge, so an assignment guarded by a known false condition can still be excluded.
+pub(crate) fn evaluate_loop_literal_conditions<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    use_def: &UseDefMap<'db>,
+    mut id: ScopedReachabilityConstraintId,
+) -> Truthiness {
+    if let Some(truthiness) = terminal_reachability(id) {
+        return truthiness;
+    }
+    let conditions = loop_literal_conditions(db, scope);
+    for _ in 0..128 {
+        let node = use_def.reachability_constraints().get_interior_node(id);
+        id = match conditions[node.atom().index()] {
+            Some(true) => node.if_true(),
+            Some(false) => node.if_false(),
+            None => node.if_ambiguous(),
+        };
+        if let Some(truthiness) = terminal_reachability(id) {
+            return truthiness;
+        }
+    }
+    Truthiness::Ambiguous
+}
+
 fn terminal_reachability(id: ScopedReachabilityConstraintId) -> Option<Truthiness> {
     match id {
         ScopedReachabilityConstraintId::ALWAYS_TRUE => Some(Truthiness::AlwaysTrue),
