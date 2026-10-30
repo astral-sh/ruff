@@ -49,13 +49,41 @@ use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
-    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
-    StringLiteralType, SubclassOfType, Type, TypePair, TypeVarBoundOrConstraints, UnionType,
+    BytesLiteralType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionType,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
+    NegativeIntersectionElements, StringLiteralType, SubclassOfType, Type, TypePair,
+    TypeVarBoundOrConstraints, UnionType,
 };
-use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, ProgramEnvironment};
+use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, Program, ProgramEnvironment};
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
+
+/// Class origins in the MROs of the two possible TypedDict fallbacks, `dict` and `Mapping`.
+#[salsa::tracked(returns(ref), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+fn typed_dict_fallback_bases<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+) -> Option<Box<[ClassLiteral<'db>]>> {
+    let env = ProgramEnvironment::from_program(program);
+    let mut bases = Vec::new();
+    for known in [KnownClass::Dict, KnownClass::Mapping] {
+        let fallback = known.to_specialized_instance(db, &env, &[Type::unknown(), Type::unknown()]);
+        let Type::NominalInstance(instance) = fallback else {
+            return None;
+        };
+        let origin = instance.class_literal(db, &env).as_static()?;
+        // Specializing a generic changes the arguments on its bases, but preserves the
+        // class literals in the MRO. Defer to the normal relation for unresolved MROs.
+        for &base in origin.try_mro(db, None).ok()?.iter() {
+            match base {
+                ClassBase::Class(class) => bases.push(class.class_literal(db)),
+                ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => return None,
+                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict(_) => {}
+            }
+        }
+    }
+    Some(bases.into_boxed_slice())
+}
 
 /// Extract `(core, guard)` from truthiness-guarded intersections.
 ///
@@ -1137,6 +1165,7 @@ impl<'db> UnionBuilder<'db> {
         // unpacking them.
         let should_simplify_full = !ty.is_alias_like() && !self.cycle_recovery;
 
+        let mut typed_dict_bases = None;
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
 
@@ -1160,6 +1189,31 @@ impl<'db> UnionBuilder<'db> {
 
             if ty == element_type {
                 return;
+            }
+
+            match (ty, element_type) {
+                // Distinct literal receivers give `str.startswith` distinct bound methods.
+                (
+                    Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_)),
+                    Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_)),
+                ) => continue,
+                // A nominal instance has no TypedDict schema. In the other direction a
+                // TypedDict can only subtype nominal classes through its dict or Mapping
+                // fallback. An unrelated class and a TypedDict also exclude `object()`.
+                (Type::TypedDict(_), Type::NominalInstance(nominal))
+                | (Type::NominalInstance(nominal), Type::TypedDict(_))
+                    if should_simplify_full && !nominal.is_object() =>
+                {
+                    let bases = typed_dict_bases.get_or_insert_with(|| {
+                        typed_dict_fallback_bases(db, self.env.program(db)).as_deref()
+                    });
+                    if bases
+                        .is_some_and(|bases| !bases.contains(&nominal.class_literal(db, &self.env)))
+                    {
+                        continue;
+                    }
+                }
+                _ => {}
             }
 
             // `object` already contains every possible union element.
