@@ -805,17 +805,16 @@ fn loop_literal_conditions<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Box<[Op
 
     let use_def = use_def_map(db, scope);
     let file = scope.program_file(db);
-    let module = parsed_module(db, file.python_file(db)).load(db);
+    let module = ruff_db::parsed::parsed_module(db, file.python_file(db)).load(db);
     let index = ty_python_core::semantic_index(db, file);
     use_def
         .predicates()
         .iter()
         .map(|predicate| {
             let expression = match predicate.node {
-                PredicateNode::Condition(expr)
-                | PredicateNode::Expression {
-                    expression: expr, ..
-                } if expr.scope(db) == scope => expr.node_ref(db).node(&module),
+                PredicateNode::Expression(expr) if expr.scope(db) == scope => {
+                    expr.node_ref(db).node(&module)
+                }
                 _ => return None,
             };
             let value = match expression {

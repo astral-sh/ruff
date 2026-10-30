@@ -2863,14 +2863,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let evaluator = map.narrowing_evaluator(ScopedNarrowingConstraint::ALWAYS_TRUE);
             let targets = evaluator.predicate_narrowing_targets();
             if map.predicates().iter_enumerated().any(|(id, predicate)| {
-                if !targets.contains(id, place) { return false; }
-                let expression = match predicate.node {
-                    PredicateNode::Expression { expression, .. } | PredicateNode::Condition(expression) => expression,
-                    _ => return true,
+                if !targets.contains(id, place) {
+                    return false;
+                }
+                let PredicateNode::Expression(expression) = predicate.node else {
+                    return true;
                 };
-                !matches!(expression.node_ref(db).node(module), ast::Expr::Compare(c)
-                    if c.operands.iter().all(ast::Expr::is_name_expr)
-                       && c.ops.iter().all(|op| matches!(op, ast::CmpOp::Lt | ast::CmpOp::LtE | ast::CmpOp::Gt | ast::CmpOp::GtE)))
+                let ast::Expr::Compare(comparison) = expression.node_ref(db).node(module) else {
+                    return true;
+                };
+                let compares_names = comparison.operands.iter().all(ast::Expr::is_name_expr);
+                let is_ordering = comparison.ops.iter().all(|op| {
+                    matches!(
+                        op,
+                        ast::CmpOp::Lt | ast::CmpOp::LtE | ast::CmpOp::Gt | ast::CmpOp::GtE
+                    )
+                });
+                !(compares_names && is_ordering)
             }) {
                 return false;
             }
