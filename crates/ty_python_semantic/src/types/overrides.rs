@@ -6,6 +6,7 @@
 mod attributes;
 
 use std::cell::LazyCell;
+use std::hash::BuildHasher;
 
 use bitflags::bitflags;
 use ruff_db::{
@@ -143,6 +144,7 @@ pub(super) fn check_class<'db>(
         Vec::new()
     };
     let override_class = OverrideClass {
+        base_names: OverrideCandidates::from_bases(db, bases.iter().copied()).once,
         class: class_specialized,
         scope,
         kind: CodeGeneratorKind::from_class(db, class.into()),
@@ -157,6 +159,79 @@ pub(super) fn check_class<'db>(
     )]
     for member in own_class_members {
         check_class_declaration(context, configuration, &override_class, &member);
+    }
+}
+
+/// A negative result proves that no contributing declaration has this name.
+/// Hash collisions only cause additional lookups.
+#[derive(Default, PartialEq, Eq, get_size2::GetSize)]
+struct OverrideNames([u64; 16]);
+
+impl OverrideNames {
+    fn bit(name: &Name) -> (usize, u64) {
+        let hash = rustc_hash::FxBuildHasher.hash_one(name.as_str());
+        ((hash >> 6) as usize % 16, 1 << (hash % 64))
+    }
+
+    fn may_contain(&self, name: &Name) -> bool {
+        // Ordinary classes can synthesize special methods, including ordering methods.
+        if name.starts_with("__") && name.ends_with("__") {
+            return true;
+        }
+        let (word, bit) = Self::bit(name);
+        self.0[word] & bit != 0
+    }
+}
+
+/// Names a single base can provide, before specializing it for the subclass.
+/// A class with generated fields can contribute names outside its own source.
+#[salsa::tracked(returns(ref), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+fn own_override_names(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<OverrideNames> {
+    if CodeGeneratorKind::from_class(db, class.into()).is_some()
+        || crate::types::dedicated::django::is_model(db, class)
+    {
+        return None;
+    }
+    let owner = ClassType::NonGeneric(class.into());
+    let mut names = OverrideNames::default();
+    let table = place_table(db, class.body_scope(db));
+    for name in table
+        .symbols()
+        .map(ty_python_core::symbol::Symbol::name)
+        .chain(owner.own_instance_attribute_names(db))
+        .chain(class.slot_names(db).unwrap_or_default())
+    {
+        let (word, bit) = OverrideNames::bit(name);
+        names.0[word] |= bit;
+    }
+    Some(names)
+}
+
+/// Names that may be supplied by one or more bases, or by two or more bases.
+#[derive(Default)]
+struct OverrideCandidates {
+    once: OverrideNames,
+    twice: OverrideNames,
+}
+
+impl OverrideCandidates {
+    fn from_bases<'db>(db: &'db dyn Db, bases: impl IntoIterator<Item = ClassBase<'db>>) -> Self {
+        let mut candidates = Self::default();
+        for base in bases {
+            if matches!(base, ClassBase::Generic | ClassBase::Protocol) {
+                continue;
+            }
+            let names = base
+                .into_class()
+                .and_then(|base| base.static_class_literal(db))
+                .and_then(|(class, _)| own_override_names(db, class).as_ref())
+                .unwrap_or(&OverrideNames([u64::MAX; 16]));
+            for (i, &bits) in names.0.iter().enumerate() {
+                candidates.twice.0[i] |= candidates.once.0[i] & bits;
+                candidates.once.0[i] |= bits;
+            }
+        }
+        candidates
     }
 }
 
@@ -201,6 +276,13 @@ fn check_inherited_conflicts<'db>(
             .collect::<FxIndexSet<_>>()
     });
 
+    let candidates = match &attribute_contracts {
+        Some(contracts) => {
+            OverrideCandidates::from_bases(db, contracts.iter().copied().map(ClassBase::Class))
+        }
+        None => OverrideCandidates::from_bases(db, mro.iter().copied().map(ClassBase::Class)),
+    };
+
     for (index, candidate_owner) in mro.iter().copied().enumerate() {
         if first_dynamic_base.is_some_and(|position| index >= position) {
             break;
@@ -234,7 +316,8 @@ fn check_inherited_conflicts<'db>(
                     .map(|name| (name, None)),
             );
         for (name, definition) in names {
-            if is_mangled_private(name)
+            if !candidates.twice.may_contain(name)
+                || is_mangled_private(name)
                 || name == "__hash__"
                 || !seen.insert(name.clone())
                 || class
@@ -607,6 +690,7 @@ fn conflicting_named_tuple_field<'db>(
 }
 
 struct OverrideClass<'db> {
+    base_names: OverrideNames,
     class: ClassType<'db>,
     scope: ScopeId<'db>,
     kind: Option<CodeGeneratorKind<'db>>,
@@ -632,6 +716,18 @@ fn check_class_declaration<'db>(
         member,
         first_reachable_definition,
     } = member;
+
+    // A new name on an ordinary class only needs the explicit @override check.
+    if !override_class.base_names.may_contain(&member.name)
+        && class_kind.is_none()
+        && override_class.enum_info.is_none()
+        && override_class.named_tuple_bases.is_empty()
+    {
+        if first_reachable_definition.kind(db).is_function_def() {
+            check_explicit_overrides(context, member, class_scope, class);
+        }
+        return;
+    }
 
     let subclass_instance_member = lookup_override_member(db, env, class, &member.name);
     let Place::Defined(DefinedPlace {

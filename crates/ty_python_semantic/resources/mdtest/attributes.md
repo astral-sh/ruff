@@ -392,6 +392,19 @@ class C:
 reveal_type(C().value)  # revealed: Before | After
 ```
 
+The initial value can also come from an inherited class attribute.
+
+```py
+class Base:
+    score = Before()
+
+class Child(Base):
+    def update(self) -> None:
+        self.score += 1  # error: [invalid-assignment]
+
+reveal_type(Child().score)  # revealed: Before | After
+```
+
 #### Augmented assignments to conditionally defined class-level defaults
 
 A conditional class default must not hide the dynamic fallback used when that default is absent.

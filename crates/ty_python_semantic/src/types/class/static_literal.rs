@@ -10,6 +10,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::{PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use std::cell::RefCell;
+use std::hash::BuildHasher;
 
 use super::implicit_attributes::implicit_attribute_names;
 use crate::{
@@ -62,7 +63,9 @@ use ty_python_core::{
     definition::{Definition, DefinitionKind, DefinitionState},
     place_table,
     scope::ScopeId,
-    semantic_index, use_def_map,
+    semantic_index,
+    symbol::ScopedSymbolId,
+    use_def_map,
 };
 
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
@@ -113,6 +116,69 @@ pub struct StaticClassLiteral<'db> {
     /// Whether this class has an explicit `metaclass` keyword argument.
     #[returns(copy)]
     pub(crate) has_explicit_metaclass: bool,
+}
+
+/// A missing bit proves a name does not occur. Collisions fall through to exact lookup.
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue,
+)]
+pub(super) struct MemberNameHints {
+    class: u128,
+    instance: u128,
+    implicit: u128,
+    augmented: u128,
+}
+
+impl MemberNameHints {
+    #[inline]
+    pub(super) fn bit(name: &str) -> u128 {
+        1 << (rustc_hash::FxBuildHasher.hash_one(name) & 127)
+    }
+
+    pub(super) fn may_be_implicit(&self, name: &str) -> bool {
+        self.implicit & Self::bit(name) != 0
+    }
+
+    pub(super) fn may_be_augmented(&self, name: &str) -> bool {
+        self.augmented & Self::bit(name) != 0
+    }
+}
+
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn member_name_hints(db: &dyn Db, scope: ScopeId<'_>) -> MemberNameHints {
+    let mut hints = MemberNameHints::default();
+    let index = semantic_index(db, scope.program_file(db));
+    let body = scope.file_scope_id(db);
+    let defs = index.use_def_map(body);
+    for (i, symbol) in index.place_table(body).symbols().enumerate() {
+        let bit = MemberNameHints::bit(symbol.name().as_str());
+        hints.class |= bit;
+        if symbol.is_declared()
+            || defs
+                .end_of_scope_imported_final_candidates(ScopedSymbolId::from_usize(i).into())
+                .next()
+                .is_some()
+        {
+            hints.instance |= bit;
+        }
+    }
+    for method in attribute_scopes(db, scope) {
+        let defs = index.use_def_map(method);
+        let places = index.place_table(method);
+        for (id, name) in places.defined_instance_attributes() {
+            let bit = MemberNameHints::bit(name);
+            hints.instance |= bit;
+            hints.implicit |= bit;
+            if defs.reachable_member_bindings(id).any(|binding| {
+                binding.binding.is_defined_and(|d| {
+                    matches!(d.kind(db), DefinitionKind::AugmentedAssignment(_))
+                })
+            }) {
+                hints.augmented |= bit;
+            }
+        }
+    }
+    hints
 }
 
 // The Salsa heap is tracked separately.
@@ -212,6 +278,18 @@ struct OwnClassFields<'db> {
 
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
+    /// Ordinary member lookup only needs to consider sources outside the class body when
+    /// a field-generating class or a slot can create an otherwise unmentioned name.
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| false)]
+    fn has_no_generated_fields_or_slots(self, db: &'db dyn Db) -> bool {
+        CodeGeneratorKind::from_static_class(db, self).is_none()
+            && self.slot_names(db).is_none_or(<[Name]>::is_empty)
+    }
+
+    pub(super) fn member_hints(self, db: &'db dyn Db) -> &'db MemberNameHints {
+        member_name_hints(db, self.body_scope(db))
+    }
+
     /// Return `true` if this class represents `known_class`
     pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
@@ -1564,6 +1642,13 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
+        let hints = self.member_hints(db);
+        let bit = MemberNameHints::bit(name);
+        if (hints.class | hints.implicit) & bit == 0 && self.has_no_generated_fields_or_slots(db) {
+            return self
+                .own_synthesized_member(db, env, specialization, inherited_generic_context, name)
+                .map_or_else(Member::unbound, Member::definitely_declared);
+        }
         let code_generator = CodeGeneratorKind::from_static_class(db, self);
         if code_generator.is_some_and(CodeGeneratorKind::is_dataclass_like) {
             if name == "__dataclass_fields__" {
@@ -1605,7 +1690,12 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let body_scope = self.body_scope(db);
-        let member = class_member(db, body_scope, name).map_type(|ty| {
+        let member = if hints.class & bit != 0 {
+            class_member(db, body_scope, name)
+        } else {
+            Member::unbound()
+        }
+        .map_type(|ty| {
             let ty = if name.starts_with("__") && name.ends_with("__") {
                 into_dunder_paramspec_callable(db, env, ty)
             } else {
@@ -2919,6 +3009,38 @@ impl<'db> StaticClassLiteral<'db> {
             .collect()
     }
 
+    /// Record which MRO entries can supply instance storage without resolving any member types.
+    #[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    fn instance_member_bases(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Option<Box<[(ClassBase<'db>, u128)]>> {
+        let mut augmented = 0;
+        Some(
+            self.iter_mro(db, specialization)
+                .filter_map(|base| {
+                    let names = match base {
+                        ClassBase::Class(class) => {
+                            class
+                                .static_class_literal(db)
+                                .map_or(u128::MAX, |(literal, _)| {
+                                    let hints = literal.member_hints(db);
+                                    // A pending augmented assignment can read its initial value
+                                    // from a class attribute further along the MRO.
+                                    augmented |= hints.augmented;
+                                    hints.instance | augmented
+                                })
+                        }
+                        ClassBase::Generic | ClassBase::Protocol => 0,
+                        _ => u128::MAX,
+                    };
+                    (names != 0).then_some((base, names))
+                })
+                .collect(),
+        )
+    }
+
     /// Look up an instance attribute (available in `__dict__`) of the given name.
     ///
     /// See [`Type::instance_member`] for more details.
@@ -2933,7 +3055,16 @@ impl<'db> StaticClassLiteral<'db> {
             return Place::Undefined.into();
         }
 
-        match MroLookup::new(db, env, self.iter_mro(db, specialization)).instance_member(name) {
+        let lookup = if let Some(bases) = self.instance_member_bases(db, specialization) {
+            let bit = MemberNameHints::bit(name);
+            let bases = bases
+                .iter()
+                .filter_map(|(base, names)| (names & bit != 0).then_some(*base));
+            MroLookup::new(db, env, bases).instance_member(name)
+        } else {
+            MroLookup::new(db, env, self.iter_mro(db, specialization)).instance_member(name)
+        };
+        match lookup {
             InstanceMemberResult::Done(result) => result,
             InstanceMemberResult::TypedDict => KnownClass::TypedDictFallback
                 .to_instance(db, env)
@@ -2964,6 +3095,10 @@ impl<'db> StaticClassLiteral<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> Member<'db> {
+        if self.member_hints(db).instance & MemberNameHints::bit(name) == 0 {
+            return Member::unbound();
+        }
+
         // TODO: There are many things that are not yet implemented here:
         // - `typing.Final`
         // - Proper diagnostics

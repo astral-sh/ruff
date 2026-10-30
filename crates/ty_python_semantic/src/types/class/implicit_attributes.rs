@@ -79,6 +79,9 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> Option<ImplicitAttributeName<'db>> {
+        if !self.member_hints(db).may_be_implicit(name) {
+            return None;
+        }
         let class_body_scope = self.body_scope(db);
         // Collect names in a tracked query so unrelated edits can preserve dependent member
         // lookups, and avoid retaining query entries for names that no method can define.

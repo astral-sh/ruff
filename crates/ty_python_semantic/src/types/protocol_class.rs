@@ -2588,7 +2588,7 @@ fn protocol_member_read_type<'db>(
                 MemberLookupPolicy::NO_INSTANCE_FALLBACK,
             ),
             ty,
-            Place::Undefined.into(),
+            || Place::Undefined.into(),
             InstanceFallbackShadowsNonDataDescriptor::No,
         )
         .unwrap_or_else(|error| error.fallback_member(db))

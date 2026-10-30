@@ -835,41 +835,43 @@ fn c3_merge<'db>(
     db: &'db dyn Db,
     mut sequences: Vec<VecDeque<ClassBase<'db>>>,
 ) -> Option<Mro<'db>> {
-    // Most MROs aren't that long...
-    let mut mro = Vec::with_capacity(8);
+    // A head can be selected exactly when its identity occurs in no sequence tail.
+    // Count each tail entry once and update the counts as heads advance.
+    let mut tail_counts = rustc_hash::FxHashMap::<_, usize>::default();
+    for base in sequences
+        .iter()
+        .flat_map(|sequence| sequence.iter().skip(1))
+    {
+        *tail_counts.entry(base.mro_identity(db)).or_default() += 1;
+    }
 
+    let mut mro = Vec::with_capacity(8);
     loop {
         sequences.retain(|sequence| !sequence.is_empty());
-
         if sequences.is_empty() {
             return Some(Mro::from(mro));
         }
 
-        // If the candidate exists "deeper down" in the inheritance hierarchy,
-        // we should refrain from adding it to the MRO for now. Add the first candidate
-        // for which this does not hold true. If this holds true for all candidates,
-        // return `None`; it will be impossible to find a consistent MRO for the class
-        // with the given bases.
-        let mro_entry = sequences.iter().find_map(|outer_sequence| {
-            let candidate = outer_sequence[0];
-            let candidate_identity = candidate.mro_identity(db);
-
-            let not_head = sequences.iter().all(|sequence| {
-                sequence
-                    .iter()
-                    .skip(1)
-                    .all(|base| base.mro_identity(db) != candidate_identity)
-            });
-
-            not_head.then_some(candidate)
+        let (entry, identity) = sequences.iter().find_map(|sequence| {
+            let entry = sequence[0];
+            let identity = entry.mro_identity(db);
+            tail_counts
+                .get(&identity)
+                .is_none_or(|count| *count == 0)
+                .then_some((entry, identity))
         })?;
+        mro.push(entry);
 
-        mro.push(mro_entry);
-
-        // Make sure we don't try to add the candidate to the MRO twice:
-        let mro_entry_identity = mro_entry.mro_identity(db);
         for sequence in &mut sequences {
-            sequence.pop_front_if(|base| base.mro_identity(db) == mro_entry_identity);
+            if sequence
+                .pop_front_if(|base| base.mro_identity(db) == identity)
+                .is_some()
+                && let Some(head) = sequence.front()
+            {
+                *tail_counts
+                    .get_mut(&head.mro_identity(db))
+                    .expect("new head was in a tail") -= 1;
+            }
         }
     }
 }

@@ -240,10 +240,6 @@ impl<'db> StaticClassLiteral<'db> {
     /// Inherited slots are excluded; callers that need the complete layout should use
     /// [`Self::has_instance_slot`]. A dynamic declaration returns `None` rather than guessing.
     pub(crate) fn slot_names(self, db: &'db dyn Db) -> Option<&'db [Name]> {
-        if !self.has_explicit_slots(db) && !self.has_generated_slots(db) {
-            return None;
-        }
-
         match self.slot_definition(db) {
             SlotDefinition::Names(names) => Some(names),
             SlotDefinition::NonEmpty | SlotDefinition::DynamicOrNone => None,
@@ -252,12 +248,11 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// Returns whether this class definitely introduces at least one instance slot.
     pub(super) fn has_nonempty_slots(self, db: &'db dyn Db) -> bool {
-        (self.has_explicit_slots(db) || self.has_generated_slots(db))
-            && match self.slot_definition(db) {
-                SlotDefinition::Names(names) => !names.is_empty(),
-                SlotDefinition::NonEmpty => true,
-                SlotDefinition::DynamicOrNone => false,
-            }
+        match self.slot_definition(db) {
+            SlotDefinition::Names(names) => !names.is_empty(),
+            SlotDefinition::NonEmpty => true,
+            SlotDefinition::DynamicOrNone => false,
+        }
     }
 
     /// Returns whether this class synthesizes slots through a dataclass or named tuple.

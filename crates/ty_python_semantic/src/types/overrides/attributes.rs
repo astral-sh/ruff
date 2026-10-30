@@ -277,7 +277,7 @@ fn bind_attribute<'db>(
             env,
             class_member,
             receiver,
-            instance_member.into(),
+            || instance_member.into(),
             InstanceFallbackShadowsNonDataDescriptor::No,
         )
         .ok()?

@@ -2373,6 +2373,7 @@ impl<'db> ClassType<'db> {
     ) -> ImplicitAttribute<'db> {
         let augmented_bindings = self
             .static_class_literal(db)
+            .filter(|(class, _)| class.member_hints(db).may_be_augmented(name))
             .map(|(class, _)| class.implicit_attribute_bindings(db, name, target_method_decorator))
             .filter(|implicit| member.is_undefined() == implicit.member.is_undefined())
             .and_then(|implicit| implicit.augmented_bindings);

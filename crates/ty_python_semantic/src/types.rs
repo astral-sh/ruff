@@ -4732,20 +4732,21 @@ impl<'db> Type<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        let class_attr = self
-            .find_name_in_mro_with_policy(db, env, name, policy)
-            .expect("The meta-type of an instance-like type should always have an MRO");
+        let class_attr = || {
+            self.find_name_in_mro_with_policy(db, env, name, policy)
+                .expect("The meta-type of an instance-like type should always have an MRO")
+        };
         let Some(metaclass) = class
             .inferred_metaclass(db)
             .for_inheritance(db, env)
             .to_instance_approximation(db, env)
             .and_then(|metaclass| metaclass.nominal_class(db, env))
         else {
-            return class_attr;
+            return class_attr();
         };
         let metaclass_member = metaclass.instance_member(db, env, name);
         if metaclass_member.is_undefined() {
-            return class_attr;
+            return class_attr();
         }
         let metaclass_member_is_implicit = metaclass_member
             .qualifiers
@@ -4779,13 +4780,15 @@ impl<'db> Type<'db> {
         } else {
             own_class_member
         };
-        let inherited_class_member = class.class_literal(db).class_member_from_mro(
-            db,
-            env,
-            name,
-            policy,
-            class.iter_mro(db).skip(1),
-        );
+        let inherited_class_member = || {
+            class.class_literal(db).class_member_from_mro(
+                db,
+                env,
+                name,
+                policy,
+                class.iter_mro(db).skip(1),
+            )
+        };
 
         let metaclass_member = if metaclass_member_is_implicit {
             Self::with_definedness(metaclass_member, Definedness::PossiblyUndefined)
@@ -4794,7 +4797,7 @@ impl<'db> Type<'db> {
         };
         let class_member = own_class_member
             .or_fall_back_to(db, env, || metaclass_member)
-            .or_fall_back_to(db, env, || inherited_class_member);
+            .or_fall_back_to(db, env, inherited_class_member);
         let class_member = if metaclass_member_is_implicit {
             // Preserve the existing convention that an inferred instance member is assumed to be
             // available even when no lower-precedence fallback exists.
@@ -5643,7 +5646,7 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         key: MemberLookupKey<'db>,
         receiver: Type<'db>,
-        fallback: MemberLookupResult<'db>,
+        fallback: impl FnOnce() -> MemberLookupResult<'db>,
         policy: InstanceFallbackShadowsNonDataDescriptor,
     ) -> MemberLookupResult<'db> {
         let meta_attr_plain =
@@ -5660,10 +5663,12 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         meta_attr_plain: PlaceAndQualifiers<'db>,
         receiver: Type<'db>,
-        fallback: MemberLookupResult<'db>,
+        fallback: impl FnOnce() -> MemberLookupResult<'db>,
         policy: InstanceFallbackShadowsNonDataDescriptor,
     ) -> MemberLookupResult<'db> {
-        let meta_attr_ty = meta_attr_plain.place.ignore_possibly_undefined();
+        let Some(meta_attr_ty) = meta_attr_plain.place.ignore_possibly_undefined() else {
+            return fallback();
+        };
         // Preserve the receiver's type variables and all its narrowed class constraints.
         let owner = receiver.to_meta_type(db, env);
         let (
@@ -5676,7 +5681,27 @@ impl<'db> Type<'db> {
         ) = Self::try_call_dunder_get_on_attribute(db, env, meta_attr_plain, Some(receiver), owner);
 
         let meta_attr_error = meta_attr_error.map(MemberLookupErrorKind::DescriptorGet);
-        let meta_properties = meta_attr_ty.and_then(|ty| ty.property_deprecations(db));
+        let meta_properties = meta_attr_ty.property_deprecations(db);
+        // Only a slot needs the instance declaration even when its getter takes precedence.
+        if !matches!(meta_attr_ty, Type::SlotDescriptor(_))
+            && matches!(
+                meta_attr,
+                Place::Defined(DefinedPlace {
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                })
+            )
+            && matches!(meta_attr_kind, AttributeKind::DataDescriptor)
+        {
+            return member_lookup_result(
+                db,
+                meta_attr.with_qualifiers(meta_attr_qualifiers),
+                meta_attr_error,
+                meta_properties,
+            );
+        }
+
+        let fallback = fallback();
         let fallback_error = fallback.err().map(|error| error.kind(db));
         let fallback_member = fallback.unwrap_or_else(|error| error.fallback_member(db));
         let fallback_properties = fallback_member.deprecated_properties(db);
@@ -5686,7 +5711,7 @@ impl<'db> Type<'db> {
         // Unlike an arbitrary data descriptor, its inherited getter must not hide a more precise
         // declaration established by the receiver's class.
         if matches!(meta_attr, Place::Defined(_))
-            && matches!(meta_attr_ty, Some(Type::SlotDescriptor(_)))
+            && matches!(meta_attr_ty, Type::SlotDescriptor(_))
             && !fallback_member.place.is_undefined()
         {
             return fallback;
@@ -6050,14 +6075,12 @@ impl<'db> Type<'db> {
                     .into();
                 }
 
-                let fallback = this.instance_member(db, env, name_str);
-
                 let result = Type::invoke_descriptor_protocol(
                     db,
                     env,
                     key,
                     receiver,
-                    fallback.into(),
+                    || this.instance_member(db, env, name_str).into(),
                     InstanceFallbackShadowsNonDataDescriptor::No,
                 );
 
@@ -6578,7 +6601,7 @@ impl<'db> Type<'db> {
                         env,
                         key,
                         receiver,
-                        Place::Undefined.into(),
+                        || Place::Undefined.into(),
                         InstanceFallbackShadowsNonDataDescriptor::No,
                     );
                     map_member_lookup_type(db, result, |ty| {
@@ -6765,12 +6788,14 @@ impl<'db> Type<'db> {
                         env,
                         key,
                         receiver,
-                        member_lookup_result(
-                            db,
-                            class_attr_fallback,
-                            class_attr_error.map(MemberLookupErrorKind::DescriptorGet),
-                            None,
-                        ),
+                        || {
+                            member_lookup_result(
+                                db,
+                                class_attr_fallback,
+                                class_attr_error.map(MemberLookupErrorKind::DescriptorGet),
+                                None,
+                            )
+                        },
                         InstanceFallbackShadowsNonDataDescriptor::Yes,
                     );
 
