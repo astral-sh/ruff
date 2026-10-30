@@ -19,7 +19,8 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
 use rustc_hash::FxHasher;
 pub use semantic_model::{
-    Completion, ExpectedStringLiteralCompletion, HasDefinition, HasType, NameKind, SemanticModel,
+    Completion, ExpectedStringLiteralCompletion, HasDefinition, HasType, MatchCaseCompletion,
+    MatchCaseCompletionKind, MatchCaseCompletions, NameKind, SemanticModel,
 };
 use std::hash::BuildHasherDefault;
 pub use suppression::suppress_single;
