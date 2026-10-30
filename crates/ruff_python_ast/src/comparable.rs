@@ -15,6 +15,8 @@
 //! an implicit concatenation of string literals, as these expressions are considered to
 //! have the same shape in that they evaluate to the same value.
 
+mod flat;
+
 use crate as ast;
 use crate::{Expr, Number};
 use std::borrow::Cow;
@@ -613,37 +615,6 @@ impl<'a> From<&'a ast::ElifElseClause> for ComparableElifElseClause<'a> {
         Self {
             test: test.as_ref().map(Into::into),
             body: body.iter().map(Into::into).collect(),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ComparableLiteral<'a> {
-    None,
-    Ellipsis,
-    Bool(&'a bool),
-    Str(Vec<ComparableStringLiteral<'a>>),
-    Bytes(Vec<ComparableBytesLiteral<'a>>),
-    Number(ComparableNumber<'a>),
-}
-
-impl<'a> From<ast::LiteralExpressionRef<'a>> for ComparableLiteral<'a> {
-    fn from(literal: ast::LiteralExpressionRef<'a>) -> Self {
-        match literal {
-            ast::LiteralExpressionRef::NoneLiteral(_) => Self::None,
-            ast::LiteralExpressionRef::EllipsisLiteral(_) => Self::Ellipsis,
-            ast::LiteralExpressionRef::BooleanLiteral(ast::ExprBooleanLiteral {
-                value, ..
-            }) => Self::Bool(value),
-            ast::LiteralExpressionRef::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                Self::Str(value.iter().map(Into::into).collect())
-            }
-            ast::LiteralExpressionRef::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
-                Self::Bytes(value.iter().map(Into::into).collect())
-            }
-            ast::LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
-                Self::Number(value.into())
-            }
         }
     }
 }

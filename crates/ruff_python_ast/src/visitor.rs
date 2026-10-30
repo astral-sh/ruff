@@ -13,8 +13,7 @@ use crate::{
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
 ///
-/// Prefer [`crate::statement_visitor::StatementVisitor`] for visitors that only need to visit
-/// statements.
+/// For statement-only traversal of parsed syntax, use [`crate::flat::statement_visitor::StatementVisitor`].
 ///
 /// Use the [`PreorderVisitor`](source_order::SourceOrderVisitor) if you want to visit the nodes
 /// in source-order rather than evaluation order.

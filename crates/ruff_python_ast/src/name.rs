@@ -1,3 +1,4 @@
+use crate::flat;
 use std::borrow::{Borrow, Cow};
 use std::fmt::{Debug, Display, Formatter, Write};
 use std::hash::{Hash, Hasher};
@@ -7,7 +8,6 @@ use arrayvec::ArrayVec;
 use char_str::{CharStr, CharString};
 
 use crate::Expr;
-use crate::generated::ExprName;
 
 /// An immutable name.
 ///
@@ -54,18 +54,6 @@ impl Name {
     #[inline]
     pub fn new(name: impl AsRef<str>) -> Self {
         Self(CharStr::from(name.as_ref()))
-    }
-
-    /// Creates an inline name, returning `None` if `name` does not fit inline.
-    #[inline]
-    pub fn new_inline(name: impl AsRef<str>) -> Option<Self> {
-        CharStr::new_inline(name.as_ref()).map(Self)
-    }
-
-    /// Creates an exactly-sized, heap-allocated name.
-    #[inline]
-    pub fn new_heap(name: impl AsRef<str>) -> Self {
-        Self(CharStr::new_heap(name.as_ref()))
     }
 
     #[inline]
@@ -391,16 +379,16 @@ impl<'a> QualifiedName<'a> {
     /// Returns `None` if this name is empty or `expr` is not a name or an
     /// attribute chain rooted at a name.
     #[inline]
-    pub fn qualify(&self, mut expr: &'a Expr) -> Option<Self> {
+    pub fn qualify(&self, mut expr: flat::View<'a, Expr>) -> Option<Self> {
         let prefix = self.segments();
         if prefix.is_empty() {
             return None;
         }
 
         let mut segments = SegmentsVec::from_slice(prefix);
-        while let Expr::Attribute(attribute) = expr {
-            segments.push(attribute.attr.as_str());
-            expr = &attribute.value;
+        while let Some(attribute) = expr.as_attribute_expr() {
+            segments.push(attribute.attr().as_str());
+            expr = attribute.value();
         }
         if !expr.is_name_expr() {
             return None;
@@ -513,113 +501,116 @@ pub struct UnqualifiedName<'a>(SegmentsVec<'a>);
 
 impl<'a> UnqualifiedName<'a> {
     /// Convert an `Expr` to its [`UnqualifiedName`] (like `["typing", "List"]`).
-    pub fn from_expr(expr: &'a Expr) -> Option<Self> {
+    pub fn from_expr(expr: flat::View<'a, Expr>) -> Option<Self> {
         // Unroll the loop up to eight times, to match the maximum number of expected attributes.
         // In practice, unrolling appears to give about a 4x speed-up on this hot path.
-        let attr1 = match expr {
-            Expr::Attribute(attr1) => attr1,
+        let attr1 = match expr.classify() {
+            flat::ExprKind::Attribute(attr1) => attr1,
             // Ex) `foo`
-            Expr::Name(ExprName { id, .. }) => return Some(Self::from_slice(&[id.as_str()])),
+            flat::ExprKind::Name(name) => return Some(Self::from_slice(&[name.id().as_str()])),
             _ => return None,
         };
 
-        let attr2 = match attr1.value.as_ref() {
-            Expr::Attribute(attr2) => attr2,
+        let attr2 = match attr1.value().classify() {
+            flat::ExprKind::Attribute(attr2) => attr2,
             // Ex) `foo.bar`
-            Expr::Name(ExprName { id, .. }) => {
-                return Some(Self::from_slice(&[id.as_str(), attr1.attr.as_str()]));
+            flat::ExprKind::Name(name) => {
+                return Some(Self::from_slice(&[
+                    name.id().as_str(),
+                    attr1.attr().as_str(),
+                ]));
             }
             _ => return None,
         };
 
-        let attr3 = match attr2.value.as_ref() {
-            Expr::Attribute(attr3) => attr3,
+        let attr3 = match attr2.value().classify() {
+            flat::ExprKind::Attribute(attr3) => attr3,
             // Ex) `foo.bar.baz`
-            Expr::Name(ExprName { id, .. }) => {
+            flat::ExprKind::Name(name) => {
                 return Some(Self::from_slice(&[
-                    id.as_str(),
-                    attr2.attr.as_str(),
-                    attr1.attr.as_str(),
+                    name.id().as_str(),
+                    attr2.attr().as_str(),
+                    attr1.attr().as_str(),
                 ]));
             }
             _ => return None,
         };
 
-        let attr4 = match attr3.value.as_ref() {
-            Expr::Attribute(attr4) => attr4,
+        let attr4 = match attr3.value().classify() {
+            flat::ExprKind::Attribute(attr4) => attr4,
             // Ex) `foo.bar.baz.bop`
-            Expr::Name(ExprName { id, .. }) => {
+            flat::ExprKind::Name(name) => {
                 return Some(Self::from_slice(&[
-                    id.as_str(),
-                    attr3.attr.as_str(),
-                    attr2.attr.as_str(),
-                    attr1.attr.as_str(),
+                    name.id().as_str(),
+                    attr3.attr().as_str(),
+                    attr2.attr().as_str(),
+                    attr1.attr().as_str(),
                 ]));
             }
             _ => return None,
         };
 
-        let attr5 = match attr4.value.as_ref() {
-            Expr::Attribute(attr5) => attr5,
+        let attr5 = match attr4.value().classify() {
+            flat::ExprKind::Attribute(attr5) => attr5,
             // Ex) `foo.bar.baz.bop.bap`
-            Expr::Name(ExprName { id, .. }) => {
+            flat::ExprKind::Name(name) => {
                 return Some(Self::from_slice(&[
-                    id.as_str(),
-                    attr4.attr.as_str(),
-                    attr3.attr.as_str(),
-                    attr2.attr.as_str(),
-                    attr1.attr.as_str(),
+                    name.id().as_str(),
+                    attr4.attr().as_str(),
+                    attr3.attr().as_str(),
+                    attr2.attr().as_str(),
+                    attr1.attr().as_str(),
                 ]));
             }
             _ => return None,
         };
 
-        let attr6 = match attr5.value.as_ref() {
-            Expr::Attribute(attr6) => attr6,
+        let attr6 = match attr5.value().classify() {
+            flat::ExprKind::Attribute(attr6) => attr6,
             // Ex) `foo.bar.baz.bop.bap.bab`
-            Expr::Name(ExprName { id, .. }) => {
+            flat::ExprKind::Name(name) => {
                 return Some(Self::from_slice(&[
-                    id.as_str(),
-                    attr5.attr.as_str(),
-                    attr4.attr.as_str(),
-                    attr3.attr.as_str(),
-                    attr2.attr.as_str(),
-                    attr1.attr.as_str(),
+                    name.id().as_str(),
+                    attr5.attr().as_str(),
+                    attr4.attr().as_str(),
+                    attr3.attr().as_str(),
+                    attr2.attr().as_str(),
+                    attr1.attr().as_str(),
                 ]));
             }
             _ => return None,
         };
 
-        let attr7 = match attr6.value.as_ref() {
-            Expr::Attribute(attr7) => attr7,
+        let attr7 = match attr6.value().classify() {
+            flat::ExprKind::Attribute(attr7) => attr7,
             // Ex) `foo.bar.baz.bop.bap.bab.bob`
-            Expr::Name(ExprName { id, .. }) => {
+            flat::ExprKind::Name(name) => {
                 return Some(Self::from_slice(&[
-                    id.as_str(),
-                    attr6.attr.as_str(),
-                    attr5.attr.as_str(),
-                    attr4.attr.as_str(),
-                    attr3.attr.as_str(),
-                    attr2.attr.as_str(),
-                    attr1.attr.as_str(),
+                    name.id().as_str(),
+                    attr6.attr().as_str(),
+                    attr5.attr().as_str(),
+                    attr4.attr().as_str(),
+                    attr3.attr().as_str(),
+                    attr2.attr().as_str(),
+                    attr1.attr().as_str(),
                 ]));
             }
             _ => return None,
         };
 
-        let attr8 = match attr7.value.as_ref() {
-            Expr::Attribute(attr8) => attr8,
+        let attr8 = match attr7.value().classify() {
+            flat::ExprKind::Attribute(attr8) => attr8,
             // Ex) `foo.bar.baz.bop.bap.bab.bob.bib`
-            Expr::Name(ExprName { id, .. }) => {
+            flat::ExprKind::Name(name) => {
                 return Some(Self(SegmentsVec::from([
-                    id.as_str(),
-                    attr7.attr.as_str(),
-                    attr6.attr.as_str(),
-                    attr5.attr.as_str(),
-                    attr4.attr.as_str(),
-                    attr3.attr.as_str(),
-                    attr2.attr.as_str(),
-                    attr1.attr.as_str(),
+                    name.id().as_str(),
+                    attr7.attr().as_str(),
+                    attr6.attr().as_str(),
+                    attr5.attr().as_str(),
+                    attr4.attr().as_str(),
+                    attr3.attr().as_str(),
+                    attr2.attr().as_str(),
+                    attr1.attr().as_str(),
                 ])));
             }
             _ => return None,
@@ -627,16 +618,16 @@ impl<'a> UnqualifiedName<'a> {
 
         let mut segments = Vec::with_capacity(SMALL_LEN * 2);
 
-        let mut current = &*attr8.value;
+        let mut current = attr8.value();
 
         loop {
-            current = match current {
-                Expr::Attribute(attr) => {
-                    segments.push(attr.attr.as_str());
-                    &*attr.value
+            current = match current.classify() {
+                flat::ExprKind::Attribute(attr) => {
+                    segments.push(attr.attr().as_str());
+                    attr.value()
                 }
-                Expr::Name(ExprName { id, .. }) => {
-                    segments.push(id.as_str());
+                flat::ExprKind::Name(name) => {
+                    segments.push(name.id().as_str());
                     break;
                 }
                 _ => {
@@ -649,14 +640,14 @@ impl<'a> UnqualifiedName<'a> {
 
         // Append the attributes we visited before calling into the recursion.
         segments.extend_from_slice(&[
-            attr8.attr.as_str(),
-            attr7.attr.as_str(),
-            attr6.attr.as_str(),
-            attr5.attr.as_str(),
-            attr4.attr.as_str(),
-            attr3.attr.as_str(),
-            attr2.attr.as_str(),
-            attr1.attr.as_str(),
+            attr8.attr().as_str(),
+            attr7.attr().as_str(),
+            attr6.attr().as_str(),
+            attr5.attr().as_str(),
+            attr4.attr().as_str(),
+            attr3.attr().as_str(),
+            attr2.attr().as_str(),
+            attr1.attr().as_str(),
         ]);
 
         Some(Self(SegmentsVec::from(segments)))
@@ -906,7 +897,7 @@ mod tests {
     use crate::name::Name;
     use crate::name::{QualifiedName, SegmentsVec};
     use crate::{
-        AtomicNodeIndex, Expr, ExprAttribute, ExprContext, ExprName, ExprNoneLiteral, Identifier,
+        Expr, ExprAttribute, ExprContext, ExprName, ExprNoneLiteral, Identifier, NodeIndex,
     };
 
     #[test]
@@ -915,14 +906,17 @@ mod tests {
         let expr = Expr::Name(ExprName {
             id: "la".into(),
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::NONE,
+            node_index: NodeIndex::NONE,
             ctx: ExprContext::Load,
         });
-        assert_eq!(name.qualify(&expr), Some(name.clone()));
+        assert_eq!(
+            name.qualify(crate::flat::Tree::from(&expr).root()),
+            Some(name.clone())
+        );
 
         let expr = attribute_expr(attribute_expr(expr, "norm"), "__name__");
         assert_eq!(
-            name.qualify(&expr),
+            name.qualify(crate::flat::Tree::from(&expr).root()),
             Some(QualifiedName::user_defined("numpy.linalg.norm.__name__"))
         );
     }
@@ -932,10 +926,10 @@ mod tests {
         let name = QualifiedName::user_defined_identifier("numpy");
         let expr = Expr::NoneLiteral(ExprNoneLiteral {
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::NONE,
+            node_index: NodeIndex::NONE,
         });
         let expr = attribute_expr(expr, "member");
-        assert_eq!(name.qualify(&expr), None);
+        assert_eq!(name.qualify(crate::flat::Tree::from(&expr).root()), None);
     }
 
     fn attribute_expr(value: Expr, attribute: &str) -> Expr {
@@ -943,7 +937,7 @@ mod tests {
             value: Box::new(value),
             attr: Identifier::new(attribute, TextRange::default()),
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::NONE,
+            node_index: NodeIndex::NONE,
             ctx: ExprContext::Load,
         })
     }

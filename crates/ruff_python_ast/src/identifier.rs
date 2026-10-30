@@ -10,7 +10,8 @@
 //!
 //! This module can be used to identify the [`TextRange`] of the `except` token.
 
-use crate::{self as ast, Alias, ExceptHandler, Parameter, ParameterWithDefault, Stmt};
+use crate::flat::{self, fields as ast};
+use crate::{Alias, Parameter, ParameterWithDefault, Stmt, StmtClassDef, StmtFunctionDef};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use ruff_python_trivia::{Cursor, is_python_whitespace};
@@ -20,7 +21,7 @@ pub trait Identifier {
     fn identifier(&self) -> TextRange;
 }
 
-impl Identifier for ast::StmtFunctionDef {
+impl Identifier for StmtFunctionDef {
     /// Return the [`TextRange`] of the identifier in the given function definition.
     ///
     /// For example, return the range of `f` in:
@@ -33,7 +34,7 @@ impl Identifier for ast::StmtFunctionDef {
     }
 }
 
-impl Identifier for ast::StmtClassDef {
+impl Identifier for StmtClassDef {
     /// Return the [`TextRange`] of the identifier in the given class definition.
     ///
     /// For example, return the range of `C` in:
@@ -103,17 +104,17 @@ impl Identifier for Alias {
     }
 }
 
-/// Return the [`TextRange`] of the `except` token in an [`ExceptHandler`].
-pub fn except(handler: &ExceptHandler, source: &str) -> TextRange {
+/// Return the [`TextRange`] of the `except` token in an [`ExceptHandler`](crate::ExceptHandler).
+pub fn except(handler: impl Ranged, source: &str) -> TextRange {
     IdentifierTokenizer::new(source, handler.range())
         .next()
         .expect("Failed to find `except` token in `ExceptHandler`")
 }
 
 /// Return the [`TextRange`] of the `else` token in a `For` or `While` statement.
-pub fn else_(stmt: &Stmt, source: &str) -> Option<TextRange> {
-    let (Stmt::For(ast::StmtFor { body, orelse, .. })
-    | Stmt::While(ast::StmtWhile { body, orelse, .. })) = stmt
+pub fn else_(stmt: crate::flat::View<'_, Stmt>, source: &str) -> Option<TextRange> {
+    let (ast::Stmt::For(ast::StmtFor { body, orelse, .. })
+    | ast::Stmt::While(ast::StmtWhile { body, orelse, .. })) = stmt.fields()
     else {
         return None;
     };
@@ -219,6 +220,42 @@ impl Iterator for IdentifierTokenizer<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_token()
+    }
+}
+
+impl Identifier for flat::View<'_, StmtFunctionDef> {
+    fn identifier(&self) -> TextRange {
+        self.name().range()
+    }
+}
+impl Identifier for flat::View<'_, StmtClassDef> {
+    fn identifier(&self) -> TextRange {
+        self.name().range()
+    }
+}
+impl Identifier for flat::View<'_, Stmt> {
+    fn identifier(&self) -> TextRange {
+        match self.classify() {
+            flat::StmtKind::ClassDef(class) => class.identifier(),
+            flat::StmtKind::FunctionDef(function) => function.identifier(),
+            _ => self.range(),
+        }
+    }
+}
+impl Identifier for flat::View<'_, Parameter> {
+    fn identifier(&self) -> TextRange {
+        self.name().range()
+    }
+}
+impl Identifier for flat::View<'_, ParameterWithDefault> {
+    fn identifier(&self) -> TextRange {
+        self.parameter().identifier()
+    }
+}
+impl Identifier for flat::View<'_, Alias> {
+    fn identifier(&self) -> TextRange {
+        self.asname()
+            .map_or_else(|| self.name().range(), |node| node.range())
     }
 }
 
