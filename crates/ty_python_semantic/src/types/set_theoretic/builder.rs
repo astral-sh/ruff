@@ -49,10 +49,9 @@ use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BytesLiteralType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionType,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
-    NegativeIntersectionElements, StringLiteralType, SubclassOfType, Type, TypePair,
-    TypeVarBoundOrConstraints, UnionType,
+    BytesLiteralType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
+    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
+    StringLiteralType, SubclassOfType, Type, TypePair, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, Program, ProgramEnvironment};
 use rustc_hash::FxHashSet;
@@ -1191,29 +1190,21 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
-            match (ty, element_type) {
-                // Distinct literal receivers give `str.startswith` distinct bound methods.
-                (
-                    Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_)),
-                    Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_)),
-                ) => continue,
-                // A nominal instance has no TypedDict schema. In the other direction a
-                // TypedDict can only subtype nominal classes through its dict or Mapping
-                // fallback. An unrelated class and a TypedDict also exclude `object()`.
-                (Type::TypedDict(_), Type::NominalInstance(nominal))
-                | (Type::NominalInstance(nominal), Type::TypedDict(_))
-                    if should_simplify_full && !nominal.is_object() =>
+            // A nominal instance has no TypedDict schema. In the other direction a
+            // TypedDict can only subtype nominal classes through its dict or Mapping
+            // fallback. An unrelated class and a TypedDict also exclude `object()`.
+            if should_simplify_full
+                && let (Type::TypedDict(_), Type::NominalInstance(nominal))
+                | (Type::NominalInstance(nominal), Type::TypedDict(_)) = (ty, element_type)
+                && !nominal.is_object()
+            {
+                let bases = typed_dict_bases.get_or_insert_with(|| {
+                    typed_dict_fallback_bases(db, self.env.program(db)).as_deref()
+                });
+                if bases.is_some_and(|bases| !bases.contains(&nominal.class_literal(db, &self.env)))
                 {
-                    let bases = typed_dict_bases.get_or_insert_with(|| {
-                        typed_dict_fallback_bases(db, self.env.program(db)).as_deref()
-                    });
-                    if bases
-                        .is_some_and(|bases| !bases.contains(&nominal.class_literal(db, &self.env)))
-                    {
-                        continue;
-                    }
+                    continue;
                 }
-                _ => {}
             }
 
             // `object` already contains every possible union element.

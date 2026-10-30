@@ -47,18 +47,6 @@ def _(string_instance: str, literalstring: LiteralString):
     reveal_type("a".startswith(literalstring))  # revealed: bool
 ```
 
-A bound method taken from a union of literal strings retains each possible receiver.
-
-```py
-from typing import Literal
-
-def _(value: Literal["ab", "ac", "zz"]):
-    startswith = value.startswith
-    reveal_type(startswith("a"))  # revealed: bool
-    reveal_type(startswith(""))  # revealed: Literal[True]
-    reveal_type(startswith("missing"))  # revealed: Literal[False]
-```
-
 Unlike bound methods for some other classes implemented in C, `"foo".startswith` is an instance of
 `types.BuiltinFunctionType` at runtime, rather than `types.MethodWrapperType`:
 
