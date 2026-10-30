@@ -341,6 +341,7 @@ impl<Context> Format<Context> for SourcePosition {
 ///
 /// This is done by allocating a new string internally.
 pub fn text(text: &str) -> Text<'_> {
+    #[cfg(debug_assertions)]
     debug_assert_no_newlines(text);
 
     Text { text }
@@ -388,6 +389,7 @@ where
     fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
         let source_code = f.context().source_code();
         let slice = source_code.slice(self.range);
+        #[cfg(debug_assertions)]
         debug_assert_no_newlines(slice.text(source_code));
 
         let text_width = TextWidth::from_text(
@@ -401,6 +403,8 @@ where
     }
 }
 
+#[cfg(debug_assertions)]
+#[track_caller]
 fn debug_assert_no_newlines(text: &str) {
     debug_assert!(
         !text.contains('\r'),
