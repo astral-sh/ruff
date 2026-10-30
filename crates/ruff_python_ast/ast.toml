@@ -56,6 +56,9 @@
 #    These properties cannot be nested, for example we cannot create a vector of option types.
 # * is_annotation - If this field is a type annotation.
 #
+# flat_fields:
+# Logical fields for nodes whose owned Rust struct is handwritten.
+#
 # source_order:
 # Defines in what order the fields appear in source
 #
@@ -567,13 +570,27 @@ fields = [
 [ExceptHandler]
 doc = "See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)"
 
-[ExceptHandler.nodes]
-ExceptHandlerExceptHandler = {}
+[ExceptHandler.nodes.ExceptHandlerExceptHandler]
+flat_fields = [
+  { name = "type_", type = "Box<Expr>?" },
+  { name = "name", type = "Identifier?" },
+  { name = "body", type = "Stmt*" },
+]
 
-[InterpolatedStringElement.nodes]
-InterpolatedElement = { variant = "Interpolation" }
-InterpolatedStringLiteralElement = { variant = "Literal" }
+[InterpolatedStringElement.nodes.InterpolatedElement]
+variant = "Interpolation"
+flat_fields = [
+  { name = "expression", type = "Box<Expr>" },
+  { name = "debug_text", type = "DebugText?" },
+  { name = "conversion", type = "ConversionFlag" },
+  { name = "format_spec", type = "Box<InterpolatedStringFormatSpec>?" },
+]
 
+[InterpolatedStringElement.nodes.InterpolatedStringLiteralElement]
+variant = "Literal"
+flat_fields = [
+  { name = "value", type = "LiteralText" },
+]
 
 [Pattern]
 doc = "See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)"
@@ -646,24 +663,124 @@ fields = [
   { name = "default", type = "Box<Expr>?" },
 ]
 
-[ungrouped.nodes]
-InterpolatedStringFormatSpec = {}
-PatternArguments = {}
-PatternKeyword = {}
-Comprehension = {}
-Arguments = {}
-Parameters = {}
-Parameter = {}
-ParameterWithDefault = {}
-Keyword = {}
-Alias = {}
-WithItem = {}
-MatchCase = {}
-Decorator = {}
-ElifElseClause = {}
-TypeParams = {}
-FString = {}
-TString = {}
-StringLiteral = {}
-BytesLiteral = {}
-Identifier = {}
+[ungrouped.nodes.InterpolatedStringFormatSpec]
+flat_fields = [
+  { name = "elements", type = "InterpolatedStringElement*" },
+]
+
+[ungrouped.nodes.PatternArguments]
+flat_fields = [
+  { name = "patterns", type = "Pattern*" },
+  { name = "keywords", type = "PatternKeyword*" },
+]
+
+[ungrouped.nodes.PatternKeyword]
+flat_fields = [
+  { name = "attr", type = "Identifier" },
+  { name = "pattern", type = "Pattern" },
+]
+
+[ungrouped.nodes.Comprehension]
+flat_fields = [
+  { name = "target", type = "Expr" },
+  { name = "iter", type = "Expr" },
+  { name = "ifs", type = "Expr*" },
+  { name = "is_async", type = "bool" },
+]
+
+[ungrouped.nodes.Arguments]
+flat_fields = [
+  { name = "args", type = "Expr*" },
+  { name = "keywords", type = "Keyword*" },
+]
+
+[ungrouped.nodes.Parameters]
+flat_fields = [
+  { name = "posonlyargs", type = "ParameterWithDefault*" },
+  { name = "args", type = "ParameterWithDefault*" },
+  { name = "vararg", type = "Box<Parameter>?" },
+  { name = "kwonlyargs", type = "ParameterWithDefault*" },
+  { name = "kwarg", type = "Box<Parameter>?" },
+]
+
+[ungrouped.nodes.Parameter]
+flat_fields = [
+  { name = "name", type = "Identifier" },
+  { name = "annotation", type = "Box<Expr>?" },
+]
+
+[ungrouped.nodes.ParameterWithDefault]
+flat_fields = [
+  { name = "parameter", type = "Parameter" },
+  { name = "default", type = "Box<Expr>?" },
+]
+
+[ungrouped.nodes.Keyword]
+flat_fields = [
+  { name = "arg", type = "Identifier?" },
+  { name = "value", type = "Expr" },
+]
+
+[ungrouped.nodes.Alias]
+flat_fields = [
+  { name = "name", type = "Identifier" },
+  { name = "asname", type = "Identifier?" },
+]
+
+[ungrouped.nodes.WithItem]
+flat_fields = [
+  { name = "context_expr", type = "Expr" },
+  { name = "optional_vars", type = "Box<Expr>?" },
+]
+
+[ungrouped.nodes.MatchCase]
+flat_fields = [
+  { name = "pattern", type = "Pattern" },
+  { name = "guard", type = "Box<Expr>?" },
+  { name = "body", type = "Stmt*" },
+]
+
+[ungrouped.nodes.Decorator]
+flat_fields = [
+  { name = "expression", type = "Expr" },
+]
+
+[ungrouped.nodes.ElifElseClause]
+flat_fields = [
+  { name = "test", type = "Expr?" },
+  { name = "body", type = "Stmt*" },
+]
+
+[ungrouped.nodes.TypeParams]
+flat_fields = [
+  { name = "type_params", type = "TypeParam*" },
+]
+
+[ungrouped.nodes.FString]
+flat_fields = [
+  { name = "elements", type = "InterpolatedStringElement*" },
+  { name = "flags", type = "FStringFlags" },
+]
+
+[ungrouped.nodes.TString]
+flat_fields = [
+  { name = "elements", type = "InterpolatedStringElement*" },
+  { name = "flags", type = "TStringFlags" },
+]
+
+[ungrouped.nodes.StringLiteral]
+flat_fields = [
+  { name = "value", type = "LiteralText" },
+  { name = "flags", type = "StringLiteralFlags" },
+]
+
+[ungrouped.nodes.BytesLiteral]
+flat_fields = [
+  { name = "value", type = "LiteralBytes" },
+  { name = "flags", type = "BytesLiteralFlags" },
+]
+
+[ungrouped.nodes.Identifier]
+flat_fields = [
+  { name = "id", type = "Name" },
+]
