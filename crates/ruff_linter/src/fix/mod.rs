@@ -167,18 +167,6 @@ fn cmp_fix(name1: &str, name2: &str, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
             std::cmp::Ordering::Equal
         }
     })
-    // The ordering above only looks at where the first edit starts. What happens is that if two
-    // fixes both start with the same edit, like the same import, they are tied. Without this
-    // tie-break, the fix further down the file will cause the one further up to be discarded,
-    // because it will overlap (basically the one below would cancel the one above in `FAST002`).
-    // Also, `noqa` makes the order of the diagnostics not reliable, since it changes it when
-    // removing the suppressed diagnostics.
-    .then_with(|| {
-        fix1.edits()
-            .iter()
-            .map(Edit::start)
-            .cmp(fix2.edits().iter().map(Edit::start))
-    })
 }
 
 #[cfg(test)]

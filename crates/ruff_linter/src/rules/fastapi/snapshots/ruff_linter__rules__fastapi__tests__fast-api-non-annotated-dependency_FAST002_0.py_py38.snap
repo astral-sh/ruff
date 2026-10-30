@@ -24,7 +24,7 @@ help: Replace with `typing_extensions.Annotated`
    |
 note: This is an unsafe fix and may change runtime behavior
 
-FAST002 [*] FastAPI dependency without `Annotated`
+FAST002 FastAPI dependency without `Annotated`
   --> FAST002_0.py:25:5
    |
 23 | def get_items(
@@ -35,17 +35,7 @@ FAST002 [*] FastAPI dependency without `Annotated`
 27 |     pass
    |
 help: Replace with `typing_extensions.Annotated`
-   |
-14 | from pydantic import BaseModel
-15 + from typing_extensions import Annotated
-16 |
---------------------------------------------------------------------------------
-25 |     current_user: User = Depends(get_current_user),
-   -     some_security_param: str = Security(get_oauth2_user),
-26 +     some_security_param: Annotated[str, Security(get_oauth2_user)],
-27 | ):
-   |
-note: This is an unsafe fix and may change runtime behavior
+info: Automatic fix is unavailable because a required parameter would follow an optional parameter. Consider reordering arguments to enable the fix.
 
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:32:5
@@ -70,7 +60,7 @@ help: Replace with `typing_extensions.Annotated`
    |
 note: This is an unsafe fix and may change runtime behavior
 
-FAST002 [*] FastAPI dependency without `Annotated`
+FAST002 FastAPI dependency without `Annotated`
   --> FAST002_0.py:33:5
    |
 31 | def do_stuff(
@@ -81,19 +71,9 @@ FAST002 [*] FastAPI dependency without `Annotated`
 35 |     some_form_param: str = Form(),
    |
 help: Replace with `typing_extensions.Annotated`
-   |
-14 | from pydantic import BaseModel
-15 + from typing_extensions import Annotated
-16 |
---------------------------------------------------------------------------------
-33 |     some_path_param: str = Path(),
-   -     some_cookie_param: str = Cookie(),
-34 +     some_cookie_param: Annotated[str, Cookie()],
-35 |     some_file_param: UploadFile = File(),
-   |
-note: This is an unsafe fix and may change runtime behavior
+info: Automatic fix is unavailable because a required parameter would follow an optional parameter. Consider reordering arguments to enable the fix.
 
-FAST002 [*] FastAPI dependency without `Annotated`
+FAST002 FastAPI dependency without `Annotated`
   --> FAST002_0.py:34:5
    |
 32 |     some_path_param: str = Path(),
@@ -104,19 +84,9 @@ FAST002 [*] FastAPI dependency without `Annotated`
 36 |     some_query_param: str | None = Query(default=None),
    |
 help: Replace with `typing_extensions.Annotated`
-   |
-14 | from pydantic import BaseModel
-15 + from typing_extensions import Annotated
-16 |
---------------------------------------------------------------------------------
-34 |     some_cookie_param: str = Cookie(),
-   -     some_file_param: UploadFile = File(),
-35 +     some_file_param: Annotated[UploadFile, File()],
-36 |     some_form_param: str = Form(),
-   |
-note: This is an unsafe fix and may change runtime behavior
+info: Automatic fix is unavailable because a required parameter would follow an optional parameter. Consider reordering arguments to enable the fix.
 
-FAST002 [*] FastAPI dependency without `Annotated`
+FAST002 FastAPI dependency without `Annotated`
   --> FAST002_0.py:35:5
    |
 33 |     some_cookie_param: str = Cookie(),
@@ -127,17 +97,7 @@ FAST002 [*] FastAPI dependency without `Annotated`
 37 |     some_body_param: str = Body("foo"),
    |
 help: Replace with `typing_extensions.Annotated`
-   |
-14 | from pydantic import BaseModel
-15 + from typing_extensions import Annotated
-16 |
---------------------------------------------------------------------------------
-35 |     some_file_param: UploadFile = File(),
-   -     some_form_param: str = Form(),
-36 +     some_form_param: Annotated[str, Form()],
-37 |     some_query_param: str | None = Query(default=None),
-   |
-note: This is an unsafe fix and may change runtime behavior
+info: Automatic fix is unavailable because a required parameter would follow an optional parameter. Consider reordering arguments to enable the fix.
 
 FAST002 [*] FastAPI dependency without `Annotated`
   --> FAST002_0.py:36:5
@@ -303,23 +263,27 @@ help: Replace with `typing_extensions.Annotated`
 109 | @app.get("/test5")
     - def handler5(d: str = Depends(get_one), e: str = Depends(get_two)): ...
 110 + def handler5(d: Annotated[str, Depends(get_one)], e: str = Depends(get_two)): ...
+111 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
-FAST002 [*] FastAPI dependency without `Annotated`
+FAST002 FastAPI dependency without `Annotated`
    --> FAST002_0.py:109:41
     |
 108 | @app.get("/test5")
 109 | def handler5(d: str = Depends(get_one), e: str = Depends(get_two)): ...
     |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `typing_extensions.Annotated`
+info: Automatic fix is unavailable because a required parameter would follow an optional parameter. Consider reordering arguments to enable the fix.
+
+FAST002 FastAPI dependency without `Annotated`
+   --> FAST002_0.py:115:5
     |
-14  | from pydantic import BaseModel
-15  + from typing_extensions import Annotated
-16  |
---------------------------------------------------------------------------------
-109 | @app.get("/test5")
-    - def handler5(d: str = Depends(get_one), e: str = Depends(get_two)): ...
-110 + def handler5(d: str = Depends(get_one), e: Annotated[str, Depends(get_two)]): ...
+113 | def handler6(
+114 |     d: str = Depends(get_one),  # noqa: FAST002
+115 |     e: str = Depends(get_two),
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+116 | ): ...
     |
-note: This is an unsafe fix and may change runtime behavior
+help: Replace with `typing_extensions.Annotated`
+info: Automatic fix is unavailable because a required parameter would follow an optional parameter. Consider reordering arguments to enable the fix.
