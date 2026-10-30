@@ -15,12 +15,14 @@ use crate::{Db, ReferenceKind, ReferenceTarget};
 use rayon::prelude::*;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::find_node::CoveringNode;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::find_node::CoveringNode;
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{
-    self as ast, AnyNodeRef,
+    self as ast,
+    flat::AnyNodeRef,
+    flat::visitor::source_order::{SourceOrderVisitor, TraversalSignal},
     name::Name,
-    visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
 use ruff_python_trivia::NameMatcher;
 use ruff_text_size::Ranged;
@@ -276,22 +278,21 @@ fn references_for_keyword_arguments_in_file(
 /// Returns whether `node` assigns `value` to the sole target `__slots__`, e.g.
 /// `__slots__ = (...)` or `__slots__: tuple = (...)`.
 fn is_slots_assignment(node: AnyNodeRef<'_>, value: AnyNodeRef<'_>) -> bool {
-    match node {
-        AnyNodeRef::StmtAssign(assign) => {
-            assign.value.range() == value.range()
+    match node.classify() {
+        flat::AnyKind::StmtAssign(assign) => {
+            assign.value().range() == value.range()
                 && matches!(
-                    assign.targets.as_slice(),
-                    [ast::Expr::Name(name)] if name.id.as_str() == "__slots__"
+                    assign.targets().as_array().map(|items| items.map(flat::View::<ast::Expr>::classify)),
+                    Some([flat::ExprKind::Name(name)]) if name.id().as_str() == "__slots__"
                 )
         }
-        AnyNodeRef::StmtAnnAssign(assign) => {
+        flat::AnyKind::StmtAnnAssign(assign) => {
             assign
-                .value
-                .as_deref()
+                .value()
                 .is_some_and(|assigned| assigned.range() == value.range())
                 && matches!(
-                    assign.target.as_ref(),
-                    ast::Expr::Name(name) if name.id.as_str() == "__slots__"
+                    assign.target().classify(),
+                    flat::ExprKind::Name(name) if name.id().as_str() == "__slots__"
                 )
         }
         _ => false,
@@ -599,75 +600,75 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
         self.ancestors.push(node);
 
-        match node {
-            AnyNodeRef::ExprName(name_expr) => {
+        match node.classify() {
+            flat::AnyKind::ExprName(name_expr) => {
                 // If the name doesn't match our target text, this isn't a match
-                if name_expr.id.as_str() != self.search.target_text {
+                if name_expr.id().as_str() != self.search.target_text {
                     return TraversalSignal::Traverse;
                 }
 
-                let kind = OccurrenceKind::from(name_expr.ctx);
+                let kind = OccurrenceKind::from(name_expr.ctx());
                 let covering_node = CoveringNode::from_ancestors(self.ancestors.clone());
                 self.check_covering_node(&covering_node, kind);
             }
-            AnyNodeRef::ExprAttribute(attr_expr) => {
-                let kind = OccurrenceKind::from(attr_expr.ctx);
-                self.check_identifier(&attr_expr.attr, kind);
+            flat::AnyKind::ExprAttribute(attr_expr) => {
+                let kind = OccurrenceKind::from(attr_expr.ctx());
+                self.check_identifier(attr_expr.attr(), kind);
             }
-            AnyNodeRef::StmtFunctionDef(func) => {
-                self.check_declaration_identifier(&func.name);
+            flat::AnyKind::StmtFunctionDef(func) => {
+                self.check_declaration_identifier(func.name());
             }
-            AnyNodeRef::StmtClassDef(class) => {
-                self.check_declaration_identifier(&class.name);
+            flat::AnyKind::StmtClassDef(class) => {
+                self.check_declaration_identifier(class.name());
             }
-            AnyNodeRef::Parameter(parameter) => {
-                self.check_declaration_identifier(&parameter.name);
+            flat::AnyKind::Parameter(parameter) => {
+                self.check_declaration_identifier(parameter.name());
             }
-            AnyNodeRef::Keyword(keyword) => {
-                if let Some(arg) = &keyword.arg {
+            flat::AnyKind::Keyword(keyword) => {
+                if let Some(arg) = keyword.arg() {
                     self.check_reference_identifier(arg);
                 }
             }
-            AnyNodeRef::StmtGlobal(global_stmt) => {
-                for name in &global_stmt.names {
+            flat::AnyKind::StmtGlobal(global_stmt) => {
+                for name in global_stmt.names() {
                     self.check_declaration_identifier(name);
                 }
             }
-            AnyNodeRef::StmtNonlocal(nonlocal_stmt) => {
-                for name in &nonlocal_stmt.names {
+            flat::AnyKind::StmtNonlocal(nonlocal_stmt) => {
+                for name in nonlocal_stmt.names() {
                     self.check_declaration_identifier(name);
                 }
             }
-            AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
-                if let Some(name) = &handler.name {
+            flat::AnyKind::ExceptHandlerExceptHandler(handler) => {
+                if let Some(name) = handler.name() {
                     self.check_binding_identifier(name);
                 }
             }
-            AnyNodeRef::PatternMatchAs(pattern_as) => {
-                if let Some(name) = &pattern_as.name {
+            flat::AnyKind::PatternMatchAs(pattern_as) => {
+                if let Some(name) = pattern_as.name() {
                     self.check_binding_identifier(name);
                 }
             }
-            AnyNodeRef::PatternMatchStar(pattern_star) => {
-                if let Some(name) = &pattern_star.name {
+            flat::AnyKind::PatternMatchStar(pattern_star) => {
+                if let Some(name) = pattern_star.name() {
                     self.check_binding_identifier(name);
                 }
             }
-            AnyNodeRef::PatternMatchMapping(pattern_mapping) => {
-                if let Some(rest_name) = &pattern_mapping.rest {
+            flat::AnyKind::PatternMatchMapping(pattern_mapping) => {
+                if let Some(rest_name) = pattern_mapping.rest() {
                     self.check_binding_identifier(rest_name);
                 }
             }
-            AnyNodeRef::TypeParamParamSpec(param_spec) => {
-                self.check_declaration_identifier(&param_spec.name);
+            flat::AnyKind::TypeParamParamSpec(param_spec) => {
+                self.check_declaration_identifier(param_spec.name());
             }
-            AnyNodeRef::TypeParamTypeVarTuple(param_tuple) => {
-                self.check_declaration_identifier(&param_tuple.name);
+            flat::AnyKind::TypeParamTypeVarTuple(param_tuple) => {
+                self.check_declaration_identifier(param_tuple.name());
             }
-            AnyNodeRef::TypeParamTypeVar(param_var) => {
-                self.check_declaration_identifier(&param_var.name);
+            flat::AnyKind::TypeParamTypeVar(param_var) => {
+                self.check_declaration_identifier(param_var.name());
             }
-            AnyNodeRef::ExprStringLiteral(string_expr) => {
+            flat::AnyKind::ExprStringLiteral(string_expr) => {
                 // A string literal listed in a class's `__slots__` names an
                 // instance attribute, so renaming that attribute should rename
                 // the matching slot string too.
@@ -688,15 +689,15 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                     sub_finder.visit_expr(sub_ast.expr());
                 }
             }
-            AnyNodeRef::Alias(alias) => {
+            flat::AnyKind::Alias(alias) => {
                 // Handle import alias declarations
-                if let Some(asname) = &alias.asname {
+                if let Some(asname) = alias.asname() {
                     self.check_declaration_identifier(asname);
                 }
                 // Only check the original name if it matches our target text
                 // This is for cases where we're renaming the imported symbol name itself
-                if alias.name.id == self.search.target_text {
-                    self.check_declaration_identifier(&alias.name);
+                if *alias.name().id() == self.search.target_text {
+                    self.check_declaration_identifier(alias.name());
                 }
             }
             _ => {}
@@ -718,8 +719,8 @@ impl<'a> SourceOrderVisitor<'a> for KeywordArgumentReferencesFinder<'a> {
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
         self.0.ancestors.push(node);
 
-        if let AnyNodeRef::Keyword(keyword) = node {
-            if let Some(arg) = &keyword.arg {
+        if let flat::AnyKind::Keyword(keyword) = node.classify() {
+            if let Some(arg) = keyword.arg() {
                 self.0.check_reference_identifier(arg);
             }
         }
@@ -735,23 +736,27 @@ impl<'a> SourceOrderVisitor<'a> for KeywordArgumentReferencesFinder<'a> {
 
 impl<'a> LocalReferencesFinder<'a> {
     /// Checks an identifier of a binding (e.g. `x = 10`)
-    fn check_binding_identifier(&mut self, identifier: &ast::Identifier) {
+    fn check_binding_identifier(&mut self, identifier: flat::View<'_, ast::Identifier>) {
         self.check_identifier(identifier, OccurrenceKind::Binding);
     }
 
     /// Checks an identifier that references a variable (a use).
-    fn check_reference_identifier(&mut self, identifier: &ast::Identifier) {
+    fn check_reference_identifier(&mut self, identifier: flat::View<'_, ast::Identifier>) {
         self.check_identifier(identifier, OccurrenceKind::Reference);
     }
 
     /// Checks an identifier that's part of a declaration, e.g. the name of the class.
-    fn check_declaration_identifier(&mut self, identifier: &ast::Identifier) {
+    fn check_declaration_identifier(&mut self, identifier: flat::View<'_, ast::Identifier>) {
         self.check_identifier(identifier, OccurrenceKind::Declaration);
     }
 
-    fn check_identifier(&mut self, identifier: &ast::Identifier, kind: OccurrenceKind) {
+    fn check_identifier(
+        &mut self,
+        identifier: flat::View<'_, ast::Identifier>,
+        kind: OccurrenceKind,
+    ) {
         // Quick text-based check first
-        if identifier.id != self.search.target_text {
+        if *identifier.id() != self.search.target_text {
             return;
         }
 
@@ -869,17 +874,17 @@ impl<'a> LocalReferencesFinder<'a> {
     /// We only do this when the attribute belongs to the same class that
     /// declares the `__slots__`, so unrelated classes that happen to use the
     /// same slot name are left untouched.
-    fn check_slots_string_literal(&mut self, string_expr: &'a ast::ExprStringLiteral) {
+    fn check_slots_string_literal(&mut self, string_expr: flat::View<'a, ast::ExprStringLiteral>) {
         // Quick text-based check first. We only handle single-part string
         // literals; implicitly concatenated strings ("a" "b") can't name a
         // single attribute, so they never match an identifier here.
-        if string_expr.value.is_implicit_concatenated() {
+        if string_expr.value().is_implicit_concatenated() {
             return;
         }
-        let [part] = string_expr.value.as_slice() else {
+        let Some([part]) = string_expr.value().as_slice().as_array() else {
             return;
         };
-        if part.value.as_ref() != self.search.target_text {
+        if part.value() != self.search.target_text {
             return;
         }
 
@@ -896,7 +901,7 @@ impl<'a> LocalReferencesFinder<'a> {
         }
 
         // Rename the inner content of the string, leaving the quotes intact.
-        let content_range = ast::StringLikePart::String(part).content_range();
+        let content_range = ast::flat::StringLikePart::from(part).content_range();
         let target = ReferenceTarget::new(self.model.file(), content_range, ReferenceKind::Other);
         self.references.push(target);
     }
@@ -908,23 +913,25 @@ impl<'a> LocalReferencesFinder<'a> {
     /// Supported shapes (v1):
     /// - `__slots__ = ("a", "b")` / `["a", "b"]` / `{"a", "b"}`
     /// - `__slots__ = {"a": ..., "b": ...}` (dict keys only)
-    fn enclosing_slots_class(&self) -> Option<&'a ast::StmtClassDef> {
+    fn enclosing_slots_class(&self) -> Option<flat::View<'a, ast::StmtClassDef>> {
         // `self.ancestors` ends with the string literal itself. Walk outward.
         let mut ancestors = self.ancestors.iter().rev();
 
         // The string is either a direct element of a tuple/list/set, or a key
         // of a dict. Skip the immediate container node.
-        match ancestors.next()? {
-            AnyNodeRef::ExprStringLiteral(_) => {}
+        match ancestors.next()?.classify() {
+            flat::AnyKind::ExprStringLiteral(_) => {}
             _ => return None,
         }
         let container = *ancestors.next()?;
-        match container {
-            AnyNodeRef::ExprTuple(_) | AnyNodeRef::ExprList(_) | AnyNodeRef::ExprSet(_) => {}
+        match container.classify() {
+            flat::AnyKind::ExprTuple(_)
+            | flat::AnyKind::ExprList(_)
+            | flat::AnyKind::ExprSet(_) => {}
             // For a dict, both keys and values have the `ExprDict` as their
             // direct parent, so `is_dict_key` checks that this string is one of
             // the keys before we treat it as a slot name.
-            AnyNodeRef::ExprDict(dict) => {
+            flat::AnyKind::ExprDict(dict) => {
                 if !self.is_dict_key(dict) {
                     return None;
                 }
@@ -939,21 +946,22 @@ impl<'a> LocalReferencesFinder<'a> {
         }
 
         // That assignment must live directly in a class body.
-        match ancestors.next()? {
-            AnyNodeRef::StmtClassDef(class) => Some(class),
+        match ancestors.next()?.classify() {
+            flat::AnyKind::StmtClassDef(class) => Some(class),
             _ => None,
         }
     }
 
     /// Returns whether the string literal currently being visited is a *key*
     /// of `dict`, as opposed to one of its values.
-    fn is_dict_key(&self, dict: &'a ast::ExprDict) -> bool {
-        let Some(AnyNodeRef::ExprStringLiteral(string_expr)) = self.ancestors.last() else {
+    fn is_dict_key(&self, dict: flat::View<'a, ast::ExprDict>) -> bool {
+        let Some(flat::AnyKind::ExprStringLiteral(string_expr)) =
+            self.ancestors.last().map(|node| node.classify())
+        else {
             return false;
         };
-        dict.items.iter().any(|item| {
+        dict.items().iter().any(|item| {
             item.key
-                .as_ref()
                 .is_some_and(|key| key.range() == string_expr.range())
         })
     }
@@ -965,7 +973,7 @@ impl<'a> LocalReferencesFinder<'a> {
     /// the value in a stub), and its nearest enclosing class must be `class` itself. A parameter or
     /// local that merely shares the name, or an attribute of a nested class, is not treated as the
     /// slot.
-    fn target_belongs_to_class(&self, class: &'a ast::StmtClassDef) -> bool {
+    fn target_belongs_to_class(&self, class: flat::View<'a, ast::StmtClassDef>) -> bool {
         let db = self.model.db();
         let file = self.model.file();
         let class_range = class.range();

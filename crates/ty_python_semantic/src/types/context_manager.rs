@@ -8,7 +8,7 @@ use crate::{
         diagnostic::INVALID_CONTEXT_MANAGER,
     },
 };
-use ruff_python_ast as ast;
+use ruff_python_ast::flat;
 use ty_python_core::EvaluationMode;
 
 impl<'db> Type<'db> {
@@ -385,7 +385,7 @@ impl<'db> ContextManagerError<'db> {
         &self,
         context: &InferContext<'db, '_>,
         context_expression_type: Type<'db>,
-        context_expression_node: ast::AnyNodeRef,
+        context_expression_node: flat::AnyNodeRef,
     ) {
         fn unbound_on<'db>(error: &CallDunderError<'db>) -> FxOrderSet<Type<'db>> {
             match error {

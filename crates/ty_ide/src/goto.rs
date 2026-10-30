@@ -2,6 +2,7 @@ use crate::docstring::Docstring;
 pub use crate::goto_declaration::goto_declaration;
 pub use crate::goto_definition::goto_definition;
 pub use crate::goto_type_definition::goto_type_definition;
+use ruff_python_ast::flat;
 use ty_python_semantic::Db;
 
 use std::borrow::Cow;
@@ -9,9 +10,9 @@ use std::borrow::Cow;
 use crate::NavigationTarget;
 use crate::stub_mapping::StubMapper;
 use ruff_db::parsed::ParsedModuleRef;
-use ruff_python_ast::find_node::{CoveringNode, covering_node};
+use ruff_python_ast::flat::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::token::{Token, TokenAt, TokenKind, Tokens};
-use ruff_python_ast::{self as ast, AnyNodeRef, ExprRef};
+use ruff_python_ast::{self as ast, flat::AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ty_python_core::ProgramFile;
@@ -31,10 +32,10 @@ use ty_python_semantic::{
 
 #[derive(Clone, Debug)]
 pub(crate) enum GotoTarget<'a> {
-    Expression(ast::ExprRef<'a>),
-    FunctionDef(&'a ast::StmtFunctionDef),
-    ClassDef(&'a ast::StmtClassDef),
-    Parameter(&'a ast::Parameter),
+    Expression(flat::View<'a, ast::Expr>),
+    FunctionDef(flat::View<'a, ast::StmtFunctionDef>),
+    ClassDef(flat::View<'a, ast::StmtClassDef>),
+    Parameter(flat::View<'a, ast::Parameter>),
 
     /// Go to on the operator of a binary operation.
     ///
@@ -43,7 +44,7 @@ pub(crate) enum GotoTarget<'a> {
     ///   ^
     /// ```
     BinOp {
-        expression: &'a ast::ExprBinOp,
+        expression: flat::View<'a, ast::ExprBinOp>,
         operator_range: TextRange,
     },
 
@@ -54,7 +55,7 @@ pub(crate) enum GotoTarget<'a> {
     /// ^
     /// ```
     UnaryOp {
-        expression: &'a ast::ExprUnaryOp,
+        expression: flat::View<'a, ast::ExprUnaryOp>,
         operator_range: TextRange,
     },
 
@@ -79,8 +80,8 @@ pub(crate) enum GotoTarget<'a> {
     ///                   ^^^
     /// ```
     ImportModuleAlias {
-        alias: &'a ast::Alias,
-        asname: &'a ast::Identifier,
+        alias: flat::View<'a, ast::Alias>,
+        asname: flat::View<'a, ast::Identifier>,
     },
 
     /// In an import statement, the named under which the symbol is exported
@@ -91,8 +92,8 @@ pub(crate) enum GotoTarget<'a> {
     ///                 ^^^
     /// ```
     ImportExportedName {
-        alias: &'a ast::Alias,
-        import_from: &'a ast::StmtImportFrom,
+        alias: flat::View<'a, ast::Alias>,
+        import_from: flat::View<'a, ast::StmtImportFrom>,
     },
 
     /// Import alias in from import statement
@@ -101,8 +102,8 @@ pub(crate) enum GotoTarget<'a> {
     ///                        ^^^
     /// ```
     ImportSymbolAlias {
-        alias: &'a ast::Alias,
-        asname: &'a ast::Identifier,
+        alias: flat::View<'a, ast::Alias>,
+        asname: flat::View<'a, ast::Identifier>,
     },
 
     /// Go to on the exception handler variable
@@ -111,7 +112,7 @@ pub(crate) enum GotoTarget<'a> {
     /// except Exception as e: ...
     ///                     ^
     /// ```
-    ExceptVariable(&'a ast::ExceptHandlerExceptHandler),
+    ExceptVariable(flat::View<'a, ast::ExceptHandlerExceptHandler>),
 
     /// Go to on a keyword argument
     /// ```py
@@ -119,8 +120,8 @@ pub(crate) enum GotoTarget<'a> {
     ///      ^
     /// ```
     KeywordArgument {
-        keyword: &'a ast::Keyword,
-        call_expression: &'a ast::ExprCall,
+        keyword: flat::View<'a, ast::Keyword>,
+        call_expression: flat::View<'a, ast::ExprCall>,
     },
 
     /// Go to on the rest parameter of a pattern match
@@ -130,7 +131,7 @@ pub(crate) enum GotoTarget<'a> {
     ///     case {"a": a, "b": b, **rest}: ...
     ///                             ^^^^
     /// ```
-    PatternMatchRest(&'a ast::PatternMatchMapping),
+    PatternMatchRest(flat::View<'a, ast::PatternMatchMapping>),
 
     /// Go to on a keyword argument of a class pattern
     ///
@@ -139,7 +140,7 @@ pub(crate) enum GotoTarget<'a> {
     ///     case Point3D(x=0, y=0, z=0): ...
     ///                  ^    ^    ^
     /// ```
-    PatternKeywordArgument(&'a ast::PatternKeyword),
+    PatternKeywordArgument(flat::View<'a, ast::PatternKeyword>),
 
     /// Go to on a pattern star argument
     ///
@@ -147,7 +148,7 @@ pub(crate) enum GotoTarget<'a> {
     /// match array:
     ///     case [*args]: ...
     ///            ^^^^
-    PatternMatchStarName(&'a ast::PatternMatchStar),
+    PatternMatchStarName(flat::View<'a, ast::PatternMatchStar>),
 
     /// Go to on the name of a pattern match as pattern
     ///
@@ -155,7 +156,7 @@ pub(crate) enum GotoTarget<'a> {
     /// match x:
     ///     case [x] as y: ...
     ///                 ^
-    PatternMatchAsName(&'a ast::PatternMatchAs),
+    PatternMatchAsName(flat::View<'a, ast::PatternMatchAs>),
 
     /// Go to on the name of a type variable
     ///
@@ -163,7 +164,7 @@ pub(crate) enum GotoTarget<'a> {
     /// type Alias[T: int = bool] = list[T]
     ///            ^
     /// ```
-    TypeParamTypeVarName(&'a ast::TypeParamTypeVar),
+    TypeParamTypeVarName(flat::View<'a, ast::TypeParamTypeVar>),
 
     /// Go to on the name of a type param spec
     ///
@@ -171,7 +172,7 @@ pub(crate) enum GotoTarget<'a> {
     /// type Alias[**P = [int, str]] = Callable[P, int]
     ///              ^
     /// ```
-    TypeParamParamSpecName(&'a ast::TypeParamParamSpec),
+    TypeParamParamSpecName(flat::View<'a, ast::TypeParamParamSpec>),
 
     /// Go to on the name of a type var tuple
     ///
@@ -179,13 +180,13 @@ pub(crate) enum GotoTarget<'a> {
     /// type Alias[*Ts = ()] = tuple[*Ts]
     ///             ^^
     /// ```
-    TypeParamTypeVarTupleName(&'a ast::TypeParamTypeVarTuple),
+    TypeParamTypeVarTupleName(flat::View<'a, ast::TypeParamTypeVarTuple>),
 
     NonLocal {
-        identifier: &'a ast::Identifier,
+        identifier: flat::View<'a, ast::Identifier>,
     },
     Globals {
-        identifier: &'a ast::Identifier,
+        identifier: flat::View<'a, ast::Identifier>,
     },
     /// Go to on the invocation of a callable
     ///
@@ -203,9 +204,9 @@ pub(crate) enum GotoTarget<'a> {
     /// merging of both the class and the initializer.
     Call {
         /// The callable that can actually be selected by a cursor
-        callable: ast::ExprRef<'a>,
+        callable: flat::View<'a, ast::Expr>,
         /// The call of the callable
-        call: &'a ast::ExprCall,
+        call: flat::View<'a, ast::ExprCall>,
         /// Whether the cursor is positioned on the parenthesis.
         ///
         /// This is useful for tweaking the behavior of goto-def.
@@ -226,7 +227,7 @@ pub(crate) enum GotoTarget<'a> {
     /// isn't actually in the AST.
     StringAnnotationSubexpr {
         /// The string literal that is a string annotation.
-        string_expr: &'a ast::ExprStringLiteral,
+        string_expr: flat::View<'a, ast::ExprStringLiteral>,
         /// The range to query in the sub-AST for the sub-expression.
         subrange: TextRange,
         /// "How many levels of sub-ASTs are you on?"
@@ -239,7 +240,7 @@ pub(crate) enum GotoTarget<'a> {
 
     /// Go to on a string-literal subscript key (e.g. `person["name"]`).
     SubscriptStringLiteralKey {
-        subscript: &'a ast::ExprSubscript,
+        subscript: flat::View<'a, ast::ExprSubscript>,
         literal_key: &'a str,
     },
 }
@@ -516,7 +517,7 @@ impl GotoTarget<'_> {
             | GotoTarget::ImportModuleAlias { alias, .. }
             | GotoTarget::ImportExportedName { alias, .. } => alias.inferred_type(model),
             GotoTarget::ExceptVariable(except) => except.inferred_type(model),
-            GotoTarget::KeywordArgument { keyword, .. } => keyword.value.inferred_type(model),
+            GotoTarget::KeywordArgument { keyword, .. } => keyword.value().inferred_type(model),
             // When asking the type of a callable, usually you want the callable itself?
             // (i.e. the type of `MyClass` in `MyClass()` is `<class MyClass>` and not `() -> MyClass`)
             GotoTarget::Call { callable, .. } => callable.inferred_type(model),
@@ -541,15 +542,15 @@ impl GotoTarget<'_> {
                 let model_to_use;
                 let expr_to_use;
                 let subsubast;
-                let (subast, submodel) = model.enter_string_annotation(string_expr)?;
+                let (subast, submodel) = model.enter_string_annotation(*string_expr)?;
                 // Must filter to exprs to get ExprStringLiteral over StringLiteral
                 let subexpr = covering_node(subast.syntax().into(), *subrange)
                     .find_first(AnyNodeRef::is_expression)
                     .ok()?
                     .node()
-                    .as_expr_ref()?;
+                    .cast::<ast::Expr>()?;
                 if *levels == 2
-                    && let ExprRef::StringLiteral(string_expr) = subexpr
+                    && let Some(string_expr) = subexpr.as_string_literal_expr()
                 {
                     // Do it again if we're a nested string annotation!
                     let (new_subast, subsubmodel) =
@@ -560,7 +561,7 @@ impl GotoTarget<'_> {
                         .find_first(AnyNodeRef::is_expression)
                         .ok()?
                         .node()
-                        .as_expr_ref()?;
+                        .cast::<ast::Expr>()?;
                 } else {
                     model_to_use = submodel;
                     expr_to_use = subexpr;
@@ -568,11 +569,11 @@ impl GotoTarget<'_> {
                 expr_to_use.inferred_type(&model_to_use)
             }
             GotoTarget::BinOp { expression, .. } => {
-                let (_, ty) = ty_python_semantic::definitions_for_bin_op(model, expression)?;
+                let (_, ty) = ty_python_semantic::definitions_for_bin_op(model, *expression)?;
                 Some(ty)
             }
             GotoTarget::UnaryOp { expression, .. } => {
-                let (_, ty) = ty_python_semantic::definitions_for_unary_op(model, expression)?;
+                let (_, ty) = ty_python_semantic::definitions_for_unary_op(model, *expression)?;
                 Some(ty)
             }
             GotoTarget::SubscriptStringLiteralKey { subscript, .. } => {
@@ -600,8 +601,8 @@ impl GotoTarget<'_> {
     /// Try to get a call signature for this target.
     pub(crate) fn call_signature(&self, model: &SemanticModel) -> Option<String> {
         if let GotoTarget::Call { call, .. } = self {
-            constructor_signature(model, call)
-                .or_else(|| call_type_simplified_by_overloads(model, call))
+            constructor_signature(model, *call)
+                .or_else(|| call_type_simplified_by_overloads(model, *call))
         } else {
             None
         }
@@ -644,9 +645,9 @@ impl GotoTarget<'_> {
             // For property setters/deleters, the getter is a co-definition of
             // the same logical symbol.
             GotoTarget::FunctionDef(function) => {
-                let mut defs = definitions_and_overloads_for_function(model, function);
+                let mut defs = definitions_and_overloads_for_function(model, *function);
                 defs.extend(
-                    property_getter_definitions(function, model, alias_resolution)
+                    property_getter_definitions(*function, model, alias_resolution)
                         .into_iter()
                         .flatten(),
                 );
@@ -665,15 +666,15 @@ impl GotoTarget<'_> {
             GotoTarget::ImportSymbolAlias { asname, .. } => Some(definitions_for_name(
                 model,
                 asname.as_str(),
-                AnyNodeRef::from(*asname),
+                AnyNodeRef::from(asname),
                 alias_resolution,
             )),
 
             GotoTarget::ImportExportedName { alias, import_from } => {
-                let symbol_name = alias.name.as_str();
+                let symbol_name = alias.name().as_str();
                 Some(definitions_for_imported_symbol(
                     model,
-                    import_from,
+                    *import_from,
                     symbol_name,
                     alias_resolution,
                 ))
@@ -694,7 +695,7 @@ impl GotoTarget<'_> {
             GotoTarget::ImportModuleAlias { asname, .. } => Some(definitions_for_name(
                 model,
                 asname.as_str(),
-                AnyNodeRef::from(*asname),
+                AnyNodeRef::from(asname),
                 alias_resolution,
             )),
 
@@ -704,64 +705,38 @@ impl GotoTarget<'_> {
                 call_expression,
             } => Some(definitions_for_keyword_argument(
                 model,
-                keyword,
-                call_expression,
+                *keyword,
+                *call_expression,
             )),
 
             // Exception handler names are bindings but not expressions, so look them up by ident.
-            GotoTarget::ExceptVariable(except_handler) => {
-                except_handler.name.as_ref().map(|name| {
-                    definitions_for_name(
-                        model,
-                        name.as_str(),
-                        AnyNodeRef::Identifier(name),
-                        alias_resolution,
-                    )
-                })
-            }
+            GotoTarget::ExceptVariable(except_handler) => except_handler.name().map(|name| {
+                definitions_for_name(model, name.as_str(), name.erase(), alias_resolution)
+            }),
 
             // Patterns are glorified assignments but we have to look them up by ident
             // because they're not expressions
-            GotoTarget::PatternMatchRest(pattern_mapping) => {
-                pattern_mapping.rest.as_ref().map(|name| {
-                    definitions_for_name(
-                        model,
-                        name.as_str(),
-                        AnyNodeRef::Identifier(name),
-                        alias_resolution,
-                    )
-                })
-            }
+            GotoTarget::PatternMatchRest(pattern_mapping) => pattern_mapping.rest().map(|name| {
+                definitions_for_name(model, name.as_str(), name.erase(), alias_resolution)
+            }),
 
-            GotoTarget::PatternMatchAsName(pattern_as) => pattern_as.name.as_ref().map(|name| {
-                definitions_for_name(
-                    model,
-                    name.as_str(),
-                    AnyNodeRef::Identifier(name),
-                    alias_resolution,
-                )
+            GotoTarget::PatternMatchAsName(pattern_as) => pattern_as.name().map(|name| {
+                definitions_for_name(model, name.as_str(), name.erase(), alias_resolution)
             }),
 
             GotoTarget::PatternKeywordArgument(pattern_keyword) => {
-                let name = &pattern_keyword.attr;
+                let name = pattern_keyword.attr();
                 Some(definitions_for_name(
                     model,
                     name.as_str(),
-                    AnyNodeRef::Identifier(name),
+                    name.erase(),
                     alias_resolution,
                 ))
             }
 
-            GotoTarget::PatternMatchStarName(pattern_star) => {
-                pattern_star.name.as_ref().map(|name| {
-                    definitions_for_name(
-                        model,
-                        name.as_str(),
-                        AnyNodeRef::Identifier(name),
-                        alias_resolution,
-                    )
-                })
-            }
+            GotoTarget::PatternMatchStarName(pattern_star) => pattern_star.name().map(|name| {
+                definitions_for_name(model, name.as_str(), name.erase(), alias_resolution)
+            }),
 
             // For callables, both the definition of the callable and the actual function impl are relevant.
             //
@@ -773,7 +748,7 @@ impl GotoTarget<'_> {
                 // `definitions_for_callable` always resolves import aliases. That's why we
                 // skip it in cases import alias resolution is turned of (rename, highlight references).
                 if alias_resolution == ImportAliasResolution::ResolveAliases {
-                    definitions.extend(definitions_for_callable(model, call));
+                    definitions.extend(definitions_for_callable(model, *call));
                 }
 
                 let expr_definitions =
@@ -790,14 +765,14 @@ impl GotoTarget<'_> {
 
             GotoTarget::BinOp { expression, .. } => {
                 let (definitions, _) =
-                    ty_python_semantic::definitions_for_bin_op(model, expression)?;
+                    ty_python_semantic::definitions_for_bin_op(model, *expression)?;
 
                 Some(definitions)
             }
 
             GotoTarget::UnaryOp { expression, .. } => {
                 let (definitions, _) =
-                    ty_python_semantic::definitions_for_unary_op(model, expression)?;
+                    ty_python_semantic::definitions_for_unary_op(model, *expression)?;
 
                 Some(definitions)
             }
@@ -812,15 +787,15 @@ impl GotoTarget<'_> {
                 let model_to_use;
                 let expr_to_use;
                 let subsubast;
-                let (subast, submodel) = model.enter_string_annotation(string_expr)?;
+                let (subast, submodel) = model.enter_string_annotation(*string_expr)?;
                 // Must filter to exprs to get ExprStringLiteral over StringLiteral
                 let subexpr = covering_node(subast.syntax().into(), *subrange)
                     .find_first(AnyNodeRef::is_expression)
                     .ok()?
                     .node()
-                    .as_expr_ref()?;
+                    .cast::<ast::Expr>()?;
                 if *levels == 2
-                    && let ExprRef::StringLiteral(string_expr) = subexpr
+                    && let Some(string_expr) = subexpr.as_string_literal_expr()
                 {
                     // Do it again if we're a nested string annotation!
                     let (new_subast, subsubmodel) =
@@ -831,7 +806,7 @@ impl GotoTarget<'_> {
                         .find_first(AnyNodeRef::is_expression)
                         .ok()?
                         .node()
-                        .as_expr_ref()?;
+                        .cast::<ast::Expr>()?;
                 } else {
                     model_to_use = submodel;
                     expr_to_use = subexpr;
@@ -845,38 +820,38 @@ impl GotoTarget<'_> {
                 Some(definitions_for_name(
                     model,
                     identifier.as_str(),
-                    AnyNodeRef::Identifier(identifier),
+                    identifier.erase(),
                     alias_resolution,
                 ))
             }
 
             // These are declarations of sorts, but they're stmts and not exprs, so look up by ident.
             GotoTarget::TypeParamTypeVarName(type_var) => {
-                let name = &type_var.name;
+                let name = type_var.name();
                 Some(definitions_for_name(
                     model,
                     name.as_str(),
-                    AnyNodeRef::Identifier(name),
+                    name.erase(),
                     alias_resolution,
                 ))
             }
 
             GotoTarget::TypeParamParamSpecName(name) => {
-                let name = &name.name;
+                let name = name.name();
                 Some(definitions_for_name(
                     model,
                     name.as_str(),
-                    AnyNodeRef::Identifier(name),
+                    name.erase(),
                     alias_resolution,
                 ))
             }
 
             GotoTarget::TypeParamTypeVarTupleName(name) => {
-                let name = &name.name;
+                let name = name.name();
                 Some(definitions_for_name(
                     model,
                     name.as_str(),
-                    AnyNodeRef::Identifier(name),
+                    name.erase(),
                     alias_resolution,
                 ))
             }
@@ -884,7 +859,7 @@ impl GotoTarget<'_> {
             GotoTarget::SubscriptStringLiteralKey {
                 subscript,
                 literal_key,
-            } => typed_dict_key_definition(model, subscript, literal_key)
+            } => typed_dict_key_definition(model, *subscript, literal_key)
                 .map(|definition| vec![definition]),
         };
         definitions.map(Definitions::new)
@@ -900,18 +875,18 @@ impl GotoTarget<'_> {
                 callable: expression,
                 ..
             }
-            | GotoTarget::Expression(expression) => match expression {
-                ast::ExprRef::Name(name) => Some(Cow::Borrowed(name.id.as_str())),
-                ast::ExprRef::Attribute(attr) => Some(Cow::Borrowed(attr.attr.as_str())),
+            | GotoTarget::Expression(expression) => match expression.classify() {
+                flat::ExprKind::Name(name) => Some(Cow::Borrowed(name.id().as_str())),
+                flat::ExprKind::Attribute(attr) => Some(Cow::Borrowed(attr.attr().as_str())),
                 _ => None,
             },
             GotoTarget::StringAnnotationSubexpr { name, .. } => name.as_deref().map(Cow::Borrowed),
-            GotoTarget::FunctionDef(function) => Some(Cow::Borrowed(function.name.as_str())),
-            GotoTarget::ClassDef(class) => Some(Cow::Borrowed(class.name.as_str())),
-            GotoTarget::Parameter(parameter) => Some(Cow::Borrowed(parameter.name.as_str())),
+            GotoTarget::FunctionDef(function) => Some(Cow::Borrowed(function.name().as_str())),
+            GotoTarget::ClassDef(class) => Some(Cow::Borrowed(class.name().as_str())),
+            GotoTarget::Parameter(parameter) => Some(Cow::Borrowed(parameter.name().as_str())),
             GotoTarget::ImportSymbolAlias { asname, .. } => Some(Cow::Borrowed(asname.as_str())),
             GotoTarget::ImportExportedName { alias, .. } => {
-                Some(Cow::Borrowed(alias.name.as_str()))
+                Some(Cow::Borrowed(alias.name().as_str()))
             }
             GotoTarget::ImportModuleComponent {
                 module_name,
@@ -926,28 +901,24 @@ impl GotoTarget<'_> {
                 }
             }
             GotoTarget::ImportModuleAlias { asname, .. } => Some(Cow::Borrowed(asname.as_str())),
-            GotoTarget::ExceptVariable(except) => {
-                Some(Cow::Borrowed(except.name.as_ref()?.as_str()))
-            }
+            GotoTarget::ExceptVariable(except) => Some(Cow::Borrowed(except.name()?.as_str())),
             GotoTarget::KeywordArgument { keyword, .. } => {
-                Some(Cow::Borrowed(keyword.arg.as_ref()?.as_str()))
+                Some(Cow::Borrowed(keyword.arg()?.as_str()))
             }
-            GotoTarget::PatternMatchRest(rest) => Some(Cow::Borrowed(rest.rest.as_ref()?.as_str())),
+            GotoTarget::PatternMatchRest(rest) => Some(Cow::Borrowed(rest.rest()?.as_str())),
             GotoTarget::PatternKeywordArgument(keyword) => {
-                Some(Cow::Borrowed(keyword.attr.as_str()))
+                Some(Cow::Borrowed(keyword.attr().as_str()))
             }
-            GotoTarget::PatternMatchStarName(star) => {
-                Some(Cow::Borrowed(star.name.as_ref()?.as_str()))
-            }
+            GotoTarget::PatternMatchStarName(star) => Some(Cow::Borrowed(star.name()?.as_str())),
             GotoTarget::PatternMatchAsName(as_name) => {
-                Some(Cow::Borrowed(as_name.name.as_ref()?.as_str()))
+                Some(Cow::Borrowed(as_name.name()?.as_str()))
             }
             GotoTarget::TypeParamTypeVarName(type_var) => {
-                Some(Cow::Borrowed(type_var.name.as_str()))
+                Some(Cow::Borrowed(type_var.name().as_str()))
             }
-            GotoTarget::TypeParamParamSpecName(spec) => Some(Cow::Borrowed(spec.name.as_str())),
+            GotoTarget::TypeParamParamSpecName(spec) => Some(Cow::Borrowed(spec.name().as_str())),
             GotoTarget::TypeParamTypeVarTupleName(tuple) => {
-                Some(Cow::Borrowed(tuple.name.as_str()))
+                Some(Cow::Borrowed(tuple.name().as_str()))
             }
             GotoTarget::NonLocal { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
             GotoTarget::Globals { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
@@ -967,8 +938,8 @@ impl GotoTarget<'_> {
         tracing::trace!("Covering node is of kind {:?}", covering_node.node().kind());
 
         let node = covering_node.node();
-        let string_annotation = match node {
-            AnyNodeRef::ExprStringLiteral(string_expr) => {
+        let string_annotation = match node.classify() {
+            flat::AnyKind::ExprStringLiteral(string_expr) => {
                 model.enter_string_annotation(string_expr)
             }
             _ => None,
@@ -979,16 +950,16 @@ impl GotoTarget<'_> {
         // key target). Non-literal subscripts (e.g. `value[a<CURSOR>b]`) still hover the
         // identifier itself. This avoids "no hover" on literals and lets hover/goto show the
         // subscript result type.
-        if let Some(expr) = node.as_expr_ref()
+        if let Some(expr) = node.cast::<ast::Expr>()
             && string_annotation.is_none()
         {
             let enclosing_subscript_with_slice_range =
-                |range: TextRange| -> Option<&'a ast::ExprSubscript> {
+                |range: TextRange| -> Option<flat::View<'a, ast::ExprSubscript>> {
                     covering_node.ancestors().find_map(|node| {
-                        let AnyNodeRef::ExprSubscript(subscript) = node else {
+                        let flat::AnyKind::ExprSubscript(subscript) = node.classify() else {
                             return None;
                         };
-                        (subscript.slice.range() == range).then_some(subscript)
+                        (subscript.slice().range() == range).then_some(subscript)
                     })
                 };
 
@@ -1005,9 +976,9 @@ impl GotoTarget<'_> {
             // expression).
             let slice_expr_range = if expr.is_literal_expr() {
                 Some(expr.range())
-            } else if let Some(unary_op) = expr.unary_op_expr()
-                && matches!(unary_op.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
-                && unary_op.operand.is_literal_expr()
+            } else if let Some(unary_op) = expr.as_unary_op_expr()
+                && matches!(unary_op.op(), ast::UnaryOp::USub | ast::UnaryOp::UAdd)
+                && unary_op.operand().is_literal_expr()
             {
                 Some(unary_op.range())
             } else {
@@ -1017,8 +988,8 @@ impl GotoTarget<'_> {
             if let Some(slice_range) = slice_expr_range
                 && let Some(subscript) = enclosing_subscript_with_slice_range(slice_range)
             {
-                if let Some(literal) = subscript.slice.as_string_literal_expr() {
-                    let key = literal.value.to_str();
+                if let Some(literal) = subscript.slice().as_string_literal_expr() {
+                    let key = literal.value().to_str();
                     return Some(GotoTarget::SubscriptStringLiteralKey {
                         subscript,
                         literal_key: key,
@@ -1030,10 +1001,12 @@ impl GotoTarget<'_> {
             // 3. Cursor on the unary-op operand for `values[-1]` (e.g. `values[-<CURSOR>1]`,
             // covering node is the inner literal and parent is `ExprUnaryOp`).
             if expr.is_literal_expr()
-                && let Some(AnyNodeRef::ExprUnaryOp(unary_op)) = covering_node.parent()
-                && matches!(unary_op.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
-                && unary_op.operand.is_literal_expr()
-                && unary_op.operand.range() == expr.range()
+                && let Some(flat::AnyKind::ExprUnaryOp(unary_op)) = covering_node
+                    .parent()
+                    .map(flat::View::<flat::Any>::classify)
+                && matches!(unary_op.op(), ast::UnaryOp::USub | ast::UnaryOp::UAdd)
+                && unary_op.operand().is_literal_expr()
+                && unary_op.operand().range() == expr.range()
                 && let Some(subscript) = enclosing_subscript_with_slice_range(unary_op.range())
             {
                 return Some(GotoTarget::Expression(subscript.into()));
@@ -1042,10 +1015,13 @@ impl GotoTarget<'_> {
             // 4. Cursor on a literal or signed-literal `ExprSlice` bound (e.g. `values[1:<CURSOR>2]`,
             // `values[:-<CURSOR>1]`).
             if slice_expr_range.is_some()
-                && let Some(slice) = covering_node.ancestors().find_map(|node| match node {
-                    AnyNodeRef::ExprSlice(slice) => Some(slice),
-                    _ => None,
-                })
+                && let Some(slice) =
+                    covering_node
+                        .ancestors()
+                        .find_map(|node| match node.classify() {
+                            flat::AnyKind::ExprSlice(slice) => Some(slice),
+                            _ => None,
+                        })
                 && let Some(subscript) = enclosing_subscript_with_slice_range(slice.range())
             {
                 return Some(GotoTarget::Expression(subscript.into()));
@@ -1053,49 +1029,54 @@ impl GotoTarget<'_> {
 
             // 5. Cursor immediately before the `[` (e.g. `values<CURSOR>[0]` or
             // `values<CURSOR>[1:]`).
-            if let Some(AnyNodeRef::ExprSubscript(subscript)) = covering_node.parent()
-                && subscript.value.range() == expr.range()
+            if let Some(flat::AnyKind::ExprSubscript(subscript)) = covering_node
+                .parent()
+                .map(flat::View::<flat::Any>::classify)
+                && subscript.value().range() == expr.range()
                 && expr.range().end() == offset
             {
                 return Some(GotoTarget::Expression(subscript.into()));
             }
         }
 
-        match node {
-            AnyNodeRef::Identifier(identifier) => match covering_node.parent() {
-                Some(AnyNodeRef::StmtFunctionDef(function)) => {
+        match node.classify() {
+            flat::AnyKind::Identifier(identifier) => match covering_node
+                .parent()
+                .map(flat::View::<flat::Any>::classify)
+            {
+                Some(flat::AnyKind::StmtFunctionDef(function)) => {
                     Some(GotoTarget::FunctionDef(function))
                 }
-                Some(AnyNodeRef::StmtClassDef(class)) => Some(GotoTarget::ClassDef(class)),
-                Some(AnyNodeRef::Parameter(parameter)) => Some(GotoTarget::Parameter(parameter)),
-                Some(AnyNodeRef::Alias(alias)) => {
+                Some(flat::AnyKind::StmtClassDef(class)) => Some(GotoTarget::ClassDef(class)),
+                Some(flat::AnyKind::Parameter(parameter)) => Some(GotoTarget::Parameter(parameter)),
+                Some(flat::AnyKind::Alias(alias)) => {
                     // Find the containing import statement to determine the type
                     let import_stmt = covering_node.ancestors().find(|node| {
                         matches!(
-                            node,
-                            AnyNodeRef::StmtImport(_) | AnyNodeRef::StmtImportFrom(_)
+                            node.classify(),
+                            flat::AnyKind::StmtImport(_) | flat::AnyKind::StmtImportFrom(_)
                         )
                     });
 
-                    match import_stmt {
-                        Some(AnyNodeRef::StmtImport(_)) => {
+                    match import_stmt.map(flat::View::<flat::Any>::classify) {
+                        Some(flat::AnyKind::StmtImport(_)) => {
                             // Regular import statement like "import x.y as z"
 
                             // Is the offset within the alias name (asname) part?
-                            if let Some(asname) = &alias.asname {
-                                if asname.range.contains_inclusive(offset) {
+                            if let Some(asname) = alias.asname() {
+                                if asname.range().contains_inclusive(offset) {
                                     return Some(GotoTarget::ImportModuleAlias { alias, asname });
                                 }
                             }
 
                             // Is the offset in the module name part?
-                            if alias.name.range.contains_inclusive(offset) {
-                                let full_name = alias.name.as_str();
+                            if alias.name().range().contains_inclusive(offset) {
+                                let full_name = alias.name().as_str();
 
                                 if let Some((component_index, component_range)) =
                                     find_module_component(
                                         full_name,
-                                        alias.name.range.start(),
+                                        alias.name().range().start(),
                                         offset,
                                     )
                                 {
@@ -1110,18 +1091,18 @@ impl GotoTarget<'_> {
 
                             None
                         }
-                        Some(AnyNodeRef::StmtImportFrom(import_from)) => {
+                        Some(flat::AnyKind::StmtImportFrom(import_from)) => {
                             // From import statement like "from x import y as z"
 
                             // Is the offset within the alias name (asname) part?
-                            if let Some(asname) = &alias.asname {
-                                if asname.range.contains_inclusive(offset) {
+                            if let Some(asname) = alias.asname() {
+                                if asname.range().contains_inclusive(offset) {
                                     return Some(GotoTarget::ImportSymbolAlias { alias, asname });
                                 }
                             }
 
                             // Is the offset in the original name part?
-                            if alias.name.range.contains_inclusive(offset) {
+                            if alias.name().range().contains_inclusive(offset) {
                                 return Some(GotoTarget::ImportExportedName { alias, import_from });
                             }
 
@@ -1130,16 +1111,16 @@ impl GotoTarget<'_> {
                         _ => None,
                     }
                 }
-                Some(AnyNodeRef::StmtImportFrom(from)) => {
+                Some(flat::AnyKind::StmtImportFrom(from)) => {
                     // Handle offset within module name in from import statements
-                    if let Some(module_expr) = &from.module {
+                    if let Some(module_expr) = from.module() {
                         let full_module_name = module_expr.to_string();
                         if let Some((component_index, component_range)) =
                             find_module_component(&full_module_name, module_expr.start(), offset)
                         {
                             return Some(GotoTarget::ImportModuleComponent {
                                 module_name: full_module_name,
-                                level: from.level,
+                                level: from.level(),
                                 component_index,
                                 component_range,
                             });
@@ -1148,47 +1129,49 @@ impl GotoTarget<'_> {
 
                     None
                 }
-                Some(AnyNodeRef::ExceptHandlerExceptHandler(handler)) => handler
-                    .name
+                Some(flat::AnyKind::ExceptHandlerExceptHandler(handler)) => handler
+                    .name()
                     .is_some()
                     .then_some(GotoTarget::ExceptVariable(handler)),
-                Some(AnyNodeRef::Keyword(keyword)) => {
+                Some(flat::AnyKind::Keyword(keyword)) => {
                     // Find the containing call expression from the ancestor chain
                     let call_expression = covering_node
                         .ancestors()
-                        .find_map(ruff_python_ast::AnyNodeRef::expr_call)?;
+                        .find_map(flat::View::as_expr_call)?;
                     Some(GotoTarget::KeywordArgument {
                         keyword,
                         call_expression,
                     })
                 }
-                Some(AnyNodeRef::PatternMatchMapping(mapping)) => {
+                Some(flat::AnyKind::PatternMatchMapping(mapping)) => {
                     Some(GotoTarget::PatternMatchRest(mapping))
                 }
-                Some(AnyNodeRef::PatternKeyword(keyword)) => {
+                Some(flat::AnyKind::PatternKeyword(keyword)) => {
                     Some(GotoTarget::PatternKeywordArgument(keyword))
                 }
-                Some(AnyNodeRef::PatternMatchStar(star)) => {
+                Some(flat::AnyKind::PatternMatchStar(star)) => {
                     Some(GotoTarget::PatternMatchStarName(star))
                 }
-                Some(AnyNodeRef::PatternMatchAs(as_pattern)) => {
+                Some(flat::AnyKind::PatternMatchAs(as_pattern)) => {
                     Some(GotoTarget::PatternMatchAsName(as_pattern))
                 }
-                Some(AnyNodeRef::TypeParamTypeVar(var)) => {
+                Some(flat::AnyKind::TypeParamTypeVar(var)) => {
                     Some(GotoTarget::TypeParamTypeVarName(var))
                 }
-                Some(AnyNodeRef::TypeParamParamSpec(bound)) => {
+                Some(flat::AnyKind::TypeParamParamSpec(bound)) => {
                     Some(GotoTarget::TypeParamParamSpecName(bound))
                 }
-                Some(AnyNodeRef::TypeParamTypeVarTuple(var_tuple)) => {
+                Some(flat::AnyKind::TypeParamTypeVarTuple(var_tuple)) => {
                     Some(GotoTarget::TypeParamTypeVarTupleName(var_tuple))
                 }
-                Some(AnyNodeRef::ExprAttribute(attribute)) => {
+                Some(flat::AnyKind::ExprAttribute(attribute)) => {
                     // Check if this is seemingly a callable being invoked (the `y` in `x.y(...)`)
                     let grandparent_expr = covering_node.ancestors().nth(2);
                     let attribute_expr = attribute.into();
-                    if let Some(AnyNodeRef::ExprCall(call)) = grandparent_expr {
-                        if ruff_python_ast::ExprRef::from(&call.func) == attribute_expr {
+                    if let Some(flat::AnyKind::ExprCall(call)) =
+                        grandparent_expr.map(flat::View::<flat::Any>::classify)
+                    {
+                        if call.func().is_same_node(attribute) {
                             return Some(GotoTarget::Call {
                                 call,
                                 callable: attribute_expr,
@@ -1198,22 +1181,22 @@ impl GotoTarget<'_> {
                     }
                     Some(GotoTarget::Expression(attribute_expr))
                 }
-                Some(AnyNodeRef::StmtNonlocal(_)) => Some(GotoTarget::NonLocal { identifier }),
-                Some(AnyNodeRef::StmtGlobal(_)) => Some(GotoTarget::Globals { identifier }),
+                Some(flat::AnyKind::StmtNonlocal(_)) => Some(GotoTarget::NonLocal { identifier }),
+                Some(flat::AnyKind::StmtGlobal(_)) => Some(GotoTarget::Globals { identifier }),
                 None => None,
                 Some(parent) => {
                     tracing::debug!(
                         "Missing `GoToTarget` for identifier with parent {:?}",
-                        parent.kind()
+                        parent.view().node_kind()
                     );
                     None
                 }
             },
 
-            AnyNodeRef::ExprBinOp(binary) => {
-                if offset >= binary.left.end() && offset < binary.right.start() {
-                    let between_operands =
-                        tokens.in_range(TextRange::new(binary.left.end(), binary.right.start()));
+            flat::AnyKind::ExprBinOp(binary) => {
+                if offset >= binary.left().end() && offset < binary.right().start() {
+                    let between_operands = tokens
+                        .in_range(TextRange::new(binary.left().end(), binary.right().start()));
                     if let Some(operator_token) = between_operands
                         .iter()
                         .find(|token| token.kind().as_binary_operator().is_some())
@@ -1229,10 +1212,10 @@ impl GotoTarget<'_> {
                 Some(GotoTarget::Expression(binary.into()))
             }
 
-            AnyNodeRef::ExprUnaryOp(unary) => {
-                if offset >= unary.start() && offset < unary.operand.start() {
+            flat::AnyKind::ExprUnaryOp(unary) => {
+                if offset >= unary.start() && offset < unary.operand().start() {
                     let before_operand =
-                        tokens.in_range(TextRange::new(unary.start(), unary.operand.start()));
+                        tokens.in_range(TextRange::new(unary.start(), unary.operand().start()));
 
                     if let Some(operator_token) = before_operand
                         .iter()
@@ -1248,7 +1231,7 @@ impl GotoTarget<'_> {
                 Some(GotoTarget::Expression(unary.into()))
             }
 
-            node @ AnyNodeRef::ExprStringLiteral(string_expr) => {
+            node @ flat::AnyKind::ExprStringLiteral(string_expr) => {
                 // Check if we've clicked on a sub-GotoTarget inside a string annotation's sub-AST
                 if let Some((subast, submodel)) = string_annotation
                     && let Some(sub_goto_target) = find_goto_target_impl(
@@ -1272,9 +1255,9 @@ impl GotoTarget<'_> {
                             name,
                         }),
                         GotoTarget::Expression(subexpr) => {
-                            let name = match subexpr {
-                                ast::ExprRef::Name(name) => Some(name.id.to_string()),
-                                ast::ExprRef::Attribute(attr) => Some(attr.attr.to_string()),
+                            let name = match subexpr.classify() {
+                                flat::ExprKind::Name(name) => Some(name.id().to_string()),
+                                flat::ExprKind::Attribute(attr) => Some(attr.attr().to_string()),
                                 _ => None,
                             };
                             Some(GotoTarget::StringAnnotationSubexpr {
@@ -1284,10 +1267,10 @@ impl GotoTarget<'_> {
                                 name,
                             })
                         }
-                        _ => node.as_expr_ref().map(GotoTarget::Expression),
+                        _ => node.view().cast::<ast::Expr>().map(GotoTarget::Expression),
                     }
                 } else {
-                    node.as_expr_ref().map(GotoTarget::Expression)
+                    node.view().cast::<ast::Expr>().map(GotoTarget::Expression)
                 }
             }
 
@@ -1300,10 +1283,10 @@ impl GotoTarget<'_> {
                 for node in covering_node
                     .parent()
                     .into_iter()
-                    .chain(std::iter::once(node))
+                    .chain(std::iter::once(node.view()))
                 {
-                    if let AnyNodeRef::ExprCall(call) = node
-                        && let ast::Expr::Name(ref name) = *call.func
+                    if let flat::AnyKind::ExprCall(call) = node.classify()
+                        && let Some(name) = call.func().as_name_expr()
                     {
                         return Some(GotoTarget::Call {
                             call,
@@ -1312,7 +1295,7 @@ impl GotoTarget<'_> {
                         });
                     }
                 }
-                node.as_expr_ref().map(GotoTarget::Expression)
+                node.view().cast::<ast::Expr>().map(GotoTarget::Expression)
             }
         }
     }
@@ -1325,37 +1308,36 @@ impl Ranged for GotoTarget<'_> {
                 callable: expression,
                 ..
             }
-            | GotoTarget::Expression(expression) => match expression {
-                ast::ExprRef::Attribute(attribute) => attribute.attr.range,
+            | GotoTarget::Expression(expression) => match expression.classify() {
+                flat::ExprKind::Attribute(attribute) => attribute.attr().range(),
                 _ => expression.range(),
             },
-            GotoTarget::FunctionDef(function) => function.name.range,
-            GotoTarget::ClassDef(class) => class.name.range,
-            GotoTarget::Parameter(parameter) => parameter.name.range,
-            GotoTarget::ImportSymbolAlias { asname, .. } => asname.range,
-            Self::ImportExportedName { alias, .. } => alias.name.range,
+            GotoTarget::FunctionDef(function) => function.name().range(),
+            GotoTarget::ClassDef(class) => class.name().range(),
+            GotoTarget::Parameter(parameter) => parameter.name().range(),
+            GotoTarget::ImportSymbolAlias { asname, .. } => asname.range(),
+            Self::ImportExportedName { alias, .. } => alias.name().range(),
             GotoTarget::ImportModuleComponent {
                 component_range, ..
             } => *component_range,
             GotoTarget::StringAnnotationSubexpr { subrange, .. } => *subrange,
-            GotoTarget::ImportModuleAlias { asname, .. } => asname.range,
-            GotoTarget::ExceptVariable(except) => except
-                .name
-                .as_ref()
-                .map_or(except.range(), |name| name.range),
-            GotoTarget::KeywordArgument { keyword, .. } => keyword.arg.as_ref().unwrap().range,
-            GotoTarget::PatternMatchRest(rest) => rest.rest.as_ref().unwrap().range,
-            GotoTarget::PatternKeywordArgument(keyword) => keyword.attr.range,
-            GotoTarget::PatternMatchStarName(star) => star.name.as_ref().unwrap().range,
-            GotoTarget::PatternMatchAsName(as_name) => as_name.name.as_ref().unwrap().range,
-            GotoTarget::TypeParamTypeVarName(type_var) => type_var.name.range,
-            GotoTarget::TypeParamParamSpecName(spec) => spec.name.range,
-            GotoTarget::TypeParamTypeVarTupleName(tuple) => tuple.name.range,
-            GotoTarget::NonLocal { identifier, .. } => identifier.range,
-            GotoTarget::Globals { identifier, .. } => identifier.range,
+            GotoTarget::ImportModuleAlias { asname, .. } => asname.range(),
+            GotoTarget::ExceptVariable(except) => {
+                except.name().map_or(except.range(), |name| name.range())
+            }
+            GotoTarget::KeywordArgument { keyword, .. } => keyword.arg().unwrap().range(),
+            GotoTarget::PatternMatchRest(rest) => rest.rest().unwrap().range(),
+            GotoTarget::PatternKeywordArgument(keyword) => keyword.attr().range(),
+            GotoTarget::PatternMatchStarName(star) => star.name().unwrap().range(),
+            GotoTarget::PatternMatchAsName(as_name) => as_name.name().unwrap().range(),
+            GotoTarget::TypeParamTypeVarName(type_var) => type_var.name().range(),
+            GotoTarget::TypeParamParamSpecName(spec) => spec.name().range(),
+            GotoTarget::TypeParamTypeVarTupleName(tuple) => tuple.name().range(),
+            GotoTarget::NonLocal { identifier, .. } => identifier.range(),
+            GotoTarget::Globals { identifier, .. } => identifier.range(),
             GotoTarget::BinOp { operator_range, .. }
             | GotoTarget::UnaryOp { operator_range, .. } => *operator_range,
-            GotoTarget::SubscriptStringLiteralKey { subscript, .. } => subscript.slice.range(),
+            GotoTarget::SubscriptStringLiteralKey { subscript, .. } => subscript.slice().range(),
         }
     }
 }
@@ -1365,19 +1347,19 @@ impl Ranged for GotoTarget<'_> {
 /// This ensures that the setter/deleter function name is recognized as a
 /// co-definition of the same logical symbol as the getter.
 fn property_getter_definitions<'db>(
-    function: &ast::StmtFunctionDef,
+    function: flat::View<'_, ast::StmtFunctionDef>,
     model: &SemanticModel<'db>,
     alias_resolution: ImportAliasResolution,
 ) -> Option<Vec<ResolvedDefinition<'db>>> {
-    for decorator in &function.decorator_list {
-        if let Some(attr_expr) = decorator.expression.as_attribute_expr()
-            && matches!(attr_expr.attr.as_str(), "setter" | "deleter")
+    for decorator in function.decorator_list() {
+        if let Some(attr_expr) = decorator.expression().as_attribute_expr()
+            && matches!(attr_expr.attr().as_str(), "setter" | "deleter")
             && matches!(
-                attr_expr.value.inferred_type(model),
+                attr_expr.value().inferred_type(model),
                 Some(Type::PropertyInstance(_))
             )
         {
-            return definitions_for_expression(model, (&*attr_expr.value).into(), alias_resolution);
+            return definitions_for_expression(model, attr_expr.value(), alias_resolution);
         }
     }
     None
@@ -1386,26 +1368,26 @@ fn property_getter_definitions<'db>(
 /// Shared helper to get definitions for an expr (that is presumably a name/attr)
 fn definitions_for_expression<'db>(
     model: &SemanticModel<'db>,
-    expression: ruff_python_ast::ExprRef<'_>,
+    expression: flat::View<'_, ast::Expr>,
     alias_resolution: ImportAliasResolution,
 ) -> Option<Vec<ResolvedDefinition<'db>>> {
-    match expression {
-        ast::ExprRef::Name(name) => Some(definitions_for_name(
+    match expression.classify() {
+        flat::ExprKind::Name(name) => Some(definitions_for_name(
             model,
-            name.id.as_str(),
+            name.id().as_str(),
             expression.into(),
             alias_resolution,
         )),
-        ast::ExprRef::Attribute(attribute) => Some(ty_python_semantic::definitions_for_attribute(
-            model, attribute,
-        )),
+        flat::ExprKind::Attribute(attribute) => Some(
+            ty_python_semantic::definitions_for_attribute(model, attribute),
+        ),
         _ => None,
     }
 }
 
 fn definitions_for_callable<'db>(
     model: &SemanticModel<'db>,
-    call: &ast::ExprCall,
+    call: flat::View<'_, ast::ExprCall>,
 ) -> Vec<ResolvedDefinition<'db>> {
     // Attempt to refine to a specific call
     let signature_info = call_signature_details(model, call);

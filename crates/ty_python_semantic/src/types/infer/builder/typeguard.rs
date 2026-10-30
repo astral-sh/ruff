@@ -1,4 +1,5 @@
 use ruff_python_ast as ast;
+use ruff_python_ast::flat;
 use ty_python_core::place::PlaceExpr;
 use ty_python_core::place_table;
 use ty_python_core::scope::ScopeId;
@@ -12,7 +13,7 @@ pub(super) fn bind_type_guard_return_type<'db>(
     scope: ScopeId<'db>,
     return_ty: Type<'db>,
     bindings: &Bindings<'db>,
-    arguments: &ast::Arguments,
+    arguments: flat::View<'_, ast::Arguments>,
 ) -> Type<'db> {
     let narrowed_argument_index = || {
         bindings
@@ -80,9 +81,9 @@ pub(super) fn bind_type_guard_return_type<'db>(
             // Preserve positional behavior when there isn't a unique callable binding whose
             // parameter mapping we can use.
             None => arguments
-                .args
+                .args()
                 .get(narrowed_argument_index())
-                .map(ast::ArgOrKeyword::from),
+                .map(flat::ArgOrKeyword::Arg),
         }?;
         if argument.is_variadic() {
             return None;

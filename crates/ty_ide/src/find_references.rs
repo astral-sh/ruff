@@ -2,8 +2,8 @@ use crate::goto::find_goto_target;
 use crate::references::{FixtureReferenceTarget, ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
 use ruff_db::parsed::ParsedModuleRef;
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::find_node::covering_node;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::find_node::covering_node;
 use ruff_python_ast::token::TokenKind;
 use ruff_text_size::{Ranged, TextSize};
 use ty_python_core::ProgramFile;
@@ -62,7 +62,7 @@ fn explicit_fixture_name_at_offset<'db>(
         .at_offset(offset)
         .find(|token| token.kind() == TokenKind::String)?;
     let covering = covering_node(module.syntax().into(), token.range());
-    let AnyNodeRef::StringLiteral(literal) = covering.node() else {
+    let flat::AnyKind::StringLiteral(literal) = covering.node().classify() else {
         return None;
     };
 
@@ -75,26 +75,29 @@ fn explicit_fixture_name_at_offset<'db>(
     let mut ancestors = covering.ancestors();
     let mut in_name_argument = false;
     let function = loop {
-        match ancestors.next()? {
+        match ancestors.next()?.classify() {
             // The literal must be the value of `name`, not another keyword.
-            AnyNodeRef::Keyword(keyword)
-                if keyword.arg.as_deref() == Some("name")
-                    && keyword.value.is_string_literal_expr() =>
+            flat::AnyKind::Keyword(keyword)
+                if keyword
+                    .arg()
+                    .map(flat::View::<ruff_python_ast::Identifier>::as_str)
+                    == Some("name")
+                    && keyword.value().is_string_literal_expr() =>
             {
                 in_name_argument = true;
             }
             // The decorator must belong directly to a function, not a class.
-            AnyNodeRef::Decorator(_) if in_name_argument => {
-                let AnyNodeRef::StmtFunctionDef(function) = ancestors.next()? else {
+            flat::AnyKind::Decorator(_) if in_name_argument => {
+                let flat::AnyKind::StmtFunctionDef(function) = ancestors.next()?.classify() else {
                     return None;
                 };
                 break function;
             }
             // Skip over intermediate nodes that connect the literal, keyword, and decorator.
-            AnyNodeRef::StringLiteral(_)
-            | AnyNodeRef::ExprStringLiteral(_)
-            | AnyNodeRef::Arguments(_)
-            | AnyNodeRef::ExprCall(_) => {}
+            flat::AnyKind::StringLiteral(_)
+            | flat::AnyKind::ExprStringLiteral(_)
+            | flat::AnyKind::Arguments(_)
+            | flat::AnyKind::ExprCall(_) => {}
             // Reject unrelated syntax, such as return annotations, and failed guards.
             _ => return None,
         }

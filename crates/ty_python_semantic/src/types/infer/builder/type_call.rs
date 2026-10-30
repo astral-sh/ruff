@@ -13,6 +13,7 @@ use crate::types::infer::builder::{
 };
 use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type};
 use ruff_python_ast as ast;
+use ruff_python_ast::flat;
 use ty_python_core::definition::Definition;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -28,31 +29,28 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// to avoid cascading errors later on.
     pub(super) fn infer_builtins_type_call(
         &mut self,
-        call_expr: &ast::ExprCall,
+        call_expr: flat::View<'_, ast::ExprCall>,
         definition: Option<Definition<'db>>,
     ) -> Type<'db> {
         let env = self.program_environment();
         let db = self.db();
 
-        let ast::Arguments {
-            args,
-            keywords,
-            range: _,
-            node_index: _,
-        } = &call_expr.arguments;
+        let arguments_node = call_expr.arguments();
+        let args = arguments_node.args();
+        let keywords = arguments_node.keywords();
 
         for keyword in keywords {
-            self.infer_expression(&keyword.value, TypeContext::default());
+            self.infer_expression(keyword.value(), TypeContext::default());
         }
 
-        let [name_arg, bases_arg, namespace_arg] = match &**args {
-            [single] => {
+        let [name_arg, bases_arg, namespace_arg] = match args {
+            args if let Some([single]) = args.as_array() => {
                 let arg_type = self.infer_expression(single, TypeContext::default());
 
                 return if keywords.is_empty() {
                     arg_type.dunder_class(db, env)
                 } else {
-                    if keywords.iter().any(|keyword| keyword.arg.is_some())
+                    if keywords.iter().any(|keyword| keyword.arg().is_some())
                         && let Some(builder) =
                             self.context.report_lint(&NO_MATCHING_OVERLOAD, call_expr)
                     {
@@ -66,12 +64,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 };
             }
 
-            [first, second] if second.is_starred_expr() => {
+            args if let Some([first, second]) = args.as_array()
+                && second.is_starred_expr() =>
+            {
                 self.infer_expression(first, TypeContext::default());
                 self.infer_expression(second, TypeContext::default());
 
-                match &**keywords {
-                    [single] if single.arg.is_none() => {
+                match keywords.as_array() {
+                    Some([single]) if single.arg().is_none() => {
                         return SubclassOfType::subclass_of_unknown();
                     }
                     _ => {
@@ -90,7 +90,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
 
-            [name, bases, namespace] => [name, bases, namespace],
+            args if let Some([name, bases, namespace]) = args.as_array() => {
+                [name, bases, namespace]
+            }
 
             _ => {
                 for arg in args {
@@ -116,10 +118,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let namespace_type = self.infer_expression(namespace_arg, TypeContext::default());
 
         // TODO: validate other keywords against `__init_subclass__` methods of superclasses
-        if keywords
-            .iter()
-            .any(|keyword| keyword.arg.as_deref() == Some("metaclass"))
-        {
+        if keywords.iter().any(|keyword| {
+            keyword.arg().map(flat::View::<ast::Identifier>::as_str) == Some("metaclass")
+        }) {
             if let Some(builder) = self.context.report_lint(&NO_MATCHING_OVERLOAD, call_expr) {
                 let mut diagnostic =
                     builder.into_diagnostic("No overload of class `type` matches arguments");
@@ -130,30 +131,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // If any argument is a starred expression, we can't know how many positional arguments
         // we're receiving, so fall back to `type[Unknown]` to avoid false-positive errors.
-        if args.iter().any(ast::Expr::is_starred_expr) {
+        if args.iter().any(flat::View::is_starred_expr) {
             return SubclassOfType::subclass_of_unknown();
         }
 
         // Extract members from the namespace dict (third argument).
         let (members, has_dynamic_namespace): (Box<[(ast::name::Name, Type<'db>)]>, bool) =
-            if let ast::Expr::Dict(dict) = namespace_arg {
+            if let flat::ExprKind::Dict(dict) = namespace_arg.classify() {
                 // Check if all keys are string literal types. If any key is not a string literal
                 // type or is missing (spread), the namespace is considered dynamic.
-                let all_keys_are_string_literals = dict.items.iter().all(|item| {
+                let all_keys_are_string_literals = dict.items().iter().all(|item| {
                     item.key
-                        .as_ref()
                         .is_some_and(|k| self.expression_type(k).is_string_literal())
                 });
                 let members = dict
-                    .items
+                    .items()
                     .iter()
                     .filter_map(|item| {
                         // Only extract items with string literal keys.
-                        let key_expr = item.key.as_ref()?;
+                        let key_expr = item.key?;
                         let key_name = self.expression_type(key_expr).as_string_literal()?;
                         let key_name = ast::name::Name::new(key_name.value(db));
                         // Get the already-inferred type from when we inferred the dict above.
-                        let value_ty = self.expression_type(&item.value);
+                        let value_ty = self.expression_type(item.value);
                         Some((key_name, value_ty))
                     })
                     .collect();
@@ -274,7 +274,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     report_instance_layout_conflict(
                         &self.context,
                         dynamic_class.header_range(db),
-                        bases_arg.as_tuple_expr().map(|tuple| tuple.elts.as_slice()),
+                        bases_arg
+                            .as_tuple_expr()
+                            .map(flat::View::<ast::ExprTuple>::elts),
                         &disjoint_bases,
                     );
                 }
@@ -310,11 +312,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_builtins_type_deferred(
         &mut self,
         definition: Definition<'db>,
-        call_expr: &ast::Expr,
+        call_expr: flat::View<'_, ast::Expr>,
     ) {
         let db = self.db();
 
-        let ast::Expr::Call(call) = call_expr else {
+        let flat::ExprKind::Call(call) = call_expr.classify() else {
             return;
         };
 
@@ -324,7 +326,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return;
         };
 
-        let [_name_arg, bases_arg, _namespace_arg] = &*call.arguments.args else {
+        let Some([_name_arg, bases_arg, _namespace_arg]) = call.arguments().args().as_array()
+        else {
             return;
         };
 

@@ -17,6 +17,7 @@ use crate::{
     },
 };
 use char_str::format_char;
+use ruff_python_ast::flat;
 use ruff_python_ast::{self as ast, name::Name};
 use ruff_python_stdlib::{identifiers::is_identifier, keyword::is_keyword};
 use rustc_hash::FxHashSet;
@@ -29,7 +30,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// it is assumed that the type for this AST node has already been inferred before this method is called.
     pub(super) fn infer_namedtuple_call_expression(
         &mut self,
-        call_expr: &ast::ExprCall,
+        call_expr: flat::View<'_, ast::ExprCall>,
         definition: Option<Definition<'db>>,
         kind: NamedTupleKind,
     ) -> Type<'db> {
@@ -55,16 +56,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             )
         };
 
-        let ast::Arguments {
-            args,
-            keywords,
-            range: _,
-            node_index: _,
-        } = &call_expr.arguments;
+        let arguments_node = call_expr.arguments();
+        let args = arguments_node.args();
+        let keywords = arguments_node.keywords();
 
         // Check for variadic arguments early, before extracting positional args.
-        let has_starred = args.iter().any(ast::Expr::is_starred_expr);
-        let has_double_starred = keywords.iter().any(|kw| kw.arg.is_none());
+        let has_starred = args.iter().any(flat::View::is_starred_expr);
+        let has_double_starred = keywords.iter().any(|kw| kw.arg().is_none());
 
         // Emit diagnostic for missing required arguments or unsupported variadic arguments.
         // For `typing.NamedTuple`, emit a diagnostic since variadic arguments are not supported.
@@ -88,41 +86,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Extract typename and fields from positional or keyword arguments.
         // For `collections.namedtuple`, both `typename` and `field_names` can be keyword arguments.
         // For `typing.NamedTuple`, only positional arguments are supported.
-        let (name_arg, fields_arg, rest, name_from_keyword, fields_from_keyword): (
-            Option<&ast::Expr>,
-            Option<&ast::Expr>,
-            &[ast::Expr],
-            bool,
-            bool,
-        ) = match kind {
-            NamedTupleKind::Collections => {
-                let typename_kw = call_expr.arguments.find_keyword("typename");
-                let field_names_kw = call_expr.arguments.find_keyword("field_names");
-
-                match &**args {
-                    [name, fields, rest @ ..] => (Some(name), Some(fields), rest, false, false),
-                    [name, rest @ ..] => (
-                        Some(name),
-                        field_names_kw.map(|kw| &kw.value),
-                        rest,
-                        false,
-                        field_names_kw.is_some(),
-                    ),
-                    [] => (
-                        typename_kw.map(|kw| &kw.value),
-                        field_names_kw.map(|kw| &kw.value),
-                        &[],
-                        typename_kw.is_some(),
-                        field_names_kw.is_some(),
-                    ),
-                }
-            }
-            NamedTupleKind::Typing => match &**args {
-                [name, fields, rest @ ..] => (Some(name), Some(fields), rest, false, false),
-                [name, rest @ ..] => (Some(name), None, rest, false, false),
-                [] => (None, None, &[], false, false),
-            },
+        let (name_keyword, fields_keyword) = match kind {
+            NamedTupleKind::Collections => (
+                call_expr.arguments().find_keyword("typename"),
+                call_expr.arguments().find_keyword("field_names"),
+            ),
+            NamedTupleKind::Typing => (None, None),
         };
+        let name_from_keyword = args.is_empty() && name_keyword.is_some();
+        let fields_from_keyword = args.len() < 2 && fields_keyword.is_some();
+        let name_arg = args
+            .first()
+            .or_else(|| name_keyword.map(flat::View::<ast::Keyword>::value));
+        let fields_arg = args
+            .get(1)
+            .or_else(|| fields_keyword.map(flat::View::<ast::Keyword>::value));
+        let rest = args.slice(2.min(args.len())..);
 
         // Check if we have both required arguments.
         let (Some(name_arg), Some(fields_arg)) = (name_arg, fields_arg) else {
@@ -130,7 +109,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_expression(arg, TypeContext::default());
             }
             for kw in keywords {
-                self.infer_expression(&kw.value, TypeContext::default());
+                self.infer_expression(kw.value(), TypeContext::default());
             }
 
             if !has_starred && !has_double_starred {
@@ -167,7 +146,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.infer_expression(fields_arg, TypeContext::default());
 
             for kw in keywords {
-                if let Some(arg) = kw.arg.as_deref() {
+                if let Some(arg) = kw.arg() {
                     if name_from_keyword && arg == "typename" {
                         continue;
                     }
@@ -175,7 +154,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         continue;
                     }
                 }
-                self.infer_expression(&kw.value, TypeContext::default());
+                self.infer_expression(kw.value(), TypeContext::default());
             }
             return fallback();
         }
@@ -184,7 +163,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if !rest.is_empty() {
             if let Some(builder) = self
                 .context
-                .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, &rest[0])
+                .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, rest.at(0))
             {
                 builder.into_diagnostic(format_args!(
                     "Too many positional arguments to function `{kind}`: expected 2, got {}",
@@ -195,33 +174,32 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Infer keyword arguments.
         let mut default_types: Vec<Type<'db>> = vec![];
-        let mut defaults_kw: Option<&ast::Keyword> = None;
+        let mut defaults_kw: Option<flat::View<'_, ast::Keyword>> = None;
         let mut rename_type = None;
 
         for kw in keywords {
             // `kw.arg` is `None` for double-starred kwargs (`**kwargs`), but we already
             // returned early above if there were any, so this should always be `Some`.
             let arg = kw
-                .arg
-                .as_ref()
+                .arg()
                 .expect("double-starred kwargs should have been handled above");
 
             // Skip keywords that were used for the required arguments (already inferred above).
             // These flags are only true for `collections.namedtuple`.
-            if name_from_keyword && arg.id.as_str() == "typename" {
+            if name_from_keyword && arg.id().as_str() == "typename" {
                 continue;
             }
-            if fields_from_keyword && arg.id.as_str() == "field_names" {
+            if fields_from_keyword && arg.id().as_str() == "field_names" {
                 continue;
             }
 
-            let kw_type = self.infer_expression(&kw.value, TypeContext::default());
+            let kw_type = self.infer_expression(kw.value(), TypeContext::default());
 
-            match arg.id.as_str() {
+            match arg.id().as_str() {
                 "defaults" if kind.is_collections() => {
                     defaults_kw = Some(kw);
                     if let Some(element_types) =
-                        extract_fixed_length_iterable_element_types(db, env, &kw.value, |expr| {
+                        extract_fixed_length_iterable_element_types(db, env, kw.value(), |expr| {
                             self.expression_type(expr)
                         })
                     {
@@ -241,7 +219,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         UnionType::from_two_elements(db, env, iterable_any, Type::none(db, env));
                     if !kw_type.is_assignable_to(db, env, valid_type)
                         && let Some(builder) =
-                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
+                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, kw.value())
                     {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Invalid argument to parameter `defaults` of `namedtuple()`"
@@ -258,7 +236,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // Emit diagnostic for non-bool types.
                     if !kw_type.is_assignable_to(db, env, KnownClass::Bool.to_instance(db, env))
                         && let Some(builder) =
-                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
+                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, kw.value())
                     {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Invalid argument to parameter `rename` of `namedtuple()`"
@@ -279,7 +257,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     );
                     if !kw_type.is_assignable_to(db, env, valid_type)
                         && let Some(builder) =
-                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
+                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, kw.value())
                     {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Invalid argument to parameter `module` of `namedtuple()`"
@@ -407,9 +385,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn infer_collections_namedtuple_fields(
         &mut self,
         rename_type: Option<Type<'db>>,
-        fields_arg: &ast::Expr,
+        fields_arg: flat::View<'_, ast::Expr>,
         default_types: &[Type<'db>],
-        defaults_kw: Option<&ast::Keyword>,
+        defaults_kw: Option<flat::View<'_, ast::Keyword>>,
     ) -> NamedTupleSpec<'db> {
         let env = self.program_environment();
         let db = self.db();
@@ -543,7 +521,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     pub(super) fn infer_typing_namedtuple_fields(
         &mut self,
-        fields_arg: &ast::Expr,
+        fields_arg: flat::View<'_, ast::Expr>,
     ) -> NamedTupleSpec<'db> {
         #[derive(Debug, Copy, Clone, PartialEq, Eq)]
         enum SequenceKind {
@@ -555,9 +533,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
 
         // Get the elements from the list or tuple literal.
-        let (elements, field_arg_kind) = match fields_arg {
-            ast::Expr::List(list) => (&list.elts, SequenceKind::List),
-            ast::Expr::Tuple(tuple) => (&tuple.elts, SequenceKind::Tuple),
+        let (elements, field_arg_kind) = match fields_arg.classify() {
+            flat::ExprKind::List(list) => (list.elts(), SequenceKind::List),
+            flat::ExprKind::Tuple(tuple) => (tuple.elts(), SequenceKind::Tuple),
             _ => {
                 self.infer_expression(fields_arg, TypeContext::default());
                 if let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg) {
@@ -575,12 +553,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         for (i, element) in elements.iter().enumerate() {
             // Each element should be a tuple or list like ("field_name", type) or ["field_name", type].
-            let (field_spec_elts, field_spec_kind) = match element {
-                ast::Expr::Tuple(tuple) => (&tuple.elts, SequenceKind::Tuple),
-                ast::Expr::List(list) => (&list.elts, SequenceKind::List),
+            let (field_spec_elts, field_spec_kind) = match element.classify() {
+                flat::ExprKind::Tuple(tuple) => (tuple.elts(), SequenceKind::Tuple),
+                flat::ExprKind::List(list) => (list.elts(), SequenceKind::List),
                 _ => {
                     self.infer_expression(element, TypeContext::default());
-                    for element in &elements[(i + 1)..] {
+                    for element in elements.slice((i + 1)..) {
                         self.infer_expression(element, TypeContext::default());
                     }
                     match field_arg_kind {
@@ -609,9 +587,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             };
 
-            let [name_expr, declaration_expr] = &**field_spec_elts else {
+            let Some([name_expr, declaration_expr]) = field_spec_elts.as_array() else {
                 self.infer_expression(element, TypeContext::default());
-                for element in &elements[(i + 1)..] {
+                for element in elements.slice((i + 1)..) {
                     self.infer_expression(element, TypeContext::default());
                 }
                 match field_arg_kind {
@@ -659,7 +637,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.store_expression_type(element, element_type);
 
             let Some(name) = name_type.as_string_literal() else {
-                for element in &elements[(i + 1)..] {
+                for element in elements.slice((i + 1)..) {
                     self.infer_expression(element, TypeContext::default());
                 }
                 match field_arg_kind {
@@ -711,7 +689,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn check_invalid_namedtuple_field_names(
         &self,
         field_names: &[Name],
-        fields_arg: &ast::Expr,
+        fields_arg: flat::View<'_, ast::Expr>,
         kind: NamedTupleKind,
     ) {
         for (i, field_name) in field_names.iter().enumerate() {

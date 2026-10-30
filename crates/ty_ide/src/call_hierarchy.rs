@@ -8,6 +8,7 @@
 //! AST access goes through the salsa-cached `parsed_module`, which preserves
 //! incrementality without forcing the entry points themselves to be tracked.
 
+use ruff_python_ast::flat;
 pub(crate) mod incoming_calls;
 pub(crate) mod outgoing_calls;
 
@@ -15,10 +16,10 @@ use crate::goto::{GotoTarget, find_goto_target};
 use crate::{Db, SymbolKind};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::find_node::CoveringNode;
+use ruff_python_ast::flat::find_node::CoveringNode;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::Tokens;
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::{self as ast, flat::AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::ResolverFile;
 use ty_python_core::ProgramFile;
@@ -136,20 +137,20 @@ pub(super) fn snapshot_item_label(item: &CallHierarchyItem) -> String {
 /// `Identifier` of `foo` in the attribute access.
 #[derive(Clone, Copy)]
 enum CalleeLeaf<'a> {
-    Name(&'a ast::ExprName),
+    Name(flat::View<'a, ast::ExprName>),
     AttrIdentifier {
-        attribute: &'a ast::ExprAttribute,
-        identifier: &'a ast::Identifier,
+        attribute: flat::View<'a, ast::ExprAttribute>,
+        identifier: flat::View<'a, ast::Identifier>,
     },
 }
 
 impl<'a> CalleeLeaf<'a> {
-    fn from_expr(expr: &'a ast::Expr) -> Option<Self> {
-        match expr {
-            ast::Expr::Name(name) => Some(CalleeLeaf::Name(name)),
-            ast::Expr::Attribute(attr) => Some(CalleeLeaf::AttrIdentifier {
+    fn from_expr(expr: flat::View<'a, ast::Expr>) -> Option<Self> {
+        match expr.classify() {
+            flat::ExprKind::Name(name) => Some(CalleeLeaf::Name(name)),
+            flat::ExprKind::Attribute(attr) => Some(CalleeLeaf::AttrIdentifier {
                 attribute: attr,
-                identifier: &attr.attr,
+                identifier: attr.attr(),
             }),
             _ => None,
         }
@@ -172,7 +173,7 @@ impl<'a> CalleeLeaf<'a> {
         let call_site_range = match self {
             CalleeLeaf::Name(name) => {
                 stack.push(AnyNodeRef::from(name));
-                name.range
+                name.range()
             }
             CalleeLeaf::AttrIdentifier {
                 attribute,
@@ -180,7 +181,7 @@ impl<'a> CalleeLeaf<'a> {
             } => {
                 stack.push(AnyNodeRef::from(attribute));
                 stack.push(AnyNodeRef::from(identifier));
-                identifier.range
+                identifier.range()
             }
         };
         let covering = CoveringNode::from_ancestors(stack);

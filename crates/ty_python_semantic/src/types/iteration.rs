@@ -16,6 +16,7 @@ use compact_str::ToCompactString;
 use ruff_db::diagnostic::{Annotation, Span};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
+use ruff_python_ast::flat;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
@@ -67,23 +68,22 @@ fn async_generator_stub_declaration<'db>(
     };
     let module = parsed_module(db, definition.program_file(db).python_file(db)).load(db);
     let node = function.node(&module);
-    if !node.is_async || !function_has_stub_body(node) {
+    if !node.is_async() || !function_has_stub_body(node) {
         return None;
     }
     // Start at `async`, excluding any decorators from the declaration's range.
     let start = module
         .tokens()
-        .in_range(TextRange::new(node.start(), node.name.start()))
+        .in_range(TextRange::new(node.start(), node.name().start()))
         .iter()
         .rfind(|token| token.kind() == TokenKind::Async)?
         .start();
     let end = node
-        .returns
-        .as_ref()
-        .map_or(node.parameters.end(), |returns| returns.end());
+        .returns()
+        .map_or(node.parameters().end(), |returns| returns.end());
     Some((
         Span::from(definition.file(db)).with_range(TextRange::new(start, end)),
-        node.name.id.clone(),
+        node.name().id().clone(),
     ))
 }
 
@@ -93,14 +93,14 @@ fn async_generator_stub_declaration<'db>(
 /// than inferring its enclosing scope while that scope's diagnostics are still being collected.
 fn iterable_factory_definition<'db>(
     context: &InferContext<'db, '_>,
-    iterable_node: ast::AnyNodeRef,
+    iterable_node: flat::AnyNodeRef,
 ) -> Option<Definition<'db>> {
-    let call = *iterable_node.as_expr_call()?;
+    let call = iterable_node.as_expr_call()?;
     let db = context.db();
     let expression = semantic_index(db, context.program_file()).try_expression(call)?;
     let inference = infer_expression_types(db, expression, TypeContext::default());
     let bindings = inference
-        .expression_type(call.func.as_ref())
+        .expression_type(call.func())
         .bindings(db, context.program_environment());
     let [overload] = bindings.single_element()?.overloads() else {
         return None;
@@ -115,15 +115,15 @@ fn iterable_factory_definition<'db>(
 pub(super) fn extract_literal_container_element_types<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    expression: &ast::Expr,
-    expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+    expression: flat::View<'_, ast::Expr>,
+    expression_type: impl FnMut(flat::View<'_, ast::Expr>) -> Type<'db>,
 ) -> Option<Box<[Type<'db>]>> {
-    match expression {
-        ast::Expr::List(_) => {
+    match expression.classify() {
+        flat::ExprKind::List(_) => {
             extract_fixed_length_iterable_element_types(db, env, expression, expression_type)
         }
-        ast::Expr::Set(set) if !set.elts.iter().any(ast::Expr::is_starred_expr) => {
-            Some(set.elts.iter().map(expression_type).collect())
+        flat::ExprKind::Set(set) if !set.elts().iter().any(flat::View::is_starred_expr) => {
+            Some(set.elts().iter().map(expression_type).collect())
         }
         _ => None,
     }
@@ -136,29 +136,29 @@ pub(super) fn extract_literal_container_element_types<'db>(
 pub(crate) fn extract_fixed_length_iterable_element_types<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    iterable: &ast::Expr,
-    mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+    iterable: flat::View<'_, ast::Expr>,
+    mut expression_type: impl FnMut(flat::View<'_, ast::Expr>) -> Type<'db>,
 ) -> Option<Box<[Type<'db>]>> {
     fn extend_fixed_length_iterable<'db>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        iterable: &ast::Expr,
-        expression_type: &mut impl FnMut(&ast::Expr) -> Type<'db>,
+        iterable: flat::View<'_, ast::Expr>,
+        expression_type: &mut impl FnMut(flat::View<'_, ast::Expr>) -> Type<'db>,
         element_types: &mut Vec<Type<'db>>,
     ) -> Option<()> {
-        let elements = match iterable {
-            ast::Expr::List(list) => Some(&list.elts),
-            ast::Expr::Tuple(tuple) => Some(&tuple.elts),
+        let elements = match iterable.classify() {
+            flat::ExprKind::List(list) => Some(list.elts()),
+            flat::ExprKind::Tuple(tuple) => Some(tuple.elts()),
             _ => None,
         };
 
         if let Some(elements) = elements {
             for element in elements {
-                if let ast::Expr::Starred(starred) = element {
+                if let flat::ExprKind::Starred(starred) = element.classify() {
                     extend_fixed_length_iterable(
                         db,
                         env,
-                        starred.value.as_ref(),
+                        starred.value(),
                         expression_type,
                         element_types,
                     )?;
@@ -775,7 +775,7 @@ impl<'db> IterationError<'db> {
         &self,
         context: &InferContext<'db, '_>,
         iterable_type: Type<'db>,
-        iterable_node: ast::AnyNodeRef,
+        iterable_node: flat::AnyNodeRef,
     ) {
         #[derive(Copy, Clone)]
         enum ErrorContext {

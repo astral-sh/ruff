@@ -4,6 +4,7 @@
 
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
+use ruff_python_ast::flat;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::Ranged;
 use ty_python_core::scope::{NodeWithScopeKind, ScopeKind};
@@ -16,16 +17,12 @@ use crate::types::{KnownClass, Type, TypeContext};
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_await_expression(
         &mut self,
-        await_expression: &ast::ExprAwait,
+        await_expression: flat::View<'_, ast::ExprAwait>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let ast::ExprAwait {
-            range: _,
-            node_index: _,
-            value,
-        } = await_expression;
+        let value = await_expression.value();
 
         let expr_type = self.infer_expression(
             value,
@@ -33,12 +30,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         );
 
         expr_type.try_await(db, env).unwrap_or_else(|err| {
-            err.report_diagnostic(&self.context, expr_type, value.as_ref().into());
+            err.report_diagnostic(&self.context, expr_type, value.into());
             Type::unknown()
         })
     }
 
-    pub(super) fn check_unused_awaitable(&self, expression: &ast::Expr) {
+    pub(super) fn check_unused_awaitable(&self, expression: flat::View<'_, ast::Expr>) {
         let db = self.db();
         let ty = self.expression_type(expression);
         if ty.is_awaitable(db)
@@ -59,12 +56,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Returns `true` if `expr` is a call to a known diagnostic function
     /// (e.g., `reveal_type` or `assert_type`) whose return value should not
     /// trigger the `unused-awaitable` lint.
-    fn is_known_function_call(&self, expr: &ast::Expr) -> bool {
-        let ast::Expr::Call(call) = expr else {
+    fn is_known_function_call(&self, expr: flat::View<'_, ast::Expr>) -> bool {
+        let flat::ExprKind::Call(call) = expr.classify() else {
             return false;
         };
         matches!(
-            self.expression_type(&call.func),
+            self.expression_type(call.func()),
             Type::FunctionLiteral(f)
                 if matches!(
                     f.known(self.db()),
@@ -77,13 +74,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///
     /// Accounts for asynchronous functions, notebook cells, annotation restrictions, enclosing
     /// scopes, and the different scoping behavior of comprehensions and generator expressions.
-    pub(super) fn can_await_here(&self, expression: &ast::Expr) -> bool {
-        let Some(expression_scope) = self.index.try_expression_scope_id(expression) else {
+    pub(super) fn can_await_here(&self, expression: flat::View<'_, ast::Expr>) -> bool {
+        let Some(expression_scope) = self.index.try_expression_scope_id(&expression) else {
             return false;
         };
         let annotation_parent_scope = self
             .index
-            .annotation_parent_scope_id(self.module(), expression);
+            .annotation_parent_scope_id(self.module(), &expression);
 
         let db = self.db();
 
@@ -112,7 +109,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             match scope.node() {
                 NodeWithScopeKind::Function(function) => {
-                    return function.node(self.module()).is_async;
+                    return function.node(self.module()).is_async();
                 }
                 NodeWithScopeKind::Lambda(_)
                 | NodeWithScopeKind::Class(_)
@@ -140,7 +137,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     /// Suggest awaiting an expression, adding parentheses if its precedence requires them.
-    pub(super) fn await_expression_fix(&self, expression: &ast::Expr) -> Option<Fix> {
+    pub(super) fn await_expression_fix(
+        &self,
+        expression: flat::View<'_, ast::Expr>,
+    ) -> Option<Fix> {
         if !self.can_await_here(expression) {
             return None;
         }

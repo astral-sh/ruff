@@ -77,7 +77,7 @@ impl<'db> NewType<'db> {
         let Some(call_expr) = assignment.value(&module).as_call_expr() else {
             return object_fallback;
         };
-        let Some(second_arg) = call_expr.arguments.args.get(1) else {
+        let Some(second_arg) = call_expr.arguments().args().get(1) else {
             return object_fallback;
         };
         match definition_expression_type(db, definition, second_arg) {

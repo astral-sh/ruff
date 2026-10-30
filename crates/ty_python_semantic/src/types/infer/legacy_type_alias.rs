@@ -3,9 +3,10 @@
 
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::source_text;
-use ruff_python_ast::helpers::is_dotted_name;
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, visitor as ast_visitor};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::helpers::is_dotted_name;
+use ruff_python_ast::flat::visitor::Visitor;
+use ruff_python_ast::{self as ast, flat::visitor as ast_visitor};
 use ruff_text_size::Ranged;
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::place::PlaceExpr;
@@ -74,7 +75,7 @@ pub(super) fn legacy_type_alias_definition<'db>(
             let value = assignment.value(&module);
             // The parser represents a missing right-hand side as an invalid name.
             if value.is_string_literal_expr()
-                || value.as_name_expr().is_some_and(ast::ExprName::is_invalid)
+                || value.as_name_expr().is_some_and(flat::View::is_invalid)
             {
                 return None;
             }
@@ -90,12 +91,12 @@ pub(super) fn legacy_type_alias_definition<'db>(
         _ => return None,
     };
     if !matches!(
-        value,
-        ast::Expr::Name(_)
-            | ast::Expr::Attribute(_)
-            | ast::Expr::Subscript(_)
-            | ast::Expr::BinOp(_)
-            | ast::Expr::StringLiteral(_)
+        value.classify(),
+        flat::ExprKind::Name(_)
+            | flat::ExprKind::Attribute(_)
+            | flat::ExprKind::Subscript(_)
+            | flat::ExprKind::BinOp(_)
+            | flat::ExprKind::StringLiteral(_)
     ) {
         return None;
     }
@@ -107,7 +108,10 @@ pub(super) fn legacy_type_alias_definition<'db>(
                 is_implicit: false,
             });
     }
-    if matches!(value, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+    if matches!(
+        value.classify(),
+        flat::ExprKind::Name(_) | flat::ExprKind::Attribute(_)
+    ) {
         // For `Items = list[T]; Forwarded = Items`, reuse Items's definition, including
         // its parameters and recursive identity. Do this before inspecting its value:
         // `A: TypeAlias = list; B = A` must retain A's default specialization even though
@@ -182,7 +186,10 @@ pub(super) fn non_alias_assignment<'db>(
     };
     let module = parsed_module(db, definition.python_file(db)).load(db);
     let value = assignment.value(&module);
-    if matches!(value, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+    if matches!(
+        value.classify(),
+        flat::ExprKind::Name(_) | flat::ExprKind::Attribute(_)
+    ) {
         return forwarding_alias_definition(db, definition, value)
             .filter(|target| *target != definition)
             .and_then(|target| non_alias_assignment(db, target, ty));
@@ -192,17 +199,17 @@ pub(super) fn non_alias_assignment<'db>(
     }
     // These forms can describe an alias even when one of its type arguments is invalid.
     // Type-expression inference diagnoses those arguments and preserves the outer type.
-    if let ast::Expr::Subscript(subscript) = value
-        && is_dotted_name(&subscript.value)
+    if let flat::ExprKind::Subscript(subscript) = value.classify()
+        && is_dotted_name(subscript.value())
     {
-        let base = crate::types::definition_expression_type(db, definition, &subscript.value);
+        let base = crate::types::definition_expression_type(db, definition, subscript.value());
         if matches!(
             base,
             Type::ClassLiteral(_)
                 | Type::GenericAlias(_)
                 | Type::SpecialForm(_)
                 | Type::KnownInstance(KnownInstanceType::TypeAliasType(_))
-        ) && forwarding_alias_definition(db, definition, &subscript.value)
+        ) && forwarding_alias_definition(db, definition, subscript.value())
             .is_none_or(|target| non_alias_assignment(db, target, base).is_none())
         {
             return None;
@@ -275,17 +282,17 @@ fn resolve_imported_definition<'db>(
 fn forwarding_alias_definition<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    value: &ast::Expr,
+    value: flat::View<'_, ast::Expr>,
 ) -> Option<Definition<'db>> {
-    match value {
-        ast::Expr::Name(name) if name.ctx.is_load() => {
+    match value.classify() {
+        flat::ExprKind::Name(name) if name.ctx().is_load() => {
             referenced_name_definition(db, definition.program_file(db), name, None)
         }
-        ast::Expr::Attribute(attribute) if attribute.ctx.is_load() => {
+        flat::ExprKind::Attribute(attribute) if attribute.ctx().is_load() => {
             let env = ProgramEnvironment::from_definition(definition);
             let receiver =
-                crate::types::definition_expression_type(db, definition, &attribute.value);
-            match receiver.member(db, &env, &attribute.attr).place {
+                crate::types::definition_expression_type(db, definition, attribute.value());
+            match receiver.member(db, &env, attribute.attr().as_str()).place {
                 Place::Defined(place) if place.is_definitely_defined() => {
                     place.provenance.definition()
                 }
@@ -301,14 +308,14 @@ fn forwarding_alias_definition<'db>(
 fn referenced_name_definition<'db>(
     db: &'db dyn Db,
     file: ProgramFile<'db>,
-    name: &ast::ExprName,
+    name: flat::View<'_, ast::ExprName>,
     string_annotation_scope: Option<FileScopeId>,
 ) -> Option<Definition<'db>> {
     let index = semantic_index(db, file);
     let (scope, mode) = if let Some(scope) = string_annotation_scope {
         (scope, PlaceLoadMode::StringAnnotation)
     } else {
-        let expression = ast::ExprRef::Name(name);
+        let expression = name.into();
         let mode = if file.file(db).is_stub(db) {
             PlaceLoadMode::Deferred
         } else {
@@ -448,11 +455,11 @@ struct LegacyTypeVarCollector<'db> {
 }
 
 impl<'db> LegacyTypeVarCollector<'db> {
-    fn expression_type(&self, expression: &ast::Expr) -> Option<Type<'db>> {
+    fn expression_type(&self, expression: flat::View<'_, ast::Expr>) -> Option<Type<'db>> {
         let db = self.db;
         let file = self.alias_definition.program_file(db);
-        match expression {
-            ast::Expr::Name(name) if name.ctx.is_load() => {
+        match expression.classify() {
+            flat::ExprKind::Name(name) if name.ctx().is_load() => {
                 let definition =
                     referenced_name_definition(db, file, name, self.string_annotation_scope)?;
                 // Another alias's parameters are not free parameters of this alias. Inferring
@@ -462,15 +469,19 @@ impl<'db> LegacyTypeVarCollector<'db> {
                     && legacy_type_alias_definition(db, definition).is_none())
                 .then(|| binding_type(db, definition))
             }
-            ast::Expr::Attribute(attribute) => self
-                .expression_type(&attribute.value)?
-                .member(db, &ProgramEnvironment::from_file(file), &attribute.attr)
+            flat::ExprKind::Attribute(attribute) => self
+                .expression_type(attribute.value())?
+                .member(
+                    db,
+                    &ProgramEnvironment::from_file(file),
+                    attribute.attr().as_str(),
+                )
                 .ignore_possibly_undefined(),
             _ => None,
         }
     }
 
-    fn collect_typevar(&mut self, expression: &ast::Expr) {
+    fn collect_typevar(&mut self, expression: flat::View<'_, ast::Expr>) {
         let Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))) =
             self.expression_type(expression)
         else {
@@ -490,8 +501,8 @@ impl<'db> LegacyTypeVarCollector<'db> {
 }
 
 impl<'ast> Visitor<'ast> for LegacyTypeVarCollector<'_> {
-    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
-        if let ast::Expr::StringLiteral(string) = expr
+    fn visit_expr(&mut self, expr: flat::View<'ast, ast::Expr>) {
+        if let flat::ExprKind::StringLiteral(string) = expr.classify()
             && let Some(string_literal) = string.as_single_part_string()
         {
             let file = self.alias_definition.program_file(self.db);
@@ -499,7 +510,7 @@ impl<'ast> Visitor<'ast> for LegacyTypeVarCollector<'_> {
             if let Ok(parsed) = parsed_string_annotation(source.as_str(), string_literal) {
                 let string_scope = self
                     .string_annotation_scope
-                    .unwrap_or_else(|| semantic_index(self.db, file).expression_scope_id(expr));
+                    .unwrap_or_else(|| semantic_index(self.db, file).expression_scope_id(&expr));
                 let previous_scope = self.string_annotation_scope.replace(string_scope);
                 self.visit_expr(parsed.expr());
                 self.string_annotation_scope = previous_scope;
@@ -507,13 +518,13 @@ impl<'ast> Visitor<'ast> for LegacyTypeVarCollector<'_> {
             }
         }
 
-        match expr {
-            ast::Expr::Subscript(subscript) => match self.expression_type(&subscript.value) {
+        match expr.classify() {
+            flat::ExprKind::Subscript(subscript) => match self.expression_type(subscript.value()) {
                 // Literal values and Annotated metadata do not bind type parameters.
                 Some(Type::SpecialForm(SpecialFormType::Literal)) => return,
                 Some(Type::SpecialForm(SpecialFormType::Annotated)) => {
-                    if let ast::Expr::Tuple(arguments) = subscript.slice.as_ref()
-                        && let Some(annotation) = arguments.elts.first()
+                    if let flat::ExprKind::Tuple(arguments) = subscript.slice().classify()
+                        && let Some(annotation) = arguments.elts().first()
                     {
                         self.visit_expr(annotation);
                     }
@@ -521,7 +532,7 @@ impl<'ast> Visitor<'ast> for LegacyTypeVarCollector<'_> {
                 }
                 _ => {}
             },
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) => self.collect_typevar(expr),
+            flat::ExprKind::Name(_) | flat::ExprKind::Attribute(_) => self.collect_typevar(expr),
             _ => {}
         }
 

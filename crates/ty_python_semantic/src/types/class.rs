@@ -1,4 +1,5 @@
 use crate::ProgramEnvironment;
+use ruff_python_ast::flat;
 use std::fmt::Write;
 
 pub(crate) use self::dynamic_literal::{
@@ -129,15 +130,15 @@ fn dynamic_class_header_range<'db>(
                 .expect("anchor should not be NodeIndex::NONE");
             let absolute_index = NodeIndex::from(anchor_u32 + offset);
             if let Some(relative_range) = relative_range {
-                let string: &ast::ExprStringLiteral = module
+                let string: flat::View<'_, ast::ExprStringLiteral> = module
                     .get_by_index(absolute_index)
-                    .try_into()
+                    .cast()
                     .expect("string annotation offset should point to ExprStringLiteral");
                 return relative_range + string.start();
             }
-            let node: &ast::ExprCall = module
+            let node: flat::View<'_, ast::ExprCall> = module
                 .get_by_index(absolute_index)
-                .try_into()
+                .cast()
                 .expect("scope offset should point to ExprCall");
             node.range()
         }

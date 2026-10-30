@@ -18,7 +18,7 @@ use crate::{Db, HasDefinition, HasType, ProgramEnvironment, SemanticModel};
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
-use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
+use ruff_python_ast::{self as ast, flat, flat::AnyNodeRef, name::Name};
 use ruff_python_trivia::NameMatcher;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -42,11 +42,11 @@ static CLASS_MATCHER: LazyLock<NameMatcher<'static>> =
 /// Returns the inferred return type of an unannotated function.
 pub fn inlay_hint_return_type<'db>(
     model: &SemanticModel<'db>,
-    function: &ast::StmtFunctionDef,
+    function: flat::View<'_, ast::StmtFunctionDef>,
 ) -> Option<Type<'db>> {
     // TODO: Remove the async check once return-type inference supports async functions,
     // using the awaited return type for the hint instead of the coroutine type.
-    if function.returns.is_some() || function.is_async {
+    if function.returns().is_some() || function.is_async() {
         return None;
     }
     let db = model.db();
@@ -64,10 +64,11 @@ pub fn inlay_hint_return_type<'db>(
 /// This is useful for IDE features like semantic tokens.
 pub fn definition_for_name<'db>(
     model: &SemanticModel<'db>,
-    name: &ast::ExprName,
+    name: flat::View<'_, ast::ExprName>,
     alias_resolution: ImportAliasResolution,
 ) -> Option<Definition<'db>> {
-    let definitions = definitions_for_name(model, name.id.as_str(), name.into(), alias_resolution);
+    let definitions =
+        definitions_for_name(model, name.id().as_str(), name.into(), alias_resolution);
 
     // Find the first valid definition and return its kind
     for declaration in definitions {
@@ -113,7 +114,7 @@ pub fn definitions_for_name<'db>(
     //
     // Only numeric builtins need expression inference to distinguish annotations from runtime values.
     if matches!(name_str, "float" | "complex")
-        && let Some(expr) = node.expr_name()
+        && let Some(expr) = node.as_expr_name()
         && let Some(ty) = expr.inferred_type(model)
         && let Some(union) = ty.as_union()
         && matches!(
@@ -142,17 +143,17 @@ pub fn definitions_for_name<'db>(
 /// Returns definitions for an attribute expression, inferring its receiver through the IDE model.
 pub fn definitions_for_attribute<'db>(
     model: &SemanticModel<'db>,
-    attribute: &ast::ExprAttribute,
+    attribute: flat::View<'_, ast::ExprAttribute>,
 ) -> Vec<ResolvedDefinition<'db>> {
     // Determine the type of the LHS
-    let Some(lhs_ty) = attribute.value.inferred_type(model) else {
+    let Some(lhs_ty) = attribute.value().inferred_type(model) else {
         return vec![];
     };
     definition_resolution::definitions_for_attribute(
         model.db(),
         &model.program_environment(),
         lhs_ty,
-        attribute.attr.as_str(),
+        attribute.attr().as_str(),
     )
 }
 
@@ -303,23 +304,23 @@ impl<'a> ImplementationsFinder<'a> {
     /// assigned to `self` in a method body (`self.sound = ...`).
     pub fn for_attribute(
         model: &SemanticModel<'a>,
-        attribute: &'a ast::ExprAttribute,
+        attribute: flat::View<'a, ast::ExprAttribute>,
     ) -> Option<Self> {
         let db = model.db();
-        let lhs_ty = attribute.value.inferred_type(model)?;
+        let lhs_ty = attribute.value().inferred_type(model)?;
         let env = model.program_environment();
         let mut roots = Vec::new();
         let mut seen = FxHashSet::default();
         collect_implementation_root_classes(db, &env, lhs_ty, &mut seen, &mut roots);
 
-        let accessor_role = match attribute.ctx {
+        let accessor_role = match attribute.ctx() {
             ast::ExprContext::Load => Some(PropertyAccessorRole::Getter),
             ast::ExprContext::Store => Some(PropertyAccessorRole::Setter),
             ast::ExprContext::Del => Some(PropertyAccessorRole::Deleter),
             ast::ExprContext::Invalid => None,
         };
 
-        ImplementationsFinder::for_member_roots(db, roots, attribute.attr.as_str(), accessor_role)
+        ImplementationsFinder::for_member_roots(db, roots, attribute.attr().as_str(), accessor_role)
     }
 
     /// Creates an `ImplementationsFinder` for a method declaration.
@@ -338,7 +339,7 @@ impl<'a> ImplementationsFinder<'a> {
     /// parent classes: on `Dog.speak`, the root is `Dog`, so `Animal.speak` is not included.
     pub fn for_method(
         model: &SemanticModel<'a>,
-        function: &'a ast::StmtFunctionDef,
+        function: flat::View<'a, ast::StmtFunctionDef>,
     ) -> Option<Self> {
         let db = model.db();
         let env = model.program_environment();
@@ -361,7 +362,7 @@ impl<'a> ImplementationsFinder<'a> {
         ImplementationsFinder::for_member_roots(
             db,
             vec![root],
-            function.name.as_str(),
+            function.name().as_str(),
             accessor_role,
         )
     }
@@ -380,7 +381,10 @@ impl<'a> ImplementationsFinder<'a> {
     /// The clicked class is the root and is returned first, followed by its known transitive
     /// subclasses such as `Dog` and `Cat`. This walks down the hierarchy only: clicking a subclass
     /// returns that class and its own subclasses, not its parents.
-    pub fn for_class(model: &SemanticModel<'a>, class: &ast::StmtClassDef) -> Option<Self> {
+    pub fn for_class(
+        model: &SemanticModel<'a>,
+        class: flat::View<'_, ast::StmtClassDef>,
+    ) -> Option<Self> {
         let db = model.db();
         let env = model.program_environment();
         let class_definition = class.definition(model);
@@ -490,12 +494,12 @@ fn class_implementations_for_file<'db>(
 /// descriptor protocol. This corresponds to `inspect.getattr_static(x, "y")` at the type level.
 pub fn static_member_type_for_attribute<'db>(
     model: &SemanticModel<'db>,
-    attribute: &ast::ExprAttribute,
+    attribute: flat::View<'_, ast::ExprAttribute>,
 ) -> Option<Type<'db>> {
     let db = model.db();
-    let lhs_ty = attribute.value.inferred_type(model)?;
+    let lhs_ty = attribute.value().inferred_type(model)?;
     lhs_ty
-        .static_member(db, &model.program_environment(), attribute.attr.as_str())
+        .static_member(db, &model.program_environment(), attribute.attr().as_str())
         .ignore_possibly_undefined()
 }
 
@@ -829,10 +833,10 @@ pub struct TypedDictKeyHover<'db> {
 
 pub fn typed_dict_key_definition<'db>(
     model: &SemanticModel<'db>,
-    subscript: &ast::ExprSubscript,
+    subscript: flat::View<'_, ast::ExprSubscript>,
     key: &str,
 ) -> Option<ResolvedDefinition<'db>> {
-    let value_ty = subscript.value.inferred_type(model)?;
+    let value_ty = subscript.value().inferred_type(model)?;
     let typed_dict = value_ty.as_typed_dict()?;
     let field = typed_dict.items(model.db()).get(key)?;
     let definition = field.first_declaration()?;
@@ -841,14 +845,14 @@ pub fn typed_dict_key_definition<'db>(
 
 pub fn typed_dict_key_hover<'db>(
     model: &SemanticModel<'db>,
-    subscript: &ast::ExprSubscript,
+    subscript: flat::View<'_, ast::ExprSubscript>,
 ) -> Option<TypedDictKeyHover<'db>> {
     let db = model.db();
     let key = subscript
-        .slice
+        .slice()
         .as_string_literal_expr()
-        .map(|literal| literal.value.to_str())?;
-    let value_ty = subscript.value.inferred_type(model)?;
+        .map(|literal| literal.value().to_str())?;
+    let value_ty = subscript.value().inferred_type(model)?;
     let typed_dict = value_ty.as_typed_dict()?;
     let owner = value_ty
         .display(db, &model.program_environment())
@@ -870,15 +874,15 @@ pub fn typed_dict_key_hover<'db>(
 /// This resolves the keyword argument to the corresponding parameter(s) in the callable's signature(s).
 pub fn definitions_for_keyword_argument<'db>(
     model: &SemanticModel<'db>,
-    keyword: &ast::Keyword,
-    call_expr: &ast::ExprCall,
+    keyword: flat::View<'_, ast::Keyword>,
+    call_expr: flat::View<'_, ast::ExprCall>,
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
-    let Some(func_type) = call_expr.func.inferred_type(model) else {
+    let Some(func_type) = call_expr.func().inferred_type(model) else {
         return Vec::new();
     };
 
-    let Some(keyword_name) = keyword.arg.as_ref() else {
+    let Some(keyword_name) = keyword.arg() else {
         return Vec::new();
     };
     let keyword_name_str = keyword_name.as_str();
@@ -909,7 +913,7 @@ pub fn definitions_for_keyword_argument<'db>(
 /// as aliases.
 pub fn definitions_for_imported_symbol<'db>(
     model: &SemanticModel<'db>,
-    import_node: &ast::StmtImportFrom,
+    import_node: flat::View<'_, ast::StmtImportFrom>,
     symbol_name: &str,
     alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
@@ -932,7 +936,7 @@ pub fn definitions_for_imported_symbol<'db>(
 /// implementation, if present.
 pub fn definitions_and_overloads_for_function<'db>(
     model: &SemanticModel<'db>,
-    function: &ast::StmtFunctionDef,
+    function: flat::View<'_, ast::StmtFunctionDef>,
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
     if let Some(function_type) = function
@@ -1136,10 +1140,10 @@ fn displayed_parameters_for_signature<'db>(
 /// (in case of overloads or union types).
 pub fn call_signature_details<'db>(
     model: &SemanticModel<'db>,
-    call_expr: &ast::ExprCall,
+    call_expr: flat::View<'_, ast::ExprCall>,
 ) -> Vec<CallSignatureDetails<'db>> {
     let db = model.db();
-    let Some(func_type) = call_expr.func.inferred_type(model) else {
+    let Some(func_type) = call_expr.func().inferred_type(model) else {
         return Vec::new();
     };
 
@@ -1152,7 +1156,7 @@ pub fn call_signature_details<'db>(
         // Use from_arguments_typed so that check_types can infer TypeVar
         // specializations from the actual argument types at this call site.
         let call_arguments =
-            CallArguments::from_arguments_typed(&call_expr.arguments, |expression| {
+            CallArguments::from_arguments_typed(call_expr.arguments(), |expression| {
                 expression.inferred_type(model)
             });
         let mut bindings =
@@ -1192,13 +1196,13 @@ pub fn call_signature_details<'db>(
 fn resolve_single_overload<'db>(
     model: &SemanticModel<'db>,
     callable_type: Type<'db>,
-    call_expr: &ast::ExprCall,
+    call_expr: flat::View<'_, ast::ExprCall>,
 ) -> Option<Signature<'db>> {
     let db = model.db();
     let env = &model.program_environment();
     let bindings = callable_type.bindings(db, env);
 
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |expression| {
+    let args = CallArguments::from_arguments_typed(call_expr.arguments(), |expression| {
         expression.inferred_type(model)
     });
 
@@ -1238,11 +1242,11 @@ pub enum CallArgumentForm {
 fn full_type_bindings_for_call<'db>(
     model: &SemanticModel<'db>,
     func_type: Type<'db>,
-    call_expr: &ast::ExprCall,
+    call_expr: flat::View<'_, ast::ExprCall>,
 ) -> crate::types::call::Bindings<'db> {
     let db = model.db();
     let env = &model.program_environment();
-    let call_arguments = CallArguments::from_arguments_typed(&call_expr.arguments, |expression| {
+    let call_arguments = CallArguments::from_arguments_typed(call_expr.arguments(), |expression| {
         expression.inferred_type(model)
     });
     let constraints = ConstraintSetBuilder::new();
@@ -1314,13 +1318,13 @@ fn argument_form_from_binding<'db>(
 /// determined unambiguously, for example because a variadic argument maps to multiple parameters.
 pub fn call_argument_forms(
     model: &SemanticModel<'_>,
-    call_expr: &ast::ExprCall,
+    call_expr: flat::View<'_, ast::ExprCall>,
 ) -> Vec<CallArgumentForm> {
-    let Some(func_type) = call_expr.func.inferred_type(model) else {
+    let Some(func_type) = call_expr.func().inferred_type(model) else {
         return Vec::new();
     };
 
-    let argument_count = call_expr.arguments.len();
+    let argument_count = call_expr.arguments().len();
     let db = model.db();
 
     // Ordinary callables have only value-form arguments for IDE purposes, so skip full binding.
@@ -1392,10 +1396,10 @@ pub fn call_argument_forms(
 /// succeeds in are those where we would print a complicated/ugly type anyway.
 pub fn call_type_simplified_by_overloads(
     model: &SemanticModel,
-    call_expr: &ast::ExprCall,
+    call_expr: flat::View<'_, ast::ExprCall>,
 ) -> Option<String> {
     let db = model.db();
-    let func_type = call_expr.func.inferred_type(model)?;
+    let func_type = call_expr.func().inferred_type(model)?;
 
     let env = &model.program_environment();
     let callable_type = func_type.try_upcast_to_callable(db, env)?.to_type(db, env);
@@ -1414,13 +1418,13 @@ pub fn call_type_simplified_by_overloads(
 /// Returns the definitions of the binary operation along with its callable type.
 pub fn definitions_for_bin_op<'db>(
     model: &SemanticModel<'db>,
-    binary_op: &ast::ExprBinOp,
+    binary_op: flat::View<'_, ast::ExprBinOp>,
 ) -> Option<(Vec<ResolvedDefinition<'db>>, Type<'db>)> {
     let db = model.db();
-    let left_ty = binary_op.left.inferred_type(model)?;
-    let right_ty = binary_op.right.inferred_type(model)?;
+    let left_ty = binary_op.left().inferred_type(model)?;
+    let right_ty = binary_op.right().inferred_type(model)?;
     let env = &model.program_environment();
-    let Ok(bindings) = Type::try_call_bin_op(db, env, left_ty, binary_op.op, right_ty) else {
+    let Ok(bindings) = Type::try_call_bin_op(db, env, left_ty, binary_op.op(), right_ty) else {
         return None;
     };
 
@@ -1442,12 +1446,12 @@ pub fn definitions_for_bin_op<'db>(
 /// Returns the definitions for an unary operator along with their callable types.
 pub fn definitions_for_unary_op<'db>(
     model: &SemanticModel<'db>,
-    unary_op: &ast::ExprUnaryOp,
+    unary_op: flat::View<'_, ast::ExprUnaryOp>,
 ) -> Option<(Vec<ResolvedDefinition<'db>>, Type<'db>)> {
     let db = model.db();
-    let operand_ty = unary_op.operand.inferred_type(model)?;
+    let operand_ty = unary_op.operand().inferred_type(model)?;
 
-    let unary_dunder_method = match unary_op.op {
+    let unary_dunder_method = match unary_op.op() {
         ast::UnaryOp::Invert => "__invert__",
         ast::UnaryOp::UAdd => "__pos__",
         ast::UnaryOp::USub => "__neg__",
@@ -1463,7 +1467,7 @@ pub fn definitions_for_unary_op<'db>(
         TypeContext::default(),
     ) {
         Ok(bindings) => bindings,
-        Err(CallDunderError::MethodNotAvailable) if unary_op.op == ast::UnaryOp::Not => {
+        Err(CallDunderError::MethodNotAvailable) if unary_op.op() == ast::UnaryOp::Not => {
             // The runtime falls back to `__len__` for `not` if `__bool__` is not defined.
             match operand_ty.try_call_dunder(
                 db,
@@ -1575,14 +1579,14 @@ pub fn find_active_signature_from_details(
 /// Falls back to arity-based matching if type-based resolution fails.
 pub fn resolved_call_signature<'db>(
     model: &SemanticModel<'db>,
-    call_expr: &ast::ExprCall,
+    call_expr: flat::View<'_, ast::ExprCall>,
 ) -> Option<CallSignatureDetails<'db>> {
     let db = model.db();
-    let func_type = call_expr.func.inferred_type(model)?;
+    let func_type = call_expr.func().inferred_type(model)?;
     let env = &model.program_environment();
     let callable_type = func_type.try_upcast_to_callable(db, env)?.to_type(db, env);
 
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |expression| {
+    let args = CallArguments::from_arguments_typed(call_expr.arguments(), |expression| {
         expression.inferred_type(model)
     });
 
@@ -1632,7 +1636,7 @@ pub struct InlayHintCallArgumentDetails {
 pub fn inlay_hint_call_argument_details<'db>(
     db: &'db dyn Db,
     model: &SemanticModel<'db>,
-    call_expr: &ast::ExprCall,
+    call_expr: flat::View<'_, ast::ExprCall>,
 ) -> Option<InlayHintCallArgumentDetails> {
     let resolved = resolved_call_signature(model, call_expr)?;
 
@@ -1640,7 +1644,7 @@ pub fn inlay_hint_call_argument_details<'db>(
 
     let mut argument_names = HashMap::new();
 
-    for arg_index in 0..call_expr.arguments.args.len() {
+    for arg_index in 0..call_expr.arguments().args().len() {
         let Some(arg_mapping) = resolved.argument_to_parameter_mapping.get(arg_index) else {
             continue;
         };
@@ -2091,7 +2095,7 @@ fn class_literal_to_hierarchy_info<'db>(
                 .node(db)
                 .as_class()
                 .map(|c| c.node(&parsed))
-                .map(|class_def| class_def.name.range())
+                .map(|class_def| class_def.name().range())
                 .unwrap_or(header_range);
             (header_range, selection_range)
         }
@@ -2155,8 +2159,11 @@ fn class_literal_to_hierarchy_info<'db>(
     }
 }
 
-pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -> Option<String> {
-    let function_ty = call_expr.func.inferred_type(model)?;
+pub fn constructor_signature(
+    model: &SemanticModel,
+    call_expr: flat::View<'_, ast::ExprCall>,
+) -> Option<String> {
+    let function_ty = call_expr.func().inferred_type(model)?;
     let db = model.db();
     let class_name = function_ty.as_class_literal()?.name(db);
     let env = &model.program_environment();
@@ -2212,7 +2219,8 @@ mod tests {
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::testing::assert_function_query_was_not_run_by_name;
-    use ruff_python_ast as ast;
+    use ruff_python_ast::flat;
+
     use ty_python_core::ProgramFile;
 
     #[test]
@@ -2226,15 +2234,15 @@ mod tests {
         let expression = &parsed
             .suite()
             .first()
-            .and_then(ast::Stmt::as_expr_stmt)
+            .and_then(flat::View::as_expr_stmt)
             .context("expected an expression statement")?
-            .value;
+            .value();
         let model = SemanticModel::new(&db, file);
 
         let definitions = definitions_for_name(
             &model,
             "isinstance",
-            expression.as_ref().into(),
+            expression.into(),
             ImportAliasResolution::ResolveAliases,
         );
         assert_eq!(definitions.len(), 1);
@@ -2266,7 +2274,7 @@ cast(val="", typ=int)
             .unwrap()
             .as_expr_stmt()
             .unwrap()
-            .value
+            .value()
             .as_call_expr()
             .unwrap();
         let model = SemanticModel::new(&db, file);
@@ -2307,7 +2315,7 @@ f(y="", x=1)
             .unwrap()
             .as_expr_stmt()
             .unwrap()
-            .value
+            .value()
             .as_call_expr()
             .unwrap();
         let model = SemanticModel::new(&db, file);
@@ -2344,7 +2352,7 @@ f(val="", typ=int)
             .unwrap()
             .as_expr_stmt()
             .unwrap()
-            .value
+            .value()
             .as_call_expr()
             .unwrap();
         let model = SemanticModel::new(&db, file);
@@ -2382,7 +2390,7 @@ f("", int)
             .unwrap()
             .as_expr_stmt()
             .unwrap()
-            .value
+            .value()
             .as_call_expr()
             .unwrap();
         let model = SemanticModel::new(&db, file);
@@ -2423,7 +2431,7 @@ f(int, x)
             .unwrap()
             .as_expr_stmt()
             .unwrap()
-            .value
+            .value()
             .as_call_expr()
             .unwrap();
         let model = SemanticModel::new(&db, file);
@@ -2465,7 +2473,7 @@ TypeAliasType("Alias", int)
         let calls: Vec<_> = parsed
             .suite()
             .iter()
-            .filter_map(|stmt| stmt.as_expr_stmt()?.value.as_call_expr())
+            .filter_map(|stmt| stmt.as_expr_stmt()?.value().as_call_expr())
             .collect();
         let model = SemanticModel::new(&db, file);
 
@@ -2514,7 +2522,7 @@ cast(*args)
             .unwrap()
             .as_expr_stmt()
             .unwrap()
-            .value
+            .value()
             .as_call_expr()
             .unwrap();
         let model = SemanticModel::new(&db, file);

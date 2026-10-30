@@ -1,6 +1,7 @@
 //! Truthiness of already-inferred expressions, including paths that cannot produce a value.
 
-use ruff_python_ast as ast;
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{BoolOp, Expr, Keyword, UnaryOp};
 use ty_python_core::{Truthiness, expression::ExpressionContext};
 
 use crate::{Db, ProgramEnvironment, types::Type};
@@ -44,8 +45,8 @@ pub(crate) struct TruthinessAnalyzer<'a, 'db, T, C> {
 
 impl<'a, 'db, T, C> TruthinessAnalyzer<'a, 'db, T, C>
 where
-    T: Fn(&ast::Expr) -> Type<'db>,
-    C: Fn(&ast::Expr) -> Option<Truthiness>,
+    T: Fn(flat::View<'_, Expr>) -> Type<'db>,
+    C: Fn(flat::View<'_, Expr>) -> Option<Truthiness>,
 {
     /// Read value types and comparison-chain outcomes from the same inference region.
     pub(crate) fn new(
@@ -65,7 +66,7 @@ where
     /// Return `Uninhabited` when evaluation cannot produce either boolean outcome.
     pub(crate) fn truthiness(
         &self,
-        expression: &ast::Expr,
+        expression: flat::View<'_, Expr>,
         context: ExpressionContext,
     ) -> Truthiness {
         self.evaluate(expression, context)
@@ -75,7 +76,7 @@ where
     }
 
     /// Check completion without testing the result object's truthiness.
-    fn can_complete(&self, expression: &ast::Expr) -> bool {
+    fn can_complete(&self, expression: flat::View<'_, Expr>) -> bool {
         self.evaluate(expression, ExpressionContext::Value)
             .is_some()
     }
@@ -86,7 +87,7 @@ where
     /// records that test and can be `Uninhabited` if the test itself cannot complete.
     fn evaluate(
         &self,
-        expression: &ast::Expr,
+        expression: flat::View<'_, Expr>,
         context: ExpressionContext,
     ) -> Option<EvaluationOutcome<'db>> {
         let value = || {
@@ -95,16 +96,17 @@ where
                 .then_some(EvaluationOutcome::Value(ty))
         };
 
-        match expression {
-            ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
+        match expression.classify() {
+            flat::ExprKind::BoolOp(expr_bool_op) => {
+                let op = expr_bool_op.op();
+                let values = expr_bool_op.values();
+
                 if context == ExpressionContext::Condition {
                     let truthiness = values.iter().fold(
                         Truthiness::from(op.is_and()),
                         |result, operand| match op {
-                            ast::BoolOp::And => {
-                                result.and_then(|| self.truthiness(operand, context))
-                            }
-                            ast::BoolOp::Or => result.or_else(|| self.truthiness(operand, context)),
+                            BoolOp::And => result.and_then(|| self.truthiness(operand, context)),
+                            BoolOp::Or => result.or_else(|| self.truthiness(operand, context)),
                         },
                     );
                     return Some(EvaluationOutcome::Condition(truthiness));
@@ -127,16 +129,20 @@ where
                 }
                 value()
             }
-            ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                op: ast::UnaryOp::Not,
-                operand,
-                ..
-            }) if context == ExpressionContext::Condition => Some(EvaluationOutcome::Condition(
-                self.truthiness(operand, context).negate(),
-            )),
-            ast::Expr::If(ast::ExprIf {
-                test, body, orelse, ..
-            }) => {
+            flat::ExprKind::UnaryOp(expr_unary_op)
+                if expr_unary_op.op() == UnaryOp::Not
+                    && context == ExpressionContext::Condition =>
+            {
+                let operand = expr_unary_op.operand();
+                Some(EvaluationOutcome::Condition(
+                    self.truthiness(operand, context).negate(),
+                ))
+            }
+            flat::ExprKind::If(expr_if) => {
+                let test = expr_if.test();
+                let body = expr_if.body();
+                let orelse = expr_if.orelse();
+
                 let outcome = match self.truthiness(test, ExpressionContext::Condition) {
                     Truthiness::Uninhabited => None,
                     Truthiness::AlwaysTrue => self.evaluate(body, context),
@@ -163,7 +169,7 @@ where
                 }
             }
             _ => {
-                let operands_complete = match expression {
+                let operands_complete = match expression.fields() {
                     ast::Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => {
                         self.can_complete(operand)
                     }
@@ -171,16 +177,21 @@ where
                     | ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                         self.can_complete(value)
                     }
-                    ast::Expr::Call(call) => {
-                        self.can_complete(&call.func)
+                    ast::Expr::Call(ast::ExprCall { node: call, .. }) => {
+                        self.can_complete(call.func())
                             && call
-                                .arguments
-                                .args
+                                .arguments()
+                                .args()
                                 .iter()
-                                .chain(call.arguments.keywords.iter().map(|keyword| &keyword.value))
+                                .chain(
+                                    call.arguments()
+                                        .keywords()
+                                        .iter()
+                                        .map(flat::View::<Keyword>::value),
+                                )
                                 .all(|argument| self.can_complete(argument))
                     }
-                    ast::Expr::Compare(compare) => {
+                    ast::Expr::Compare(ast::ExprCompare { node: compare, .. }) => {
                         // Later comparisons can be skipped by short-circuiting.
                         self.can_complete(compare.first_operand())
                             && compare

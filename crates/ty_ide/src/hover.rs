@@ -7,7 +7,8 @@ use crate::{Db, MarkupKind, RangedValue};
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
-use ruff_python_ast::find_node::covering_node;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::find_node::covering_node;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use std::fmt::{self, Display};
 use ty_python_core::ProgramFile;
@@ -56,22 +57,21 @@ pub fn hover<'db>(
         });
     }
 
-    if let GotoTarget::Expression(expr) = goto_target {
-        if expr.is_literal_expr() {
-            return None;
-        }
+    if let GotoTarget::Expression(expr) = goto_target
+        && expr.is_literal_expr()
+    {
+        return None;
     }
 
     let env = model.program_environment();
     let keyword_argument = keyword_argument_hover_contents(db, &model, &goto_target);
 
     let typed_dict_key = match &goto_target {
-        GotoTarget::Expression(ast::ExprRef::Subscript(subscript))
-        | GotoTarget::SubscriptStringLiteralKey { subscript, .. } => {
-            typed_dict_key_hover(&model, subscript)
-        }
+        GotoTarget::Expression(expr) => expr.as_subscript_expr(),
+        GotoTarget::SubscriptStringLiteralKey { subscript, .. } => Some(*subscript),
         _ => None,
-    };
+    }
+    .and_then(|subscript| typed_dict_key_hover(&model, subscript));
 
     let mut alias_docstring: Option<Docstring> = None;
 
@@ -196,7 +196,7 @@ enum AnnotationContext {
 /// annotation, `offset` identifies the operator within it.
 fn annotation_operator(
     model: &SemanticModel<'_>,
-    syntax: ast::AnyNodeRef<'_>,
+    syntax: flat::AnyNodeRef<'_>,
     target: &GotoTarget<'_>,
     offset: TextSize,
     context: AnnotationContext,
@@ -205,17 +205,21 @@ fn annotation_operator(
         GotoTarget::UnaryOp {
             expression,
             operator_range,
-        } if expression.op == ast::UnaryOp::Invert => (SpecialFormType::Not, *operator_range),
+        } if expression.op() == ast::UnaryOp::Invert => (SpecialFormType::Not, *operator_range),
         GotoTarget::BinOp {
             expression,
             operator_range,
-        } => match expression.op {
+        } => match expression.op() {
             ast::Operator::BitAnd => (SpecialFormType::Intersection, *operator_range),
             ast::Operator::BitOr => (SpecialFormType::Union, *operator_range),
             _ => return None,
         },
-        GotoTarget::Expression(ast::ExprRef::StringLiteral(string_expr))
-        | GotoTarget::StringAnnotationSubexpr { string_expr, .. } => {
+        _ => {
+            let string_expr = match target {
+                GotoTarget::Expression(expr) => expr.as_string_literal_expr()?,
+                GotoTarget::StringAnnotationSubexpr { string_expr, .. } => *string_expr,
+                _ => return None,
+            };
             if matches!(context, AnnotationContext::Source)
                 && !is_in_annotation_expression(
                     model,
@@ -236,7 +240,6 @@ fn annotation_operator(
                 AnnotationContext::StringAnnotation,
             );
         }
-        _ => return None,
     };
 
     if matches!(context, AnnotationContext::StringAnnotation)
@@ -261,13 +264,13 @@ fn keyword_argument_hover_contents<'db>(
         return None;
     };
 
-    let name = keyword.arg.as_ref()?.as_str();
-    let signature = resolved_call_signature(model, call_expression)?;
+    let name = keyword.arg()?.as_str();
+    let signature = resolved_call_signature(model, *call_expression)?;
     let argument_index = call_expression
-        .arguments
+        .arguments()
         .iter_source_order()
         .position(|argument| {
-            matches!(argument, ast::ArgOrKeyword::Keyword(candidate) if candidate.range == keyword.range)
+            matches!(argument, ast::flat::ArgOrKeyword::Keyword(candidate) if candidate.range() == keyword.range())
         })?;
     let argument_mapping = signature
         .argument_to_parameter_mapping

@@ -1,5 +1,6 @@
 //! Diagnostic messages and fixes for conditions selected by the redundant-condition checker.
 
+use ruff_python_ast::flat::{self, fields as ast};
 use std::borrow::Cow;
 
 use ruff_db::{
@@ -10,7 +11,8 @@ use ruff_db::{
 };
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_python_ast::{
-    self as ast, PythonVersion,
+    CmpOp, ElifElseClause, Expr, ExprName, MatchCase, PythonVersion, Stmt, StmtIf, StmtWhile,
+    UnaryOp,
     helpers::any_over_expr,
     token::{TokenKind, Tokens, parenthesized_range},
 };
@@ -20,7 +22,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::{SearchPath, file_to_module};
 use ty_python_core::{
     Truthiness,
-    ast_ids::HasScopedUseId,
     definition::{Definition, DefinitionKind},
     place::PlaceExpr,
     predicate::{Predicate, PredicateNode},
@@ -110,8 +111,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Quoting a nested test identifies which part of the enclosing condition is redundant.
         let should_quote_test_expression = || {
-            !matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_))
-                || !self.index.is_boolean_test_root(test)
+            !matches!(
+                test.classify(),
+                flat::ExprKind::Name(_) | flat::ExprKind::Attribute(_)
+            ) || !self.index.is_boolean_test_root(*test)
         };
 
         let annotate_inferred_type = |diagnostic: &mut LintDiagnosticGuard| {
@@ -149,7 +152,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ));
             }
 
-            if let ast::Expr::Compare(compare) = test
+            if let flat::ExprKind::Compare(compare) = test.classify()
                 && let Some((left, _, single_comparator)) = compare.as_single()
             {
                 if let (Type::LiteralValue(left_type), Type::LiteralValue(right_type)) = (
@@ -172,15 +175,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 } else {
                     for node in [left, single_comparator] {
-                        match node {
+                        match node.fields() {
                             ast::Expr::NoneLiteral(_)
                             | ast::Expr::BooleanLiteral(_)
                             | ast::Expr::NumberLiteral(_) => {}
                             ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                                op: ast::UnaryOp::USub | ast::UnaryOp::UAdd,
+                                op: UnaryOp::USub | UnaryOp::UAdd,
                                 operand,
                                 ..
-                            }) if matches!(&**operand, ast::Expr::NumberLiteral(_)) => {}
+                            }) if matches!(
+                                operand.classify(),
+                                flat::ExprKind::NumberLiteral(_)
+                            ) => {}
                             _ => {
                                 diagnostic.annotate(self.context.secondary(node).message(
                                     format_args!(
@@ -214,7 +220,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     "Object of type `{}` might always be truthy (did you mean to call it?)",
                     test_type.display(db, env)
                 ));
-            } else if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+            } else if matches!(
+                test.classify(),
+                flat::ExprKind::Name(_) | flat::ExprKind::Attribute(_)
+            ) {
                 diagnostic.set_concise_message(format_args!(
                     "Callable `{}` might always be truthy \
                         (has type `{}` -- did you mean to call it?)",
@@ -237,7 +246,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .info("Callable objects are usually functions, and functions are always truthy");
 
             let should_await = self.should_await_call(
-                test,
+                *test,
                 callables.iter().flat_map(|callable| {
                     callable
                         .signatures(db)
@@ -259,7 +268,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 should_await,
             };
 
-            uncalled_function.suggest_call(&self.context, &mut diagnostic, test);
+            uncalled_function.suggest_call(&self.context, &mut diagnostic, *test);
 
             diagnostic
         } else if kind == &ConditionKind::Iterable {
@@ -290,7 +299,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
 
             let definition_info =
-                condition_definition_info(db, self.program_file(), test, |expr| {
+                condition_definition_info(db, self.program_file(), *test, |expr| {
                     self.expression_type(expr)
                 });
 
@@ -321,7 +330,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         first_party_annotation = Some(IterableAnnotation {
                             range: FileRange::new(file, annotation.range()),
                             scope: semantic_index(db, single_definition.program_file(db))
-                                .expression_scope_id(annotation),
+                                .expression_scope_id(&annotation),
                             iterable_ranges: self
                                 .iterable_annotation_ranges(single_definition, annotation),
                         });
@@ -413,7 +422,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             if diagnostic.fix().is_none() {
                 let semantic_model = SemanticModel::new(db, self.program_file());
-                let test_ref = ast::AnyNodeRef::from(*test);
+                let test_ref = flat::AnyNodeRef::from(test);
                 if semantic_model.definitely_has_builtin_binding("len", test_ref)
                     && semantic_model.definitely_has_builtin_binding("tuple", test_ref)
                 {
@@ -433,7 +442,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     diagnostic.set_concise_message(format_args!(
                         "{} `{}` is always truthy (has type `{}`)",
-                        if matches!(test, ast::Expr::Name(_)) {
+                        if test.is_name_expr() {
                             "Variable"
                         } else {
                             "Expression"
@@ -477,7 +486,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     builder.into_diagnostic(format_args!("{function} is always truthy"));
 
                 let should_await = self.should_await_call(
-                    test,
+                    *test,
                     function
                         .signature()
                         .iter()
@@ -501,7 +510,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     should_await,
                 };
 
-                uncalled_function.suggest_call(&self.context, &mut diagnostic, test);
+                uncalled_function.suggest_call(&self.context, &mut diagnostic, *test);
 
                 diagnostic
             } else if let Some(tuple_spec) = test_type.tuple_instance_spec(db, env)
@@ -536,7 +545,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
 
                 annotate_inferred_type(&mut diagnostic);
-                self.diagnose_single_length_tuple(length, test, *test_type, &mut diagnostic);
+                self.diagnose_single_length_tuple(length, *test, *test_type, &mut diagnostic);
 
                 diagnostic
             } else if let Type::TypedDict(typed_dict) = test_type
@@ -600,7 +609,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 annotate_inferred_type(&mut diagnostic);
                 diagnostic.help("Did you mean to use `any()`?");
                 if SemanticModel::new(db, self.program_file())
-                    .definitely_has_builtin_binding("any", ast::AnyNodeRef::from(*test))
+                    .definitely_has_builtin_binding("any", flat::AnyNodeRef::from(test))
                 {
                     // display-only edits rather than unsafe edits
                     // because we don't know what the user *really* wanted here!
@@ -633,7 +642,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 } else {
                     diagnostic.set_concise_message(format_args!(
                         "{} `{}` is always truthy (has type `{}`)",
-                        if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+                        if test.is_name_expr() || test.is_attribute_expr() {
                             "Nonempty string"
                         } else {
                             "Expression"
@@ -646,10 +655,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 diagnostic
             } else if describe_as_condition
                 && let Some((subexpr, subexpr_type, subexpr_length)) =
-                    self.length_test_against_type_with_known_length(test)
+                    self.length_test_against_type_with_known_length(*test)
             {
                 self.report_redundant_length_comparison(
-                    test,
+                    *test,
                     subexpr,
                     subexpr_type,
                     subexpr_length,
@@ -665,7 +674,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 add_always_truthy_concise_message(&mut diagnostic);
                 annotate_inferred_type(&mut diagnostic);
                 if test_type.try_await(db, env).is_ok()
-                    && let Some(fix) = self.await_expression_fix(test)
+                    && let Some(fix) = self.await_expression_fix(*test)
                 {
                     diagnostic.help("Did you mean to `await` this expression?");
                     diagnostic.set_fix(fix);
@@ -775,7 +784,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     diagnostic.set_concise_message(format_args!(
                         "{} `{}` is always falsy (has type `{}`)",
-                        if matches!(test, ast::Expr::Name(_)) {
+                        if test.is_name_expr() {
                             "Variable"
                         } else {
                             "Expression"
@@ -814,10 +823,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 diagnostic
             } else if describe_as_condition
                 && let Some((subexpr, subexpr_type, subexpr_length)) =
-                    self.length_test_against_type_with_known_length(test)
+                    self.length_test_against_type_with_known_length(*test)
             {
                 self.report_redundant_length_comparison(
-                    test,
+                    *test,
                     subexpr,
                     subexpr_type,
                     subexpr_length,
@@ -850,22 +859,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// where `x` has a known length.
     fn length_test_against_type_with_known_length<'a>(
         &self,
-        test: &'a ast::Expr,
-    ) -> Option<(&'a ast::Expr, Type<'db>, i64)> {
+        test: flat::View<'a, Expr>,
+    ) -> Option<(flat::View<'a, Expr>, Type<'db>, i64)> {
         let db = self.db();
         let env = self.program_environment();
 
-        if let ast::Expr::Compare(compare) = test
+        if let flat::ExprKind::Compare(compare) = test.classify()
             && let Some((left, single_op, single_comparator)) = compare.as_single()
-            && let (ast::Expr::Call(call), other) | (other, ast::Expr::Call(call)) =
-                (left, single_comparator)
-            && matches!(single_op, ast::CmpOp::Eq | ast::CmpOp::NotEq)
-            && let ast::Arguments { args, keywords, .. } = &call.arguments
+            && let (flat::ExprKind::Call(call), other) | (other, flat::ExprKind::Call(call)) =
+                (left.classify(), single_comparator.classify())
+            && matches!(single_op, CmpOp::Eq | CmpOp::NotEq)
+            && let ast::Arguments { args, keywords, .. } = call.arguments().fields()
             && keywords.is_empty()
-            && let [single_arg] = &**args
-            && let Type::FunctionLiteral(function) = self.expression_type(&call.func)
+            && let Some([single_arg]) = args.as_array()
+            && let Type::FunctionLiteral(function) = self.expression_type(call.func())
             && function.is_known(db, KnownFunction::Len)
-            && self.expression_type(other).is_int_literal()
+            && self.expression_type(other.view()).is_int_literal()
         {
             let arg_type = self.expression_type(single_arg);
             let length = arg_type.len(db, env)?.as_int_literal()?;
@@ -877,8 +886,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     fn report_redundant_length_comparison<'a>(
         &self,
-        test: &ast::Expr,
-        test_subexpression: &ast::Expr,
+        test: flat::View<'_, Expr>,
+        test_subexpression: flat::View<'_, Expr>,
         subexpression_type: Type<'db>,
         length: i64,
         builder: LintDiagnosticGuardBuilder<'a, 'a>,
@@ -926,7 +935,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         definition: Definition<'db>,
         module: &'ast ParsedModuleRef,
         inferred_type: Type<'db>,
-    ) -> Option<&'ast ast::Expr> {
+    ) -> Option<flat::View<'ast, Expr>> {
         let db = self.db();
         let annotation = match definition.kind(db) {
             DefinitionKind::AnnotatedAssignment(assignment) => assignment.annotation(module),
@@ -940,14 +949,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn annotation_expression_type(
         &self,
         definition: Definition<'db>,
-        expression: &ast::Expr,
+        expression: flat::View<'_, Expr>,
     ) -> Option<Type<'db>> {
         let db = self.db();
         let file = definition.program_file(db);
         let index = semantic_index(db, file);
-        let scope = index.try_expression_scope_id(expression).or_else(|| {
+        let scope = index.try_expression_scope_id(&expression).or_else(|| {
             let module = parsed_module(db, definition.python_file(db)).load(db);
-            index.annotation_parent_scope_id(&module, expression)
+            index.annotation_parent_scope_id(&module, &expression)
         })?;
         Some(definition_expression_type_in_scope(
             db,
@@ -963,25 +972,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn iterable_annotation_ranges(
         &self,
         definition: Definition<'db>,
-        annotation: &ast::Expr,
+        annotation: flat::View<'_, Expr>,
     ) -> Option<IterableAnnotationRanges> {
         let db = self.db();
-        match annotation {
-            ast::Expr::StringLiteral(string) => {
+        match annotation.classify() {
+            flat::ExprKind::StringLiteral(string) => {
                 let source = source_text(db, definition.file(db));
                 let parsed =
                     parsed_string_annotation(&source, string.as_single_part_string()?).ok()?;
                 self.iterable_annotation_ranges(definition, parsed.expr())
             }
-            ast::Expr::Subscript(subscript) => {
+            flat::ExprKind::Subscript(subscript) => {
                 let known_class = self
-                    .annotation_expression_type(definition, &subscript.value)?
+                    .annotation_expression_type(definition, subscript.value())?
                     .as_class_literal()?
                     .known(db)?;
 
                 (known_class == KnownClass::Iterable).then_some(IterableAnnotationRanges {
-                    origin: subscript.value.range(),
-                    element: subscript.slice.range(),
+                    origin: subscript.value().range(),
+                    element: subscript.slice().range(),
                 })
             }
             _ => None,
@@ -999,7 +1008,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn diagnose_single_length_tuple(
         &self,
         length: TupleLength,
-        node: &ast::Expr,
+        node: flat::View<'_, Expr>,
         node_type: Type<'db>,
         diagnostic: &mut Diagnostic,
     ) {
@@ -1011,7 +1020,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if length == TupleLength::Fixed(1)
             && let Some(tuple_spec) = node_type.tuple_instance_spec(db, env)
             && let Tuple::Fixed(fixed_length_tuple) = &*tuple_spec
-            && matches!(node, ast::Expr::Name(_) | ast::Expr::Attribute(_))
+            && matches!(
+                node.classify(),
+                flat::ExprKind::Name(_) | flat::ExprKind::Attribute(_)
+            )
         {
             if node_type.exact_tuple_instance_spec(db).is_none() {
                 if let Some(definition) = node_type.definition(db, env)
@@ -1082,7 +1094,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Whether every callable return type is known to be awaitable in this context.
     fn should_await_call(
         &self,
-        expression: &ast::Expr,
+        expression: flat::View<'_, Expr>,
         return_types: impl IntoIterator<Item = Type<'db>>,
     ) -> bool {
         if !self.can_await_here(expression) {
@@ -1127,7 +1139,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn branch_range_until_first_newline(
         &self,
         branch_start: TextSize,
-        first_statement: &ast::Stmt,
+        first_statement: flat::View<'_, Stmt>,
     ) -> TextRange {
         TextRange::new(
             branch_start,
@@ -1135,7 +1147,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         )
     }
 
-    fn is_unreachable(&self, stmt: &ast::Stmt) -> bool {
+    fn is_unreachable(&self, stmt: flat::View<'_, Stmt>) -> bool {
         !is_range_reachable(
             self.db(),
             self.index,
@@ -1148,13 +1160,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &self,
         diagnostic: &mut Diagnostic,
         full_condition_truthiness: Truthiness,
-        while_statement: &ast::StmtWhile,
-        following_suite: &[ast::Stmt],
+        while_statement: flat::View<'_, StmtWhile>,
+        following_suite: flat::Suite<'_>,
     ) {
         if full_condition_truthiness.is_always_true() {
             let mut else_branch_is_unreachable = false;
 
-            if let Some(stmt) = first_nontrivial_statement(&while_statement.orelse)
+            if let Some(stmt) = first_nontrivial_statement(while_statement.orelse())
                 && self.is_unreachable(stmt)
             {
                 // E.g. for
@@ -1213,7 +1225,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 );
             }
         } else if full_condition_truthiness.is_always_false()
-            && let Some(stmt) = first_nontrivial_statement(&while_statement.body)
+            && let Some(stmt) = first_nontrivial_statement(while_statement.body())
             && self.is_unreachable(stmt)
         {
             // The body of the `while` loop here is unreachable due to the condition being always falsy:
@@ -1235,7 +1247,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &self,
         diagnostic: &mut Diagnostic,
         full_condition_truthiness: Truthiness,
-        following_suite: &[ast::Stmt],
+        following_suite: flat::Suite<'_>,
     ) {
         if full_condition_truthiness.is_always_false()
             && let Some(stmt) = first_nontrivial_statement(following_suite)
@@ -1253,14 +1265,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &self,
         diagnostic: &mut Diagnostic,
         full_condition_truthiness: Truthiness,
-        case: &ast::MatchCase,
-        following_cases: &[ast::MatchCase],
+        case: flat::View<'_, MatchCase>,
+        following_cases: flat::NodeList<'_, MatchCase>,
     ) {
         if full_condition_truthiness.is_always_true()
-            && case.pattern.is_irrefutable()
+            && case.pattern().is_irrefutable()
             && let Some((next_case, stmt)) = following_cases
                 .iter()
-                .find_map(|case| first_nontrivial_statement(&case.body).map(|stmt| (case, stmt)))
+                .find_map(|case| first_nontrivial_statement(case.body()).map(|stmt| (case, stmt)))
             && self.is_unreachable(stmt)
         {
             // The second `case` branch here is unreachable because the first `case`
@@ -1280,7 +1292,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .message("This following branch is unreachable"),
             );
         } else if full_condition_truthiness.is_always_false()
-            && let Some(stmt) = first_nontrivial_statement(&case.body)
+            && let Some(stmt) = first_nontrivial_statement(case.body())
             && self.is_unreachable(stmt)
         {
             // The `case` body here is unreachable due to the always-falsy guard:
@@ -1304,9 +1316,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         condition: &RedundantCondition<'_, 'db>,
         diagnostic: &mut Diagnostic,
         full_condition_truthiness: Truthiness,
-        if_stmt: &ast::StmtIf,
+        if_stmt: flat::View<'_, StmtIf>,
         branch_index: usize,
-        following_suite: &[ast::Stmt],
+        following_suite: flat::Suite<'_>,
     ) {
         if full_condition_truthiness.is_ambiguous() {
             return;
@@ -1319,18 +1331,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             kind,
         } = condition;
 
-        let if_elif_else_suites: Vec<&[ast::Stmt]> = std::iter::once(&*if_stmt.body)
-            .chain(if_stmt.elif_else_clauses.iter().map(|clause| &*clause.body))
+        let if_elif_else_suites: Vec<flat::Suite<'_>> = std::iter::once(if_stmt.body())
+            .chain(
+                if_stmt
+                    .elif_else_clauses()
+                    .iter()
+                    .map(flat::View::<ElifElseClause>::body),
+            )
             .collect();
 
         if full_condition_truthiness.is_always_true() {
             let mut implicit_else_is_unreachable = false;
 
             // The branch index includes the initial `if`, but `elif_else_clauses` does not.
-            if let Some((next_branch, stmt)) = if_stmt.elif_else_clauses[branch_index..]
+            if let Some((next_branch, stmt)) = if_stmt
+                .elif_else_clauses()
+                .slice(branch_index..)
                 .iter()
                 .find_map(|clause| {
-                    first_nontrivial_statement(&clause.body).map(|stmt| (clause, stmt))
+                    first_nontrivial_statement(clause.body()).map(|stmt| (clause, stmt))
                 })
                 && self.is_unreachable(stmt)
             {
@@ -1348,10 +1367,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         .secondary(self.branch_range_until_first_newline(next_branch.start(), stmt))
                         .message("This following branch is unreachable"),
                 );
-            } else if branch_index == if_stmt.elif_else_clauses.len()
+            } else if branch_index == if_stmt.elif_else_clauses().len()
                 && if_elif_else_suites
                     .iter()
-                    .all(|suite| suite_ends_with_exit(self, suite, SuiteExitKind::Any))
+                    .all(|suite| suite_ends_with_exit(self, *suite, SuiteExitKind::Any))
                 && !suite_ends_with_exit(self, following_suite, SuiteExitKind::Defensive)
                 && let Some(stmt) = first_nontrivial_statement(following_suite)
                 && self.is_unreachable(stmt)
@@ -1379,11 +1398,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             if !implicit_else_is_unreachable
                 && kind.is_boolean()
-                && let Some(clause) = if_stmt.elif_else_clauses.last()
-                && clause.test.as_ref() == Some(test)
+                && let Some(clause) = if_stmt.elif_else_clauses().last()
+                && clause.test() == Some(*test)
                 && !diagnostic.has_applicable_fix(Applicability::DisplayOnly)
             {
-                if let Some(fix) = self.add_assert_never_else(clause, test) {
+                if let Some(fix) = self.add_assert_never_else(clause, *test) {
                     diagnostic.help("Add an `else` branch that calls `assert_never`");
                     diagnostic.set_fix(fix);
                 } else {
@@ -1391,7 +1410,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         "Replace this `elif` with an `else` branch \
                         that asserts the condition to be `True`",
                     );
-                    if let Some(fix) = self.replace_redundant_elif_with_assertion(clause, test) {
+                    if let Some(fix) = self.replace_redundant_elif_with_assertion(clause, *test) {
                         diagnostic.set_fix(fix);
                     }
                 }
@@ -1421,9 +1440,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// could have side effects. Returns `None`
     /// when no such variable or unshadowed runtime import is available.
     /// The fix is unsafe because the new branch raises if the static assumptions fail at runtime.
-    fn add_assert_never_else(&self, clause: &ast::ElifElseClause, test: &ast::Expr) -> Option<Fix> {
+    fn add_assert_never_else(
+        &self,
+        clause: flat::View<'_, ElifElseClause>,
+        test: flat::View<'_, Expr>,
+    ) -> Option<Fix> {
         let db = self.db();
-        let first_statement = clause.body.first()?;
+        let first_statement = clause.body().first()?;
         let source = source_text(db, self.file());
         let indentation = indentation_at_offset(clause.start(), &source)?;
         let argument = self.assert_never_argument(test)?;
@@ -1471,7 +1494,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 format!(
                     "{leading_newline}{indentation}else:{line_ending}{body_indentation}{}({}){line_ending}",
                     action.symbol_text(),
-                    argument.id,
+                    argument.id(),
                 ),
                 end,
             ),
@@ -1481,26 +1504,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Find a variable tested directly, by a comparison, or by a narrowing function.
     /// More complex conditions cannot provide an argument without repeating their evaluation.
-    fn assert_never_argument<'a>(&self, test: &'a ast::Expr) -> Option<&'a ast::ExprName> {
-        if any_over_expr(test, ast::Expr::is_named_expr) {
+    fn assert_never_argument<'a>(
+        &self,
+        test: flat::View<'a, Expr>,
+    ) -> Option<flat::View<'a, ExprName>> {
+        if any_over_expr(test, flat::View::is_named_expr) {
             return None;
         }
 
         let mut operand = test;
 
-        while let ast::Expr::UnaryOp(unary) = operand
-            && unary.op == ast::UnaryOp::Not
+        while let flat::ExprKind::UnaryOp(unary) = operand.classify()
+            && unary.op() == UnaryOp::Not
         {
-            operand = &unary.operand;
+            operand = unary.operand();
         }
 
-        let candidates = match operand {
-            ast::Expr::Name(_) => [Some(operand), None],
-            ast::Expr::Compare(compare) => {
+        let candidates = match operand.classify() {
+            flat::ExprKind::Name(_) => [Some(operand), None],
+            flat::ExprKind::Compare(compare) => {
                 let (left, _, right) = compare.as_single()?;
                 [Some(left), Some(right)]
             }
-            ast::Expr::Call(call) => [call.arguments.args.first(), None],
+            flat::ExprKind::Call(call) => [call.arguments().args().first(), None],
             _ => return None,
         };
 
@@ -1524,7 +1550,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             {
                 return None;
             }
-            let place = places.symbol_id(&name.id)?;
+            let place = places.symbol_id(name.id())?;
             let (constraint, _) = infer_narrowing_constraints(db, predicate, place.into());
             NarrowingConstraint::intersection(ty)
                 .merge_constraint_and(constraint?)
@@ -1536,12 +1562,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Resolve a name using the bindings and constraints that precede its `if` chain.
     /// This preserves earlier narrowing, including constraints on captured variables.
-    fn type_before_if_chain(&self, name: &ast::ExprName) -> Option<Type<'db>> {
+    fn type_before_if_chain(&self, name: flat::View<'_, ExprName>) -> Option<Type<'db>> {
         let db = self.db();
         let env = self.program_environment();
         let use_def = self.index.use_def_map(self.scope().file_scope_id(db));
-        let snapshot =
-            use_def.if_chain_start_for_use(name.scoped_use_id(db, self.program_file()))?;
+        let snapshot = use_def.if_chain_start_for_use(self.index.scoped_use_id(name))?;
         let place_expr = PlaceExpr::from_expr_name(name);
         let mut procedure = PlaceLoadResolutionProcedure::new(
             db,
@@ -1574,10 +1599,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// fail at runtime, and optimized Python execution may remove the assertion entirely.
     fn replace_redundant_elif_with_assertion(
         &self,
-        clause: &ast::ElifElseClause,
-        test: &ast::Expr,
+        clause: flat::View<'_, ElifElseClause>,
+        test: flat::View<'_, Expr>,
     ) -> Option<Fix> {
-        let first_statement = clause.body.first()?;
+        let first_statement = clause.body().first()?;
         let source = source_text(self.db(), self.file());
         let tokens = self.module().tokens();
         let first_statement_line_start = source.line_start(first_statement.start());
@@ -1596,7 +1621,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let indentation = indentation_at_offset(first_statement.start(), &source)?;
-        let parenthesized_test_range = parenthesized_range(test.into(), clause.into(), tokens);
+        let parenthesized_test_range = parenthesized_range(test, clause.into(), tokens);
         let test_range = parenthesized_test_range.unwrap_or(test.range());
         let header_prefix_range = TextRange::new(clause.start(), test_range.start());
 
@@ -1648,8 +1673,8 @@ fn logical_line_end(source: &str, tokens: &Tokens, offset: TextSize) -> TextSize
 /// Return the first "nontrivial" statement in `suite`, if any.
 ///
 /// See [`is_trivial_statement`] for the definition of a trivial statement.
-fn first_nontrivial_statement(suite: &[ast::Stmt]) -> Option<&ast::Stmt> {
-    suite.iter().find(|stmt| !is_trivial_statement(stmt))
+fn first_nontrivial_statement(suite: flat::Suite<'_>) -> Option<flat::View<'_, Stmt>> {
+    suite.iter().find(|stmt| !is_trivial_statement(*stmt))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1665,8 +1690,16 @@ impl UncalledFunction {
     /// It's true that calling the function might not actually fix this diagnostic
     /// if the function returns something that is always truthy. They still probably
     /// meant to call the function, though, so it's still a useful suggestion/fix!
-    fn suggest_call(self, context: &InferContext, diagnostic: &mut Diagnostic, test: &ast::Expr) {
-        if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+    fn suggest_call(
+        self,
+        context: &InferContext,
+        diagnostic: &mut Diagnostic,
+        test: flat::View<'_, Expr>,
+    ) {
+        if matches!(
+            test.classify(),
+            flat::ExprKind::Name(_) | flat::ExprKind::Attribute(_)
+        ) {
             let (call, applicability) = if self.has_parameters {
                 ("(...)", Applicability::DisplayOnly)
             } else {

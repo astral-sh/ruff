@@ -81,9 +81,10 @@
 //! example, type inference establishes that the branches in `make_counter`
 //! always define `value`, so the `Exhausted` step is unreachable.
 
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast::name::Name;
+use ruff_python_ast::{Expr, flat};
 use smallvec::SmallVec;
-use ty_python_core::ast_ids::{HasScopedUseId, ScopedUseId};
+use ty_python_core::ast_ids::ScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
@@ -103,7 +104,7 @@ pub(crate) enum PlaceLoadMode<'ast> {
     ///
     /// For example, a caller resolving `value` in `print(value)` uses this mode so that only
     /// bindings that reach that occurrence are considered.
-    AtExpression(ast::ExprRef<'ast>),
+    AtExpression(flat::View<'ast, Expr>),
     /// Resolve a plain name using bindings and constraints retained at an earlier point in
     /// the same scope. Enclosing-scope resolution still follows the name's lexical scope.
     AtNameSnapshot(BindingsSnapshotId),
@@ -918,15 +919,12 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
         let use_def = self.index.use_def_map(scope);
 
         match self.mode {
-            PlaceLoadMode::AtExpression(expr_ref) => {
-                if expr_ref
-                    .as_name_expr()
-                    .is_some_and(|name| name.is_invalid())
-                {
+            PlaceLoadMode::AtExpression(expr) => {
+                if expr.as_name_expr().is_some_and(flat::View::is_invalid) {
                     return None;
                 }
 
-                let use_id = expr_ref.scoped_use_id(self.db, self.file);
+                let use_id = self.index.scoped_use_id(expr);
                 Some((
                     PlaceLoadSourceKind::Bindings(use_def.bindings_at_use(use_id)),
                     Some((scope, ConstraintKey::UseId(use_id))),
@@ -965,38 +963,34 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
                     PlaceLoadMode::Deferred | PlaceLoadMode::StringAnnotation => {
                         Some(PlaceExprPrefixLoad::AllReachable(prefix_id))
                     }
-                    PlaceLoadMode::AtExpression(mut prefix_expr_ref) => {
+                    PlaceLoadMode::AtExpression(mut prefix_expr) => {
                         let prefix = table.place(prefix_id);
                         for _ in
                             0..(place_expr.num_member_segments() - prefix.num_member_segments())
                         {
-                            prefix_expr_ref = match prefix_expr_ref {
-                                ast::ExprRef::Attribute(attribute) => {
-                                    ast::ExprRef::from(&attribute.value)
-                                }
-                                ast::ExprRef::Subscript(subscript) => {
-                                    ast::ExprRef::from(&subscript.value)
-                                }
+                            prefix_expr = match prefix_expr.classify() {
+                                flat::ExprKind::Attribute(attribute) => attribute.value(),
+                                flat::ExprKind::Subscript(subscript) => subscript.value(),
                                 _ => return None,
                             };
                         }
 
-                        if prefix_expr_ref
+                        if prefix_expr
                             .as_name_expr()
-                            .is_some_and(|name| name.is_invalid())
+                            .is_some_and(flat::View::is_invalid)
                         {
                             return None;
                         }
 
-                        if let ast::ExprRef::Named(named) = prefix_expr_ref {
+                        if let Some(named) = prefix_expr.as_named_expr() {
                             return named
-                                .target
+                                .target()
                                 .is_name_expr()
                                 .then_some(PlaceExprPrefixLoad::DefinitelyBound);
                         }
 
                         Some(PlaceExprPrefixLoad::AtUse(
-                            prefix_expr_ref.scoped_use_id(self.db, self.file),
+                            self.index.scoped_use_id(prefix_expr),
                         ))
                     }
                 }),

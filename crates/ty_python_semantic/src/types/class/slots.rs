@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::flat;
 use ruff_python_ast::{self as ast, name::Name};
 use ty_python_core::{place_table, use_def_map};
 
@@ -413,19 +414,19 @@ impl<'db> StaticClassLiteral<'db> {
             return SlotDefinition::DynamicOrNone;
         };
 
-        let literal_slot_name = |expression: &ast::Expr| {
+        let literal_slot_name = |expression: flat::View<'_, ast::Expr>| {
             definition_expression_type(db, definition, expression)
                 .as_string_literal()
                 .map(|literal| Name::new(literal.value(db)))
         };
 
-        let names = match value {
-            ast::Expr::List(list) => list.elts.iter().map(literal_slot_name).collect(),
-            ast::Expr::Set(set) => set.elts.iter().map(literal_slot_name).collect(),
-            ast::Expr::Dict(dictionary) => dictionary
-                .items
+        let names = match value.classify() {
+            flat::ExprKind::List(list) => list.elts().iter().map(literal_slot_name).collect(),
+            flat::ExprKind::Set(set) => set.elts().iter().map(literal_slot_name).collect(),
+            flat::ExprKind::Dict(dictionary) => dictionary
+                .items()
                 .iter()
-                .map(|item| item.key.as_ref().and_then(literal_slot_name))
+                .map(|item| item.key.and_then(literal_slot_name))
                 .collect(),
             _ => None,
         };

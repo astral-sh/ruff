@@ -1,6 +1,11 @@
 //! Implements logic used by the document symbol provider, workspace symbol
 //! provider, and auto-import feature of the completion provider.
 
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{
+    Alias, Arguments, Comprehension, Decorator, Expr, ExprAttribute, ExprCall, ExprContext,
+    ExprName, Identifier, Operator, Pattern, Stmt, StmtImport, StmtImportFrom,
+};
 use std::borrow::Cow;
 use std::ops::Range;
 
@@ -9,9 +14,8 @@ use regex::Regex;
 use ruff_db::parsed::parsed_module;
 
 use ruff_index::{IndexVec, newtype_index};
-use ruff_python_ast as ast;
+use ruff_python_ast::flat::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_python_ast::name::{Name, UnqualifiedName};
-use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
@@ -398,7 +402,7 @@ pub(crate) fn symbols_for_file(db: &dyn Db, file: ProgramFile<'_>) -> FlatSymbol
     let module = parsed.load_then_clear_on_drop(db);
 
     let mut visitor = SymbolVisitor::tree(db, file);
-    visitor.visit_body(&module.syntax().body);
+    visitor.visit_body(module.syntax().body());
     visitor.into_flat_symbols()
 }
 
@@ -418,7 +422,7 @@ pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: ProgramFile<'_>) -
     let module = parsed.load_then_clear_on_drop(db);
 
     let mut visitor = SymbolVisitor::globals(db, file);
-    visitor.visit_body(&module.syntax().body);
+    visitor.visit_body(module.syntax().body());
 
     visitor.into_flat_symbols()
 }
@@ -441,15 +445,15 @@ pub struct ImportedFrom {
 }
 
 impl ImportedFrom {
-    fn import(alias: &ast::Alias, kind: ImportKind) -> Option<ImportedFrom> {
-        let module_name = ModuleName::new(&alias.name)?;
+    fn import(alias: flat::View<'_, Alias>, kind: ImportKind) -> Option<ImportedFrom> {
+        let module_name = ModuleName::new(alias.name().as_str())?;
         Some(ImportedFrom { module_name, kind })
     }
 
     fn import_from(
         db: &dyn Db,
         importing_file: ImportingFile<'_>,
-        ast: &ast::StmtImportFrom,
+        ast: flat::View<'_, StmtImportFrom>,
         kind: ImportKind,
     ) -> Option<ImportedFrom> {
         let module_name = ModuleName::from_import_statement(db, importing_file, ast).ok()?;
@@ -468,9 +472,9 @@ enum ImportKind {
     Wildcard,
 }
 
-impl From<&ast::Alias> for ImportKind {
-    fn from(alias: &ast::Alias) -> ImportKind {
-        if alias.asname.as_ref().map(ast::Identifier::as_str) == Some(alias.name.as_str()) {
+impl From<flat::View<'_, Alias>> for ImportKind {
+    fn from(alias: flat::View<'_, Alias>) -> ImportKind {
+        if alias.asname().map(flat::View::<Identifier>::as_str) == Some(alias.name().as_str()) {
             ImportKind::RedundantAlias
         } else {
             ImportKind::Normal
@@ -543,23 +547,22 @@ struct Imports<'db> {
 
 impl<'db> Imports<'db> {
     /// Track the imports from the given `import ...` statement.
-    fn add_import(&mut self, import: &'db ast::StmtImport) {
-        for alias in &import.names {
+    fn add_import(&mut self, import: flat::View<'db, StmtImport>) {
+        for alias in import.names() {
             let asname = alias
-                .asname
-                .as_ref()
-                .map(|ident| &ident.id)
-                .unwrap_or(&alias.name.id);
-            let module_name = ImportModuleName::Import(&alias.name.id);
+                .asname()
+                .map(flat::View::<Identifier>::id)
+                .unwrap_or(alias.name().id());
+            let module_name = ImportModuleName::Import(alias.name().id());
             self.module_names
                 .insert(asname, ImportModuleKind::Definitive(module_name));
         }
     }
 
     /// Track the imports from the given `from ... import ...` statement.
-    fn add_import_from(&mut self, import_from: &'db ast::StmtImportFrom) {
-        for alias in &import_from.names {
-            if &alias.name == "*" {
+    fn add_import_from(&mut self, import_from: flat::View<'db, StmtImportFrom>) {
+        for alias in import_from.names() {
+            if alias.name() == "*" {
                 // FIXME: We'd ideally include the names
                 // imported from the module, but we don't
                 // want to do this eagerly. So supporting
@@ -569,13 +572,12 @@ impl<'db> Imports<'db> {
             }
 
             let asname = alias
-                .asname
-                .as_ref()
-                .map(|ident| &ident.id)
-                .unwrap_or(&alias.name.id);
+                .asname()
+                .map(flat::View::<Identifier>::id)
+                .unwrap_or(alias.name().id());
             let module_name = ImportModuleName::ImportFrom {
                 parent: import_from,
-                child: &alias.name.id,
+                child: alias.name().id(),
             };
             self.module_names
                 .insert(asname, ImportModuleKind::Possible(module_name));
@@ -644,7 +646,7 @@ enum ImportModuleName<'db> {
     /// A possible module in a `from ... import ...` statement.
     ImportFrom {
         /// The `..foo` in `from ..foo import quux`.
-        parent: &'db ast::StmtImportFrom,
+        parent: flat::View<'db, StmtImportFrom>,
         /// The `foo` in `from quux import foo`.
         child: &'db Name,
     },
@@ -673,8 +675,8 @@ impl<'db> ImportModuleName<'db> {
 
 #[derive(Clone, Copy, Debug)]
 enum AstImport<'a> {
-    Import(&'a ast::StmtImport),
-    ImportFrom(&'a ast::StmtImportFrom),
+    Import(flat::View<'a, StmtImport>),
+    ImportFrom(flat::View<'a, StmtImportFrom>),
 }
 
 impl Ranged for AstImport<'_> {
@@ -707,9 +709,9 @@ struct SymbolVisitor<'db> {
     /// that is inside a class.
     in_class: bool,
     /// The statement whose expressions are currently being visited.
-    current_stmt: Option<&'db ast::Stmt>,
+    current_stmt: Option<flat::View<'db, Stmt>>,
     /// The binding declared directly by the pattern currently being visited.
-    pattern_binding: Option<&'db ast::Identifier>,
+    pattern_binding: Option<flat::View<'db, Identifier>>,
     /// Whether store-context names should be excluded from the enclosing scope.
     suppress_store_symbols: bool,
     /// When enabled, the visitor should only try to extract
@@ -834,13 +836,13 @@ impl<'db> SymbolVisitor<'db> {
         }
     }
 
-    fn visit_body(&mut self, body: &'db [ast::Stmt]) {
+    fn visit_body(&mut self, body: flat::Suite<'db>) {
         for stmt in body {
             self.visit_stmt(stmt);
         }
     }
 
-    fn visit_nonbinding_target(&mut self, target: &'db ast::Expr) {
+    fn visit_nonbinding_target(&mut self, target: flat::View<'db, Expr>) {
         let previous = std::mem::replace(&mut self.suppress_store_symbols, true);
         self.visit_expr(target);
         self.suppress_store_symbols = previous;
@@ -863,7 +865,7 @@ impl<'db> SymbolVisitor<'db> {
     /// Adds a symbol for a name definition.
     fn add_name_symbol(
         &mut self,
-        stmt: &ast::Stmt,
+        stmt: flat::View<'_, Stmt>,
         name: &Name,
         name_range: TextRange,
         kind: SymbolKind,
@@ -880,20 +882,24 @@ impl<'db> SymbolVisitor<'db> {
         self.add_symbol(symbol);
     }
 
-    fn add_pattern_binding(&mut self, stmt: &ast::Stmt, name: &ast::Identifier) {
-        if self.in_function || !name.is_valid() || name.id == "_" {
+    fn add_pattern_binding(
+        &mut self,
+        stmt: flat::View<'_, Stmt>,
+        name: flat::View<'_, Identifier>,
+    ) {
+        if self.in_function || !name.is_valid() || name.id() == "_" {
             return;
         }
 
-        self.add_assignment(stmt, &name.id, name.range());
+        self.add_assignment(stmt, name.id(), name.range());
 
-        if self.exports_only && self.all_origin.is_some() && name.id == "__all__" {
+        if self.exports_only && self.all_origin.is_some() && name.id() == "__all__" {
             self.all_invalid = true;
         }
     }
 
     /// Adds a symbol introduced via an assignment.
-    fn add_assignment(&mut self, stmt: &ast::Stmt, name: &Name, name_range: TextRange) {
+    fn add_assignment(&mut self, stmt: flat::View<'_, Stmt>, name: &Name, name_range: TextRange) {
         // Include assignments only when we're in global or class scope.
         if self.in_function {
             return;
@@ -913,8 +919,12 @@ impl<'db> SymbolVisitor<'db> {
     }
 
     /// Adds a symbol introduced via an import `stmt`.
-    fn add_import_alias(&mut self, import: AstImport<'_>, alias: &ast::Alias) -> Option<SymbolId> {
-        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+    fn add_import_alias(
+        &mut self,
+        import: AstImport<'_>,
+        alias: flat::View<'_, Alias>,
+    ) -> Option<SymbolId> {
+        let name = alias.asname().unwrap_or(alias.name());
         let kind = if matches!(import, AstImport::Import(_)) {
             SymbolKind::Module
         } else if Self::is_constant_name(name.as_str()) {
@@ -943,7 +953,7 @@ impl<'db> SymbolVisitor<'db> {
         };
         Some(self.add_symbol(SymbolTree {
             parent: None,
-            name: name.id.to_string(),
+            name: name.id().to_string(),
             kind,
             deprecated: false,
             name_range: name.range(),
@@ -955,7 +965,11 @@ impl<'db> SymbolVisitor<'db> {
     /// Extracts `__all__` names from the given assignment.
     ///
     /// If the assignment isn't for `__all__`, then this is a no-op.
-    fn add_all_assignment(&mut self, targets: &[ast::Expr], value: Option<&ast::Expr>) {
+    fn add_all_assignment(
+        &mut self,
+        target: Option<flat::View<'_, Expr>>,
+        value: Option<flat::View<'_, Expr>>,
+    ) {
         // We don't care about `__all__` unless we're
         // specifically looking for exported symbols.
         if !self.exports_only {
@@ -964,7 +978,7 @@ impl<'db> SymbolVisitor<'db> {
         if self.in_function || self.in_class {
             return;
         }
-        let Some(target) = targets.first() else {
+        let Some(target) = target else {
             return;
         };
         if !is_dunder_all(target) {
@@ -972,13 +986,13 @@ impl<'db> SymbolVisitor<'db> {
         }
 
         let Some(value) = value else { return };
-        match *value {
+        match value.fields() {
             // `__all__ = [...]`
             // `__all__ = (...)`
             ast::Expr::List(ast::ExprList { ref elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { ref elts, .. }) => {
                 self.update_all_origin(DunderAllOrigin::CurrentModule);
-                if !self.add_all_names(elts) {
+                if !self.add_all_names(*elts) {
                     self.all_invalid = true;
                 }
             }
@@ -1003,8 +1017,8 @@ impl<'db> SymbolVisitor<'db> {
     /// of inferring the type of `submodule`). With that said, we
     /// could likely support a subset of cases here without too much
     /// ceremony. ---AG
-    fn extend_all(&mut self, expr: &ast::Expr) -> bool {
-        match expr {
+    fn extend_all(&mut self, expr: flat::View<'_, Expr>) -> bool {
+        match expr.fields() {
             // `__all__ += [...]`
             // `__all__ += (...)`
             // `__all__ += {...}`
@@ -1050,8 +1064,8 @@ impl<'db> SymbolVisitor<'db> {
     /// `false` otherwise.
     fn update_all_by_call_idiom(
         &mut self,
-        function_name: &ast::Identifier,
-        arguments: &ast::Arguments,
+        function_name: flat::View<'_, Identifier>,
+        arguments: flat::View<'_, Arguments>,
     ) -> bool {
         if arguments.len() != 1 {
             return false;
@@ -1089,16 +1103,16 @@ impl<'db> SymbolVisitor<'db> {
     /// Adds all of the names exported from the module
     /// imported by `import_from`. i.e., This implements
     /// `from module import *` semantics.
-    fn add_exported_from_wildcard(&mut self, import_from: &ast::StmtImportFrom) {
+    fn add_exported_from_wildcard(&mut self, import_from: flat::View<'_, StmtImportFrom>) {
         let Some(symbols) = self.get_names_from_wildcard(import_from) else {
             self.all_invalid = true;
             return;
         };
         let star_range = import_from
-            .names
+            .names()
             .iter()
-            .find(|alias| &alias.name == "*")
-            .map(Ranged::range);
+            .find(|alias| alias.name() == "*")
+            .map(|node| node.range());
         let importing_file = ImportingFile::File(
             self.file.file(self.db),
             self.file.resolver_environment(self.db),
@@ -1144,7 +1158,7 @@ impl<'db> SymbolVisitor<'db> {
 
     /// Adds `__all__` from the module imported by `import_from`. i.e.,
     /// This implements `from module import __all__` semantics.
-    fn add_all_from_import(&mut self, import_from: &ast::StmtImportFrom) {
+    fn add_all_from_import(&mut self, import_from: flat::View<'_, StmtImportFrom>) {
         let Some(symbols) = self.get_names_from_wildcard(import_from) else {
             self.all_invalid = true;
             return;
@@ -1161,7 +1175,7 @@ impl<'db> SymbolVisitor<'db> {
     /// module imported in `import_from`.
     fn get_names_from_wildcard(
         &self,
-        import_from: &ast::StmtImportFrom,
+        import_from: flat::View<'_, StmtImportFrom>,
     ) -> Option<&'db FlatSymbols> {
         let importing_file = ImportingFile::File(
             self.file.file(self.db),
@@ -1180,7 +1194,7 @@ impl<'db> SymbolVisitor<'db> {
     /// names.
     ///
     /// Returns `false` if any of the names are invalid.
-    fn add_all_names(&mut self, exprs: &[ast::Expr]) -> bool {
+    fn add_all_names(&mut self, exprs: flat::NodeList<'_, Expr>) -> bool {
         for expr in exprs {
             let Some(name) = create_all_name(expr) else {
                 return false;
@@ -1235,11 +1249,11 @@ impl<'db> SymbolVisitor<'db> {
         name.chars().all(|c| c.is_ascii_uppercase() || c == '_')
     }
 
-    fn has_deprecated_decorator(decorator_list: &[ast::Decorator]) -> bool {
+    fn has_deprecated_decorator(decorator_list: flat::NodeList<'_, Decorator>) -> bool {
         decorator_list.iter().any(|decorator| {
-            let expr = match &decorator.expression {
-                ast::Expr::Call(call) => &*call.func,
-                other => other,
+            let expr = match decorator.expression().classify() {
+                flat::ExprKind::Call(call) => call.func(),
+                other => other.view(),
             };
             UnqualifiedName::from_expr(expr)
                 .is_some_and(|name| name.segments().last() == Some(&"deprecated"))
@@ -1296,11 +1310,11 @@ impl<'db> SymbolVisitor<'db> {
         true
     }
 
-    fn visit_stmt_impl(&mut self, stmt: &'db ast::Stmt) {
-        match stmt {
-            ast::Stmt::FunctionDef(func_def) => {
+    fn visit_stmt_impl(&mut self, stmt: flat::View<'db, Stmt>) {
+        match stmt.fields() {
+            ast::Stmt::FunctionDef(ast::StmtFunctionDef { node: func_def, .. }) => {
                 let kind = SymbolKind::function_kind(
-                    &func_def.name,
+                    func_def.name().as_str(),
                     self.iter_symbol_stack()
                         .last()
                         .is_some_and(|tree| tree.kind == SymbolKind::Class),
@@ -1308,25 +1322,25 @@ impl<'db> SymbolVisitor<'db> {
 
                 let symbol = SymbolTree {
                     parent: None,
-                    name: func_def.name.to_string(),
+                    name: func_def.name().to_string(),
                     kind,
-                    deprecated: Self::has_deprecated_decorator(&func_def.decorator_list),
-                    name_range: func_def.name.range(),
+                    deprecated: Self::has_deprecated_decorator(func_def.decorator_list()),
+                    name_range: func_def.name().range(),
                     full_range: stmt.range(),
                     imported_from: None,
                 };
 
-                for decorator in &func_def.decorator_list {
+                for decorator in func_def.decorator_list() {
                     self.visit_decorator(decorator);
                 }
 
                 let symbol_id = self.add_symbol(symbol);
 
-                if let Some(type_params) = &func_def.type_params {
+                if let Some(type_params) = func_def.type_params() {
                     self.visit_type_params(type_params);
                 }
-                self.visit_parameters(&func_def.parameters);
-                if let Some(returns) = &func_def.returns {
+                self.visit_parameters(func_def.parameters());
+                if let Some(returns) = func_def.returns() {
                     self.visit_annotation(returns);
                 }
 
@@ -1341,34 +1355,36 @@ impl<'db> SymbolVisitor<'db> {
                 let was_in_function = self.in_function;
                 self.in_function = true;
 
-                self.visit_body(&func_def.body);
+                self.visit_body(func_def.body());
 
                 // Restore the previous function scope state
                 self.in_function = was_in_function;
 
                 self.pop_symbol();
             }
-            ast::Stmt::ClassDef(class_def) => {
+            ast::Stmt::ClassDef(ast::StmtClassDef {
+                node: class_def, ..
+            }) => {
                 let symbol = SymbolTree {
                     parent: None,
-                    name: class_def.name.to_string(),
+                    name: class_def.name().to_string(),
                     kind: SymbolKind::Class,
-                    deprecated: Self::has_deprecated_decorator(&class_def.decorator_list),
-                    name_range: class_def.name.range(),
+                    deprecated: Self::has_deprecated_decorator(class_def.decorator_list()),
+                    name_range: class_def.name().range(),
                     full_range: stmt.range(),
                     imported_from: None,
                 };
 
-                for decorator in &class_def.decorator_list {
+                for decorator in class_def.decorator_list() {
                     self.visit_decorator(decorator);
                 }
 
                 let symbol_id = self.add_symbol(symbol);
 
-                if let Some(type_params) = &class_def.type_params {
+                if let Some(type_params) = class_def.type_params() {
                     self.visit_type_params(type_params);
                 }
-                if let Some(arguments) = &class_def.arguments {
+                if let Some(arguments) = class_def.arguments() {
                     self.visit_arguments(arguments);
                 }
 
@@ -1382,31 +1398,32 @@ impl<'db> SymbolVisitor<'db> {
                 self.in_class = true;
 
                 self.symbol_stack.push(symbol_id);
-                self.visit_body(&class_def.body);
+                self.visit_body(class_def.body());
                 self.pop_symbol();
 
                 // Restore the previous class scope state
                 self.in_class = was_in_class;
             }
-            ast::Stmt::TypeAlias(type_alias) => {
+            ast::Stmt::TypeAlias(ast::StmtTypeAlias {
+                node: type_alias, ..
+            }) => {
                 // Include assignments only when we're in global or class scope
                 if self.in_function {
                     return;
                 }
-                let ast::Expr::Name(name) = &*type_alias.name else {
+                let flat::ExprKind::Name(name) = type_alias.name().classify() else {
                     return;
                 };
-                self.add_name_symbol(stmt, &name.id, name.range(), SymbolKind::Variable);
+                self.add_name_symbol(stmt, name.id(), name.range(), SymbolKind::Variable);
             }
-            ast::Stmt::Assign(assign) => {
-                self.add_all_assignment(&assign.targets, Some(&assign.value));
+            ast::Stmt::Assign(ast::StmtAssign { node: assign, .. }) => {
+                self.add_all_assignment(assign.targets().first(), Some(assign.value()));
                 source_order::walk_stmt(self, stmt);
             }
-            ast::Stmt::AnnAssign(ann_assign) => {
-                self.add_all_assignment(
-                    std::slice::from_ref(&ann_assign.target),
-                    ann_assign.value.as_deref(),
-                );
+            ast::Stmt::AnnAssign(ast::StmtAnnAssign {
+                node: ann_assign, ..
+            }) => {
+                self.add_all_assignment(Some(ann_assign.target()), ann_assign.value());
                 source_order::walk_stmt(self, stmt);
             }
             ast::Stmt::AugAssign(ast::StmtAugAssign {
@@ -1432,7 +1449,7 @@ impl<'db> SymbolVisitor<'db> {
                     return;
                 }
                 // Anything other than `+=` is not valid.
-                if !matches!(op, ast::Operator::Add) {
+                if !matches!(op, Operator::Add) {
                     self.all_invalid = true;
                     return;
                 }
@@ -1440,7 +1457,7 @@ impl<'db> SymbolVisitor<'db> {
                     self.all_invalid = true;
                 }
             }
-            ast::Stmt::Expr(expr) => {
+            ast::Stmt::Expr(ast::StmtExpr { node: expr, .. }) => {
                 source_order::walk_stmt(self, stmt);
 
                 // We don't care about `__all__` unless we're
@@ -1455,16 +1472,21 @@ impl<'db> SymbolVisitor<'db> {
                 }
                 let Some(ast::ExprCall {
                     func, arguments, ..
-                }) = expr.value.as_call_expr()
+                }) = expr
+                    .value()
+                    .as_call_expr()
+                    .map(flat::View::<ExprCall>::fields)
                 else {
                     return;
                 };
                 let Some(ast::ExprAttribute {
                     value,
                     attr,
-                    ctx: ast::ExprContext::Load,
+                    ctx: ExprContext::Load,
                     ..
-                }) = func.as_attribute_expr()
+                }) = func
+                    .as_attribute_expr()
+                    .map(flat::View::<ExprAttribute>::fields)
                 else {
                     return;
                 };
@@ -1475,7 +1497,7 @@ impl<'db> SymbolVisitor<'db> {
                     self.all_invalid = true;
                 }
             }
-            ast::Stmt::Import(import) => {
+            ast::Stmt::Import(ast::StmtImport { node: import, .. }) => {
                 // We ignore any names introduced by imports
                 // unless we're specifically looking for the
                 // set of exported symbols.
@@ -1487,11 +1509,13 @@ impl<'db> SymbolVisitor<'db> {
                     return;
                 }
                 self.imports.add_import(import);
-                for alias in &import.names {
+                for alias in import.names() {
                     self.add_import_alias(AstImport::Import(import), alias);
                 }
             }
-            ast::Stmt::ImportFrom(import_from) => {
+            ast::Stmt::ImportFrom(ast::StmtImportFrom {
+                node: import_from, ..
+            }) => {
                 // We ignore any names introduced by imports
                 // unless we're specifically looking for the
                 // set of exported symbols.
@@ -1503,15 +1527,12 @@ impl<'db> SymbolVisitor<'db> {
                     return;
                 }
                 self.imports.add_import_from(import_from);
-                for alias in &import_from.names {
-                    if &alias.name == "*" {
+                for alias in import_from.names() {
+                    if alias.name() == "*" {
                         self.add_exported_from_wildcard(import_from);
                     } else {
-                        if &alias.name == "__all__"
-                            && alias
-                                .asname
-                                .as_ref()
-                                .is_none_or(|asname| asname == "__all__")
+                        if alias.name() == "__all__"
+                            && alias.asname().is_none_or(|asname| asname == "__all__")
                         {
                             self.add_all_from_import(import_from);
                         }
@@ -1529,26 +1550,26 @@ impl<'db> SymbolVisitor<'db> {
 }
 
 impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
-    fn visit_stmt(&mut self, stmt: &'db ast::Stmt) {
+    fn visit_stmt(&mut self, stmt: flat::View<'db, Stmt>) {
         let previous_stmt = self.current_stmt.replace(stmt);
         self.visit_stmt_impl(stmt);
         self.current_stmt = previous_stmt;
     }
 
-    fn visit_expr(&mut self, expr: &'db ast::Expr) {
+    fn visit_expr(&mut self, expr: flat::View<'db, Expr>) {
         if self.in_function {
             return;
         }
 
-        match expr {
-            ast::Expr::Name(name)
-                if name.ctx.is_store()
+        match expr.classify() {
+            flat::ExprKind::Name(name)
+                if name.ctx().is_store()
                     && !self.suppress_store_symbols
                     && let Some(stmt) = self.current_stmt =>
             {
-                self.add_assignment(stmt, &name.id, name.range());
+                self.add_assignment(stmt, name.id(), name.range());
 
-                if name.id != "__all__" {
+                if name.id() != "__all__" {
                     return;
                 }
 
@@ -1567,34 +1588,34 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     self.all_invalid = true;
                 }
             }
-            ast::Expr::Lambda(lambda) => {
-                if let Some(parameters) = &lambda.parameters {
+            flat::ExprKind::Lambda(lambda) => {
+                if let Some(parameters) = lambda.parameters() {
                     self.visit_parameters(parameters);
                 }
 
                 let was_in_function = self.in_function;
                 self.in_function = true;
-                self.visit_expr(&lambda.body);
+                self.visit_expr(lambda.body());
                 self.in_function = was_in_function;
             }
             _ => source_order::walk_expr(self, expr),
         }
     }
 
-    fn visit_comprehension(&mut self, comprehension: &'db ast::Comprehension) {
-        self.visit_nonbinding_target(&comprehension.target);
-        self.visit_expr(&comprehension.iter);
+    fn visit_comprehension(&mut self, comprehension: flat::View<'db, Comprehension>) {
+        self.visit_nonbinding_target(comprehension.target());
+        self.visit_expr(comprehension.iter());
 
-        for condition in &comprehension.ifs {
+        for condition in comprehension.ifs() {
             self.visit_expr(condition);
         }
     }
 
-    fn visit_pattern(&mut self, pattern: &'db ast::Pattern) {
-        let binding = match pattern {
-            ast::Pattern::MatchStar(pattern) => pattern.name.as_ref(),
-            ast::Pattern::MatchAs(pattern) => pattern.name.as_ref(),
-            ast::Pattern::MatchMapping(pattern) => pattern.rest.as_ref(),
+    fn visit_pattern(&mut self, pattern: flat::View<'db, Pattern>) {
+        let binding = match pattern.classify() {
+            flat::PatternKind::MatchStar(pattern) => pattern.name(),
+            flat::PatternKind::MatchAs(pattern) => pattern.name(),
+            flat::PatternKind::MatchMapping(pattern) => pattern.rest(),
             _ => None,
         };
 
@@ -1604,13 +1625,13 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
         self.pattern_binding = previous_binding;
     }
 
-    fn visit_identifier(&mut self, identifier: &'db ast::Identifier) {
+    fn visit_identifier(&mut self, identifier: flat::View<'db, Identifier>) {
         source_order::walk_identifier(self, identifier);
 
         if let Some(stmt) = self.current_stmt
             && self
                 .pattern_binding
-                .is_some_and(|binding| std::ptr::eq(binding, identifier))
+                .is_some_and(|binding| binding.is_same_node(identifier))
         {
             self.add_pattern_binding(stmt, identifier);
         }
@@ -1629,18 +1650,21 @@ enum DunderAllOrigin {
 }
 
 /// Checks if the given expression is a name expression for `__all__`.
-fn is_dunder_all(expr: &ast::Expr) -> bool {
-    matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "__all__")
+fn is_dunder_all(expr: flat::View<'_, Expr>) -> bool {
+    matches!(expr.fields(), ast::Expr::Name(ast::ExprName { id, .. }) if id == "__all__")
 }
 
-fn is_recognized_all_assignment(stmt: &ast::Stmt, name: &ast::ExprName) -> bool {
-    match stmt {
-        ast::Stmt::Assign(assign) => assign
-            .targets
+fn is_recognized_all_assignment(
+    stmt: flat::View<'_, Stmt>,
+    name: flat::View<'_, ExprName>,
+) -> bool {
+    match stmt.classify() {
+        flat::StmtKind::Assign(assign) => assign
+            .targets()
             .first()
             .is_some_and(|target| is_dunder_all(target) && target.range() == name.range()),
-        ast::Stmt::AnnAssign(assign) => {
-            is_dunder_all(&assign.target) && assign.target.range() == name.range()
+        flat::StmtKind::AnnAssign(assign) => {
+            is_dunder_all(assign.target()) && assign.target().range() == name.range()
         }
         _ => false,
     }
@@ -1649,8 +1673,8 @@ fn is_recognized_all_assignment(stmt: &ast::Stmt, name: &ast::ExprName) -> bool 
 /// Create and return a string representing a name from the given
 /// expression, or `None` if it is an invalid expression for a
 /// `__all__` element.
-fn create_all_name(expr: &ast::Expr) -> Option<Name> {
-    Some(expr.as_string_literal_expr()?.value.to_str().into())
+fn create_all_name(expr: flat::View<'_, Expr>) -> Option<Name> {
+    Some(expr.as_string_literal_expr()?.value().to_str().into())
 }
 
 #[cfg(test)]

@@ -220,7 +220,7 @@ pub(crate) fn attribute_declarations<'db, 's>(
 pub(crate) fn module_docstring(db: &dyn Db, file: PythonFile<'_>) -> Option<String> {
     let module = parsed_module(db, file).load(db);
     docstring_from_body(module.suite())
-        .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+        .map(|docstring_expr| docstring_expr.value().to_str().to_owned())
 }
 
 pub fn check_file_unwrap(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
