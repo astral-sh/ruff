@@ -163,6 +163,7 @@ memchr = { version = "2.7.1", default-features = false, features = ["std"] }
 # Keep v2 until an updated Rust crate includes the fix.
 mimalloc = { version = "0.1.52", default-features = false, features = ["v2"] }
 natord = { version = "1.0.9", default-features = false }
+nix = { version = "0.31.2", default-features = false }
 notify = { version = "8.0.0", default-features = false, features = ["macos_fsevent"] }
 ordermap = { version = "1.0.0", default-features = false, features = ["std"] }
 parking_lot = { version = "0.12.4", default-features = false }

@@ -53,7 +53,11 @@ tracing-flame = { workspace = true }
 tracing-subscriber = { workspace = true }
 wild = { workspace = true }
 
-[target.'cfg(all(not(target_os = "macos"), not(target_os = "windows"), not(target_os = "openbsd"), not(target_os = "aix"), not(target_os = "android"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64", target_arch = "riscv64")))'.dependencies]
+[target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
+mimalloc = { workspace = true }
+nix = { workspace = true, features = ["process"] }
+
+[target.'cfg(all(not(all(target_os = "linux", target_arch = "x86_64")), not(target_os = "macos"), not(target_os = "windows"), not(target_os = "openbsd"), not(target_os = "aix"), not(target_os = "android"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64", target_arch = "riscv64")))'.dependencies]
 tikv-jemallocator = { workspace = true }
 
 [dev-dependencies]

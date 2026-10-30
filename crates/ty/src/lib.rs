@@ -41,13 +41,29 @@ use crate::printer::Printer;
 pub use args::Cli;
 
 pub fn run() -> anyhow::Result<ExitStatus> {
-    setup_rayon();
     ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
 
     let args = wild::args_os();
     let args =
         ruff_command_line::expand_args(args).context("Failed to read CLI arguments from file")?;
     let args = Cli::parse_from(args);
+
+    // Huge pages speed up cold checks, but increase the resident size of long-lived
+    // heaps. Set the policy before the Rayon workers make their first allocations.
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    {
+        let long_running = match &args.command {
+            Command::Check(check) => check.watch,
+            Command::Server(server) => !server.find_executable,
+            _ => false,
+        };
+        if long_running
+            && !std::env::vars_os().any(|(name, _)| name.eq_ignore_ascii_case("MIMALLOC_ALLOW_THP"))
+        {
+            let _ = nix::sys::prctl::set_thp_disable(true);
+        }
+    }
+    setup_rayon();
 
     match args.command {
         Command::Check(check_args) => run_check(check_args),
