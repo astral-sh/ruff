@@ -1,5 +1,6 @@
 use ruff_formatter::{FormatRuleWithOptions, write};
-use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprIf};
 
 use crate::comments::leading_comments;
@@ -33,7 +34,7 @@ pub struct FormatExprIf {
     layout: ExprIfLayout,
 }
 
-impl FormatRuleWithOptions<ExprIf, PyFormatContext<'_>> for FormatExprIf {
+impl FormatRuleWithOptions<flat::View<'_, ExprIf>, PyFormatContext<'_>> for FormatExprIf {
     type Options = ExprIfLayout;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -43,14 +44,10 @@ impl FormatRuleWithOptions<ExprIf, PyFormatContext<'_>> for FormatExprIf {
 }
 
 impl FormatNodeRule<ExprIf> for FormatExprIf {
-    fn fmt_fields(&self, item: &ExprIf, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprIf {
-            range: _,
-            node_index: _,
-            test,
-            body,
-            orelse,
-        } = item;
+    fn fmt_fields(&self, item: flat::View<'_, ExprIf>, f: &mut PyFormatter) -> FormatResult<()> {
+        let test = item.test();
+        let body = item.body();
+        let orelse = item.orelse();
         let comments = f.context().comments().clone();
 
         let inner = format_with(|f: &mut PyFormatter| {
@@ -62,12 +59,12 @@ impl FormatNodeRule<ExprIf> for FormatExprIf {
                 [
                     body.format(),
                     in_parentheses_only_soft_line_break_or_space(),
-                    leading_comments(comments.leading(test.as_ref())),
+                    leading_comments(comments.leading(test)),
                     token("if"),
                     space(),
                     test.format(),
                     in_parentheses_only_soft_line_break_or_space(),
-                    leading_comments(comments.leading(orelse.as_ref())),
+                    leading_comments(comments.leading(orelse)),
                     token("else"),
                     space(),
                 ]
@@ -83,7 +80,7 @@ impl FormatNodeRule<ExprIf> for FormatExprIf {
     }
 }
 
-impl NeedsParentheses for ExprIf {
+impl NeedsParentheses for flat::View<'_, ExprIf> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,
@@ -99,13 +96,13 @@ impl NeedsParentheses for ExprIf {
 
 #[derive(Debug)]
 struct FormatOrElse<'a> {
-    orelse: &'a Expr,
+    orelse: flat::View<'a, Expr>,
 }
 
 impl Format<PyFormatContext<'_>> for FormatOrElse<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        match self.orelse {
-            Expr::If(expr) if !f.context().is_expression_parenthesized(expr.into()) => {
+        match self.orelse.classify() {
+            flat::ExprKind::If(expr) if !f.context().is_expression_parenthesized(expr.into()) => {
                 write!(f, [expr.format().with_options(ExprIfLayout::Nested)])
             }
             _ => write!(f, [in_parentheses_only_group(&self.orelse.format())]),

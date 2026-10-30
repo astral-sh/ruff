@@ -10,7 +10,7 @@ use ruff_db::diagnostic::{
 use ruff_formatter::FormatOptions;
 use ruff_python_ast::Mod;
 use ruff_python_ast::comparable::ComparableMod;
-use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
+use ruff_python_ast::flat::visitor::source_order::SourceOrderVisitor;
 use ruff_python_formatter::{PreviewMode, PyFormatOptions, format_module_source, format_range};
 use ruff_python_parser::{ParseOptions, Parsed, UnsupportedSyntaxError, parse};
 use ruff_source_file::{LineIndex, OneIndexed, SourceFileBuilder};
@@ -622,9 +622,9 @@ impl StmtVisitor {
 }
 
 impl<'a> SourceOrderVisitor<'a> for StmtVisitor {
-    fn visit_stmt(&mut self, stmt: &'a ruff_python_ast::Stmt) {
+    fn visit_stmt(&mut self, stmt: ruff_python_ast::flat::View<'a, ruff_python_ast::Stmt>) {
         self.nodes.push(stmt.range());
-        ruff_python_ast::visitor::source_order::walk_stmt(self, stmt);
+        ruff_python_ast::flat::visitor::source_order::walk_stmt(self, stmt);
     }
 }
 

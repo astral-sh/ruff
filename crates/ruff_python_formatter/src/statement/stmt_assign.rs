@@ -1,7 +1,8 @@
 use ruff_formatter::{FormatError, RemoveSoftLinesBuffer, format_args, write};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::StringLikeKind;
 use ruff_python_ast::{
-    AnyNodeRef, Expr, ExprAttribute, ExprCall, FString, Operator, StmtAssign, StringLike, TString,
-    TypeParams,
+    Expr, FString, Operator, StmtAssign, TString, TypeParams, flat::AnyNodeRef, flat::StringLike,
 };
 
 use crate::builders::parenthesize_if_expands;
@@ -30,13 +31,13 @@ use crate::string::implicit::{
 pub struct FormatStmtAssign;
 
 impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
-    fn fmt_fields(&self, item: &StmtAssign, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtAssign {
-            range: _,
-            node_index: _,
-            targets,
-            value,
-        } = item;
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, StmtAssign>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let targets = item.targets();
+        let value = item.value();
 
         let (first, rest) = targets.split_first().ok_or(FormatError::syntax_error(
             "Expected at least on assignment target",
@@ -71,7 +72,7 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
         // Avoid parenthesizing the value for single-target assignments where the
         // target has its own parentheses (list, dict, tuple, ...) and the target expands.
         else if has_target_own_parentheses(first, f.context())
-            && !f.context().is_expression_parenthesized(first.into())
+            && !f.context().is_expression_parenthesized(first)
         {
             FormatStatementsLastExpression::RightToLeft {
                 before_operator: AnyBeforeOperator::Expression(first),
@@ -91,7 +92,12 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
         if f.options().source_type().is_ipynb()
             && f.context().node_level().is_last_top_level_statement()
             && trailing_semicolon(item.into(), f.context().source()).is_some()
-            && matches!(targets.as_slice(), [Expr::Name(_)])
+            && matches!(
+                targets
+                    .as_array()
+                    .map(|items| items.map(flat::View::<Expr>::classify)),
+                Some([flat::ExprKind::Name(_)])
+            )
         {
             token(";").fmt(f)?;
         }
@@ -102,7 +108,7 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
 
 /// Formats a single target with the equal operator.
 struct FormatTargetWithEqualOperator<'a> {
-    target: &'a Expr,
+    target: flat::View<'a, Expr>,
 
     /// Whether parentheses should be preserved as in the source or if the target
     /// should only be parenthesized if necessary (because of comments or because it doesn't fit).
@@ -194,7 +200,7 @@ pub(super) enum FormatStatementsLastExpression<'a> {
     /// keyword like `return` or a Name) because it has better performance characteristics.
     LeftToRight {
         /// The right side of an assignment or the value returned in a return statement.
-        value: &'a Expr,
+        value: flat::View<'a, Expr>,
 
         /// The parent statement that encloses the `value` expression.
         statement: AnyNodeRef<'a>,
@@ -257,7 +263,7 @@ pub(super) enum FormatStatementsLastExpression<'a> {
         operator: AnyAssignmentOperator,
 
         /// The assigned `value`.
-        value: &'a Expr,
+        value: flat::View<'a, Expr>,
 
         /// The assignment statement.
         statement: AnyNodeRef<'a>,
@@ -265,7 +271,10 @@ pub(super) enum FormatStatementsLastExpression<'a> {
 }
 
 impl<'a> FormatStatementsLastExpression<'a> {
-    pub(super) fn left_to_right<S: Into<AnyNodeRef<'a>>>(value: &'a Expr, statement: S) -> Self {
+    pub(super) fn left_to_right<S: Into<AnyNodeRef<'a>>>(
+        value: flat::View<'a, Expr>,
+        statement: S,
+    ) -> Self {
         Self::LeftToRight {
             value,
             statement: statement.into(),
@@ -277,7 +286,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         match self {
             FormatStatementsLastExpression::LeftToRight { value, statement } => {
-                let can_inline_comment = should_inline_comments(value, *statement, f.context());
+                let can_inline_comment = should_inline_comments(*value, *statement, f.context());
 
                 let string_like = StringLike::try_from(*value).ok();
                 let format_interpolated_string = string_like
@@ -291,7 +300,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     && format_implicit_flat.is_none()
                     && format_interpolated_string.is_none()
                 {
-                    return maybe_parenthesize_value(value, *statement).fmt(f);
+                    return maybe_parenthesize_value(*value, *statement).fmt(f);
                 }
 
                 let comments = f.context().comments().clone();
@@ -360,7 +369,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                             return write!(
                                 f,
                                 [maybe_parenthesize_expression(
-                                    value,
+                                    *value,
                                     *statement,
                                     Parenthesize::IfBreaks,
                                 )]
@@ -453,7 +462,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                             return write!(
                                 f,
                                 [maybe_parenthesize_expression(
-                                    value,
+                                    *value,
                                     *statement,
                                     Parenthesize::IfBreaks,
                                 )]
@@ -548,7 +557,8 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 value,
                 statement,
             } => {
-                let should_inline_comments = should_inline_comments(value, *statement, f.context());
+                let should_inline_comments =
+                    should_inline_comments(*value, *statement, f.context());
 
                 let string_like = StringLike::try_from(*value).ok();
                 let format_interpolated_string = string_like
@@ -558,7 +568,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 });
                 // Use the normal `maybe_parenthesize_layout` for splittable `value`s.
                 if !should_inline_comments
-                    && !should_non_inlineable_use_best_fit(value, *statement, f.context())
+                    && !should_non_inlineable_use_best_fit(*value, *statement, f.context())
                     && format_implicit_flat.is_none()
                     && format_interpolated_string.is_none()
                 {
@@ -569,7 +579,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                             space(),
                             operator,
                             space(),
-                            maybe_parenthesize_value(value, *statement)
+                            maybe_parenthesize_value(*value, *statement)
                         ]
                     );
                 }
@@ -770,7 +780,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                 operator,
                                 space(),
                                 maybe_parenthesize_expression(
-                                    value,
+                                    *value,
                                     *statement,
                                     Parenthesize::IfBreaks
                                 )
@@ -916,7 +926,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                                 operator,
                                 space(),
                                 maybe_parenthesize_expression(
-                                    value,
+                                    *value,
                                     *statement,
                                     Parenthesize::IfBreaks
                                 )
@@ -1044,8 +1054,8 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
 
 #[derive(Debug, Copy, Clone)]
 enum InterpolatedString<'a> {
-    FString(&'a FString),
-    TString(&'a TString),
+    FString(flat::View<'a, FString>),
+    TString(flat::View<'a, TString>),
 }
 
 impl Format<PyFormatContext<'_>> for InterpolatedString<'_> {
@@ -1117,14 +1127,14 @@ fn format_interpolated_string_assignment<'a>(
     string: StringLike<'a>,
     context: &PyFormatContext,
 ) -> Option<InterpolatedString<'a>> {
-    let (interpolated_string, elements) = match string {
-        StringLike::TString(expr) => {
+    let (interpolated_string, elements) = match string.classify() {
+        StringLikeKind::TString(expr) => {
             let t_string = expr.as_single_part_tstring()?;
-            (InterpolatedString::TString(t_string), &t_string.elements)
+            (InterpolatedString::TString(t_string), t_string.elements())
         }
-        StringLike::FString(expr) => {
+        StringLikeKind::FString(expr) => {
             let f_string = expr.as_single_part_fstring()?;
-            (InterpolatedString::FString(f_string), &f_string.elements)
+            (InterpolatedString::FString(f_string), f_string.elements())
         }
         _ => {
             return None;
@@ -1244,8 +1254,8 @@ impl Format<PyFormatContext<'_>> for AnyAssignmentOperator {
 
 #[derive(Copy, Clone, Debug)]
 pub(super) enum AnyBeforeOperator<'a> {
-    Expression(&'a Expr),
-    TypeParams(&'a TypeParams),
+    Expression(flat::View<'a, Expr>),
+    TypeParams(flat::View<'a, TypeParams>),
 }
 
 impl Format<PyFormatContext<'_>> for AnyBeforeOperator<'_> {
@@ -1262,8 +1272,8 @@ impl Format<PyFormatContext<'_>> for AnyBeforeOperator<'_> {
                         .fmt(f)
                 }
                 // Never parenthesize targets that come with their own parentheses, e.g. don't parenthesize lists or dictionary literals.
-                else if should_parenthesize_target(expression, f.context()) {
-                    if can_omit_optional_parentheses(expression, f.context()) {
+                else if should_parenthesize_target(*expression, f.context()) {
+                    if can_omit_optional_parentheses(*expression, f.context()) {
                         optional_parentheses(&expression.format().with_options(Parentheses::Never))
                             .fmt(f)
                     } else {
@@ -1284,24 +1294,25 @@ impl Format<PyFormatContext<'_>> for AnyBeforeOperator<'_> {
 
 /// Returns `true` for unsplittable expressions for which comments should be inlined.
 fn should_inline_comments(
-    expression: &Expr,
+    expression: flat::View<'_, Expr>,
     parent: AnyNodeRef,
     context: &PyFormatContext,
 ) -> bool {
-    match expression {
-        Expr::Name(_) | Expr::NoneLiteral(_) | Expr::NumberLiteral(_) | Expr::BooleanLiteral(_) => {
-            true
-        }
-        Expr::StringLiteral(string) => {
+    match expression.classify() {
+        flat::ExprKind::Name(_)
+        | flat::ExprKind::NoneLiteral(_)
+        | flat::ExprKind::NumberLiteral(_)
+        | flat::ExprKind::BooleanLiteral(_) => true,
+        flat::ExprKind::StringLiteral(string) => {
             string.needs_parentheses(parent, context) == OptionalParentheses::BestFit
         }
-        Expr::BytesLiteral(bytes) => {
+        flat::ExprKind::BytesLiteral(bytes) => {
             bytes.needs_parentheses(parent, context) == OptionalParentheses::BestFit
         }
-        Expr::FString(fstring) => {
+        flat::ExprKind::FString(fstring) => {
             fstring.needs_parentheses(parent, context) == OptionalParentheses::BestFit
         }
-        Expr::TString(tstring) => {
+        flat::ExprKind::TString(tstring) => {
             tstring.needs_parentheses(parent, context) == OptionalParentheses::BestFit
         }
         _ => false,
@@ -1310,16 +1321,18 @@ fn should_inline_comments(
 
 /// Tests whether an expression for which comments shouldn't be inlined should use the best fit layout
 fn should_non_inlineable_use_best_fit(
-    expr: &Expr,
+    expr: flat::View<'_, Expr>,
     parent: AnyNodeRef,
     context: &PyFormatContext,
 ) -> bool {
-    match expr {
-        Expr::Attribute(attribute) => {
+    match expr.classify() {
+        flat::ExprKind::Attribute(attribute) => {
             attribute.needs_parentheses(parent, context) == OptionalParentheses::BestFit
         }
-        Expr::Call(call) => call.needs_parentheses(parent, context) == OptionalParentheses::BestFit,
-        Expr::Subscript(subscript) => {
+        flat::ExprKind::Call(call) => {
+            call.needs_parentheses(parent, context) == OptionalParentheses::BestFit
+        }
+        flat::ExprKind::Subscript(subscript) => {
             subscript.needs_parentheses(parent, context) == OptionalParentheses::BestFit
         }
         _ => false,
@@ -1328,37 +1341,49 @@ fn should_non_inlineable_use_best_fit(
 
 /// Returns `true` for targets that have their own set of parentheses when they split,
 /// in which case we want to avoid parenthesizing the assigned value.
-pub(super) fn has_target_own_parentheses(target: &Expr, context: &PyFormatContext) -> bool {
-    matches!(target, Expr::Tuple(_)) || has_own_parentheses(target, context).is_some()
+pub(super) fn has_target_own_parentheses(
+    target: flat::View<'_, Expr>,
+    context: &PyFormatContext,
+) -> bool {
+    matches!(target.classify(), flat::ExprKind::Tuple(_))
+        || has_own_parentheses(target, context).is_some()
 }
 
-fn should_parenthesize_target(target: &Expr, context: &PyFormatContext) -> bool {
+fn should_parenthesize_target(target: flat::View<'_, Expr>, context: &PyFormatContext) -> bool {
     !(has_target_own_parentheses(target, context)
         || is_attribute_with_parenthesized_value(target, context))
 }
 
-fn is_attribute_with_parenthesized_value(target: &Expr, context: &PyFormatContext) -> bool {
-    match target {
-        Expr::Attribute(ExprAttribute { value, .. }) => {
-            has_parentheses(value.as_ref(), context).is_some()
+fn is_attribute_with_parenthesized_value(
+    target: flat::View<'_, Expr>,
+    context: &PyFormatContext,
+) -> bool {
+    match target.classify() {
+        flat::ExprKind::Attribute(expr_attribute) => {
+            let value = expr_attribute.value();
+
+            has_parentheses(value, context).is_some()
                 || is_attribute_with_parenthesized_value(value, context)
         }
-        Expr::Subscript(_) => true,
-        Expr::Call(ExprCall { arguments, .. }) => !arguments.is_empty(),
+        flat::ExprKind::Subscript(_) => true,
+        flat::ExprKind::Call(expr_call) => {
+            let arguments = expr_call.arguments();
+            !arguments.is_empty()
+        }
         _ => false,
     }
 }
 
 /// Like [`maybe_parenthesize_expression`] but with special handling for lambdas.
 fn maybe_parenthesize_value<'a>(
-    expression: &'a Expr,
+    expression: flat::View<'a, Expr>,
     parent: AnyNodeRef<'a>,
 ) -> MaybeParenthesizeValue<'a> {
     MaybeParenthesizeValue { expression, parent }
 }
 
 struct MaybeParenthesizeValue<'a> {
-    expression: &'a Expr,
+    expression: flat::View<'a, Expr>,
     parent: AnyNodeRef<'a>,
 }
 
@@ -1366,13 +1391,13 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeValue<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let MaybeParenthesizeValue { expression, parent } = self;
 
-        if let Expr::Lambda(lambda) = expression
+        if let flat::ExprKind::Lambda(lambda) = expression.classify()
             && !f.context().comments().has_leading(lambda)
         {
             parenthesize_if_expands(&lambda.format().with_options(ExprLambdaLayout::Assignment))
                 .fmt(f)
         } else {
-            maybe_parenthesize_expression(expression, *parent, Parenthesize::IfBreaks).fmt(f)
+            maybe_parenthesize_expression(*expression, *parent, Parenthesize::IfBreaks).fmt(f)
         }
     }
 }

@@ -1,6 +1,7 @@
 use ruff_formatter::prelude::{space, token};
 use ruff_formatter::write;
 use ruff_python_ast::StmtAssert;
+use ruff_python_ast::flat;
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
@@ -10,13 +11,13 @@ use crate::prelude::*;
 pub struct FormatStmtAssert;
 
 impl FormatNodeRule<StmtAssert> for FormatStmtAssert {
-    fn fmt_fields(&self, item: &StmtAssert, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtAssert {
-            range: _,
-            node_index: _,
-            test,
-            msg,
-        } = item;
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, StmtAssert>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let test = item.test();
+        let msg = item.msg();
 
         write!(
             f,

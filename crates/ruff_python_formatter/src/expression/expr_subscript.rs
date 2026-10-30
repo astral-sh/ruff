@@ -1,6 +1,7 @@
 use ruff_formatter::{FormatRuleWithOptions, write};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{Expr, ExprSubscript};
+use ruff_python_ast::ExprSubscript;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::AnyNodeRef;
 
 use crate::expression::CallChainLayout;
 use crate::expression::expr_tuple::TupleParentheses;
@@ -14,7 +15,9 @@ pub struct FormatExprSubscript {
     call_chain_layout: CallChainLayout,
 }
 
-impl FormatRuleWithOptions<ExprSubscript, PyFormatContext<'_>> for FormatExprSubscript {
+impl FormatRuleWithOptions<flat::View<'_, ExprSubscript>, PyFormatContext<'_>>
+    for FormatExprSubscript
+{
     type Options = CallChainLayout;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -24,14 +27,13 @@ impl FormatRuleWithOptions<ExprSubscript, PyFormatContext<'_>> for FormatExprSub
 }
 
 impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
-    fn fmt_fields(&self, item: &ExprSubscript, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprSubscript {
-            range: _,
-            node_index: _,
-            value,
-            slice,
-            ctx: _,
-        } = item;
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, ExprSubscript>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let value = item.value();
+        let slice = item.slice();
 
         let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
 
@@ -43,22 +45,26 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
         );
 
         let format_inner = format_with(|f: &mut PyFormatter| {
-            if f.context().is_expression_parenthesized(value.into()) {
+            if f.context().is_expression_parenthesized(value) {
                 value.format().with_options(Parentheses::Always).fmt(f)
             } else {
-                match value.as_ref() {
-                    Expr::Attribute(expr) => expr
+                match value.classify() {
+                    flat::ExprKind::Attribute(expr) => expr
                         .format()
                         .with_options(call_chain_layout.decrement_call_like_count())
                         .fmt(f),
-                    Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f),
-                    Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+                    flat::ExprKind::Call(expr) => {
+                        expr.format().with_options(call_chain_layout).fmt(f)
+                    }
+                    flat::ExprKind::Subscript(expr) => {
+                        expr.format().with_options(call_chain_layout).fmt(f)
+                    }
                     _ => value.format().with_options(Parentheses::Never).fmt(f),
                 }
             }?;
 
             let format_slice = format_with(|f: &mut PyFormatter| {
-                if let Expr::Tuple(tuple) = slice.as_ref() {
+                if let flat::ExprKind::Tuple(tuple) = slice.classify() {
                     write!(f, [tuple.format().with_options(TupleParentheses::Preserve)])
                 } else {
                     write!(f, [slice.format()])
@@ -80,26 +86,26 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
     }
 }
 
-impl NeedsParentheses for ExprSubscript {
+impl NeedsParentheses for flat::View<'_, ExprSubscript> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         {
-            if CallChainLayout::from_expression(self.into(), context).is_fluent() {
+            if CallChainLayout::from_expression((*self).into(), context).is_fluent() {
                 OptionalParentheses::Multiline
-            } else if context.is_expression_parenthesized(self.value.as_ref().into()) {
+            } else if context.is_expression_parenthesized(self.value()) {
                 OptionalParentheses::Never
             } else {
-                match self.value.needs_parentheses(self.into(), context) {
+                match self.value().needs_parentheses(self.into(), context) {
                     OptionalParentheses::BestFit => {
                         if let Some(function) = parent.as_stmt_function_def() {
-                            if function.returns.as_deref().is_some_and(|returns| {
+                            if function.returns().is_some_and(|returns| {
                                 AnyNodeRef::ptr_eq(returns.into(), self.into())
                             }) {
-                                if function.parameters.is_empty()
-                                    && !context.comments().has(&*function.parameters)
+                                if function.parameters().is_empty()
+                                    && !context.comments().has(function.parameters())
                                 {
                                     // Apply the `optional_parentheses` layout when the subscript
                                     // is in a return type position of a function without parameters.

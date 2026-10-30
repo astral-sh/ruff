@@ -1,6 +1,7 @@
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprUnaryOp;
 use ruff_python_ast::UnaryOp;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::AnyNodeRef;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_text_size::Ranged;
 
@@ -12,13 +13,13 @@ use crate::prelude::*;
 pub struct FormatExprUnaryOp;
 
 impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
-    fn fmt_fields(&self, item: &ExprUnaryOp, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprUnaryOp {
-            range: _,
-            node_index: _,
-            op,
-            operand,
-        } = item;
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, ExprUnaryOp>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let op = item.op();
+        let operand = item.operand();
 
         let operator = match op {
             UnaryOp::Invert => "~",
@@ -65,7 +66,7 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
 
         if operand
             .as_bin_op_expr()
-            .is_some_and(|bin_op| bin_op.op.is_pow())
+            .is_some_and(|bin_op| bin_op.op().is_pow())
         {
             operand.format().with_options(Parentheses::Always).fmt(f)
         } else {
@@ -74,7 +75,7 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
     }
 }
 
-impl NeedsParentheses for ExprUnaryOp {
+impl NeedsParentheses for flat::View<'_, ExprUnaryOp> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,
@@ -84,36 +85,35 @@ impl NeedsParentheses for ExprUnaryOp {
             return OptionalParentheses::Always;
         }
 
-        if needs_line_break(self, context) {
+        if needs_line_break(*self, context) {
             return OptionalParentheses::Always;
         }
 
-        if context.is_expression_parenthesized(self.operand.as_ref().into()) {
+        if context.is_expression_parenthesized(self.operand()) {
             return OptionalParentheses::Never;
         }
 
-        if context.comments().has(self.operand.as_ref()) {
+        if context.comments().has(self.operand()) {
             return OptionalParentheses::Always;
         }
 
-        self.operand.needs_parentheses(self.into(), context)
+        self.operand().needs_parentheses(self.into(), context)
     }
 }
 
 /// Returns `true` if the unary operator will have a hard line break between the operator and its
 /// operand and thus requires parentheses.
-fn needs_line_break(item: &ExprUnaryOp, context: &PyFormatContext) -> bool {
+fn needs_line_break(item: flat::View<'_, ExprUnaryOp>, context: &PyFormatContext) -> bool {
     let comments = context.comments();
     let parenthesized_operand_range =
-        parenthesized_range(item.operand.as_ref().into(), item.into(), context.tokens());
-    let leading_operand_comments = comments.leading(item.operand.as_ref());
+        parenthesized_range(item.operand(), item.into(), context.tokens());
+    let leading_operand_comments = comments.leading(item.operand());
     let has_leading_comments_before_parens = parenthesized_operand_range.is_some_and(|range| {
         leading_operand_comments
             .iter()
             .any(|comment| comment.start() < range.start())
     });
 
-    !leading_operand_comments.is_empty()
-        && !context.is_expression_parenthesized(item.operand.as_ref().into())
+    !leading_operand_comments.is_empty() && !context.is_expression_parenthesized(item.operand())
         || has_leading_comments_before_parens
 }

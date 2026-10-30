@@ -1,4 +1,5 @@
 use ruff_python_ast::StmtBreak;
+use ruff_python_ast::flat;
 
 use crate::prelude::*;
 
@@ -6,7 +7,11 @@ use crate::prelude::*;
 pub struct FormatStmtBreak;
 
 impl FormatNodeRule<StmtBreak> for FormatStmtBreak {
-    fn fmt_fields(&self, _item: &StmtBreak, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(
+        &self,
+        _item: flat::View<'_, StmtBreak>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         token("break").fmt(f)
     }
 }

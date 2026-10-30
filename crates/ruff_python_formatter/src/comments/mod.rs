@@ -96,7 +96,7 @@ pub(crate) use format::{
     leading_alternate_branch_comments, leading_comments, leading_node_comments, trailing_comments,
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
-use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::flat::AnyNodeRef;
 use ruff_python_trivia::{CommentLinePosition, SuppressionKind, TriviaRanges};
 use ruff_text_size::{Ranged, TextRange};
 pub(crate) use visitor::collect_comments;
@@ -411,25 +411,15 @@ impl<'a> Comments<'a> {
     /// normally if `node` is the first or last node of a suppression range.
     #[cfg(debug_assertions)]
     pub(crate) fn mark_verbatim_node_comments_formatted(&self, node: AnyNodeRef) {
-        use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
-
-        struct MarkVerbatimCommentsAsFormattedVisitor<'a>(&'a Comments<'a>);
-
-        impl<'a> SourceOrderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
-            fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
-                for comment in self.0.leading_dangling_trailing(node) {
-                    comment.mark_formatted();
-                }
-
-                TraversalSignal::Traverse
-            }
-        }
-
         for dangling in self.dangling(node) {
             dangling.mark_formatted();
         }
 
-        node.visit_source_order(&mut MarkVerbatimCommentsAsFormattedVisitor(self));
+        for descendant in node.descendants().skip(1) {
+            for comment in self.leading_dangling_trailing(descendant) {
+                comment.mark_formatted();
+            }
+        }
     }
 
     /// Returns an object that implements [Debug] for nicely printing the [`Comments`].
@@ -439,37 +429,7 @@ impl<'a> Comments<'a> {
 
     /// Returns true if the node itself or any of its descendants have comments.
     pub(crate) fn contains_comments(&self, node: AnyNodeRef) -> bool {
-        use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
-
-        struct Visitor<'a> {
-            comments: &'a Comments<'a>,
-            has_comment: bool,
-        }
-
-        impl<'a> SourceOrderVisitor<'a> for Visitor<'a> {
-            fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
-                if self.has_comment {
-                    TraversalSignal::Skip
-                } else if self.comments.has(node) {
-                    self.has_comment = true;
-                    TraversalSignal::Skip
-                } else {
-                    TraversalSignal::Traverse
-                }
-            }
-        }
-
-        if self.has(node) {
-            return true;
-        }
-
-        let mut visitor = Visitor {
-            comments: self,
-            has_comment: false,
-        };
-        node.visit_source_order(&mut visitor);
-
-        visitor.has_comment
+        node.descendants().any(|descendant| self.has(descendant))
     }
 }
 
@@ -503,7 +463,7 @@ struct CommentsData<'a> {
     comments: CommentsMap<'a>,
 }
 
-/// A single-hash Bloom filter over the addresses of nodes with comments.
+/// A single-hash Bloom filter over the arena rows of nodes with comments.
 /// Different nodes can set the same bit, so a hit still needs an exact lookup.
 #[derive(Debug, Default)]
 struct CommentNodeFilter([u64; 32]);
@@ -525,8 +485,7 @@ impl CommentNodeFilter {
     }
 
     fn position(&self, node: AnyNodeRef<'_>) -> (usize, u64) {
-        // Drop the low bits because AST node addresses are typically aligned.
-        let index = node.as_ptr().as_ptr().addr() >> 3;
+        let index = node.handle().index();
         ((index / 64) % self.0.len(), 1 << (index % 64))
     }
 }
@@ -585,7 +544,7 @@ mod tests {
         let test_case = CommentsTestCase::from_code("pass");
         let node = test_case.parsed.syntax();
 
-        // Force a collision independently of where the allocator put the node.
+        // Force a collision regardless of the node's row.
         let mut bloom_filter = CommentNodeFilter::default();
         bloom_filter.0.fill(u64::MAX);
         let comments = Comments {

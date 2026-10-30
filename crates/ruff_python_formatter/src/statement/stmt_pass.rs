@@ -1,4 +1,5 @@
 use ruff_python_ast::StmtPass;
+use ruff_python_ast::flat;
 
 use crate::prelude::*;
 
@@ -6,7 +7,7 @@ use crate::prelude::*;
 pub struct FormatStmtPass;
 
 impl FormatNodeRule<StmtPass> for FormatStmtPass {
-    fn fmt_fields(&self, _item: &StmtPass, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, _item: flat::View<'_, StmtPass>, f: &mut PyFormatter) -> FormatResult<()> {
         token("pass").fmt(f)
     }
 }

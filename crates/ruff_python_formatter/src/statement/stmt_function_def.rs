@@ -8,18 +8,20 @@ use crate::statement::clause::{ClauseHeader, clause};
 use crate::statement::stmt_class_def::FormatDecorators;
 use crate::statement::suite::SuiteKind;
 use ruff_formatter::write;
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_ast::{NodeKind, StmtFunctionDef};
 
 #[derive(Default)]
 pub struct FormatStmtFunctionDef;
 
 impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
-    fn fmt_fields(&self, item: &StmtFunctionDef, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtFunctionDef {
-            decorator_list,
-            body,
-            ..
-        } = item;
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, StmtFunctionDef>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let decorator_list = item.decorator_list();
+        let body = item.body();
 
         let comments = f.context().comments().clone();
 
@@ -91,10 +93,13 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
     }
 }
 
-fn format_function_header(f: &mut PyFormatter, item: &StmtFunctionDef) -> FormatResult<()> {
-    let StmtFunctionDef {
+fn format_function_header(
+    f: &mut PyFormatter,
+    item: flat::View<'_, StmtFunctionDef>,
+) -> FormatResult<()> {
+    let ast::StmtFunctionDef {
         range: _,
-        node_index: _,
+        node: _,
         is_async,
         decorator_list: _,
         name,
@@ -102,24 +107,24 @@ fn format_function_header(f: &mut PyFormatter, item: &StmtFunctionDef) -> Format
         parameters,
         returns,
         body: _,
-    } = item;
+    } = item.fields();
 
     let comments = f.context().comments().clone();
 
-    if *is_async {
+    if is_async {
         write!(f, [token("async"), space()])?;
     }
 
     write!(f, [token("def"), space(), name.format()])?;
 
-    if let Some(type_params) = type_params.as_ref() {
+    if let Some(type_params) = type_params {
         type_params.format().fmt(f)?;
     }
 
     let format_inner = format_with(|f: &mut PyFormatter| {
         parameters.format().fmt(f)?;
 
-        if let Some(return_annotation) = returns.as_deref() {
+        if let Some(return_annotation) = returns {
             write!(f, [space(), token("->"), space()])?;
 
             if return_annotation.is_tuple_expr() {
@@ -163,7 +168,7 @@ fn format_function_header(f: &mut PyFormatter, item: &StmtFunctionDef) -> Format
                     .with_options(Parentheses::Always)
                     .fmt(f)
             } else {
-                let parenthesize = if parameters.is_empty() && !comments.has(parameters.as_ref()) {
+                let parenthesize = if parameters.is_empty() && !comments.has(parameters) {
                     // If the parameters are empty, add parentheses around literal expressions
                     // (any non splitable expression) but avoid parenthesizing subscripts and
                     // other parenthesized expressions unless necessary.

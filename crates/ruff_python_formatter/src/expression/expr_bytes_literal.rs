@@ -1,5 +1,6 @@
 use ruff_python_ast::ExprBytesLiteral;
-use ruff_python_ast::{AnyNodeRef, StringLike};
+use ruff_python_ast::flat;
+use ruff_python_ast::{flat::AnyNodeRef, flat::StringLike};
 
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, in_parentheses_only_group,
@@ -12,7 +13,11 @@ use crate::string::{StringLikeExtensions, implicit::FormatImplicitConcatenatedSt
 pub struct FormatExprBytesLiteral;
 
 impl FormatNodeRule<ExprBytesLiteral> for FormatExprBytesLiteral {
-    fn fmt_fields(&self, item: &ExprBytesLiteral, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, ExprBytesLiteral>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         if let Some(bytes_literal) = item.as_single_part_bytestring() {
             bytes_literal.format().fmt(f)
         } else {
@@ -30,15 +35,15 @@ impl FormatNodeRule<ExprBytesLiteral> for FormatExprBytesLiteral {
     }
 }
 
-impl NeedsParentheses for ExprBytesLiteral {
+impl NeedsParentheses for flat::View<'_, ExprBytesLiteral> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if self.value.is_implicit_concatenated() {
+        if self.value().is_implicit_concatenated() {
             OptionalParentheses::Multiline
-        } else if StringLike::Bytes(self).is_multiline(context) {
+        } else if StringLike::from(*self).is_multiline(context) {
             OptionalParentheses::Never
         } else {
             OptionalParentheses::BestFit

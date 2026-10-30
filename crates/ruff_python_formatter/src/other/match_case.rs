@@ -1,5 +1,6 @@
 use ruff_formatter::{FormatRuleWithOptions, format_args, write};
 use ruff_python_ast::MatchCase;
+use ruff_python_ast::flat;
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
@@ -13,7 +14,7 @@ pub struct FormatMatchCase {
     last_suite_in_statement: bool,
 }
 
-impl FormatRuleWithOptions<MatchCase, PyFormatContext<'_>> for FormatMatchCase {
+impl FormatRuleWithOptions<flat::View<'_, MatchCase>, PyFormatContext<'_>> for FormatMatchCase {
     type Options = bool;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -23,20 +24,16 @@ impl FormatRuleWithOptions<MatchCase, PyFormatContext<'_>> for FormatMatchCase {
 }
 
 impl FormatNodeRule<MatchCase> for FormatMatchCase {
-    fn fmt_fields(&self, item: &MatchCase, f: &mut PyFormatter) -> FormatResult<()> {
-        let MatchCase {
-            range: _,
-            node_index: _,
-            pattern,
-            guard,
-            body,
-        } = item;
+    fn fmt_fields(&self, item: flat::View<'_, MatchCase>, f: &mut PyFormatter) -> FormatResult<()> {
+        let pattern = item.pattern();
+        let guard = item.guard();
+        let body = item.body();
 
         let comments = f.context().comments().clone();
         let dangling_item_comments = comments.dangling(item);
 
-        let format_guard = guard.as_deref().map(|guard| {
-            format_with(|f| {
+        let format_guard = guard.map(|guard| {
+            format_with(move |f| {
                 write!(f, [space(), token("if"), space()])?;
 
                 maybe_parenthesize_expression(guard, item, Parenthesize::IfBreaksParenthesized)

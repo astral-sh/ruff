@@ -1,6 +1,7 @@
 use ruff_formatter::write;
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprAwait;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::AnyNodeRef;
 use ruff_text_size::Ranged;
 
 use crate::expression::maybe_parenthesize_expression;
@@ -13,12 +14,8 @@ use crate::prelude::*;
 pub struct FormatExprAwait;
 
 impl FormatNodeRule<ExprAwait> for FormatExprAwait {
-    fn fmt_fields(&self, item: &ExprAwait, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprAwait {
-            range: _,
-            node_index: _,
-            value,
-        } = item;
+    fn fmt_fields(&self, item: flat::View<'_, ExprAwait>, f: &mut PyFormatter) -> FormatResult<()> {
+        let value = item.value();
 
         write!(
             f,
@@ -31,7 +28,7 @@ impl FormatNodeRule<ExprAwait> for FormatExprAwait {
     }
 }
 
-impl NeedsParentheses for ExprAwait {
+impl NeedsParentheses for flat::View<'_, ExprAwait> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,
@@ -39,11 +36,11 @@ impl NeedsParentheses for ExprAwait {
     ) -> OptionalParentheses {
         if parent.is_expr_await() || is_type_annotation_of(self.range(), parent) {
             OptionalParentheses::Always
-        } else if context.is_expression_parenthesized(self.value.as_ref().into()) {
+        } else if context.is_expression_parenthesized(self.value()) {
             // Prefer splitting the value if it is parenthesized.
             OptionalParentheses::Never
         } else {
-            self.value.needs_parentheses(self.into(), context)
+            self.value().needs_parentheses(self.into(), context)
         }
     }
 }

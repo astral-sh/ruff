@@ -1,6 +1,7 @@
 use ruff_formatter::write;
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::PatternMatchClass;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::AnyNodeRef;
 
 use crate::comments::dangling_comments;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
@@ -10,13 +11,13 @@ use crate::prelude::*;
 pub struct FormatPatternMatchClass;
 
 impl FormatNodeRule<PatternMatchClass> for FormatPatternMatchClass {
-    fn fmt_fields(&self, item: &PatternMatchClass, f: &mut PyFormatter) -> FormatResult<()> {
-        let PatternMatchClass {
-            range: _,
-            node_index: _,
-            cls,
-            arguments,
-        } = item;
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, PatternMatchClass>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let cls = item.cls();
+        let arguments = item.arguments();
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
@@ -32,7 +33,7 @@ impl FormatNodeRule<PatternMatchClass> for FormatPatternMatchClass {
     }
 }
 
-impl NeedsParentheses for PatternMatchClass {
+impl NeedsParentheses for flat::View<'_, PatternMatchClass> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,

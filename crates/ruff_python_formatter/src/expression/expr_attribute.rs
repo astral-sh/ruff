@@ -1,6 +1,7 @@
 use ruff_formatter::{FormatRuleWithOptions, write};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{Expr, ExprAttribute, ExprNumberLiteral, Number};
+use ruff_python_ast::flat::AnyNodeRef;
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{Expr, ExprAttribute, Number};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, find_only_token_in_range};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -15,7 +16,9 @@ pub struct FormatExprAttribute {
     call_chain_layout: CallChainLayout,
 }
 
-impl FormatRuleWithOptions<ExprAttribute, PyFormatContext<'_>> for FormatExprAttribute {
+impl FormatRuleWithOptions<flat::View<'_, ExprAttribute>, PyFormatContext<'_>>
+    for FormatExprAttribute
+{
     type Options = CallChainLayout;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -25,14 +28,13 @@ impl FormatRuleWithOptions<ExprAttribute, PyFormatContext<'_>> for FormatExprAtt
 }
 
 impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
-    fn fmt_fields(&self, item: &ExprAttribute, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprAttribute {
-            value,
-            range: _,
-            node_index: _,
-            attr,
-            ctx: _,
-        } = item;
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, ExprAttribute>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let value = item.value();
+        let attr = item.attr();
 
         let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
         let comments = f.context().comments().clone();
@@ -43,35 +45,34 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
         if value.is_name_expr()
             && !call_chain_layout.is_fluent()
             && &f.context().source()[TextRange::new(value.end(), attr.start())] == "."
-            && !comments.has(value.as_ref())
+            && !comments.has(value)
             && dangling.is_empty()
         {
             return source_text_slice(item.range()).fmt(f);
         }
 
         let format_inner = format_with(|f: &mut PyFormatter| {
-            let parenthesize_value =
-                is_base_ten_number_literal(value.as_ref(), f.context().source()) || {
-                    f.context().is_expression_parenthesized(value.into())
-                };
+            let parenthesize_value = is_base_ten_number_literal(value, f.context().source()) || {
+                f.context().is_expression_parenthesized(value)
+            };
 
             if call_chain_layout.is_fluent() {
                 if parenthesize_value {
                     // Don't propagate the call chain layout.
                     value.format().with_options(Parentheses::Always).fmt(f)?;
                 } else {
-                    match value.as_ref() {
-                        Expr::Attribute(expr) => {
+                    match value.classify() {
+                        flat::ExprKind::Attribute(expr) => {
                             expr.format()
                                 .with_options(call_chain_layout.transition_after_attribute())
                                 .fmt(f)?;
                         }
-                        Expr::Call(expr) => {
+                        flat::ExprKind::Call(expr) => {
                             expr.format()
                                 .with_options(call_chain_layout.transition_after_attribute())
                                 .fmt(f)?;
                         }
-                        Expr::Subscript(expr) => {
+                        flat::ExprKind::Subscript(expr) => {
                             expr.format()
                                 .with_options(call_chain_layout.transition_after_attribute())
                                 .fmt(f)?;
@@ -104,7 +105,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                     .take_while(|token| token.kind == SimpleTokenKind::RParen)
                     .last()
                     .is_some_and(|right_paren| {
-                        let trailing_value_comments = comments.trailing(&**value);
+                        let trailing_value_comments = comments.trailing(value);
                         trailing_value_comments.iter().any(|comment| {
                             comment.line_position().is_end_of_line()
                                 && comment.start() > right_paren.end()
@@ -170,7 +171,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                 (dangling, dangling)
             } else {
                 let dot_token = find_only_token_in_range(
-                    TextRange::new(item.value.end(), item.attr.start()),
+                    TextRange::new(item.value().end(), item.attr().start()),
                     SimpleTokenKind::Dot,
                     f.context().source(),
                 );
@@ -200,18 +201,18 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
     }
 }
 
-impl NeedsParentheses for ExprAttribute {
+impl NeedsParentheses for flat::View<'_, ExprAttribute> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         // Checks if there are any own line comments in an attribute chain (a.b.c).
-        if CallChainLayout::from_expression(self.into(), context).is_fluent() {
+        if CallChainLayout::from_expression((*self).into(), context).is_fluent() {
             OptionalParentheses::Multiline
-        } else if context.comments().has_dangling(self) {
+        } else if context.comments().has_dangling(*self) {
             OptionalParentheses::Always
-        } else if context.is_expression_parenthesized(self.value.as_ref().into()) {
+        } else if context.is_expression_parenthesized(self.value()) {
             // We have to avoid creating syntax errors like
             // ```python
             // variable = (something) # trailing
@@ -220,7 +221,7 @@ impl NeedsParentheses for ExprAttribute {
             // See https://github.com/astral-sh/ruff/issues/19350
             if context
                 .comments()
-                .trailing(self.value.as_ref())
+                .trailing(self.value())
                 .iter()
                 .any(|comment| comment.line_position().is_end_of_line())
             {
@@ -229,24 +230,26 @@ impl NeedsParentheses for ExprAttribute {
                 OptionalParentheses::Never
             }
         } else {
-            self.value.needs_parentheses(self.into(), context)
+            self.value().needs_parentheses(self.into(), context)
         }
     }
 }
 
 // Non Hex, octal or binary number literals need parentheses to disambiguate the attribute `.` from
 // a decimal point. Floating point numbers don't strictly need parentheses but it reads better (rather than 0.0.test()).
-fn is_base_ten_number_literal(expr: &Expr, source: &str) -> bool {
-    if let Some(ExprNumberLiteral {
+fn is_base_ten_number_literal(expr: flat::View<'_, Expr>, source: &str) -> bool {
+    if let Some(ast::ExprNumberLiteral {
         value,
         range,
-        node_index: _,
-    }) = expr.as_number_literal_expr()
+        node: _,
+    }) = expr
+        .as_number_literal_expr()
+        .map(flat::View::<ruff_python_ast::ExprNumberLiteral>::fields)
     {
         match value {
             Number::Float(_) => true,
             Number::Int(_) => {
-                let text = &source[*range];
+                let text = &source[range];
                 !matches!(
                     text.as_bytes().get(0..2),
                     Some([b'0', b'x' | b'X' | b'o' | b'O' | b'b' | b'B'])

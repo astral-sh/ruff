@@ -1,5 +1,6 @@
-use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::{AnyNodeRef, Stmt};
+use ruff_formatter::FormatOwnedWithRule;
+use ruff_python_ast::flat;
+use ruff_python_ast::{Stmt, flat::AnyNodeRef};
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -36,48 +37,41 @@ pub(crate) mod suite;
 #[derive(Default)]
 pub struct FormatStmt;
 
-impl FormatRule<Stmt, PyFormatContext<'_>> for FormatStmt {
-    fn fmt(&self, item: &Stmt, f: &mut PyFormatter) -> FormatResult<()> {
-        match item {
-            Stmt::FunctionDef(x) => x.format().fmt(f),
-            Stmt::ClassDef(x) => x.format().fmt(f),
-            Stmt::Return(x) => x.format().fmt(f),
-            Stmt::Delete(x) => x.format().fmt(f),
-            Stmt::Assign(x) => x.format().fmt(f),
-            Stmt::AugAssign(x) => x.format().fmt(f),
-            Stmt::AnnAssign(x) => x.format().fmt(f),
-            Stmt::For(x) => x.format().fmt(f),
-            Stmt::While(x) => x.format().fmt(f),
-            Stmt::If(x) => x.format().fmt(f),
-            Stmt::With(x) => x.format().fmt(f),
-            Stmt::Match(x) => x.format().fmt(f),
-            Stmt::Raise(x) => x.format().fmt(f),
-            Stmt::Try(x) => x.format().fmt(f),
-            Stmt::Assert(x) => x.format().fmt(f),
-            Stmt::Import(x) => x.format().fmt(f),
-            Stmt::ImportFrom(x) => x.format().fmt(f),
-            Stmt::Global(x) => x.format().fmt(f),
-            Stmt::Nonlocal(x) => x.format().fmt(f),
-            Stmt::Expr(x) => x.format().fmt(f),
-            Stmt::Pass(x) => x.format().fmt(f),
-            Stmt::Break(x) => x.format().fmt(f),
-            Stmt::Continue(x) => x.format().fmt(f),
-            Stmt::TypeAlias(x) => x.format().fmt(f),
-            Stmt::IpyEscapeCommand(x) => x.format().fmt(f),
+impl FormatRule<flat::View<'_, Stmt>, PyFormatContext<'_>> for FormatStmt {
+    fn fmt(&self, item: &flat::View<'_, Stmt>, f: &mut PyFormatter) -> FormatResult<()> {
+        let item = *item;
+        match item.classify() {
+            flat::StmtKind::FunctionDef(x) => x.format().fmt(f),
+            flat::StmtKind::ClassDef(x) => x.format().fmt(f),
+            flat::StmtKind::Return(x) => x.format().fmt(f),
+            flat::StmtKind::Delete(x) => x.format().fmt(f),
+            flat::StmtKind::Assign(x) => x.format().fmt(f),
+            flat::StmtKind::AugAssign(x) => x.format().fmt(f),
+            flat::StmtKind::AnnAssign(x) => x.format().fmt(f),
+            flat::StmtKind::For(x) => x.format().fmt(f),
+            flat::StmtKind::While(x) => x.format().fmt(f),
+            flat::StmtKind::If(x) => x.format().fmt(f),
+            flat::StmtKind::With(x) => x.format().fmt(f),
+            flat::StmtKind::Match(x) => x.format().fmt(f),
+            flat::StmtKind::Raise(x) => x.format().fmt(f),
+            flat::StmtKind::Try(x) => x.format().fmt(f),
+            flat::StmtKind::Assert(x) => x.format().fmt(f),
+            flat::StmtKind::Import(x) => x.format().fmt(f),
+            flat::StmtKind::ImportFrom(x) => x.format().fmt(f),
+            flat::StmtKind::Global(x) => x.format().fmt(f),
+            flat::StmtKind::Nonlocal(x) => x.format().fmt(f),
+            flat::StmtKind::Expr(x) => x.format().fmt(f),
+            flat::StmtKind::Pass(x) => x.format().fmt(f),
+            flat::StmtKind::Break(x) => x.format().fmt(f),
+            flat::StmtKind::Continue(x) => x.format().fmt(f),
+            flat::StmtKind::TypeAlias(x) => x.format().fmt(f),
+            flat::StmtKind::IpyEscapeCommand(x) => x.format().fmt(f),
         }
     }
 }
 
-impl<'ast> AsFormat<PyFormatContext<'ast>> for Stmt {
-    type Format<'a> = FormatRefWithRule<'a, Stmt, FormatStmt, PyFormatContext<'ast>>;
-
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, FormatStmt)
-    }
-}
-
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for Stmt {
-    type Format = FormatOwnedWithRule<Stmt, FormatStmt, PyFormatContext<'ast>>;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for flat::View<'_, Stmt> {
+    type Format = FormatOwnedWithRule<Self, FormatStmt, PyFormatContext<'ast>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatStmt)

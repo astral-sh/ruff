@@ -1,6 +1,7 @@
 use ruff_formatter::write;
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::PatternMatchOr;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::AnyNodeRef;
 
 use crate::comments::leading_comments;
 use crate::expression::parentheses::{
@@ -13,12 +14,12 @@ use crate::prelude::*;
 pub struct FormatPatternMatchOr;
 
 impl FormatNodeRule<PatternMatchOr> for FormatPatternMatchOr {
-    fn fmt_fields(&self, item: &PatternMatchOr, f: &mut PyFormatter) -> FormatResult<()> {
-        let PatternMatchOr {
-            range: _,
-            node_index: _,
-            patterns,
-        } = item;
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, PatternMatchOr>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let patterns = item.patterns();
         let inner = format_with(|f: &mut PyFormatter| {
             let mut patterns = patterns.iter();
             let comments = f.context().comments().clone();
@@ -50,7 +51,7 @@ impl FormatNodeRule<PatternMatchOr> for FormatPatternMatchOr {
     }
 }
 
-impl NeedsParentheses for PatternMatchOr {
+impl NeedsParentheses for flat::View<'_, PatternMatchOr> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,

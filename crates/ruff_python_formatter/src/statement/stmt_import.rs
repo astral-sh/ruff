@@ -1,5 +1,6 @@
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::StmtImport;
+use ruff_python_ast::flat;
 
 use crate::prelude::*;
 
@@ -7,19 +8,19 @@ use crate::prelude::*;
 pub struct FormatStmtImport;
 
 impl FormatNodeRule<StmtImport> for FormatStmtImport {
-    fn fmt_fields(&self, item: &StmtImport, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtImport {
-            names,
-            is_lazy,
-            range: _,
-            node_index: _,
-        } = item;
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, StmtImport>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let names = item.names();
+        let is_lazy = item.is_lazy();
         let names = format_with(|f| {
             f.join_with(&format_args![token(","), space()])
                 .entries(names.iter().formatted())
                 .finish()
         });
-        if *is_lazy {
+        if is_lazy {
             write!(f, [token("lazy"), space()])?;
         }
         write!(f, [token("import"), space(), names])

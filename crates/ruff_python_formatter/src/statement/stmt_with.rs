@@ -1,5 +1,6 @@
 use ruff_formatter::{FormatContext, FormatError, format_args, write};
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::flat;
 use ruff_python_ast::{StmtWith, WithItem};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
@@ -18,7 +19,11 @@ use crate::statement::suite::SuiteKind;
 pub struct FormatStmtWith;
 
 impl FormatNodeRule<StmtWith> for FormatStmtWith {
-    fn fmt_fields(&self, with_stmt: &StmtWith, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(
+        &self,
+        with_stmt: flat::View<'_, StmtWith>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // The `with` statement can have one dangling comment on the open parenthesis, like:
         // ```python
         // with (  # comment
@@ -36,7 +41,7 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
         let dangling_comments = comments.dangling(with_stmt);
         let partition_point = dangling_comments.partition_point(|comment| {
             with_stmt
-                .items
+                .items()
                 .first()
                 .is_some_and(|with_item| with_item.start() > comment.start())
         });
@@ -51,7 +56,7 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                         f,
                         [
                             with_stmt
-                                .is_async
+                                .is_async()
                                 .then_some(format_args![token("async"), space()]),
                             token("with"),
                             space()
@@ -84,15 +89,16 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
 
                         WithItemsLayout::ParenthesizeIfExpands => {
                             parenthesize_if_expands(&format_with(|f| {
-                                let mut joiner =
-                                    f.join_comma_separated(with_stmt.body.first().unwrap().start());
+                                let mut joiner = f.join_comma_separated(
+                                    with_stmt.body().first().unwrap().start(),
+                                );
 
-                                for item in &with_stmt.items {
+                                for item in with_stmt.items() {
                                     joiner.entry_with_line_separator(
-                                        item,
+                                        &item,
                                         &item.format().with_options(
                                             WithItemLayout::ParenthesizedContextManagers {
-                                                single: with_stmt.items.len() == 1,
+                                                single: with_stmt.items().len() == 1,
                                             },
                                         ),
                                         soft_line_break_or_space(),
@@ -105,9 +111,9 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
 
                         WithItemsLayout::Python38OrOlder => f
                             .join_with(format_args![token(","), space()])
-                            .entries(with_stmt.items.iter().map(|item| {
+                            .entries(with_stmt.items().iter().map(|item| {
                                 item.format().with_options(WithItemLayout::Python38OrOlder {
-                                    single: with_stmt.items.len() == 1,
+                                    single: with_stmt.items().len() == 1,
                                 })
                             }))
                             .finish(),
@@ -115,15 +121,16 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                         WithItemsLayout::Parenthesized => parenthesized(
                             "(",
                             &format_with(|f: &mut PyFormatter| {
-                                let mut joiner =
-                                    f.join_comma_separated(with_stmt.body.first().unwrap().start());
+                                let mut joiner = f.join_comma_separated(
+                                    with_stmt.body().first().unwrap().start(),
+                                );
 
-                                for item in &with_stmt.items {
+                                for item in with_stmt.items() {
                                     joiner.entry(
-                                        item,
+                                        &item,
                                         &item.format().with_options(
                                             WithItemLayout::ParenthesizedContextManagers {
-                                                single: with_stmt.items.len() == 1,
+                                                single: with_stmt.items().len() == 1,
                                             },
                                         ),
                                     );
@@ -138,7 +145,7 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                     }
                 }),
                 colon_comments,
-                &with_stmt.body,
+                with_stmt.body(),
                 SuiteKind::other(true),
             )]
         )
@@ -166,7 +173,7 @@ enum WithItemsLayout<'a> {
     ///
     /// Ensure that this layout is compatible with [`Self::SingleWithoutTarget`] because removing the parentheses
     /// results in the formatter taking that layout when formatting the file again
-    SingleParenthesizedContextManager(&'a WithItem),
+    SingleParenthesizedContextManager(flat::View<'a, WithItem>),
 
     /// The with statement's only item has no target.
     ///
@@ -185,7 +192,7 @@ enum WithItemsLayout<'a> {
     /// Be careful that [`Self::SingleParenthesizedContextManager`] and this layout are compatible because
     /// adding parentheses around a [`WithItem`] will result in the context expression being parenthesized in
     /// the next formatting pass.
-    SingleWithoutTarget(&'a WithItem),
+    SingleWithoutTarget(flat::View<'a, WithItem>),
 
     /// It's a single with item with a target. Use the optional parentheses layout (see [`optional_parentheses`])
     /// to mimic the `maybe_parenthesize_expression` behavior.
@@ -198,7 +205,7 @@ enum WithItemsLayout<'a> {
     /// ```
     ///
     /// Only used for Python 3.9+
-    SingleWithTarget(&'a WithItem),
+    SingleWithTarget(flat::View<'a, WithItem>),
 
     /// The target python version doesn't support parenthesized context managers because it is Python 3.8 or older.
     ///
@@ -250,7 +257,7 @@ enum WithItemsLayout<'a> {
 
 impl<'a> WithItemsLayout<'a> {
     fn from_statement(
-        with: &'a StmtWith,
+        with: flat::View<'a, StmtWith>,
         context: &PyFormatContext,
         parenthesized_comments: &[SourceComment],
     ) -> FormatResult<Self> {
@@ -276,7 +283,7 @@ impl<'a> WithItemsLayout<'a> {
             return Ok(Self::ParenthesizeIfExpands);
         }
 
-        if let [single] = with.items.as_slice() {
+        if let Some([single]) = with.items().as_array() {
             // If the with item itself has comments (not the context expression), then keep the parentheses
             // ```python
             // with (
@@ -290,7 +297,7 @@ impl<'a> WithItemsLayout<'a> {
 
             // Preserve the parentheses around the context expression instead of parenthesizing the entire
             // with items.
-            if context.is_expression_parenthesized((&single.context_expr).into()) {
+            if context.is_expression_parenthesized(single.context_expr()) {
                 return Ok(Self::SingleParenthesizedContextManager(single));
             }
         }
@@ -304,32 +311,35 @@ impl<'a> WithItemsLayout<'a> {
             return Ok(Self::Python38OrOlder);
         }
 
-        Ok(match with.items.as_slice() {
-            [single] => {
-                if single.optional_vars.is_none() {
+        Ok(match with.items() {
+            items if let Some([single]) = items.as_array() => {
+                if single.optional_vars().is_none() {
                     Self::SingleWithoutTarget(single)
-                } else if can_omit_optional_parentheses(&single.context_expr, context) {
+                } else if can_omit_optional_parentheses(single.context_expr(), context) {
                     Self::SingleWithTarget(single)
                 } else {
                     Self::ParenthesizeIfExpands
                 }
             }
             // Always parenthesize multiple items
-            [..] => Self::ParenthesizeIfExpands,
+            _ => Self::ParenthesizeIfExpands,
         })
     }
 }
 
-fn has_magic_trailing_comma(with: &StmtWith, context: &PyFormatContext) -> bool {
-    let Some(last_item) = with.items.last() else {
+fn has_magic_trailing_comma(with: flat::View<'_, StmtWith>, context: &PyFormatContext) -> bool {
+    let Some(last_item) = with.items().last() else {
         return false;
     };
 
     commas::has_magic_trailing_comma(TextRange::new(last_item.end(), with.end()), context)
 }
 
-fn are_with_items_parenthesized(with: &StmtWith, context: &PyFormatContext) -> FormatResult<bool> {
-    let [first_item, _, ..] = with.items.as_slice() else {
+fn are_with_items_parenthesized(
+    with: flat::View<'_, StmtWith>,
+    context: &PyFormatContext,
+) -> FormatResult<bool> {
+    let Some(([first_item, _], _)) = with.items().split_first_chunk() else {
         return Ok(false);
     };
 

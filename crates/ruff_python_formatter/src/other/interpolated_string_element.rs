@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use ruff_formatter::{Buffer, FormatOptions as _, RemoveSoftLinesBuffer, format_args, write};
 use ruff_python_ast::{
     AnyStringFlags, ConversionFlag, Expr, InterpolatedElement, InterpolatedStringElement,
-    InterpolatedStringLiteralElement, StringFlags,
+    InterpolatedStringLiteralElement, StringFlags, flat,
 };
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSlice};
@@ -23,13 +23,13 @@ use super::interpolated_string::{InterpolatedStringContext, InterpolatedStringLa
 ///
 /// This delegates the actual formatting to the appropriate formatter.
 pub(crate) struct FormatInterpolatedStringElement<'a> {
-    element: &'a InterpolatedStringElement,
+    element: flat::View<'a, InterpolatedStringElement>,
     context: InterpolatedStringContext,
 }
 
 impl<'a> FormatInterpolatedStringElement<'a> {
     pub(crate) fn new(
-        element: &'a InterpolatedStringElement,
+        element: flat::View<'a, InterpolatedStringElement>,
         context: InterpolatedStringContext,
     ) -> Self {
         Self { element, context }
@@ -38,11 +38,11 @@ impl<'a> FormatInterpolatedStringElement<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatInterpolatedStringElement<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        match self.element {
-            InterpolatedStringElement::Literal(string_literal) => {
+        match self.element.classify() {
+            flat::InterpolatedStringElementKind::Literal(string_literal) => {
                 FormatFStringLiteralElement::new(string_literal, self.context.flags()).fmt(f)
             }
-            InterpolatedStringElement::Interpolation(expression) => {
+            flat::InterpolatedStringElementKind::Interpolation(expression) => {
                 FormatInterpolatedElement::new(expression, self.context).fmt(f)
             }
         }
@@ -51,13 +51,16 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedStringElement<'_> {
 
 /// Formats an f-string literal element.
 pub(crate) struct FormatFStringLiteralElement<'a> {
-    element: &'a InterpolatedStringLiteralElement,
+    element: flat::View<'a, InterpolatedStringLiteralElement>,
     /// Flags of the enclosing F-string part
     fstring_flags: AnyStringFlags,
 }
 
 impl<'a> FormatFStringLiteralElement<'a> {
-    fn new(element: &'a InterpolatedStringLiteralElement, fstring_flags: AnyStringFlags) -> Self {
+    fn new(
+        element: flat::View<'a, InterpolatedStringLiteralElement>,
+        fstring_flags: AnyStringFlags,
+    ) -> Self {
         Self {
             element,
             fstring_flags,
@@ -78,13 +81,13 @@ impl Format<PyFormatContext<'_>> for FormatFStringLiteralElement<'_> {
 
 /// Formats an f-string expression element.
 pub(crate) struct FormatInterpolatedElement<'a> {
-    element: &'a InterpolatedElement,
+    element: flat::View<'a, InterpolatedElement>,
     context: InterpolatedStringContext,
 }
 
 impl<'a> FormatInterpolatedElement<'a> {
     pub(crate) fn new(
-        element: &'a InterpolatedElement,
+        element: flat::View<'a, InterpolatedElement>,
         context: InterpolatedStringContext,
     ) -> Self {
         Self { element, context }
@@ -93,15 +96,10 @@ impl<'a> FormatInterpolatedElement<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let InterpolatedElement {
-            expression,
-            debug_text,
-            conversion,
-            format_spec,
-            ..
-        } = self.element;
-
-        let expression = &**expression;
+        let expression = self.element.expression();
+        let debug_text = self.element.debug_text();
+        let conversion = self.element.conversion();
+        let format_spec = self.element.format_spec();
 
         if let Some(debug_text) = debug_text {
             token("{").fmt(f)?;
@@ -145,7 +143,7 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
                 ConversionFlag::None => (),
             }
 
-            if let Some(format_spec) = format_spec.as_deref() {
+            if let Some(format_spec) = format_spec {
                 write!(f, [token(":"), verbatim_text(format_spec)])?;
             }
 
@@ -221,7 +219,7 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
                     ConversionFlag::None => (),
                 }
 
-                if let Some(format_spec) = format_spec.as_deref() {
+                if let Some(format_spec) = format_spec {
                     // ```py
                     // f"{
                     //     foo
@@ -234,7 +232,7 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
 
                     token(":").fmt(f)?;
 
-                    for element in &format_spec.elements {
+                    for element in format_spec.elements() {
                         FormatInterpolatedStringElement::new(element, context).fmt(f)?;
                     }
                 }
@@ -287,27 +285,31 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
     }
 }
 
-fn interpolated_element_expression_range(element: &InterpolatedElement) -> TextRange {
+fn interpolated_element_expression_range(
+    element: flat::View<'_, InterpolatedElement>,
+) -> TextRange {
     element
-        .format_spec
-        .as_deref()
+        .format_spec()
         .map(|format_spec| TextRange::new(element.start(), format_spec.start()))
         .unwrap_or_else(|| element.range())
 }
 
-fn needs_bracket_spacing(expr: &Expr, context: &PyFormatContext) -> bool {
+fn needs_bracket_spacing(expr: flat::View<'_, Expr>, context: &PyFormatContext) -> bool {
     // Ruff parenthesizes single element tuples, that's why we shouldn't insert
     // a space around the curly braces for those.
     if expr
         .as_tuple_expr()
-        .is_some_and(|tuple| !tuple.parenthesized && tuple.elts.len() == 1)
+        .is_some_and(|tuple| !tuple.parenthesized() && tuple.elts().len() == 1)
     {
         return false;
     }
 
     matches!(
-        left_most(expr, context.trivia()),
-        Expr::Dict(_) | Expr::DictComp(_) | Expr::Set(_) | Expr::SetComp(_)
+        left_most(expr, context.trivia()).classify(),
+        flat::ExprKind::Dict(_)
+            | flat::ExprKind::DictComp(_)
+            | flat::ExprKind::Set(_)
+            | flat::ExprKind::SetComp(_)
     )
 }
 

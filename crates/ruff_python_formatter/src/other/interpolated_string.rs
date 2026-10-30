@@ -1,4 +1,4 @@
-use ruff_python_ast::{AnyStringFlags, InterpolatedStringElements};
+use ruff_python_ast::AnyStringFlags;
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
@@ -50,7 +50,7 @@ impl InterpolatedStringLayout {
     //
     // Reference: https://prettier.io/docs/en/next/rationale.html#template-literals
     pub(crate) fn from_interpolated_string_elements(
-        elements: &InterpolatedStringElements,
+        elements: ruff_python_ast::flat::InterpolatedStringElements<'_>,
         source: &str,
     ) -> Self {
         if elements

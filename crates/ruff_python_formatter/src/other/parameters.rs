@@ -1,7 +1,11 @@
 use std::assert_matches;
 
 use ruff_formatter::{FormatRuleWithOptions, format_args, write};
-use ruff_python_ast::{AnyNodeRef, Parameters};
+use ruff_python_ast::{
+    Parameters,
+    flat::AnyNodeRef,
+    flat::{self, fields as ast},
+};
 use ruff_python_trivia::{CommentLinePosition, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -38,7 +42,7 @@ pub struct FormatParameters {
     parentheses: ParametersParentheses,
 }
 
-impl FormatRuleWithOptions<Parameters, PyFormatContext<'_>> for FormatParameters {
+impl FormatRuleWithOptions<flat::View<'_, Parameters>, PyFormatContext<'_>> for FormatParameters {
     type Options = ParametersParentheses;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -48,16 +52,20 @@ impl FormatRuleWithOptions<Parameters, PyFormatContext<'_>> for FormatParameters
 }
 
 impl FormatNodeRule<Parameters> for FormatParameters {
-    fn fmt_fields(&self, item: &Parameters, f: &mut PyFormatter) -> FormatResult<()> {
-        let Parameters {
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, Parameters>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let ast::Parameters {
             range: _,
-            node_index: _,
+            node: _,
             posonlyargs,
             args,
             vararg,
             kwonlyargs,
             kwarg,
-        } = item;
+        } = item.fields();
 
         let (slash, star) = find_parameter_separators(f.context().source(), item);
 
@@ -163,11 +171,11 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             // afterwards.
             if let Some(vararg) = vararg {
                 joiner.entry(&format_args![
-                    leading_node_comments(vararg.as_ref()),
+                    leading_node_comments(vararg),
                     token("*"),
                     vararg.format()
                 ]);
-                last_node = Some(vararg.as_ref().into());
+                last_node = Some(vararg.into());
             } else if !kwonlyargs.is_empty() {
                 // Given very strange comment placement, comments here may not actually have been
                 // marked as `StarLeading`/`StarTrailing`, but that's fine since we still produce
@@ -199,11 +207,11 @@ impl FormatNodeRule<Parameters> for FormatParameters {
 
             if let Some(kwarg) = kwarg {
                 joiner.entry(&format_args![
-                    leading_node_comments(kwarg.as_ref()),
+                    leading_node_comments(kwarg),
                     token("**"),
                     kwarg.format()
                 ]);
-                last_node = Some(kwarg.as_ref().into());
+                last_node = Some(kwarg.into());
             }
 
             joiner.finish()?;
@@ -343,11 +351,12 @@ pub(crate) struct ParameterSeparator {
 /// Returns the location of the slash and star separators, if any.
 pub(crate) fn find_parameter_separators(
     contents: &str,
-    parameters: &Parameters,
+    parameters: flat::View<'_, Parameters>,
 ) -> (Option<ParameterSeparator>, Option<ParameterSeparator>) {
     // We only compute preceding_end and token location here since following_start depends on the
     // star location, but the star location depends on slash's position
-    let slash = if let Some(preceding_end) = parameters.posonlyargs.last().map(Ranged::end) {
+    let slash = if let Some(preceding_end) = parameters.posonlyargs().last().map(|node| node.end())
+    {
         // ```text
         // def f(a1=1, a2=2, /, a3, a4): pass
         //                 ^^^^^^^^^^^ the range (defaults)
@@ -372,19 +381,19 @@ pub(crate) fn find_parameter_separators(
     };
 
     // If we have a vararg we have a node that the comments attach to
-    let star = if parameters.vararg.is_some() {
+    let star = if parameters.vararg().is_some() {
         // When the vararg is present the comments attach there and we don't need to do manual
         // formatting
         None
-    } else if let Some(first_keyword_argument) = parameters.kwonlyargs.first() {
+    } else if let Some(first_keyword_argument) = parameters.kwonlyargs().first() {
         // Check in that order:
         // * `f(a, /, b, *, c)` and `f(a=1, /, b=2, *, c)`
         // * `f(a, /, *, b)`
         // * `f(*, b)` (else branch)
         let after_parameters = parameters
-            .args
+            .args()
             .last()
-            .map(|arg| arg.range.end())
+            .map(|arg| arg.range().end())
             .or(slash.map(|(_, slash)| slash.end()));
         if let Some(preceding_end) = after_parameters {
             let range = TextRange::new(preceding_end, parameters.end());
@@ -405,7 +414,7 @@ pub(crate) fn find_parameter_separators(
                 following_start: first_keyword_argument.start(),
             })
         } else {
-            let mut tokens = SimpleTokenizer::new(contents, parameters.range).skip_trivia();
+            let mut tokens = SimpleTokenizer::new(contents, parameters.range()).skip_trivia();
 
             let lparen_or_star = tokens
                 .next()
@@ -440,12 +449,12 @@ pub(crate) fn find_parameter_separators(
     // * `f(a, /, *, **b)`
     // * `f(a, /)`
     let slash_following_start = parameters
-        .args
+        .args()
         .first()
-        .map(Ranged::start)
-        .or(parameters.vararg.as_ref().map(|first| first.start()))
+        .map(|node| node.start())
+        .or(parameters.vararg().map(|first| first.start()))
         .or(star.as_ref().map(|star| star.separator.start()))
-        .or(parameters.kwarg.as_deref().map(Ranged::start))
+        .or(parameters.kwarg().map(|node| node.start()))
         .unwrap_or(parameters.end());
     let slash = slash.map(|(preceding_end, slash)| ParameterSeparator {
         preceding_end,
@@ -653,7 +662,7 @@ pub(crate) enum ArgumentSeparatorCommentLocation {
 }
 
 fn has_trailing_comma(
-    parameters: &Parameters,
+    parameters: flat::View<'_, Parameters>,
     last_node: Option<AnyNodeRef>,
     source: &str,
 ) -> bool {
@@ -662,11 +671,11 @@ fn has_trailing_comma(
         return false;
     };
 
-    let ends_with_pos_only_argument_separator = !parameters.posonlyargs.is_empty()
-        && parameters.args.is_empty()
-        && parameters.vararg.is_none()
-        && parameters.kwonlyargs.is_empty()
-        && parameters.kwarg.is_none();
+    let ends_with_pos_only_argument_separator = !parameters.posonlyargs().is_empty()
+        && parameters.args().is_empty()
+        && parameters.vararg().is_none()
+        && parameters.kwonlyargs().is_empty()
+        && parameters.kwarg().is_none();
 
     let mut tokens = SimpleTokenizer::starts_at(last_node.end(), source).skip_trivia();
     // `def a(b, c, /): ... `

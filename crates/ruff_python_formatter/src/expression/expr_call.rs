@@ -1,6 +1,7 @@
 use ruff_formatter::FormatRuleWithOptions;
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{Expr, ExprCall};
+use ruff_python_ast::ExprCall;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::AnyNodeRef;
 
 use crate::comments::dangling_comments;
 use crate::expression::CallChainLayout;
@@ -12,7 +13,7 @@ pub struct FormatExprCall {
     call_chain_layout: CallChainLayout,
 }
 
-impl FormatRuleWithOptions<ExprCall, PyFormatContext<'_>> for FormatExprCall {
+impl FormatRuleWithOptions<flat::View<'_, ExprCall>, PyFormatContext<'_>> for FormatExprCall {
     type Options = CallChainLayout;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -22,13 +23,9 @@ impl FormatRuleWithOptions<ExprCall, PyFormatContext<'_>> for FormatExprCall {
 }
 
 impl FormatNodeRule<ExprCall> for FormatExprCall {
-    fn fmt_fields(&self, item: &ExprCall, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprCall {
-            range_start: _,
-            node_index: _,
-            func,
-            arguments,
-        } = item;
+    fn fmt_fields(&self, item: flat::View<'_, ExprCall>, f: &mut PyFormatter) -> FormatResult<()> {
+        let func = item.func();
+        let arguments = item.arguments();
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
@@ -37,16 +34,20 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
 
         let fmt_func = format_with(|f: &mut PyFormatter| {
             // Format the function expression.
-            if f.context().is_expression_parenthesized(func.into()) {
+            if f.context().is_expression_parenthesized(func) {
                 func.format().with_options(Parentheses::Always).fmt(f)
             } else {
-                match func.as_ref() {
-                    Expr::Attribute(expr) => expr
+                match func.classify() {
+                    flat::ExprKind::Attribute(expr) => expr
                         .format()
                         .with_options(call_chain_layout.decrement_call_like_count())
                         .fmt(f),
-                    Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f),
-                    Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+                    flat::ExprKind::Call(expr) => {
+                        expr.format().with_options(call_chain_layout).fmt(f)
+                    }
+                    flat::ExprKind::Subscript(expr) => {
+                        expr.format().with_options(call_chain_layout).fmt(f)
+                    }
                     _ => func.format().with_options(Parentheses::Never).fmt(f),
                 }
             }?;
@@ -72,20 +73,20 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
     }
 }
 
-impl NeedsParentheses for ExprCall {
+impl NeedsParentheses for flat::View<'_, ExprCall> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if CallChainLayout::from_expression(self.into(), context).is_fluent() {
+        if CallChainLayout::from_expression((*self).into(), context).is_fluent() {
             OptionalParentheses::Multiline
-        } else if context.comments().has_dangling(self) {
+        } else if context.comments().has_dangling(*self) {
             OptionalParentheses::Always
-        } else if context.is_expression_parenthesized(self.func.as_ref().into()) {
+        } else if context.is_expression_parenthesized(self.func()) {
             OptionalParentheses::Never
         } else {
-            self.func.needs_parentheses(self.into(), context)
+            self.func().needs_parentheses(self.into(), context)
         }
     }
 }

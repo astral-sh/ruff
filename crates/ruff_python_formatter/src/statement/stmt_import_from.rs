@@ -1,5 +1,6 @@
 use ruff_formatter::write;
 use ruff_python_ast::StmtImportFrom;
+use ruff_python_ast::flat;
 use ruff_text_size::Ranged;
 
 use crate::builders::{PyFormatterExtensions, TrailingComma, parenthesize_if_expands};
@@ -11,17 +12,17 @@ use crate::prelude::*;
 pub struct FormatStmtImportFrom;
 
 impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
-    fn fmt_fields(&self, item: &StmtImportFrom, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtImportFrom {
-            module,
-            names,
-            level,
-            is_lazy,
-            range: _,
-            node_index: _,
-        } = item;
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, StmtImportFrom>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let module = item.module();
+        let names = item.names();
+        let level = item.level();
+        let is_lazy = item.is_lazy();
 
-        if *is_lazy {
+        if is_lazy {
             write!(f, [token("lazy"), space()])?;
         }
 
@@ -31,21 +32,21 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
                 token("from"),
                 space(),
                 format_with(|f| {
-                    for _ in 0..*level {
+                    for _ in 0..level {
                         token(".").fmt(f)?;
                     }
                     Ok(())
                 }),
-                module.as_ref().map(DotDelimitedIdentifier::new),
+                module.map(DotDelimitedIdentifier::new),
                 space(),
                 token("import"),
                 space(),
             ]
         )?;
 
-        if let [name] = names.as_slice() {
+        if let Some([name]) = names.as_array() {
             // star can't be surrounded by parentheses
-            if name.name.as_str() == "*" {
+            if name.name().as_str() == "*" {
                 return token("*").fmt(f);
             }
         }
