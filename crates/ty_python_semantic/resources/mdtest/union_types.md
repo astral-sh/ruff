@@ -481,7 +481,6 @@ class Movie(TypedDict):
     year: int
 
 class Counts(TypedDict, extra_items=int): ...
-
 class Ticket: ...
 
 def _(
