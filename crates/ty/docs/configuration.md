@@ -1,6 +1,35 @@
 <!-- WARNING: This file is auto-generated (cargo dev generate-all). Update the doc comments on the 'Options' struct in 'crates/ty_project/src/metadata/options.rs' if you want to change anything here. -->
 
 # Configuration
+## `baseline`
+
+Path to the JSON file that records existing lint diagnostics for this project.
+Relative paths are resolved against the project root. Use `ty check --update-baseline`
+to create or update the file.
+
+Diagnostic baselines are in preview. The file format may change between ty releases.
+
+**Default value**: `null`
+
+**Type**: `str`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty]
+    baseline = "ty-baseline.json"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    baseline = "ty-baseline.json"
+    ```
+
+---
+
 ## `rules`
 
 Configures the enabled rules and their severity.
@@ -156,6 +185,47 @@ Defaults to `true`.
     [analysis]
     # Disable support for `type: ignore` comments
     respect-type-ignore-comments = false
+    ```
+
+---
+
+### `return-type-inference`
+
+This setting controls when ty infers return types for functions without an explicit
+return type annotation.
+
+- `"never"`: Do not infer return types from function bodies. Unannotated functions
+  will have an inferred return type of `Unknown`.
+- `"always"`: Infer return types for unannotated functions and methods.
+
+Enabling return type inference will never override explicit return type annotations.
+Lambda functions are not affected by this setting and their return type will always
+be inferred.
+
+Return types for generator functions and asynchronous functions are currently not
+inferred, but we plan to change this soon.
+
+Functions in stubs and `if TYPE_CHECKING` blocks are never considered for return type
+inference.
+
+**Default value**: `"never"`
+
+**Type**: `"never" | "always"`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    return-type-inference = "always"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    return-type-inference = "always"
     ```
 
 ---
@@ -831,6 +901,53 @@ Defaults to `true`.
 
 ---
 
+#### `return-type-inference`
+
+This setting controls when ty infers return types for functions without an explicit
+return type annotation.
+
+- `"never"`: Do not infer return types from function bodies. Unannotated functions
+  will have an inferred return type of `Unknown`.
+- `"always"`: Infer return types for unannotated functions and methods.
+
+Enabling return type inference will never override explicit return type annotations.
+Lambda functions are not affected by this setting and their return type will always
+be inferred.
+
+Return types for generator functions and asynchronous functions are currently not
+inferred, but we plan to change this soon.
+
+Functions in stubs and `if TYPE_CHECKING` blocks are never considered for return type
+inference.
+
+**Default value**: `"never"`
+
+**Type**: `"never" | "always"`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
+    [tool.ty.overrides.analysis]
+    return-type-inference = "always"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [[overrides]]
+    include = ["src"]
+
+    [overrides.analysis]
+    return-type-inference = "always"
+    ```
+
+---
+
 #### `strict-equality-semantics`
 
 Configure ty's behavior regarding type inference and narrowing of equality
@@ -1220,7 +1337,7 @@ Defaults to `full`.
 
 **Default value**: `full`
 
-**Type**: `full | concise | github | gitlab | junit`
+**Type**: `full | concise | github | gitlab | junit | sarif`
 
 **Example usage**:
 

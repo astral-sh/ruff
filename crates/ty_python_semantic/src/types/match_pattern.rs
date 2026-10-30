@@ -20,8 +20,8 @@ use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
-    Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
+    CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, IntersectionType,
+    KnownClass, Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
     TypeVarBoundOrConstraints, TypedDictType, UnionType, binding_type, equality_truthiness,
     infer_same_file_expression_type,
 };
@@ -932,12 +932,10 @@ fn pattern_fallthrough_type<'db>(
         }
     }
 
-    IntersectionBuilder::new(db, env)
-        .add_positive(subject_ty)
-        .add_negative(definite_match_pattern_type_for_subject(
-            db, env, kind, subject_ty,
-        ))
-        .build()
+    // Reachability and capture inference both walk OR patterns in order. Caching the difference
+    // lets them reuse the remaining subject type after each alternative fails.
+    let definitely_matched = definite_match_pattern_type_for_subject(db, env, kind, subject_ty);
+    IntersectionType::from_positive_and_negative(db, env, subject_ty, definitely_matched)
 }
 
 /// Return the fallthrough type for a binding that can reach a later match case.
@@ -1034,11 +1032,20 @@ fn try_sequence_pattern_binding_fallthrough_type<'db>(
 ) -> Result<Type<'db>, ()> {
     let resolved = subject_ty.resolve_type_alias(db);
     let narrowed = match resolved {
-        Type::Union(union) => union
-            .try_map(db, env, |element| {
-                try_sequence_pattern_binding_fallthrough_type(db, env, kind, *element, budget).ok()
-            })
-            .ok_or(())?,
+        Type::Union(union) => {
+            // Wait until every element fits within the expansion budget before simplifying the
+            // union. Otherwise, we can spend substantial time simplifying a partial result that
+            // must be discarded when a later element exceeds the budget.
+            let mapped = union
+                .elements(db)
+                .iter()
+                .map(|element| {
+                    try_sequence_pattern_binding_fallthrough_type(db, env, kind, *element, budget)
+                })
+                .collect::<Result<Vec<_>, ()>>()?;
+            let mut mapped = mapped.into_iter();
+            union.try_map(db, env, |_| mapped.next()).ok_or(())?
+        }
         Type::Intersection(intersection) => {
             let mut failed = false;
             let narrowed = intersection.map_positive(db, env, |element| {

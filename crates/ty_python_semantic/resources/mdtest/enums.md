@@ -2163,6 +2163,21 @@ for color in Color:
 reveal_type(list(Color))  # revealed: list[Color]
 ```
 
+## Combining flag members
+
+Flag operators accept other members of the same enum. A member's literal type does not restrict the
+other operand to that same member.
+
+```py
+from enum import Flag
+
+class Flags(Flag):
+    A = 1
+    B = 2
+
+Flags.A | Flags.B  # no diagnostic
+```
+
 ## Methods / non-member attributes
 
 Methods and non-member attributes defined in the enum class can be accessed on enum members:

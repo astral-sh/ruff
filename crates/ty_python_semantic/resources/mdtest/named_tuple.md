@@ -1370,6 +1370,44 @@ class IntBox(Box[int]):
 reveal_type(IntBox(1)._replace(content=42))  # revealed: IntBox
 ```
 
+### `_replace` methods from different classes
+
+The `_replace` methods of different named tuples retain different return types even when their
+fields match. A union of these methods cannot promise to return only one of the classes, regardless
+of branch order:
+
+```py
+from typing import Callable, NamedTuple
+
+class A(NamedTuple):
+    x: int
+
+class B(NamedTuple):
+    x: int
+
+def choose(flag: bool) -> Callable[..., A]:
+    # error: [invalid-return-type]
+    return A._replace if flag else B._replace
+
+def reversed_order(flag: bool) -> Callable[..., A]:
+    # error: [invalid-return-type]
+    return B._replace if flag else A._replace
+
+def either_class(flag: bool) -> Callable[..., A | B]:
+    return A._replace if flag else B._replace  # no diagnostic
+```
+
+The same distinction applies to named tuples created with the functional syntax:
+
+```py
+DynamicA = NamedTuple("DynamicA", [("x", int)])
+DynamicB = NamedTuple("DynamicB", [("x", int)])
+
+def choose_dynamic(flag: bool) -> Callable[..., DynamicA]:
+    # error: [invalid-return-type]
+    return DynamicA._replace if flag else DynamicB._replace
+```
+
 ## `collections.namedtuple`
 
 ```py

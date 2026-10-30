@@ -18,9 +18,7 @@ use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
 use ruff_db::cancellation::{Canceled, CancellationToken, CancellationTokenSource};
-use ruff_db::diagnostic::{
-    Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
-};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity};
 use ruff_db::files::File;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use ruff_db::{STACK_SIZE, max_parallelism};
@@ -134,6 +132,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         MainLoopMode::Fix(FixMode::ApplyFixes)
     } else if args.add_ignore {
         MainLoopMode::Fix(FixMode::AddIgnore)
+    } else if args.update_baseline {
+        MainLoopMode::UpdateBaseline
     } else {
         MainLoopMode::Check
     };
@@ -177,6 +177,12 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     let mut db = ProjectDatabase::fallible(project_metadata, system)?;
     let project = db.project();
+
+    if matches!(mode, MainLoopMode::UpdateBaseline) && project.settings(&db).baseline().is_none() {
+        return Err(anyhow!(
+            "`--update-baseline` requires a baseline path from `--baseline` or configuration"
+        ));
+    }
 
     project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
     project.set_force_exclude(&mut db, force_exclude);
@@ -353,7 +359,7 @@ impl MainLoop {
         let (check_sender, check_receiver) = crossbeam_channel::bounded(1);
 
         // Initialize the uv environment for all scripts
-        let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+        let scripts = db.project().scripts_to_synchronize(db);
         self.synchronize_scripts(db, &scripts);
 
         request_check(&check_sender);
@@ -417,6 +423,11 @@ impl MainLoop {
                         tracing::warn!("No python files found under the given path(s)");
                     }
 
+                    let mut result = result;
+                    if !matches!(self.mode, MainLoopMode::UpdateBaseline) {
+                        retain_visible_diagnostics(&mut result);
+                    }
+
                     let result = match self.mode {
                         MainLoopMode::Check => {
                             // TODO: We should have an official flag to silence workspace diagnostics.
@@ -445,7 +456,8 @@ impl MainLoop {
                                 ),
                             };
 
-                            if let Ok(result) = result {
+                            if let Ok(mut result) = result {
+                                retain_visible_diagnostics(&mut result.diagnostics);
                                 let fixed_diagnostics = match mode {
                                     FixMode::AddIgnore => None,
                                     FixMode::ApplyFixes => Some(result.count),
@@ -474,6 +486,28 @@ impl MainLoop {
                             } else {
                                 Err(Canceled)
                             }
+                        }
+                        MainLoopMode::UpdateBaseline => {
+                            let settings = db.project().settings(db);
+                            let Some(baseline_path) = settings.baseline() else {
+                                return Err(anyhow!(
+                                    "`--update-baseline` requires a baseline path from `--baseline` or configuration"
+                                ));
+                            };
+                            let result = ty_project::baseline::write(db, baseline_path, result)?;
+                            if !result.diagnostics.is_empty() {
+                                self.write_diagnostics(db, &result.diagnostics, None)?;
+                            }
+
+                            if settings.terminal().output_format.is_human_readable() {
+                                let count = result.count;
+                                writeln!(
+                                    self.printer.stream_for_requested_summary(),
+                                    "Updated baseline `{baseline_path}` with {count} diagnostic{}.",
+                                    if count == 1 { "" } else { "s" }
+                                )?;
+                            }
+                            Ok(result.diagnostics)
                         }
                     };
 
@@ -514,7 +548,7 @@ impl MainLoop {
                                 files_changed: true,
                             }
                         ) {
-                            let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+                            let scripts = db.project().scripts_to_synchronize(db);
                             self.synchronize_scripts(db, &scripts);
                         }
                     }
@@ -632,7 +666,6 @@ impl MainLoop {
                 if stdout.is_enabled() {
                     let mut stdout = BufWriter::new(stdout);
                     let display_config = DisplayDiagnosticConfig::new("ty")
-                        .format(terminal_settings.output_format.into())
                         .color(colored::control::SHOULD_COLORIZE.should_colorize())
                         .with_cancellation_token(Some(self.cancellation_token.clone()))
                         .context(0);
@@ -640,7 +673,9 @@ impl MainLoop {
                     write!(
                         stdout,
                         "{}",
-                        DisplayDiagnostics::new(db, &display_config, diagnostics)
+                        terminal_settings
+                            .output_format
+                            .display(db, &display_config, diagnostics)
                     )?;
                     stdout.flush()?;
                 }
@@ -674,12 +709,19 @@ impl MainLoop {
 enum MainLoopMode {
     Check,
     Fix(FixMode),
+    UpdateBaseline,
 }
 
 #[derive(Copy, Clone, Debug)]
 enum FixMode {
     AddIgnore,
     ApplyFixes,
+}
+
+fn retain_visible_diagnostics(diagnostics: &mut Vec<Diagnostic>) {
+    diagnostics.retain(|diagnostic| {
+        !(diagnostic.severity() == Severity::Hint && diagnostic.id().is_lint())
+    });
 }
 
 fn exit_status_from_diagnostics(
@@ -703,7 +745,7 @@ fn exit_status_from_diagnostics(
     }
 
     match max_severity {
-        Severity::Info => ExitStatus::Success,
+        Severity::Hint | Severity::Info => ExitStatus::Success,
         Severity::Warning => {
             if terminal_settings.error_on_warning {
                 ExitStatus::Failure

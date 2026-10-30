@@ -1175,6 +1175,45 @@ fn benchmark_recursive_protocol_materialization_scaling(criterion: &mut Criterio
     }
 }
 
+/// Materializing nested callables reuses shared parameter and return types. A recursive leaf
+/// permits reuse after its cycle closes; a cycle through the whole graph also needs reuse while
+/// the cycle is still active. Both cases should avoid exponential work as the nesting grows.
+fn benchmark_recursive_callable_materialization(criterion: &mut Criterion) {
+    for depth in [8, 12] {
+        // Implicit aliases in the leaf case expose shared callables directly, without an
+        // intervening cache for each named type alias.
+        for (name, recursive_target, alias_prefix) in [
+            ("leaf", "Recursive".to_string(), ""),
+            ("cycle", format!("A{depth}"), "type "),
+        ] {
+            let mut code = format!(
+                "
+            from collections.abc import Callable
+            from ty_extensions import Top
+
+            type Recursive = Callable[..., {recursive_target}]
+            {alias_prefix}A0 = Recursive"
+            );
+
+            for index in 1..=depth {
+                let previous = index - 1;
+                write!(
+                    &mut code,
+                    "\n            {alias_prefix}A{index} = Callable[[A{previous}, A{previous}], A{previous}]"
+                )
+                .ok();
+            }
+            write!(&mut code, "\n            def f(value: Top[A{depth}]): ...").ok();
+
+            benchmark_micro_case(
+                criterion,
+                &format!("ty_micro[recursive_callable_materialization_{name}_{depth}]"),
+                &code,
+            );
+        }
+    }
+}
+
 /// Comparing a recursive protocol whose specializations grow should not repeatedly expand its
 /// members.
 fn benchmark_recursive_protocol_growing_specialization(criterion: &mut Criterion) {
@@ -1292,6 +1331,43 @@ fn benchmark_gradual_vararg_call(criterion: &mut Criterion) {
     benchmark_micro_case(criterion, "ty_micro[gradual_vararg_call]", &code);
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4796>.
+///
+/// Capturing independently bounded generic overloads must not enumerate every combination of
+/// signatures specialized to their declared bounds.
+fn benchmark_paramspec_bounded_overloads(criterion: &mut Criterion) {
+    let mut code = "
+        from typing import Callable, Literal, overload
+
+        class Array[S: tuple[int, ...]]:
+            def shape(self) -> S:
+                raise NotImplementedError
+        "
+    .to_string();
+
+    for index in 0..6 {
+        writeln!(
+            &mut code,
+            "
+        @overload
+        def overloaded[S: tuple[int, ...]](value: Array[S], tag: Literal[{index}]) -> None: ..."
+        )
+        .ok();
+    }
+
+    code.push_str(
+        "
+        def overloaded(*args, **kwargs) -> None: ...
+
+        def capture[**P](callback: Callable[P, object]) -> None: ...
+
+        capture(overloaded)
+        ",
+    );
+
+    benchmark_micro_case(criterion, "ty_micro[paramspec_bounded_overloads]", &code);
+}
+
 /// Regression benchmark for many precise arguments flowing into one variadic parameter.
 ///
 /// The declared type is intentionally non-gradual, so argument checks still run. The important
@@ -1366,6 +1442,48 @@ fn benchmark_typed_dict_get_large_literal_union(criterion: &mut Criterion) {
         "ty_micro[typed_dict_get_large_literal_union]",
         &code,
     );
+}
+
+fn benchmark_union_construction(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 256;
+
+    let mut construction = String::new();
+    let mut type_form =
+        String::from("from typing_extensions import TypeForm\nclass CommonBase: ...\n");
+    for index in 0..NUM_CLASSES {
+        writeln!(construction, "class C{index}[T]: ...").ok();
+        writeln!(type_form, "class C{index}[T](CommonBase): ...").ok();
+    }
+    let members = (0..NUM_CLASSES)
+        .map(|index| format!("C{index}[int]"))
+        .join(" | ");
+
+    // The unused alias measures the cost of building a runtime union in a single expression.
+    // Nothing asks for the type it denotes, so the union can stay unnormalized.
+    writeln!(construction, "Alias = {members}").ok();
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[generic_union_construction_256]",
+        &construction,
+    );
+
+    // Storing the union in an unannotated tuple makes ty infer it in a value context. The later
+    // assignment forces ty to normalize the stored union to check it against `TypeForm[CommonBase]`.
+    writeln!(type_form, "stored = ({members},)").ok();
+    type_form.push_str("checked: tuple[TypeForm[CommonBase], ...] = stored\n");
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[generic_union_type_form_256]",
+        &type_form,
+    );
+
+    // Each assignment extends a previously inferred union by one literal. The final union is unused,
+    // but rescanning the growing prefix at each assignment would still make construction quadratic.
+    let mut split = String::from("from typing import Literal\nU1 = Literal[0] | Literal[1]\n");
+    for i in 2..=1024 {
+        writeln!(split, "U{i} = U{} | Literal[{i}]", i - 1).ok();
+    }
+    benchmark_micro_case(criterion, "ty_micro[split_literal_union_1024]", &split);
 }
 
 /// Benchmark for narrowing a large union type through multiple match statements.
@@ -1443,6 +1561,51 @@ fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
     );
 
     benchmark_micro_case(criterion, "ty_micro[large_union_narrowing]", &code);
+}
+
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4815>.
+///
+/// The three OR patterns stay fixed as the subject union grows. Using `typing.Union` avoids
+/// the separate cost of inferring a long chain of `|` expressions.
+fn benchmark_class_or_pattern_captures(criterion: &mut Criterion) {
+    for num_classes in [45, 90] {
+        let mut code = "
+            from typing import Union"
+            .to_string();
+
+        for i in 0..num_classes {
+            writeln!(
+                code,
+                "
+            class C{i}:
+                value: int"
+            )
+            .ok();
+        }
+
+        let members = (0..num_classes).map(|i| format!("C{i}")).join(", ");
+        writeln!(
+            code,
+            "
+            def get_value(subject: Union[{members}]) -> int | None:
+                match subject:
+                    case C0(value=v) | C1(value=v) | C2(value=v):
+                        return v
+                    case C3(value=v) | C4(value=v) | C5(value=v):
+                        return v
+                    case C6(value=v) | C7(value=v) | C8(value=v):
+                        return v
+                    case _:
+                        return None"
+        )
+        .ok();
+
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[class_or_pattern_captures_{num_classes}]"),
+            &code,
+        );
+    }
 }
 
 /// Benchmark for narrowing through a long `isinstance` elif chain.
@@ -1956,12 +2119,17 @@ fn benchmark_literal_or_pattern_reachability(criterion: &mut Criterion) {
 /// Each case matches a pair of class patterns and captures their attributes. Preserving correlations
 /// across the cases can produce many tuple alternatives with wide element unions.
 /// Generic variants also require relating specializations when narrowing the captured attributes.
+/// Eight and ten cases expose the steep growth while keeping instrumented runs short.
 fn benchmark_tuple_class_pattern_captures(criterion: &mut Criterion) {
     for (name, num_cases, generic) in [
         ("ty_micro[tuple_class_pattern_captures_8]", 8, false),
-        ("ty_micro[tuple_class_pattern_captures]", 16, false),
+        ("ty_micro[tuple_class_pattern_captures_10]", 10, false),
         ("ty_micro[generic_tuple_class_pattern_captures_8]", 8, true),
-        ("ty_micro[generic_tuple_class_pattern_captures]", 16, true),
+        (
+            "ty_micro[generic_tuple_class_pattern_captures_10]",
+            10,
+            true,
+        ),
     ] {
         let type_parameters = if generic { "[T]" } else { "" };
         let type_arguments = if generic { "[int]" } else { "" };
@@ -2528,13 +2696,17 @@ criterion_group!(
     benchmark_materialized_recursive_protocol_overload,
     benchmark_materialized_recursive_protocol_subtyping,
     benchmark_recursive_protocol_materialization_scaling,
+    benchmark_recursive_callable_materialization,
     benchmark_recursive_protocol_growing_specialization,
     benchmark_recursive_protocol_specialized_receiver,
     benchmark_async_context_manager_recursive_protocol,
+    benchmark_paramspec_bounded_overloads,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,
+    benchmark_union_construction,
     benchmark_large_union_narrowing,
+    benchmark_class_or_pattern_captures,
     benchmark_large_isinstance_narrowing,
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,

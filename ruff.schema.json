@@ -781,6 +781,24 @@
         "all"
       ]
     },
+    "AllowedFloatValue": {
+      "type": "number",
+      "format": "double"
+    },
+    "AllowedValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer",
+          "format": "int64"
+        },
+        {
+          "$ref": "#/definitions/AllowedFloatValue"
+        }
+      ]
+    },
     "AnalyzeOptions": {
       "description": "Configures Ruff's `analyze` command.",
       "type": "object",
@@ -2961,6 +2979,26 @@
           ],
           "items": {
             "$ref": "#/definitions/ConstantType"
+          }
+        },
+        "allow-magic-values": {
+          "description": "Specific literal values to ignore when used as \"magic values\" (see `PLR2004`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/AllowedValue"
+          }
+        },
+        "extend-allow-magic-values": {
+          "description": "Literal values to ignore when used as \"magic values\" (see `PLR2004`),\nin addition to those included in [`allow-magic-values`](#lint_pylint_allow-magic-values).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/AllowedValue"
           }
         },
         "max-args": {
@@ -5273,6 +5311,7 @@
         "self-or-cls-assignment",
         "set-attr-with-constant",
         "shallow-copy-environ",
+        "shared-clock-mock",
         "shebang-leading-whitespace",
         "shebang-missing-executable-file",
         "shebang-missing-python",
@@ -5495,6 +5534,7 @@
         "unnecessary-placeholder",
         "unnecessary-range-start",
         "unnecessary-regular-expression",
+        "unnecessary-regular-expression-compile",
         "unnecessary-return-none",
         "unnecessary-round",
         "unnecessary-spread",

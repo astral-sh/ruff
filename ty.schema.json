@@ -13,6 +13,17 @@
         }
       ]
     },
+    "baseline": {
+      "description": "Path to the JSON file that records existing lint diagnostics for this project.\nRelative paths are resolved against the project root. Use `ty check --update-baseline`\nto create or update the file.\n\nDiagnostic baselines are in preview. The file format may change between ty releases.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/RelativePathBuf"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "environment": {
       "description": "Configures the type checking environment.",
       "anyOf": [
@@ -97,6 +108,17 @@
           "type": [
             "boolean",
             "null"
+          ]
+        },
+        "return-type-inference": {
+          "description": "This setting controls when ty infers return types for functions without an explicit\nreturn type annotation.\n\n- `\"never\"`: Do not infer return types from function bodies. Unannotated functions\n  will have an inferred return type of `Unknown`.\n- `\"always\"`: Infer return types for unannotated functions and methods.\n\nEnabling return type inference will never override explicit return type annotations.\nLambda functions are not affected by this setting and their return type will always\nbe inferred.\n\nReturn types for generator functions and asynchronous functions are currently not\ninferred, but we plan to change this soon.\n\nFunctions in stubs and `if TYPE_CHECKING` blocks are never considered for return type\ninference.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ReturnTypeInference"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "strict-equality-semantics": {
@@ -241,6 +263,11 @@
           "description": "Print diagnostics as a JUnit-style XML report.",
           "type": "string",
           "const": "junit"
+        },
+        {
+          "description": "Print diagnostics as a [SARIF] report.\n\n[SARIF]: https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html",
+          "type": "string",
+          "const": "sarif"
         }
       ]
     },
@@ -329,6 +356,21 @@
       "allOf": [
         {
           "$ref": "#/definitions/SystemPathBuf"
+        }
+      ]
+    },
+    "ReturnTypeInference": {
+      "description": "Controls return type inference for functions without explicit return annotations.",
+      "oneOf": [
+        {
+          "description": "Do not infer return types from function bodies. Unannotated functions\nwill have an inferred return type of `Unknown`.",
+          "type": "string",
+          "const": "never"
+        },
+        {
+          "description": "Infer return types for unannotated functions and methods.",
+          "type": "string",
+          "const": "always"
         }
       ]
     },

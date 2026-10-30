@@ -26,8 +26,8 @@ For the full list of supported options, run `ruff check --help`.
 The set of enabled rules is controlled via the [`lint.select`](settings.md#lint_select),
 [`lint.extend-select`](settings.md#lint_extend-select), and [`lint.ignore`](settings.md#lint_ignore) settings.
 
-Ruff's linter mirrors Flake8's rule code system, in which each rule code consists of a one-to-three
-letter prefix, followed by three digits (e.g., `F401`). The prefix indicates that "source" of the rule
+Ruff's linter uses Flake8-style rule codes: an alphabetic prefix followed by digits (e.g., `F401`).
+The prefix indicates the source of the rule
 (e.g., `F` for Pyflakes, `E` for pycodestyle, `ANN` for flake8-annotations).
 
 Rule selectors like [`lint.select`](settings.md#lint_select) and [`lint.ignore`](settings.md#lint_ignore) accept either
@@ -356,7 +356,7 @@ $ python -m timeit "head = next(iter(range(99999999)))"
 5000000 loops, best of 5: 70.8 nsec per loop
 ```
 
-However, when the collection is empty, this raised exception changes from an `IndexError` to `StopIteration`:
+However, when the collection is empty, the raised exception changes from an `IndexError` to `StopIteration`:
 
 ```console
 $ python -c 'list(range(0))[0]'
@@ -620,7 +620,7 @@ def foo():
 foo()
 ```
 
-It is strongly suggested to use explicit range suppressions, in order to prevent
+We strongly suggest using explicit range suppressions to prevent
 accidental suppressions of violations, especially at global module scope.
 For this reason, a `RUF104` diagnostic will also be produced for any implicit range.
 If implicit range suppressions are desired, the `RUF104` rule can be disabled,
@@ -679,7 +679,7 @@ line, at global module scope, and preferably near the top of the file:
 # ruff: file-ignore[F401, ARG001]
 ```
 
-The full-level suppression comment specification is as follows:
+The file-level suppression comment specification is as follows:
 
 - An own-line comment starting with case sensitive `#ruff:`, with optional whitespace
   after the `#` symbol and `:` symbol, followed by `file-ignore[`, any rules to

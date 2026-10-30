@@ -19,6 +19,7 @@ help: Remove `else`
 9  +     print("math is broken")
 10 |     return None
    |
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
   --> useless_else_on_loop.py:18:5
@@ -38,6 +39,7 @@ help: Remove `else`
 18 +     print("math is broken")
 19 |     return None
    |
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
   --> useless_else_on_loop.py:30:1
@@ -56,6 +58,7 @@ help: Remove `else`
 30 + print("or else!")
 31 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
   --> useless_else_on_loop.py:37:1
@@ -74,6 +77,7 @@ help: Remove `else`
 37 + print("or else!")
 38 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
   --> useless_else_on_loop.py:42:1
@@ -97,6 +101,7 @@ help: Remove `else`
 44 +     break
 45 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
   --> useless_else_on_loop.py:88:5
@@ -116,6 +121,7 @@ help: Remove `else`
 88 +     return True
 89 |     return False
    |
+note: This is an unsafe fix and may change runtime behavior
 
 PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
    --> useless_else_on_loop.py:98:9
@@ -160,4 +166,41 @@ help: Remove `else`
 145 +     print("fat chance")
 146 +     for j in range(10):
 147 +         break
+148 |
+    |
+
+PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
+   --> useless_else_on_loop.py:155:5
+    |
+153 |     for j in range(10):
+154 |         pass
+155 |     else:  # comment on the `else` line
+    |     ^^^^
+156 |         # comment within the `else` block
+157 |         print("fat chance")
+    |
+help: Remove `else`
+    |
+154 |         pass
+    -     else:  # comment on the `else` line
+    -         # comment within the `else` block
+    -         print("fat chance")
+155 +     # comment within the `else` block
+156 +     print("fat chance")
+157 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
+   --> useless_else_on_loop.py:164:5
+    |
+162 |     for j in range(10):
+163 |         pass
+164 |     else: print("fat chance")  # comment on the statement
+    |     ^^^^
+help: Remove `else`
+    |
+163 |         pass
+    -     else: print("fat chance")  # comment on the statement
+164 +     print("fat chance")  # comment on the statement
     |

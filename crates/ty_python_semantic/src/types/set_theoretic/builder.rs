@@ -201,6 +201,83 @@ fn merge_disjoint_exclusions<'db>(
     Some(common.build())
 }
 
+/// Prove coverage without circular inference. Unlike intersection simplification, coverage
+/// only needs subtyping; checking disjointness after a failed subtype check adds unnecessary work.
+#[salsa::tracked(returns(copy), cycle_result=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
+fn exclusion_is_covered<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
+    let env = ProgramEnvironment::from_program(types.program(db));
+    types.first(db).is_subtype_of(db, &env, types.second(db))
+}
+
+/// Remove exclusions already covered by another union element: `A | (B & ~A) = A | B`.
+///
+/// The coverage predicate must account for every materialization of a gradual exclusion.
+fn remove_covered_exclusions<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    mut is_covered: impl FnMut(Type<'db>) -> bool,
+) -> Option<Type<'db>> {
+    let Type::Intersection(intersection) = ty else {
+        return None;
+    };
+    let negative = intersection.negative(db);
+    // Most pairs cover no exclusions. Avoid allocating a retained list for those pairs.
+    let first_covered = negative.iter().position(|excluded| is_covered(*excluded))?;
+    let retained = negative.iter().take(first_covered).copied().chain(
+        negative
+            .iter()
+            .skip(first_covered + 1)
+            .copied()
+            .filter(|excluded| !is_covered(*excluded)),
+    );
+
+    let mut widened = IntersectionBuilder::new(db, env)
+        .positive_elements(intersection.positive(db).iter().copied());
+    for negative in retained {
+        widened.add_negative_in_place(negative);
+    }
+    Some(widened.build())
+}
+
+/// Literal groups bypass pairwise union simplification. Match their exclusions in one pass so
+/// that restoring many excluded literals does not require comparing every pair of literals.
+fn normalize_covered_literal_exclusions<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    types: &mut [Type<'db>],
+    unpack_aliases: bool,
+) -> bool {
+    if !types.iter().any(|ty| {
+        matches!(ty, Type::Intersection(intersection) if !intersection.negative(db).is_empty())
+    }) {
+        return false;
+    }
+    let literals: FxHashSet<_> = types
+        .iter()
+        .filter_map(|ty| ty.as_literal_value_kind())
+        .collect();
+    if literals.is_empty() {
+        return false;
+    }
+
+    let mut changed = false;
+    for ty in types {
+        if !unpack_aliases && any_over_type(db, env, *ty, false, Type::is_alias_like) {
+            continue;
+        }
+        if let Some(widened) = remove_covered_exclusions(db, env, *ty, |excluded| {
+            excluded
+                .as_literal_value_kind()
+                .is_some_and(|literal| literals.contains(&literal))
+        }) {
+            *ty = widened;
+            changed = true;
+        }
+    }
+    changed
+}
+
 /// Return `true` if union simplification should preserve this pair because one element is
 /// `Hashable` and the other is a non-final nominal instance.
 ///
@@ -370,7 +447,7 @@ impl<'db> Type<'db> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum UnionElement<'db> {
     Type(Type<'db>),
     // A map from integer literals to their promotability.
@@ -565,6 +642,7 @@ const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
 /// Huge enums and string literal sets are not uncommon (especially in generated code), and it's annoying
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 8192;
+#[derive(Clone)]
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
@@ -1116,8 +1194,19 @@ impl<'db> UnionBuilder<'db> {
                     merge_truthiness_guarded_pair(db, &self.env, ty, element_type)
             {
                 to_remove.push(i);
-                ty = merged_type;
-                continue;
+                // A nominal core can replace the first element in place; no earlier elements
+                // need to be reconsidered.
+                if i == 0 && merged_type.is_nominal_instance() && !merged_type.is_object() {
+                    ty = merged_type;
+                    continue;
+                }
+                for index in to_remove.into_iter().rev() {
+                    self.elements.swap_remove(index);
+                }
+                // The merged type can also subsume earlier elements, such as `bool` when
+                // the truthy and falsy parts of `int` merge.
+                self.add_in_place_impl(merged_type, seen_aliases);
+                return;
             }
 
             if !self.cycle_recovery
@@ -1157,6 +1246,49 @@ impl<'db> UnionBuilder<'db> {
                     self.add_in_place_impl(merged, seen_aliases);
                     return;
                 }
+                let remove_covered_by = |intersection, covering: Type<'db>| {
+                    // Fast path: strict subtyping already rejects a dynamic covering type for
+                    // any nonempty exclusion. Avoid interning and querying those type pairs.
+                    if covering.is_dynamic() {
+                        return None;
+                    }
+                    remove_covered_exclusions(db, &self.env, intersection, |excluded| {
+                        // An element that also excludes `E` cannot restore it. Check exact
+                        // containment before interning a pair and evaluating its relation.
+                        if let Type::Intersection(covering) = covering
+                            && covering.negative(db).contains(&excluded)
+                        {
+                            return false;
+                        }
+                        // Strict subtyping covers every materialization of a gradual exclusion;
+                        // assignability would not suffice.
+                        !should_preserve_hashable_union(db, &self.env, excluded, covering)
+                            && exclusion_is_covered(
+                                db,
+                                TypePair::new(db, self.env.program(db), excluded, covering),
+                            )
+                    })
+                };
+                if let Some(widened) = remove_covered_by(ty, element_type) {
+                    for index in to_remove.into_iter().rev() {
+                        self.elements.swap_remove(index);
+                    }
+                    // The covering element is unchanged. Recheck only the widened incoming
+                    // type against earlier elements that it might now subsume.
+                    self.add_in_place_impl(widened, seen_aliases);
+                    return;
+                }
+                if let Some(widened) = remove_covered_by(element_type, ty) {
+                    to_remove.push(i);
+                    for index in to_remove.into_iter().rev() {
+                        self.elements.swap_remove(index);
+                    }
+                    // The existing element changed, so recheck it against the whole union
+                    // before adding the incoming covering type.
+                    self.add_in_place_impl(widened, seen_aliases);
+                    self.add_in_place_impl(ty, seen_aliases);
+                    return;
+                }
                 if ty.is_redundant_with(db, &self.env, element_type) {
                     return;
                 }
@@ -1179,6 +1311,18 @@ impl<'db> UnionBuilder<'db> {
                     self.collapse_to_object();
                     return;
                 }
+            } else if !self.cycle_recovery
+                && let (alias @ Type::Recursive(_), Type::Intersection(negated))
+                | (Type::Intersection(negated), alias @ Type::Recursive(_)) = (ty, element_type)
+                && negated.is_simple_negation(db)
+                && negated.negative(db).contains(&alias)
+                && !alias.has_unguarded_alias_cycle(db)
+                && alias.is_subtype_of(db, &self.env, alias)
+            {
+                // Apply the same complement law to an exact recursive alias pair. Avoid
+                // provisional binders, and require reflexive subtyping to exclude gradual types.
+                self.collapse_to_object();
+                return;
             }
         }
 
@@ -1245,7 +1389,10 @@ impl<'db> UnionBuilder<'db> {
             }
         }
 
-        if normalize_enum_complement_unions(db, &self.env, &mut types) {
+        if (!cycle_recovery
+            && normalize_covered_literal_exclusions(db, &self.env, &mut types, unpack_aliases))
+            || normalize_enum_complement_unions(db, &self.env, &mut types)
+        {
             let builder = UnionBuilder::new(db, &self.env)
                 .unpack_aliases(unpack_aliases)
                 .cycle_recovery(cycle_recovery)
@@ -1316,7 +1463,7 @@ pub(crate) struct IntersectionBuilder<'db> {
     // One disjunction does not multiply alternatives. Only subsequent distributions consume
     // the bounded constructor's budget, after impossible and redundant branches are removed.
     has_disjunction: bool,
-    preserve_aliases: bool,
+    preserve_positive_aliases: bool,
 }
 
 impl<'db> IntersectionBuilder<'db> {
@@ -1326,17 +1473,23 @@ impl<'db> IntersectionBuilder<'db> {
             env: env.clone(),
             intersections: vec![InnerIntersectionBuilder::default()],
             has_disjunction: false,
-            preserve_aliases: false,
+            preserve_positive_aliases: false,
         }
     }
 
-    /// Retain aliases when rebuilding mapped intersections.
+    /// Retain positive aliases when rebuilding mapped intersections.
+    ///
+    /// A positive alias can represent a type on its own, while `~A` is represented as an
+    /// intersection with `A` as a negative element. Negative aliases that survive simplification
+    /// are retained by default to preserve recursive self-references. Positive aliases are unfolded
+    /// by default to preserve existing intersection normalization.
     ///
     /// Unfolding aliases after their mapping has completed can repeatedly insert a recursive
-    /// type into itself. The builder expands set operations to distribute and flatten them,
-    /// but retains atomic aliases unless simplifying the intersection changes their values.
-    pub(crate) fn preserve_aliases(mut self, preserve: bool) -> Self {
-        self.preserve_aliases = preserve;
+    /// type into itself, so mapped intersections retain positive aliases as well. Direct unions and
+    /// intersections still distribute and flatten, and elements are simplified using their alias
+    /// values.
+    pub(crate) fn preserve_positive_aliases(mut self, preserve: bool) -> Self {
+        self.preserve_positive_aliases = preserve;
         self
     }
 
@@ -1526,11 +1679,12 @@ impl<'db> IntersectionBuilder<'db> {
             _ => {
                 // If we are already a union-of-intersections, distribute the new intersected element
                 // across all of those intersections.
-                let element = if self.preserve_aliases && matches!(original, Type::TypeAlias(_)) {
-                    original
-                } else {
-                    ty
-                };
+                let element =
+                    if self.preserve_positive_aliases && matches!(original, Type::TypeAlias(_)) {
+                        original
+                    } else {
+                        ty
+                    };
                 for inner in &mut self.intersections {
                     inner.add_positive(db, &self.env, element);
                 }
@@ -1575,7 +1729,16 @@ impl<'db> IntersectionBuilder<'db> {
             Type::TypeAlias(_) | Type::Recursive(_) => {
                 self.add_negative_impl::<L>(ty, seen_aliases)?;
             }
-            Type::Union(union) => {
+            // Retain recursive unions of instance types: their negations expose no positive
+            // constraints or literal exclusions, and unfolding during mapping can repeatedly
+            // insert the alias's body. Other members still need normalization, for example
+            // `bool & ~(Literal[True] | list[A])` simplifies to `Literal[False]`.
+            Type::Union(union)
+                if !union.elements(db).iter().all(|element| {
+                    matches!(element.resolve_type_alias(db), Type::NominalInstance(_))
+                }) || (!matches!(original, Type::Recursive(_))
+                    && !matches!(original, Type::TypeAlias(alias) if alias.is_recursive(db))) =>
+            {
                 for elem in union.elements(db) {
                     self.add_negative_impl::<L>(*elem, seen_aliases)?;
                 }
@@ -1616,13 +1779,11 @@ impl<'db> IntersectionBuilder<'db> {
                 self.add_negative_impl::<L>(intersection, seen_aliases)?;
             }
             _ => {
-                let element = if self.preserve_aliases && matches!(original, Type::TypeAlias(_)) {
-                    original
-                } else {
-                    ty
-                };
+                // Pass the original alias to preserve recursive self-references.
+                // `InnerIntersectionBuilder::add_negative` resolves it for simplification
+                // (for example, `~Any` becomes `Any`) and stores it if it remains negative.
                 for inner in &mut self.intersections {
-                    inner.add_negative(db, &self.env, element);
+                    inner.add_negative(db, &self.env, original);
                 }
             }
         }
@@ -2776,6 +2937,29 @@ mod tests {
 
         let intersection = IntersectionBuilder::new(db, &env).build();
         assert_eq!(intersection, Type::object());
+    }
+
+    #[test]
+    fn build_intersection_preserves_negated_alias() {
+        let mut db = setup_db();
+        db.write_dedented("/src/a.py", "type Alias = int").unwrap();
+        let env = db.program_environment();
+        let file = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
+        let module = ProgramFile::new(&db, file, env.program(&db));
+        let alias = Type::TypeAlias(
+            global_symbol(&db, module, "Alias")
+                .place
+                .expect_type()
+                .as_type_alias()
+                .expect("Alias is a type alias"),
+        );
+
+        let negated = IntersectionBuilder::new(&db, &env)
+            .add_negative(alias)
+            .build();
+        assert!(matches!(negated, Type::Intersection(intersection)
+            if intersection.is_simple_negation(&db) && intersection.iter_negative(&db).eq([alias])));
+        assert_eq!(negated, alias.negate(&db, &env));
     }
 
     #[test]

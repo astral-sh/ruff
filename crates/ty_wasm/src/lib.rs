@@ -565,7 +565,7 @@ impl Workspace {
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
                     documentation: comp
                         .documentation
-                        .map(|docstring| docstring.render_plaintext()),
+                        .map(|docstring| docstring.render(MarkupKind::PlainText)),
                 }
             })
             .collect())
@@ -584,6 +584,7 @@ impl Workspace {
             &InlayHintSettings {
                 variable_types: true,
                 call_argument_names: true,
+                return_types: true,
             },
         );
 
@@ -756,7 +757,7 @@ impl Workspace {
                     label: sig.label,
                     documentation: sig
                         .documentation
-                        .map(|docstring| docstring.render_plaintext()),
+                        .map(|docstring| docstring.render(MarkupKind::PlainText)),
                     parameters,
                     active_parameter: sig.active_parameter.and_then(|p| u32::try_from(p).ok()),
                 }
@@ -1211,11 +1212,13 @@ pub enum Severity {
     Warning,
     Error,
     Fatal,
+    Hint,
 }
 
 impl From<diagnostic::Severity> for Severity {
     fn from(value: diagnostic::Severity) -> Self {
         match value {
+            diagnostic::Severity::Hint => Self::Hint,
             diagnostic::Severity::Info => Self::Info,
             diagnostic::Severity::Warning => Self::Warning,
             diagnostic::Severity::Error => Self::Error,

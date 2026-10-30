@@ -1060,6 +1060,8 @@ mod tests {
         	unmatched-suppression-comment (RUF104),
         	rule-codes-in-suppression-comments (RUF106),
         	pandas3-deprecation,
+        	shared-clock-mock,
+        	unnecessary-regular-expression-compile,
         ]
 
         Removed in preview:

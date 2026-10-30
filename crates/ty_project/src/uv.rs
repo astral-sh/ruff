@@ -59,7 +59,7 @@ impl UseUv {
         matches!(self, Self::On)
     }
 
-    const fn script_environments_enabled(self) -> bool {
+    pub(super) const fn script_environments_enabled(self) -> bool {
         matches!(self, Self::Scripts | Self::On)
     }
 }

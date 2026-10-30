@@ -9,9 +9,14 @@ use crate::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 use ordermap::OrderMap;
 use pep440_rs::VersionSpecifiers;
 use ruff_db::RustDoc;
+#[cfg(feature = "junit")]
+use ruff_db::diagnostic::render::JunitRenderer;
+use ruff_db::diagnostic::render::{
+    ConciseRenderer, FullRenderer, GithubRenderer, GitlabRenderer, Renderer, SarifRenderer,
+};
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity,
-    Span, SubDiagnostic, SubDiagnosticSeverity,
+    Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity, Span, SubDiagnostic,
+    SubDiagnosticSeverity,
 };
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
@@ -39,8 +44,8 @@ use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings, PythonE
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, PythonEnvironment, PythonVersionFileSource, PythonVersionSource,
-    PythonVersionWithSource, SitePackagesDiscoveryError, SitePackagesPaths, SysPrefixPathOrigin,
-    inferred_python_version_source_annotation,
+    PythonVersionWithSource, ReturnTypeInference, SitePackagesDiscoveryError, SitePackagesPaths,
+    SysPrefixPathOrigin, inferred_python_version_source_annotation,
 };
 use ty_static::EnvVars;
 
@@ -59,6 +64,19 @@ use ty_static::EnvVars;
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
+    /// Path to the JSON file that records existing lint diagnostics for this project.
+    /// Relative paths are resolved against the project root. Use `ty check --update-baseline`
+    /// to create or update the file.
+    ///
+    /// Diagnostic baselines are in preview. The file format may change between ty releases.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"null"#,
+        value_type = "str",
+        example = r#"baseline = "ty-baseline.json""#
+    )]
+    pub baseline: Option<RelativePathBuf>,
+
     /// Configures the type checking environment.
     #[option_group]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -539,6 +557,10 @@ impl Options {
         let overrides = strategy.fallback(overrides, |_| Vec::new())?;
 
         let settings = Settings {
+            baseline: self
+                .baseline
+                .as_ref()
+                .map(|path| path.absolute(context.configuration_root(), db.system())),
             rules: Arc::new(rules),
             terminal,
             src,
@@ -1462,6 +1484,10 @@ pub enum OutputFormat {
     /// Print diagnostics as a JUnit-style XML report.
     #[cfg(feature = "junit")]
     Junit,
+    /// Print diagnostics as a [SARIF] report.
+    ///
+    /// [SARIF]: https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html
+    Sarif,
 }
 
 impl OutputFormat {
@@ -1473,18 +1499,30 @@ impl OutputFormat {
     pub const fn is_human_readable(&self) -> bool {
         matches!(self, OutputFormat::Full | OutputFormat::Concise)
     }
-}
 
-impl From<OutputFormat> for DiagnosticFormat {
-    fn from(value: OutputFormat) -> Self {
-        match value {
-            OutputFormat::Full => Self::Full,
-            OutputFormat::Concise => Self::Concise,
-            OutputFormat::Gitlab => Self::Gitlab,
-            OutputFormat::Github => Self::Github,
+    /// Display diagnostics in this output format.
+    pub fn display<'a>(
+        self,
+        db: &'a dyn Db,
+        config: &'a DisplayDiagnosticConfig,
+        diagnostics: &'a [Diagnostic],
+    ) -> impl Display + use<'a> {
+        let resolver: &dyn ruff_db::Db = db;
+        fmt::from_fn(move |f| match self {
+            Self::Full => FullRenderer::new(&resolver, config).render(f, diagnostics),
+            Self::Concise => ConciseRenderer::new(&resolver, config).render(f, diagnostics),
+            Self::Gitlab => GitlabRenderer::new(&resolver, config).render(f, diagnostics),
+            Self::Github => GithubRenderer::new(&resolver, config).render(f, diagnostics),
             #[cfg(feature = "junit")]
-            OutputFormat::Junit => Self::Junit,
-        }
+            Self::Junit => JunitRenderer::new(&resolver, config).render(f, diagnostics),
+            Self::Sarif => SarifRenderer::new(
+                &resolver,
+                config,
+                db.lint_registry().rule_metadata(),
+                ruff_db::program_version().unwrap_or("Unknown"),
+            )
+            .render(f, diagnostics),
+        })
     }
 }
 
@@ -1519,7 +1557,7 @@ pub struct TerminalOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"full"#,
-        value_type = "full | concise | github | gitlab | junit",
+        value_type = "full | concise | github | gitlab | junit | sarif",
         example = r#"
             output-format = "concise"
         "#
@@ -1555,6 +1593,31 @@ pub struct TerminalOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalysisOptions {
+    /// This setting controls when ty infers return types for functions without an explicit
+    /// return type annotation.
+    ///
+    /// - `"never"`: Do not infer return types from function bodies. Unannotated functions
+    ///   will have an inferred return type of `Unknown`.
+    /// - `"always"`: Infer return types for unannotated functions and methods.
+    ///
+    /// Enabling return type inference will never override explicit return type annotations.
+    /// Lambda functions are not affected by this setting and their return type will always
+    /// be inferred.
+    ///
+    /// Return types for generator functions and asynchronous functions are currently not
+    /// inferred, but we plan to change this soon.
+    ///
+    /// Functions in stubs and `if TYPE_CHECKING` blocks are never considered for return type
+    /// inference.
+    #[option(
+        default = r#""never""#,
+        value_type = r#""never" | "always""#,
+        example = r#"
+            return-type-inference = "always"
+        "#
+    )]
+    pub return_type_inference: Option<ReturnTypeInference>,
+
     /// Whether ty should use strict narrowing for unspecialized generic classes in
     /// `isinstance()` and `issubclass()` checks, `match` class patterns, and `TypeIs` checks.
     ///
@@ -1747,6 +1810,7 @@ impl AnalysisOptions {
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
         let Self {
+            return_type_inference,
             strict_generic_narrowing,
             strict_equality_semantics,
             respect_type_ignore_comments,
@@ -1755,6 +1819,7 @@ impl AnalysisOptions {
         } = self;
 
         let AnalysisSettings {
+            return_type_inference: return_type_inference_default,
             strict_generic_narrowing: strict_generic_narrowing_default,
             strict_equality_semantics: strict_equality_semantics_default,
             respect_type_ignore_comments: respect_type_ignore_default,
@@ -1785,6 +1850,7 @@ impl AnalysisOptions {
             };
 
         AnalysisSettings {
+            return_type_inference: return_type_inference.unwrap_or(return_type_inference_default),
             strict_generic_narrowing: strict_generic_narrowing
                 .unwrap_or(strict_generic_narrowing_default),
             strict_equality_semantics: strict_equality_semantics
@@ -2245,19 +2311,14 @@ pub struct ToSettingsError {
 
 impl ToSettingsError {
     pub(crate) fn pretty<'a>(&'a self, db: &'a dyn Db) -> impl fmt::Display + use<'a> {
-        let db: &dyn ruff_db::Db = db;
-
         fmt::from_fn(move |f| {
-            let display_config = DisplayDiagnosticConfig::new("ty")
-                .format(self.output_format.into())
-                .color(self.color);
+            let display_config = DisplayDiagnosticConfig::new("ty").color(self.color);
 
             write!(
                 f,
                 "{}",
-                self.diagnostic
-                    .to_diagnostic()
-                    .display(&db, &display_config)
+                self.output_format
+                    .display(db, &display_config, &[self.diagnostic.to_diagnostic()])
             )
         })
     }

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ruff ecosystem report</title>
+    <style>
+      :root { color-scheme: light; --ink: #261230; --purple: #6340ac; --line: #ded8ec; }
+      * { box-sizing: border-box; }
+      body { margin: 0; color: var(--ink); background: #f7f5fa; font: 15px/1.5 system-ui, sans-serif; }
+      main { max-width: 1600px; margin: auto; padding: 32px; }
+      header { border-radius: 16px; padding: 28px 32px; background: var(--ink); color: #f4f4f1; }
+      h1 { margin: 0; color: #d7ff64; font-size: 28px; letter-spacing: -0.03em; }
+      #subtitle { margin: 8px 0 0; color: #cdcbfb; }
+      .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 24px 0; }
+      .stat { background: white; border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; }
+      .stat strong { display: block; font-size: 28px; font-weight: 650; }
+      .stat span { color: #6f5d6f; }
+      .controls { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; background: white; padding: 20px; border: 1px solid var(--line); border-radius: 12px; }
+      label { display: flex; flex-direction: column; gap: 6px; font-weight: 550; font-size: 13px; }
+      input, select, button { font: inherit; color: var(--ink); border: 1px solid #bdb0d2; background: white; padding: 9px 12px; border-radius: 7px; }
+      input:focus, select:focus, button:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+      select { max-width: 310px; }
+      .search { flex: 1; min-width: 220px; }
+      .pagination { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+      .pagination label { display: inline; }
+      #page { width: 80px; }
+      button { cursor: pointer; }
+      button:disabled { opacity: 0.45; cursor: default; }
+      #count { margin-left: auto; color: #6f5d6f; }
+      .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: white; }
+      table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+      th { text-align: left; padding: 12px 16px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #6f5d6f; background: #f0edf5; }
+      th:first-child { width: 15%; }
+      th:nth-child(2) { width: 22%; }
+      td { padding: 7px 16px; border-top: 1px solid #eee9f3; vertical-align: top; overflow-wrap: anywhere; }
+      td:last-child { white-space: pre-wrap; font: 13px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; }
+      a { color: var(--purple); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .added td:last-child { background: #eff9e7; color: #245b24; }
+      .removed td:last-child { background: #fff0f0; color: #9b3039; }
+      .error td:last-child { background: #fff4df; color: #784800; }
+      .context td:last-child { color: #6f5d6f; }
+      #empty { padding: 40px 20px; text-align: center; color: #6f5d6f; }
+      footer { margin-top: 16px; color: #6f5d6f; font-size: 13px; }
+      [hidden] { display: none !important; }
+      @media (max-width: 700px) { main { padding: 16px; } header { padding: 20px; } .stats { grid-template-columns: repeat(2, 1fr); gap: 10px; } table { min-width: 700px; } #count { width: 100%; margin: 0; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header><h1>Ruff ecosystem report</h1><p id="subtitle"></p></header>
+      <section class="stats" aria-label="Summary">
+        <div class="stat"><strong id="changed">0</strong><span id="projects">Projects with changes</span></div>
+        <div class="stat"><strong id="added">0</strong><span>Added lines</span></div>
+        <div class="stat"><strong id="removed">0</strong><span>Removed lines</span></div>
+        <div class="stat"><strong id="errors">0</strong><span>Project errors</span></div>
+      </section>
+      <section class="controls" aria-label="Filters">
+        <label>Project<select id="project"><option value="">All projects</option></select></label>
+        <label id="rule-label">Rule<select id="rule"><option value="">All rules</option></select></label>
+        <label>Change<select id="kind"><option value="">All entries</option><option value="added">Added</option><option value="removed">Removed</option><option value="error">Errors</option></select></label>
+        <label class="search">Search<input id="search" type="search" placeholder="Project, path, rule, or diff text" /></label>
+      </section>
+      <div class="pagination">
+        <button id="previous" type="button">Previous</button>
+        <label for="page">Page</label><input id="page" type="number" min="1" value="1" />
+        <span>of <span id="pages">1</span></span>
+        <button id="next" type="button">Next</button>
+        <span id="count" role="status"></span>
+      </div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Project</th><th>Source</th><th>Diff</th></tr></thead><tbody id="rows"></tbody></table>
+        <p id="empty" hidden></p>
+      </div>
+      <footer id="note"></footer>
+      <noscript>Enable JavaScript to browse the full report.</noscript>
+    </main>
+    <script id="report-data" type="application/json"><!-- report-data --></script>
+    <script>
+      const report = JSON.parse(document.getElementById("report-data").textContent);
+      const get = (id) => document.getElementById(id);
+      document.title = `${report.title} · Ruff ecosystem`;
+      get("subtitle").textContent = report.title;
+      for (const name of ["changed", "added", "removed", "errors"]) get(name).textContent = report[name].toLocaleString();
+      get("projects").textContent = `Projects changed (of ${report.projects})`;
+      get("rule-label").hidden = report.command !== "check";
+      get("note").textContent = report.command === "format" ? "All changed lines and their hunk context are included. Source links point near each hunk in the original project; formatting the baseline can shift line numbers." : "All changed diagnostic lines are included, including fix availability changes.";
+      for (const field of ["project", "rule"]) {
+        const counts = new Map();
+        for (const row of report.rows) if (row[field]) counts.set(row[field], (counts.get(row[field]) || 0) + 1);
+        for (const [name, count] of [...counts].sort(([a], [b]) => a.localeCompare(b))) {
+          const option = document.createElement("option");
+          option.value = name;
+          option.textContent = `${name} (${count.toLocaleString()})`;
+          get(field).append(option);
+        }
+      }
+      let filtered = report.rows;
+      let page = 1;
+      const pageSize = 100;
+      function render() {
+        const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+        page = Math.max(1, Math.min(page, pages));
+        const start = (page - 1) * pageSize;
+        const fragment = document.createDocumentFragment();
+        for (const row of filtered.slice(start, start + pageSize)) {
+          const tr = document.createElement("tr");
+          tr.className = row.kind;
+          const project = document.createElement("td");
+          project.textContent = row.project;
+          const source = document.createElement("td");
+          if (row.url) {
+            const link = document.createElement("a");
+            link.href = row.url;
+            link.textContent = row.path;
+            source.append(link);
+          } else source.textContent = row.path || "—";
+          const text = document.createElement("td");
+          text.textContent = row.text;
+          tr.append(project, source, text);
+          fragment.append(tr);
+        }
+        get("rows").replaceChildren(fragment);
+        get("page").value = page;
+        get("page").max = pages;
+        get("pages").textContent = pages;
+        get("previous").disabled = page === 1;
+        get("next").disabled = page === pages;
+        get("count").textContent = filtered.length ? `${start + 1}–${Math.min(start + pageSize, filtered.length)} of ${filtered.length.toLocaleString()} matching entries` : "0 matching entries";
+        get("empty").hidden = filtered.length > 0;
+        get("empty").textContent = report.rows.length ? "No entries match these filters." : "No changes or project errors.";
+      }
+      function filter() {
+        const query = get("search").value.toLowerCase();
+        filtered = report.rows.filter(row =>
+          (!get("project").value || row.project === get("project").value) &&
+          (!get("rule").value || row.rule === get("rule").value) &&
+          (!get("kind").value || row.kind === get("kind").value) &&
+          (!query || [row.project, row.path, row.rule, row.text].some(value => value.toLowerCase().includes(query)))
+        );
+        page = 1;
+        render();
+      }
+      for (const name of ["project", "rule", "kind"]) get(name).addEventListener("change", filter);
+      let timeout;
+      get("search").addEventListener("input", () => { clearTimeout(timeout); timeout = setTimeout(filter, 200); });
+      get("page").addEventListener("change", () => { page = Number.parseInt(get("page").value, 10) || 1; render(); });
+      get("previous").addEventListener("click", () => { page--; render(); });
+      get("next").addEventListener("click", () => { page++; render(); });
+      render();
+    </script>
+  </body>
+</html>

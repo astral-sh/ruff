@@ -1,5 +1,108 @@
 # Changelog
 
+## 0.17.3
+
+Released on 2026-10-26.
+
+### Preview features
+
+- \[`suspicious`\] Add `shared-clock-mock` ([#29074](https://github.com/astral-sh/ruff/pull/29074))
+
+### Bug fixes
+
+- \[`pyupgrade`\] Avoid incorrect conversions to f-strings (`UP032`) ([#25485](https://github.com/astral-sh/ruff/pull/25485))
+
+### Performance
+
+- Buffer stdout in `ruff format` ([#29631](https://github.com/astral-sh/ruff/pull/29631))
+- Specialize ASCII identifier lexing ([#29503](https://github.com/astral-sh/ruff/pull/29503))
+- Speed up identifier and keyword lexing ([#29463](https://github.com/astral-sh/ruff/pull/29463))
+
+### Documentation
+
+- \[`flake8-bandit`\] Describe what the rule actually checks for `httpx` (`S113`) ([#27936](https://github.com/astral-sh/ruff/pull/27936))
+
+### Contributors
+
+- [@itsvedantkumar](https://github.com/itsvedantkumar)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@anishgirianish](https://github.com/anishgirianish)
+
+## 0.17.2
+
+Released on 2026-10-22.
+
+### Preview features
+
+- \[`complexity`\] Add `unnecessary-regular-expression-compile` ([#25533](https://github.com/astral-sh/ruff/pull/25533))
+
+### Bug fixes
+
+- Avoid syntax errors for type variables with starred constraints (`UP040`, `UP046`, `UP047`, `RUF053`) ([#28362](https://github.com/astral-sh/ruff/pull/28362))
+- \[`pydocstyle`\] Treat backslash-escaped `*args` and `**kwargs` as documented (`D417`) ([#29536](https://github.com/astral-sh/ruff/pull/29536))
+- \[`pylint`\] Avoid false positive on starred elements (`PLE0643`) ([#29483](https://github.com/astral-sh/ruff/pull/29483))
+- \[`pylint`\] Mark fixes unsafe when deleting comments (`PLR5501`, `PLW0120`) ([#29414](https://github.com/astral-sh/ruff/pull/29414))
+- \[`pyupgrade`\] Mark fix unsafe when deleting comments (`UP035`) ([#29413](https://github.com/astral-sh/ruff/pull/29413))
+
+### Performance
+
+- Avoid intermediate names in lint name resolution ([#29506](https://github.com/astral-sh/ruff/pull/29506))
+- Prefilter bidirectional Unicode checks by UTF-8 leading bytes ([#29561](https://github.com/astral-sh/ruff/pull/29561))
+- Share postfix parsing and reduce expression copies ([#29480](https://github.com/astral-sh/ruff/pull/29480))
+
+### Configuration
+
+- \[`pylint`\] Add a configurable allowlist for `magic-value-comparison` (`PLR2004`) ([#18961](https://github.com/astral-sh/ruff/pull/18961))
+
+### Documentation
+
+- Clarify documentation and correct stale guidance ([#29374](https://github.com/astral-sh/ruff/pull/29374))
+- \[`pyupgrade`\] Remove mentions of variance related to fix safety (`UP040`, `UP047`) ([#29592](https://github.com/astral-sh/ruff/pull/29592))
+
+### Contributors
+
+- [@fixfon](https://github.com/fixfon)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@zaniebot](https://github.com/zaniebot)
+- [@FrancescoPezzella](https://github.com/FrancescoPezzella)
+- [@anishgirianish](https://github.com/anishgirianish)
+- [@rajveer3x](https://github.com/rajveer3x)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@LckyLike](https://github.com/LckyLke)
+- [@DaniBodor](https://github.com/DaniBodor)
+
+## 0.17.1
+
+Released on 2026-10-15.
+
+### Preview features
+
+- \[`pycodestyle`\] Don't treat `None`, `True`, or `False` as keywords (`E271`-`E274`) ([#29322](https://github.com/astral-sh/ruff/pull/29322))
+
+### Bug fixes
+
+- Fix dedent with multiple leading comments ([#29382](https://github.com/astral-sh/ruff/pull/29382))
+- \[`flake8-pyi`\] Detect legacy positional-only parameters in `__new__` methods (`PYI063`) ([#28502](https://github.com/astral-sh/ruff/pull/28502))
+- \[`flake8-pyi`\] Fix false positives on quoted annotations (`PYI036`) ([#29274](https://github.com/astral-sh/ruff/pull/29274))
+- \[`perflint`\] Avoid invalid comprehension suggestions (`PERF401`, `PERF403`) ([#29366](https://github.com/astral-sh/ruff/pull/29366))
+
+### Rule changes
+
+- Treat more `collections` and `weakref` containers as mutable ([#29213](https://github.com/astral-sh/ruff/pull/29213))
+
+### Documentation
+
+- \[`flake8-import-conventions`\] Update default and example `aliases` ([#29333](https://github.com/astral-sh/ruff/pull/29333))
+
+### Contributors
+
+- [@fixfon](https://github.com/fixfon)
+- [@mmaxjr](https://github.com/mmaxjr)
+- [@joshuavetos](https://github.com/joshuavetos)
+- [@nekomario28](https://github.com/nekomario28)
+- [@ntBre](https://github.com/ntBre)
+- [@shan3520](https://github.com/shan3520)
+
 ## 0.17.0
 
 Released on 2026-10-09.

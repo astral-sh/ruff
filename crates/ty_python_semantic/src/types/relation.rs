@@ -2,7 +2,7 @@ use crate::ProgramEnvironment;
 use std::borrow::Cow;
 
 use itertools::Itertools;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
@@ -21,11 +21,11 @@ use crate::types::typevar::TypeVarDomain;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    MaterializationKind, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType,
+    SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
-    Db,
+    Db, Program,
     types::{
         ErrorContext, ErrorContextTree, Type, TypePair, constraints::ConstraintSet,
         typevar::TypeVarSet,
@@ -208,6 +208,107 @@ pub(crate) enum TypeVarEvaluation {
     Lazy,
 }
 
+/// Return whether a generic target positive has a static nominal origin missing from every
+/// source positive. Return `false` unless the source positives are nonempty and all have static
+/// nominal origins whose classes have no explicit bases.
+fn has_missing_generic_nominal_bound<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    source: IntersectionType<'db>,
+    target: IntersectionType<'db>,
+) -> bool {
+    // With only nominal source positives, each nominal target positive needs a matching
+    // source positive. Classes without explicit bases can supply only their own origin or
+    // object. Since the target is generic, a missing origin proves failure without inspecting
+    // arguments, exclusions, or MROs. Keep matching origins and inheritance on the full path.
+    !source.positive(db).is_empty()
+        && target.positive(db).iter().any(|&target| {
+            // The proof also applies to non-generic targets other than object, but this extra
+            // filtering costs more than it saves for them: their general relation already
+            // avoids recursion guards and specialization checks.
+            let Type::NominalInstance(instance) = target else {
+                return false;
+            };
+            if !instance.is_definition_generic(db) {
+                return false;
+            }
+            let Some(target) = instance.class_literal(db, env).as_static() else {
+                return false;
+            };
+            source.positive(db).iter().all(|&source| {
+                source
+                    .as_nominal_instance()
+                    .and_then(|source| source.class_literal(db, env).as_static())
+                    .is_some_and(|source| source != target && !source.has_explicit_bases(db))
+            })
+        })
+}
+
+/// Return the class of a nominal instance with no generic specialization or tuple
+/// specification of its own, provided the class is defined by a `class` statement.
+fn non_generic_nominal_class<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> Option<ClassLiteral<'db>> {
+    let Type::NominalInstance(instance) = ty else {
+        return None;
+    };
+    if instance.own_tuple_spec(db).is_some() {
+        return None;
+    }
+    let ClassType::NonGeneric(class @ ClassLiteral::Static(_)) = instance.class(db, env) else {
+        return None;
+    };
+    Some(class)
+}
+
+/// Recognize a single nominal positive and nominal exclusions, without alias, type-variable, or
+/// enum-literal operands. These classes can still inherit specialized or recursive generic bases.
+fn nominal_intersection_bound<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> Option<ClassLiteral<'db>> {
+    let positive = if let Type::Intersection(intersection) = ty {
+        if intersection.positive(db).len() != 1
+            || intersection
+                .negative(db)
+                .iter()
+                .any(|&negative| non_generic_nominal_class(db, env, negative).is_none())
+        {
+            return None;
+        }
+        *intersection.positive(db).iter().next()?
+    } else {
+        ty
+    };
+    non_generic_nominal_class(db, env, positive)
+}
+
+/// Index union alternatives by their required nominal class before checking their exclusions.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn nominal_union_index<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    union: UnionType<'db>,
+) -> Option<FxHashMap<ClassLiteral<'db>, Box<[Type<'db>]>>> {
+    let env = ProgramEnvironment::from_program(program);
+    let mut index: FxHashMap<_, Vec<_>> = FxHashMap::default();
+    for &element in union.elements(db) {
+        index
+            .entry(nominal_intersection_bound(db, &env, element)?)
+            .or_default()
+            .push(element);
+    }
+    let mut index: FxHashMap<_, _> = index
+        .into_iter()
+        .map(|(class, elements)| (class, elements.into_boxed_slice()))
+        .collect();
+    index.shrink_to_fit();
+    Some(index)
+}
+
 #[salsa::tracked]
 impl<'db> Type<'db> {
     /// Return `true` if subtyping is always reflexive for this type; `T <: T` is always true for
@@ -240,6 +341,8 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetSolutions(_)
                 | KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
                 | KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_)
+                | KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_)
+                | KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
             | Type::DataclassDecorator(_)
@@ -673,7 +776,15 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         other: Type<'db>,
     ) -> bool {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+        // Comparing inferred signatures can depend on the union being simplified. Preserve
+        // failed redundancy checks during a cycle so changes to that union cannot make the
+        // comparison alternate between true and false. Keeping an extra alternative is safe.
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _| true,
+            cycle_fn=|_, _, previous: &bool, current: bool, _| *previous && current,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
         fn is_redundant_with_impl<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
             let program = types.program(db);
             let env = ProgramEnvironment::from_program(program);
@@ -692,6 +803,14 @@ impl<'db> Type<'db> {
 
         if self == other {
             return true;
+        }
+
+        // Avoid creating a cached relation query for comparisons that class origins alone can
+        // reject. The general relation below would also return false; this is only a shortcut.
+        if let (Type::Intersection(source), Type::Intersection(target)) = (self, other)
+            && has_missing_generic_nominal_bound(db, env, source, target)
+        {
+            return false;
         }
 
         let program = env.program(db);
@@ -1336,6 +1455,43 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return self.check_type_pair(db, alternatives, target);
         }
 
+        // Fast path for pattern narrowing, which can compare many intersections against the
+        // same wide union. If the source intersection and every arm require a single nominal
+        // class and have only nominal exclusions, the cached index lets us skip arms the
+        // source cannot match. Keep the full traversal when collecting error context for each arm.
+        if source.is_intersection()
+            && !self.is_context_collection_enabled()
+            && let Some(source_class) = nominal_intersection_bound(db, self.env, source)
+            && let Some(index) = nominal_union_index(db, self.env.program(db), union)
+            // A gradual base can make the source assignable to a class outside its known MRO.
+            && !(self.relation.is_assignability()
+                && source_class.iter_mro(db).any(|base| {
+                    matches!(base, ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_))
+                }))
+        {
+            // A successful alternative needs the same nominal class or one of its bases.
+            // Check class identity separately: an unspecialized generic class acquires default
+            // arguments in its MRO. The full relation still checks each alternative's exclusions.
+            let mut matching = std::iter::once(source_class)
+                .chain(source_class.iter_mro(db).filter_map(|base| match base {
+                    ClassBase::Class(ClassType::NonGeneric(class)) if class != source_class => {
+                        Some(class)
+                    }
+                    _ => None,
+                }))
+                .filter_map(|class| index.get(&class));
+            let Some(elements) = matching.next() else {
+                return self.never();
+            };
+            // One group preserves the target union's comparison order. If several bounds match,
+            // use the original traversal so recursive inherited specializations keep that order.
+            if matching.next().is_none() {
+                return elements.iter().when_any(db, self.constraints, |&element| {
+                    self.check_type_pair(db, source, element)
+                });
+            }
+        }
+
         let check_expanded_source = || {
             // Normally non-unions cannot directly contain unions in our model due to the fact that
             // we enforce a DNF structure on our set-theoretic types. However, it *is* possible for
@@ -1387,7 +1543,43 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 }
                 result
             })
-            .or(db, self.constraints, check_expanded_source);
+            .or(db, self.constraints, check_expanded_source)
+            .or(db, self.constraints, || {
+                let has_exclusions = |element: Type<'db>| {
+                    matches!(element, Type::Intersection(intersection) if !intersection.negative(db).is_empty())
+                };
+                if !self.is_eager_assignability()
+                    || !elements.iter().copied().any(has_exclusions)
+                {
+                    return self.never();
+                }
+
+                // A gradual union can cover the source collectively even when no arm does:
+                // `U` is assignable to `(U & ~Top[A]) | A`. Materializing the covering arm A
+                // gives `(U & ~Top[A]) | Top[A]`, which simplifies to `U | Top[A]`: Top[A]
+                // restores the part excluded from U. Leave intersections with exclusions intact.
+                // Keep type-variable domains unchanged, since they describe the specializations
+                // allowed in this relation.
+                let materialization_visitor = ApplyTypeMappingVisitor {
+                    materialize_typevar_bounds_and_defaults: false,
+                    ..self.materialization_visitor.for_new_materialization_root()
+                };
+                let materialized = UnionType::from_elements(
+                    db,
+                    self.env,
+                    elements.iter().copied().map(|element| {
+                        if has_exclusions(element) {
+                            element
+                        } else {
+                            element.materialize(db, MaterializationKind::Top, &materialization_visitor)
+                        }
+                    }),
+                );
+                if materialized == target {
+                    return self.never();
+                }
+                self.without_context_collection(|| self.check_type_pair(db, source, materialized))
+            });
 
         if context_tree.is_some()
             && !elements_context.is_empty()
@@ -1944,6 +2136,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     Type::instance(db, env, ClassType::Generic(source_alias)),
                     target_typeform.type_argument(db),
                 ),
+
+            (
+                Type::KnownInstance(KnownInstanceType::UnionType(source)),
+                Type::KnownInstance(KnownInstanceType::UnionType(target)),
+            ) => ConstraintSet::from_bool(self.constraints, source.same_value(db, env, target)),
 
             (Type::KnownInstance(source_instance), Type::TypeForm(target_typeform))
                 if let Some(source_argument) = source_instance.type_form_argument(db, env) =>
@@ -3784,6 +3981,13 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                         right_partial.wrapped(db).inner(db),
                     )
                 })
+            }),
+
+            (
+                Type::KnownInstance(KnownInstanceType::UnionType(left)),
+                Type::KnownInstance(KnownInstanceType::UnionType(right)),
+            ) => nontrivial_check(self, || {
+                ConstraintSet::from_bool(self.constraints, left.is_disjoint_from(db, env, right))
             }),
 
             (

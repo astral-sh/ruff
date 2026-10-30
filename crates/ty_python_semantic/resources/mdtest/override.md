@@ -968,6 +968,15 @@ class WrappedMethodWithOverrideBranch(BaseProperty):
         def method(self) -> int:
             return 3
 
+class ConditionalMethods(BaseProperty):
+    if coinflip():
+        def method(self) -> int:  # error: [missing-override-decorator]
+            return 2
+
+    else:
+        def method(self) -> int:  # error: [missing-override-decorator]
+            return 3
+
 class WrappedInvalidExplicitOverrideWithUndecoratedBranch:
     if coinflip():
         @wrap(BaseProperty.method)
@@ -1019,6 +1028,30 @@ class OverrideOnFirstOverload(StubParent):
     @overload
     def method(self, value: str) -> str: ...
 
+# With an overload implementation, `@override` belongs on the implementation, including in stubs.
+class OverrideOnStubImplementation(StubParent):
+    @overload
+    def method(self, value: int) -> int: ...
+    @overload
+    def method(self, value: str) -> str: ...
+    @override
+    def method(self, value: int | str) -> int | str: ...  # no diagnostic
+
+class MissingOverrideOnStubImplementation(StubParent):
+    @overload
+    def method(self, value: int) -> int: ...
+    @overload
+    def method(self, value: str) -> str: ...
+    def method(self, value: int | str) -> int | str: ...  # error: [missing-override-decorator]
+
+class OverrideOnStubOverloadWithImplementation(StubParent):
+    @overload
+    @override
+    def method(self, value: int) -> int: ...  # error: [invalid-overload]
+    @overload
+    def method(self, value: str) -> str: ...
+    def method(self, value: int | str) -> int | str: ...  # error: [missing-override-decorator]
+
 class StubProtocolInterface(Protocol):
     def method(self) -> int: ...
 
@@ -1031,6 +1064,54 @@ class StubAbstractInterface(ABC):
 
 class StubAbstractImplementation(StubAbstractInterface):
     def method(self) -> int: ...  # error: [missing-override-decorator]
+```
+
+## Missing `@override` decorator on property accessors
+
+We report missing decorators on all property accessors together, even though the accessors share a
+name.
+
+```toml
+[rules]
+missing-override-decorator = "error"
+```
+
+```py
+from typing_extensions import override
+
+class Parent:
+    attr: int
+
+class Child(Parent):
+    @property
+    def attr(self) -> int:  # error: [missing-override-decorator]
+        return 1
+
+    @attr.setter
+    def attr(self, value: int) -> None:  # error: [missing-override-decorator]
+        pass
+
+    @attr.deleter
+    def attr(self) -> None:  # error: [missing-override-decorator]
+        pass
+```
+
+Decorating or suppressing one accessor does not hide diagnostics on the others.
+
+```py
+class PartiallyDecorated(Parent):
+    @property
+    @override
+    def attr(self) -> int:  # no diagnostic
+        return 1
+
+    @attr.setter
+    def attr(self, value: int) -> None:  # error: [missing-override-decorator]
+        pass
+
+    @attr.deleter
+    def attr(self) -> None:  # ty: ignore[missing-override-decorator]
+        pass
 ```
 
 ## Missing `@override` decorator on Python 3.11
@@ -1342,8 +1423,9 @@ class Spam:
         return x
 ```
 
-In a stub file, `@override` should always be applied to the first overload. Even if it isn't, we
-always emit `invalid-explicit-override` diagnostics on the first overload.
+Without an implementation, `@override` should be applied to the first overload. Even if it isn't, we
+emit `invalid-explicit-override` diagnostics on the first overload. When an implementation is
+present, the diagnostic points to it, including in stub files.
 
 `module.pyi`:
 
@@ -1369,6 +1451,12 @@ class Spam:
     def baz(self, x: str) -> str: ...  # error: [invalid-explicit-override]
     @overload
     def baz(self, x: int) -> int: ...
+    @overload
+    def quux(self, x: str) -> str: ...
+    @overload
+    def quux(self, x: int) -> int: ...
+    @override
+    def quux(self, x: str | int) -> str | int: ...  # error: [invalid-explicit-override]
 ```
 
 ## Overloads in statically-known branches in stub files

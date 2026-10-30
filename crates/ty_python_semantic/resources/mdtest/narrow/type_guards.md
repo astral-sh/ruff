@@ -573,6 +573,60 @@ def _(arg: Callable[[str], object] | Callable[[int], object]):
         reveal_type(arg)  # revealed: (str, /) -> object
 ```
 
+## Generic union parameters
+
+Guards infer type arguments separately for each union member, so narrowing preserves the selected
+member's specialization. `TypeGuard` narrows only its positive branch; `TypeIs` also narrows its
+negative branch.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import TypeGuard, TypeIs
+
+T = TypeVar("T", covariant=True)
+E = TypeVar("E", covariant=True)
+
+class Ok(Generic[T]): ...
+class Err(Generic[E]): ...
+
+def guard_error(value: Ok[T] | Err[E]) -> TypeGuard[Err[E]]:
+    return isinstance(value, Err)
+
+def is_error(value: Ok[T] | Err[E]) -> TypeIs[Err[E]]:
+    return isinstance(value, Err)
+
+def check(value: Ok[int] | Err[str]):
+    if reveal_type(guard_error(value)):  # revealed: TypeGuard[Err[str] @ value]
+        reveal_type(value)  # revealed: Err[str]
+    else:
+        reveal_type(value)  # revealed: Ok[int] | Err[str]
+
+def check_is(value: Ok[int] | Err[str]):
+    if reveal_type(is_error(value)):  # revealed: TypeIs[Err[str] @ value]
+        reveal_type(value)  # revealed: Err[str]
+    else:
+        reveal_type(value)  # revealed: Ok[int] & ~Err[str]
+```
+
+PEP 695 functions preserve the specialization when the union members are reversed:
+
+```py
+def guard_error_pep695[T, E](value: Ok[T] | Err[E]) -> TypeGuard[Err[E]]:
+    return isinstance(value, Err)
+
+def is_error_pep695[T, E](value: Ok[T] | Err[E]) -> TypeIs[Err[E]]:
+    return isinstance(value, Err)
+
+def check_pep695(value: Err[str] | Ok[int]):
+    reveal_type(guard_error_pep695(value))  # revealed: TypeGuard[Err[str] @ value]
+    reveal_type(is_error_pep695(value))  # revealed: TypeIs[Err[str] @ value]
+```
+
 ## `TypeIs` narrowing with generic classes and gradual types
 
 ### Non-strict mode
@@ -1296,6 +1350,50 @@ def overwritten_target(value: object):
         reveal_type(value)  # revealed: TypeGuard[list[int] @ value] & ~AlwaysFalsy
     else:
         reveal_type(value)  # revealed: TypeGuard[list[int] @ value] & ~AlwaysTruthy
+```
+
+## Negative TypeIs narrowing with recursive unions
+
+Excluding a recursive union still exposes its literal exclusions. Removing `True` from `bool` leaves
+a value whose truthiness is known.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal, assert_type
+from typing_extensions import TypeIs
+
+type RecursiveBool = Literal[True] | list[RecursiveBool]
+
+def is_recursive_bool(value: object) -> TypeIs[RecursiveBool]:
+    raise NotImplementedError
+
+def f(value: bool):
+    if not is_recursive_bool(value):
+        assert_type(bool(value), Literal[False])
+```
+
+Excluding an enum member also narrows the remaining members' `name` and `value` attributes.
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+type RecursiveColor = Literal[Color.RED] | list[RecursiveColor]
+
+def is_recursive_color(value: object) -> TypeIs[RecursiveColor]:
+    raise NotImplementedError
+
+def f(value: Color):
+    if not is_recursive_color(value):
+        assert_type(value.name, Literal["BLUE"])
+        assert_type(value.value, Literal[2])
 ```
 
 ## Recursive TypeIs targets

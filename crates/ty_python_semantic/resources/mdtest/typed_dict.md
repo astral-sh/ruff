@@ -2657,6 +2657,77 @@ config["host"] = "127.0.0.1"
 config["port"] = 80
 ```
 
+Read-only keys also can't be deleted, even if they are not required:
+
+```py
+from typing_extensions import NotRequired
+
+class Cache(TypedDict):
+    value: NotRequired[ReadOnly[int]]
+
+def _(cache: Cache) -> None:
+    # snapshot: invalid-argument-type
+    del cache["value"]
+```
+
+```snapshot
+error[invalid-argument-type]: Cannot delete read-only key "value" from TypedDict `Cache`
+  --> src/mdtest_snippet.py:30:15
+   |
+30 |     del cache["value"]
+   |               ^^^^^^^
+```
+
+Read-only keys cannot be removed with `pop()` either. We also reject `setdefault()`, which can
+insert a value if the key is missing:
+
+```py
+def _(cache: Cache) -> None:
+    # error: [invalid-argument-type] "Cannot pop read-only key "value" from TypedDict `Cache`"
+    cache.pop("value")
+    # error: [invalid-argument-type] "Cannot pop read-only key "value" from TypedDict `Cache`"
+    cache.pop("value", 0)
+    # error: [invalid-argument-type] "Cannot set default for read-only key "value" on TypedDict `Cache`"
+    cache.setdefault("value", 0)
+```
+
+## Diagnostics in read-only method arguments
+
+An invalid mutation of a non-required read-only key does not suppress errors in the key or default
+argument:
+
+```py
+from typing_extensions import Literal, NotRequired, ReadOnly, TypedDict
+
+class Cache(TypedDict):
+    value: NotRequired[ReadOnly[int]]
+
+def key(value: str) -> Literal["value"]:
+    return "value"
+
+def _(cache: Cache) -> None:
+    # error: [invalid-argument-type] "Cannot pop read-only key"
+    # error: [unresolved-reference] "Name `missing_default` used when not defined"
+    cache.pop("value", missing_default)
+
+    # error: [invalid-argument-type] "Cannot set default for read-only key"
+    # error: [unresolved-reference] "Name `missing_default` used when not defined"
+    cache.setdefault("value", missing_default)
+
+    # error: [invalid-argument-type] "Cannot pop read-only key"
+    # error: [invalid-argument-type] "Argument to function `key` is incorrect"
+    cache.pop(key(1))
+```
+
+Errors in the key are also reported when the mutation is an argument to an overloaded call:
+
+```py
+def _(cache: Cache) -> None:
+    # error: [invalid-argument-type] "Cannot pop read-only key"
+    # error: [invalid-argument-type] "Argument to function `key` is incorrect"
+    sorted((cache.pop(key(1)),))
+```
+
 ## `update()` with `ReadOnly` items
 
 `update()` also cannot write to `ReadOnly` items, unless the source key is bottom-typed and
@@ -3027,7 +3098,7 @@ def invalid_default(mapping: OptionalValue) -> None:
 ```
 
 For a required field, the default cannot contribute to the result. This also holds when the field
-type is an explicit type alias:
+type is a PEP 695 alias:
 
 ```py
 type ValueAlias = Value
@@ -3438,8 +3509,8 @@ def _(value: AnyExtraItems | OtherAnyExtraItems) -> None:
 ```
 
 Rejected common-constraint probes must not affect fallback protocol inference. Both mappings below
-contain an `int`, so inference should select the `int` constraint. It currently selects the broader
-`object` constraint instead:
+contain an `int`, so inference selects the `int` constraint rather than the broader `object`
+constraint:
 
 ```py
 from typing import Literal, Protocol, TypeVar, TypedDict
@@ -3460,8 +3531,7 @@ def get_value(value: GetValue[ConstrainedValue]) -> ConstrainedValue:
 
 def takes_str(value: str) -> None: ...
 def _(value: ValueA | ValueB) -> None:
-    # TODO: revealed int
-    reveal_type(get_value(value))  # revealed: object
+    reveal_type(get_value(value))  # revealed: int
     takes_str(get_value(value))  # error: [invalid-argument-type]
 ```
 
@@ -3498,14 +3568,14 @@ def _(value: CorrelatedA | CorrelatedB) -> None:
 
 ```snapshot
 error[invalid-argument-type]: Argument to function `takes_int` is incorrect
-   --> src/mdtest_snippet.py:347:15
+   --> src/mdtest_snippet.py:346:15
     |
-347 |     takes_int(set_and_get(value, "a", 1))
+346 |     takes_int(set_and_get(value, "a", 1))
     |               ^^^^^^^^^^^^^^^^^^^^^^^^^^ Expected `int`, found `object`
 info: Function defined here
-   --> src/mdtest_snippet.py:343:5
+   --> src/mdtest_snippet.py:342:5
     |
-343 | def takes_int(value: int) -> None: ...
+342 | def takes_int(value: int) -> None: ...
     |     ^^^^^^^^^ ---------- Parameter declared here
 ```
 
@@ -5713,6 +5783,9 @@ from typing_extensions import TypedDict
 # error: [unknown-argument] "Argument `year` does not match any known parameter of function `TypedDict`"
 # error: [missing-argument] "No argument provided for required parameter `fields` of function `TypedDict`"
 Movie2 = TypedDict("Movie2", name=str, year=int)
+
+# The invalid declaration does not cause another diagnostic when used as an annotation.
+def use(value: Movie2): ...  # no diagnostic
 ```
 
 ## Function syntax with invalid arguments

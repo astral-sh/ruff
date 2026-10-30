@@ -3,6 +3,9 @@
 ```toml
 [environment]
 python-version = "3.14"  # I like using modern syntax
+
+[analysis]
+return-type-inference = "always"
 ```
 
 ## Basic
@@ -20,12 +23,9 @@ def returns_a():
 def returns_none():
     return None
 
-# TODO: should be `Literal[1]`
-reveal_type(returns_1())  # revealed: Unknown
-# TODO: should be `Literal["a"]`
-reveal_type(returns_a())  # revealed: Unknown
-# TODO: should be `None`
-reveal_type(returns_none())  # revealed: Unknown
+reveal_type(returns_1())  # revealed: Literal[1]
+reveal_type(returns_a())  # revealed: Literal["a"]
+reveal_type(returns_none())  # revealed: None
 ```
 
 If a return expression refers back to a parameter of unknown type, the inferred return type is
@@ -66,8 +66,7 @@ def returns_literal_1_or_a(flag: bool):
     else:
         return "a"
 
-# TODO: should be `Literal[1, "a"]`
-reveal_type(returns_literal_1_or_a(True))  # revealed: Unknown
+reveal_type(returns_literal_1_or_a(True))  # revealed: Literal[1, "a"]
 ```
 
 If control flow in a function can reach the end, or if all return statements `return` without an
@@ -86,10 +85,9 @@ def implicit_none_3(flag: bool):
     else:
         return
 
-# TODO: should be `None`
-reveal_type(implicit_none_1())  # revealed: Unknown
-reveal_type(implicit_none_2())  # revealed: Unknown
-reveal_type(implicit_none_3(True))  # revealed: Unknown
+reveal_type(implicit_none_1())  # revealed: None
+reveal_type(implicit_none_2())  # revealed: None
+reveal_type(implicit_none_3(True))  # revealed: None
 ```
 
 If the function has a mix of return statements with and without expressions, or some code paths that
@@ -107,9 +105,8 @@ def returns_int_or_none_2(flag: bool):
     else:
         return
 
-# TODO: should be `Literal[1] | None`
-reveal_type(returns_int_or_none_1(True))  # revealed: Unknown
-reveal_type(returns_int_or_none_2(True))  # revealed: Unknown
+reveal_type(returns_int_or_none_1(True))  # revealed: Literal[1] | None
+reveal_type(returns_int_or_none_2(True))  # revealed: Literal[1] | None
 ```
 
 Return type inference takes narrowed types into account, so this function can only return `str`:
@@ -120,8 +117,7 @@ def to_str(x: int | str):
         return str(x)
     return x
 
-# TODO: should be `str`
-reveal_type(to_str(1))  # revealed: Unknown
+reveal_type(to_str(1))  # revealed: str
 ```
 
 ## Functions with non-trivial control flow
@@ -139,8 +135,7 @@ def returns_from_loop(some_condition):
             return x
         x = "a"
 
-# TODO: should be `Literal[1, "a"]`
-reveal_type(returns_from_loop(True))  # revealed: Unknown
+reveal_type(returns_from_loop(True))  # revealed: Literal[1, "a"]
 ```
 
 ### Unreachable `return` statements
@@ -154,8 +149,7 @@ def can_only_return_int(flag: bool):
     else:
         return "a"
 
-# TODO: should be `Literal[1]`
-reveal_type(can_only_return_int(True))  # revealed: Unknown
+reveal_type(can_only_return_int(True))  # revealed: Literal[1]
 ```
 
 ### Branches that do not return
@@ -169,8 +163,7 @@ def non_returning_else(flag: bool):
     else:
         raise Exception("This branch never returns")
 
-# TODO: should be `Literal[1]`
-reveal_type(non_returning_else(True))  # revealed: Unknown
+reveal_type(non_returning_else(True))  # revealed: Literal[1]
 ```
 
 ### Exhaustive matches
@@ -183,8 +176,7 @@ def type_name(x: int | str):
         case str():
             return "str"
 
-# TODO: should be `Literal["int", "str"]`
-reveal_type(type_name(1))  # revealed: Unknown
+reveal_type(type_name(1))  # revealed: Literal["int", "str"]
 ```
 
 ### Returning from `finally` clauses
@@ -200,7 +192,7 @@ def returns_from_finally():
         return "a"
 
 # TODO: should ideally be `Literal["a"]`
-reveal_type(returns_from_finally())  # revealed: Unknown
+reveal_type(returns_from_finally())  # revealed: Literal[1, "a"]
 ```
 
 If the `return` in the `finally` clause is conditional, both the `try` block and the `finally` block
@@ -214,8 +206,7 @@ def returns_from_try_or_finally(flag: bool):
         if flag:
             return "a"
 
-# TODO: should be `Literal[1] | Literal["a"]`
-reveal_type(returns_from_try_or_finally(True))  # revealed: Unknown
+reveal_type(returns_from_try_or_finally(True))  # revealed: Literal[1, "a"]
 ```
 
 ## Functions that do not return
@@ -229,8 +220,7 @@ def infinite_loop():
     while True:
         pass
 
-# TODO: should be `Never`
-reveal_type(infinite_loop())  # revealed: Unknown
+reveal_type(infinite_loop())  # revealed: Never
 ```
 
 ### Functions that always raise exceptions
@@ -242,8 +232,7 @@ Similarly, a function that always raises an exception, should also have an infer
 def always_raises():
     raise Exception("This function always raises")
 
-# TODO: should be `Never`
-reveal_type(always_raises())  # revealed: Unknown
+reveal_type(always_raises())  # revealed: Never
 ```
 
 ### Functions that call other functions that do not return
@@ -257,8 +246,7 @@ import sys
 def my_exit():
     sys.exit()
 
-# TODO: should be `Never`
-reveal_type(my_exit())  # revealed: Unknown
+reveal_type(my_exit())  # revealed: Never
 ```
 
 ## Generic functions
@@ -269,17 +257,14 @@ A generic function without a return type annotation can also have its return typ
 def generic_identity[T](x: T):
     return x
 
-# TODO: should be `Literal[1]` or `int`
-reveal_type(generic_identity(1))  # revealed: Unknown
-# TODO: should be `Literal["a"]` or `str`
-reveal_type(generic_identity("a"))  # revealed: Unknown
+reveal_type(generic_identity(1))  # revealed: Literal[1]
+reveal_type(generic_identity("a"))  # revealed: Literal["a"]
 
 def swap[X, Y](x: X, y: Y):
     return y, x
 
 def _(x: int, y: str):
-    # TODO: should be `tuple[str, int]`
-    reveal_type(swap(x, y))  # revealed: Unknown
+    reveal_type(swap(x, y))  # revealed: tuple[str, int]
 ```
 
 If there are multiple paths, the inferred return type can be included in a union:
@@ -290,10 +275,8 @@ def returns_t_or_none[T](x: T, flag: bool):
         return x
 
 def _(flag: bool):
-    # TODO: should be `Literal[1] | None` or `int | None`
-    reveal_type(returns_t_or_none(1, flag))  # revealed: Unknown
-    # TODO: should be `Literal["a"] | None` or `str | None`
-    reveal_type(returns_t_or_none("a", flag))  # revealed: Unknown
+    reveal_type(returns_t_or_none(1, flag))  # revealed: Literal[1] | None
+    reveal_type(returns_t_or_none("a", flag))  # revealed: Literal["a"] | None
 ```
 
 ## Internal structure that should not leak out
@@ -316,7 +299,6 @@ def returns_class():
 Inner1 = returns_class()
 Inner2 = returns_class()
 
-# TODO: This should be `bool` or `Literal[False]`, not `Literal[True]`
 reveal_type(Inner1 is Inner2)  # revealed: bool
 
 # TODO: This should ideally be an error
@@ -357,13 +339,10 @@ def returns_callable():
 callable1 = returns_callable()
 callable2 = returns_callable()
 
-# This should be `bool` or `Literal[False]`, not `Literal[True]`
 reveal_type(callable1 is callable2)  # revealed: bool
 
-# TODO: should be `Callable[[], int]`
-reveal_type(callable1)  # revealed: Unknown
-# TODO: should be `int`
-reveal_type(callable1())  # revealed: Unknown
+reveal_type(callable1)  # revealed: () -> int
+reveal_type(callable1())  # revealed: int
 ```
 
 ### Nested definitions and generics
@@ -385,8 +364,7 @@ def returns_instance[T](x: T):
 def _(x: int):
     inner = returns_instance(x)
 
-    # TODO: `Inner` would probably be wrong here. Ideally, we would return a synthetic protocol
-    # with a type of `int` for the `attr` attribute.
+    # TODO: Ideally, we would return a synthetic protocol with an `int` attribute.
     reveal_type(inner)  # revealed: Unknown
 
     # TODO: should ideally be `int`
@@ -432,8 +410,7 @@ def identity_1[T](func: T) -> T:
 def returns_1():
     return 1
 
-# TODO: should be `Literal[1]`
-reveal_type(returns_1())  # revealed: Unknown
+reveal_type(returns_1())  # revealed: Literal[1]
 ```
 
 This should also work with decorators that use `Callable` and `ParamSpec`:
@@ -469,12 +446,11 @@ def replace(func):
         return "a"
     return returns_str
 
-@replace  # error: [dynamic-function-decorator-return]
+@replace
 def returns_4_but_will_be_replaced():
     return 4
 
-# TODO: should ideally be `Literal["a"]`
-reveal_type(returns_4_but_will_be_replaced())  # revealed: Unknown
+reveal_type(returns_4_but_will_be_replaced())  # revealed: Literal["a"]
 ```
 
 ## Methods
@@ -512,15 +488,12 @@ class BaseNA:
         return 1
 
 class DerivedNA(BaseNA):
-    # TODO: Without unioning with `Unknown`, this should be an invalid-method-override error.
     def method(self):
         return "a"
 
 def _(base: BaseNA, derived: DerivedNA):
-    # TODO: Should either be `int` or `Literal[1] | Unknown`
-    reveal_type(base.method())  # revealed: Unknown
-    # TODO: Should either be `str` or `Literal["a"] | Unknown`
-    reveal_type(derived.method())  # revealed: Unknown
+    reveal_type(base.method())  # revealed: Literal[1] | Unknown
+    reveal_type(derived.method())  # revealed: Literal["a"] | Unknown
 ```
 
 ### Final classes and methods
@@ -541,10 +514,8 @@ class SomeClass:
     def final_method(self):
         return "a"
 
-# TODO: Should be `Literal[1]`
-reveal_type(FinalClass().method())  # revealed: Unknown
-# TODO: Should be `Literal["a"]`
-reveal_type(SomeClass().final_method())  # revealed: Unknown
+reveal_type(FinalClass().method())  # revealed: Literal[1]
+reveal_type(SomeClass().final_method())  # revealed: Literal["a"]
 ```
 
 ### Overriding annotated base class methods
@@ -565,8 +536,7 @@ class Child(Parent):
 In this case, we let the child class "inherit" the base class annotation:
 
 ```py
-# TODO: Should be `int | None`
-reveal_type(Child().method())  # revealed: Unknown
+reveal_type(Child().method())  # revealed: int | None
 ```
 
 This also works for subclasses further down:
@@ -576,13 +546,11 @@ class GrandChild(Child):
     def method(self):
         return 2
 
-# TODO: Should be `int | None`
-reveal_type(GrandChild().method())  # revealed: Unknown
+reveal_type(GrandChild().method())  # revealed: int | None
 ```
 
-The inherited return annotation takes precedence over the inferred body return type. If a subclass
-method returns an incompatible value, we report an error on the `return` statement and retain the
-inherited return type for callers:
+The inherited return annotation takes precedence over the inferred body return type, even if a
+subclass method returns an incompatible value:
 
 ```py
 class IncompatibleChild(Parent):
@@ -590,8 +558,7 @@ class IncompatibleChild(Parent):
         # TODO: This should be an invalid-return-type error.
         return "a"
 
-# TODO: Should be `int | None`
-reveal_type(IncompatibleChild().method())  # revealed: Unknown
+reveal_type(IncompatibleChild().method())  # revealed: int | None
 ```
 
 ### Methods that return `None` or `Never`
@@ -618,8 +585,7 @@ class IntJob(Job):
         return 1
 
 def _(task: Task, job: Job):
-    # TODO: Should be `None | Unknown`
-    reveal_type(task.compute())  # revealed: Unknown
+    reveal_type(task.compute())  # revealed: None | Unknown
     reveal_type(job.run())  # revealed: Unknown
 ```
 
@@ -627,10 +593,76 @@ For the child classes, we can infer a stricter (wider) return type based on thei
 implementations. Unioning in the inferred return type of the child method body seems appropriate:
 
 ```py
-# TODO: Should probably be `None | int | Unknown`
-reveal_type(IntTask().compute())  # revealed: Unknown
-# TODO: Should probably be `int | Unknown`
-reveal_type(IntJob().run())  # revealed: Unknown
+# Here, the return types could plausibly also include `None` from the base class method, but since we
+# union with `Unknown` right now, we don't impose any strict constraints on child classes of `IntTask`
+# and `IntJob`, so maybe just returning `Literal[1] | Unknown` is even better, because including `None`
+# could also lead to false positives (the actual methods here cannot actually return `None).
+reveal_type(IntTask().compute())  # revealed: Literal[1] | Unknown
+reveal_type(IntJob().run())  # revealed: Literal[1] | Unknown
+```
+
+### Abstract methods
+
+Abstract methods often have a no-op body, and even if they contain an implementation, we treat their
+return type as unknown, based on the assumption that these default implementations are often not a
+reliable indicator of the actual contract that subclass methods are expected to fulfill.
+
+```py
+from abc import ABC, abstractmethod
+
+class Abstract(ABC):
+    @abstractmethod
+    def get(self): ...
+    @abstractmethod
+    def get_with_default_implementation(self):
+        return 1
+
+def _(abstract: Abstract):
+    reveal_type(abstract.get())  # revealed: Unknown
+    reveal_type(abstract.get_with_default_implementation())  # revealed: Unknown
+```
+
+Concrete overrides still infer their own return types:
+
+```py
+class Concrete(Abstract):
+    def get(self):
+        return 1
+
+    def get_with_default_implementation(self):
+        return "a string"
+
+def _(concrete: Concrete):
+    reveal_type(concrete.get())  # revealed: Literal[1] | Unknown
+    reveal_type(concrete.get_with_default_implementation())  # revealed: Literal["a string"] | Unknown
+```
+
+### Protocol methods
+
+The same reasoning applies for methods on protocols.
+
+```py
+from typing import Protocol
+
+class Abstract(Protocol):
+    def get(self): ...
+    def get_with_default_implementation(self):
+        return 1
+
+def _(abstract: Abstract):
+    reveal_type(abstract.get())  # revealed: Unknown
+    reveal_type(abstract.get_with_default_implementation())  # revealed: Unknown
+
+class Concrete(Abstract):
+    def get(self):
+        return 1
+
+    def get_with_default_implementation(self):
+        return 1
+
+def _(concrete: Concrete):
+    reveal_type(concrete.get())  # revealed: Literal[1] | Unknown
+    reveal_type(concrete.get_with_default_implementation())  # revealed: Literal[1] | Unknown
 ```
 
 ### `__new__`
@@ -702,15 +734,13 @@ class Fluent:
 
 Fluent().set_value(1).set_value(2)
 
-# TODO: Should be `Fluent` or `Fluent | Unknown`
-reveal_type(Fluent().set_value(1))  # revealed: Unknown
+reveal_type(Fluent().set_value(1))  # revealed: Fluent | Unknown
 
 class FluentSub(Fluent): ...
 
 FluentSub().set_value(1).set_value(2)
 
-# TODO: Should be `FluentSub` or `FluentSub | Unknown`
-reveal_type(FluentSub().set_value(1))  # revealed: Unknown
+reveal_type(FluentSub().set_value(1))  # revealed: FluentSub | Unknown
 ```
 
 This also works when the type of `self` has been widened or narrowed:
@@ -750,17 +780,59 @@ class Factory:
 
 class FactorySub(Factory): ...
 
-# TODO: Should be `type[Factory]` or `type[Factory] | Unknown`
-reveal_type(Factory.reference())  # revealed: Unknown
+reveal_type(Factory.reference())  # revealed: type[Factory] | Unknown
+reveal_type(Factory.create())  # revealed: Factory | Unknown
+reveal_type(FactorySub.reference())  # revealed: type[FactorySub] | Unknown
+reveal_type(FactorySub.create())  # revealed: FactorySub | Unknown
+```
 
-# TODO: Should be `Factory` or `Factory | Unknown`
-reveal_type(Factory.create())  # revealed: Unknown
+### Methods returning class-scoped type variables
 
-# TODO: Should be `type[FactorySub]` or `type[FactorySub] | Unknown`
-reveal_type(FactorySub.reference())  # revealed: Unknown
+If the inferred return type refers to a class-scoped type variable, it should be specialized
+accordingly.
 
-# TODO: Should be `FactorySub` or `FactorySub | Unknown`
-reveal_type(FactorySub.create())  # revealed: Unknown
+```py
+class Pair[X, Y]:
+    def __init__(self, first: X, second: Y):
+        self.first = first
+        self.second = second
+
+    def get_first(self):
+        return self.first
+
+    def get_second(self):
+        return self.second
+
+    def get_both(self):
+        return self.first, self.second
+
+def _(pair_int_str: Pair[int, str]):
+    reveal_type(pair_int_str.get_first())  # revealed: int | Unknown
+    reveal_type(pair_int_str.get_second())  # revealed: str | Unknown
+    reveal_type(pair_int_str.get_both())  # revealed: tuple[int, str] | Unknown
+```
+
+This also works for classmethods:
+
+```py
+class Factory[T]:
+    @classmethod
+    def identity(cls, value: T):
+        return value
+
+reveal_type(Factory[int].identity(1))  # revealed: int | Unknown
+```
+
+Static methods also retain the class's type arguments:
+
+```py
+class Box[T]:
+    @staticmethod
+    def identity(value: T):
+        return value
+
+reveal_type(Box[int].identity(1))  # revealed: int | Unknown
+value: int = Box[int].identity(1)  # no diagnostic
 ```
 
 ## Overloaded functions
@@ -838,8 +910,7 @@ def factorial(n: int):
 
 # TODO: Should ideally be `def factorial(n: int) -> int`
 reveal_type(factorial)  # revealed: def factorial(n: int) -> Unknown
-# TODO: Should ideally be `int`
-reveal_type(factorial(5))  # revealed: Unknown
+reveal_type(factorial(5))  # revealed: int
 
 def fibonacci(n: int):
     if n == 0:
@@ -850,8 +921,7 @@ def fibonacci(n: int):
 
 # TODO: Should ideally be `def fibonacci(n: int) -> int`
 reveal_type(fibonacci)  # revealed: def fibonacci(n: int) -> Unknown
-# TODO: Should ideally be `int`
-reveal_type(fibonacci(5))  # revealed: Unknown
+reveal_type(fibonacci(5))  # revealed: int
 ```
 
 In some cases, fixed-point iteration might be able to determine a precise return type:
@@ -863,7 +933,7 @@ def alternating(n: int):
     return -alternating(n - 1)
 
 # TODO: Should ideally be `Literal[-1, 1]`, or at least `Literal[-1, 1] | Unknown`
-reveal_type(alternating(3))  # revealed: Unknown
+reveal_type(alternating(3))  # revealed: int
 ```
 
 ### Divergent
@@ -874,14 +944,14 @@ A function that would never return normally should still be analyzed without err
 def divergent():
     return divergent()
 
-# TODO: Should ideally be `Never`, but `Unknown` is also okay
-reveal_type(divergent())  # revealed: Unknown
+# Should ideally be `Never`
+reveal_type(divergent())  # revealed: Divergent
 
 def expanding(x):
     return (expanding(x), expanding(x))
 
-# TODO: Should ideally be `Never` or `tuple[Never, Never]`, but `Unknown` is also okay
-reveal_type(expanding(5))  # revealed: Unknown
+# Should ideally be `Never` or `tuple[Never, Never]`
+reveal_type(expanding(5))  # revealed: tuple[Divergent, Divergent]
 ```
 
 ### Mutual recursion
@@ -899,9 +969,8 @@ def right(n: int):
         return "a"
     return left(n - 1)
 
-# TODO: Should be `Literal[1, "a"]` or `Literal[1, "a"] | Unknown`
-reveal_type(left(3))  # revealed: Unknown
-reveal_type(right(3))  # revealed: Unknown
+reveal_type(left(3))  # revealed: Literal[1, "a"]
+reveal_type(right(3))  # revealed: Literal["a", 1]
 ```
 
 ## Edge cases
@@ -930,8 +999,7 @@ return type of `logged(..)` calls. For example:
 ```py
 logging_len = logged(len)
 
-# TODO: Should be `_Wrapped[(...), Unknown, (arg), Unknown]`
-reveal_type(logging_len)  # revealed: Unknown
+reveal_type(logging_len)  # revealed: _Wrapped[(...), Unknown, (arg), Unknown]
 ```
 
 The wrapped function can be called, and the `__wrapped__` attribute can be accessed:
@@ -946,13 +1014,13 @@ i.e. `method` should be callable with an implicitly bound `self` argument:
 
 ```py
 class C:
-    # TODO: Return type inference should remove this diagnostic.
-    @logged  # error: [dynamic-function-decorator-return]
+    @logged
     def method(self):
         return 42
 
 instance = C()
-instance.method()  # no diagnostic
+# TODO: This shouldn't be an error
+instance.method()  # error: [missing-argument]
 ```
 
 Calling `method` on the class object itself is also possible:
@@ -963,8 +1031,8 @@ C.method(instance)  # also no diagnostic
 
 ### `NotImplemented`
 
-A dunder method that returns `NotImplemented` is not treated in a special way by return type
-inference:
+An unannotated `__eq__` method inherits the `bool` return annotation from `object.__eq__`, so
+returning `NotImplemented` does not affect the inferred return type, which remains `bool`:
 
 ```py
 class C:
@@ -976,17 +1044,13 @@ class C:
             return NotImplemented
         return self.x == other.x
 
-# TODO: Should be `NotImplementedType | Unknown | bool`
-reveal_type(C.__eq__(C(1), C(2)))  # revealed: Unknown
+reveal_type(C.__eq__(C(1), C(2)))  # revealed: bool
 ```
 
-However, when called implicitly through the `==` operator, a return value of `NotImplemented` is
-handled in a special way (the reverse `type(rhs).__eq__(rhs, lhs)` call is tried, and then it falls
-back to `lhs is rhs`). Therefore, the final result for the following comparisons should always be a
-`bool`:
+Consequently, the following two comparisons, which implicitly call `C.__eq__`, also have a `bool`
+result:
 
 ```py
-# TODO: These should ideally be `bool` or `bool | Unknown`
-reveal_type(C(1) == C(2))  # revealed: Unknown
-reveal_type(C(1) == "something else")  # revealed: Unknown
+reveal_type(C(1) == C(2))  # revealed: bool
+reveal_type(C(1) == "something else")  # revealed: bool
 ```

@@ -2,6 +2,7 @@ use super::*;
 use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
 use crate::types::call::bind::CallableDescription;
+use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::type_alias::PEP695TypeAliasType;
 use crate::types::typevar::TypeVarSet;
 use crate::{Db, ProgramEnvironment};
@@ -775,6 +776,7 @@ fn pending_narrowing_cycle_recovery_preserves_guarded_contributions() {
     // Pending narrowing in an opaque bound invalidates the enclosing type argument.
     let pending_typevar = BoundTypeVarInstance::synthetic_self(
         &db,
+        SelfTypeVarOrigin::ReceiverPlaceholder,
         pending,
         BindingContext::Synthetic(env.program(&db)),
     );

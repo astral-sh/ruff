@@ -160,6 +160,11 @@ class ExplicitInheritedGenericPartiallySpecializedExtraTypevar(MultipleTypevars[
 # error: [invalid-generic-class] "`Generic` base class must include all type variables used in other base classes"
 class ExplicitInheritedGenericPartiallySpecializedMissingTypevar(MultipleTypevars[T, int], Generic[S]): ...
 
+# error: [invalid-generic-class] "`Generic` base class must include all type variables used in other base classes"
+class ExplicitInheritedGenericEmpty(MultipleTypevars[T, S], Generic[()]): ...
+
+reveal_type(generic_context(ExplicitInheritedGenericEmpty))  # revealed: None
+
 # revealed: ty_extensions._internal.GenericContext[T@ExplicitInheritedGeneric, S@ExplicitInheritedGeneric]
 reveal_type(generic_context(ExplicitInheritedGeneric))
 # revealed: ty_extensions._internal.GenericContext[T@ExplicitInheritedGenericPartiallySpecialized]
@@ -210,6 +215,315 @@ reveal_type(generic_context(Base))  # revealed: ty_extensions._internal.GenericC
 class Child(Base[T]): ...
 
 child: Child[int]
+```
+
+## Protocol instances as generic arguments
+
+`Generic` and `Protocol` expect type variables, not protocol instances. This also applies to a
+specialized protocol whose methods use its type parameter:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, Protocol
+
+class HasMethod[T](Protocol):
+    def method(self) -> T: ...
+
+def _(value: HasMethod[int]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+    Protocol[value]  # error: [invalid-argument-type]
+    class C(Generic[value]): ...  # error: [invalid-argument-type]
+    class D(Protocol[value]): ...  # error: [invalid-argument-type]
+```
+
+A method's own type parameter does not make the protocol instance a valid argument either. Here, `U`
+appears in the method signature, but the returned protocol does not use its argument:
+
+```py
+class Q[T](Protocol):
+    value: int
+
+class HasGenericMethod[T](Protocol):
+    def method[U](self, value: U) -> Q[U]: ...
+
+def _(value: HasGenericMethod[int]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+    Protocol[value]  # error: [invalid-argument-type]
+```
+
+A nested specialization in a method return type is also invalid:
+
+```py
+def _(value: HasMethod[HasMethod[int]]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+The same applies to a nested specialization in an attribute:
+
+```py
+class P[T](Protocol):
+    value: T
+
+def _(value: P[P[int]]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+## Finite recursive protocols as generic arguments
+
+`Generic` and `Protocol` reject protocol instances even when their methods are recursive:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Generic, Protocol
+
+class P[T](Protocol):
+    def method(self) -> P[int]: ...
+
+def _(value: P[int]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+The same restriction applies when the method returns a different specialization of the protocol:
+
+```py
+def _(value: P[str]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+A property that swaps its type arguments returns to the original specialization after two steps.
+This finite cycle does not change which arguments are valid:
+
+```py
+class Swapped[A, B](Protocol):
+    @property
+    def next(self) -> Swapped[B, A]: ...
+
+def _(value: Swapped[int, str]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+## Runtime `TypeVarTuple` arguments
+
+A list is not a valid argument to `Generic` or `Protocol`, even when it contains runtime
+`TypeVarTuple` objects:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, Protocol, TypeVarTuple
+
+def _(value: TypeVarTuple) -> None:
+    Generic[[value]]  # error: [invalid-argument-type]
+    Protocol[[value]]  # error: [invalid-argument-type]
+
+    class GenericBase(Generic[[value]]): ...  # error: [invalid-argument-type]
+    class ProtocolBase(Protocol[[value]]): ...  # error: [invalid-argument-type]
+```
+
+The `typing_extensions` variant has the same behavior:
+
+```py
+from typing_extensions import TypeVarTuple as TypeVarTupleExtensions
+
+def _(value: TypeVarTupleExtensions) -> None:
+    Generic[[value]]  # error: [invalid-argument-type]
+    Protocol[[value]]  # error: [invalid-argument-type]
+```
+
+Naming the list type with an alias does not make the argument valid:
+
+```py
+type Alias = list[TypeVarTuple]
+
+def _(alias: Alias) -> None:
+    Generic[alias]  # error: [invalid-argument-type]
+```
+
+A `NewType` based on that list type is also invalid:
+
+```py
+from typing import NewType
+
+X = NewType("X", list[TypeVarTuple])
+
+def _(newtype: X) -> None:
+    Generic[newtype]  # error: [invalid-argument-type]
+```
+
+Nor does a type variable's bound make the list a valid argument:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", bound=list[TypeVarTuple])
+
+def _(bounded: T) -> None:
+    Generic[bounded]  # error: [invalid-argument-type]
+```
+
+We reject protocol instances even when specialized with `TypeVarTuple`:
+
+```py
+class Unused[T](Protocol):
+    value: int
+
+def _(value: Unused[TypeVarTuple]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+The protocol remains invalid if one of its members uses that argument:
+
+```py
+class Used[T](Protocol):
+    value: T
+
+def _(value: Used[TypeVarTuple]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+A protocol parameter's bound does not make an instance a valid argument, even when the protocol is
+specialized with `Any`:
+
+```py
+from typing import Any
+
+class Bounded[T: list[TypeVarTuple]](Protocol):
+    def method(self) -> T: ...
+
+def _(value: Bounded[Any]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+## Type variable defaults in generic arguments
+
+A type-variable default does not restrict values annotated with that type variable. A default
+containing a `TypeVarTuple` therefore does not make these arguments valid:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, Protocol, TypeVar, TypeVarTuple
+
+T = TypeVar("T", default=list[TypeVarTuple])
+
+def _(value: T) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+    Protocol[value]  # error: [invalid-argument-type]
+```
+
+## Recursive structural types in generic arguments
+
+A recursive protocol instance is not a valid `Generic` argument, even when its members keep changing
+specialization:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Generic, Protocol, TypedDict
+
+class Recursive[T](Protocol):
+    next: Recursive[list[T]]
+
+def _(value: Recursive[int]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+The recursive reference can also appear in a method's return type:
+
+```py
+class RecursiveMethod[T](Protocol):
+    def method(self) -> RecursiveMethod[list[T]]: ...
+
+def _(value: RecursiveMethod[int]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+The same restriction applies to properties whose return types keep changing specialization:
+
+```py
+class RecursiveProperty[T](Protocol):
+    @property
+    def next(self) -> RecursiveProperty[list[T]]: ...
+
+def _(value: RecursiveProperty[int]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+Mutually recursive methods can keep changing specialization too. Each round below adds another
+`list` around the argument:
+
+```py
+class Left[T](Protocol):
+    def method(self) -> Right[list[T]]: ...
+
+class Right[U](Protocol):
+    def method(self) -> Left[U]: ...
+
+def _(value: Left[int]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+We also reject a non-generic protocol instance whose method returns the growing type:
+
+```py
+class Root(Protocol):
+    def method(self) -> Left[int]: ...
+
+def _(value: Root) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+A growing recursive `TypedDict` is also invalid:
+
+```py
+class Payload[T](TypedDict):
+    child: Payload[list[T]]
+
+def _(value: Payload[int]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+## Recursive bounds in generic arguments
+
+A recursive bound on an unused protocol parameter does not make the protocol instance a valid
+`Generic` argument:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Generic, Protocol
+
+type Recursive[T] = list[Recursive[list[T]]]
+
+class P[T: Recursive[int]](Protocol):
+    def method(self) -> int: ...
+
+def _(value: P[Any]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
 ```
 
 ## Specializing classes with unavailable generic context
@@ -644,6 +958,29 @@ def value(factory: type[Box[T]]) -> T:
     return factory().value
 
 reveal_type(value(Box))  # revealed: int
+```
+
+## Aliases of unsubscripted generic classes
+
+An implicit alias preserves the generic class object. A PEP 613 alias uses the class's default
+specialization, including when that alias is assigned to another name:
+
+```py
+from typing_extensions import Generic, TypeAlias, TypeVar
+
+T = TypeVar("T", default=str)
+
+class Box(Generic[T]): ...
+
+BoxAlias = Box
+DefaultBox: TypeAlias = Box
+ForwardedDefault = DefaultBox
+
+def inspect(generic: BoxAlias[int], default: DefaultBox):
+    reveal_type(generic)  # revealed: Box[int]
+    reveal_type(default)  # revealed: Box[str]
+
+def invalid(forwarded: ForwardedDefault[int]): ...  # error: [not-subscriptable]
 ```
 
 ## Narrowing class objects of final generic classes
@@ -1298,6 +1635,95 @@ reveal_type(D(1))  # revealed: D[int]
 wrong_innards: D[int] = D("five")
 ```
 
+### Type variable defaults across `__new__` and `__init__`
+
+A type variable left unsolved by `__new__` can still be inferred from `__init__`. Its default
+applies only when neither method solves it, including when `__new__` is inherited.
+
+```py
+from typing_extensions import Any, Generic, Self, TypeVar
+
+T = TypeVar("T", default=str)
+
+class Base:
+    def __new__(cls, *args: Any, **kwargs: Any) -> Self:
+        return super().__new__(cls)
+
+class C(Base, Generic[T]):
+    def __init__(self, value: T | None = None) -> None: ...
+
+reveal_type(C(int()))  # revealed: C[int]
+reveal_type(C())  # revealed: C[str]
+reveal_type(C[float](float()))  # revealed: C[float]
+C[str](int())  # error: [invalid-argument-type]
+```
+
+Inferring a gradual type from an argument also takes precedence over the default:
+
+```py
+from ty_extensions._internal import Unknown
+
+def gradual(unknown: Unknown, dynamic: Any):
+    reveal_type(C(unknown))  # revealed: C[Unknown]
+    reveal_type(C(dynamic))  # revealed: C[Any]
+```
+
+The same applies when `__new__` is defined directly and returns the generic class instead of `Self`:
+
+```py
+class Direct(Generic[T]):
+    def __new__(cls, *args: Any, **kwargs: Any) -> "Direct[T]":
+        return super().__new__(cls)
+
+    def __init__(self, value: T | None = None) -> None: ...
+
+reveal_type(Direct(int()))  # revealed: Direct[int]
+reveal_type(Direct())  # revealed: Direct[str]
+```
+
+An explicitly annotated `self` can infer the class's type argument through a method type variable:
+
+```py
+V = TypeVar("V")
+
+class ExplicitSelf(Base, Generic[T]):
+    def __init__(self: "ExplicitSelf[V]", value: V) -> None: ...
+
+reveal_type(ExplicitSelf(int()))  # revealed: ExplicitSelf[int]
+```
+
+Each method can solve different type variables. A default that references another type variable uses
+that variable's inferred type:
+
+```py
+U = TypeVar("U", default=T)
+
+class Pair(Generic[T, U]):
+    def __new__(cls, first: T, second: object = None) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, first: object, second: U | None = None) -> None: ...
+
+reveal_type(Pair(int(), bytes()))  # revealed: Pair[int, bytes]
+reveal_type(Pair(int()))  # revealed: Pair[int, int]
+```
+
+When both methods infer a type, we combine their results even if one happens to equal the default:
+
+```py
+class Both(Generic[T]):
+    def __new__(cls, first: T, second: object) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, first: object, second: T) -> None: ...
+
+reveal_type(Both(str(), int()))  # revealed: Both[str | int]
+
+def inferred_unknown(unknown: Unknown):
+    reveal_type(Both(unknown, int()))  # revealed: Both[Unknown | int]
+    reveal_type(Both(int(), unknown))  # revealed: Both[int | Unknown]
+```
+
 ### Both present, `__new__` inherited from a generic base class
 
 If either method comes from a generic base class, we don't currently use its inferred specialization
@@ -1854,6 +2280,48 @@ class DescriptorChild(DescriptorParent[T]): ...
 
 reveal_type(DescriptorChild.descriptor)  # revealed: Unknown
 reveal_type(DescriptorChild[int].descriptor)  # revealed: int
+```
+
+## Unions of generic intersections
+
+Sharing one class constraint does not make two intersections interchangeable. Neither of these
+alternatives covers the other:
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+
+class Cell(Generic[T]):
+    value: T
+
+class Other(Generic[T]): ...
+class Marker: ...
+
+def different_classes(value: Intersection[Cell[int], Marker] | Intersection[Marker, Other[int]]):
+    reveal_type(value)  # revealed: (Cell[int] & Marker) | (Marker & Other[int])
+```
+
+An alternative with an additional constraint is redundant when the other constraints match. Here,
+`T` is invariant by default, so `Cell[bool]` is not a subtype of `Cell[int]`:
+
+```py
+def specializations(
+    narrower: Intersection[Other[int], Marker, Cell[int]] | Intersection[Cell[int], Marker],
+    incompatible: Intersection[Cell[bool], Marker] | Intersection[Cell[int], Marker],
+):
+    reveal_type(narrower)  # revealed: Cell[int] & Marker
+    reveal_type(incompatible)  # revealed: (Cell[bool] & Marker) | (Cell[int] & Marker)
+```
+
+An inherited specialization can also make an intersection redundant:
+
+```py
+class Child(Cell[int]): ...
+
+def inherited(value: Intersection[Child, Marker] | Intersection[Cell[int], Marker]):
+    reveal_type(value)  # revealed: Cell[int] & Marker
 ```
 
 ## Fallback MROs preserve generic class identity
@@ -3134,9 +3602,9 @@ func(G())  # error: [invalid-argument-type]
 
 ## Default type parameter after `TypeVarTuple`
 
-A type parameter with a default cannot follow a `TypeVarTuple` in a legacy `Generic[...]` or
-`Protocol[...]` subscription. This is prohibited by the typing spec because a `TypeVarTuple`
-consumes all remaining positional type arguments, making any subsequent defaults meaningless.
+A `TypeVar` with a default cannot follow a `TypeVarTuple` in a legacy `Generic[...]` or
+`Protocol[...]` base. A specialization could bind the last type argument to the `TypeVar` or use its
+default and bind one more argument to the pack.
 
 ```toml
 [environment]
@@ -3154,35 +3622,48 @@ Ts2 = TypeVarTuple("Ts2", default=Unpack[tuple[int, str]])
 Us = TypeVarTuple("Us")
 P = ParamSpec("P", default=[int, str])
 
-# TODO: should emit [invalid-type-variable-default]
+# error: [invalid-type-variable-default] "Type parameter `T` with a default follows TypeVarTuple `Ts`"
 class Foo(Generic[*Ts, T]): ...
 
-# TODO: should emit [invalid-type-variable-default]
+# error: [invalid-type-variable-default]
 class Bar(Generic[U, *Ts, T]): ...
 
-# TODO: should emit [invalid-type-variable-default]
+# error: [invalid-type-variable-default]
 class Baz(Protocol[*Ts, T]): ...
 
-# TODO: should emit [invalid-type-variable-default]
+# error: [invalid-type-variable-default]
 class Qux(Generic[*Ts, T, T2]): ...
 
-# TODO: should emit [invalid-type-variable-default]
+# error: [invalid-type-variable-default]
 class Quux(Generic[Unpack[Ts], T]): ...
 
-# Note: the spec says this is fine,
-# but it raises `TypeError` at runtime
-# (<https://github.com/python/typing/issues/2211>)
-#
-# TODO: should emit [invalid-type-variable-default]
-class Corge(Generic[Unpack[Us], P]): ...
+# A parameter list for a ParamSpec is distinguishable from the types that fill the pack.
+class Corge(Generic[Unpack[Us], P]): ...  # no diagnostic
 
-# TODO: should also emit [invalid-type-variable-default]
 # error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
 class Grault(Generic[Unpack[Us], Unpack[Ts2]]): ...
 
 # These are fine:
 class Ok1(Generic[U, *Ts]): ...
 class Ok2(Generic[U, Unpack[Ts]]): ...
+```
+
+A required `TypeVar` between the pack and the defaulted `TypeVar` leaves the same ambiguity.
+
+```py
+# snapshot: invalid-type-variable-default
+class Separated(Generic[*Ts, U, T]): ...
+```
+
+```snapshot
+error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
+  --> src/mdtest_snippet.py:36:33
+   |
+36 | class Separated(Generic[*Ts, U, T]): ...
+   |                         ---     ^ `T` has a default
+   |                         |
+   |                         `Ts` is a TypeVarTuple
+info: Using the default would let the TypeVarTuple consume an extra positional type argument
 ```
 
 ## Inferring constructor type arguments through growing recursive aliases
@@ -3257,6 +3738,188 @@ def copy(value: Nested) -> Nested:
 
 def invalid() -> Nested:
     return Box("wrong")  # error: [invalid-return-type]
+```
+
+## Writable `__class__` protocol specializations
+
+Specializing a writable `__class__` property to `object` still requires the exact class.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Just(Protocol[T]):
+    @property
+    def __class__(self) -> type[T]: ...
+    @__class__.setter
+    def __class__(self, value: type[T]) -> None: ...
+
+class Custom: ...
+
+exact: Just[object] = object()  # no diagnostic
+subclass: Just[object] = Custom()  # error: [invalid-assignment]
+exact_class: type[Just[object]] = object  # no diagnostic
+subclass_class: type[Just[object]] = Custom  # error: [invalid-assignment]
+```
+
+## Multiple inherited recursive protocol methods
+
+A subclass with several inherited recursive methods satisfies the matching protocol specialization.
+An arbitrary type argument does not satisfy `Chain[int]`.
+
+```py
+from __future__ import annotations
+from collections.abc import Callable
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+A = TypeVar("A")
+
+class Chain(Protocol[T]):
+    def value(self) -> T:
+        raise NotImplementedError
+    def first(self: Chain[tuple[A]], callback: Callable[[A], T]) -> Chain[T]:
+        raise NotImplementedError
+    def second(self: Chain[tuple[A]], callback: Callable[[A], T]) -> Chain[T]:
+        raise NotImplementedError
+    def third(self: Chain[tuple[A]], callback: Callable[[A], T]) -> Chain[T]:
+        raise NotImplementedError
+
+class Concrete(Chain[T]): ...
+
+def check(value: Concrete[T]) -> None:
+    matching: Chain[T] = value  # no diagnostic
+    incompatible: Chain[int] = value  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Concrete[T@check]` is not assignable to `Chain[int]`
+  --> src/mdtest_snippet.py:22:32
+   |
+22 |     incompatible: Chain[int] = value  # snapshot: invalid-assignment
+   |                   ----------   ^^^^^ Incompatible value of type `Concrete[T@check]`
+   |                   |
+   |                   Declared type
+info: type `Concrete[T@check]` is not assignable to protocol `Chain[int]`
+info: └── protocol member `value` is incompatible
+info:     └── incompatible return types: `T@check` is not assignable to `int`
+```
+
+## Recursive protocol receiver restrictions
+
+An implementation can use the same receiver restriction as a generic protocol. Its other parameters
+and return types must still match.
+
+```py
+from __future__ import annotations
+from collections.abc import Callable, Iterable
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+class Chain(Protocol[T]):
+    def value(self) -> T:
+        raise RuntimeError
+    def step(self: Chain[tuple[S]], callback: Callable[[S], T]) -> None:
+        raise RuntimeError
+
+class Inherited(Chain[T]):
+    def __init__(self, values: Iterable[T]) -> None: ...
+
+class Structural(Generic[T]):
+    def value(self) -> T:
+        raise NotImplementedError
+    def step(self: Chain[tuple[S]], callback: Callable[[S], T]) -> None:
+        raise NotImplementedError
+
+class Invalid(Generic[T]):
+    def value(self) -> T:
+        raise NotImplementedError
+    def step(self: Chain[tuple[S]], callback: Callable[[S], str]) -> None:
+        raise NotImplementedError
+
+def accepts(value: Chain[int]) -> None: ...
+def check(inherited: Inherited[int], structural: Structural[int], wrong: Structural[str], invalid: Invalid[int]):
+    accepts(inherited)  # no diagnostic
+    accepts(structural)  # no diagnostic
+    accepts(wrong)  # error: [invalid-argument-type]
+    accepts(invalid)  # error: [invalid-argument-type]
+```
+
+A subprotocol must pass the same assignability check.
+
+```py
+class StructuralProtocol(Protocol[T]):
+    def value(self) -> T: ...
+    def step(self: Chain[tuple[S]], callback: Callable[[S], T]) -> None: ...
+
+def check_protocol(valid: StructuralProtocol[int], invalid: StructuralProtocol[str]):
+    accepts(valid)  # no diagnostic
+    accepts(invalid)  # error: [invalid-argument-type]
+```
+
+The expected protocol also supplies the inherited constructor's type argument.
+
+```py
+contextual: Chain[int] = Inherited(())  # no diagnostic
+reveal_type(contextual)  # revealed: Inherited[int]
+```
+
+## Variance of protocol receiver restrictions
+
+An implementation can accept a broader receiver than a protocol requires.
+
+```py
+from __future__ import annotations
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Reader(Protocol[T_co]):
+    def read(self) -> T_co: ...
+
+class Required(Protocol):
+    def method(self: Reader[bool]) -> None: ...
+
+class Broad:
+    def method(self: Reader[int]) -> None: ...
+
+class Incompatible:
+    def method(self: Reader[str]) -> None: ...
+
+def accepts(value: Required) -> None: ...
+def check(broad: Broad, incompatible: Incompatible):
+    accepts(broad)  # no diagnostic
+    accepts(incompatible)  # error: [invalid-argument-type]
+```
+
+## Structurally equivalent protocol receiver restrictions
+
+Receiver annotations can match structurally even when their type arguments do not satisfy the
+protocol's declared variance.
+
+```py
+from __future__ import annotations
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Recursive(Protocol[T_co]):
+    def child(self) -> Recursive[T_co]: ...
+
+class Required(Protocol):
+    def method(self: Recursive[int]) -> None: ...
+
+class Implementation:
+    def child(self) -> Implementation:
+        return self
+    def method(self: Recursive[str]) -> None: ...
+
+def accepts(value: Required) -> None: ...
+def check(value: Implementation):
+    accepts(value)  # no diagnostic
 ```
 
 ## Aliased `Self` in explicit receivers
@@ -3599,6 +4262,40 @@ def narrow_intersection(value: Intersection[Parent[S], Other[S]]) -> None:
 def narrow_intersection_bounded(value: Intersection[Parent[BoundedS], Other[BoundedS]]) -> None:
     if isinstance(value, ChildBoth):
         reveal_type(value)  # revealed: ChildBoth[BoundedS@narrow_intersection_bounded]
+```
+
+## Inheriting different specializations of a property
+
+`String` can return `str` for the property inherited from `Base[Any]`. Combining it with `Integer`
+also requires the property to return `int`, so the new subclass is invalid.
+
+```py
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    @property
+    def value(self) -> T:
+        raise NotImplementedError
+
+class String(Base[Any]):  # no diagnostic
+    @property
+    def value(self) -> str:
+        return ""
+
+class Integer(Base[int]): ...
+class Conflict(String, Integer): ...  # error: [invalid-property-type-override]
+```
+
+An explicit override is also checked against `Base[int]`, and the error is reported only at the
+override.
+
+```py
+class Explicit(String, Integer):
+    @property
+    def value(self) -> str:  # error: [invalid-property-type-override]
+        return ""
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

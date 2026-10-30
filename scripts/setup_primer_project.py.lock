@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.11"
 
 [options]
@@ -8,7 +8,7 @@ exclude-newer-span = "P7D"
 
 [manifest]
 requirements = [{ name = "mypy-primer", git = "https://github.com/hauntsaninja/mypy_primer" }]
-build-constraints = [{ name = "setuptools", specifier = "==84.0.0" }]
+build-constraints = [{ name = "setuptools", specifier = "==84.0.0", hashes = ["sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670", "sha256:f4695c21257f0d9b537ec2692c941d02ee143b7cc1276941349a546573b2ef73"] }]
 
 [[package]]
 name = "mypy-primer"

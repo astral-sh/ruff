@@ -349,6 +349,130 @@ def takes_objects(*args: object, **kwargs: object) -> object:
 static_assert(not is_subtype_of(TopCallable, RegularCallableTypeOf[takes_objects]))
 ```
 
+## Bottom callable assignability
+
+The bottom callable accepts every argument list and returns `Never`, so it can satisfy any callable
+signature, including one with required keyword-only parameters. Returning `Never` alone is not
+sufficient, nor is accepting every argument list with an incompatible return type.
+
+```py
+from typing import Any, Callable, Never, Protocol
+from ty_extensions import Bottom
+
+class Required(Protocol):
+    def __call__(self, value: int, /, *, enabled: bool) -> str: ...
+
+def never_returns(*values: object, **options: object) -> Never:
+    raise NotImplementedError
+
+def check(
+    bottom: Bottom[Callable[..., Any]],
+    restricted: Callable[[int], Never],
+    returns_none: Bottom[Callable[..., None]],
+) -> None:
+    positional: Callable[[str, bytes], int] = bottom  # no diagnostic
+    keyword_only: Required = bottom  # no diagnostic
+    declared: Required = never_returns  # no diagnostic
+
+    wrong_parameters: Callable[[str], int] = restricted  # error: [invalid-assignment]
+    wrong_return: Callable[[int], str] = returns_none  # error: [invalid-assignment]
+```
+
+Receiver restrictions still apply when a bound method accepts every argument list and returns
+`Never`.
+
+```py
+class Restricted:
+    def method(self: "Allowed", *values: object, **options: object) -> Never:
+        raise NotImplementedError
+
+class Allowed(Restricted): ...
+
+def check_receiver(restricted: Restricted, allowed: Allowed) -> None:
+    valid: Callable[[int], str] = allowed.method  # no diagnostic
+    invalid: Callable[[int], str] = restricted.method  # error: [invalid-assignment]
+```
+
+An unrestricted callable accepting every argument list also satisfies a target with a restricted
+receiver. Return types and the source's own receiver restriction still have to match.
+
+```py
+from ty_extensions._internal import RegularCallableTypeOf
+
+class Target:
+    def method(self: "AllowedTarget", value: int) -> str:
+        return ""
+
+class AllowedTarget(Target): ...
+
+def accepts_target(callback: RegularCallableTypeOf[Target().method]) -> None: ...
+def returns_str(*args: object, **kwargs: object) -> str:
+    return ""
+
+def returns_int(*args: object, **kwargs: object) -> int:
+    return 0
+
+accepts_target(returns_str)  # no diagnostic
+accepts_target(returns_int)  # error: [invalid-argument-type]
+
+def check_source_receiver(restricted: Restricted, allowed: Allowed) -> None:
+    accepts_target(allowed.method)  # no diagnostic
+    accepts_target(restricted.method)  # error: [invalid-argument-type]
+```
+
+## Top callable assignability
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Every callable is assignable to the top callable, which permits no calls and has return type
+`object`. A narrower return type or a parameter list that permits calls still imposes requirements.
+
+```py
+from typing import Callable, Protocol
+from ty_extensions import Top
+
+class Required(Protocol):
+    def __call__(self, *, enabled: bool) -> bytes: ...
+
+def check(positional: Callable[[int], str], keyword_only: Required) -> None:
+    first: Top[Callable[..., object]] = positional  # no diagnostic
+    second: Top[Callable[..., object]] = keyword_only  # no diagnostic
+    wrong_return: Top[Callable[..., int]] = positional  # error: [invalid-assignment]
+    wrong_parameters: Top[Callable[[str], object]] = positional  # error: [invalid-assignment]
+```
+
+A receiver restriction does not prevent assignment to the top callable, since it permits no calls.
+This also holds for methods with aliased return types or unused type parameters. The restriction
+still applies when assigning to a callable that permits calls.
+
+```py
+type Result = str
+
+class Restricted:
+    def method(self: "Allowed") -> str:
+        return ""
+
+    def aliased(self: "Allowed") -> Result:
+        return ""
+
+    def generic[T](self: "Allowed") -> str:
+        return ""
+
+class Allowed(Restricted): ...
+
+def check_receiver(restricted: Restricted) -> None:
+    valid: Top[Callable[..., object]] = restricted.method  # no diagnostic
+    aliased: Top[Callable[..., object]] = restricted.aliased  # no diagnostic
+    generic: Top[Callable[..., object]] = restricted.generic  # no diagnostic
+
+    invalid: Callable[[], str] = restricted.method  # error: [invalid-assignment]
+    invalid_alias: Callable[[], str] = restricted.aliased  # error: [invalid-assignment]
+    invalid_generic: Callable[[], str] = restricted.generic  # error: [invalid-assignment]
+```
+
 ## `ParamSpec` specializations
 
 For a class invariant in a `ParamSpec`, every fixed specialization lies between the bottom and top
@@ -1528,6 +1652,129 @@ static_assert(not is_equivalent_to(Top[GenericRecursive[int]], Top[GenericRecurs
 
 def generic_recursive_materialization(value: Top[Covariant[GenericRecursive[int]]]) -> None:
     reveal_type(value)  # revealed: Covariant[Top[GenericRecursive[int]]]
+```
+
+## Recursive callables
+
+Materializing a recursive callable also materializes its return type. Calling its bottom
+materialization repeatedly preserves that materialization at every recursive reference.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+from typing import Any
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to, is_subtype_of
+
+type Callback = Callable[..., Callback]
+
+static_assert(is_subtype_of(Bottom[Callback], Top[Callback]))
+static_assert(not is_subtype_of(Top[Callback], Bottom[Callback]))
+
+def call(bottom: Bottom[Callback]):
+    static_assert(is_equivalent_to(TypeOf[bottom()], Bottom[Callback]))
+    static_assert(is_equivalent_to(TypeOf[bottom()()], Bottom[Callback]))
+
+def call_expanded(bottom: Bottom[Callable[..., Callback]]):
+    static_assert(is_equivalent_to(TypeOf[bottom()], Bottom[Callback]))
+
+def call_after_alias(bottom: Bottom[tuple[Callback, Callable[..., Callback]]]):
+    static_assert(is_equivalent_to(TypeOf[bottom[1]()], Bottom[Callback]))
+```
+
+Recursive references in parameter types use the opposite materialization, since callable parameters
+are contravariant.
+
+```py
+type Consumer = Callable[[Consumer], Any]
+
+static_assert(is_equivalent_to(Top[Consumer], Callable[[Bottom[Consumer]], object]))
+static_assert(is_equivalent_to(Bottom[Consumer], Callable[[Top[Consumer]], Bottom[Any]]))
+```
+
+Mutually recursive aliases also retain their materialization when a callable is reached through
+different paths in the same type.
+
+```py
+type Node = tuple[Factory, Any]
+type Factory = Callable[[], Node]
+
+def call_mutual(bottom: Bottom[tuple[Node, Factory]]):
+    static_assert(is_equivalent_to(TypeOf[bottom[1]()], Bottom[Node]))
+```
+
+## Legacy recursive callables
+
+The same materialization rules apply to recursive aliases declared with `TypeAlias`.
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeAlias
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to, is_subtype_of
+
+Callback: TypeAlias = Callable[..., "Callback"]
+
+static_assert(is_subtype_of(Bottom[Callback], Top[Callback]))
+static_assert(not is_subtype_of(Top[Callback], Bottom[Callback]))
+
+def call(bottom: Bottom[Callback]):
+    static_assert(is_equivalent_to(TypeOf[bottom()], Bottom[Callback]))
+    static_assert(is_equivalent_to(TypeOf[bottom()()], Bottom[Callback]))
+
+def call_expanded(bottom: Bottom[Callable[..., Callback]]):
+    static_assert(is_equivalent_to(TypeOf[bottom()], Bottom[Callback]))
+
+def call_after_alias(bottom: Bottom[tuple[Callback, Callable[..., Callback]]]):
+    static_assert(is_equivalent_to(TypeOf[bottom[1]()], Bottom[Callback]))
+```
+
+Recursive parameter types reverse the materialization in legacy aliases as well.
+
+```py
+Consumer: TypeAlias = Callable[["Consumer"], Any]
+
+static_assert(is_equivalent_to(Top[Consumer], Callable[[Bottom[Consumer]], object]))
+static_assert(is_equivalent_to(Bottom[Consumer], Callable[[Top[Consumer]], Bottom[Any]]))
+```
+
+The same applies to mutually recursive legacy aliases.
+
+```py
+Node: TypeAlias = tuple["Factory", Any]
+Factory: TypeAlias = Callable[[], Node]
+
+def call_mutual(bottom: Bottom[tuple[Node, Factory]]):
+    static_assert(is_equivalent_to(TypeOf[bottom[1]()], Bottom[Node]))
+```
+
+## Recursive function defaults
+
+A function's type parameter default can refer to its own `__call__` method. Materializing the
+function preserves the recursion guard when following that method back to the function's signature.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from collections.abc import Callable
+from ty_extensions import Bottom
+from ty_extensions._internal import CallableTypeOf, TypeOf
+
+def factory[T = TypeOf[factory.__call__]]() -> Callable[..., T]:
+    raise NotImplementedError
+
+def check(value: Bottom[CallableTypeOf[factory]]):
+    reveal_type(value)  # revealed: () -> ([T'return](*args: object, **kwargs: object) -> T'return)
+
+def check_method(value: Bottom[TypeOf[factory.__call__]]):
+    reveal_type(value)  # revealed: <method-wrapper '__call__' of function 'factory'>
 ```
 
 ## Subtyping
@@ -3273,6 +3520,26 @@ class LegacyWrappedReceiver(Protocol[T_co]):
 # TODO: Matching receiver restrictions should not prevent these protocols from being compatible.
 static_assert(is_subtype_of(LegacyWrappedReceiver[str], LegacyWrappedReceiver[int]))  # error: [static-assert-error]
 static_assert(is_subtype_of(Top[LegacyWrappedReceiver[int]], LegacyWrappedReceiver[int]))
+```
+
+### Reflexivity of materialized recursive protocols
+
+Each materialization of `Stream[Any]` is a subtype of itself, even though checking its methods
+structurally can produce an ever more deeply nested receiver type.
+
+```py
+from __future__ import annotations
+
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Stream[T](Protocol):
+    def flatten[U](self: Stream[Stream[U]]) -> Stream[U]: ...
+    def window(self) -> Stream[Stream[T]]: ...
+
+static_assert(is_subtype_of(Top[Stream[Any]], Top[Stream[Any]]))
+static_assert(is_subtype_of(Bottom[Stream[Any]], Bottom[Stream[Any]]))
 ```
 
 ### Recursive protocol receivers with gradual members

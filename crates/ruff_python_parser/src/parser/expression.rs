@@ -335,94 +335,93 @@ impl<'src> Parser<'src> {
         context: ExpressionContext,
     ) -> ParsedExpr {
         let token = self.current_token_kind();
-        let start = self.node_start();
 
-        if let Some(unary_op) = token.as_unary_operator() {
-            let expr = self.parse_unary_expression(unary_op, context);
+        if token != TokenKind::Identifier {
+            if let Some(unary_op) = token.as_unary_operator() {
+                let expr = self.parse_unary_expression(unary_op, context);
 
-            if matches!(unary_op, UnaryOp::Not) {
-                if left_precedence > OperatorPrecedence::Not {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "Boolean 'not' expression cannot be used here".to_string(),
-                        ),
-                        &expr,
-                    );
+                if matches!(unary_op, UnaryOp::Not) {
+                    if left_precedence > OperatorPrecedence::Not {
+                        self.add_error(
+                            ParseErrorType::OtherError(
+                                "Boolean 'not' expression cannot be used here".to_string(),
+                            ),
+                            &expr,
+                        );
+                    }
+                } else {
+                    // > The power operator `**` binds less tightly than an arithmetic
+                    // > or bitwise unary operator on its right, that is, 2**-1 is 0.5.
+                    //
+                    // Reference: https://docs.python.org/3/reference/expressions.html#id21
+                    if left_precedence > OperatorPrecedence::PosNegBitNot
+                        && left_precedence != OperatorPrecedence::Exponent
+                    {
+                        self.add_error(
+                            ParseErrorType::OtherError(format!(
+                                "Unary '{unary_op}' expression cannot be used here",
+                            )),
+                            &expr,
+                        );
+                    }
                 }
-            } else {
-                // > The power operator `**` binds less tightly than an arithmetic
-                // > or bitwise unary operator on its right, that is, 2**-1 is 0.5.
-                //
-                // Reference: https://docs.python.org/3/reference/expressions.html#id21
-                if left_precedence > OperatorPrecedence::PosNegBitNot
-                    && left_precedence != OperatorPrecedence::Exponent
-                {
-                    self.add_error(
-                        ParseErrorType::OtherError(format!(
-                            "Unary '{unary_op}' expression cannot be used here",
-                        )),
-                        &expr,
-                    );
-                }
+
+                return Expr::UnaryOp(expr).into();
             }
 
-            return Expr::UnaryOp(expr).into();
+            match token {
+                TokenKind::Star => {
+                    let starred_expr = self.parse_starred_expression(context);
+
+                    if left_precedence > OperatorPrecedence::None
+                        || !context.is_starred_expression_allowed()
+                    {
+                        self.add_error(
+                            ParseErrorType::InvalidStarredExpressionUsage,
+                            &starred_expr,
+                        );
+                    }
+
+                    return Expr::Starred(starred_expr).into();
+                }
+                TokenKind::Await => {
+                    let await_expr = self.parse_await_expression();
+
+                    // `await` expressions cannot be nested
+                    if left_precedence >= OperatorPrecedence::Await {
+                        self.add_error(
+                            ParseErrorType::OtherError(
+                                "Await expression cannot be used here".to_string(),
+                            ),
+                            &await_expr,
+                        );
+                    }
+
+                    return Expr::Await(await_expr).into();
+                }
+                TokenKind::Lambda => {
+                    // Lambda expression isn't allowed in this context but we'll still parse it and
+                    // report an error for better recovery.
+                    let lambda_expr = self.parse_lambda_expr();
+                    self.add_error(ParseErrorType::InvalidLambdaExpressionUsage, &lambda_expr);
+                    return Expr::Lambda(lambda_expr).into();
+                }
+                TokenKind::Yield => {
+                    let expr = self.parse_yield_expression();
+
+                    if left_precedence > OperatorPrecedence::None
+                        || !context.is_yield_expression_allowed()
+                    {
+                        self.add_error(ParseErrorType::InvalidYieldExpressionUsage, &expr);
+                    }
+
+                    return expr.into();
+                }
+                _ => {}
+            }
         }
 
-        match token {
-            TokenKind::Star => {
-                let starred_expr = self.parse_starred_expression(context);
-
-                if left_precedence > OperatorPrecedence::None
-                    || !context.is_starred_expression_allowed()
-                {
-                    self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &starred_expr);
-                }
-
-                return Expr::Starred(starred_expr).into();
-            }
-            TokenKind::Await => {
-                let await_expr = self.parse_await_expression();
-
-                // `await` expressions cannot be nested
-                if left_precedence >= OperatorPrecedence::Await {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "Await expression cannot be used here".to_string(),
-                        ),
-                        &await_expr,
-                    );
-                }
-
-                return Expr::Await(await_expr).into();
-            }
-            TokenKind::Lambda => {
-                // Lambda expression isn't allowed in this context but we'll still parse it and
-                // report an error for better recovery.
-                let lambda_expr = self.parse_lambda_expr();
-                self.add_error(ParseErrorType::InvalidLambdaExpressionUsage, &lambda_expr);
-                return Expr::Lambda(lambda_expr).into();
-            }
-            TokenKind::Yield => {
-                let expr = self.parse_yield_expression();
-
-                if left_precedence > OperatorPrecedence::None
-                    || !context.is_yield_expression_allowed()
-                {
-                    self.add_error(ParseErrorType::InvalidYieldExpressionUsage, &expr);
-                }
-
-                return expr.into();
-            }
-            _ => {}
-        }
-
-        let lhs = self.parse_atom(context);
-
-        ParsedExpr {
-            expr: self.parse_postfix_expression(lhs.expr, start, context),
-            is_parenthesized: lhs.is_parenthesized,
-        }
+        self.parse_primary_expression(context)
     }
 
     /// Parses an expression with a minimum precedence of bitwise `or`.
@@ -577,13 +576,14 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Parses an atom.
+    /// Parses an atom and any following calls, subscripts, or attributes.
     ///
-    /// See: <https://docs.python.org/3/reference/expressions.html#atoms>
-    fn parse_atom(&mut self, context: ExpressionContext) -> ParsedExpr {
+    /// See: <https://docs.python.org/3/reference/expressions.html#primaries>
+    fn parse_primary_expression(&mut self, context: ExpressionContext) -> ParsedExpr {
+        let mut is_parenthesized = false;
         let start = self.node_start();
 
-        let lhs = match self.current_token_kind() {
+        let mut lhs = match self.current_token_kind() {
             TokenKind::Float => {
                 let value = self.bump_float();
 
@@ -647,7 +647,9 @@ impl<'src> Parser<'src> {
                 self.parse_strings()
             }
             TokenKind::Lpar => {
-                return self.parse_parenthesized_expression();
+                let parsed = self.parse_parenthesized_expression();
+                is_parenthesized = parsed.is_parenthesized;
+                parsed.expr
             }
             TokenKind::Lsqb => self.parse_list_like_expression(),
             TokenKind::Lbrace => self.parse_set_or_dict_like_expression(),
@@ -670,21 +672,6 @@ impl<'src> Parser<'src> {
             }
         };
 
-        lhs.into()
-    }
-
-    /// Parses a postfix expression in a loop until there are no postfix expressions left to parse.
-    ///
-    /// For a given left-hand side, a postfix expression can begin with either `(` for a call
-    /// expression, `[` for a subscript expression, or `.` for an attribute expression.
-    ///
-    /// This method does nothing if the current token is not a candidate for a postfix expression.
-    fn parse_postfix_expression(
-        &mut self,
-        mut lhs: Expr,
-        start: TextSize,
-        context: ExpressionContext,
-    ) -> Expr {
         loop {
             lhs = match self.current_token_kind() {
                 TokenKind::Lpar => Expr::Call(self.parse_call_expression(lhs, start)),
@@ -692,8 +679,13 @@ impl<'src> Parser<'src> {
                 TokenKind::Dot => {
                     Expr::Attribute(self.parse_attribute_expression(lhs, start, context))
                 }
-                _ => break lhs,
+                _ => break,
             };
+        }
+
+        ParsedExpr {
+            expr: lhs,
+            is_parenthesized,
         }
     }
 

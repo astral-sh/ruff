@@ -169,12 +169,32 @@ class ConstraintSet:
         """
         Returns whether this constraint set always holds with the given inferable
         type variables, without checking their declared bounds or constraints.
+
+        If the computation budget is exceeded, the result has type `bool` rather
+        than a known literal value.
         """
 
     def is_never_satisfied(self, *, inferable: TypeForm[tuple[object, ...]]) -> bool:
         """
         Returns whether this constraint set never holds with the given inferable
         type variables, without checking their declared bounds or constraints.
+
+        If the computation budget is exceeded, the result has type `bool` rather
+        than a known literal value.
+        """
+
+    def is_trivially_always_satisfied(self) -> bool:
+        """
+        Returns whether this constraint set is the true terminal BDD.
+
+        A nonterminal BDD returns `False` even if it is semantically always satisfied.
+        """
+
+    def is_trivially_never_satisfied(self) -> bool:
+        """
+        Returns whether this constraint set is the false terminal BDD.
+
+        A nonterminal BDD returns `False` even if it is semantically never satisfied.
         """
 
     def solutions_for(

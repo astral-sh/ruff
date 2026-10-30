@@ -1,7 +1,7 @@
 //! Inference for subscript expressions (e.g., `x[0]`, `list[int]`).
 
 use crate::Db;
-use crate::ProgramEnvironment;
+use crate::{Program, ProgramEnvironment};
 use std::fmt::{self, Display};
 
 use compact_str::{CompactString, ToCompactString};
@@ -10,7 +10,7 @@ use ruff_python_ast as ast;
 use crate::subscript::{PyIndex, PySlice};
 use crate::types::special_form::TypeQualifier;
 
-use super::call::{Bindings, CallArguments, CallDunderError, CallErrorKind};
+use super::call::{CallArguments, CallDunderError, CallErrorKind};
 use super::class::KnownClass;
 use super::class_base::ClassBase;
 use super::context::InferContext;
@@ -52,7 +52,7 @@ impl Display for SubscriptKind {
 }
 
 /// A dunder method used for subscripting.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum DunderMethod {
     GetItem,
     ClassGetItem,
@@ -70,6 +70,93 @@ impl DunderMethod {
             Self::GetItem => "__getitem__",
             Self::ClassGetItem => "__class_getitem__",
         }
+    }
+
+    fn call<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        value_ty: Type<'db>,
+        slice_ty: Type<'db>,
+    ) -> Option<Result<Type<'db>, SubscriptError<'db>>> {
+        // The same receiver and key types recur across subscript expressions. Only the return
+        // type and the callable's type are needed after overload resolution.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+        enum Outcome<'db> {
+            Returned(Type<'db>),
+            PossiblyUnbound(Type<'db>),
+            Invalid {
+                return_ty: Type<'db>,
+                callable_ty: Type<'db>,
+                kind: CallErrorKind,
+            },
+        }
+
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn call_subscript_method<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            method: DunderMethod,
+            value_ty: Type<'db>,
+            slice_ty: Type<'db>,
+        ) -> Option<Outcome<'db>> {
+            let env = ProgramEnvironment::from_program(program);
+            let arguments = CallArguments::positional([slice_ty]);
+            let call = match method {
+                DunderMethod::GetItem => value_ty.try_call_dunder(
+                    db,
+                    &env,
+                    method.as_str(),
+                    arguments,
+                    TypeContext::default(),
+                ),
+                DunderMethod::ClassGetItem => value_ty.try_call_dunder_on_class(
+                    db,
+                    &env,
+                    method.as_str(),
+                    &arguments,
+                    TypeContext::default(),
+                ),
+            };
+            match call {
+                Ok(bindings) => Some(Outcome::Returned(bindings.return_type(db, &env))),
+                Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
+                    Some(Outcome::PossiblyUnbound(bindings.return_type(db, &env)))
+                }
+                Err(CallDunderError::CallError(kind, bindings, _)) => Some(Outcome::Invalid {
+                    return_ty: bindings.return_type(db, &env),
+                    callable_ty: bindings.callable_type(),
+                    kind,
+                }),
+                Err(CallDunderError::MethodNotAvailable) => None,
+            }
+        }
+
+        let outcome = call_subscript_method(db, env.program(db), self, value_ty, slice_ty)?;
+        Some(match outcome {
+            Outcome::Returned(ty) => Ok(ty),
+            Outcome::PossiblyUnbound(ty) => Err(SubscriptError::new(
+                ty,
+                SubscriptErrorKind::DunderPossiblyUnbound {
+                    method: self,
+                    value_ty,
+                },
+            )),
+            Outcome::Invalid {
+                return_ty,
+                callable_ty,
+                kind,
+            } => Err(SubscriptError::new(
+                return_ty,
+                SubscriptErrorKind::DunderCallError {
+                    method: self,
+                    value_ty,
+                    slice_ty,
+                    kind,
+                    callable_ty,
+                },
+            )),
+        })
     }
 }
 
@@ -121,7 +208,7 @@ pub(crate) enum SubscriptErrorKind<'db> {
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
         kind: CallErrorKind,
-        bindings: Box<Bindings<'db>>,
+        callable_ty: Type<'db>,
     },
     /// A `TypedDict` was subscripted with an invalid key.
     InvalidTypedDictKey {
@@ -272,14 +359,14 @@ impl<'db> SubscriptErrorKind<'db> {
                 value_ty,
                 slice_ty,
                 kind,
-                bindings,
+                callable_ty,
             } => match kind {
                 CallErrorKind::NotCallable => {
                     if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` is not callable \
                             on object of type `{}`",
-                            bindings.callable_type().display(db, env),
+                            callable_ty.display(db, env),
                             value_ty.display(db, env),
                         ));
                     }
@@ -301,7 +388,7 @@ impl<'db> SubscriptErrorKind<'db> {
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` cannot be called \
                             with key of type `{}` on object of type `{}`",
-                            bindings.callable_type().display(db, env),
+                            callable_ty.display(db, env),
                             slice_ty.display(db, env),
                             value_ty.display(db, env),
                         ));
@@ -312,7 +399,7 @@ impl<'db> SubscriptErrorKind<'db> {
                         builder.into_diagnostic(format_args!(
                             "Method `{method}` of type `{}` may not be callable \
                             on object of type `{}`",
-                            bindings.callable_type().display(db, env),
+                            callable_ty.display(db, env),
                             value_ty.display(db, env),
                         ));
                     }
@@ -949,40 +1036,8 @@ impl<'db> Type<'db> {
         // If the class defines `__getitem__`, return its return type.
         //
         // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
-        match value_ty.try_call_dunder(
-            db,
-            env,
-            "__getitem__",
-            CallArguments::positional([slice_ty]),
-            TypeContext::default(),
-        ) {
-            Ok(outcome) => {
-                return Ok(outcome.return_type(db, env));
-            }
-            Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
-                return Err(SubscriptError::new(
-                    bindings.return_type(db, env),
-                    SubscriptErrorKind::DunderPossiblyUnbound {
-                        method: DunderMethod::GetItem,
-                        value_ty,
-                    },
-                ));
-            }
-            Err(CallDunderError::CallError(call_error_kind, bindings, _)) => {
-                return Err(SubscriptError::new(
-                    bindings.return_type(db, env),
-                    SubscriptErrorKind::DunderCallError {
-                        method: DunderMethod::GetItem,
-                        value_ty,
-                        slice_ty,
-                        kind: call_error_kind,
-                        bindings,
-                    },
-                ));
-            }
-            Err(CallDunderError::MethodNotAvailable) => {
-                // try `__class_getitem__`
-            }
+        if let Some(result) = DunderMethod::GetItem.call(db, env, value_ty, slice_ty) {
+            return result;
         }
 
         // Otherwise, if the value is itself a class and defines `__class_getitem__`,
@@ -995,41 +1050,8 @@ impl<'db> Type<'db> {
         // despite the fact that there will be no corresponding `__class_getitem__`
         // method in these `sys.version_info` branches.
         if value_ty.is_subtype_of(db, env, KnownClass::Type.to_instance(db, env)) {
-            let call_arguments = CallArguments::positional([slice_ty]);
-            match value_ty.try_call_dunder_on_class(
-                db,
-                env,
-                "__class_getitem__",
-                &call_arguments,
-                TypeContext::default(),
-            ) {
-                Ok(bindings) => {
-                    return Ok(bindings.return_type(db, env));
-                }
-                Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
-                    return Err(SubscriptError::new(
-                        bindings.return_type(db, env),
-                        SubscriptErrorKind::DunderPossiblyUnbound {
-                            method: DunderMethod::ClassGetItem,
-                            value_ty,
-                        },
-                    ));
-                }
-                Err(CallDunderError::CallError(call_error_kind, bindings, _)) => {
-                    return Err(SubscriptError::new(
-                        bindings.return_type(db, env),
-                        SubscriptErrorKind::DunderCallError {
-                            method: DunderMethod::ClassGetItem,
-                            value_ty,
-                            slice_ty,
-                            kind: call_error_kind,
-                            bindings,
-                        },
-                    ));
-                }
-                Err(CallDunderError::MethodNotAvailable) => {
-                    // Fall through to the logic below
-                }
+            if let Some(result) = DunderMethod::ClassGetItem.call(db, env, value_ty, slice_ty) {
+                return result;
             }
 
             if let Type::ClassLiteral(class) = value_ty {

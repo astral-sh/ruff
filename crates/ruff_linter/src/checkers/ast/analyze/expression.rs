@@ -402,6 +402,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
         }
         Expr::Attribute(attribute) => {
+            if checker.is_rule_enabled(Rule::SharedClockMock)
+                && matches!(attribute.ctx, ExprContext::Store | ExprContext::Del)
+            {
+                ruff::rules::shared_clock_attribute(checker, attribute);
+            }
             if attribute.ctx == ExprContext::Load {
                 if checker.any_rule_enabled(&[
                     Rule::SuspiciousPickleUsage,
@@ -1035,6 +1040,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::PytestPatchWithLambda) {
                 flake8_pytest_style::rules::patch_with_lambda(checker, call);
             }
+            if checker.is_rule_enabled(Rule::SharedClockMock) {
+                ruff::rules::shared_clock_mock(checker, call);
+            }
             if checker.any_rule_enabled(&[
                 Rule::PytestParametrizeNamesWrongType,
                 Rule::PytestParametrizeValuesWrongType,
@@ -1328,6 +1336,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::UnnecessaryRegularExpression) {
                 ruff::rules::unnecessary_regular_expression(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::UnnecessaryRegularExpressionCompile) {
+                ruff::rules::unnecessary_regular_expression_compile(checker, call);
             }
             if checker.is_rule_enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_expr(checker, expr);

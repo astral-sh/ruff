@@ -1,15 +1,18 @@
 //! Instance types: both nominal and structural.
 
 use crate::ProgramEnvironment;
+use ruff_python_ast::name::Name;
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::debug_assert_matches;
 use std::marker::PhantomData;
 
+use itertools::Itertools;
+
 use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView, StructuralMemberPriority};
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
-    MaterializationKind, SubclassOfType, Type, TypeAliasType,
+    MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -831,8 +834,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let source_protocol = ty.as_protocol_instance();
 
         // Every gradual type lies between its bottom and top materializations, and is assignable
-        // to and from either one. Comparing the exact same class specialization can therefore
-        // settle these directions without expanding a recursive protocol's members.
+        // to and from either one. Each materialization is a subtype of itself. For the same class
+        // specialization, we can check these relations without expanding recursive members.
         if let Some(source) = source_protocol
             && let (Some(source_origin), Some(target_origin)) =
                 (source.class_origin(db), protocol.class_origin(db))
@@ -841,8 +844,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 source.materialization_kind(db),
                 protocol.materialization_kind(db),
             ) {
-                (None | Some(MaterializationKind::Bottom), Some(MaterializationKind::Top))
-                | (Some(MaterializationKind::Bottom), None) => true,
+                (_, Some(MaterializationKind::Top)) | (Some(MaterializationKind::Bottom), _) => {
+                    true
+                }
                 (Some(MaterializationKind::Top), None)
                 | (None, Some(MaterializationKind::Bottom))
                     if self.relation.is_assignability() =>
@@ -1009,9 +1013,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         {
             structurally_satisfied
         } else {
+            // A finite mismatch can reject the implementation before recursive receivers expand
+            // the protocol again, just as in protocol-to-protocol comparisons.
             protocol
                 .interface(db)
                 .members(db)
+                .sorted_by_cached_key(|member| member.structural_member_priority(db, env))
                 .when_all(db, self.constraints, |member| {
                     self.type_satisfies_protocol_member(db, ty, &member)
                 })
@@ -1897,6 +1904,16 @@ impl<'db> ProtocolInstanceType<'db> {
             }
 
             let env = ProgramEnvironment::from_program(interface.base().program(db));
+            // A protocol equivalent to `object` must be satisfied by every possible receiver type.
+            // Use an unconstrained type variable so `Self` remains specific to the receiver:
+            // `object.__class__` accepts `type[Self]`, and a concrete return type cannot satisfy
+            // a promise to return `Self` for every receiver.
+            let receiver = Type::TypeVar(BoundTypeVarInstance::synthetic(
+                db,
+                &env,
+                Name::new_static("ProtocolSelf"),
+                TypeVarVariance::Invariant,
+            ));
             let constraints = ConstraintSetBuilder::new();
             let relation_visitor = HasRelationToVisitor::default(&constraints);
             let disjointness_visitor = IsDisjointVisitor::default(&constraints);
@@ -1912,7 +1929,7 @@ impl<'db> ProtocolInstanceType<'db> {
                 &materialization_visitor,
             );
             checker
-                .check_type_satisfies_protocol(db, Type::object(), protocol)
+                .check_type_satisfies_protocol(db, receiver, protocol)
                 .is_always_satisfied(db, &env, TypeVarSet::None)
         }
 

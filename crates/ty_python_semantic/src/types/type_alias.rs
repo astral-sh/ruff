@@ -10,7 +10,7 @@ use crate::{
         cyclic::CycleDetector,
         definition_expression_type,
         display::qualified_name_components_from_scope,
-        generics::{ApplySpecialization, Specialization, bind_typevar},
+        generics::{ApplySpecialization, Specialization, bind_typevar, walk_specialization_types},
         variance::{VarianceInferable, VarianceOrigin},
         visitor,
     },
@@ -268,12 +268,21 @@ impl<'db> PEP695TypeAliasType<'db> {
             .node(&parsed)
             .type_params
             .as_ref()
-            .map(|type_params| {
+            .and_then(|type_params| {
                 let index = semantic_index(db, program_file);
                 let definition = index.expect_single_definition(type_alias_stmt_node);
                 GenericContext::from_type_params(db, index, definition, type_params)
             })
     }
+}
+
+/// Find the `name` and `value` arguments to `TypeAliasType`. If either is supplied
+/// twice, use the positional argument for error recovery.
+pub(super) fn type_alias_arguments(arguments: &ast::Arguments) -> Option<(&ast::Expr, &ast::Expr)> {
+    let keyword = |name| arguments.find_keyword(name).map(|keyword| &keyword.value);
+    let name = arguments.args.first().or_else(|| keyword("name"))?;
+    let value = arguments.args.get(1).or_else(|| keyword("value"))?;
+    Some((name, value))
 }
 
 /// A PEP 695 `types.TypeAliasType` created by manually calling the constructor.
@@ -341,8 +350,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         let ast::Expr::Call(call) = value_node else {
             return Type::unknown();
         };
-        // The value is the second positional argument to TypeAliasType(name, value).
-        let Some(value_arg) = call.arguments.find_argument_value("value", 1) else {
+        let Some((_, value_arg)) = type_alias_arguments(&call.arguments) else {
             return Type::unknown();
         };
         definition_expression_type(db, definition, value_arg)
@@ -403,7 +411,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
             variables.insert(typevar);
         }
 
-        (!variables.is_empty()).then(|| GenericContext::from_typevar_instances(db, &env, variables))
+        GenericContext::try_from_typevar_instances(db, &env, variables)
     }
 }
 
@@ -443,6 +451,18 @@ pub enum TypeAliasType<'db> {
     PEP695(PEP695TypeAliasType<'db>),
     /// A type alias defined by manually instantiating the PEP 695 `types.TypeAliasType`.
     ManualPEP695(ManualPEP695TypeAliasType<'db>),
+}
+
+/// Visit an alias's type arguments without evaluating its value.
+/// This includes arguments for parameters that the alias's value does not use.
+pub(super) fn walk_type_alias_arguments<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    type_alias: TypeAliasType<'db>,
+    visitor: &V,
+) {
+    if let Some(specialization) = type_alias.specialization(db) {
+        walk_specialization_types(db, specialization, visitor);
+    }
 }
 
 pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -741,25 +761,28 @@ impl<'db> TypeAliasType<'db> {
                 // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
                 // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
                 // will detect the cycle and return the fallback value.
-                let mapped = visitor.visit(db, ty, type_mapping, || {
-                    self.value_type_with_recursion(db, visitor.recursion_context)
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                });
+                visitor.visit(db, ty, type_mapping, || {
+                    let mapped = self
+                        .value_type_with_recursion(db, visitor.recursion_context)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
 
-                // If the type mapping does not result in any change to this type alias, keep the
-                // alias node instead of eagerly expanding it. A recursive backedge also returns
-                // the alias itself, and fully static aliases must retain their original identity.
-                if mapped == ty
-                    || self.value_type_with_recursion(db, visitor.recursion_context) == mapped
-                {
-                    ty
-                } else if let TypeMapping::Materialize(materialization_kind) = type_mapping
-                    && self.is_recursive(db)
-                {
-                    Type::TypeAlias(self.with_materialization_kind(db, Some(*materialization_kind)))
-                } else {
-                    mapped
-                }
+                    // If the type mapping does not result in any change to this type alias, keep the
+                    // alias node instead of eagerly expanding it. A recursive backedge also returns
+                    // the alias itself, and fully static aliases must retain their original identity.
+                    if mapped == ty
+                        || self.value_type_with_recursion(db, visitor.recursion_context) == mapped
+                    {
+                        ty
+                    } else if let TypeMapping::Materialize(materialization_kind) = type_mapping
+                        && self.is_recursive(db)
+                    {
+                        Type::TypeAlias(
+                            self.with_materialization_kind(db, Some(*materialization_kind)),
+                        )
+                    } else {
+                        mapped
+                    }
+                })
             }
         }
     }

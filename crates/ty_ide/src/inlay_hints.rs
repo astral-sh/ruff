@@ -2,15 +2,21 @@ use std::{fmt, vec};
 use ty_python_semantic::ProgramEnvironment;
 
 use crate::{Db, FxIndexMap, HasNavigationTargets, NavigationTarget};
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_python_ast::token::{Tokens, parenthesized_range};
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
-use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp};
+use ruff_python_ast::{
+    AnyNodeRef, ArgOrKeyword, Arguments, Expr, ExprAttribute, ExprName, ExprUnaryOp, Parameters,
+    Stmt, StmtAssign, UnaryOp,
+};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::file_to_module;
 use ty_python_core::ProgramFile;
 use ty_python_semantic::importer::{ImportAction, ImportRequest, Importer, MembersInScope};
-use ty_python_semantic::types::ide_support::inlay_hint_call_argument_details;
-use ty_python_semantic::types::{Type, TypeDetail};
+use ty_python_semantic::types::ide_support::{
+    inlay_hint_call_argument_details, inlay_hint_return_type,
+};
+use ty_python_semantic::types::{Type, TypeDetail, TypeDisplayDetails};
 use ty_python_semantic::{HasType, SemanticModel};
 
 #[derive(Debug, Clone)]
@@ -25,23 +31,44 @@ impl InlayHint {
     fn variable_type<'db>(
         context: InlayHintImportContext<'_, 'db>,
         expr: &Expr,
-        rhs: &Expr,
+        assignment: &StmtAssign,
         ty: Type<'db>,
-        mut allow_edits: bool,
+        tokens: &Tokens,
     ) -> Option<Self> {
-        let InlayHintImportContext { db, file, importer } = context;
+        let InlayHintImportContext { db, file, .. } = context;
 
-        let position = expr.range().end();
         let env = ProgramEnvironment::from_file(file);
         // Render the type to a string, and get subspans for all the types that make it up
         let details = ty.display(db, &env).to_string_parts();
 
         // Filter out repetitive hints like `x: T = T()`
-        if call_matches_name(rhs, &details.label) {
+        if call_matches_name(&assignment.value, &details.label) {
             return None;
         }
 
-        let mut dynamic_importer = DynamicImporter::new(importer, expr);
+        let range =
+            parenthesized_range(expr.into(), assignment.into(), tokens).unwrap_or(expr.range());
+        Some(Self::type_annotation(
+            context,
+            expr.into(),
+            range.end(),
+            &details,
+            ": ",
+            annotations_are_valid_syntax(assignment),
+        ))
+    }
+
+    fn type_annotation<'db>(
+        context: InlayHintImportContext<'_, 'db>,
+        scope_node: AnyNodeRef<'_>,
+        position: TextSize,
+        details: &TypeDisplayDetails<'db>,
+        prefix: &str,
+        mut allow_edits: bool,
+    ) -> Self {
+        let InlayHintImportContext { db, file, importer } = context;
+        let env = ProgramEnvironment::from_file(file);
+        let mut dynamic_importer = DynamicImporter::new(importer, scope_node);
 
         // Ok so the idea here is that we potentially have a random soup of spans here,
         // and each byte of the string can have at most one target associate with it.
@@ -58,7 +85,7 @@ impl InlayHint {
         let mut edit_label = details.label.clone();
         let mut edit_offset: isize = 0;
 
-        let mut label_parts = vec![": ".into()];
+        let mut label_parts = vec![prefix.into()];
         for (target, detail) in details.targets.iter().zip(&details.details) {
             match detail {
                 TypeDetail::Type(ty) => {
@@ -81,6 +108,16 @@ impl InlayHint {
                             return None;
                         }
 
+                        let module =
+                            file_to_module(db, definition.program_file(db).resolver_file(db))?;
+
+                        // Types like `ty_extensions.Unknown` only exist in stubs and cannot be
+                        // imported at runtime, so we do not provide edits.
+                        if module.is_known_stub_only(db) {
+                            allow_edits = false;
+                            return None;
+                        }
+
                         // Don't try to import symbols in scope
                         let definition_file = definition.file(db);
                         if definition_file == file.file(db) {
@@ -93,9 +130,6 @@ impl InlayHint {
                         let definition_name = definition_name
                             .as_deref()
                             .unwrap_or(&details.label[start..end]);
-
-                        let file = definition.program_file(db);
-                        let module = file_to_module(db, file.resolver_file(db))?;
 
                         if should_skip_import(db, module, *ty) {
                             return None;
@@ -150,7 +184,7 @@ impl InlayHint {
         let text_edits = if details.is_valid_syntax && allow_edits {
             let mut text_edits = vec![InlayHintTextEdit {
                 range: TextRange::new(position, position),
-                new_text: format!(": {edit_label}"),
+                new_text: format!("{prefix}{edit_label}"),
             }];
 
             text_edits.extend(dynamic_importer.text_edits());
@@ -160,12 +194,12 @@ impl InlayHint {
             vec![]
         };
 
-        Some(Self {
+        Self {
             position,
             kind: InlayHintKind::Type,
             label: InlayHintLabel { parts: label_parts },
             text_edits,
-        })
+        }
     }
 
     fn call_argument_name(
@@ -184,6 +218,50 @@ impl InlayHint {
             label: InlayHintLabel { parts: label_parts },
             text_edits: vec![],
         }
+    }
+
+    /// Attach the edits that turn this positional argument into a keyword argument.
+    fn enable_call_argument_edit(&mut self, argument: &Expr) {
+        let needs_parentheses = match argument {
+            // The named expression starts at the name on the left of `:=`. The hint starts
+            // at that same name or at the outermost opening parenthesis if the argument is grouped.
+            Expr::Named(_) => self.position == argument.start(),
+            Expr::Generator(generator) => !generator.parenthesized,
+            _ => false,
+        };
+        let mut prefix = InlayHintTextEdit {
+            range: TextRange::empty(self.position),
+            new_text: self.display().to_string(),
+        };
+        self.text_edits = if needs_parentheses {
+            prefix.new_text.push('(');
+            vec![
+                prefix,
+                InlayHintTextEdit {
+                    range: TextRange::empty(argument.end()),
+                    new_text: ")".to_owned(),
+                },
+            ]
+        } else {
+            vec![prefix]
+        };
+    }
+
+    fn return_type<'db>(
+        context: InlayHintImportContext<'_, 'db>,
+        function: &ruff_python_ast::StmtFunctionDef,
+        ty: Type<'db>,
+    ) -> Self {
+        let env = ProgramEnvironment::from_file(context.file);
+        let details = ty.display(context.db, &env).to_string_parts();
+        Self::type_annotation(
+            context,
+            function.into(),
+            function.parameters.end(),
+            &details,
+            " -> ",
+            true,
+        )
     }
 
     pub fn display(&self) -> InlayHintDisplay<'_> {
@@ -288,9 +366,7 @@ pub fn inlay_hints(
     settings: &InlayHintSettings,
 ) -> Vec<InlayHint> {
     let ast = parsed_module(db, file.python_file(db)).load(db);
-    let importer = Importer::new(db, file, &ast);
-
-    let mut visitor = InlayHintVisitor::new(db, file, importer, range, settings);
+    let mut visitor = InlayHintVisitor::new(db, file, &ast, range, settings);
 
     visitor.visit_body(ast.suite());
 
@@ -316,12 +392,16 @@ pub struct InlayHintSettings {
     /// foo("x="1)
     /// ```
     pub call_argument_names: bool,
+
+    /// Whether to show inferred return types on unannotated function definitions.
+    /// Requires `analysis.return-type-inference` to be activated.
+    pub return_types: bool,
     // Add any new setting that enables additional inlays to `any_enabled`.
 }
 
 impl InlayHintSettings {
     pub fn any_enabled(&self) -> bool {
-        self.variable_types || self.call_argument_names
+        self.variable_types || self.call_argument_names || self.return_types
     }
 }
 
@@ -330,6 +410,7 @@ impl Default for InlayHintSettings {
         Self {
             variable_types: true,
             call_argument_names: true,
+            return_types: true,
         }
     }
 }
@@ -345,41 +426,45 @@ struct InlayHintVisitor<'a, 'db> {
     db: &'db dyn Db,
     model: SemanticModel<'db>,
     importer: Importer<'db>,
+    tokens: &'db Tokens,
     hints: Vec<InlayHint>,
-    assignment_rhs: Option<&'a Expr>,
+    pending_return_hint: Option<(&'a Parameters, InlayHint)>,
+    assignment: Option<&'a StmtAssign>,
     range: TextRange,
     settings: &'a InlayHintSettings,
-    in_no_edits_allowed: bool,
 }
 
 impl<'a, 'db> InlayHintVisitor<'a, 'db> {
     fn new(
         db: &'db dyn Db,
         file: ProgramFile<'db>,
-        importer: Importer<'db>,
+        ast: &'db ParsedModuleRef,
         range: TextRange,
         settings: &'a InlayHintSettings,
     ) -> Self {
         Self {
             db,
             model: SemanticModel::new(db, file),
-            importer,
+            importer: Importer::new(db, file, ast),
+            tokens: ast.tokens(),
             hints: Vec::new(),
-            assignment_rhs: None,
+            pending_return_hint: None,
+            assignment: None,
             range,
             settings,
-            in_no_edits_allowed: false,
         }
     }
 
-    fn add_type_hint(&mut self, expr: &Expr, rhs: &Expr, ty: Type<'db>, allow_edits: bool) {
-        if !self.settings.variable_types {
+    fn add_type_hint(&mut self, expr: &Expr) {
+        let Some(assignment) = self.assignment else {
+            return;
+        };
+        if !self.settings.variable_types || is_ignored_variable_assignment_target(expr) {
             return;
         }
-
-        if is_ignored_variable_assignment_target(expr) {
+        let Some(ty) = expr.inferred_type(&self.model) else {
             return;
-        }
+        };
 
         let context = InlayHintImportContext {
             db: self.db,
@@ -387,14 +472,17 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             importer: &self.importer,
         };
 
-        if let Some(inlay_hint) = InlayHint::variable_type(context, expr, rhs, ty, allow_edits) {
+        if let Some(inlay_hint) =
+            InlayHint::variable_type(context, expr, assignment, ty, self.tokens)
+        {
             self.hints.push(inlay_hint);
         }
     }
 
     fn add_call_argument_name(
         &mut self,
-        position: TextSize,
+        argument: &Expr,
+        arguments: &Arguments,
         name: &str,
         navigation_target: Option<NavigationTarget>,
     ) -> bool {
@@ -406,7 +494,9 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             return false;
         }
 
-        let inlay_hint = InlayHint::call_argument_name(position, name, navigation_target);
+        let range = parenthesized_range(argument.into(), arguments.into(), self.tokens)
+            .unwrap_or(argument.range());
+        let inlay_hint = InlayHint::call_argument_name(range.start(), name, navigation_target);
 
         self.hints.push(inlay_hint);
         true
@@ -414,6 +504,16 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
 }
 
 impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
+    fn leave_node(&mut self, node: AnyNodeRef<'a>) {
+        if let AnyNodeRef::Parameters(parameters) = node
+            && let Some((_, hint)) = self
+                .pending_return_hint
+                .take_if(|(expected, _)| std::ptr::eq(*expected, parameters))
+        {
+            self.hints.push(hint);
+        }
+    }
+
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
         if self.range.intersect(node.range()).is_some() {
             TraversalSignal::Traverse
@@ -432,16 +532,12 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
         match stmt {
             Stmt::Assign(assign) => {
                 if !type_hint_is_excessive_for_expr(&assign.value) {
-                    self.assignment_rhs = Some(&*assign.value);
-                }
-                if !annotations_are_valid_syntax(assign) {
-                    self.in_no_edits_allowed = true;
+                    self.assignment = Some(assign);
                 }
                 for target in &assign.targets {
                     self.visit_expr(target);
                 }
-                self.in_no_edits_allowed = false;
-                self.assignment_rhs = None;
+                self.assignment = None;
 
                 self.visit_expr(&assign.value);
 
@@ -451,8 +547,27 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                 self.visit_expr(&expr.value);
                 return;
             }
+            Stmt::FunctionDef(function) => {
+                let position = function.parameters.end();
+                if self.settings.return_types
+                    && self.range.contains_inclusive(position)
+                    && let Some(ty) = inlay_hint_return_type(&self.model, function)
+                {
+                    self.pending_return_hint = Some((
+                        function.parameters.as_ref(),
+                        InlayHint::return_type(
+                            InlayHintImportContext {
+                                db: self.db,
+                                file: self.model.program_file(),
+                                importer: &self.importer,
+                            },
+                            function,
+                            ty,
+                        ),
+                    ));
+                }
+            }
             // TODO
-            Stmt::FunctionDef(_) => {}
             Stmt::For(_) => {}
             _ => {}
         }
@@ -462,24 +577,10 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
-            Expr::Name(name) => {
-                if let Some(rhs) = self.assignment_rhs {
-                    if name.ctx.is_store() {
-                        if let Some(ty) = expr.inferred_type(&self.model) {
-                            self.add_type_hint(expr, rhs, ty, !self.in_no_edits_allowed);
-                        }
-                    }
-                }
-                source_order::walk_expr(self, expr);
-            }
-            Expr::Attribute(attribute) => {
-                if let Some(rhs) = self.assignment_rhs {
-                    if attribute.ctx.is_store() {
-                        if let Some(ty) = expr.inferred_type(&self.model) {
-                            self.add_type_hint(expr, rhs, ty, !self.in_no_edits_allowed);
-                        }
-                    }
-                }
+            Expr::Name(ExprName { ctx, .. }) | Expr::Attribute(ExprAttribute { ctx, .. })
+                if ctx.is_store() =>
+            {
+                self.add_type_hint(expr);
                 source_order::walk_expr(self, expr);
             }
             Expr::Call(call) => {
@@ -488,7 +589,7 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
                 self.visit_expr(&call.func);
 
-                let mut last_editable_hint_index: Option<usize> = None;
+                let mut last_editable_hint = None;
 
                 // `argument_names` is keyed by positional-arg index, not source-order index,
                 // so track them separately to stay in sync after keyword args appear mid-call.
@@ -498,16 +599,15 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                         if let Some((name, parameter_label_offset)) =
                             details.argument_names.get(&positional_index)
                             && !arg_matches_name(argument, name)
-                        {
-                            if self.add_call_argument_name(
-                                arg_or_keyword.range().start(),
+                            && self.add_call_argument_name(
+                                argument,
+                                &call.arguments,
                                 name,
                                 parameter_label_offset.map(NavigationTarget::from),
-                            ) {
-                                if !argument.is_starred_expr() {
-                                    last_editable_hint_index = Some(self.hints.len() - 1);
-                                }
-                            }
+                            )
+                            && !argument.is_starred_expr()
+                        {
+                            last_editable_hint = Some((self.hints.len() - 1, argument));
                         }
 
                         positional_index += 1;
@@ -518,12 +618,8 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
                 // For the last positional argument, provide an edit to insert
                 // the inlay hint.
-                if let Some(index) = last_editable_hint_index {
-                    let hint: &mut InlayHint = &mut self.hints[index];
-                    hint.text_edits = vec![InlayHintTextEdit {
-                        range: TextRange::empty(hint.position),
-                        new_text: format!("{}=", hint.label.parts()[0].text()),
-                    }];
+                if let Some((index, argument)) = last_editable_hint {
+                    self.hints[index].enable_call_argument_edit(argument);
                 }
             }
             _ => {
@@ -631,7 +727,7 @@ fn should_skip_import(db: &dyn Db, module: ty_module_resolver::Module, ty: Type)
     module.is_known(db, ty_module_resolver::KnownModule::Builtins) || ty.is_none(db)
 }
 
-fn annotations_are_valid_syntax(stmt_assign: &ruff_python_ast::StmtAssign) -> bool {
+fn annotations_are_valid_syntax(stmt_assign: &StmtAssign) -> bool {
     if stmt_assign.targets.len() > 1 {
         return false;
     }
@@ -666,7 +762,7 @@ struct DynamicallyImportedMember {
 
 struct DynamicImporter<'a, 'db> {
     importer: &'a Importer<'db>,
-    /// The expression node used to compute members in scope (lazily).
+    /// The node used to compute members in scope (lazily).
     scope_node: AnyNodeRef<'a>,
     scope_offset: TextSize,
     members: Option<MembersInScope<'db>>,
@@ -676,11 +772,11 @@ struct DynamicImporter<'a, 'db> {
 }
 
 impl<'a, 'db> DynamicImporter<'a, 'db> {
-    fn new(importer: &'a Importer<'db>, expr: &'a Expr) -> Self {
+    fn new(importer: &'a Importer<'db>, scope_node: AnyNodeRef<'a>) -> Self {
         Self {
             importer,
-            scope_node: expr.into(),
-            scope_offset: expr.range().start(),
+            scope_node,
+            scope_offset: scope_node.range().start(),
             members: None,
             dynamic_imports: FxIndexMap::default(),
         }
@@ -770,27 +866,51 @@ mod tests {
     use itertools::Itertools;
     use ruff_db::{
         diagnostic::{
-            Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
-            LintName, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
+            Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, LintName, Severity,
+            Span, SubDiagnostic, SubDiagnosticSeverity,
         },
         files::{File, FileRange, system_path_to_file},
         source::source_text,
     };
     use ruff_diagnostics::{Edit, Fix};
     use ruff_python_ast::PySourceType;
-    use ruff_python_parser::parse_unchecked_source;
+    use ruff_python_parser::{parse_module, parse_unchecked_source};
     use ruff_python_trivia::textwrap::dedent;
-    use ruff_text_size::{TextLen, TextSize};
+    use ruff_text_size::TextSize;
 
     use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
     use ty_project::ProjectMetadata;
+    use ty_project::metadata::options::{AnalysisOptions, Options};
+    use ty_python_semantic::ReturnTypeInference;
+
+    /// For a given Python function definition and a call to that function,
+    /// return the edited Python source code after inlay hints have been applied to the function call.
+    ///
+    /// For example, `apply_inlay_hints("def f(x): ...\n", "f(y := 1)")` returns `"f(x=(y := 1))"`.
+    #[track_caller]
+    fn apply_inlay_hints(definition: &str, call: &str) -> String {
+        let mut source = format!("{definition}{call}");
+        let test = inlay_hint_test(&format!("{definition}<START>{call}<END>"));
+        let hints = test.collect_hints(&InlayHintSettings::default());
+
+        let edits = hints.iter().flat_map(|hint| &hint.text_edits);
+        apply_edits(&mut source, edits);
+
+        parse_module(&source).unwrap();
+        source.strip_prefix(definition).unwrap().to_owned()
+    }
 
     fn inlay_hint_test(source: &str) -> InlayHintTest {
+        inlay_hint_test_with_options(source, Options::default())
+    }
+
+    fn inlay_hint_test_with_options(source: &str, options: Options) -> InlayHintTest {
         const START: &str = "<START>";
         const END: &str = "<END>";
 
-        let mut db =
-            ty_project::TestDb::new(ProjectMetadata::new("test", SystemPathBuf::from("/")));
+        let mut project = ProjectMetadata::new("test", SystemPathBuf::from("/"));
+        project.set_override_options(options);
+        let mut db = ty_project::TestDb::new(project);
 
         let source = dedent(source);
 
@@ -828,6 +948,355 @@ mod tests {
         }
     }
 
+    fn return_type_hint_test(source: &str) -> InlayHintTest {
+        inlay_hint_test_with_options(
+            source,
+            Options {
+                analysis: Some(AnalysisOptions {
+                    return_type_inference: Some(ReturnTypeInference::Always),
+                    ..AnalysisOptions::default()
+                }),
+                ..Options::default()
+            },
+        )
+    }
+
+    #[test]
+    fn inferred_return_types() {
+        let mut test = return_type_hint_test(
+            r#"
+        def unannotated(x: int):
+            return str(x)
+
+        def annotated() -> int:
+            return 1
+        "#,
+        );
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        def unannotated(x: int)[ -> str]:
+            return str([object=]x)
+
+        def annotated() -> int:
+            return 1
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ^^^
+        info: Source
+          --> main2.py:LL:29
+           |
+        LL | def unannotated(x: int)[ -> str]:
+           |                             ^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:22
+           |
+        LL |     def __new__(cls, object: object = "") -> Self: ...
+           |                      ^^^^^^
+        info: Source
+          --> main2.py:LL:17
+           |
+        LL |     return str([object=]x)
+           |                 ^^^^^^
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+          |
+        1 |
+          - def unannotated(x: int):
+          -     return str(x)
+        2 + def unannotated(x: int) -> str:
+        3 +     return str(object=x)
+        4 |
+          |
+        "#);
+
+        let mut test = return_type_hint_test(
+            r#"
+        class C:
+            value: str
+
+            def method(self):
+                return self.value
+        "#,
+        );
+        assert_snapshot!(test.inlay_hints(), @"
+
+        class C:
+            value: str
+
+            def method(self)[ -> str | Unknown]:
+                return self.value
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ^^^
+        info: Source
+          --> main2.py:LL:26
+           |
+        LL |     def method(self)[ -> str | Unknown]:
+           |                          ^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
+           |
+        LL | Unknown: _SpecialForm
+           | ^^^^^^^
+        info: Source
+          --> main2.py:LL:32
+           |
+        LL |     def method(self)[ -> str | Unknown]:
+           |                                ^^^^^^^
+        ");
+
+        let mut test = return_type_hint_test(
+            r#"
+        class C:
+            value: str
+
+            @property
+            def text(self):
+                return self.value
+        "#,
+        );
+        assert_snapshot!(test.inlay_hints(), @"
+
+        class C:
+            value: str
+
+            @property
+            def text(self)[ -> str | Unknown]:
+                return self.value
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ^^^
+        info: Source
+          --> main2.py:LL:24
+           |
+        LL |     def text(self)[ -> str | Unknown]:
+           |                        ^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
+           |
+        LL | Unknown: _SpecialForm
+           | ^^^^^^^
+        info: Source
+          --> main2.py:LL:30
+           |
+        LL |     def text(self)[ -> str | Unknown]:
+           |                              ^^^^^^^
+        ");
+
+        let mut test = return_type_hint_test(
+            r#"
+        def stringify(function):
+            def wrapper():
+                return str(function())
+
+            return wrapper
+
+        @stringify
+        def number():
+            return 42
+        "#,
+        );
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        def stringify(function)[ -> () -> str]:
+            def wrapper()[ -> str]:
+                return str([object=]function())
+
+            return wrapper
+
+        @stringify
+        def number()[ -> Literal[42]]:
+            return 42
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ^^^
+        info: Source
+          --> main2.py:LL:35
+           |
+        LL | def stringify(function)[ -> () -> str]:
+           |                                   ^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ^^^
+        info: Source
+          --> main2.py:LL:23
+           |
+        LL |     def wrapper()[ -> str]:
+           |                       ^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:22
+           |
+        LL |     def __new__(cls, object: object = "") -> Self: ...
+           |                      ^^^^^^
+        info: Source
+          --> main2.py:LL:21
+           |
+        LL |         return str([object=]function())
+           |                     ^^^^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/typing.pyi:LL:1
+           |
+        LL | Literal: _SpecialForm
+           | ^^^^^^^
+        info: Source
+          --> main2.py:LL:18
+           |
+        LL | def number()[ -> Literal[42]]:
+           |                  ^^^^^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class int:
+           |       ^^^
+        info: Source
+          --> main2.py:LL:26
+           |
+        LL | def number()[ -> Literal[42]]:
+           |                          ^^
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+           |
+        1  + from typing import Literal
+        2  |
+        3  | def stringify(function):
+           -     def wrapper():
+           -         return str(function())
+        4  +     def wrapper() -> str:
+        5  +         return str(object=function())
+        6  |
+        7  |     return wrapper
+        8  |
+        9  | @stringify
+           - def number():
+        10 + def number() -> Literal[42]:
+        11 |     return 42
+           |
+        "#);
+
+        // We do not infer return types for overloaded functions.
+        let mut test = return_type_hint_test(
+            r#"
+        from typing import overload
+
+
+        @overload
+        def overloaded(x: int) -> int: ...
+        @overload
+        def overloaded(x: str) -> str: ...
+        def overloaded(x):
+            return "a" if isinstance(x, str) else 0
+        "#,
+        );
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        from typing import overload
+
+
+        @overload
+        def overloaded(x: int) -> int: ...
+        @overload
+        def overloaded(x: str) -> str: ...
+        def overloaded(x):
+            return "a" if isinstance(x, str) else 0
+        "#);
+
+        // TODO: Show a `str` return-type hint once async return-type inference is supported.
+        let mut test = return_type_hint_test(
+            r#"
+        async def asynchronous(x: int):
+            return f"{x}"
+        "#,
+        );
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        async def asynchronous(x: int):
+            return f"{x}"
+        "#);
+    }
+
+    #[test]
+    fn return_type_hint_imports() {
+        let mut test = return_type_hint_test(
+            r#"
+        from module import make
+
+        def create():
+            return make()
+        "#,
+        );
+        test.with_extra_file(
+            "module.py",
+            &dedent(
+                r#"
+        class Item: ...
+
+        def make() -> Item: ...
+        "#,
+            ),
+        );
+        assert_snapshot!(test.inlay_hints(), @"
+
+        from module import make
+
+        def create()[ -> Item]:
+            return make()
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> module.py:2:7
+          |
+        2 | class Item: ...
+          |       ^^^^
+        info: Source
+         --> main2.py:4:18
+          |
+        4 | def create()[ -> Item]:
+          |                  ^^^^
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+          |
+        1 |
+          - from module import make
+        2 + from module import make, Item
+        3 |
+          - def create():
+        4 + def create() -> Item:
+        5 |     return make()
+          |
+        ");
+    }
+
     struct InlayHintTest {
         db: ty_project::TestDb,
         file: File,
@@ -850,9 +1319,8 @@ mod tests {
             self.db.write_file(file_name, content).unwrap();
         }
 
-        /// Returns the inlay hints for the given test case with custom settings.
-        fn inlay_hints_with_settings(&mut self, settings: &InlayHintSettings) -> String {
-            let hints = inlay_hints(
+        fn collect_hints(&self, settings: &InlayHintSettings) -> Vec<InlayHint> {
+            inlay_hints(
                 &self.db,
                 ProgramFile::new(
                     &self.db,
@@ -861,7 +1329,12 @@ mod tests {
                 ),
                 self.range,
                 settings,
-            );
+            )
+        }
+
+        /// Returns the inlay hints for the given test case with custom settings.
+        fn inlay_hints_with_settings(&mut self, settings: &InlayHintSettings) -> String {
+            let hints = self.collect_hints(settings);
 
             let mut inlay_hint_buf = source_text(&self.db, self.file).as_str().to_string();
             let mut text_edit_buf = inlay_hint_buf.clone();
@@ -903,13 +1376,7 @@ mod tests {
                 .into_iter()
                 .unique_by(|edit| (edit.range, edit.new_text.clone()))
                 .collect();
-            let mut edit_offset = TextSize::default();
-
-            for edit in all_edits.iter().sorted_by_key(|edit| edit.range.start()) {
-                let updated_range = edit.range + edit_offset;
-                text_edit_buf.replace_range(updated_range.to_std_range(), &edit.new_text);
-                edit_offset += edit.new_text.text_len() - edit.range.len();
-            }
+            apply_edits(&mut text_edit_buf, &all_edits);
 
             let edited = parse_unchecked_source(&text_edit_buf, PySourceType::Python);
             if edited.has_invalid_syntax() && !source_has_errors {
@@ -968,10 +1435,7 @@ Source with applied edits:
 
             let mut buf = String::new();
 
-            let config = DisplayDiagnosticConfig::new("ty")
-                .color(false)
-                .context(0)
-                .format(DiagnosticFormat::Full);
+            let config = DisplayDiagnosticConfig::new("ty").color(false).context(0);
 
             let diag = diagnostic.into_diagnostic();
             let config =
@@ -982,8 +1446,23 @@ Source with applied edits:
         }
     }
 
+    /// Apply edits from right to left so each replacement leaves the remaining offsets unchanged.
+    fn apply_edits<'a>(
+        source: &mut String,
+        edits: impl IntoIterator<Item = &'a InlayHintTextEdit>,
+    ) {
+        for edit in edits
+            .into_iter()
+            .sorted_by_key(|edit| edit.range.start())
+            .rev()
+        {
+            source.replace_range(edit.range.to_std_range(), &edit.new_text);
+        }
+    }
+
     #[test]
     fn test_assign_statement() {
+        // The type hint and its edit follow the whole assignment target, including its parentheses.
         let mut test = inlay_hint_test(
             "
             def i(x: int, /) -> int:
@@ -991,7 +1470,7 @@ Source with applied edits:
 
             x = 1
             y = x
-            z = i(1)
+            ((z)) = i(1)
             w = z
             aa = b'foo'
             bb = aa
@@ -1005,7 +1484,7 @@ Source with applied edits:
 
         x = 1
         y[: Literal[1]] = x
-        z[: int] = i(1)
+        ((z))[: int] = i(1)
         w[: int] = z
         aa = b'foo'
         bb[: Literal[b"foo"]] = aa
@@ -1039,10 +1518,10 @@ Source with applied edits:
         LL | class int:
            |       ^^^
         info: Source
-          --> main2.py:LL:5
+          --> main2.py:LL:9
            |
-        LL | z[: int] = i(1)
-           |     ^^^
+        LL | ((z))[: int] = i(1)
+           |         ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -1086,10 +1565,10 @@ Source with applied edits:
         --------------------------------------------------------------------------------
         6  | x = 1
            - y = x
-           - z = i(1)
+           - ((z)) = i(1)
            - w = z
         7  + y: Literal[1] = x
-        8  + z: int = i(1)
+        8  + ((z)): int = i(1)
         9  + w: int = z
         10 | aa = b'foo'
            - bb = aa
@@ -1993,17 +2472,10 @@ Source with applied edits:
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
           |
-        1 + from ty_extensions._internal import Unknown
-        2 |
-        3 | class A:
-        4 |     def __init__(self, y):
-        5 |         self.x = int(1)
-          -         self.y = y
-        6 +         self.y: Unknown = y
-        7 |
+        6 |
           - a = A(2)
-        8 + a = A(y=2)
-        9 | a.y = int(3)
+        7 + a = A(y=2)
+        8 | a.y = int(3)
           |
         ");
     }
@@ -2691,13 +3163,15 @@ Source with applied edits:
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
            |
-        1  + from ty_extensions._internal import Unknown
-        2  + from string.templatelib import Template
-        3  |
+        1  + from string.templatelib import Template
+        2  |
            - a = [1, 2]
            - b = [1.0, 2.0]
            - c = [True, False]
-           - d = [None, None]
+        3  + a: list[int] = [1, 2]
+        4  + b: list[float] = [1.0, 2.0]
+        5  + c: list[bool] = [True, False]
+        6  | d = [None, None]
            - e = ["hel", "lo"]
            - f = ['the', 're']
            - g = [f"{ft}", f"{ft}"]
@@ -2705,17 +3179,13 @@ Source with applied edits:
            - i = [b'/x01', b'/x02']
            - j = [+1, +2.0]
            - k = [-1, -2.0]
-        4  + a: list[int] = [1, 2]
-        5  + b: list[float] = [1.0, 2.0]
-        6  + c: list[bool] = [True, False]
-        7  + d: list[None | Unknown] = [None, None]
-        8  + e: list[str] = ["hel", "lo"]
-        9  + f: list[str] = ['the', 're']
-        10 + g: list[str] = [f"{ft}", f"{ft}"]
-        11 + h: list[Template] = [t"wow %d", t"wow %d"]
-        12 + i: list[bytes] = [b'/x01', b'/x02']
-        13 + j: list[float] = [+1, +2.0]
-        14 + k: list[float] = [-1, -2.0]
+        7  + e: list[str] = ["hel", "lo"]
+        8  + f: list[str] = ['the', 're']
+        9  + g: list[str] = [f"{ft}", f"{ft}"]
+        10 + h: list[Template] = [t"wow %d", t"wow %d"]
+        11 + i: list[bytes] = [b'/x01', b'/x02']
+        12 + j: list[float] = [+1, +2.0]
+        13 + k: list[float] = [-1, -2.0]
            |
         "#);
     }
@@ -3388,16 +3858,19 @@ Source with applied edits:
 
     #[test]
     fn test_function_call_with_positional_or_keyword_parameter() {
+        // Both the hint and its edit go before the argument's outermost parentheses.
         let mut test = inlay_hint_test(
             "
             def foo(x: int): pass
-            foo(1)",
+            foo(1)
+            foo(((2)))",
         );
 
         assert_snapshot!(test.inlay_hints(), @"
 
         def foo(x: int): pass
         foo([x=]1)
+        foo([x=]((2)))
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:2:9
@@ -3410,15 +3883,47 @@ Source with applied edits:
         3 | foo([x=]1)
           |      ^
 
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def foo(x: int): pass
+          |         ^
+        info: Source
+         --> main2.py:4:6
+          |
+        4 | foo([x=]((2)))
+          |      ^
+
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
           |
         2 | def foo(x: int): pass
           - foo(1)
+          - foo(((2)))
         3 + foo(x=1)
+        4 + foo(x=((2)))
           |
         ");
+    }
+
+    #[test]
+    fn accepting_keyword_argument_hints_produces_valid_python() {
+        const DEFINITION: &str = "def f(x): ...\n";
+
+        fn apply_keyword_hint(call: &str) -> String {
+            apply_inlay_hints(DEFINITION, call)
+        }
+
+        // An assignment expression or a sole generator argument can use the call's parentheses.
+        // Inserting just `x=` would produce `f(x=y := 1)` or `f(x=i for i in [1])`. Both are invalid.
+        // As a keyword value, the expression needs its own pair, which may already be present.
+        assert_snapshot!(apply_keyword_hint("f(y := 1)"), @"f(x=(y := 1))");
+        assert_snapshot!(apply_keyword_hint("f((y := 1))"), @"f(x=(y := 1))");
+        assert_snapshot!(apply_keyword_hint("f(f(y := 1))"), @"f(x=f(x=(y := 1)))");
+
+        assert_snapshot!(apply_keyword_hint("f(i for i in [1])"), @"f(x=(i for i in [1]))");
+        assert_snapshot!(apply_keyword_hint("f((i for i in [1]))"), @"f(x=(i for i in [1]))");
     }
 
     #[test]
@@ -6588,6 +7093,139 @@ Source with applied edits:
     }
 
     #[test]
+    fn inferred_unknown_type() {
+        // We do not suggest edits/imports for ty-internal types (Unknown), even if they are nested.
+        let mut test = return_type_hint_test(
+            r#"
+        def twice(value):
+            return [value, value]
+        "#,
+        );
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def twice(value)[ -> list[Unknown]]:
+            return [value, value]
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class list(MutableSequence[_T]):
+           |       ^^^^
+        info: Source
+          --> main2.py:LL:22
+           |
+        LL | def twice(value)[ -> list[Unknown]]:
+           |                      ^^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
+           |
+        LL | Unknown: _SpecialForm
+           | ^^^^^^^
+        info: Source
+          --> main2.py:LL:27
+           |
+        LL | def twice(value)[ -> list[Unknown]]:
+           |                           ^^^^^^^
+        ");
+
+        // We still suggest edits/imports for a user-defined class named Unknown.
+        let mut test = return_type_hint_test(
+            r#"
+        from module import make_unknown
+
+        def custom_unknown():
+            return make_unknown()
+        "#,
+        );
+        test.with_extra_file(
+            "module.py",
+            &dedent(
+                r#"
+        class Unknown: ...
+
+        def make_unknown() -> Unknown:
+            return Unknown()
+        "#,
+            ),
+        );
+        assert_snapshot!(test.inlay_hints(), @"
+
+        from module import make_unknown
+
+        def custom_unknown()[ -> Unknown]:
+            return make_unknown()
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> module.py:2:7
+          |
+        2 | class Unknown: ...
+          |       ^^^^^^^
+        info: Source
+         --> main2.py:4:26
+          |
+        4 | def custom_unknown()[ -> Unknown]:
+          |                          ^^^^^^^
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+          |
+        1 |
+          - from module import make_unknown
+        2 + from module import make_unknown, Unknown
+        3 |
+          - def custom_unknown():
+        4 + def custom_unknown() -> Unknown:
+        5 |     return make_unknown()
+          |
+        ");
+    }
+
+    #[test]
+    fn typeshed_helper_type() {
+        // We do not suggest edits/imports for typeshed-internal types (PathEntryFinderProtocol).
+        let mut test = inlay_hint_test(
+            r#"
+        import pkgutil
+
+        finder = pkgutil.get_importer(path_item=".")
+        "#,
+        );
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        import pkgutil
+
+        finder[: PathEntryFinderProtocol | None] = pkgutil.get_importer(path_item=".")
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/_typeshed/importlib.pyi:LL:7
+           |
+        LL | class PathEntryFinderProtocol(Protocol):
+           |       ^^^^^^^^^^^^^^^^^^^^^^^
+        info: Source
+          --> main2.py:LL:10
+           |
+        LL | finder[: PathEntryFinderProtocol | None] = pkgutil.get_importer(path_item=".")
+           |          ^^^^^^^^^^^^^^^^^^^^^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/types.pyi:LL:7
+           |
+        LL | class NoneType:
+           |       ^^^^^^^^
+        info: Source
+          --> main2.py:LL:36
+           |
+        LL | finder[: PathEntryFinderProtocol | None] = pkgutil.get_importer(path_item=".")
+           |                                    ^^^^
+        "#);
+    }
+
+    #[test]
     fn hover_type_with_top_materialization() {
         let mut test = inlay_hint_test(
             r#"
@@ -6640,15 +7278,6 @@ Source with applied edits:
            |
         LL |     x[: Top[list[Any]]] = xyxy
            |                  ^^^
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-          |
-        5 | def f(xyxy: Top[list[Any]]):
-          -     x = xyxy
-        6 +     x: Top[list[Any]] = xyxy
-          |
         ");
     }
 
@@ -7042,17 +7671,18 @@ Source with applied edits:
     fn auto_import_each_hint_independently() {
         // Each hint needs its own imports, even when another hint uses the same types.
         // Repeated types within a hint should only produce one import per symbol.
-        let test = inlay_hint_test("x = (y, 1, y, 1)\nx = (y, 1, y, 1)\n");
-        let hints = inlay_hints(
-            &test.db,
-            ProgramFile::new(
-                &test.db,
-                test.file,
-                test.db.program_environment().program(&test.db),
+        let mut test =
+            inlay_hint_test("from module import y\nx = (y, 1, y, 1)\nx = (y, 1, y, 1)\n");
+        test.with_extra_file(
+            "module.py",
+            &dedent(
+                r#"
+        class Y: ...
+        y: Y
+        "#,
             ),
-            test.range,
-            &InlayHintSettings::default(),
         );
+        let hints = test.collect_hints(&InlayHintSettings::default());
 
         assert_eq!(hints.len(), 2);
         let source = source_text(&test.db, test.file);
@@ -7060,28 +7690,21 @@ Source with applied edits:
             .into_iter()
             .map(|hint| {
                 let mut edited = source.as_str().to_string();
-                for edit in hint
-                    .text_edits
-                    .iter()
-                    .sorted_by_key(|edit| edit.range.start())
-                    .rev()
-                {
-                    edited.replace_range(edit.range.to_std_range(), &edit.new_text);
-                }
+                apply_edits(&mut edited, &hint.text_edits);
                 edited
             })
             .join("\n");
 
         assert_snapshot!(edited_sources, @"
-        from ty_extensions._internal import Unknown
         from typing import Literal
-        x: tuple[Unknown, Literal[1], Unknown, Literal[1]] = (y, 1, y, 1)
+        from module import y, Y
+        x: tuple[Y, Literal[1], Y, Literal[1]] = (y, 1, y, 1)
         x = (y, 1, y, 1)
 
-        from ty_extensions._internal import Unknown
         from typing import Literal
+        from module import y, Y
         x = (y, 1, y, 1)
-        x: tuple[Unknown, Literal[1], Unknown, Literal[1]] = (y, 1, y, 1)
+        x: tuple[Y, Literal[1], Y, Literal[1]] = (y, 1, y, 1)
         ");
     }
 
