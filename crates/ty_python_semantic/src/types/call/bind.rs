@@ -2360,12 +2360,12 @@ impl<'db> Bindings<'db> {
                                         class.generic_context(db).map(wrap_generic_context)
                                     }
 
-                                    Type::FunctionLiteral(function) => {
-                                        signature_generic_context(function.signature(db))
-                                    }
+                                    Type::FunctionLiteral(function) => signature_generic_context(
+                                        function.signature_without_inferred_return_type(db),
+                                    ),
 
                                     Type::BoundMethod(bound_method) => bound_method
-                                        .unbound_signatures(db)
+                                        .unbound_signatures_without_inferred_return_type(db)
                                         .and_then(signature_generic_context),
 
                                     Type::Callable(callable) => {
@@ -9537,7 +9537,7 @@ impl<'db> ForwardedParameterSource<'db> {
             .source_parameter_index
             .unwrap_or(parameter.signature_parameter_index + self.parameter_index_offset);
         self.function
-            .signature(db)
+            .signature_without_inferred_return_type(db)
             .overloads
             .get(self.overload_index)?
             .parameters()

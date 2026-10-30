@@ -1403,7 +1403,8 @@ fn method_override_types<'db>(
 ) -> Option<(Type<'db>, Type<'db>)> {
     let (subclass_type, superclass_type) = match (subclass_type, superclass_type) {
         (Type::BoundMethod(subclass_method), Type::BoundMethod(superclass_method))
-            if let Some(superclass_signature) = superclass_method.unbound_signatures(db) =>
+            if let Some(superclass_signature) =
+                superclass_method.unbound_signatures_without_inferred_return_type(db) =>
         {
             let explicit_receiver = match superclass_signature.overloads.as_slice() {
                 [signature] => signature
