@@ -1501,7 +1501,7 @@ def with_callback(
     return run
 
 run = with_callback(consume, text)
-run(accepts_object, 1)  # no diagnostic
+run(accepts_object, 1)  # ok
 # error: [invalid-argument-type] "Argument is incorrect: Expected `((int, /) -> None) & ((str, /) -> None)`, found `def accepts_str(value: str, /) -> None`"
 # error: [invalid-argument-type] "Argument is incorrect: Expected `((int, /) -> None) & ((str, /) -> None)`, found `def accepts_str(value: str, /) -> None`"
 # error: [invalid-argument-type] "Argument is incorrect: Expected `int`, found `Literal["text"]`"
@@ -1518,7 +1518,7 @@ def nested(
 
 inner = nested(consume, text)(1)
 reveal_type(inner)  # revealed: ((int, /) -> None) & ((str, /) -> None)
-inner("text")  # no diagnostic
+inner("text")  # ok
 ```
 
 ### Type variable variance alongside a parameter list
@@ -1790,8 +1790,8 @@ def text(callback: Callable[[str], None]) -> None: ...
 callback = partial(invoke, integer, text)
 # TODO: Preserve both captured parameter lists in the partial.
 reveal_type(callback)  # revealed: partial[Unknown]
-callback(1)  # no diagnostic
-callback("text")  # no diagnostic
+callback(1)  # ok
+callback("text")  # ok
 # TODO: error: [invalid-argument-type]
 callback(None)
 ```
@@ -1824,12 +1824,12 @@ def anything(value: object, /) -> None: ...
 def _(concrete: Callback[[int]], gradual: Callback[...]) -> None:
     callback = instances(concrete, gradual)
     reveal_type(callback)  # revealed: Callback[(int, /)]
-    callback(1)  # no diagnostic
+    callback(1)  # ok
     callback("bad")  # error: [invalid-argument-type]
 
     callback = instances(gradual, concrete)
     reveal_type(callback)  # revealed: Callback[(int, /)]
-    callback(1)  # no diagnostic
+    callback(1)  # ok
     callback("bad")  # error: [invalid-argument-type]
 
     reveal_type(instance_first(concrete, anything))  # revealed: Callback[(int, /)]
@@ -1896,7 +1896,7 @@ def forward(function: Callable[P, object], *args: P.args, **kwargs: P.kwargs) ->
 def identity(value: T) -> T:
     return value
 
-forward(identity, b"text")  # no diagnostic
+forward(identity, b"text")  # ok
 ```
 
 ### Generic constructors with bounded return types
@@ -1953,7 +1953,7 @@ class Factory(Generic[P]):
     def for_protocol(cls: Callable[Params, R], protocol: Callable[[], P]) -> "Factory[P]":
         raise NotImplementedError
 
-Factory.for_protocol(Protocol)  # no diagnostic
+Factory.for_protocol(Protocol)  # ok
 ```
 
 ### Captured and fixed variables in a return type
@@ -1979,20 +1979,20 @@ def unrestricted(fixed: S) -> None:
         return value, fixed
 
     # TODO: Reject this call because `S` is not bounded by `str`.
-    forward(make, 1)  # no diagnostic
+    forward(make, 1)  # ok
 
 def non_generic(fixed: S) -> None:
     def make(value: int) -> tuple[int, S]:
         return value, fixed
 
     # TODO: Reject this call because `S` is not bounded by `str`.
-    forward(make, 1)  # no diagnostic
+    forward(make, 1)  # ok
 
 def bounded(fixed: BoundedS) -> None:
     def make(value: T) -> tuple[T, BoundedS]:
         return value, fixed
 
-    forward(make, 1)  # no diagnostic
+    forward(make, 1)  # ok
 ```
 
 ### Specializing a captured variable to satisfy a return bound
@@ -2015,9 +2015,9 @@ def outer(fixed: S) -> None:
     def make(value: T) -> tuple[T, S]:
         return value, fixed
 
-    forward(make, "text")  # no diagnostic
+    forward(make, "text")  # ok
     # TODO: Reject this call because `T` cannot satisfy both the argument and the return bound.
-    forward(make, 1)  # no diagnostic
+    forward(make, 1)  # ok
 ```
 
 ### Parameter lists after incomplete inference
@@ -2172,16 +2172,16 @@ def forward(
     # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     box.invoke(callback, 1)
-    result = box.invoke(callback, *args, **kwargs)  # no diagnostic
+    result = box.invoke(callback, *args, **kwargs)  # ok
     # revealed: tuple[Box[P@forward, str], str] | tuple[Box[P@forward, T@forward], T@forward]
     reveal_type(result)
-    return result  # no diagnostic
+    return result  # ok
 
 def reverse(
     a: Box[P, str], b: Box[P, T], cond: bool, callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs
 ) -> tuple[Box[P, str], str] | tuple[Box[P, T], T]:
     invoke = b.invoke if cond else a.invoke
-    return invoke(callback, *args, **kwargs)  # no diagnostic
+    return invoke(callback, *args, **kwargs)  # ok
 ```
 
 ## Calling a union of methods with a `ParamSpec`
@@ -2206,7 +2206,7 @@ def forward(
     a: Box[str], b: Box[T], cond: bool, callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs
 ) -> tuple[Box[str], str] | tuple[Box[T], T]:
     box = a if cond else b
-    result = box.invoke(callback, *args, **kwargs)  # no diagnostic
+    result = box.invoke(callback, *args, **kwargs)  # ok
     # revealed: tuple[Box[str], str] | tuple[Box[T@forward], T@forward]
     reveal_type(result)
     # error: [invalid-argument-type]
@@ -2214,7 +2214,7 @@ def forward(
     # error: [missing-argument]
     # error: [missing-argument]
     box.invoke(callback, 1)
-    return result  # no diagnostic
+    return result  # ok
 
 def callback(x: int, *, label: str) -> None: ...
 def concrete(a: Box[str], b: Box[int], cond: bool):

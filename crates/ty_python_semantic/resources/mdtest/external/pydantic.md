@@ -1407,10 +1407,10 @@ class AnnotatedFrozenFields(BaseModel):
 
 fields = AnnotatedFrozenFields()
 fields.annotated = 1  # error: [invalid-assignment]
-fields.unfrozen_by_assignment = 1  # no diagnostic
+fields.unfrozen_by_assignment = 1  # ok
 fields.frozen_by_assignment = 1  # error: [invalid-assignment]
-fields.unfrozen_by_none_assignment = 1  # no diagnostic
-fields.unfrozen_by_none_annotation = 1  # no diagnostic
+fields.unfrozen_by_none_assignment = 1  # ok
+fields.unfrozen_by_none_annotation = 1  # ok
 ```
 
 This also works through a type alias:
@@ -1436,9 +1436,9 @@ class MutableFields(BaseModel):
     unknown: int = Field(default=0, frozen=os.environ.get("FROZEN") == "1")
 
 fields = MutableFields()
-fields.disabled = 1  # no diagnostic
-fields.none = 1  # no diagnostic
-fields.unknown = 1  # no diagnostic
+fields.disabled = 1  # ok
+fields.none = 1  # ok
+fields.unknown = 1  # ok
 ```
 
 Pydantic checks whether the model is frozen before checking the field, so `Field(frozen=False)` does
@@ -1464,7 +1464,7 @@ class RedeclaresFrozenField(FrozenFieldBase):
     value: int
 
 InheritsFrozenField(value=1).value = 2  # error: [invalid-assignment]
-RedeclaresFrozenField(value=1).value = 2  # no diagnostic
+RedeclaresFrozenField(value=1).value = 2  # ok
 ```
 
 Frozen fields are also supported on generic models:
@@ -1485,7 +1485,7 @@ class FrozenFieldWithCustomSetattr(BaseModel):
     def __setattr__(self, name, value):
         object.__setattr__(self, name, value)
 
-FrozenFieldWithCustomSetattr(value=1).value = 2  # no diagnostic
+FrozenFieldWithCustomSetattr(value=1).value = 2  # ok
 ```
 
 ## Frozen models and protocols
@@ -1531,7 +1531,7 @@ class FrozenField(BaseModel):
     value: int = Field(frozen=True)
 
 update(FrozenField(value=1))  # error: [invalid-argument-type]
-read(FrozenField(value=1))  # no diagnostic
+read(FrozenField(value=1))  # ok
 ```
 
 ## Validation of default values
@@ -1857,7 +1857,7 @@ class Child(Parent):
     params: ClassVar[int] = 1  # error: [invalid-attribute-override]
 
 reveal_type(Child.__init__)  # revealed: (self: Child, *, name: LaxStr, **extra: Any) -> None
-Child(name="child")  # no diagnostic
+Child(name="child")  # ok
 Child()  # error: [missing-argument] "No argument provided for required parameter `name`"
 ```
 
@@ -1869,7 +1869,7 @@ class Grandchild(Child):
 
 reveal_type(Grandchild.__init__)  # revealed: (self: Grandchild, *, name: LaxStr, **extra: Any) -> None
 reveal_type(Grandchild.__replace__)  # revealed: (self: Grandchild, *, name: str = ...) -> Grandchild
-Grandchild(name="grandchild")  # no diagnostic
+Grandchild(name="grandchild")  # ok
 ```
 
 A `ClassVar` declaration without a value also excludes the inherited field.
@@ -1879,7 +1879,7 @@ class AnnotationOnly(Parent):
     params: ClassVar[int]  # error: [invalid-attribute-override]
 
 reveal_type(AnnotationOnly.__init__)  # revealed: (self: AnnotationOnly, *, name: LaxStr, **extra: Any) -> None
-AnnotationOnly(name="child")  # no diagnostic
+AnnotationOnly(name="child")  # ok
 ```
 
 ## Class variables overriding mixin attributes
@@ -1897,7 +1897,7 @@ class Child(BaseModel, Parent):
     params: ClassVar[int] = 1  # error: [invalid-attribute-override]
 
 reveal_type(Child.__init__)  # revealed: (self: Child, **extra: Any) -> None
-child = Child()  # no diagnostic
+child = Child()  # ok
 reveal_type(child.params)  # revealed: int
 ```
 
@@ -1911,7 +1911,7 @@ class Model(BaseModel, Mixin):
     pass
 
 reveal_type(Model.__init__)  # revealed: (self: Model, **extra: Any) -> None
-Model()  # no diagnostic
+Model()  # ok
 ```
 
 ## Differences from dataclasses

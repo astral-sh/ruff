@@ -1035,7 +1035,7 @@ class OverrideOnStubImplementation(StubParent):
     @overload
     def method(self, value: str) -> str: ...
     @override
-    def method(self, value: int | str) -> int | str: ...  # no diagnostic
+    def method(self, value: int | str) -> int | str: ...  # ok
 
 class MissingOverrideOnStubImplementation(StubParent):
     @overload
@@ -1102,7 +1102,7 @@ Decorating or suppressing one accessor does not hide diagnostics on the others.
 class PartiallyDecorated(Parent):
     @property
     @override
-    def attr(self) -> int:  # no diagnostic
+    def attr(self) -> int:  # ok
         return 1
 
     @attr.setter

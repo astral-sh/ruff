@@ -251,7 +251,7 @@ def compare(value):
     reveal_type("ready" != value)  # revealed: Literal[True]
 
     assert value == "ready"
-    "unreachable".missing  # no diagnostic (unreachable)
+    "unreachable".missing  # ok (unreachable)
 ```
 
 The same applies to `Any`, including when both operands have been narrowed to `None`.

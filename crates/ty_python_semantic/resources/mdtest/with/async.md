@@ -709,7 +709,7 @@ class Manager:
     def __aexit__(self, exc_type, exc, tb) -> Any: ...
 
 async def main():
-    async with Manager():  # no diagnostic
+    async with Manager():  # ok
         pass
 ```
 
@@ -817,7 +817,7 @@ from typing import Protocol
 class Stream[T](Protocol):
     def flatten(self: Stream[Stream[T]]) -> None: ...
 
-@asynccontextmanager  # no diagnostic
+@asynccontextmanager  # ok
 async def open_stream(value: Stream[int]) -> AsyncGenerator[Stream[int], None]:
     yield value
 
@@ -831,7 +831,7 @@ parameter. Checking the decorator still terminates when the receiver's type argu
 class Node[T: object](Protocol):
     def read(self: Node[tuple[T, T]]) -> int: ...
 
-@asynccontextmanager  # no diagnostic
+@asynccontextmanager  # ok
 async def open_node(value: list[Node[int]]) -> AsyncGenerator[list[Node[int]], None]:
     yield value
 

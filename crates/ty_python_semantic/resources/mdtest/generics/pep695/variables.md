@@ -1243,7 +1243,7 @@ class WithProperty:
 
 ```py
 def stored[T: Stored](obj: T):
-    obj.cls = type(obj)  # no diagnostic
+    obj.cls = type(obj)  # ok
     obj.cls = Stored  # error: [invalid-assignment]
 ```
 
@@ -1251,7 +1251,7 @@ The same binding applies to every possible setter of a conditionally defined pro
 
 ```py
 def property_bound[T: WithProperty](obj: T):
-    obj.cls = type(obj)  # no diagnostic
+    obj.cls = type(obj)  # ok
     obj.cls = WithProperty  # error: [invalid-assignment]
 ```
 
@@ -1259,16 +1259,16 @@ Every constraint must permit a write or deletion, with `Self` still bound to the
 
 ```py
 def constrained[T: (Stored, WithProperty)](obj: T):
-    obj.cls = type(obj)  # no diagnostic
-    del obj.cls  # no diagnostic
+    obj.cls = type(obj)  # ok
+    del obj.cls  # ok
 ```
 
 A union bound preserves the same `Self` binding and deletion support.
 
 ```py
 def bounded[T: Stored | WithProperty](obj: T):
-    obj.cls = type(obj)  # no diagnostic
-    del obj.cls  # no diagnostic
+    obj.cls = type(obj)  # ok
+    del obj.cls  # ok
 ```
 
 A protocol annotation also binds `Self` to the original type variable. Its additional `marker`
@@ -1282,7 +1282,7 @@ class HasClass(Protocol):
     cls: type[Self]
 
 def protocol_bound[T: Stored | HasClass](obj: T):
-    obj.cls = type(obj)  # no diagnostic
+    obj.cls = type(obj)  # ok
 ```
 
 ## Read-only attribute alternatives
@@ -1319,10 +1319,10 @@ class Custom:
         pass
 
 def assign[T: Custom](obj: T):
-    obj.dynamic = 1  # no diagnostic
+    obj.dynamic = 1  # ok
     obj.dynamic = "wrong"  # error: [invalid-assignment]
     obj.other = 1  # error: [invalid-assignment]
-    obj.declared = "ok"  # no diagnostic
+    obj.declared = "ok"  # ok
     obj.declared = 1  # error: [invalid-assignment]
 ```
 
@@ -1350,7 +1350,7 @@ class Other:
             pass
 
 def assign[T: Custom | Other](obj: T):
-    obj.other = obj  # no diagnostic
+    obj.other = obj  # ok
     obj.other = Custom()  # error: [invalid-assignment]
 ```
 
@@ -1358,7 +1358,7 @@ Conditionally defined setters also retain the original receiver's type.
 
 ```py
 def conditional[T: Other](obj: T):
-    obj.other = obj  # no diagnostic
+    obj.other = obj  # ok
     # error: [invalid-assignment]
     # error: [invalid-assignment]
     obj.other = Other()
@@ -1373,7 +1373,7 @@ class ClassMethod:
         pass
 
 def class_method[T: ClassMethod](obj: T):
-    obj.other = obj  # no diagnostic
+    obj.other = obj  # ok
     obj.other = ClassMethod()  # error: [invalid-assignment]
 ```
 
@@ -1417,7 +1417,7 @@ class Child(Frozen):
 
 def child[T: Child](obj: T):
     obj.value = 1  # error: [invalid-assignment]
-    obj.extra = 1  # no diagnostic
+    obj.extra = 1  # ok
 ```
 
 A writable alternative does not make the frozen field writable.

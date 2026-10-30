@@ -356,16 +356,16 @@ def test(
     if also_never_empty:  # snapshot: redundant-condition
         pass
 
-    if sometimes_empty:  # no diagnostic
+    if sometimes_empty:  # ok
         pass
 
-    if also_sometimes_empty:  # no diagnostic
+    if also_sometimes_empty:  # ok
         pass
 
     assert never_empty  # error: [redundant-condition] "TypedDict `NeverEmpty` with 2 required fields is always truthy"
     assert also_never_empty  # error: [redundant-condition] "TypedDict `AlsoNeverEmpty` with 1 required field is always truthy"
-    assert sometimes_empty  # no diagnostic
-    assert also_sometimes_empty  # no diagnostic
+    assert sometimes_empty  # ok
+    assert also_sometimes_empty  # ok
 ```
 
 ```snapshot
@@ -767,12 +767,12 @@ a = True if func else False  # error: [redundant-condition]
 if coinflip() if func else False:  # error: [redundant-condition]
     pass
 
-b = func and coinflip()  # no diagnostic
+b = func and coinflip()  # ok
 
 if func and coinflip():  # error: [redundant-condition]
     pass
 
-c = func or coinflip()  # no diagnostic
+c = func or coinflip()  # ok
 
 if func or coinflip():  # error: [redundant-condition]
     pass
@@ -1247,7 +1247,7 @@ of short-circuit evaluation.
 
 ```py
 def defensive_condition(value: Comparable):
-    if value < 1 < 0:  # no diagnostic
+    if value < 1 < 0:  # ok
         raise ValueError
 ```
 
@@ -1261,9 +1261,9 @@ def saved_condition(value: Comparable):
     reveal_type(saved)  # revealed: ~AlwaysTruthy
     reveal_type(bool(saved))  # revealed: bool
 
-    if saved:  # no diagnostic
+    if saved:  # ok
         pass
-    return not (value < 1 < 0)  # no diagnostic
+    return not (value < 1 < 0)  # ok
 ```
 
 ## Conditional expressions used as conditions
@@ -1301,7 +1301,7 @@ Passing a function as an argument does not test its truthiness. Here, `callable(
 
 ```py
 def callable_check(flag: bool):
-    if callable(ready if flag else None):  # no diagnostic
+    if callable(ready if flag else None):  # ok
         pass
 ```
 
@@ -1311,7 +1311,7 @@ reported as a whole:
 
 ```py
 def boolean_branches(value: int, flag: bool):
-    assert isinstance(value, int) if flag else True  # no diagnostic
+    assert isinstance(value, int) if flag else True  # ok
 
     # error: [redundant-condition-strict]
     if isinstance(value, int) if flag else True:
@@ -3544,10 +3544,10 @@ from typing import Annotated
 
 def func(): ...
 
-negated: "Annotated[int, not not func]"  # no diagnostic
-conditional: "Annotated[int, 1 if not func else 0]"  # no diagnostic
-strict_negated: "Annotated[int, not not (1 == 1)]"  # no diagnostic
-strict_conditional: "Annotated[int, 1 if 1 == 1 else 0]"  # no diagnostic
+negated: "Annotated[int, not not func]"  # ok
+conditional: "Annotated[int, 1 if not func else 0]"  # ok
+strict_negated: "Annotated[int, not not (1 == 1)]"  # ok
+strict_conditional: "Annotated[int, 1 if 1 == 1 else 0]"  # ok
 ```
 
 Unquoted annotations still report redundant tests in their metadata. The function object `func` is
@@ -4931,23 +4931,23 @@ that is intentionally unreachable, but which could be enabled for debugging purp
 we suppress the diagnostic: it is assumed that this region is deliberately unreachable.
 
 ```py
-if False:  # no diagnostic
+if False:  # ok
     pass
 
-if 0:  # no diagnostic
+if 0:  # ok
     pass
 ```
 
 For consistency, we do the same for `if True:`, `if 1:`, `if 2:`, etc.:
 
 ```py
-if 1:  # no diagnostic
+if 1:  # ok
     pass
 
-if True:  # no diagnostic
+if True:  # ok
     pass
 
-if 2:  # no diagnostic
+if 2:  # ok
     pass
 ```
 
@@ -4955,7 +4955,7 @@ if 2:  # no diagnostic
 unreachable region, so we special-case a literal `None` too:
 
 ```py
-assert None  # no diagnostic
+assert None  # ok
 ```
 
 ## Defensive assertions
@@ -4985,7 +4985,7 @@ def func(): ...
 def assertion_boundaries(x: str, flag: bool):
     assert func and isinstance(x, str)  # error: [redundant-condition]
     
-    # no diagnostic: `and` is used as a value expression here, not as a condition.
+    # ok: `and` is used as a value expression here, not as a condition.
     assert flag, isinstance(x, str) and flag
 ```
 
@@ -4997,16 +4997,16 @@ def accepts(value: bool) -> bool:
     return value
 
 def ambiguous_boolean_and(value: int, flag: bool):
-    assert flag and value is not None  # no diagnostic
+    assert flag and value is not None  # ok
 
 def ambiguous_boolean_or(value: int, flag: bool):
-    assert flag or value is None  # no diagnostic
+    assert flag or value is None  # ok
 
 def ambiguous_short_circuit(other: object, flag: bool):
-    assert flag and (other or True)  # no diagnostic
+    assert flag and (other or True)  # ok
 
 def nested_boolean_assertion(value: int, flag: bool):
-    assert flag and accepts(not (value is None))  # no diagnostic
+    assert flag and accepts(not (value is None))  # ok
 ```
 
 Short-circuit conditions remain exempt when they are the complete assertion, whether they always
@@ -5014,8 +5014,8 @@ succeed or always fail:
 
 ```py
 def short_circuit_assertion(value: object):
-    assert value or True  # no diagnostic
-    assert value and False  # no diagnostic
+    assert value or True  # ok
+    assert value and False  # ok
 ```
 
 The strict rule can still fire in assertion tests that use a walrus expression when their inferred
@@ -5110,40 +5110,40 @@ def coinflip() -> bool:
 reveal_type(sys.version_info >= (3, 14))  # revealed: Literal[True]
 reveal_type(sys.version_info < (3, 15))  # revealed: Literal[True]
 
-if sys.version_info >= (3, 14):  # no diagnostic
+if sys.version_info >= (3, 14):  # ok
     pass
 
 if coinflip():
     pass
-elif sys.version_info < (3, 15):  # no diagnostic
+elif sys.version_info < (3, 15):  # ok
     pass
 
-if os.name == "posix":  # no diagnostic
+if os.name == "posix":  # ok
     pass
 
 if coinflip():
     pass
-elif os.name == "nt":  # no diagnostic
+elif os.name == "nt":  # ok
     pass
 
 reveal_type(TYPE_CHECKING)  # revealed: Literal[True]
 
-if TYPE_CHECKING:  # no diagnostic
+if TYPE_CHECKING:  # ok
     pass
 
 reveal_type(typing.TYPE_CHECKING)  # revealed: Literal[True]
 
-if not typing.TYPE_CHECKING:  # no diagnostic
+if not typing.TYPE_CHECKING:  # ok
     pass
 
 if sys.version_info < (3, 15):
     pass
-elif (3, 12) <= sys.version_info < (3, 13):  # no diagnostic
+elif (3, 12) <= sys.version_info < (3, 13):  # ok
     pass
 
 if os.name == "posix":
     pass
-elif os.name == "nt":  # no diagnostic
+elif os.name == "nt":  # ok
     pass
 ```
 
@@ -5161,7 +5161,7 @@ catch_exe_failure = "\n" if sys.platform == "win32" else ""
 
 reveal_type(catch_exe_failure)  # revealed: Literal[""]
 
-if catch_exe_failure:  # no diagnostic
+if catch_exe_failure:  # ok
     pass
 
 if sys.platform == "win32":
@@ -5171,7 +5171,7 @@ else:
 
 reveal_type(line_prefix)  # revealed: Literal[""]
 
-if line_prefix:  # no diagnostic
+if line_prefix:  # ok
     pass
 ```
 
@@ -5190,37 +5190,37 @@ from sys import version_info as foo, platform as sys_platform
 
 PLATFORM = sys.platform
 
-if PLATFORM == "linux":  # no diagnostic
+if PLATFORM == "linux":  # ok
     pass
 
 PLATFORM_ALIAS = PLATFORM
 
-if PLATFORM_ALIAS == "linux":  # no diagnostic
+if PLATFORM_ALIAS == "linux":  # ok
     pass
 
 OS_MODULE = os
 OPERATING_SYSTEM = OS_MODULE.name
 
-if OPERATING_SYSTEM == "posix":  # no diagnostic
+if OPERATING_SYSTEM == "posix":  # ok
     pass
 
 IS_PY314 = sys.version_info >= (3, 14)
 reveal_type(IS_PY314)  # revealed: Literal[True]
 
-if IS_PY314:  # no diagnostic
+if IS_PY314:  # ok
     pass
 
-if not IS_PY314:  # no diagnostic
+if not IS_PY314:  # ok
     pass
 
 VERSION_INFO = sys.version_info
 
-if VERSION_INFO >= (3, 14):  # no diagnostic
+if VERSION_INFO >= (3, 14):  # ok
     pass
 
 CHECKING = TYPE_CHECKING
 
-if CHECKING:  # no diagnostic
+if CHECKING:  # ok
     pass
 
 ORDINARY_CONSTANT = 1 == 1
@@ -5232,7 +5232,7 @@ BAR = foo
 
 reveal_type(BAR >= (3, 14))  # revealed: Literal[True]
 
-if BAR >= (3, 14):  # no diagnostic
+if BAR >= (3, 14):  # ok
     pass
 
 reveal_type(TYPE_CHECKINGGGGG)  # revealed: Literal[True]
@@ -5242,12 +5242,12 @@ if TYPE_CHECKINGGGGG:
 
 reveal_type(sys_platform)  # revealed: Literal["linux"]
 
-if sys_platform == "linux":  # no diagnostic
+if sys_platform == "linux":  # ok
     pass
 
 reveal_type(os_name)  # revealed: Literal["posix"]
 
-if os_name == "posix":  # no diagnostic
+if os_name == "posix":  # ok
     pass
 ```
 
@@ -5260,21 +5260,21 @@ import c
 from b import line_prefix
 from c import IS_PY314, PLATFORM, BAR
 
-if line_prefix:  # no diagnostic
+if line_prefix:  # ok
     pass
 
-if PLATFORM == "linux":  # no diagnostic
+if PLATFORM == "linux":  # ok
     pass
 
-if c.PLATFORM_ALIAS == "linux":  # no diagnostic
+if c.PLATFORM_ALIAS == "linux":  # ok
     pass
 
-if IS_PY314:  # no diagnostic
+if IS_PY314:  # ok
     pass
 
 reveal_type(BAR >= (3, 14))  # revealed: Literal[True]
 
-if BAR >= (3, 14):  # no diagnostic
+if BAR >= (3, 14):  # ok
     pass
 ```
 
@@ -5297,7 +5297,7 @@ class FixedConfig:
 
 def rebound_receiver():
     config = PlatformConfig()
-    if config.enabled:  # no diagnostic
+    if config.enabled:  # ok
         pass
     if config.fixed:  # error: [redundant-condition-strict] "Condition `config.fixed` is always true"
         pass
@@ -5307,14 +5307,14 @@ def rebound_receiver():
         pass
 
 def narrowed_receiver(config: PlatformConfig | FixedConfig):
-    if config.enabled:  # no diagnostic
+    if config.enabled:  # ok
         pass
 
     if isinstance(config, FixedConfig):
         if config.enabled:  # error: [redundant-condition-strict] "Condition `config.enabled` is always true"
             pass
     else:
-        if config.enabled:  # no diagnostic
+        if config.enabled:  # ok
             pass
 ```
 
@@ -5326,27 +5326,27 @@ ordinary assignments. Their aliases remain exempt when tested later.
 ```py
 import sys
 
-if windows := sys.platform == "win32":  # no diagnostic
+if windows := sys.platform == "win32":  # ok
     pass
-if windows:  # no diagnostic
+if windows:  # ok
     pass
 
 unix, version = sys.platform != "win32", sys.version_info
-if unix:  # no diagnostic
+if unix:  # ok
     pass
-if version >= (3, 14):  # no diagnostic
+if version >= (3, 14):  # ok
     pass
 
 def local_aliases():
-    if is_windows := sys.platform == "win32":  # no diagnostic
+    if is_windows := sys.platform == "win32":  # ok
         pass
-    if is_windows:  # no diagnostic
+    if is_windows:  # ok
         pass
 
     is_unix, major = sys.platform != "win32", sys.version_info.major
-    if is_unix:  # no diagnostic
+    if is_unix:  # ok
         pass
-    if major >= 3:  # no diagnostic
+    if major >= 3:  # ok
         pass
 
 if ordinary := 1 == 1:  # error: [redundant-condition-strict] "Condition `ordinary := 1 == 1` is always true"
@@ -5364,7 +5364,7 @@ import sys
 
 platform = ""
 platform += sys.platform
-if platform == "win32":  # no diagnostic
+if platform == "win32":  # ok
     pass
 
 fixed = ""
@@ -5454,7 +5454,7 @@ def environment_alias():
     source = sys.platform
     alias = source
     source = 1
-    if alias == "linux":  # no diagnostic
+    if alias == "linux":  # ok
         pass
 ```
 
@@ -5464,7 +5464,7 @@ An augmented assignment also depends on the previous value of its target:
 def augmented_assignment():
     value = sys.platform
     value += ""
-    if value == "linux":  # no diagnostic
+    if value == "linux":  # ok
         pass
 ```
 
@@ -5493,7 +5493,7 @@ def reaching_assignment(flag: bool):
         value = sys.platform
     else:
         value = "ready"
-    if value:  # no diagnostic
+    if value:  # ok
         pass
 
 def reaching_guard():
@@ -5501,7 +5501,7 @@ def reaching_guard():
         value = 1
     else:
         value = 2
-    if value:  # no diagnostic
+    if value:  # ok
         pass
 ```
 
@@ -5532,7 +5532,7 @@ class Snapshot:
 value = sys.platform
 
 def lazy_read():
-    if later_platform == "linux":  # no diagnostic
+    if later_platform == "linux":  # ok
         pass
 
 later_platform = sys.platform
@@ -5567,7 +5567,7 @@ to its enclosing scope:
 def comprehension_assignment():
     value = ""
     [(value := sys.platform) for _ in range(1)]
-    if value is None:  # no diagnostic
+    if value is None:  # ok
         pass
 ```
 
@@ -5576,7 +5576,7 @@ Star imports preserve the imported value's environment-dependent origin:
 ```py
 from sys import *
 
-if platform == "linux":  # no diagnostic
+if platform == "linux":  # ok
     pass
 ```
 
@@ -5602,7 +5602,7 @@ class Config:
 
     def reaching_assignment(self):
         self.value = sys.platform
-        if self.value == "linux":  # no diagnostic
+        if self.value == "linux":  # ok
             pass
 ```
 
@@ -5633,13 +5633,13 @@ class Config:
 
     def check(self):
         reveal_type(self.value)  # revealed: str
-        if self.value is None:  # no diagnostic
+        if self.value is None:  # ok
             pass
 
     def possibly_assigned(self, flag: bool):
         if flag:
             self.value = "ready"
-        if self.value is None:  # no diagnostic
+        if self.value is None:  # ok
             pass
 ```
 
@@ -5653,7 +5653,7 @@ class AugmentedConfig:
 
     def check(self):
         self.value += ""
-        if self.value is None:  # no diagnostic
+        if self.value is None:  # ok
             pass
 
 value = sys.platform
@@ -5661,7 +5661,7 @@ value = sys.platform
 def augmented_global():
     global value
     value += ""
-    if value is None:  # no diagnostic
+    if value is None:  # ok
         pass
 ```
 
@@ -5682,7 +5682,7 @@ def nested_guards(enabled: bool):
         else:
             prefix = ""
         reveal_type(prefix)  # revealed: Literal[""]
-        if prefix:  # no diagnostic
+        if prefix:  # ok
             pass
 ```
 
@@ -5699,7 +5699,7 @@ else:
     enabled = False
 
 reveal_type(enabled)  # revealed: Literal[True]
-if enabled:  # no diagnostic
+if enabled:  # ok
     pass
 ```
 
@@ -5714,7 +5714,7 @@ match sys.platform:
         marker = ""
 
 reveal_type(marker)  # revealed: Literal[""]
-if marker:  # no diagnostic
+if marker:  # ok
     pass
 ```
 
@@ -5758,14 +5758,14 @@ is unpacked or an alias is tested inside the loop.
 import sys
 
 for is_windows in (sys.platform == "win32",):
-    if is_windows:  # no diagnostic
+    if is_windows:  # ok
         pass
 
 for platform, version in ((sys.platform, sys.version_info),):
     alias = platform
-    if alias == "win32":  # no diagnostic
+    if alias == "win32":  # ok
         pass
-    if version >= (3, 14):  # no diagnostic
+    if version >= (3, 14):  # ok
         pass
 ```
 
@@ -5773,9 +5773,9 @@ Comprehension targets follow the same rule. The first iterable is evaluated in t
 later iterables are evaluated in the comprehension's scope.
 
 ```py
-[flag for flag in (sys.platform == "win32",) if flag]  # no diagnostic
-[flag for _ in range(1) for flag in (sys.platform == "win32",) if flag]  # no diagnostic
-[flag for flag, _ in ((sys.platform == "win32", 0),) if flag]  # no diagnostic
+[flag for flag in (sys.platform == "win32",) if flag]  # ok
+[flag for _ in range(1) for flag in (sys.platform == "win32",) if flag]  # ok
+[flag for flag, _ in ((sys.platform == "win32", 0),) if flag]  # ok
 ```
 
 Loop and comprehension targets without an environment-dependent source still produce diagnostics.
@@ -5798,18 +5798,18 @@ import sys
 
 match sys.platform:
     case platform:
-        if platform == "win32":  # no diagnostic
+        if platform == "win32":  # ok
             pass
 
 match (sys.platform, sys.version_info):
     case (platform, version):
-        if platform == "win32":  # no diagnostic
+        if platform == "win32":  # ok
             pass
-        if version >= (3, 14):  # no diagnostic
+        if version >= (3, 14):  # ok
             pass
 
 match sys.platform == "win32":
-    case is_windows if is_windows:  # no diagnostic
+    case is_windows if is_windows:  # ok
         pass
 ```
 
@@ -5831,7 +5831,7 @@ import sys
 from contextlib import nullcontext
 
 with nullcontext(sys.version_info) as version:
-    if version >= (3, 14):  # no diagnostic
+    if version >= (3, 14):  # ok
         pass
 
 with nullcontext((1,)) as fixed:
@@ -5870,14 +5870,14 @@ subexpression to search for references to `sys.version_info`, `os.name`, `sys.pl
 expressions:
 
 ```py
-if (lambda: sys.version_info >= (3, 12))():  # no diagnostic
+if (lambda: sys.version_info >= (3, 12))():  # ok
     pass
-if next(sys.platform == "linux" for _ in range(1)):  # no diagnostic
+if next(sys.platform == "linux" for _ in range(1)):  # ok
     pass
 
-if (lambda: sys.platform)():  # no diagnostic
+if (lambda: sys.platform)():  # ok
     pass
-if next(sys.version_info for _ in range(1)):  # no diagnostic
+if next(sys.version_info for _ in range(1)):  # ok
     pass
 ```
 
@@ -5885,12 +5885,12 @@ The exemption also follows assignments and aliases, including when a named gener
 
 ```py
 platform = (lambda: sys.platform)()
-if platform:  # no diagnostic
+if platform:  # ok
     pass
 
 platforms = (sys.platform for _ in range(1))
 alias = platforms
-if next(alias):  # no diagnostic
+if next(alias):  # ok
     pass
 ```
 
@@ -6131,7 +6131,7 @@ and lead to the `else` branch, while `value is None` would be true and enter the
 
 ```py
 def defensive_else(value: int, enabled: bool):
-    # no diagnostic: `value is not None` is always true, but the `else` branch
+    # ok: `value is not None` is always true, but the `else` branch
     # contains a defensive exit.
     if enabled and value is not None:
         print(value)
@@ -6139,7 +6139,7 @@ def defensive_else(value: int, enabled: bool):
         raise TypeError
 
 def defensive_body(value: int, enabled: bool):
-    # no diagnostic: `value is None` is always false, but the `if` branch
+    # ok: `value is None` is always false, but the `if` branch
     # contains a defensive exit.
     if enabled or value is None:
         raise TypeError
@@ -6150,11 +6150,11 @@ early return also exempt the condition from being reported by either rule:
 
 ```py
 def negated_defensive_body(value: int, enabled: bool):
-    if not (enabled and value is not None):  # no diagnostic
+    if not (enabled and value is not None):  # ok
         raise TypeError
 
 def defensive_fallthrough(value: int, enabled: bool):
-    if enabled and value is not None:  # no diagnostic
+    if enabled and value is not None:  # ok
         return value
     raise TypeError
 ```
@@ -6223,7 +6223,7 @@ branch is clearly marked as "deliberately unreachable" by the fact that it alway
 ```py
 def break_after_valid_value(values: list[int]):
     for value in values:
-        if isinstance(value, int):  # no diagnostic
+        if isinstance(value, int):  # ok
             break
         raise TypeError("expected an integer")
 ```
@@ -6234,7 +6234,7 @@ A `continue` also skips the rest of the loop body, so the same exemption applies
 ```py
 def continue_after_valid_value(values: list[int]):
     for value in values:
-        if isinstance(value, int):  # no diagnostic
+        if isinstance(value, int):  # ok
             continue
         raise TypeError("expected an integer")
 ```
@@ -6335,15 +6335,15 @@ async def async_stop() -> Never:
     raise TypeError
 
 def synchronous(value: int):
-    if value is None:  # no diagnostic
+    if value is None:  # ok
         stop()
 
 async def asynchronous(value: int):
-    if value is None:  # no diagnostic
+    if value is None:  # ok
         await async_stop()
 
 async def implicit_else(value: int):
-    if value is not None:  # no diagnostic
+    if value is not None:  # ok
         await async_stop()
     raise TypeError
 
@@ -6361,7 +6361,7 @@ you're writing code with defensive runtime checks. We support this pattern too:
 ```py
 class Foo:
     def __add__(self, other: "Foo") -> "Foo":
-        # no diagnostic, even though this is inferred as always `True`!
+        # ok, even though this is inferred as always `True`!
         if not isinstance(other, Foo):
             return NotImplemented
         return self

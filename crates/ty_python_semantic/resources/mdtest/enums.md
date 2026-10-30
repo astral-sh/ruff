@@ -2175,7 +2175,7 @@ class Flags(Flag):
     A = 1
     B = 2
 
-Flags.A | Flags.B  # no diagnostic
+Flags.A | Flags.B  # ok
 ```
 
 ## Methods / non-member attributes

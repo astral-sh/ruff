@@ -571,7 +571,7 @@ class Abstract(ABC):
 class Concrete(Abstract):
     value: int
 
-Concrete(1)  # no diagnostic
+Concrete(1)  # ok
 ```
 
 A transformer on a base class can also generate the slot that implements the property:
@@ -584,7 +584,7 @@ class ModelBase(Abstract):
 class ConcreteFromBase(ModelBase):
     value: int
 
-ConcreteFromBase(1)  # no diagnostic
+ConcreteFromBase(1)  # ok
 ```
 
 Disabling slot generation leaves the inherited property abstract:

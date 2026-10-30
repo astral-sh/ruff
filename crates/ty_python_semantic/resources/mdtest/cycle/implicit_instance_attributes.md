@@ -633,8 +633,8 @@ class ChildContext(Context):
     def get(cls):
         # TODO: This should include `None | Unknown`, not be `Never`.
         reveal_type(cls.current)  # revealed: Never
-        if not isinstance(cls.current, ChildContext):  # no diagnostic
-            cls.current = ChildContext()  # no diagnostic
+        if not isinstance(cls.current, ChildContext):  # ok
+            cls.current = ChildContext()  # ok
 ```
 
 ## Incompatible initialization in a classmethod
@@ -695,6 +695,6 @@ class Right: ...
 class Package(Left, Right, metaclass=Meta):
     @ClassProperty
     def name(cls):
-        if cls._name is None:  # no diagnostic
+        if cls._name is None:  # ok
             cls._name = module_name(cls.__module__)
 ```
