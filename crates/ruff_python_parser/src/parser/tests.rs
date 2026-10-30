@@ -659,6 +659,35 @@ fn keyword_and_dotted_import_names_use_one_row_each() {
 }
 
 #[test]
+fn recovered_class_patterns_share_literal_rows() {
+    let source = "match x:\n    case [[['value']()]()](): pass\n";
+    let parsed = crate::parse_unchecked(source, ParseOptions::from(Mode::Module));
+    assert_eq!(parsed.errors().len(), 3);
+
+    // The outer class pattern has two recovered calls nested in its callee.
+    let root = parsed.root();
+    assert_eq!(
+        root.descendants()
+            .filter(|node| node.node_kind() == ast::NodeKind::ExprCall)
+            .count(),
+        2
+    );
+    let literal = root
+        .descendants()
+        .find_map(flat::View::cast::<ast::StringLiteral>)
+        .unwrap();
+    assert_eq!(literal.value(), "value");
+    assert_eq!(
+        parsed
+            .ast()
+            .nodes()
+            .filter(|node| node.node_kind() == ast::NodeKind::StringLiteral)
+            .count(),
+        1
+    );
+}
+
+#[test]
 fn flat_storage_list_lengths() {
     for count in 0..=8 {
         let source = format!("[{}]", vec!["x"; count].join(", "));

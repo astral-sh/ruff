@@ -109,6 +109,10 @@ list records the buffer length on entry. When the list closes, the parser copies
 into the extra-data column and truncates the buffer to the recorded length. The enclosing list
 keeps its handles.
 
+During error recovery, a pattern can occupy a position that requires an expression. The parser
+emits rows for the replacement syntax and reuses the handles of expressions the pattern already
+contains. A nested recovery can therefore refer back to a literal's original row and text.
+
 Some Python constructs require speculative parsing. For example, `match` can start a statement
 or name a variable. A parser checkpoint records the ends of the columns alongside the token
 position. Rewinding discards the abandoned rows and their variable-length data. The same builder

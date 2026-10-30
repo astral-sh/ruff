@@ -47,11 +47,6 @@ pub struct Name(CharStr);
 
 impl Name {
     #[inline]
-    pub fn empty() -> Self {
-        Self(CharStr::new())
-    }
-
-    #[inline]
     pub fn new(name: impl AsRef<str>) -> Self {
         Self(CharStr::from(name.as_ref()))
     }

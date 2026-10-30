@@ -5,7 +5,7 @@ use ruff_python_ast::{self as ast, ExprContext, Number, Operator, Singleton};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::parser::progress::ParserProgress;
-use crate::parser::{Parser, RecoveryContextKind, SequenceMatchPatternParentheses, recovery};
+use crate::parser::{Parser, RecoveryContextKind, SequenceMatchPatternParentheses};
 use crate::token_set::TokenSet;
 use crate::{ParseErrorType, UnsupportedSyntaxErrorKind};
 
@@ -230,7 +230,7 @@ impl Parser<'_> {
                             ParseErrorType::OtherError("Invalid mapping pattern key".to_string()),
                             pattern,
                         );
-                        recovery::pattern_to_expr(&mut parser.storage, pattern)
+                        parser.pattern_to_expr(pattern.id)
                     }
                 };
                 keys.push(key);
@@ -667,7 +667,7 @@ impl Parser<'_> {
                 value
             } else {
                 self.add_error(ParseErrorType::ExpectedRealNumber, lhs);
-                recovery::pattern_to_expr(&mut self.storage, lhs)
+                self.pattern_to_expr(lhs.id)
             };
 
         let rhs_pattern = self.parse_match_pattern_lhs(AllowStarPattern::No);
@@ -682,7 +682,7 @@ impl Parser<'_> {
             value
         } else {
             self.add_error(ParseErrorType::ExpectedImaginaryNumber, rhs_pattern);
-            recovery::pattern_to_expr(&mut self.storage, rhs_pattern)
+            self.pattern_to_expr(rhs_pattern.id)
         };
 
         let range = self.node_range(start);
@@ -764,7 +764,7 @@ impl Parser<'_> {
                     ParseErrorType::OtherError("Invalid value for a class pattern".to_string()),
                     cls,
                 );
-                recovery::pattern_to_expr(&mut self.storage, cls)
+                self.pattern_to_expr(cls.id)
             }
         };
 
