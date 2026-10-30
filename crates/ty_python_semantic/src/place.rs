@@ -1745,7 +1745,10 @@ pub(crate) fn can_summarize_loop_header<'db>(
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _| true,
-    cycle_fn = loop_header_has_binding_cycle_recover,
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &bool, result: bool, _| {
+        // Match the union of successive binding sets in LoopHeaderReachability::cycle_normalized.
+        result || (cycle.iteration() > crate::TAINTED_CYCLES && *previous)
+    },
     heap_size = get_size2::GetSize::get_heap_size,
 )]
 fn loop_header_has_binding<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
@@ -1758,17 +1761,6 @@ fn loop_header_has_binding<'db>(db: &'db dyn Db, definition: Definition<'db>) ->
         .any(|edge| {
             !evaluate_reachability(db, map, edge.reachability_constraint()).is_always_false()
         })
-}
-
-fn loop_header_has_binding_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous: &bool,
-    result: bool,
-    _definition: Definition<'db>,
-) -> bool {
-    // Match the union of successive binding sets in LoopHeaderReachability::cycle_normalized.
-    result || (cycle.iteration() > crate::TAINTED_CYCLES && *previous)
 }
 
 fn loop_header_reachability_impl<'db>(
