@@ -513,7 +513,7 @@ reason = "the public semantic model exposes its file identity and source locatio
 [[override]]
 lint = "hawk::dead_public"
 crate = "ruff_formatter"
-item = "formatter::Formatter::<'_, Context>::state_snapshot"
+item = "formatter::Formatter::<'_, '_, Context>::state_snapshot"
 kind = "inherent_method"
 level = "expect"
 reason = "formatter clients use snapshots to restore state after speculative formatting"
@@ -521,7 +521,7 @@ reason = "formatter clients use snapshots to restore state after speculative for
 [[override]]
 lint = "hawk::dead_public"
 crate = "ruff_formatter"
-item = "formatter::Formatter::<'_, Context>::restore_state_snapshot"
+item = "formatter::Formatter::<'_, '_, Context>::restore_state_snapshot"
 kind = "inherent_method"
 level = "expect"
 reason = "formatter clients use snapshots to restore state after speculative formatting"
@@ -1020,7 +1020,7 @@ reason = "group mode predicates intentionally expose a consistent public interfa
 [[override]]
 lint = "hawk::unnecessary_public"
 crate = "ruff_formatter"
-item = "formatter::Formatter::<'buf, Context>::intern_vec"
+item = "formatter::Formatter::<'buf, 'state, Context>::intern_vec"
 kind = "inherent_method"
 level = "expect"
 reason = "the public formatter API supports interning prebuilt format elements"
