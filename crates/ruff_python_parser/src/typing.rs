@@ -1,6 +1,6 @@
 //! This module takes care of parsing a type annotation.
 
-use ruff_python_ast::relocate::relocate_expr;
+use ruff_python_ast::flat::View;
 use ruff_python_ast::{Expr, ExprStringLiteral, ModExpression, StringLiteral};
 use ruff_text_size::Ranged;
 
@@ -19,7 +19,7 @@ impl ParsedAnnotation {
         &self.parsed
     }
 
-    pub fn expression(&self) -> &Expr {
+    pub fn expression(&self) -> View<'_, Expr> {
         self.parsed.expr()
     }
 
@@ -53,13 +53,13 @@ impl AnnotationKind {
 /// Parses the given string expression node as a type annotation. The given `source` is the entire
 /// source code.
 pub fn parse_type_annotation(
-    string_expr: &ExprStringLiteral,
+    string_expr: View<'_, ExprStringLiteral>,
     source: &str,
 ) -> AnnotationParseResult {
     if let Some(string_literal) = string_expr.as_single_part_string() {
         // Compare the raw contents (without quotes) of the expression with the parsed contents
         // contained in the string literal.
-        if &source[string_literal.content_range()] == string_literal.as_str() {
+        if &source[string_literal.content_range()] == string_literal.value() {
             parse_simple_type_annotation(string_literal, source)
         } else {
             // The raw contents of the string doesn't match the parsed content. This could be the
@@ -73,7 +73,7 @@ pub fn parse_type_annotation(
 }
 
 fn parse_simple_type_annotation(
-    string_literal: &StringLiteral,
+    string_literal: View<'_, StringLiteral>,
     source: &str,
 ) -> AnnotationParseResult {
     Ok(ParsedAnnotation {
@@ -82,9 +82,11 @@ fn parse_simple_type_annotation(
     })
 }
 
-fn parse_complex_type_annotation(string_expr: &ExprStringLiteral) -> AnnotationParseResult {
-    let mut parsed = parse_expression(string_expr.value.to_str())?;
-    relocate_expr(parsed.expr_mut(), string_expr.range());
+fn parse_complex_type_annotation(
+    string_expr: View<'_, ExprStringLiteral>,
+) -> AnnotationParseResult {
+    let mut parsed = parse_expression(string_expr.value().to_str())?;
+    parsed.relocate_expression(string_expr.range());
     Ok(ParsedAnnotation {
         parsed,
         kind: AnnotationKind::Complex,

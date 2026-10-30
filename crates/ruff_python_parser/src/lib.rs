@@ -69,12 +69,12 @@ pub use crate::error::{
 };
 pub use crate::parser::ParseOptions;
 
-use crate::parser::Parser;
+use crate::parser::{Parser, ParserStorage};
+use ruff_python_ast::flat::{self, Rebuild};
 
 use ruff_python_ast::token::{Token, TokenFlags, TokenKind, Tokens};
 use ruff_python_ast::{
-    AtomicNodeIndex, Expr, Mod, ModExpression, ModModule, PySourceType, StringFlags, StringLiteral,
-    Suite,
+    Expr, Mod, ModExpression, ModModule, PySourceType, StringFlags, StringLiteral, Suite,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -203,29 +203,24 @@ pub fn parse_parenthesized_expression_range(
 /// Parsing a string annotation:
 ///
 /// ```
-/// use ruff_python_parser::parse_string_annotation;
-/// use ruff_python_ast::{StringLiteral, StringLiteralFlags, AtomicNodeIndex};
-/// use ruff_text_size::{TextRange, TextSize};
+/// use ruff_python_parser::{parse_expression, parse_string_annotation};
 ///
-/// let string = StringLiteral {
-///     value: "'''\n int | str'''".to_string().into_boxed_str(),
-///     flags: StringLiteralFlags::empty(),
-///     range: TextRange::new(TextSize::new(0), TextSize::new(16)),
-///     node_index: AtomicNodeIndex::NONE
-/// };
-/// let parsed = parse_string_annotation("'''\n int | str'''", &string);
-/// assert!(!parsed.is_ok());
+/// let source = "'''int | str'''";
+/// let parsed = parse_expression(source)?;
+/// let string = parsed.expr().as_string_literal_expr().unwrap().as_single_part_string().unwrap();
+/// assert!(parse_string_annotation(source, string).is_ok());
+/// # Ok::<(), ruff_python_parser::ParseError>(())
 /// ```
 pub fn parse_string_annotation(
     source: &str,
-    string: &StringLiteral,
+    string: flat::View<'_, StringLiteral>,
 ) -> Result<Parsed<ModExpression>, ParseError> {
     let range = string
         .range()
-        .add_start(string.flags.opener_len())
-        .sub_end(string.flags.closer_len());
+        .add_start(string.flags().opener_len())
+        .sub_end(string.flags().closer_len());
     let source = &source[..range.end().to_usize()];
-    if string.flags.is_triple_quoted() {
+    if string.flags().is_triple_quoted() {
         parse_parenthesized_expression_range(source, range)
     } else {
         parse_expression_range(source, range)
@@ -327,7 +322,8 @@ pub fn parse_cells_unchecked(
         "the first cell range must start at offset zero",
     );
 
-    let mut body = Suite::new();
+    let mut body = Vec::new();
+    let mut storage = ParserStorage::for_source(TextRange::up_to(source.text_len()));
     let mut tokens = Vec::new();
     let mut errors = Vec::new();
     let mut unsupported_syntax_errors = Vec::new();
@@ -341,17 +337,15 @@ pub fn parse_cells_unchecked(
         // The cell is lexed from `range.start()`, so the slice must keep the leading text to
         // preserve absolute offsets into the concatenated source.
         let cell_source = &source[TextRange::up_to(range.end())];
-        let Parsed {
-            syntax,
+        let ParsedDraft {
+            syntax: (),
+            storage: cell_storage,
             tokens: cell_tokens,
             errors: cell_errors,
             unsupported_syntax_errors: cell_unsupported_syntax_errors,
-        } = Parser::new_starts_at(cell_source, range.start(), options.clone())
-            .parse()
-            .try_into_module()
-            .expect("module options should parse into a module");
-
-        body.extend(syntax.body);
+        } = Parser::with_storage(cell_source, range.start(), options.clone(), storage)
+            .parse_cell(&mut body);
+        storage = cell_storage;
         tokens.extend(cell_tokens);
         errors.extend(cell_errors);
         unsupported_syntax_errors.extend(cell_unsupported_syntax_errors);
@@ -373,36 +367,100 @@ pub fn parse_cells_unchecked(
         previous_end = Some(range.end());
     }
 
-    body.shrink_to_fit();
+    let body = storage.list(body);
     tokens.shrink_to_fit();
     errors.shrink_to_fit();
     unsupported_syntax_errors.shrink_to_fit();
 
-    Parsed {
-        syntax: ModModule {
-            node_index: AtomicNodeIndex::NONE,
+    let (root, _, _) = flat::Emit::emit(
+        flat::build::ModModule {
             range: TextRange::up_to(source.text_len()),
             body,
         },
+        &mut storage,
+    );
+    ParsedDraft {
+        storage,
+        syntax: root,
         tokens: Tokens::new(tokens),
         errors,
         unsupported_syntax_errors,
     }
+    .freeze()
 }
 
-/// Represents the parsed source code.
-#[derive(Debug, PartialEq, Clone, get_size2::GetSize)]
-pub struct Parsed<T> {
-    syntax: T,
+/// Parser-owned construction storage. The published result owns its compact columns.
+struct ParsedDraft<R> {
+    syntax: R,
+    storage: ParserStorage,
     tokens: Tokens,
     errors: Vec<ParseError>,
     unsupported_syntax_errors: Vec<UnsupportedSyntaxError>,
 }
 
+impl<T> ParsedDraft<flat::Handle<T>> {
+    fn freeze(self) -> Parsed<T> {
+        Parsed {
+            tree: self.storage.finish_tree(self.syntax),
+            tokens: self.tokens,
+            errors: self.errors,
+            unsupported_syntax_errors: self.unsupported_syntax_errors,
+        }
+    }
+}
+
+/// Syntax, tokens, and diagnostics for one parse.
+#[derive(Debug, get_size2::GetSize)]
+pub struct Parsed<T> {
+    tree: flat::Tree<T>,
+    tokens: Tokens,
+    errors: Vec<ParseError>,
+    unsupported_syntax_errors: Vec<UnsupportedSyntaxError>,
+}
+
+impl<T: Clone> Clone for Parsed<T> {
+    fn clone(&self) -> Self {
+        Self {
+            tree: self.tree.clone(),
+            tokens: self.tokens.clone(),
+            errors: self.errors.clone(),
+            unsupported_syntax_errors: self.unsupported_syntax_errors.clone(),
+        }
+    }
+}
+
+impl<T: PartialEq + Rebuild> PartialEq for Parsed<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.syntax() == other.syntax()
+            && self.tokens == other.tokens
+            && self.errors == other.errors
+            && self.unsupported_syntax_errors == other.unsupported_syntax_errors
+    }
+}
+
 impl<T> Parsed<T> {
-    /// Returns the syntax node represented by this parsed output.
-    pub fn syntax(&self) -> &T {
-        &self.syntax
+    /// Borrows the root and its module-local storage.
+    pub fn root(&self) -> flat::View<'_, T> {
+        self.tree.root()
+    }
+
+    pub fn ast(&self) -> &flat::Ast {
+        self.tree.ast()
+    }
+
+    pub fn index_source_order(
+        &mut self,
+        first: u32,
+        last: u32,
+    ) -> Option<Box<[flat::Handle<flat::Any>]>> {
+        self.errors.shrink_to_fit();
+        self.unsupported_syntax_errors.shrink_to_fit();
+        self.tree.index(first, last)
+    }
+
+    /// Borrows the syntax root and its module-local storage.
+    pub fn syntax(&self) -> flat::View<'_, T> {
+        self.root()
     }
 
     /// Returns all the tokens for the parsed output.
@@ -420,9 +478,13 @@ impl<T> Parsed<T> {
         &self.unsupported_syntax_errors
     }
 
-    /// Consumes the [`Parsed`] output and returns the contained syntax node.
-    pub fn into_syntax(self) -> T {
-        self.syntax
+    /// Rebuilds an owned root and its descendants, consuming the parse.
+    /// Use [`Self::syntax`] to borrow the root.
+    pub fn into_syntax(self) -> T
+    where
+        T: Rebuild,
+    {
+        self.root().to_owned_node()
     }
 
     /// Consumes the [`Parsed`] output and returns a list of syntax errors found during parsing.
@@ -500,63 +562,50 @@ impl Parsed<Mod> {
     ///
     /// [`Some(Parsed<ModModule>)`]: Some
     pub fn try_into_module(self) -> Option<Parsed<ModModule>> {
-        match self.syntax {
-            Mod::Module(module) => Some(Parsed {
-                syntax: module,
-                tokens: self.tokens,
-                errors: self.errors,
-                unsupported_syntax_errors: self.unsupported_syntax_errors,
-            }),
-            Mod::Expression(_) => None,
-        }
+        self.cast_root()
     }
 
-    /// Attempts to convert the [`Parsed<Mod>`] into a [`Parsed<ModExpression>`].
-    ///
-    /// This method checks if the `syntax` field of the output is a [`Mod::Expression`]. If it is,
-    /// the method returns [`Some(Parsed<ModExpression>)`] with the contained expression.
-    /// Otherwise, it returns [`None`].
-    ///
-    /// [`Some(Parsed<ModExpression>)`]: Some
     fn try_into_expression(self) -> Option<Parsed<ModExpression>> {
-        match self.syntax {
-            Mod::Module(_) => None,
-            Mod::Expression(expression) => Some(Parsed {
-                syntax: expression,
-                tokens: self.tokens,
-                errors: self.errors,
-                unsupported_syntax_errors: self.unsupported_syntax_errors,
-            }),
-        }
+        self.cast_root()
+    }
+
+    fn cast_root<T: flat::Node>(self) -> Option<Parsed<T>> {
+        Some(Parsed {
+            tree: self.tree.cast()?,
+            tokens: self.tokens,
+            errors: self.errors,
+            unsupported_syntax_errors: self.unsupported_syntax_errors,
+        })
     }
 }
 
 impl Parsed<ModModule> {
-    /// Returns the module body contained in this parsed output as a [`Suite`].
-    pub fn suite(&self) -> &Suite {
-        &self.syntax.body
+    /// Borrows the module's top-level statements as a [`flat::Suite`].
+    #[inline]
+    pub fn suite(&self) -> flat::Suite<'_> {
+        self.root().body()
     }
 
-    /// Consumes the [`Parsed`] output and returns the module body as a [`Suite`].
+    /// Rebuilds an owned module body, consuming the parse.
     pub fn into_suite(self) -> Suite {
-        self.syntax.body
+        self.into_syntax().body
     }
 }
 
 impl Parsed<ModExpression> {
-    /// Returns the expression contained in this parsed output.
-    pub fn expr(&self) -> &Expr {
-        &self.syntax.body
+    /// Borrows the parsed expression.
+    pub fn expr(&self) -> flat::View<'_, Expr> {
+        self.root().body()
     }
 
-    /// Returns a mutable reference to the expression contained in this parsed output.
-    fn expr_mut(&mut self) -> &mut Expr {
-        &mut self.syntax.body
+    /// Relocates an expression parsed from a string annotation to the enclosing literal.
+    fn relocate_expression(&mut self, range: TextRange) {
+        self.tree.relocate_expression(range);
     }
 
-    /// Consumes the [`Parsed`] output and returns the contained [`Expr`].
+    /// Rebuilds an owned expression, consuming the parse.
     pub fn into_expr(self) -> Expr {
-        *self.syntax.body
+        *self.into_syntax().body
     }
 }
 
@@ -628,5 +677,136 @@ pub struct ModeParseError;
 impl std::fmt::Display for ModeParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, r#"mode must be "exec", "eval", "ipython", or "single""#)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_python_ast::CmpOp;
+    use ruff_python_ast::flat::{Builder, Emit, Lower, Tree, build};
+    use ruff_python_ast::helpers::ReturnStatementVisitor;
+    use ruff_text_size::Ranged;
+
+    use super::{ParseError, parse_expression, parse_module};
+
+    #[test]
+    fn single_and_chained_comparison_fields() -> Result<(), ParseError> {
+        let source = "left == right";
+        let parsed = parse_expression(source)?;
+        let comparison = parsed.expr().as_compare_expr().expect("comparison");
+        assert_eq!(
+            comparison
+                .as_single()
+                .map(|(left, op, right)| { (&source[left.range()], op, &source[right.range()]) }),
+            Some(("left", CmpOp::Eq, "right"))
+        );
+
+        let source = "a is not b < c";
+        let parsed = parse_expression(source)?;
+        let comparison = parsed.expr().as_compare_expr().expect("comparison");
+        assert!(comparison.as_single().is_none());
+        assert_eq!(comparison.ops().as_array(), Some([CmpOp::IsNot, CmpOp::Lt]));
+        assert_eq!(
+            comparison
+                .operands()
+                .as_array()
+                .map(|operands| { operands.map(|operand| &source[operand.range()]) }),
+            Some(["a", "b", "c"])
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn function_body_rows_exclude_headers_and_siblings() {
+        let parsed = parse_module(
+            "def outer():\n    def regular(x=(yield 1)):\n        return x\n    def generator():\n        yield from ()\n    def last():\n        pass\n",
+        )
+        .unwrap();
+        let outer = parsed
+            .suite()
+            .first()
+            .unwrap()
+            .as_function_def_stmt()
+            .unwrap();
+        let functions: Vec<_> = outer
+            .body()
+            .iter()
+            .filter_map(ruff_python_ast::flat::View::as_function_def_stmt)
+            .collect();
+        assert!(outer.body_may_contain_yield());
+        assert_eq!(
+            functions
+                .iter()
+                .map(|function| function.body_may_contain_yield())
+                .collect::<Vec<_>>(),
+            [false, true, false]
+        );
+
+        let owned = functions[0].to_owned_node();
+        assert!(Tree::from(&owned).root().body_may_contain_yield());
+    }
+
+    #[test]
+    fn rewinding_a_yield_restores_the_body_row_bound() {
+        let parsed = parse_module("def f(): pass").unwrap();
+        let function = parsed
+            .suite()
+            .first()
+            .unwrap()
+            .as_function_def_stmt()
+            .unwrap();
+        let mut builder = Builder::default();
+        // A function lowered from an owned node has no recorded body interval.
+        let root = function.to_owned_node().lower(&mut builder);
+        let checkpoint = builder.checkpoint();
+        build::ExprYield {
+            range: function.range(),
+            value: None,
+        }
+        .emit(&mut builder);
+        builder.rewind(checkpoint);
+        assert!(!builder.finish_tree(root).root().body_may_contain_yield());
+    }
+
+    #[test]
+    fn long_function_uses_the_scope_aware_walk() {
+        let mut source = String::from("def f():\n    yield 1\n");
+        for _ in 0..=u16::MAX {
+            source.push_str("    pass\n");
+        }
+        let parsed = parse_module(&source).unwrap();
+        let function = parsed
+            .suite()
+            .first()
+            .unwrap()
+            .as_function_def_stmt()
+            .unwrap();
+        assert!(function.body_may_contain_yield());
+    }
+
+    #[test]
+    fn collect_returns_in_source_order_with_and_without_yields() {
+        for (generator, tail) in [(false, ""), (true, "    yield from ()\n")] {
+            let source = format!(
+                "def f(x):\n    def nested():\n        return 0\n    if x:\n        return 1\n    try:\n        return 2\n    finally:\n        return 3\n{tail}"
+            );
+            let parsed = parse_module(&source).unwrap();
+            let function = parsed
+                .suite()
+                .first()
+                .unwrap()
+                .as_function_def_stmt()
+                .unwrap();
+            let result = ReturnStatementVisitor::for_function(function);
+            assert_eq!(result.is_generator, generator);
+            assert_eq!(
+                result
+                    .returns
+                    .iter()
+                    .map(|stmt| &source[stmt.range()])
+                    .collect::<Vec<_>>(),
+                ["return 1", "return 2", "return 3"]
+            );
+        }
     }
 }

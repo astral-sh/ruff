@@ -168,7 +168,7 @@ fn trace_visitation(source: &str) -> String {
     let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
 
     let mut visitor = RecordVisitor::default();
-    walk_module(&mut visitor, parsed.syntax());
+    walk_module(&mut visitor, &parsed.into_syntax());
 
     visitor.output
 }

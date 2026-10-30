@@ -2,6 +2,15 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr, ExprContext, Pattern};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
+pub(super) fn pattern_to_expr(
+    storage: &mut super::ParserStorage,
+    pattern: super::syntax::Pattern,
+) -> super::syntax::Expr {
+    let rewritten = owned_pattern_to_expr(pattern.view(storage).to_owned_node());
+    let id = ast::flat::Lower::lower(&rewritten, storage);
+    super::syntax::Node::from_view(storage.get(id))
+}
+
 /// Convert the given [`Pattern`] to an [`Expr`].
 ///
 /// This is used to convert an invalid use of pattern to their equivalent expression
@@ -25,7 +34,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 /// This function returns an invalid [`ast::ExprName`] if the given pattern is a [`Pattern::MatchAs`]
 /// with both the pattern and name present. This is because it cannot be converted to an expression
 /// without dropping one of them as there's no way to represent `x as y` as a valid expression.
-pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
+fn owned_pattern_to_expr(pattern: Pattern) -> Expr {
     match pattern {
         Pattern::MatchSingleton(ast::PatternMatchSingleton {
             range,
@@ -51,7 +60,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
             node_index,
             patterns,
         }) => Expr::List(ast::ExprList {
-            elts: patterns.into_iter().map(pattern_to_expr).collect(),
+            elts: patterns.into_iter().map(owned_pattern_to_expr).collect(),
             ctx: ExprContext::Store,
             range,
             node_index,
@@ -68,7 +77,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                 .zip(patterns)
                 .map(|(key, pattern)| ast::DictItem {
                     key: Some(key),
-                    value: pattern_to_expr(pattern),
+                    value: owned_pattern_to_expr(pattern),
                 })
                 .collect();
             if let Some(rest) = rest {
@@ -106,7 +115,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                     args: arguments
                         .patterns
                         .into_iter()
-                        .map(pattern_to_expr)
+                        .map(owned_pattern_to_expr)
                         .collect(),
                     keywords: arguments
                         .keywords
@@ -115,7 +124,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                             range: keyword_pattern.range,
                             node_index: node_index.clone(),
                             arg: Some(keyword_pattern.attr),
-                            value: pattern_to_expr(keyword_pattern.pattern),
+                            value: owned_pattern_to_expr(keyword_pattern.pattern),
                         })
                         .collect(),
                 },
@@ -164,7 +173,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                 id: Name::empty(),
                 ctx: ExprContext::Invalid,
             }),
-            (Some(pattern), None) => pattern_to_expr(*pattern),
+            (Some(pattern), None) => owned_pattern_to_expr(*pattern),
             (None, Some(name)) => Expr::Name(ast::ExprName {
                 range: name.range,
                 node_index,
@@ -185,9 +194,9 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
         }) => {
             let to_bin_expr = |left: Pattern, right: Pattern| ast::ExprBinOp {
                 range: TextRange::new(left.start(), right.end()),
-                left: Box::new(pattern_to_expr(left)),
+                left: Box::new(owned_pattern_to_expr(left)),
                 op: ast::Operator::BitOr,
-                right: Box::new(pattern_to_expr(right)),
+                right: Box::new(owned_pattern_to_expr(right)),
                 node_index: node_index.clone(),
             };
 
@@ -200,7 +209,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                             range: TextRange::new(expr_bin_op.start(), pattern.end()),
                             left: Box::new(Expr::BinOp(expr_bin_op)),
                             op: ast::Operator::BitOr,
-                            right: Box::new(pattern_to_expr(pattern)),
+                            right: Box::new(owned_pattern_to_expr(pattern)),
                             node_index: node_index.clone(),
                         }
                     }))

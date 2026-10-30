@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
+use ruff_python_ast::{self as ast, Expr, IpyEscapeKind, Number, Stmt, flat};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::{Mode, ParseOptions, parse, parse_cells_unchecked, parse_expression, parse_module};
@@ -65,11 +65,11 @@ fn test_unicode_aliases() {
 #[test]
 fn nfkc_normalizes_names() {
     let parsed = parse_expression("𝒞").unwrap();
-    let Expr::Name(name) = parsed.expr() else {
+    let flat::ExprKind::Name(name) = parsed.expr().classify() else {
         panic!("expected name expression, got {:?}", parsed.expr());
     };
 
-    assert_eq!(name.id.as_str(), "C");
+    assert_eq!(name.id().as_str(), "C");
 }
 
 #[test]
@@ -111,14 +111,14 @@ fn number_values() {
 
     for (source, expected) in cases {
         let parsed = parse_expression(source).unwrap();
-        let Expr::NumberLiteral(number) = parsed.expr() else {
+        let flat::ExprKind::NumberLiteral(number) = parsed.expr().classify() else {
             panic!(
                 "expected number expression for {source:?}, got {:?}",
                 parsed.expr()
             );
         };
 
-        assert_eq!(number.value, expected, "source: {source:?}");
+        assert_eq!(number.value(), &expected, "source: {source:?}");
     }
 }
 
@@ -146,16 +146,18 @@ fn interpolated_string_escaped_brace_values() {
 
     for (source, expected) in cases {
         let parsed = parse_expression(source).unwrap();
-        let elements = match parsed.expr() {
-            Expr::FString(string) => &string.as_single_part_fstring().unwrap().elements,
-            Expr::TString(string) => &string.as_single_part_tstring().unwrap().elements,
+        let elements = match parsed.expr().classify() {
+            flat::ExprKind::FString(string) => string.as_single_part_fstring().unwrap().elements(),
+            flat::ExprKind::TString(string) => string.as_single_part_tstring().unwrap().elements(),
             expression => panic!("expected interpolated string for {source:?}, got {expression:?}"),
         };
-        let [InterpolatedStringElement::Literal(literal)] = &**elements else {
+        let Some([flat::InterpolatedStringElementKind::Literal(literal)]) =
+            elements.as_array().map(|[node]| [node.classify()])
+        else {
             panic!("expected one literal element for {source:?}");
         };
 
-        assert_eq!(&*literal.value, expected, "source: {source:?}");
+        assert_eq!(literal.value(), expected, "source: {source:?}");
     }
 }
 
@@ -369,9 +371,8 @@ fn cells_module_range_spans_source() {
     any(target_os = "linux", target_os = "macos", target_os = "windows")
 ))]
 mod stack_growth {
+    use ruff_python_ast::flat;
     use std::assert_matches;
-
-    use ruff_python_ast::Stmt;
 
     use crate::{Mode, ParseOptions, parse_module};
 
@@ -394,8 +395,14 @@ mod stack_growth {
         );
         let parsed = parse_module(&src).unwrap();
 
-        assert_matches!(parsed.suite().first(), Some(Stmt::Assign(_)));
-        assert_matches!(parsed.suite().last(), Some(Stmt::Assign(_)));
+        assert_matches!(
+            parsed.suite().first().map(flat::View::is_assign_stmt),
+            Some(true)
+        );
+        assert_matches!(
+            parsed.suite().last().map(flat::View::is_assign_stmt),
+            Some(true)
+        );
     }
 
     #[test]
@@ -536,4 +543,230 @@ mod stack_growth {
         let source = format!("{}True\n", "not ".repeat(depth));
         parse_module(&source).unwrap();
     }
+}
+
+#[test]
+fn siblings_in_compound_statements() {
+    for (source, pairs) in [
+        (
+            "if cond: pass\nelif other: left; right\nelse: left; right",
+            2,
+        ),
+        (
+            "try: pass\nexcept TypeError: left; right\nelse: left; right\nfinally: left; right",
+            3,
+        ),
+        ("match value:\n    case 0: pass\n    case _: left; right", 1),
+    ] {
+        let parsed = parse_module(source).unwrap();
+        let parent = parsed.suite().first().unwrap();
+        let mut visited = 0;
+        for stmt in parent.descendants().filter_map(flat::View::as_stmt_expr) {
+            let suite = flat::traversal::suite(stmt, parent).unwrap();
+            if &source[stmt.range()] == "left" {
+                assert!(suite.previous_sibling().is_none());
+                assert_eq!(&source[suite.next_sibling().unwrap().range()], "right");
+            } else {
+                assert_eq!(&source[suite.previous_sibling().unwrap().range()], "left");
+                assert!(suite.next_sibling().is_none());
+            }
+            visited += 1;
+        }
+        assert_eq!(visited, 2 * pairs);
+    }
+}
+
+#[test]
+fn descendants_visit_a_subtree_in_source_order() {
+    let parsed = parse_expression("outside(call(keyword=x, *ys), sibling)").unwrap();
+    let call = parsed
+        .expr()
+        .as_call_expr()
+        .unwrap()
+        .arguments()
+        .args()
+        .first()
+        .unwrap();
+    let mut nodes = call.descendants();
+    assert!(nodes.next().unwrap().is_same_node(call));
+    let names: Vec<_> = nodes
+        .by_ref()
+        .filter_map(flat::View::cast::<ast::ExprName>)
+        .map(|name| name.id().as_str())
+        .collect();
+    assert_eq!(names, ["call", "x", "ys"]);
+    assert!(nodes.next().is_none());
+}
+
+#[test]
+fn flat_storage_detached_expression() {
+    let source = "(obj.first, [item.second, -other.third])";
+    let parsed = parse_expression(source).unwrap();
+    let clone = parsed.clone();
+    let mut detached = parsed.into_expr();
+    let expected = clone.into_expr();
+    assert_eq!(detached, expected);
+
+    let Expr::Tuple(tuple) = &mut detached else {
+        panic!("expected a tuple");
+    };
+    tuple.elts.swap(0, 1);
+    assert_ne!(detached, expected);
+}
+
+#[test]
+fn flat_storage_nested_lists() {
+    let small = "[a.x, b.y]";
+    let large = std::iter::repeat_n("c.z", 257)
+        .collect::<Vec<_>>()
+        .join(", ");
+    let source = format!(
+        "({}, [{}], {})",
+        std::iter::repeat_n(small, 80)
+            .collect::<Vec<_>>()
+            .join(", "),
+        large,
+        small
+    );
+    let parsed = parse_expression(&source).unwrap();
+    let tuple = parsed.root().body().cast::<ast::ExprTuple>().unwrap();
+    assert_eq!(tuple.elts().len(), 82);
+    for (index, expr) in tuple.elts().iter().enumerate() {
+        let list = expr.cast::<ast::ExprList>().unwrap();
+        assert_eq!(list.elts().len(), if index == 80 { 257 } else { 2 });
+        for item in list.elts() {
+            let attribute = parsed
+                .ast()
+                .view(item.handle())
+                .unwrap()
+                .cast::<ast::ExprAttribute>()
+                .unwrap();
+            assert!(attribute.value().cast::<ast::ExprName>().is_some());
+            assert_eq!(attribute.attr().id(), &source[attribute.attr().range()]);
+        }
+    }
+    let expected = parsed.expr().to_owned_node();
+    assert_eq!(*parsed.into_syntax().body, expected);
+}
+
+#[test]
+fn keyword_and_dotted_import_names_use_one_row_each() {
+    let parsed = parse_module("from a.b import c\nf(x=1, **y)\n").unwrap();
+    assert_eq!(
+        parsed.ast().nodes().len(),
+        parsed.root().descendants().count()
+    );
+}
+
+#[test]
+fn flat_storage_list_lengths() {
+    for count in 0..=8 {
+        let source = format!("[{}]", vec!["x"; count].join(", "));
+        let parsed = parse_expression(&source).unwrap();
+        let elements = parsed.root().body().cast::<ast::ExprList>().unwrap().elts();
+        assert_eq!(elements.len(), count);
+        assert_eq!(elements.is_empty(), count == 0);
+        assert!(elements.get(count).is_none());
+        for (index, item) in elements.iter().enumerate() {
+            assert_eq!(elements.get(index).unwrap().handle(), item.handle());
+        }
+    }
+}
+
+#[test]
+fn flat_storage_literals_survive_pool_growth() {
+    let long = "z".repeat(8192);
+    let source = format!(r#"["early", b"\x00\xff", "{long}", "é" "\n", f"start{{1}}end"]"#);
+    let parsed = parse_expression(&source).unwrap();
+    let expected = parsed.expr().to_owned_node();
+    let detached = parsed.into_expr();
+    assert_eq!(detached, expected);
+    let parts = &detached.as_list_expr().unwrap().elts;
+    assert_eq!(
+        parts[0].as_string_literal_expr().unwrap().value.to_str(),
+        "early"
+    );
+    assert_eq!(
+        parts[1].as_bytes_literal_expr().unwrap().value.as_slice()[0].as_slice(),
+        [0, 255]
+    );
+    assert_eq!(
+        parts[2].as_string_literal_expr().unwrap().value.to_str(),
+        long
+    );
+    assert_eq!(
+        parts[3].as_string_literal_expr().unwrap().value.to_str(),
+        "é\n"
+    );
+}
+
+#[test]
+fn flat_string_text_ranges() {
+    for len in [0, 65_534, 65_535, 65_536] {
+        let text = "x".repeat(len);
+        let (left, right) = text.split_at(len / 2);
+        let source = format!(r#"["prefix", "{text}", "{left}" "{right}"]"#);
+        let parsed = parse_expression(&source).unwrap();
+        let list = parsed.expr().as_list_expr().unwrap();
+        let [_, single, joined] = list.elts().as_array().unwrap();
+        for (expr, count) in [(single, 1), (joined, 2)] {
+            let value = expr.as_string_literal_expr().unwrap().value();
+            assert_eq!(value.as_slice().len(), count);
+            assert_eq!(value.to_str(), text);
+        }
+    }
+}
+
+#[test]
+fn flat_string_part_iteration() {
+    for (source, expected) in [
+        ("'a' 'b'", [ast::NodeKind::StringLiteral; 2]),
+        ("b'a' b'b'", [ast::NodeKind::BytesLiteral; 2]),
+        (
+            "'a' f'{x}'",
+            [ast::NodeKind::StringLiteral, ast::NodeKind::FString],
+        ),
+        ("t'{x}' t'b'", [ast::NodeKind::TString; 2]),
+    ] {
+        let parsed = parse_expression(source).unwrap();
+        let literal = flat::StringLike::try_from(parsed.expr()).unwrap();
+        assert!(literal.is_implicit_concatenated());
+        let mut parts = literal.parts();
+        assert_eq!(parts.len(), 2);
+        let second = flat::AnyNodeRef::from(parts.next_back().unwrap());
+        let first = flat::AnyNodeRef::from(parts.next().unwrap());
+        assert_eq!([first.node_kind(), second.node_kind()], expected);
+        assert!(first.end() < second.start());
+        assert!(parts.next().is_none());
+    }
+}
+
+#[test]
+fn flat_storage_notebook_cells() {
+    let source = "a = [one.first, two.second]\nb = [three.third, four.fourth]\n";
+    let sep = TextSize::try_from(source.find('\n').unwrap()).unwrap();
+    let end = TextSize::try_from(source.len() - 1).unwrap();
+    let parsed = parse_cells_unchecked(
+        source,
+        [
+            TextRange::up_to(sep),
+            TextRange::new(sep + TextSize::new(1), end),
+        ],
+        &ParseOptions::from(Mode::Module),
+    );
+    let suite = parsed.root().body();
+    assert_eq!(suite.len(), 2);
+    for (index, statement) in suite.iter().enumerate() {
+        assert_eq!(suite.get(index).unwrap().handle(), statement.handle());
+        assert!(statement.cast::<ast::StmtAssign>().is_some());
+    }
+    let body = parsed.into_suite();
+    let mut names = Vec::new();
+    for statement in &body {
+        let assignment = statement.as_assign_stmt().unwrap();
+        for element in &assignment.value.as_list_expr().unwrap().elts {
+            names.push(element.as_attribute_expr().unwrap().attr.as_str());
+        }
+    }
+    assert_eq!(names, ["first", "second", "third", "fourth"]);
 }
