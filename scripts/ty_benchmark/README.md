@@ -92,9 +92,10 @@ you might see differences when running the snapshots on your machine.
 ## Project coverage
 
 The suite includes HTTPX's synchronous and asynchronous HTTP client, FastAPI's
-web framework, NumPy's Python implementation and array stubs, and SQLAlchemy's
-typed ORM and SQL-expression APIs, alongside the existing application and library
-benchmarks. NumPy excludes its tests and does not build its C extensions; its
+web framework, NumPy's Python implementation and array stubs, SQLAlchemy's
+typed ORM and SQL-expression APIs, and Rich's terminal rendering and formatting,
+alongside the existing application and library benchmarks. NumPy excludes its
+tests and does not build its C extensions; its
 source requires a Python 3.12 project environment.
 
 Each of these projects has an incremental edit that changes diagnostics in an

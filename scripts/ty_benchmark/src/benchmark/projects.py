@@ -454,4 +454,25 @@ ALL: Final = [
             affected_files=["lib/sqlalchemy/orm/mapper.py"],
         ),
     ),
+    Project(
+        name="rich",
+        repository="https://github.com/Textualize/rich",
+        revision="9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+        python_version="3.11",
+        include=["rich"],
+        install_arguments=[
+            "pygments>=2.13,<3",
+            "markdown-it-py>=2.2",
+            "ipywidgets>=7.5.1,<9",
+            "ipython",
+            "attrs>=21.4",
+            "typing-extensions>=4,<5",
+        ],
+        edit=IncrementalEdit(
+            edited_file="rich/color.py",
+            replace_text="def get_ansi_codes(self, foreground: bool = True) -> Tuple[str, ...]:",
+            replacement="def get_ansi_codes(self, foreground: bool = True) -> int:",
+            affected_files=["rich/style.py"],
+        ),
+    ),
 ]
