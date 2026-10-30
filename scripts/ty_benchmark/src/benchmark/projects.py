@@ -134,7 +134,7 @@ ALL: Final = [
     Project(
         name="black",
         repository="https://github.com/psf/black",
-        revision="ce1897a8f20d0f64844dd666d07f4003500d0e09",
+        revision="55996d1fb8342725c8a19b6023cd9439c3c1d6f7",
         python_version="3.11",
         include=["src"],
         install_arguments=[
@@ -158,7 +158,7 @@ ALL: Final = [
     Project(
         name="discord.py",
         repository="https://github.com/Rapptz/discord.py.git",
-        revision="2fbed9362422dad4f7850eb6c5d9b1f8bff7c71a",
+        revision="65232c38702be5844cf2ce865a4777eb1928b5d0",
         python_version="3.11",
         include=["discord"],
         install_arguments=[
@@ -177,7 +177,7 @@ ALL: Final = [
     Project(
         name="homeassistant",
         repository="https://github.com/home-assistant/core.git",
-        revision="a0162d2ff0ed061501405a617961be149b15bd1f",
+        revision="c19ae285ede74cd64c3045a3a4aa43290c224f1b",
         python_version="3.14",
         include=["homeassistant"],
         skip="Missing dependencies on Windows" if sys.platform == "win32" else None,
@@ -199,7 +199,7 @@ ALL: Final = [
     Project(
         name="isort",
         repository="https://github.com/pycqa/isort",
-        revision="87adfe4732548abff5010336f2fc4b5e8237407d",
+        revision="a514c71ed86c2216d0040c7d60e302ed76a4f7ab",
         python_version="3.11",
         include=["isort"],
         install_arguments=["types-colorama", "colorama"],
@@ -239,8 +239,8 @@ ALL: Final = [
     Project(
         name="pandas",
         repository="https://github.com/pandas-dev/pandas",
-        revision="e3a56513f27849f12265a14c814e02f4f408fb3d",
-        include=["pandas", "typings"],
+        revision="a0225b65720018f4654390bb16d254daa6ee5e54",
+        include=["pandas"],
         exclude=["pandas/tests"],
         python_version="3.11",
         install_arguments=[
@@ -257,9 +257,9 @@ ALL: Final = [
     Project(
         name="pandas-stubs",
         repository="https://github.com/pandas-dev/pandas-stubs",
-        revision="1352ba3daa86f1c47a3cce5ad212a770cc693cb4",
+        revision="8dd6d91b1c05b26e30f7ddbe3dc3d4042a92bdd6",
         include=["pandas-stubs"],
-        # See https://github.com/pandas-dev/pandas-stubs/blob/1352ba3daa86f1c47a3cce5ad212a770cc693cb4/pyproject.toml#L8-L72
+        # See https://github.com/pandas-dev/pandas-stubs/blob/8dd6d91b1c05b26e30f7ddbe3dc3d4042a92bdd6/pyproject.toml#L8-L72
         python_version="3.11",
         install_arguments=[
             "-r",
@@ -272,8 +272,8 @@ ALL: Final = [
     Project(
         name="prefect",
         repository="https://github.com/PrefectHQ/prefect.git",
-        revision="db66b14dbaea18e726fc4ea0100fd194383c6c59",
-        # See https://github.com/PrefectHQ/prefect/blob/db66b14dbaea18e726fc4ea0100fd194383c6c59/.pre-commit-config.yaml#L25-L39
+        revision="a9452ac21852755311913cb27887b083b5007c03",
+        # See https://github.com/PrefectHQ/prefect/blob/a9452ac21852755311913cb27887b083b5007c03/.pre-commit-config.yaml#L25-L39
         include=[
             "src/prefect/server/models",
             "src/prefect/concurrency",
@@ -307,9 +307,9 @@ ALL: Final = [
     Project(
         name="pytorch",
         repository="https://github.com/pytorch/pytorch.git",
-        revision="29d6170e7c79f2c71943692985a1546fb2bed28c",
+        revision="ab92945cea42e47ae398aead69af0872d340ea0f",
         include=["torch", "caffe2"],
-        # Based on https://github.com/pytorch/pytorch/blob/29d6170e7c79f2c71943692985a1546fb2bed28c/pyrefly.toml#L23-L47
+        # Based on https://github.com/pytorch/pytorch/blob/ab92945cea42e47ae398aead69af0872d340ea0f/pyrefly.toml#L23-L47
         exclude=[
             "torch/_inductor/codegen/triton.py",
             "tools/linter/adapters/test_device_bias_linter.py",
@@ -350,7 +350,7 @@ ALL: Final = [
         # Based on the upstream lint environment, keeping only packages needed
         # to resolve imports from torch/ and caffe2/. Checker versions are managed
         # separately by the benchmark.
-        # https://github.com/pytorch/pytorch/blob/29d6170e7c79f2c71943692985a1546fb2bed28c/tools/linter/adapters/pyrefly_linter.py#L1-L28
+        # https://github.com/pytorch/pytorch/blob/ab92945cea42e47ae398aead69af0872d340ea0f/tools/linter/adapters/pyrefly_linter.py#L1-L28
         install_arguments=[
             "numpy",
             "expecttest",
