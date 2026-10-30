@@ -753,7 +753,7 @@ impl<'db> SemanticModel<'db> {
             return;
         }
 
-        let mut definitions = self.reaching_definitions_at(receiver);
+        let mut definitions = self.definitions_for_dictionary_key_completion(receiver);
         while let Some(definition) = definitions.pop() {
             if !visited.insert(definition) {
                 continue;
@@ -792,11 +792,14 @@ impl<'db> SemanticModel<'db> {
         }
     }
 
-    /// Returns definitions that can reach this expression's load.
+    /// Returns definitions that may supply `receiver`'s value for dictionary key completion.
     ///
     /// Names follow Python's scope lookup rules, stopping at a definitely bound source.
     /// Other tracked places use the bindings recorded at their use site.
-    fn reaching_definitions_at(&self, receiver: &ast::Expr) -> Vec<Definition<'db>> {
+    fn definitions_for_dictionary_key_completion(
+        &self,
+        receiver: &ast::Expr,
+    ) -> Vec<Definition<'db>> {
         let index = semantic_index(self.db, self.file);
         let Some(scope) = index.try_expression_scope_id(receiver) else {
             return Vec::new();
