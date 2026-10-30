@@ -154,6 +154,11 @@ pub struct ReachabilityConstraints {
 impl ReachabilityConstraints {
     /// Look up an interior node by its constraint ID.
     pub fn get_interior_node(&self, id: ScopedReachabilityConstraintId) -> InteriorNode {
+        self.used_interiors[self.interior_index(id)]
+    }
+
+    /// Returns the index of a retained nonterminal node in `used_interiors`.
+    pub fn interior_index(&self, id: ScopedReachabilityConstraintId) -> usize {
         debug_assert!(!id.is_terminal());
         let raw_index = id.as_u32() as usize;
         if let Some(used_indices) = &self.used_indices {
@@ -161,10 +166,9 @@ impl ReachabilityConstraints {
                 used_indices.get_bit(raw_index).unwrap_or(false),
                 "all used reachability constraints should have been marked as used",
             );
-            let index = used_indices.rank(raw_index) as usize;
-            self.used_interiors[index]
+            used_indices.rank(raw_index) as usize
         } else {
-            self.used_interiors[raw_index]
+            raw_index
         }
     }
 

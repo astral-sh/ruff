@@ -2673,9 +2673,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         loop_header_kind: &LoopHeaderDefinitionKind,
         definition: Definition<'db>,
     ) {
-        // This cutoff was chosen by benchmarking real isort to keep loop analysis
-        // overhead minimal while preserving diagnostics.
-        const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 4096;
         let db = self.db();
 
         let loop_header = loop_header_reachability(self.db(), definition);
@@ -2687,7 +2684,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // exact union of every visible loop-back binding can recursively force inference of large
         // boolean expressions and explode on real-world loops.
         if use_def.reachability_constraints().used_interiors().len()
-            > MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES
+            > crate::reachability::MAX_EXACT_LOOP_HEADER_TYPE_NODES
         {
             self.bindings.insert(definition, Type::unknown());
             return;

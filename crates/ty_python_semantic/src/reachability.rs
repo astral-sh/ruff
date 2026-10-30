@@ -194,7 +194,7 @@
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
 use crate::ProgramEnvironment;
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 
 use crate::{
     Db,
@@ -230,7 +230,7 @@ use ty_python_core::{
     reachability_constraints::{
         InteriorNode, ReachabilityConstraints, ScopedReachabilityConstraintId,
     },
-    scope::ScopeId,
+    scope::{ScopeId, ScopeKind},
     use_def_map,
 };
 
@@ -740,6 +740,150 @@ fn analyze_non_terminal_call_range<'db>(
     analyze_non_terminal_call_range(db, scope, level - 1, child_index + 1);
 }
 
+/// Bulk evaluation pays off for branching functions with many roots sharing the same predicates.
+/// Linear call chains use sparse checkpoints to bound the work and stack of an individual query.
+fn is_dense_function(
+    db: &dyn Db,
+    scope: ScopeId,
+    constraints: &ReachabilityConstraints,
+    predicate_count: usize,
+) -> bool {
+    let nodes = constraints.used_interiors().len();
+    nodes >= 1024
+        && nodes / 4 >= predicate_count
+        && predicate_count >= MIN_BATCH_PREDICATES
+        && matches!(scope.node(db).scope_kind(), ScopeKind::Function)
+}
+
+const MIN_BATCH_PREDICATES: usize = 64;
+
+/// Scopes above the exact loop-header inference budget rarely need all their predicates during
+/// binding lookup. A request for all unreachable ranges still evaluates them in bulk.
+pub(crate) const MAX_EXACT_LOOP_HEADER_TYPE_NODES: usize = 4096;
+
+fn batch_binding_lookups(
+    db: &dyn Db,
+    scope: ScopeId,
+    constraints: &ReachabilityConstraints,
+    predicate_count: usize,
+) -> bool {
+    constraints.used_interiors().len() <= MAX_EXACT_LOOP_HEADER_TYPE_NODES
+        && is_dense_function(db, scope, constraints, predicate_count)
+}
+
+/// Share predicate inference across the roots of a dense decision diagram. The table is a single
+/// cycle participant when a condition depends on bindings whose visibility it controls.
+#[salsa::tracked(
+    returns(deref),
+    cycle_initial = |db, _, scope| use_def_map(db, scope).predicates().iter().map(|predicate| {
+        if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
+            Truthiness::from(predicate.is_positive)
+        } else {
+            Truthiness::Ambiguous
+        }
+    }).collect(),
+    cycle_fn = widen_scope_predicates,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn scope_predicate_truthiness<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Box<[Truthiness]> {
+    let use_def = use_def_map(db, scope);
+    let env = ProgramEnvironment::from_scope(scope);
+    use_def
+        .predicates()
+        .iter()
+        .map(|predicate| analyze_single(db, &env, predicate))
+        .collect()
+}
+
+/// A single predicate can stop being a cycle head while its scope is still iterating. Widen the
+/// shared answers together so subsequent walks see a stable set of branches. Statement calls
+/// recover as returning when either iteration allows it, matching `analyze_non_terminal_call`.
+fn widen_scope_predicates<'db>(
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous: &[Truthiness],
+    mut result: Box<[Truthiness]>,
+    scope: ScopeId<'db>,
+) -> Box<[Truthiness]> {
+    if cycle.iteration() > crate::TAINTED_CYCLES {
+        let use_def = use_def_map(db, scope);
+        for (id, predicate) in use_def.predicates().iter_enumerated() {
+            let current = &mut result[id.index()];
+            let previous = previous[id.index()];
+            *current = match predicate.node {
+                PredicateNode::IsNonTerminalCall(_) if predicate.is_positive => {
+                    previous.or(*current)
+                }
+                PredicateNode::IsNonTerminalCall(_) => previous.and(*current),
+                _ => previous.union(*current),
+            };
+        }
+    }
+    result
+}
+
+/// Evaluate retained nodes in construction order. Each child was interned before its parent, and
+/// discarding unused nodes preserves that order. An uninhabited predicate admits only paths that
+/// bypass it, so its true and false branches must both be reachable.
+#[salsa::tracked(
+    returns(deref),
+    cycle_initial = |db, _, scope| vec![Truthiness::Ambiguous; use_def_map(db, scope).reachability_constraints().used_interiors().len()].into_boxed_slice(),
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn scope_reachability<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Box<[Truthiness]> {
+    let use_def = use_def_map(db, scope);
+    let constraints = use_def.reachability_constraints();
+    let predicates = scope_predicate_truthiness(db, scope);
+    let mut results = Vec::with_capacity(constraints.used_interiors().len());
+    for node in constraints.used_interiors() {
+        let child = |id| {
+            terminal_reachability(id).unwrap_or_else(|| results[constraints.interior_index(id)])
+        };
+        let result = match predicates[node.atom().index()] {
+            Truthiness::AlwaysTrue => child(node.if_true()),
+            Truthiness::AlwaysFalse => child(node.if_false()),
+            Truthiness::Ambiguous => child(node.if_ambiguous()),
+            Truthiness::Uninhabited => child(node.if_true()).and(child(node.if_false())),
+        };
+        results.push(result);
+    }
+    results.into_boxed_slice()
+}
+
+/// Reachability answers indexed by the retained nodes of one scope's graph.
+pub(crate) struct EvaluatedReachability<'db> {
+    constraints: &'db ReachabilityConstraints,
+    results: &'db [Truthiness],
+}
+
+impl<'db> EvaluatedReachability<'db> {
+    fn new(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        constraints: &'db ReachabilityConstraints,
+    ) -> Self {
+        Self {
+            constraints,
+            results: scope_reachability(db, scope),
+        }
+    }
+
+    pub(crate) fn for_scope(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        use_def: &'db UseDefMap<'db>,
+    ) -> Option<Self> {
+        let constraints = use_def.reachability_constraints();
+        is_dense_function(db, scope, constraints, use_def.predicates().len())
+            .then(|| Self::new(db, scope, constraints))
+    }
+
+    pub(crate) fn get(&self, id: ScopedReachabilityConstraintId) -> Truthiness {
+        terminal_reachability(id)
+            .unwrap_or_else(|| self.results[self.constraints.interior_index(id)])
+    }
+}
+
 /// Evaluates a reachability constraint, first caching complete blocks of statement calls up to its
 /// root predicate when the scope has many calls.
 ///
@@ -757,6 +901,9 @@ fn evaluate_reachability_constraint<'db>(
     let use_def = use_def_map(db, scope);
     let constraints = use_def.reachability_constraints();
     let predicates = use_def.predicates();
+    if batch_binding_lookups(db, scope, constraints, predicates.len()) {
+        return EvaluatedReachability::new(db, scope, constraints).get(id);
+    }
     let root = constraints.get_interior_node(id);
     let has_many_calls = analyze_non_terminal_calls_up_to_predicate(db, predicates, root);
     let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
@@ -956,16 +1103,14 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         }
 
         let root = self.get_interior_node(id);
+        let scope = predicate_scope(db, &predicates[root.atom()]);
+        if batch_binding_lookups(db, scope, self, predicates.len())
+            && std::ptr::eq(self, use_def_map(db, scope).reachability_constraints())
+        {
+            return EvaluatedReachability::new(db, scope, self).get(id);
+        }
         analyze_non_terminal_calls_up_to_predicate(db, predicates, root);
-        evaluate_reachability_path(
-            db,
-            predicate_scope(db, &predicates[root.atom()]),
-            self,
-            predicates,
-            None,
-            id,
-            true,
-        )
+        evaluate_reachability_path(db, scope, self, predicates, None, id, true)
     }
 }
 
@@ -1153,6 +1298,7 @@ pub(crate) struct NarrowingProjector<'a, 'db> {
     base_ty: Type<'db>,
     /// Checkpoint entries retain narrowed types, so projections are specific to the binding type.
     project_cache: FxHashMap<(ScopedNarrowingConstraint, Type<'db>), ProjectedNarrowingNodeId>,
+    scope_truthiness: OnceCell<Option<&'db [Truthiness]>>,
     graph: ProjectedNarrowingGraph<'db>,
     narrowed_cache: FxHashMap<(ProjectedNarrowingNodeId, Type<'db>), Type<'db>>,
 }
@@ -1177,9 +1323,28 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             place,
             base_ty,
             project_cache: FxHashMap::default(),
+            scope_truthiness: OnceCell::new(),
             graph: ProjectedNarrowingGraph::default(),
             narrowed_cache: FxHashMap::default(),
         }
+    }
+
+    fn predicate_truthiness(&self, id: ScopedPredicateId) -> Truthiness {
+        let predicate = &self.predicates[id];
+        if self.predicates.len() >= MIN_BATCH_PREDICATES
+            && let Some(results) = self.scope_truthiness.get_or_init(|| {
+                let scope = predicate_scope(self.db, predicate);
+                let use_def = use_def_map(self.db, scope);
+                let constraints = use_def.reachability_constraints();
+                let scope_predicates: &IndexSlice<_, _> = use_def.predicates();
+                (batch_binding_lookups(self.db, scope, constraints, self.predicates.len())
+                    && std::ptr::eq(scope_predicates, self.predicates))
+                .then(|| scope_predicate_truthiness(self.db, scope))
+            })
+        {
+            return results[id.index()];
+        }
+        analyze_single(self.db, self.env, predicate)
     }
 
     /// Narrows a binding while reusing projections and shared suffixes from earlier bindings.
@@ -1560,7 +1725,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         // This node represents `if_uncertain || (P && if_true) || (!P && if_false)`.
                         // Since the predicate `P` cannot narrow this place, remove it while retaining only branches that `P` can take.
                         // Including a statically unreachable branch could erase narrowing from the reachable branch.
-                        match analyze_single(self.db, self.env, &self.predicates[node.atom]) {
+                        match self.predicate_truthiness(node.atom) {
                             Truthiness::AlwaysTrue => self.or(if_true, if_uncertain),
                             Truthiness::AlwaysFalse => self.or(if_false, if_uncertain),
                             Truthiness::Ambiguous => {
@@ -2334,6 +2499,89 @@ class TargetB:
         // Enter the range directly so it becomes the cycle head when inferring `other.target`
         // reaches the other module and then re-enters this scope.
         analyze_non_terminal_call_range(&db, setup_scope, 0, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn bulk_reachability_matches_individual_ranges_after_callee_changes() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_files([
+            ("/src/dependency.py", "def condition() -> bool: ..."),
+            (
+                "/src/test.py",
+                indoc::indoc! {"
+                    from dependency import condition
+
+                    def f(flag: bool):
+                        if flag:
+                            if condition():
+                                a = 1
+                            else:
+                                b = 2
+                        if flag or condition():
+                            c = 3
+                        d = 4
+                "},
+            ),
+        ])?;
+        let file = system_path_to_file(&db, "/src/test.py").unwrap();
+        let evaluate = |db: &crate::db::tests::TestDb| {
+            let program_file = ProgramFile::new(db, file, db.program_environment().program(db));
+            let index = semantic_index(db, program_file);
+            let function = index.child_scopes(FileScopeId::global()).next().unwrap().0;
+            let scope = function.to_scope_id(db, program_file);
+            let use_def = use_def_map(db, scope);
+            let evaluated =
+                EvaluatedReachability::new(db, scope, use_def.reachability_constraints());
+            use_def
+                .range_reachability()
+                .map(|(_, root)| {
+                    let result = evaluated.get(root);
+                    assert_eq!(result, evaluate_reachability(db, use_def, root));
+                    result
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let before = evaluate(&db);
+        db.write_file(
+            "/src/dependency.py",
+            "from typing import Never\n\ndef condition() -> Never: ...",
+        )?;
+        assert_ne!(before, evaluate(&db));
+        Ok(())
+    }
+
+    #[test]
+    fn dense_reachability_converges_on_a_call_before_its_loop_back_import() -> anyhow::Result<()> {
+        use std::fmt::Write as _;
+
+        let mut db = setup_db();
+        let mut guards = String::new();
+        for i in 0..12 {
+            writeln!(
+                guards,
+                "    if flags[{i}]:\n        if flag: count += 1\n    elif count > {i}:\n        if flag: return"
+            )?;
+        }
+        let tail = "    if flag: pass\n".repeat(16);
+        let source = format!(
+            "def f(flags: list[bool], flag: bool) -> None:
+    count = 0
+{guards}    while flag:
+        def before(): ...
+        sys.exit()
+        import sys
+{tail}"
+        );
+        db.write_file("/src/test.py", &source)?;
+        let file = system_path_to_file(&db, "/src/test.py").unwrap();
+        let program_file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let ranges = crate::types::ide_support::unreachable_ranges(&db, program_file);
+        // Before guard `i`, at most `i` increments could have run. After the loop, `flag` is false.
+        let unreachable: Vec<_> = ranges.iter().map(|range| &source[range.range]).collect();
+        assert_eq!(unreachable[..12], ["if flag: return"; 12]);
+        assert_eq!(unreachable[12..], ["pass"; 16]);
         Ok(())
     }
 

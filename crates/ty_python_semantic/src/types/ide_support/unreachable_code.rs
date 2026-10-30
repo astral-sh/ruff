@@ -1,5 +1,5 @@
 use crate::Db;
-use crate::reachability::is_reachable;
+use crate::reachability::{EvaluatedReachability, is_reachable};
 use get_size2::GetSize;
 use itertools::Itertools;
 use ruff_text_size::TextRange;
@@ -50,11 +50,16 @@ pub fn unreachable_ranges(db: &dyn Db, file: ProgramFile<'_>) -> Box<[Unreachabl
     let mut unreachable = Vec::new();
     for scope_id in index.scope_ids() {
         let use_def = index.use_def_map(scope_id.file_scope_id(db));
+        let evaluated = EvaluatedReachability::for_scope(db, scope_id, use_def);
         unreachable.extend(
             use_def
                 .range_reachability()
                 .filter_map(|(range, constraint)| {
-                    (!is_reachable(db, use_def, constraint)).then_some(UnreachableRange {
+                    (!evaluated.as_ref().map_or_else(
+                        || is_reachable(db, use_def, constraint),
+                        |results| results.get(constraint).may_be_true(),
+                    ))
+                    .then_some(UnreachableRange {
                         range,
                         kind: if constraint == ScopedReachabilityConstraintId::ALWAYS_FALSE {
                             UnreachableKind::Unconditional
