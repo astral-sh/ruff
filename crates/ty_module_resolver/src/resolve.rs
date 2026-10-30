@@ -32,6 +32,7 @@ For implementors, see `import-resolution-diagram.svg` for a flow diagram that
 specifies ty's implementation of Python's import resolution algorithm.
 */
 
+use ruff_python_ast::flat::{self, fields as ast};
 mod search;
 
 use std::borrow::Cow;
@@ -49,8 +50,8 @@ use ruff_db::source::source_text;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::{
-    self as ast, PySourceType,
-    visitor::{Visitor, walk_body},
+    Expr, PySourceType, Stmt, StmtImportFrom,
+    flat::visitor::{Visitor, walk_body},
 };
 
 use crate::db::Db;
@@ -88,7 +89,7 @@ pub fn resolve_module<'db>(
 pub fn resolve_module_for_import_from<'db>(
     db: &'db dyn Db,
     importing_file: ImportingFile<'db>,
-    import: &ast::StmtImportFrom,
+    import: flat::View<'_, StmtImportFrom>,
 ) -> Option<Module<'db>> {
     let module_name = ModuleName::from_import_statement(db, importing_file, import).ok()?;
     resolve_module(db, importing_file, &module_name)
@@ -1661,7 +1662,7 @@ fn has_legacy_namespace_declaration(db: &dyn Db, init: PythonFile<'_>) -> bool {
     // but hey, this is better than nothing!
     let parsed = ruff_db::parsed::parsed_module(db, init);
     let mut visitor = LegacyNamespacePackageVisitor::default();
-    visitor.visit_body(parsed.load(db).suite());
+    visitor.visit_body(parsed.load(db).root().body());
 
     visitor.is_legacy_namespace_package
 }
@@ -1735,7 +1736,7 @@ struct LegacyNamespacePackageVisitor {
 }
 
 impl Visitor<'_> for LegacyNamespacePackageVisitor {
-    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
+    fn visit_body(&mut self, body: flat::Suite<'_>) {
         if self.is_legacy_namespace_package {
             return;
         }
@@ -1750,12 +1751,12 @@ impl Visitor<'_> for LegacyNamespacePackageVisitor {
         walk_body(self, body);
     }
 
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+    fn visit_stmt(&mut self, stmt: flat::View<'_, Stmt>) {
         if self.is_legacy_namespace_package {
             return;
         }
 
-        match stmt {
+        match stmt.fields() {
             // __path__ = pkgutil.extend_path(__path__, __name__)
             // __path__ = __import__("pkgutil").extend_path(__path__, __name__)
             ast::Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
@@ -1773,12 +1774,19 @@ impl Visitor<'_> for LegacyNamespacePackageVisitor {
 impl LegacyNamespacePackageVisitor {
     /// Check for `__path__ = pkgutil.extend_path(__path__, __name__)` or
     /// `__path__ = __import__("pkgutil").extend_path(__path__, __name__)`
-    fn check_pkgutil_extend_path(&mut self, targets: &[ast::Expr], value: &ast::Expr) {
-        let [ast::Expr::Name(maybe_path)] = targets else {
+    fn check_pkgutil_extend_path(
+        &mut self,
+        targets: flat::NodeList<'_, Expr>,
+        value: flat::View<'_, Expr>,
+    ) {
+        let Some([target]) = targets.as_array() else {
+            return;
+        };
+        let Some(maybe_path) = target.as_name_expr() else {
             return;
         };
 
-        if &*maybe_path.id != "__path__" {
+        if maybe_path.id() != "__path__" {
             return;
         }
 
@@ -1786,7 +1794,7 @@ impl LegacyNamespacePackageVisitor {
             func: extend_func,
             arguments: extend_arguments,
             ..
-        }) = value
+        }) = value.fields()
         else {
             return;
         };
@@ -1795,20 +1803,20 @@ impl LegacyNamespacePackageVisitor {
             value: maybe_pkg_util,
             attr: maybe_extend_path,
             ..
-        }) = &**extend_func
+        }) = extend_func.fields()
         else {
             return;
         };
 
         // Match if the left side of the attribute access is either `__import__("pkgutil")` or `pkgutil`
-        match &**maybe_pkg_util {
+        match maybe_pkg_util.fields() {
             // __import__("pkgutil").extend_path(__path__, __name__)
-            ast::Expr::Call(ruff_python_ast::ExprCall {
+            ast::Expr::Call(ast::ExprCall {
                 func: maybe_import,
                 arguments: import_arguments,
                 ..
             }) => {
-                let ast::Expr::Name(maybe_import) = &**maybe_import else {
+                let flat::ExprKind::Name(maybe_import) = maybe_import.classify() else {
                     return;
                 };
 
@@ -1816,18 +1824,19 @@ impl LegacyNamespacePackageVisitor {
                     return;
                 }
 
-                let Some(ast::Expr::StringLiteral(name)) =
-                    import_arguments.find_argument_value("name", 0)
+                let Some(flat::ExprKind::StringLiteral(name)) = import_arguments
+                    .find_argument_value("name", 0)
+                    .map(flat::View::<Expr>::classify)
                 else {
                     return;
                 };
 
-                if name.value.to_str() != "pkgutil" {
+                if name.value().to_str() != "pkgutil" {
                     return;
                 }
             }
             // "pkgutil.extend_path(__path__, __name__)"
-            ast::Expr::Name(name) => {
+            ast::Expr::Name(ast::ExprName { node: name, .. }) => {
                 if name.id() != "pkgutil" {
                     return;
                 }
@@ -1842,10 +1851,16 @@ impl LegacyNamespacePackageVisitor {
             return;
         }
 
-        let Some(ast::Expr::Name(path)) = extend_arguments.find_argument_value("path", 0) else {
+        let Some(flat::ExprKind::Name(path)) = extend_arguments
+            .find_argument_value("path", 0)
+            .map(flat::View::<Expr>::classify)
+        else {
             return;
         };
-        let Some(ast::Expr::Name(name)) = extend_arguments.find_argument_value("name", 1) else {
+        let Some(flat::ExprKind::Name(name)) = extend_arguments
+            .find_argument_value("name", 1)
+            .map(flat::View::<Expr>::classify)
+        else {
             return;
         };
 
@@ -1853,12 +1868,12 @@ impl LegacyNamespacePackageVisitor {
     }
 
     /// Check for `__import__('pkg_resources').declare_namespace(__name__)`
-    fn check_pkg_resources_declare_namespace(&mut self, value: &ast::Expr) {
+    fn check_pkg_resources_declare_namespace(&mut self, value: flat::View<'_, Expr>) {
         let ast::Expr::Call(ast::ExprCall {
             func,
             arguments: declare_arguments,
             ..
-        }) = value
+        }) = value.fields()
         else {
             return;
         };
@@ -1867,7 +1882,7 @@ impl LegacyNamespacePackageVisitor {
             value: maybe_pkg_resources,
             attr: maybe_declare_namespace,
             ..
-        }) = &**func
+        }) = func.fields()
         else {
             return;
         };
@@ -1881,12 +1896,12 @@ impl LegacyNamespacePackageVisitor {
             func: maybe_import,
             arguments: import_arguments,
             ..
-        }) = &**maybe_pkg_resources
+        }) = maybe_pkg_resources.fields()
         else {
             return;
         };
 
-        let ast::Expr::Name(maybe_import) = &**maybe_import else {
+        let flat::ExprKind::Name(maybe_import) = maybe_import.classify() else {
             return;
         };
 
@@ -1894,17 +1909,21 @@ impl LegacyNamespacePackageVisitor {
             return;
         }
 
-        let Some(ast::Expr::StringLiteral(name)) = import_arguments.find_argument_value("name", 0)
+        let Some(flat::ExprKind::StringLiteral(name)) = import_arguments
+            .find_argument_value("name", 0)
+            .map(flat::View::<Expr>::classify)
         else {
             return;
         };
 
-        if name.value.to_str() != "pkg_resources" {
+        if name.value().to_str() != "pkg_resources" {
             return;
         }
 
         // Check that the argument is `__name__`
-        let Some(ast::Expr::Name(name_arg)) = declare_arguments.find_argument_value("name", 0)
+        let Some(flat::ExprKind::Name(name_arg)) = declare_arguments
+            .find_argument_value("name", 0)
+            .map(flat::View::<Expr>::classify)
         else {
             return;
         };

@@ -1,5 +1,6 @@
 use ruff_python_ast as ast;
-use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
 
 use crate::place::PlaceExpr;
 use crate::symbol::Symbol;
@@ -10,18 +11,20 @@ use crate::symbol::Symbol;
 /// pre-walk so that we can synthesize "loop header definitions" that are visible to the loop body
 /// (and condition). See `LoopHeader`.
 /// TODO: Handle `nonlocal` bindings from nested scopes somehow.
-pub(crate) fn collect_while_loop_bindings(while_stmt: &ast::StmtWhile) -> Vec<PlaceExpr> {
+pub(crate) fn collect_while_loop_bindings(
+    while_stmt: flat::View<'_, ast::StmtWhile>,
+) -> Vec<PlaceExpr> {
     let mut collector = LoopBindingsVisitor::default();
-    collector.visit_expr(&while_stmt.test);
-    collector.visit_body(&while_stmt.body);
+    collector.visit_expr(while_stmt.test());
+    collector.visit_body(while_stmt.body());
     collector.bound_places
 }
 
 /// Like `collect_while_loop_bindings` above, but for `for` loops.
-pub(crate) fn collect_for_loop_bindings(for_stmt: &ast::StmtFor) -> Vec<PlaceExpr> {
+pub(crate) fn collect_for_loop_bindings(for_stmt: flat::View<'_, ast::StmtFor>) -> Vec<PlaceExpr> {
     let mut collector = LoopBindingsVisitor::default();
-    collector.add_place_from_target(&for_stmt.target);
-    collector.visit_body(&for_stmt.body);
+    collector.add_place_from_target(for_stmt.target());
+    collector.visit_body(for_stmt.body());
     collector.bound_places
 }
 
@@ -34,28 +37,28 @@ pub(crate) struct LoopBindingsVisitor {
 }
 
 impl LoopBindingsVisitor {
-    fn add_place_from_target(&mut self, target: &ast::Expr) {
-        match target {
-            ast::Expr::Name(name) => {
+    fn add_place_from_target(&mut self, target: flat::View<'_, ast::Expr>) {
+        match target.classify() {
+            flat::ExprKind::Name(name) => {
                 self.bound_places.push(PlaceExpr::from_expr_name(name));
             }
-            ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+            flat::ExprKind::Attribute(_) | flat::ExprKind::Subscript(_) => {
                 if let Some(place) = PlaceExpr::try_from_expr(target) {
                     self.bound_places.push(place);
                 }
             }
-            ast::Expr::Tuple(tuple) => {
-                for elt in &tuple.elts {
+            flat::ExprKind::Tuple(tuple) => {
+                for elt in tuple.elts() {
                     self.add_place_from_target(elt);
                 }
             }
-            ast::Expr::List(list) => {
-                for elt in &list.elts {
+            flat::ExprKind::List(list) => {
+                for elt in list.elts() {
                     self.add_place_from_target(elt);
                 }
             }
-            ast::Expr::Starred(starred) => {
-                self.add_place_from_target(&starred.value);
+            flat::ExprKind::Starred(starred) => {
+                self.add_place_from_target(starred.value());
             }
             _ => {}
         }
@@ -63,96 +66,96 @@ impl LoopBindingsVisitor {
 }
 
 impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
-    fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
-        match stmt {
-            ast::Stmt::Assign(node) => {
-                for target in &node.targets {
+    fn visit_stmt(&mut self, stmt: flat::View<'ast, ast::Stmt>) {
+        match stmt.classify() {
+            flat::StmtKind::Assign(node) => {
+                for target in node.targets() {
                     self.add_place_from_target(target);
                 }
                 // Visit the value expression to find named expressions (walrus operator).
-                self.visit_expr(&node.value);
+                self.visit_expr(node.value());
             }
-            ast::Stmt::AugAssign(node) => {
-                self.add_place_from_target(&node.target);
-                self.visit_expr(&node.value);
+            flat::StmtKind::AugAssign(node) => {
+                self.add_place_from_target(node.target());
+                self.visit_expr(node.value());
             }
-            ast::Stmt::AnnAssign(node) => {
-                if let Some(value) = &node.value {
-                    self.add_place_from_target(&node.target);
+            flat::StmtKind::AnnAssign(node) => {
+                if let Some(value) = node.value() {
+                    self.add_place_from_target(node.target());
                     self.visit_expr(value);
                 }
             }
-            ast::Stmt::For(node) => {
-                self.add_place_from_target(&node.target);
-                self.visit_expr(&node.iter);
-                self.visit_body(&node.body);
-                self.visit_body(&node.orelse);
+            flat::StmtKind::For(node) => {
+                self.add_place_from_target(node.target());
+                self.visit_expr(node.iter());
+                self.visit_body(node.body());
+                self.visit_body(node.orelse());
             }
-            ast::Stmt::While(node) => {
-                self.visit_expr(&node.test);
-                self.visit_body(&node.body);
-                self.visit_body(&node.orelse);
+            flat::StmtKind::While(node) => {
+                self.visit_expr(node.test());
+                self.visit_body(node.body());
+                self.visit_body(node.orelse());
             }
-            ast::Stmt::With(node) => {
-                for item in &node.items {
-                    self.visit_expr(&item.context_expr);
-                    if let Some(vars) = &item.optional_vars {
+            flat::StmtKind::With(node) => {
+                for item in node.items() {
+                    self.visit_expr(item.context_expr());
+                    if let Some(vars) = item.optional_vars() {
                         self.add_place_from_target(vars);
                     }
                 }
-                self.visit_body(&node.body);
+                self.visit_body(node.body());
             }
-            ast::Stmt::Try(node) => {
-                self.visit_body(&node.body);
-                for handler in &node.handlers {
-                    let ast::ExceptHandler::ExceptHandler(h) = handler;
-                    if let Some(name) = &h.name {
+            flat::StmtKind::Try(node) => {
+                self.visit_body(node.body());
+                for handler in node.handlers() {
+                    let flat::ExceptHandlerKind::ExceptHandler(h) = handler.classify();
+                    if let Some(name) = h.name() {
                         self.bound_places
-                            .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                            .push(PlaceExpr::Symbol(Symbol::new(name.id().clone())));
                     }
-                    self.visit_body(&h.body);
+                    self.visit_body(h.body());
                 }
-                self.visit_body(&node.orelse);
-                self.visit_body(&node.finalbody);
+                self.visit_body(node.orelse());
+                self.visit_body(node.finalbody());
             }
-            ast::Stmt::Import(node) => {
-                for alias in &node.names {
-                    let name = alias.asname.as_ref().unwrap_or(&alias.name);
+            flat::StmtKind::Import(node) => {
+                for alias in node.names() {
+                    let name = alias.asname().unwrap_or(alias.name());
                     self.bound_places
-                        .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                        .push(PlaceExpr::Symbol(Symbol::new(name.id().clone())));
                 }
             }
-            ast::Stmt::ImportFrom(node) => {
-                for alias in &node.names {
-                    if &*alias.name != "*" {
-                        let name = alias.asname.as_ref().unwrap_or(&alias.name);
+            flat::StmtKind::ImportFrom(node) => {
+                for alias in node.names() {
+                    if &alias.name() != "*" {
+                        let name = alias.asname().unwrap_or(alias.name());
                         self.bound_places
-                            .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                            .push(PlaceExpr::Symbol(Symbol::new(name.id().clone())));
                     }
                 }
             }
-            ast::Stmt::FunctionDef(node) => {
+            flat::StmtKind::FunctionDef(node) => {
                 self.bound_places
-                    .push(PlaceExpr::Symbol(Symbol::new(node.name.id.clone())));
+                    .push(PlaceExpr::Symbol(Symbol::new(node.name().id().clone())));
                 // Don't descend into function bodies - they're different scopes.
             }
-            ast::Stmt::ClassDef(node) => {
+            flat::StmtKind::ClassDef(node) => {
                 self.bound_places
-                    .push(PlaceExpr::Symbol(Symbol::new(node.name.id.clone())));
+                    .push(PlaceExpr::Symbol(Symbol::new(node.name().id().clone())));
                 // Don't descend into class bodies - they're different scopes.
             }
-            ast::Stmt::Match(node) => {
-                self.visit_expr(&node.subject);
-                for case in &node.cases {
-                    if let Some(guard) = &case.guard {
+            flat::StmtKind::Match(node) => {
+                self.visit_expr(node.subject());
+                for case in node.cases() {
+                    if let Some(guard) = case.guard() {
                         self.visit_expr(guard);
                     }
-                    self.visit_pattern(&case.pattern);
-                    self.visit_body(&case.body);
+                    self.visit_pattern(case.pattern());
+                    self.visit_body(case.body());
                 }
             }
-            ast::Stmt::Delete(node) => {
-                for target in &node.targets {
+            flat::StmtKind::Delete(node) => {
+                for target in node.targets() {
                     self.add_place_from_target(target);
                 }
             }
@@ -160,32 +163,32 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+    fn visit_expr(&mut self, expr: flat::View<'ast, ast::Expr>) {
         // the walrus operator
-        if let ast::Expr::Named(node) = expr {
-            self.add_place_from_target(&node.target);
+        if let flat::ExprKind::Named(node) = expr.classify() {
+            self.add_place_from_target(node.target());
         }
         walk_expr(self, expr);
     }
 
-    fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
-        match pattern {
-            ast::Pattern::MatchAs(p) => {
-                if let Some(name) = &p.name {
+    fn visit_pattern(&mut self, pattern: flat::View<'ast, ast::Pattern>) {
+        match pattern.classify() {
+            flat::PatternKind::MatchAs(p) => {
+                if let Some(name) = p.name() {
                     self.bound_places
-                        .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                        .push(PlaceExpr::Symbol(Symbol::new(name.id().clone())));
                 }
             }
-            ast::Pattern::MatchStar(p) => {
-                if let Some(name) = &p.name {
+            flat::PatternKind::MatchStar(p) => {
+                if let Some(name) = p.name() {
                     self.bound_places
-                        .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                        .push(PlaceExpr::Symbol(Symbol::new(name.id().clone())));
                 }
             }
-            ast::Pattern::MatchMapping(p) => {
-                if let Some(rest) = &p.rest {
+            flat::PatternKind::MatchMapping(p) => {
+                if let Some(rest) = p.rest() {
                     self.bound_places
-                        .push(PlaceExpr::Symbol(Symbol::new(rest.id.clone())));
+                        .push(PlaceExpr::Symbol(Symbol::new(rest.id().clone())));
                 }
             }
             _ => {}
@@ -204,8 +207,8 @@ mod tests {
 
     fn collect_while_loop_place_names(code: &str) -> Vec<String> {
         let parsed = parse_module(code).expect("valid Python code");
-        let stmt = &parsed.suite()[0];
-        let ast::Stmt::While(while_stmt) = stmt else {
+        let stmt = parsed.suite().at(0);
+        let flat::StmtKind::While(while_stmt) = stmt.classify() else {
             panic!("Expected a while statement");
         };
         collect_while_loop_bindings(while_stmt)
@@ -268,8 +271,8 @@ mod tests {
 
     fn collect_for_loop_place_names(code: &str) -> Vec<String> {
         let parsed = parse_module(code).expect("valid Python code");
-        let stmt = &parsed.suite()[0];
-        let ast::Stmt::For(for_stmt) = stmt else {
+        let stmt = parsed.suite().at(0);
+        let flat::StmtKind::For(for_stmt) = stmt.classify() else {
             panic!("Expected a for statement");
         };
         collect_for_loop_bindings(for_stmt)

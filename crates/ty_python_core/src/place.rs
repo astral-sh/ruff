@@ -9,6 +9,7 @@ use crate::{Db, PossiblyNarrowedPlaces};
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
+use ruff_python_ast::flat;
 use smallvec::SmallVec;
 use std::hash::{Hash, Hasher};
 use std::iter::FusedIterator;
@@ -23,12 +24,14 @@ use std::iter::FusedIterator;
 ///     case "ready":
 ///         ...
 /// ```
-pub(crate) fn match_subject_place_expressions(subject: &ast::Expr) -> SmallVec<[&ast::Expr; 2]> {
-    let mut expressions: SmallVec<[&ast::Expr; 2]> = SmallVec::new();
+pub(crate) fn match_subject_place_expressions(
+    subject: flat::View<'_, ast::Expr>,
+) -> SmallVec<[flat::View<'_, ast::Expr>; 2]> {
+    let mut expressions: SmallVec<[flat::View<'_, ast::Expr>; 2]> = SmallVec::new();
     expressions.push(subject);
-    match subject {
-        ast::Expr::Subscript(subscript) => expressions.push(&subscript.value),
-        ast::Expr::Attribute(attribute) => expressions.push(&attribute.value),
+    match subject.classify() {
+        flat::ExprKind::Subscript(subscript) => expressions.push(subscript.value()),
+        flat::ExprKind::Attribute(attribute) => expressions.push(attribute.value()),
         _ => {}
     }
     expressions
@@ -48,8 +51,8 @@ impl PlaceExpr {
     /// Create a new `PlaceExpr` from a name.
     ///
     /// This always returns a `PlaceExpr::Symbol` with empty flags and `name`.
-    pub fn from_expr_name(name: &ast::ExprName) -> Self {
-        PlaceExpr::Symbol(Symbol::new(name.id.clone()))
+    pub fn from_expr_name(name: flat::View<'_, ast::ExprName>) -> Self {
+        PlaceExpr::Symbol(Symbol::new(name.id().clone()))
     }
 
     /// Tries to create a `PlaceExpr` from an expression.
@@ -60,24 +63,18 @@ impl PlaceExpr {
     /// * name: `x`
     /// * attribute: `x.y`
     /// * subscripts with integer or string literals: `x[0]`, `x['key']`
-    pub fn try_from_expr<'e>(expr: impl Into<ast::ExprRef<'e>>) -> Option<Self> {
+    pub fn try_from_expr<'e>(expr: impl Into<flat::View<'e, ast::Expr>>) -> Option<Self> {
         let expr = expr.into();
 
         // For named expressions (walrus operator), extract the target. The grammar only permits
         // names as targets; parser recovery may still produce other expressions here.
-        let expr = match expr {
-            ast::ExprRef::Named(named) if named.target.is_name_expr() => {
-                named.target.as_ref().into()
-            }
-            ast::ExprRef::Named(_) => return None,
-            _ => expr,
+        let name = match expr.classify() {
+            flat::ExprKind::Named(named) => named.target().as_name_expr()?,
+            flat::ExprKind::Name(name) => name,
+            _ => return MemberExprBuilder::visit_expr(expr).and_then(Self::try_from_member_expr),
         };
 
-        if let ast::ExprRef::Name(name) = expr {
-            return Some(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
-        }
-
-        MemberExprBuilder::visit_expr(expr).and_then(Self::try_from_member_expr)
+        Some(Self::Symbol(Symbol::new(name.id().clone())))
     }
 
     /// Tries to create a `PlaceExpr` from a member expression.
@@ -626,7 +623,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
     }
 
     /// Compute possibly narrowed places for an expression predicate.
-    pub(crate) fn expression(self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
+    pub(crate) fn expression(self, expr: flat::View<'_, ast::Expr>) -> PossiblyNarrowedPlaces {
         self.expression_node(expr)
     }
 
@@ -639,38 +636,38 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         self.pattern_kind(pattern.subject(self.db), module)
     }
 
-    fn expression_node(&self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
-        match expr {
+    fn expression_node(&self, expr: flat::View<'_, ast::Expr>) -> PossiblyNarrowedPlaces {
+        match expr.classify() {
             // Simple expressions that directly narrow a place.
-            ast::Expr::Name(_) => self.simple_expr(expr),
+            flat::ExprKind::Name(_) => self.simple_expr(expr),
             // Attribute truthiness can also narrow its base (nominal tagged unions).
-            ast::Expr::Attribute(attribute) => {
+            flat::ExprKind::Attribute(attribute) => {
                 let mut places = self.simple_expr(expr);
-                places.extend(self.simple_expr(&attribute.value));
+                places.extend(self.simple_expr(attribute.value()));
                 places
             }
             // Subscript truthiness can also narrow its base (`TypedDict` and tuple unions).
-            ast::Expr::Subscript(subscript) => {
+            flat::ExprKind::Subscript(subscript) => {
                 let mut places = self.simple_expr(expr);
-                places.extend(self.simple_expr(&subscript.value));
+                places.extend(self.simple_expr(subscript.value()));
                 places
             }
             // Compare expressions can narrow places on either side
-            ast::Expr::Compare(expr_compare) => self.expr_compare(expr_compare),
+            flat::ExprKind::Compare(expr_compare) => self.expr_compare(expr_compare),
             // Call expressions (isinstance, issubclass, hasattr, TypeGuard, len, bool, etc.)
-            ast::Expr::Call(expr_call) => self.expr_call(expr_call),
+            flat::ExprKind::Call(expr_call) => self.expr_call(expr_call),
             // Unary not just delegates to its operand
-            ast::Expr::UnaryOp(unary_op) if unary_op.op == ast::UnaryOp::Not => {
-                self.expression_node(&unary_op.operand)
+            flat::ExprKind::UnaryOp(unary_op) if unary_op.op() == ast::UnaryOp::Not => {
+                self.expression_node(unary_op.operand())
             }
             // Boolean operations combine places from all sub-expressions
-            ast::Expr::BoolOp(bool_op) => self.expr_bool_op(bool_op),
+            flat::ExprKind::BoolOp(bool_op) => self.expr_bool_op(bool_op),
             // Conditional expressions combine places from all branches and the test.
-            ast::Expr::If(expr_if) => self.expr_if(expr_if),
+            flat::ExprKind::If(expr_if) => self.expr_if(expr_if),
             // Named expressions narrow both the target and the value
-            ast::Expr::Named(expr_named) => {
-                let mut places = self.simple_expr(&expr_named.target);
-                places.extend(self.expression_node(&expr_named.value));
+            flat::ExprKind::Named(expr_named) => {
+                let mut places = self.simple_expr(expr_named.target());
+                places.extend(self.expression_node(expr_named.value()));
                 places
             }
             _ => PossiblyNarrowedPlaces::default(),
@@ -678,7 +675,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
     }
 
     /// Simple expressions that directly narrow a single place.
-    fn simple_expr(&self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
+    fn simple_expr(&self, expr: flat::View<'_, ast::Expr>) -> PossiblyNarrowedPlaces {
         let mut places = PossiblyNarrowedPlaces::default();
         if let Some(place_expr) = PlaceExpr::try_from_expr(expr) {
             if let Some(place) = self.places.place_id((&place_expr).into()) {
@@ -690,30 +687,33 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
 
     /// Compare expressions can narrow places on either side of the comparison,
     /// and can also narrow subscript bases (for `TypedDict` and tuple narrowing).
-    fn expr_compare(&self, expr_compare: &ast::ExprCompare) -> PossiblyNarrowedPlaces {
+    fn expr_compare(
+        &self,
+        expr_compare: flat::View<'_, ast::ExprCompare>,
+    ) -> PossiblyNarrowedPlaces {
         let mut places = PossiblyNarrowedPlaces::default();
 
-        for operand in &expr_compare.operands {
+        for operand in expr_compare.operands() {
             self.add_narrowing_target(operand, &mut places);
         }
 
         let can_narrow_tagged_union_base = matches!(
-            &*expr_compare.ops,
-            [ast::CmpOp::Eq | ast::CmpOp::NotEq | ast::CmpOp::Is | ast::CmpOp::IsNot]
+            expr_compare.ops().as_array(),
+            Some([ast::CmpOp::Eq | ast::CmpOp::NotEq | ast::CmpOp::Is | ast::CmpOp::IsNot])
         );
 
         // Tagged-union checks can also narrow the base of a subscript or attribute on either side.
-        for expr in &expr_compare.operands {
+        for expr in expr_compare.operands() {
             if can_narrow_tagged_union_base
-                && let ast::Expr::Subscript(subscript) = expr.expression_value()
-                && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
+                && let flat::ExprKind::Subscript(subscript) = expr.expression_value().classify()
+                && let Some(place_expr) = PlaceExpr::try_from_expr(subscript.value())
                 && let Some(place) = self.places.place_id((&place_expr).into())
             {
                 places.insert(place);
             }
             if can_narrow_tagged_union_base
-                && let ast::Expr::Attribute(attribute) = expr
-                && let Some(place_expr) = PlaceExpr::try_from_expr(&attribute.value)
+                && let flat::ExprKind::Attribute(attribute) = expr.classify()
+                && let Some(place_expr) = PlaceExpr::try_from_expr(attribute.value())
                 && let Some(place) = self.places.place_id((&place_expr).into())
             {
                 places.insert(place);
@@ -725,7 +725,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
 
     /// Call expressions can narrow their first argument (isinstance, issubclass, hasattr, len)
     /// or narrow based on TypeGuard/TypeIs return types.
-    fn expr_call(&self, expr_call: &ast::ExprCall) -> PossiblyNarrowedPlaces {
+    fn expr_call(&self, expr_call: flat::View<'_, ast::ExprCall>) -> PossiblyNarrowedPlaces {
         let mut places = PossiblyNarrowedPlaces::default();
 
         // Under the current narrowing semantics, we only ever use the first two positional
@@ -734,13 +734,13 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         // narrow an explicit keyword argument. We don't know which keyword maps to the target
         // parameter while building the semantic index, so include every explicit keyword here.
         // This set is only a conservative upper bound.
-        for argument in expr_call.arguments.args.iter().take(2).chain(
+        for argument in expr_call.arguments().args().iter().take(2).chain(
             expr_call
-                .arguments
-                .keywords
+                .arguments()
+                .keywords()
                 .iter()
-                .filter(|keyword| keyword.arg.is_some())
-                .map(|keyword| &keyword.value),
+                .filter(|keyword| keyword.arg().is_some())
+                .map(flat::View::<ast::Keyword>::value),
         ) {
             if let Some(place_expr) = PlaceExpr::try_from_expr(argument)
                 && let Some(place) = self.places.place_id((&place_expr).into())
@@ -748,8 +748,8 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                 places.insert(place);
             }
             // Checking a tuple element can also eliminate alternatives of its tuple union.
-            if let ast::Expr::Subscript(subscript) = argument.expression_value()
-                && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
+            if let flat::ExprKind::Subscript(subscript) = argument.expression_value().classify()
+                && let Some(place_expr) = PlaceExpr::try_from_expr(subscript.value())
                 && let Some(place) = self.places.place_id((&place_expr).into())
             {
                 places.insert(place);
@@ -757,8 +757,10 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         }
 
         // `bool(expr)` can delegate to narrowing `expr` itself, e.g. `bool(x is not None)`
-        if let Some(first_arg) = expr_call.arguments.args.first() {
-            if expr_call.arguments.args.len() == 1 && expr_call.arguments.keywords.is_empty() {
+        if let Some(first_arg) = expr_call.arguments().args().first() {
+            if expr_call.arguments().args().len() == 1
+                && expr_call.arguments().keywords().is_empty()
+            {
                 places.extend(self.expression_node(first_arg));
             }
         }
@@ -767,33 +769,37 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
     }
 
     /// Boolean operations combine places from all sub-expressions.
-    fn expr_bool_op(&self, bool_op: &ast::ExprBoolOp) -> PossiblyNarrowedPlaces {
+    fn expr_bool_op(&self, bool_op: flat::View<'_, ast::ExprBoolOp>) -> PossiblyNarrowedPlaces {
         let mut places = PossiblyNarrowedPlaces::default();
-        for value in &bool_op.values {
+        for value in bool_op.values() {
             places.extend(self.expression_node(value));
         }
         places
     }
 
-    fn expr_if(&self, expr_if: &ast::ExprIf) -> PossiblyNarrowedPlaces {
-        let mut places = self.expression_node(&expr_if.test);
-        places.extend(self.expression_node(&expr_if.body));
-        places.extend(self.expression_node(&expr_if.orelse));
+    fn expr_if(&self, expr_if: flat::View<'_, ast::ExprIf>) -> PossiblyNarrowedPlaces {
+        let mut places = self.expression_node(expr_if.test());
+        places.extend(self.expression_node(expr_if.body()));
+        places.extend(self.expression_node(expr_if.orelse()));
         places
     }
 
     /// Helper to add a potential narrowing target expression to the set.
-    fn add_narrowing_target(&self, expr: &ast::Expr, places: &mut PossiblyNarrowedPlaces) {
+    fn add_narrowing_target(
+        &self,
+        expr: flat::View<'_, ast::Expr>,
+        places: &mut PossiblyNarrowedPlaces,
+    ) {
         if let Some(place_expr) = PlaceExpr::try_from_expr(expr)
             && let Some(place) = self.places.place_id((&place_expr).into())
         {
             places.insert(place);
         }
 
-        match expr.expression_value() {
+        match expr.expression_value().classify() {
             // type(x) is Y can narrow x
-            ast::Expr::Call(call) if call.arguments.args.len() == 1 => {
-                if let Some(first_arg) = call.arguments.args.first()
+            flat::ExprKind::Call(call) if call.arguments().args().len() == 1 => {
+                if let Some(first_arg) = call.arguments().args().first()
                     && let Some(place_expr) = PlaceExpr::try_from_expr(first_arg)
                     && let Some(place) = self.places.place_id((&place_expr).into())
                 {
@@ -801,8 +807,8 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                 }
             }
             // x.__class__ is Y can narrow x
-            ast::Expr::Attribute(attribute) if attribute.attr.as_str() == "__class__" => {
-                if let Some(place_expr) = PlaceExpr::try_from_expr(&attribute.value)
+            flat::ExprKind::Attribute(attribute) if attribute.attr().as_str() == "__class__" => {
+                if let Some(place_expr) = PlaceExpr::try_from_expr(attribute.value())
                     && let Some(place) = self.places.place_id((&place_expr).into())
                 {
                     places.insert(place);

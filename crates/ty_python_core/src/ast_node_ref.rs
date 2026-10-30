@@ -6,8 +6,8 @@ use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 #[cfg(debug_assertions)]
 use ruff_python_ast::PythonVersion;
-use ruff_python_ast::{AnyNodeRef, NodeIndex};
-use ruff_python_ast::{AnyRootNodeRef, HasNodeIndex};
+use ruff_python_ast::{NodeIndex, flat};
+#[cfg(debug_assertions)]
 use ruff_text_size::Ranged;
 
 /// Reference to an AST node.
@@ -56,46 +56,9 @@ pub struct AstNodeRef<T> {
 }
 
 impl<T> AstNodeRef<T> {
-    pub fn index(&self) -> NodeIndex {
-        self.index
-    }
-}
-
-impl<T> AstNodeRef<T>
-where
-    T: HasNodeIndex + Ranged + PartialEq + Debug,
-    for<'ast> AnyNodeRef<'ast>: From<&'ast T>,
-    for<'ast> &'ast T: TryFrom<AnyRootNodeRef<'ast>>,
-{
-    /// Creates a new `AstNodeRef` that references `node`.
-    ///
-    /// This method may panic or produce unspecified results if the provided module is from a
-    /// different file, Python version, or Salsa revision than the module to which the node belongs.
-    pub fn new(module_ref: &ParsedModuleRef, node: &T) -> Self {
-        let index = node.node_index().load();
-        debug_assert_eq!(module_ref.get_by_index(index).try_into().ok(), Some(node));
-
-        Self {
-            index,
-            #[cfg(debug_assertions)]
-            file: module_ref.module().file(),
-            #[cfg(debug_assertions)]
-            python_version: module_ref.module().python_version(),
-            #[cfg(debug_assertions)]
-            kind: AnyNodeRef::from(node).kind(),
-            #[cfg(debug_assertions)]
-            range: node.range(),
-            _node: PhantomData,
-        }
-    }
-
-    /// Returns a reference to the wrapped node.
-    ///
-    /// This method may panic or produce unspecified results if the provided module is from a
-    /// different file, Python version, or Salsa revision than the module to which the node belongs.
-    #[track_caller]
-    pub fn node<'ast>(&self, module_ref: &'ast ParsedModuleRef) -> &'ast T {
-        #[cfg(debug_assertions)]
+    #[cfg(debug_assertions)]
+    #[inline]
+    fn check_module(&self, module_ref: &ParsedModuleRef) {
         assert_eq!(
             (
                 module_ref.module().file(),
@@ -104,13 +67,41 @@ where
             (self.file, self.python_version),
             "an `AstNodeRef` cannot be used with a module parsed for a different file or Python version"
         );
-        // The user guarantees that the module is from the same file, Python version, and Salsa
-        // revision, so the file contents cannot have changed.
+    }
+
+    /// Resolves the stable source-order index in this parse.
+    #[track_caller]
+    pub fn node<'ast>(&self, module_ref: &'ast ParsedModuleRef) -> flat::View<'ast, T>
+    where
+        T: flat::Node,
+    {
+        #[cfg(debug_assertions)]
+        self.check_module(module_ref);
         module_ref
             .get_by_index(self.index)
-            .try_into()
-            .ok()
+            .cast()
             .expect("AST indices should never change within the same revision")
+    }
+
+    pub fn from_view(module_ref: &ParsedModuleRef, node: flat::View<'_, T>) -> Self {
+        let index = node.node_index();
+        debug_assert!(module_ref.get_by_index(index).is_same_node(node));
+        Self {
+            index,
+            #[cfg(debug_assertions)]
+            file: module_ref.module().file(),
+            #[cfg(debug_assertions)]
+            python_version: module_ref.module().python_version(),
+            #[cfg(debug_assertions)]
+            kind: node.erase().node_kind(),
+            #[cfg(debug_assertions)]
+            range: node.range(),
+            _node: PhantomData,
+        }
+    }
+
+    pub fn index(&self) -> NodeIndex {
+        self.index
     }
 }
 
@@ -120,7 +111,6 @@ impl<T> get_size2::GetSize for AstNodeRef<T> {}
 impl<T> Debug for AstNodeRef<T>
 where
     T: Debug,
-    for<'ast> &'ast T: TryFrom<AnyRootNodeRef<'ast>>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         cfg_select! {
@@ -162,9 +152,9 @@ mod tests {
             parsed_module(&db, PythonFile::new(&db, file, PythonVersion::PY311)).load(&db);
         let parsed_py312 =
             parsed_module(&db, PythonFile::new(&db, file, PythonVersion::PY312)).load(&db);
-        let assignment = parsed_py311.syntax().body[0].as_assign_stmt().unwrap();
+        let assignment = parsed_py311.suite().at(0).as_assign_stmt().unwrap();
 
-        let node = AstNodeRef::new(&parsed_py311, assignment);
+        let node = AstNodeRef::from_view(&parsed_py311, assignment);
         node.node(&parsed_py312);
     }
 }

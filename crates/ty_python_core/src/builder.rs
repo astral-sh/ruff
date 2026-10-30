@@ -4,17 +4,22 @@ use std::sync::Arc;
 
 use except_handlers::{ExceptionContextStackManager, ExceptionHandlers};
 use itertools::Itertools;
-use ruff_python_ast::helpers::{Truthiness, any_over_expr, is_dotted_name};
+use ruff_python_ast::flat::helpers::{any_over_expr, is_dotted_name};
+use ruff_python_ast::helpers::Truthiness;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
 use ruff_db::parsed::ParsedModuleRef;
 
 use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
+use ruff_python_ast::flat::visitor::{Visitor, walk_expr, walk_keyword, walk_pattern, walk_stmt};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::visitor::{Visitor, walk_expr, walk_keyword, walk_pattern, walk_stmt};
 use ruff_python_ast::{
-    self as ast, AtomicNodeIndex, HasNodeIndex, NodeIndex, PySourceType, PythonVersion,
+    BoolOp, CmpOp, Comprehension, ElifElseClause, Expr, ExprBoolOp, ExprContext, ExprIf,
+    ExprLambda, ExprNamed, Identifier, Keyword, MAX_REAL_INDEX, NodeIndex, Number,
+    ParameterWithDefault, Parameters, Pattern, PatternKeyword, PySourceType, PythonVersion, Stmt,
+    StmtAnnAssign, StmtAssign, StmtAugAssign, StmtFor, TypeParams, UnaryOp, WithItem,
+    flat::{self, fields as ast},
 };
 use ruff_python_parser::semantic_errors::{
     LazyImportContext, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
@@ -95,7 +100,7 @@ struct Loop {
 #[derive(Clone, Debug)]
 struct NarrowingAlias<'ast> {
     /// The RHS expression (e.g., `x is None`).
-    expression: &'ast ast::Expr,
+    expression: flat::View<'ast, Expr>,
     /// The scope whose place table should be used to resolve the aliased expression.
     expression_scope: FileScopeId,
     /// Places that, if reassigned, should invalidate this alias.
@@ -204,10 +209,10 @@ struct ConditionFlowSnapshots {
 }
 
 impl ConditionFlowSnapshots {
-    fn into_short_circuit_and_continuation(self, op: ast::BoolOp) -> (FlowSnapshot, FlowSnapshot) {
+    fn into_short_circuit_and_continuation(self, op: BoolOp) -> (FlowSnapshot, FlowSnapshot) {
         match op {
-            ast::BoolOp::And => (self.falsy, self.truthy),
-            ast::BoolOp::Or => (self.truthy, self.falsy),
+            BoolOp::And => (self.falsy, self.truthy),
+            BoolOp::Or => (self.truthy, self.falsy),
         }
     }
 }
@@ -277,7 +282,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes: IndexVec<FileScopeId, Scope>,
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
     place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
-    ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
+    ast_ids: AstIdsBuilder,
     // Box to avoid copying large builders when this index grows.
     use_def_maps: IndexVec<FileScopeId, Box<UseDefMapBuilder<'db>>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
@@ -340,7 +345,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             scopes: IndexVec::new(),
             place_tables: IndexVec::new(),
-            ast_ids: IndexVec::new(),
+            ast_ids: AstIdsBuilder::default(),
             scope_ids_by_scope: IndexVec::new(),
             use_def_maps: IndexVec::new(),
 
@@ -366,7 +371,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             resolver_environment: file.resolver_environment(db),
             python_version: file.python_version(db),
             source_text: OnceCell::new(),
-            semantic_checker: SemanticSyntaxChecker::default(),
+            semantic_checker: SemanticSyntaxChecker::new(module_ref.ast()),
             in_try_statement: false,
             semantic_syntax_errors: RefCell::default(),
             narrowing_aliases: FxHashMap::default(),
@@ -533,7 +538,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.place_tables.push(PlaceTableBuilder::default());
         self.use_def_maps
             .push(Box::new(UseDefMapBuilder::new(scope_kind)));
-        let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
+        let ast_id_scope = self.ast_ids.push_scope();
 
         let scope_id = ScopeId::new(self.db, self.file, file_scope_id);
 
@@ -1125,24 +1130,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self.use_def_maps[scope_id].reachability_constraints
     }
 
-    fn current_ast_ids(&self) -> &AstIdsBuilder {
-        let scope_id = self.current_scope();
-        &self.ast_ids[scope_id]
-    }
-
-    fn current_ast_ids_mut(&mut self) -> &mut AstIdsBuilder {
-        let scope_id = self.current_scope();
-        &mut self.ast_ids[scope_id]
-    }
-
     /// If the given expression is a use of an unannotated collection initializer, returns
     /// the definition of the initializer.
     fn unannotated_collection_initializer_binding(
         &self,
-        collection_use: &ast::Expr,
+        collection_use: flat::View<'_, Expr>,
     ) -> Option<Definition<'db>> {
         let use_def = self.current_use_def_map();
-        let use_id = self.current_ast_ids().try_use_id(collection_use)?;
+        let use_id = self
+            .ast_ids
+            .try_use_id(self.current_scope(), collection_use)?;
 
         use_def
             .bindings_at_use(use_id)
@@ -1163,7 +1160,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn unannotated_collection_literal_binding(
         &self,
-        collection_use: &ast::Expr,
+        collection_use: flat::View<'_, Expr>,
     ) -> Option<Definition<'db>> {
         let definition = self.unannotated_collection_initializer_binding(collection_use)?;
         definition
@@ -1178,12 +1175,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Any pre-existing alias entry for the `target` name has already been removed by
     /// [`Self::invalidate_narrowing_aliases_for`] in the binding pathway that ran before
     /// this call, so we only need to decide whether to insert a new entry.
-    fn try_register_narrowing_alias(&mut self, target: &ast::Expr, value: Option<&'ast ast::Expr>) {
+    fn try_register_narrowing_alias(
+        &mut self,
+        target: flat::View<'_, Expr>,
+        value: Option<flat::View<'ast, Expr>>,
+    ) {
         let Some(target_name_expr) = target.as_name_expr() else {
             return;
         };
         let Some(value) = value else { return };
-        let target_name = &target_name_expr.id;
+        let target_name = target_name_expr.id();
 
         if !Self::can_register_narrowing_alias(value) {
             return;
@@ -1240,24 +1241,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         });
     }
 
-    fn can_register_narrowing_alias(value: &ast::Expr) -> bool {
-        match value {
+    fn can_register_narrowing_alias(value: flat::View<'_, Expr>) -> bool {
+        match value.classify() {
             // Bare names are too common to treat as alias candidates on every assignment,
             // and doing so would noticeably degrade performance. Excluding them only means
             // we don't infer truthiness narrowing for arbitrary chained aliases.
-            ast::Expr::Name(_) => false,
-            ast::Expr::Compare(_) | ast::Expr::Call(_) => true,
-            ast::Expr::UnaryOp(unary) if unary.op == ast::UnaryOp::Not => {
-                Self::can_register_narrowing_alias(&unary.operand)
+            flat::ExprKind::Name(_) => false,
+            flat::ExprKind::Compare(_) | flat::ExprKind::Call(_) => true,
+            flat::ExprKind::UnaryOp(unary) if unary.op() == UnaryOp::Not => {
+                Self::can_register_narrowing_alias(unary.operand())
             }
-            ast::Expr::BoolOp(bool_op) => bool_op
-                .values
+            flat::ExprKind::BoolOp(bool_op) => bool_op
+                .values()
                 .iter()
                 .any(Self::can_register_narrowing_alias),
-            ast::Expr::If(expr_if) => {
-                Self::can_register_narrowing_alias(&expr_if.test)
-                    || Self::can_register_narrowing_alias(&expr_if.body)
-                    || Self::can_register_narrowing_alias(&expr_if.orelse)
+            flat::ExprKind::If(expr_if) => {
+                Self::can_register_narrowing_alias(expr_if.test())
+                    || Self::can_register_narrowing_alias(expr_if.body())
+                    || Self::can_register_narrowing_alias(expr_if.orelse())
             }
             _ => false,
         }
@@ -1266,56 +1267,60 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Walk a predicate expression tree, calling `f` on each leaf position
     /// where an alias Name could appear.
     fn walk_narrowing_alias_predicate<'expr>(
-        expr: &'expr ast::Expr,
-        f: &mut impl FnMut(&'expr ast::Expr),
+        expr: flat::View<'expr, Expr>,
+        f: &mut impl FnMut(flat::View<'expr, Expr>),
     ) {
-        match expr {
-            ast::Expr::Name(_) => f(expr),
-            ast::Expr::UnaryOp(unary) if unary.op == ast::UnaryOp::Not => {
-                Self::walk_narrowing_alias_predicate(&unary.operand, f);
+        match expr.classify() {
+            flat::ExprKind::Name(_) => f(expr),
+            flat::ExprKind::UnaryOp(unary) if unary.op() == UnaryOp::Not => {
+                Self::walk_narrowing_alias_predicate(unary.operand(), f);
             }
-            ast::Expr::BoolOp(bool_op) => {
-                for value in &bool_op.values {
+            flat::ExprKind::BoolOp(bool_op) => {
+                for value in bool_op.values() {
                     Self::walk_narrowing_alias_predicate(value, f);
                 }
             }
-            ast::Expr::Call(call) => {
-                for arg in &call.arguments.args {
+            flat::ExprKind::Call(call) => {
+                for arg in call.arguments().args() {
                     Self::walk_narrowing_alias_predicate(arg, f);
                 }
-                for keyword in &call.arguments.keywords {
-                    Self::walk_narrowing_alias_predicate(&keyword.value, f);
+                for keyword in call.arguments().keywords() {
+                    Self::walk_narrowing_alias_predicate(keyword.value(), f);
                 }
             }
-            ast::Expr::If(expr_if) => {
-                Self::walk_narrowing_alias_predicate(&expr_if.test, f);
-                Self::walk_narrowing_alias_predicate(&expr_if.body, f);
-                Self::walk_narrowing_alias_predicate(&expr_if.orelse, f);
+            flat::ExprKind::If(expr_if) => {
+                Self::walk_narrowing_alias_predicate(expr_if.test(), f);
+                Self::walk_narrowing_alias_predicate(expr_if.body(), f);
+                Self::walk_narrowing_alias_predicate(expr_if.orelse(), f);
             }
-            ast::Expr::Named(expr_named) => {
-                Self::walk_narrowing_alias_predicate(&expr_named.value, f);
+            flat::ExprKind::Named(expr_named) => {
+                Self::walk_narrowing_alias_predicate(expr_named.value(), f);
             }
             _ => {}
         }
     }
 
     /// Register alias predicates for alias Names found in a predicate expression.
-    fn register_narrowing_alias_predicates(&mut self, expr: &'ast ast::Expr) {
+    fn register_narrowing_alias_predicates(&mut self, expr: flat::View<'ast, Expr>) {
         Self::walk_narrowing_alias_predicate(expr, &mut |leaf| {
             let Some(name) = leaf.as_name_expr() else {
                 return;
             };
-            let Some(alias) = self.narrowing_aliases.get(&name.id) else {
+            let Some(alias) = self.narrowing_aliases.get(name.id()) else {
                 return;
             };
-            if self.current_ast_ids().try_use_id(leaf).is_none() {
+            if self
+                .ast_ids
+                .try_use_id(self.current_scope(), leaf)
+                .is_none()
+            {
                 return;
             }
 
             let aliased_expression = Expression::new(
                 self.db,
                 self.scope_ids_by_scope[alias.expression_scope],
-                AstNodeRef::new(self.module, alias.expression),
+                AstNodeRef::from_view(self.module, alias.expression),
                 None,
                 ExpressionKind::Normal,
             );
@@ -1329,7 +1334,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Add narrowed places from aliased expressions to the possibly-narrowed set.
-    fn add_alias_narrowed_places(&self, expr: &ast::Expr, places: &mut PossiblyNarrowedPlaces) {
+    fn add_alias_narrowed_places(
+        &self,
+        expr: flat::View<'_, Expr>,
+        places: &mut PossiblyNarrowedPlaces,
+    ) {
         Self::walk_narrowing_alias_predicate(expr, &mut |leaf| {
             let key = ExpressionNodeKey::from(leaf);
             if let Some(alias_predicate) = self.alias_predicates.get(&key) {
@@ -1353,14 +1362,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// leave different bindings behind depending on the condition outcome.
     fn take_condition_flow_snapshots(
         &mut self,
-        expr: &ast::Expr,
+        expr: flat::View<'_, Expr>,
     ) -> Option<ConditionFlowSnapshots> {
-        match expr {
-            ast::Expr::BoolOp(_) => self
+        match expr.classify() {
+            flat::ExprKind::BoolOp(_) => self
                 .condition_flow_snapshots_by_node
                 .remove(&ExpressionNodeKey::from(expr)),
-            ast::Expr::UnaryOp(unary_op) if unary_op.op == ast::UnaryOp::Not => {
-                let snapshots = self.take_condition_flow_snapshots(&unary_op.operand)?;
+            flat::ExprKind::UnaryOp(unary_op) if unary_op.op() == UnaryOp::Not => {
+                let snapshots = self.take_condition_flow_snapshots(unary_op.operand())?;
                 Some(ConditionFlowSnapshots {
                     truthy: snapshots.falsy,
                     falsy: snapshots.truthy,
@@ -1370,7 +1379,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn flow_snapshot_for_condition(&mut self, condition: &ast::Expr) -> ConditionFlowSnapshot {
+    fn flow_snapshot_for_condition(
+        &mut self,
+        condition: flat::View<'_, Expr>,
+    ) -> ConditionFlowSnapshot {
         self.record_exception_checkpoint_if(!Self::condition_evaluation_is_known_safe(condition));
 
         if let Some(snapshots) = self.take_condition_flow_snapshots(condition) {
@@ -1423,15 +1435,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_place_table_mut().symbol_mut(id).mark_used();
     }
 
-    fn record_place_use(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
+    fn record_place_use(&mut self, place_id: ScopedPlaceId, expr: flat::View<'ast, Expr>) {
         if let ScopedPlaceId::Symbol(symbol_id) = place_id {
             self.mark_symbol_used(symbol_id);
         }
-        let use_id = self.current_ast_ids_mut().record_use(expr);
+        let use_id = self.ast_ids.record_use(self.current_scope(), expr);
         self.current_use_def_map_mut().record_use(place_id, use_id);
     }
 
-    fn record_place_definition(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
+    fn record_place_definition(&mut self, place_id: ScopedPlaceId, expr: flat::View<'ast, Expr>) {
         match self.current_assignment() {
             Some(CurrentAssignment::Assign {
                 node,
@@ -1442,19 +1454,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     place_id,
                     AssignmentDefinitionNodeRef {
                         unpack,
-                        value: &node.value,
+                        value: node.value(),
                         target: expr,
                         owner,
                     },
                 );
 
-                self.add_dict_key_assignment_definitions(&node.targets, &node.value, assignment);
+                self.add_dict_key_assignment_definitions(node.targets(), node.value(), assignment);
             }
             Some(CurrentAssignment::AnnAssign {
                 node: ann_assign,
                 pending,
             }) => {
-                self.add_standalone_type_expression(&ann_assign.annotation);
+                self.add_standalone_type_expression(ann_assign.annotation());
                 let assignment = if let Some(pending) = pending {
                     self.finish_annotated_assignment(pending)
                 } else {
@@ -1464,9 +1476,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     )
                 };
 
-                if let Some(value) = ann_assign.value.as_deref() {
+                if let Some(value) = ann_assign.value() {
                     self.add_dict_key_assignment_definitions(
-                        [&*ann_assign.target],
+                        [ann_assign.target()],
                         value,
                         assignment,
                     );
@@ -1486,7 +1498,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 );
             }
             Some(CurrentAssignment::Named(named)) => {
-                self.mark_comprehension_named_target(place_id, named.target.range());
+                self.mark_comprehension_named_target(place_id, named.target().range());
                 self.add_definition(place_id, named);
             }
             Some(CurrentAssignment::Comprehension {
@@ -1533,7 +1545,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///
     /// This method panics if `debug_assertions` are enabled and the `definition_node` AST node
     /// already has a [`Definition`] associated with it. This is an important invariant to maintain
-    /// for all nodes *except* [`ast::Alias`] nodes representing `*` imports.
+    /// for all nodes *except* [`ruff_python_ast::Alias`] nodes representing `*` imports.
     fn add_definition(
         &mut self,
         place: ScopedPlaceId,
@@ -1684,14 +1696,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Other targets and annotations without a RHS are recorded in full by `add_definition`.
     fn begin_annotated_assignment(
         &mut self,
-        node: &'ast ast::StmtAnnAssign,
+        node: flat::View<'ast, StmtAnnAssign>,
     ) -> Option<PendingAnnotatedAssignment<'db>> {
-        let ast::Expr::Name(name) = &*node.target else {
+        let flat::ExprKind::Name(name) = node.target().classify() else {
             return None;
         };
-        node.value.as_ref()?;
+        node.value()?;
 
-        let place = self.add_symbol(name.id.clone()).into();
+        let place = self.add_symbol(name.id().clone()).into();
         let definition =
             self.create_definition(place, AnnotatedAssignmentDefinitionNodeRef { node });
         self.mark_place_declared(place);
@@ -1757,8 +1769,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     // If there are multiple targets, no definitions will be created.
     fn add_dict_key_assignment_definitions(
         &mut self,
-        targets: impl IntoIterator<Item = &'ast ast::Expr> + Copy,
-        dict: &'ast ast::Expr,
+        targets: impl IntoIterator<Item = flat::View<'ast, Expr>> + Copy,
+        dict: flat::View<'ast, Expr>,
         assignment: Definition<'db>,
     ) {
         // TODO: Although we synthesize place expressions for each dictionary key, the definition
@@ -1768,21 +1780,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             return;
         };
 
-        if let Some(target) = MemberExprBuilder::visit_expr(target.into()) {
-            self.add_dict_key_assignment_definitions_impl(&target, dict.into(), assignment);
+        if let Some(target) = MemberExprBuilder::visit_expr(target) {
+            self.add_dict_key_assignment_definitions_impl(&target, dict, assignment);
         }
     }
 
     fn add_dict_key_assignment_definitions_impl(
         &mut self,
         target: &MemberExprBuilder,
-        expr: ast::ExprRef<'ast>,
+        expr: flat::View<'ast, Expr>,
         assignment: Definition<'db>,
     ) {
-        let ruff_python_ast::ExprRef::Dict(dict) = expr else {
-            let items = match expr {
-                ruff_python_ast::ExprRef::List(list) => &list.elts,
-                ruff_python_ast::ExprRef::Tuple(tuple) => &tuple.elts,
+        let kind = expr.classify();
+        let flat::ExprKind::Dict(dict) = kind else {
+            let items = match kind {
+                flat::ExprKind::List(list) => list.elts(),
+                flat::ExprKind::Tuple(tuple) => tuple.elts(),
                 _ => return,
             };
 
@@ -1794,23 +1807,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .take_while(|e| !e.is_starred_expr())
                 .enumerate()
             {
-                if let Some(target) = MemberExprBuilder::visit_subscript_expr(
-                    target,
-                    &ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                        value: ast::Number::Int(ast::Int::from(i as u64)),
-                        range: TextRange::default(),
-                        node_index: AtomicNodeIndex::NONE,
-                    }),
-                ) {
-                    self.add_dict_key_assignment_definitions_impl(&target, item.into(), assignment);
-                }
+                let target = target.with_integer_subscript(i);
+                self.add_dict_key_assignment_definitions_impl(&target, item, assignment);
             }
             return;
         };
 
-        for item in &dict.items {
-            let Some(key) = item.key.as_ref() else {
-                if let ast::Expr::Dict(unpacked) = &item.value {
+        for item in dict.items() {
+            let Some(key) = item.key else {
+                if let flat::ExprKind::Dict(unpacked) = item.value.classify() {
                     // The unpacked keys belong to the same target. Recording them in order
                     // lets later items replace earlier bindings, including nested keys.
                     self.add_dict_key_assignment_definitions_impl(
@@ -1834,7 +1839,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     DictKeyAssignmentNodeRef {
                         key,
                         assignment,
-                        value: &item.value,
+                        value: item.value,
                     },
                 );
 
@@ -1842,11 +1847,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 //
                 // Note that we must do this _after_ adding the outer place in order to track
                 // sub-member places correctly.
-                self.add_dict_key_assignment_definitions_impl(
-                    &member_expr,
-                    (&item.value).into(),
-                    assignment,
-                );
+                self.add_dict_key_assignment_definitions_impl(&member_expr, item.value, assignment);
             }
         }
     }
@@ -2207,7 +2208,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn record_expression_narrowing_constraint(
         &mut self,
-        predicate_node: &'ast ast::Expr,
+        predicate_node: flat::View<'ast, Expr>,
     ) -> (PredicateOrLiteral<'db>, ScopedPredicateId) {
         let predicate = self.build_predicate(predicate_node, ExpressionContext::Condition, None);
         let predicate_id = self.record_narrowing_constraint(predicate);
@@ -2216,7 +2217,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn build_predicate(
         &mut self,
-        predicate_node: &'ast ast::Expr,
+        predicate_node: flat::View<'ast, Expr>,
         context: ExpressionContext,
         registered: Option<Expression<'db>>,
     ) -> PredicateOrLiteral<'db> {
@@ -2224,19 +2225,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // or `false` here for performance reasons. This list does not need to
         // be exhaustive. More complex expressions will still evaluate to the
         // correct value during type-checking.
-        fn resolve_to_literal(node: &ast::Expr) -> Option<bool> {
-            match node {
-                ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some(*value),
-                node if is_if_type_checking(node) => Some(true),
+        fn resolve_to_literal(node: flat::View<'_, Expr>) -> Option<bool> {
+            match node.fields() {
+                ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some(value),
+                node if is_if_type_checking(node.view()) => Some(true),
                 ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: ast::Number::Int(n),
+                    value: Number::Int(n),
                     ..
                 }) => Some(*n != 0),
                 ast::Expr::EllipsisLiteral(_) => Some(true),
                 ast::Expr::Lambda(_) | ast::Expr::Generator(_) => Some(true),
                 ast::Expr::NoneLiteral(_) => Some(false),
                 ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                    op: ast::UnaryOp::Not,
+                    op: UnaryOp::Not,
                     operand,
                     ..
                 }) => Some(!resolve_to_literal(operand)?),
@@ -2261,7 +2262,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         })
     }
 
-    fn visit_condition(&mut self, test: &'ast ast::Expr) {
+    fn visit_condition(&mut self, test: flat::View<'ast, Expr>) {
         self.visit_boolean_test(test, ExpressionContext::Condition);
     }
 
@@ -2326,12 +2327,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// the scope ID lets `visit_boolean_test` recognize that the test of `ready` inside the
     /// `lambda` needs its own entry. This field is temporary visitor state; only the recorded
     /// expression node IDs are retained in the semantic index.
-    fn visit_boolean_test(&mut self, test: &'ast ast::Expr, context: ExpressionContext) {
+    fn visit_boolean_test(&mut self, test: flat::View<'ast, Expr>, context: ExpressionContext) {
         let scope = self.current_scope();
         let previous = self.active_boolean_test_scope.replace(scope);
         if previous != Some(scope) {
             self.current_use_def_map_mut()
-                .record_boolean_test_root(test.node_index().load());
+                .record_boolean_test_root(test.node_index());
         }
         self.visit_expr_with_context(test, context);
         self.active_boolean_test_scope = previous;
@@ -2506,8 +2507,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///
     /// Only a definitely bound name in the current flow state is known to be safe. In particular,
     /// a builtin-looking name may be shadowed by a local binding that has not been visited yet.
-    fn place_access_can_raise(&mut self, expr: &ast::Expr, is_use: bool) -> bool {
-        let ast::Expr::Name(name) = expr else {
+    fn place_access_can_raise(&mut self, expr: flat::View<'_, Expr>, is_use: bool) -> bool {
+        let flat::ExprKind::Name(name) = expr.classify() else {
             return true;
         };
 
@@ -2517,7 +2518,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .has_active_exception_handler(self)
             && self
                 .current_place_table()
-                .symbol_id(name.id.as_str())
+                .symbol_id(name.id().as_str())
                 .is_none_or(|symbol| {
                     self.current_use_def_map_mut()
                         .symbol_live_binding_status(symbol)
@@ -2533,29 +2534,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// if value is None: ...  # safe
     /// if value: ...  # can raise
     /// ```
-    fn condition_evaluation_is_known_safe(expr: &ast::Expr) -> bool {
-        if expr.is_literal_expr() || matches!(expr, ast::Expr::Lambda(_)) {
+    fn condition_evaluation_is_known_safe(expr: flat::View<'_, Expr>) -> bool {
+        if expr.is_literal_expr() || matches!(expr.classify(), flat::ExprKind::Lambda(_)) {
             return true;
         }
 
-        match expr {
-            ast::Expr::Named(named) if named.target.is_name_expr() => {
-                Self::condition_evaluation_is_known_safe(&named.value)
+        match expr.classify() {
+            flat::ExprKind::Named(named) if named.target().is_name_expr() => {
+                Self::condition_evaluation_is_known_safe(named.value())
             }
-            ast::Expr::List(_) | ast::Expr::Tuple(_) => {
+            flat::ExprKind::List(_) | flat::ExprKind::Tuple(_) => {
                 Self::expression_evaluation_is_known_safe(expr)
             }
-            ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
+            flat::ExprKind::BoolOp(expr_bool_op) => {
+                let values = expr_bool_op.values();
+
                 values.iter().all(Self::condition_evaluation_is_known_safe)
             }
-            ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                op: ast::UnaryOp::Not,
-                operand,
-                ..
-            }) => Self::condition_evaluation_is_known_safe(operand),
-            ast::Expr::Compare(ast::ExprCompare { ops, operands, .. }) => {
-                ops.iter()
-                    .all(|op| matches!(op, ast::CmpOp::Is | ast::CmpOp::IsNot))
+            flat::ExprKind::UnaryOp(expr_unary_op) if expr_unary_op.op() == UnaryOp::Not => {
+                let operand = expr_unary_op.operand();
+                Self::condition_evaluation_is_known_safe(operand)
+            }
+            flat::ExprKind::Compare(expr_compare) => {
+                let ops = expr_compare.ops();
+                let operands = expr_compare.operands();
+
+                ops.iter().all(|op| matches!(op, CmpOp::Is | CmpOp::IsNot))
                     && operands
                         .iter()
                         .all(Self::expression_evaluation_is_known_safe)
@@ -2568,14 +2572,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///
     /// Unlike [`Self::condition_evaluation_is_known_safe`], this does not truth-test the resulting
     /// value, so loading a name is safe even when that value's `__bool__` method could raise.
-    fn expression_evaluation_is_known_safe(expr: &ast::Expr) -> bool {
-        if expr.is_literal_expr() || matches!(expr, ast::Expr::Name(_) | ast::Expr::Lambda(_)) {
+    fn expression_evaluation_is_known_safe(expr: flat::View<'_, Expr>) -> bool {
+        if expr.is_literal_expr()
+            || matches!(
+                expr.classify(),
+                flat::ExprKind::Name(_) | flat::ExprKind::Lambda(_)
+            )
+        {
             return true;
         }
 
-        match expr {
-            ast::Expr::Named(named) if named.target.is_name_expr() => {
-                Self::expression_evaluation_is_known_safe(&named.value)
+        match expr.fields() {
+            ast::Expr::Named(ast::ExprNamed { node: named, .. })
+                if named.target().is_name_expr() =>
+            {
+                Self::expression_evaluation_is_known_safe(named.value())
             }
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
@@ -2593,13 +2604,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// for value in [1, 2]: ...  # safe
     /// for value in values: ...  # can invoke user-defined iteration
     /// ```
-    fn iteration_is_known_safe(expr: &ast::Expr) -> bool {
+    fn iteration_is_known_safe(expr: flat::View<'_, Expr>) -> bool {
         matches!(
-            expr,
-            ast::Expr::StringLiteral(_)
-                | ast::Expr::BytesLiteral(_)
-                | ast::Expr::List(_)
-                | ast::Expr::Tuple(_)
+            expr.classify(),
+            flat::ExprKind::StringLiteral(_)
+                | flat::ExprKind::BytesLiteral(_)
+                | flat::ExprKind::List(_)
+                | flat::ExprKind::Tuple(_)
         ) && Self::expression_evaluation_is_known_safe(expr)
     }
 
@@ -2677,128 +2688,126 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Return whether a pattern contains any capture that changes the current flow state.
-    fn pattern_has_bindings(pattern: &ast::Pattern) -> bool {
-        match pattern {
+    fn pattern_has_bindings(pattern: flat::View<'_, Pattern>) -> bool {
+        match pattern.fields() {
             ast::Pattern::MatchValue(_) | ast::Pattern::MatchSingleton(_) => false,
             ast::Pattern::MatchSequence(ast::PatternMatchSequence { patterns, .. })
             | ast::Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
                 patterns.iter().any(Self::pattern_has_bindings)
             }
-            ast::Pattern::MatchMapping(pattern) => {
-                pattern.rest.is_some() || pattern.patterns.iter().any(Self::pattern_has_bindings)
+            ast::Pattern::MatchMapping(ast::PatternMatchMapping { node: pattern, .. }) => {
+                pattern.rest().is_some()
+                    || pattern.patterns().iter().any(Self::pattern_has_bindings)
             }
-            ast::Pattern::MatchClass(pattern) => pattern
-                .arguments
-                .patterns
+            ast::Pattern::MatchClass(ast::PatternMatchClass { node: pattern, .. }) => pattern
+                .arguments()
+                .patterns()
                 .iter()
                 .chain(
                     pattern
-                        .arguments
-                        .keywords
+                        .arguments()
+                        .keywords()
                         .iter()
-                        .map(|keyword| &keyword.pattern),
+                        .map(flat::View::<PatternKeyword>::pattern),
                 )
                 .any(Self::pattern_has_bindings),
-            ast::Pattern::MatchStar(pattern) => pattern.name.is_some(),
-            ast::Pattern::MatchAs(pattern) => {
-                pattern.name.is_some()
-                    || pattern
-                        .pattern
-                        .as_deref()
-                        .is_some_and(Self::pattern_has_bindings)
+            ast::Pattern::MatchStar(ast::PatternMatchStar { node: pattern, .. }) => {
+                pattern.name().is_some()
+            }
+            ast::Pattern::MatchAs(ast::PatternMatchAs { node: pattern, .. }) => {
+                pattern.name().is_some()
+                    || pattern.pattern().is_some_and(Self::pattern_has_bindings)
             }
         }
     }
 
     /// Returns whether matching a pattern can invoke Python user code.
-    fn pattern_can_raise(pattern: &ast::Pattern) -> bool {
-        match pattern {
-            ast::Pattern::MatchValue(_)
-            | ast::Pattern::MatchSequence(_)
-            | ast::Pattern::MatchMapping(_)
-            | ast::Pattern::MatchClass(_) => true,
-            ast::Pattern::MatchSingleton(_) | ast::Pattern::MatchStar(_) => false,
-            ast::Pattern::MatchAs(pattern) => pattern
-                .pattern
-                .as_deref()
-                .is_some_and(Self::pattern_can_raise),
-            ast::Pattern::MatchOr(pattern) => pattern.patterns.iter().any(Self::pattern_can_raise),
+    fn pattern_can_raise(pattern: flat::View<'_, Pattern>) -> bool {
+        match pattern.classify() {
+            flat::PatternKind::MatchValue(_)
+            | flat::PatternKind::MatchSequence(_)
+            | flat::PatternKind::MatchMapping(_)
+            | flat::PatternKind::MatchClass(_) => true,
+            flat::PatternKind::MatchSingleton(_) | flat::PatternKind::MatchStar(_) => false,
+            flat::PatternKind::MatchAs(pattern) => {
+                pattern.pattern().is_some_and(Self::pattern_can_raise)
+            }
+            flat::PatternKind::MatchOr(pattern) => {
+                pattern.patterns().iter().any(Self::pattern_can_raise)
+            }
         }
     }
 
-    fn predicate_kind(&mut self, pattern: &ast::Pattern) -> PatternPredicateKind<'db> {
-        match pattern {
-            ast::Pattern::MatchValue(pattern) => {
-                let value = self.add_standalone_expression(&pattern.value);
+    fn predicate_kind(&mut self, pattern: flat::View<'_, Pattern>) -> PatternPredicateKind<'db> {
+        match pattern.classify() {
+            flat::PatternKind::MatchValue(pattern) => {
+                let value = self.add_standalone_expression(pattern.value());
                 PatternPredicateKind::Value(value)
             }
-            ast::Pattern::MatchSingleton(singleton) => {
-                PatternPredicateKind::Singleton(singleton.value)
+            flat::PatternKind::MatchSingleton(singleton) => {
+                PatternPredicateKind::Singleton(singleton.value())
             }
-            ast::Pattern::MatchClass(pattern) => {
-                let cls = self.add_standalone_expression(&pattern.cls);
+            flat::PatternKind::MatchClass(pattern) => {
+                let cls = self.add_standalone_expression(pattern.cls());
 
                 PatternPredicateKind::Class(ClassPatternPredicateKind {
                     class: cls,
                     positional: pattern
-                        .arguments
-                        .patterns
+                        .arguments()
+                        .patterns()
                         .iter()
                         .map(|pattern| self.predicate_kind(pattern))
                         .collect(),
                     keywords: pattern
-                        .arguments
-                        .keywords
+                        .arguments()
+                        .keywords()
                         .iter()
                         .map(|keyword| ClassPatternKeywordPredicateKind {
-                            attr: keyword.attr.id.clone(),
-                            pattern: self.predicate_kind(&keyword.pattern),
+                            attr: keyword.attr().id().clone(),
+                            pattern: self.predicate_kind(keyword.pattern()),
                         })
                         .collect(),
                 })
             }
-            ast::Pattern::MatchMapping(pattern) => {
+            flat::PatternKind::MatchMapping(pattern) => {
                 // Retain keyed entries for subject-aware exhaustiveness analysis.
                 PatternPredicateKind::Mapping(MappingPatternPredicateKind {
                     entries: pattern
-                        .keys
+                        .keys()
                         .iter()
-                        .zip(&pattern.patterns)
+                        .zip(pattern.patterns())
                         .map(|(key, pattern)| MappingPatternEntryPredicateKind {
                             key: self.add_standalone_expression(key),
                             pattern: self.predicate_kind(pattern),
                         })
                         .collect(),
-                    rest: pattern.rest.as_ref().map(|name| name.id.clone()),
+                    rest: pattern.rest().map(|name| name.id().clone()),
                 })
             }
-            ast::Pattern::MatchSequence(pattern) => {
+            flat::PatternKind::MatchSequence(pattern) => {
                 PatternPredicateKind::Sequence(SequencePatternPredicateKind {
                     patterns: pattern
-                        .patterns
+                        .patterns()
                         .iter()
                         .map(|pattern| self.predicate_kind(pattern))
                         .collect(),
                 })
             }
-            ast::Pattern::MatchOr(pattern) => {
+            flat::PatternKind::MatchOr(pattern) => {
                 let predicates = pattern
-                    .patterns
+                    .patterns()
                     .iter()
                     .map(|pattern| self.predicate_kind(pattern))
                     .collect::<Vec<_>>()
                     .into_boxed_slice();
                 PatternPredicateKind::Or(predicates)
             }
-            ast::Pattern::MatchAs(pattern) => PatternPredicateKind::As(
-                pattern
-                    .pattern
-                    .as_ref()
-                    .map(|p| Box::new(self.predicate_kind(p))),
-                pattern.name.as_ref().map(|name| name.id.clone()),
+            flat::PatternKind::MatchAs(pattern) => PatternPredicateKind::As(
+                pattern.pattern().map(|p| Box::new(self.predicate_kind(p))),
+                pattern.name().map(|name| name.id().clone()),
             ),
-            ast::Pattern::MatchStar(pattern) => {
-                PatternPredicateKind::Star(pattern.name.as_ref().map(|name| name.id.clone()))
+            flat::PatternKind::MatchStar(pattern) => {
+                PatternPredicateKind::Star(pattern.name().map(|name| name.id().clone()))
             }
         }
     }
@@ -2806,8 +2815,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn create_pattern_predicate(
         &mut self,
         subject: Expression<'db>,
-        pattern: &ast::Pattern,
-        guard: Option<&ast::Expr>,
+        pattern: flat::View<'_, Pattern>,
+        guard: Option<flat::View<'_, Expr>>,
         previous_pattern: Option<PatternPredicate<'db>>,
     ) -> PatternPredicate<'db> {
         // This is called for the top-level pattern of each match arm. We need to create a
@@ -2815,7 +2824,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // constraints on the match subject. (Or more accurately, for the match arm's pattern,
         // since its the pattern that introduces any constraints, not the body.) Ideally, that
         // standalone expression would wrap the match arm's pattern as a whole. But a standalone
-        // expression can currently only wrap an ast::Expr, which patterns are not. So, we need to
+        // expression can currently only wrap an Expr, which patterns are not. So, we need to
         // choose an Expr that can "stand in" for the pattern, which we can wrap in a standalone
         // expression.
         //
@@ -2891,13 +2900,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// still refer to the saved subject if a guard fails, so later cases can narrow them.
     fn extend_match_subject_bindings(
         &self,
-        pattern: &ast::Pattern,
+        pattern: flat::View<'_, Pattern>,
         symbol: ScopedSymbolId,
         bindings: &mut SmallVec<[ScopedDefinitionId; 2]>,
     ) {
-        match pattern {
-            ast::Pattern::MatchAs(pattern) => {
-                if let Some(name) = &pattern.name
+        match pattern.classify() {
+            flat::PatternKind::MatchAs(pattern) => {
+                if let Some(name) = pattern.name()
                     && let Some(definition) = self
                         .definitions_by_node
                         .get(&name.into())
@@ -2908,12 +2917,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         |binding| use_def.definition(*binding).definition() == Some(*definition),
                     ));
                 }
-                if let Some(pattern) = &pattern.pattern {
+                if let Some(pattern) = pattern.pattern() {
                     self.extend_match_subject_bindings(pattern, symbol, bindings);
                 }
             }
-            ast::Pattern::MatchOr(pattern) => {
-                for pattern in &pattern.patterns {
+            flat::PatternKind::MatchOr(pattern) => {
+                for pattern in pattern.patterns() {
                     self.extend_match_subject_bindings(pattern, symbol, bindings);
                 }
             }
@@ -2925,14 +2934,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
     /// standalone (type narrowing tests, RHS of an assignment.)
-    fn add_standalone_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
+    fn add_standalone_expression(
+        &mut self,
+        expression_node: flat::View<'_, Expr>,
+    ) -> Expression<'db> {
         self.add_standalone_expression_impl(expression_node, ExpressionKind::Normal, None)
     }
 
     /// Record a predicate in the context in which Python tests it.
     fn add_predicate_expression(
         &mut self,
-        node: &ast::Expr,
+        node: flat::View<'_, Expr>,
         context: ExpressionContext,
     ) -> Expression<'db> {
         self.add_standalone_expression_impl(
@@ -2950,8 +2962,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// assignment.)
     fn add_standalone_assigned_expression(
         &mut self,
-        expression_node: &ast::Expr,
-        assigned_to: &ast::StmtAssign,
+        expression_node: flat::View<'_, Expr>,
+        assigned_to: flat::View<'_, StmtAssign>,
     ) -> Expression<'db> {
         self.add_standalone_expression_impl(
             expression_node,
@@ -2962,21 +2974,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Same as [`SemanticIndexBuilder::add_standalone_expression`], but marks the expression as a
     /// *type* expression, which makes sure that it will later be inferred as such.
-    fn add_standalone_type_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
+    fn add_standalone_type_expression(
+        &mut self,
+        expression_node: flat::View<'_, Expr>,
+    ) -> Expression<'db> {
         self.add_standalone_expression_impl(expression_node, ExpressionKind::TypeExpression, None)
     }
 
     fn add_standalone_expression_impl(
         &mut self,
-        expression_node: &ast::Expr,
+        expression_node: flat::View<'_, Expr>,
         expression_kind: ExpressionKind,
-        assigned_to: Option<&ast::StmtAssign>,
+        assigned_to: Option<flat::View<'_, StmtAssign>>,
     ) -> Expression<'db> {
         let expression = Expression::new(
             self.db,
             self.current_scope_id(),
-            AstNodeRef::new(self.module, expression_node),
-            assigned_to.map(|assigned_to| AstNodeRef::new(self.module, assigned_to)),
+            AstNodeRef::from_view(self.module, expression_node),
+            assigned_to.map(|assigned_to| AstNodeRef::from_view(self.module, assigned_to)),
             expression_kind,
         );
         self.expressions_by_node
@@ -2984,33 +2999,37 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         expression
     }
 
-    fn add_standalone_statement(&mut self, statement_node: &ast::Stmt) -> Statement<'db> {
+    fn add_standalone_statement(&mut self, statement_node: flat::View<'_, Stmt>) -> Statement<'db> {
         // Avoid allocating a salsa ingredient if the statement represents an existing
         // definition or standalone expression.
-        let statement = match statement_node {
-            ast::Stmt::FunctionDef(function) => Some(Statement::Definition(
+        let statement = match statement_node.classify() {
+            flat::StmtKind::FunctionDef(function) => Some(Statement::Definition(
                 self.expect_single_definition(function),
             )),
-            ast::Stmt::ClassDef(class) => {
+            flat::StmtKind::ClassDef(class) => {
                 Some(Statement::Definition(self.expect_single_definition(class)))
             }
-            ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
+            flat::StmtKind::Expr(stmt_expr) => {
+                let value = stmt_expr.value();
+
                 Some(Statement::Expression(self.add_standalone_expression(value)))
             }
-            ast::Stmt::Assign(assign) => {
-                if let [ast::Expr::Name(name)] = &assign.targets[..] {
+            flat::StmtKind::Assign(assign) => {
+                if let Some([target]) = assign.targets().as_array()
+                    && let Some(name) = target.as_name_expr()
+                {
                     Some(Statement::Definition(self.expect_single_definition(name)))
                 } else {
                     None
                 }
             }
-            ast::Stmt::AnnAssign(assign) if assign.target.is_name_expr() => {
+            flat::StmtKind::AnnAssign(assign) if assign.target().is_name_expr() => {
                 Some(Statement::Definition(self.expect_single_definition(assign)))
             }
-            ast::Stmt::AugAssign(assign) if assign.target.is_name_expr() => {
+            flat::StmtKind::AugAssign(assign) if assign.target().is_name_expr() => {
                 Some(Statement::Definition(self.expect_single_definition(assign)))
             }
-            ast::Stmt::TypeAlias(alias) => {
+            flat::StmtKind::TypeAlias(alias) => {
                 Some(Statement::Definition(self.expect_single_definition(alias)))
             }
             _ => None,
@@ -3023,7 +3042,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.db,
                 self.file,
                 self.current_scope(),
-                AstNodeRef::new(self.module, statement_node),
+                AstNodeRef::from_view(self.module, statement_node),
             ))
         };
 
@@ -3036,33 +3055,34 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn with_type_params<T>(
         &mut self,
         with_scope: NodeWithScopeRef,
-        type_params: Option<&'ast ast::TypeParams>,
+        type_params: Option<flat::View<'ast, TypeParams>>,
         nested: impl FnOnce(&mut Self) -> T,
     ) -> T {
         if let Some(type_params) = type_params {
             self.push_scope(with_scope);
 
-            for type_param in &type_params.type_params {
-                let (name, bound, default) = match type_param {
-                    ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
-                        range: _,
-                        node_index: _,
-                        name,
-                        bound,
-                        default,
-                    }) => (name, bound, default),
-                    ast::TypeParam::ParamSpec(ast::TypeParamParamSpec {
-                        name, default, ..
-                    }) => (name, &None, default),
-                    ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple {
-                        name,
-                        default,
-                        ..
-                    }) => (name, &None, default),
+            for type_param in type_params.type_params() {
+                let (name, bound, default) = match type_param.classify() {
+                    flat::TypeParamKind::TypeVar(type_param_type_var) => {
+                        let name = type_param_type_var.name();
+                        let bound = type_param_type_var.bound();
+                        let default = type_param_type_var.default();
+                        (name, bound, default)
+                    }
+                    flat::TypeParamKind::ParamSpec(type_param_param_spec) => {
+                        let name = type_param_param_spec.name();
+                        let default = type_param_param_spec.default();
+                        (name, None, default)
+                    }
+                    flat::TypeParamKind::TypeVarTuple(type_param_type_var_tuple) => {
+                        let name = type_param_type_var_tuple.name();
+                        let default = type_param_type_var_tuple.default();
+                        (name, None, default)
+                    }
                 };
                 self.scopes_by_expression
-                    .record_expression(name, self.current_scope());
-                let symbol = self.add_symbol(name.id.clone());
+                    .record_expression(&name, self.current_scope());
+                let symbol = self.add_symbol(name.id().clone());
                 // TODO create Definition for PEP 695 typevars
                 // note that the "bound" on the typevar is a totally different thing than whether
                 // or not a name is "bound" by a typevar declaration; the latter is always true.
@@ -3074,10 +3094,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 if let Some(default) = default {
                     self.visit_expr(default);
                 }
-                match type_param {
-                    ast::TypeParam::TypeVar(node) => self.add_definition(symbol.into(), node),
-                    ast::TypeParam::ParamSpec(node) => self.add_definition(symbol.into(), node),
-                    ast::TypeParam::TypeVarTuple(node) => self.add_definition(symbol.into(), node),
+                match type_param.classify() {
+                    flat::TypeParamKind::TypeVar(node) => self.add_definition(symbol.into(), node),
+                    flat::TypeParamKind::ParamSpec(node) => {
+                        self.add_definition(symbol.into(), node)
+                    }
+                    flat::TypeParamKind::TypeVarTuple(node) => {
+                        self.add_definition(symbol.into(), node)
+                    }
                 };
             }
         }
@@ -3101,11 +3125,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///   of a list/dict/set comprehension or generator expression
     /// - It then pops the new scope off the stack
     ///
-    /// [`Comprehension`]: ast::Comprehension
+    /// [`Comprehension`]: Comprehension
     fn with_generators_scope(
         &mut self,
         scope: NodeWithScopeRef,
-        generators: &'ast [ast::Comprehension],
+        generators: flat::NodeList<'ast, Comprehension>,
         visit_outer_elt: impl FnOnce(&mut Self),
     ) -> FileScopeId {
         let mut generators_iter = generators.iter();
@@ -3116,12 +3140,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         // The `iter` of the first generator is evaluated in the outer scope, while all subsequent
         // nodes are evaluated in the inner scope.
-        let value = self.add_standalone_expression(&generator.iter);
-        self.visit_expr(&generator.iter);
+        let value = self.add_standalone_expression(generator.iter());
+        self.visit_expr(generator.iter());
         let first_iteration_can_raise =
-            generator.is_async || !Self::iteration_is_known_safe(&generator.iter);
+            generator.is_async() || !Self::iteration_is_known_safe(generator.iter());
         self.record_exception_checkpoint_if(first_iteration_can_raise);
-        let mut loopback_can_raise = first_iteration_can_raise || !generator.target.is_name_expr();
+        let mut loopback_can_raise =
+            first_iteration_can_raise || !generator.target().is_name_expr();
 
         // Clear the assignment stack before entering the comprehension scope.
         // If the comprehension appears inside an assignment target (e.g., error-recovered
@@ -3132,7 +3157,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.push_scope(scope);
         let comprehension_scope = self.current_scope();
 
-        if generators.iter().any(|generator| generator.is_async) {
+        if generators.iter().any(flat::View::<Comprehension>::is_async) {
             self.async_comprehensions.insert(comprehension_scope);
         }
 
@@ -3141,33 +3166,33 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 node: generator,
                 first: true,
             },
-            &generator.target,
+            generator.target(),
             value,
         );
 
         let mut filtered_out_paths = Vec::new();
-        for if_expr in &generator.ifs {
+        for if_expr in generator.ifs() {
             filtered_out_paths.push(self.visit_comprehension_filter(if_expr));
         }
 
         for generator in generators_iter {
-            let value = self.add_standalone_expression(&generator.iter);
-            self.visit_expr(&generator.iter);
+            let value = self.add_standalone_expression(generator.iter());
+            self.visit_expr(generator.iter());
             let iteration_can_raise =
-                generator.is_async || !Self::iteration_is_known_safe(&generator.iter);
+                generator.is_async() || !Self::iteration_is_known_safe(generator.iter());
             self.record_exception_checkpoint_if(iteration_can_raise);
-            loopback_can_raise |= iteration_can_raise || !generator.target.is_name_expr();
+            loopback_can_raise |= iteration_can_raise || !generator.target().is_name_expr();
 
             self.add_unpackable_assignment(
                 &Unpackable::Comprehension {
                     node: generator,
                     first: false,
                 },
-                &generator.target,
+                generator.target(),
                 value,
             );
 
-            for if_expr in &generator.ifs {
+            for if_expr in generator.ifs() {
                 filtered_out_paths.push(self.visit_comprehension_filter(if_expr));
             }
         }
@@ -3195,7 +3220,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// [item for item in items if (last := item)]
     /// print(last)
     /// ```
-    fn visit_comprehension_filter(&mut self, if_expr: &'ast ast::Expr) -> FlowSnapshot {
+    fn visit_comprehension_filter(&mut self, if_expr: flat::View<'ast, Expr>) -> FlowSnapshot {
         self.visit_condition(if_expr);
         let condition_flow_snapshot = self.flow_snapshot_for_condition(if_expr);
         let filtered_out = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
@@ -3218,12 +3243,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         filtered_out
     }
 
-    fn declare_parameters(&mut self, parameters: &'ast ast::Parameters) {
+    fn declare_parameters(&mut self, parameters: flat::View<'ast, Parameters>) {
         for parameter in parameters.iter_non_variadic_params() {
             self.declare_parameter(parameter);
         }
-        if let Some(vararg) = parameters.vararg.as_ref() {
-            let symbol = self.add_symbol(vararg.name.id().clone());
+        if let Some(vararg) = parameters.vararg() {
+            let symbol = self.add_symbol(vararg.name().id().clone());
             self.current_place_table_mut()
                 .symbol_mut(symbol)
                 .mark_parameter();
@@ -3232,8 +3257,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 ParameterDefinitionNodeRef::VariadicPositionalParameter(vararg),
             );
         }
-        if let Some(kwarg) = parameters.kwarg.as_ref() {
-            let symbol = self.add_symbol(kwarg.name.id().clone());
+        if let Some(kwarg) = parameters.kwarg() {
+            let symbol = self.add_symbol(kwarg.name().id().clone());
             self.current_place_table_mut()
                 .symbol_mut(symbol)
                 .mark_parameter();
@@ -3244,7 +3269,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn declare_parameter(&mut self, parameter: &'ast ast::ParameterWithDefault) {
+    fn declare_parameter(&mut self, parameter: flat::View<'ast, ParameterWithDefault>) {
         let symbol = self.add_symbol(parameter.name().id().clone());
 
         self.add_definition(
@@ -3259,20 +3284,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn declare_lambda_parameters(
         &mut self,
-        parameters: &'ast ast::Parameters,
-        lambda: &'ast ast::ExprLambda,
+        parameters: flat::View<'ast, Parameters>,
+        lambda: flat::View<'ast, ExprLambda>,
     ) {
         let mut index = 0;
-        for parameter in &parameters.posonlyargs {
+        for parameter in parameters.posonlyargs() {
             self.declare_lambda_parameter(index, parameter, lambda);
             index += 1;
         }
-        for parameter in &parameters.args {
+        for parameter in parameters.args() {
             self.declare_lambda_parameter(index, parameter, lambda);
             index += 1;
         }
-        if let Some(vararg) = parameters.vararg.as_ref() {
-            let symbol = self.add_symbol(vararg.name.id().clone());
+        if let Some(vararg) = parameters.vararg() {
+            let symbol = self.add_symbol(vararg.name().id().clone());
             self.current_place_table_mut()
                 .symbol_mut(symbol)
                 .mark_parameter();
@@ -3286,12 +3311,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             );
             index += 1;
         }
-        for parameter in &parameters.kwonlyargs {
+        for parameter in parameters.kwonlyargs() {
             self.declare_lambda_parameter(index, parameter, lambda);
             index += 1;
         }
-        if let Some(kwarg) = parameters.kwarg.as_ref() {
-            let symbol = self.add_symbol(kwarg.name.id().clone());
+        if let Some(kwarg) = parameters.kwarg() {
+            let symbol = self.add_symbol(kwarg.name().id().clone());
             self.current_place_table_mut()
                 .symbol_mut(symbol)
                 .mark_parameter();
@@ -3309,8 +3334,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn declare_lambda_parameter(
         &mut self,
         index: usize,
-        parameter: &'ast ast::ParameterWithDefault,
-        lambda: &'ast ast::ExprLambda,
+        parameter: flat::View<'ast, ParameterWithDefault>,
+        lambda: flat::View<'ast, ExprLambda>,
     ) {
         let symbol = self.add_symbol(parameter.name().id().clone());
 
@@ -3335,16 +3360,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn add_unpackable_assignment(
         &mut self,
         unpackable: &Unpackable<'ast>,
-        target: &'ast ast::Expr,
+        target: flat::View<'ast, Expr>,
         value: Expression<'db>,
     ) {
         self.record_exception_checkpoint_if(matches!(
-            target,
-            ast::Expr::List(_) | ast::Expr::Tuple(_)
+            target.classify(),
+            flat::ExprKind::List(_) | flat::ExprKind::Tuple(_)
         ));
 
-        let current_assignment = match target {
-            ast::Expr::List(_) | ast::Expr::Tuple(_) => {
+        let current_assignment = match target.classify() {
+            flat::ExprKind::List(_) | flat::ExprKind::Tuple(_) => {
                 if matches!(unpackable, Unpackable::Comprehension { .. }) {
                     debug_assert_eq!(
                         self.scopes[self.current_scope()].node().scope_kind(),
@@ -3371,16 +3396,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     value_file_scope,
                     self.current_scope(),
                     // Note `target` belongs to the `self.module` tree
-                    AstNodeRef::new(self.module, target),
+                    AstNodeRef::from_view(self.module, target),
                     UnpackValue::new(unpackable.kind(), value),
                 );
                 self.unpacks_by_target.insert(target.into(), unpack);
                 Some(unpackable.as_current_assignment(Some(unpack)))
             }
-            ast::Expr::Name(_)
-            | ast::Expr::Starred(_)
-            | ast::Expr::Attribute(_)
-            | ast::Expr::Subscript(_) => Some(unpackable.as_current_assignment(None)),
+            flat::ExprKind::Name(_)
+            | flat::ExprKind::Starred(_)
+            | flat::ExprKind::Attribute(_)
+            | flat::ExprKind::Subscript(_) => Some(unpackable.as_current_assignment(None)),
             _ => None,
         };
 
@@ -3397,7 +3422,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
-        self.visit_body(self.module.suite());
+        self.visit_body(self.module.root().body());
 
         // Pop the root scope
         self.pop_scope();
@@ -3406,7 +3431,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         assert_eq!(&self.current_assignments, &[]);
 
-        let ast_ids = super::ast_ids::AstIds::from_builders(self.ast_ids);
+        let ast_ids = self.ast_ids.finish();
 
         let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
         semantic_syntax_errors.shrink_to_fit();
@@ -3481,7 +3506,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Self)) {
-        let mut checker = std::mem::take(&mut self.semantic_checker);
+        let mut checker = self.semantic_checker;
         f(&mut checker, self);
         self.semantic_checker = checker;
     }
@@ -3491,125 +3516,50 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .get_or_init(|| source_text(self.db, self.file.file(self.db)))
     }
 
-    fn visit_expr_with_context(&mut self, expr: &'ast ast::Expr, context: ExpressionContext) {
-        self.with_semantic_checker(|semantic, builder| semantic.visit_expr(expr, builder));
+    fn visit_expr_with_context(
+        &mut self,
+        expr: flat::View<'ast, Expr>,
+        context: ExpressionContext,
+    ) {
+        SemanticSyntaxChecker::check_expr(expr, self);
 
         self.scopes_by_expression
-            .record_expression(expr, self.current_scope());
+            .record_expression(&expr, self.current_scope());
 
-        match expr {
-            ast::Expr::Name(ast::ExprName { ctx, .. })
-            | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
-            | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
-                // Record place effects after walking the expression. For names, this is
-                // equivalent because `walk_expr` is a no-op; for attribute/subscript places,
-                // child evaluation can introduce bindings (for example via walrus operators),
-                // and those bindings need to exist before we register parent/member associations.
-                let mut deferred_effects = None;
-                if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
-                    if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method()
-                        && let PlaceExpr::Member(member) = &mut place_expr
-                        && member.is_instance_attribute_candidate()
-                        && let Some(attribute) = expr.as_attribute_expr()
-                    {
-                        // We specifically mark direct attribute assignments to the first
-                        // parameter of a method, i.e. typically `self` or `cls`.
-                        // However, we must check that the symbol hasn't been shadowed by an
-                        // intermediate scope (e.g., a comprehension variable: `for self in [...]`)
-                        // and that the AST base is still the original name rather than a
-                        // rebinding expression such as `(self := other).x`.
-                        let accessed_object_refers_to_first_parameter =
-                            self.current_first_parameter_name.is_some_and(|first| {
-                                attribute
-                                    .value
-                                    .as_name_expr()
-                                    .is_some_and(|name| name.id == first)
-                                    && !self.is_symbol_bound_in_intermediate_eager_scopes(
-                                        first,
-                                        method_scope_id,
-                                    )
-                            });
-
-                        if accessed_object_refers_to_first_parameter {
-                            member.mark_instance_attribute();
-                        }
-                    }
-
-                    let (is_use, is_definition) = match (ctx, self.current_assignment()) {
-                        (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
-                            // Record the target load now; the definition is recorded separately
-                            // after visiting the right-hand side.
-                            (true, false)
-                        }
-                        (ast::ExprContext::Load, _) => (true, false),
-                        (ast::ExprContext::Store, _) => (false, true),
-                        (ast::ExprContext::Del, _) => (true, true),
-                        (ast::ExprContext::Invalid, _) => (false, false),
-                    };
-                    deferred_effects = Some((place_expr, is_use, is_definition));
-                }
-
-                walk_expr(self, expr);
-
-                let is_use = deferred_effects
-                    .as_ref()
-                    .is_some_and(|(_, is_use, _)| *is_use);
-                let can_raise = self.place_access_can_raise(expr, is_use);
-                self.record_exception_checkpoint_if(can_raise);
-
-                if let Some((place_expr, is_use, is_definition)) = deferred_effects {
-                    let place_id = self.add_place(place_expr);
-
-                    if is_use {
-                        self.record_place_use(place_id, expr);
-
-                        // Keep track of any uses of unannotated collection initializers.
-                        if let Some(collection_def) =
-                            self.unannotated_collection_initializer_binding(expr)
-                            && let Some(current_statement) = self.current_statements.last_mut()
-                        {
-                            current_statement
-                                .collection_uses
-                                .push((collection_def, expr.into()));
-                        }
-                    }
-
-                    if is_definition {
-                        self.record_place_definition(place_id, expr);
-                    }
-
-                    if let Some(unpack_position) = self
-                        .current_assignment_mut()
-                        .and_then(CurrentAssignment::unpack_position_mut)
-                    {
-                        *unpack_position = UnpackPosition::Other;
-                    }
-                }
+        match expr.classify() {
+            flat::ExprKind::Name(node) => {
+                self.visit_place_expression(expr, node.ctx());
             }
-            ast::Expr::Named(node) => {
-                self.visit_expr(&node.value);
+            flat::ExprKind::Attribute(node) => {
+                self.visit_place_expression(expr, node.ctx());
+            }
+            flat::ExprKind::Subscript(node) => {
+                self.visit_place_expression(expr, node.ctx());
+            }
+            flat::ExprKind::Named(node) => {
+                self.visit_expr(node.value());
 
                 // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
-                if node.target.is_name_expr() {
+                if node.target().is_name_expr() {
                     self.push_assignment(CurrentAssignment::Named(node));
-                    self.visit_expr(&node.target);
+                    self.visit_expr(node.target());
                     self.pop_assignment();
                 } else {
-                    self.visit_expr(&node.target);
+                    self.visit_expr(node.target());
                 }
             }
-            ast::Expr::Lambda(lambda) => {
+            flat::ExprKind::Lambda(lambda) => {
                 self.current_statement_mut()
                     .expect("every lambda expression is part of a statement")
                     .lambda_expressions
                     .push(lambda);
 
-                if let Some(parameters) = &lambda.parameters {
+                if let Some(parameters) = lambda.parameters() {
                     // The default value of the parameters needs to be evaluated in the
                     // enclosing scope.
                     for default in parameters
                         .iter_non_variadic_params()
-                        .filter_map(|param| param.default.as_deref())
+                        .filter_map(flat::View::<ParameterWithDefault>::default)
                     {
                         self.visit_expr(default);
                     }
@@ -3618,19 +3568,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.push_scope(NodeWithScopeRef::Lambda(lambda));
 
                 // Add symbols and definitions for the parameters to the lambda scope.
-                if let Some(parameters) = lambda.parameters.as_ref() {
+                if let Some(parameters) = lambda.parameters() {
                     self.declare_lambda_parameters(parameters, lambda);
                 }
 
-                self.visit_expr(lambda.body.as_ref());
+                self.visit_expr(lambda.body());
                 self.pop_scope();
             }
-            ast::Expr::If(node) => self.visit_if_expression(node, context),
-            ast::Expr::ListComp(
-                list_comprehension @ ast::ExprListComp {
-                    elt, generators, ..
-                },
-            ) => {
+            flat::ExprKind::If(node) => self.visit_if_expression(node, context),
+            flat::ExprKind::ListComp(list_comprehension) => {
+                let elt = list_comprehension.elt();
+                let generators = list_comprehension.generators();
+
                 let scope = self.with_generators_scope(
                     NodeWithScopeRef::ListComprehension(list_comprehension),
                     generators,
@@ -3640,11 +3589,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.mark_current_comprehension_async();
                 }
             }
-            ast::Expr::SetComp(
-                set_comprehension @ ast::ExprSetComp {
-                    elt, generators, ..
-                },
-            ) => {
+            flat::ExprKind::SetComp(set_comprehension) => {
+                let elt = set_comprehension.elt();
+                let generators = set_comprehension.generators();
+
                 let scope = self.with_generators_scope(
                     NodeWithScopeRef::SetComprehension(set_comprehension),
                     generators,
@@ -3654,25 +3602,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.mark_current_comprehension_async();
                 }
             }
-            ast::Expr::Generator(
-                generator @ ast::ExprGenerator {
-                    elt, generators, ..
-                },
-            ) => {
+            flat::ExprKind::Generator(generator) => {
+                let elt = generator.elt();
+                let generators = generator.generators();
+
                 self.with_generators_scope(
                     NodeWithScopeRef::GeneratorExpression(generator),
                     generators,
                     |builder| builder.visit_expr(elt),
                 );
             }
-            ast::Expr::DictComp(
-                dict_comprehension @ ast::ExprDictComp {
-                    key,
-                    value,
-                    generators,
-                    ..
-                },
-            ) => {
+            flat::ExprKind::DictComp(dict_comprehension) => {
+                let key = dict_comprehension.key();
+                let value = dict_comprehension.value();
+                let generators = dict_comprehension.generators();
+
                 let scope = self.with_generators_scope(
                     NodeWithScopeRef::DictComprehension(dict_comprehension),
                     generators,
@@ -3687,36 +3631,33 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.mark_current_comprehension_async();
                 }
             }
-            ast::Expr::Call(_) | ast::Expr::BinOp(_) => {
+            flat::ExprKind::Call(_) | flat::ExprKind::BinOp(_) => {
                 walk_expr(self, expr);
                 self.record_exception_checkpoint();
             }
-            ast::Expr::UnaryOp(unary) => {
-                if unary.op == ast::UnaryOp::Not {
-                    self.visit_boolean_test(&unary.operand, context);
+            flat::ExprKind::UnaryOp(unary) => {
+                if unary.op() == UnaryOp::Not {
+                    self.visit_boolean_test(unary.operand(), context);
                 } else {
-                    self.visit_expr_with_context(&unary.operand, ExpressionContext::Value);
+                    self.visit_expr_with_context(unary.operand(), ExpressionContext::Value);
                 }
                 self.record_exception_checkpoint_if(
-                    unary.op != ast::UnaryOp::Not
-                        || !Self::condition_evaluation_is_known_safe(&unary.operand),
+                    unary.op() != UnaryOp::Not
+                        || !Self::condition_evaluation_is_known_safe(unary.operand()),
                 );
             }
-            ast::Expr::Compare(compare) => {
+            flat::ExprKind::Compare(compare) => {
                 self.visit_expr(compare.first_operand());
                 for (_, op, right) in compare.iter() {
                     self.visit_expr(right);
-                    self.record_exception_checkpoint_if(!matches!(
-                        op,
-                        ast::CmpOp::Is | ast::CmpOp::IsNot
-                    ));
+                    self.record_exception_checkpoint_if(!matches!(op, CmpOp::Is | CmpOp::IsNot));
                 }
             }
-            ast::Expr::BoolOp(node) => self.visit_bool_expression(node, context),
-            ast::Expr::StringLiteral(_) => {
+            flat::ExprKind::BoolOp(node) => self.visit_bool_expression(node, context),
+            flat::ExprKind::StringLiteral(_) => {
                 walk_expr(self, expr);
             }
-            ast::Expr::Yield(_) | ast::Expr::YieldFrom(_) => {
+            flat::ExprKind::Yield(_) | flat::ExprKind::YieldFrom(_) => {
                 let scope = self.current_scope();
                 if self.scopes[scope].kind() == ScopeKind::Function {
                     self.generator_functions.insert(scope);
@@ -3724,7 +3665,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 walk_expr(self, expr);
                 self.record_exception_checkpoint();
             }
-            ast::Expr::Await(_) => {
+            flat::ExprKind::Await(_) => {
                 self.mark_current_comprehension_async();
                 walk_expr(self, expr);
                 self.record_exception_checkpoint();
@@ -3735,12 +3676,98 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
+    fn visit_place_expression(&mut self, expr: flat::View<'ast, Expr>, ctx: ExprContext) {
+        // Record place effects after walking the expression. For names, this is
+        // equivalent because `walk_expr` is a no-op; for attribute/subscript places,
+        // child evaluation can introduce bindings (for example via walrus operators),
+        // and those bindings need to exist before we register parent/member associations.
+        let mut deferred_effects = None;
+        if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
+            if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method()
+                && let PlaceExpr::Member(member) = &mut place_expr
+                && member.is_instance_attribute_candidate()
+                && let Some(attribute) = expr.as_attribute_expr()
+            {
+                // We specifically mark direct attribute assignments to the first
+                // parameter of a method, i.e. typically `self` or `cls`.
+                // However, we must check that the symbol hasn't been shadowed by an
+                // intermediate scope (e.g., a comprehension variable: `for self in [...]`)
+                // and that the AST base is still the original name rather than a
+                // rebinding expression such as `(self := other).x`.
+                let accessed_object_refers_to_first_parameter =
+                    self.current_first_parameter_name.is_some_and(|first| {
+                        attribute
+                            .value()
+                            .as_name_expr()
+                            .is_some_and(|name| name.id() == first)
+                            && !self.is_symbol_bound_in_intermediate_eager_scopes(
+                                first,
+                                method_scope_id,
+                            )
+                    });
+
+                if accessed_object_refers_to_first_parameter {
+                    member.mark_instance_attribute();
+                }
+            }
+
+            let (is_use, is_definition) = match (ctx, self.current_assignment()) {
+                (ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
+                    // Record the target load now; the definition is recorded separately
+                    // after visiting the right-hand side.
+                    (true, false)
+                }
+                (ExprContext::Load, _) => (true, false),
+                (ExprContext::Store, _) => (false, true),
+                (ExprContext::Del, _) => (true, true),
+                (ExprContext::Invalid, _) => (false, false),
+            };
+            deferred_effects = Some((place_expr, is_use, is_definition));
+        }
+
+        walk_expr(self, expr);
+
+        let is_use = deferred_effects
+            .as_ref()
+            .is_some_and(|(_, is_use, _)| *is_use);
+        let can_raise = self.place_access_can_raise(expr, is_use);
+        self.record_exception_checkpoint_if(can_raise);
+
+        if let Some((place_expr, is_use, is_definition)) = deferred_effects {
+            let place_id = self.add_place(place_expr);
+
+            if is_use {
+                self.record_place_use(place_id, expr);
+
+                // Keep track of any uses of unannotated collection initializers.
+                if let Some(collection_def) = self.unannotated_collection_initializer_binding(expr)
+                    && let Some(current_statement) = self.current_statements.last_mut()
+                {
+                    current_statement
+                        .collection_uses
+                        .push((collection_def, expr.into()));
+                }
+            }
+
+            if is_definition {
+                self.record_place_definition(place_id, expr);
+            }
+
+            if let Some(unpack_position) = self
+                .current_assignment_mut()
+                .and_then(CurrentAssignment::unpack_position_mut)
+            {
+                *unpack_position = UnpackPosition::Other;
+            }
+        }
+    }
+
     /// Visits a conditional expression without reserving its flow snapshots in every recursive
     /// expression-visitor frame. This matters for deeply nested expressions in unoptimized builds.
-    fn visit_if_expression(&mut self, node: &'ast ast::ExprIf, context: ExpressionContext) {
-        let ast::ExprIf {
-            body, test, orelse, ..
-        } = node;
+    fn visit_if_expression(&mut self, node: flat::View<'ast, ExprIf>, context: ExpressionContext) {
+        let body = node.body();
+        let test = node.test();
+        let orelse = node.orelse();
         self.visit_condition(test);
         let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
         let falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
@@ -3768,12 +3795,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Keeps short-circuit flow snapshots out of the common recursive expression-visitor frame.
-    fn visit_bool_expression(&mut self, node: &'ast ast::ExprBoolOp, context: ExpressionContext) {
-        let ast::ExprBoolOp { values, op, .. } = node;
+    fn visit_bool_expression(
+        &mut self,
+        node: flat::View<'ast, ExprBoolOp>,
+        context: ExpressionContext,
+    ) {
+        let values = node.values();
+        let op = node.op();
         let mut snapshots = vec![];
         let has_named_expression = values
             .iter()
-            .any(|value| any_over_expr(value, &ast::Expr::is_named_expr));
+            .any(|value| any_over_expr(value, flat::View::is_named_expr));
         let mut reachability_constraints = SmallVec::<[ScopedReachabilityConstraintId; 1]>::new();
         let mut last_condition_flow_snapshots = None;
 
@@ -3798,8 +3830,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let predicate = self.build_predicate(value, context, None);
                 let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
                 let predicate_id = match op {
-                    ast::BoolOp::And => self.add_predicate(predicate),
-                    ast::BoolOp::Or => self.add_negated_predicate(predicate),
+                    BoolOp::And => self.add_predicate(predicate),
+                    BoolOp::Or => self.add_negated_predicate(predicate),
                 };
                 let reachability_constraint = self
                     .current_reachability_constraints_mut()
@@ -3808,7 +3840,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let continuation = if let Some(condition_flow_snapshots) = condition_flow_snapshots
                 {
                     let (short_circuit, continuation) =
-                        condition_flow_snapshots.into_short_circuit_and_continuation(*op);
+                        condition_flow_snapshots.into_short_circuit_and_continuation(op);
                     self.flow_restore(short_circuit);
                     continuation
                 } else {
@@ -3836,7 +3868,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let (last_short_circuit, no_short_circuit) =
             if let Some(condition_flow_snapshots) = last_condition_flow_snapshots {
                 let (short_circuit, no_short_circuit) =
-                    condition_flow_snapshots.into_short_circuit_and_continuation(*op);
+                    condition_flow_snapshots.into_short_circuit_and_continuation(op);
                 (Some(short_circuit), Some(no_short_circuit))
             } else {
                 (None, has_named_expression.then(|| self.flow_snapshot()))
@@ -3851,7 +3883,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
 
         if let Some(no_short_circuit) = no_short_circuit {
-            let bool_op_key = ExpressionNodeKey::from(ast::ExprRef::BoolOp(node));
+            let bool_op_key = ExpressionNodeKey::from(flat::View::<Expr>::from(node));
             let maybe_short_circuit = self.flow_snapshot();
 
             if has_specialized_last {
@@ -3861,8 +3893,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
 
             let (truthy, falsy) = match op {
-                ast::BoolOp::And => (no_short_circuit, maybe_short_circuit),
-                ast::BoolOp::Or => (maybe_short_circuit, no_short_circuit),
+                BoolOp::And => (no_short_circuit, maybe_short_circuit),
+                BoolOp::Or => (maybe_short_circuit, no_short_circuit),
             };
 
             self.condition_flow_snapshots_by_node
@@ -3870,15 +3902,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn visit_stmt_impl(&mut self, stmt: &'ast ast::Stmt) {
+    fn visit_stmt_impl(&mut self, stmt: flat::View<'ast, Stmt>) {
         self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
 
         let in_type_checking_block = self.in_type_checking_block;
         self.current_use_def_map_mut()
             .record_range_reachability(stmt.range(), in_type_checking_block);
 
-        match stmt {
-            ast::Stmt::FunctionDef(function_def) => {
+        match stmt.classify() {
+            flat::StmtKind::FunctionDef(function_def) => {
                 let ast::StmtFunctionDef {
                     decorator_list,
                     parameters,
@@ -3888,8 +3920,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     body,
                     is_async: _,
                     range: _,
-                    node_index: _,
-                } = function_def;
+                    node: _,
+                } = function_def.fields();
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
@@ -3906,14 +3938,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // ```
                 for default in parameters
                     .iter_non_variadic_params()
-                    .filter_map(|param| param.default.as_deref())
+                    .filter_map(flat::View::<ParameterWithDefault>::default)
                 {
                     self.visit_expr(default);
                 }
 
                 let nested_bindings = self.with_type_params(
                     NodeWithScopeRef::FunctionTypeParameters(function_def),
-                    type_params.as_deref(),
+                    type_params,
                     |builder| {
                         builder.visit_parameters(parameters);
                         if let Some(returns) = returns {
@@ -3927,7 +3959,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         let mut first_parameter_name = parameters
                             .iter_non_variadic_params()
                             .next()
-                            .map(|first_param| first_param.parameter.name.id().as_str());
+                            .map(|first_param| first_param.parameter().name().id().as_str());
                         std::mem::swap(
                             &mut builder.current_first_parameter_name,
                             &mut first_parameter_name,
@@ -3983,35 +4015,35 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // The symbol for the function name itself has to be evaluated
                 // at the end to match the runtime evaluation of parameter defaults
                 // and return-type annotations.
-                let symbol = self.add_symbol(name.id.clone());
+                let symbol = self.add_symbol(name.id().clone());
 
                 // Record a use of the function name in the scope that it is defined in, so that it
                 // can be used to find previously defined functions with the same name. This is
                 // used to collect all the overloaded definitions of a function. This needs to be
                 // done on the `Identifier` node as opposed to `ExprName` because that's what the
                 // AST uses.
-                let use_id = self.current_ast_ids_mut().record_use(name);
+                let use_id = self.ast_ids.record_use(self.current_scope(), name);
                 self.current_use_def_map_mut()
                     .record_use(symbol.into(), use_id);
 
                 self.add_definition(symbol.into(), function_def);
                 self.mark_symbol_used(symbol);
             }
-            ast::Stmt::ClassDef(class) => {
-                for decorator in &class.decorator_list {
+            flat::StmtKind::ClassDef(class) => {
+                for decorator in class.decorator_list() {
                     self.visit_decorator(decorator);
                 }
 
                 let nested_bindings = self.with_type_params(
                     NodeWithScopeRef::ClassTypeParameters(class),
-                    class.type_params.as_deref(),
+                    class.type_params(),
                     |builder| {
-                        if let Some(arguments) = &class.arguments {
+                        if let Some(arguments) = class.arguments() {
                             builder.visit_arguments(arguments);
                         }
 
                         builder.push_scope(NodeWithScopeRef::Class(class));
-                        builder.visit_body(&class.body);
+                        builder.visit_body(class.body());
 
                         builder.pop_scope()
                     },
@@ -4028,46 +4060,49 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.record_exception_checkpoint();
 
                 // In Python runtime semantics, a class is registered after its scope is evaluated.
-                let symbol = self.add_symbol(class.name.id.clone());
+                let symbol = self.add_symbol(class.name().id().clone());
                 self.add_definition(symbol.into(), class);
             }
-            ast::Stmt::TypeAlias(type_alias) => {
+            flat::StmtKind::TypeAlias(type_alias) => {
                 let symbol = self.add_symbol(
                     type_alias
-                        .name
+                        .name()
                         .as_name_expr()
-                        .map(|name| name.id.clone())
+                        .map(|name| name.id().clone())
                         .unwrap_or("<unknown>".into()),
                 );
                 self.add_definition(symbol.into(), type_alias);
-                self.visit_expr(&type_alias.name);
+                self.visit_expr(type_alias.name());
 
                 self.with_type_params(
                     NodeWithScopeRef::TypeAliasTypeParameters(type_alias),
-                    type_alias.type_params.as_deref(),
+                    type_alias.type_params(),
                     |builder| {
                         builder.push_scope(NodeWithScopeRef::TypeAlias(type_alias));
-                        builder.visit_expr(&type_alias.value);
+                        builder.visit_expr(type_alias.value());
                         builder.pop_scope()
                     },
                 );
             }
-            ast::Stmt::Import(node) => {
-                for (alias_index, alias) in node.names.iter().enumerate() {
+            flat::StmtKind::Import(node) => {
+                for (alias_index, alias) in node.names().iter().enumerate() {
                     self.record_exception_checkpoint();
 
                     // Mark the imported module, and all of its parents, as being imported in this
                     // file.
-                    if let Some(module_name) = ModuleName::new(&alias.name) {
+                    if let Some(module_name) = ModuleName::new(alias.name().as_str()) {
                         self.imported_modules.extend(module_name.ancestors());
                     }
 
-                    let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
+                    let (symbol_name, is_reexported) = if let Some(asname) = alias.asname() {
                         self.scopes_by_expression
-                            .record_expression(asname, self.current_scope());
-                        (asname.id.clone(), asname.id == alias.name.id)
+                            .record_expression(&asname, self.current_scope());
+                        (asname.id().clone(), asname.id() == alias.name().id())
                     } else {
-                        (Name::new(alias.name.id.split('.').next().unwrap()), false)
+                        (
+                            Name::new(alias.name().id().split('.').next().unwrap()),
+                            false,
+                        )
                     };
 
                     let symbol = self.add_symbol(symbol_name);
@@ -4081,7 +4116,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     );
                 }
             }
-            ast::Stmt::ImportFrom(node) => {
+            flat::StmtKind::ImportFrom(node) => {
                 self.record_exception_checkpoint();
 
                 // If we see:
@@ -4107,8 +4142,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     && let Ok(module_name) = ModuleName::from_identifier_parts(
                         self.db,
                         ImportingFile::File(source_file, resolver_environment),
-                        node.module.as_deref(),
-                        node.level,
+                        node.module().map(flat::View::<Identifier>::as_str),
+                        node.level(),
                     )
                     && let Ok(thispackage) = ModuleName::package_for_file(
                         self.db,
@@ -4118,7 +4153,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // Record whether this is equivalent to `from . import ...`
                     is_self_import = module_name == thispackage;
 
-                    if node.module.is_some()
+                    if node.module().is_some()
                         && let Some(relative_submodule) = module_name.relative_to(&thispackage)
                         && let Some(direct_submodule) = relative_submodule.components().next()
                         && !self.seen_submodule_imports.contains(direct_submodule)
@@ -4127,27 +4162,27 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.seen_submodule_imports
                             .insert(direct_submodule.to_owned());
 
-                        let is_immediately_shadowed = node.names.iter().any(|alias| {
-                            if &alias.name == "*" {
+                        let is_immediately_shadowed = node.names().iter().any(|alias| {
+                            if alias.name() == "*" {
                                 return false;
                             }
 
-                            let bound_name = alias.asname.as_ref().unwrap_or(&alias.name);
-                            bound_name.id.as_str() == direct_submodule
+                            let bound_name = alias.asname().unwrap_or(alias.name());
+                            bound_name.id().as_str() == direct_submodule
                         });
 
                         if !is_immediately_shadowed {
                             let direct_submodule_name = Name::new(direct_submodule);
                             let symbol = self.add_symbol(direct_submodule_name);
 
-                            let module_index = if node.level == 0 {
+                            let module_index = if node.level() == 0 {
                                 // "whatever.thispackage.x.y" we want `x`
                                 thispackage.components().count()
                             } else {
                                 // ".x.y" we want `x` (level 1 => index 0)
                                 // "..x.y" we want `y` (level 2 => index 1)
                                 // (The Identifier doesn't include the prefix dots)
-                                node.level as usize - 1
+                                node.level() as usize - 1
                             };
                             self.add_definition(
                                 symbol.into(),
@@ -4158,12 +4193,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
 
                 let mut found_star = false;
-                for (alias_index, alias) in node.names.iter().enumerate() {
+                for (alias_index, alias) in node.names().iter().enumerate() {
                     // Loading each imported name can fail after the module import and any earlier
                     // names or package-submodule side effects have completed.
                     self.record_exception_checkpoint();
 
-                    if &alias.name == "*" {
+                    if alias.name() == "*" {
                         // The following line maintains the invariant that every AST node that
                         // implements `Into<DefinitionNodeKey>` must have an entry in the
                         // `definitions_by_node` map. Maintaining this invariant ensures that
@@ -4268,16 +4303,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         continue;
                     }
 
-                    let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
+                    let (symbol_name, is_reexported) = if let Some(asname) = alias.asname() {
                         self.scopes_by_expression
-                            .record_expression(asname, self.current_scope());
+                            .record_expression(&asname, self.current_scope());
                         // It's re-exported if it's `from ... import x as x`
-                        (&asname.id, asname.id == alias.name.id)
+                        (asname.id(), asname.id() == alias.name().id())
                     } else {
                         // As a non-standard rule to handle stubs in the wild, we consider
                         // `from . import x` and `from whatever.thispackage import x` in an
                         // `__init__.pyi` to re-export `x` (as long as it wasn't renamed)
-                        (&alias.name.id, is_self_import)
+                        (alias.name().id(), is_self_import)
                     };
 
                     // Look for eager imports `from __future__ import annotations`, ignore `as ...`
@@ -4285,11 +4320,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // imports here, we assume the user's intent was to apply the `__future__`
                     // import, so we still check using it (and will also emit a diagnostic about a
                     // miss-placed `__future__` import.)
-                    self.has_future_annotations |= !node.is_lazy
-                        && alias.name.id == "annotations"
-                        && node.module.as_deref() == Some("__future__");
+                    self.has_future_annotations |= !node.is_lazy()
+                        && alias.name().id() == "annotations"
+                        && node.module().is_some_and(|name| name == "__future__");
 
-                    let symbol = self.add_symbol(symbol_name.clone());
+                    let symbol = self.add_symbol(symbol_name.clone().clone());
 
                     self.add_definition(
                         symbol.into(),
@@ -4302,12 +4337,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
 
-            ast::Stmt::Assert(ast::StmtAssert {
-                test,
-                msg,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::StmtKind::Assert(stmt_assert) => {
+                let test = stmt_assert.test();
+                let msg = stmt_assert.msg();
+
                 // We model an `assert test, msg` statement here. Conceptually, we can think of
                 // this as being equivalent to the following:
                 //
@@ -4358,21 +4391,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.record_reachability_constraint_id(predicate_id);
             }
 
-            ast::Stmt::Assign(node) => {
+            flat::StmtKind::Assign(node) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
 
-                self.visit_expr(&node.value);
+                self.visit_expr(node.value());
 
                 // Unannotated collection initializers must be standalone expressions to participate
                 // in full-scope bidirectional inference.
-                if node.targets.len() == 1 && is_collection_initializer(&node.value) {
-                    self.add_standalone_assigned_expression(&node.value, node);
+                if node.targets().len() == 1 && is_collection_initializer(node.value()) {
+                    self.add_standalone_assigned_expression(node.value(), node);
                 }
 
                 // Optimization for the common case: if there's just one target, and it's not an
                 // unpacking, and the target is a simple name, we don't need the RHS to be a
                 // standalone expression at all.
-                if let [target] = &node.targets[..]
+                if let Some([target]) = node.targets().as_array()
                     && target.is_name_expr()
                 {
                     self.push_assignment(CurrentAssignment::Assign {
@@ -4383,23 +4416,23 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.visit_expr(target);
                     self.pop_assignment();
 
-                    self.try_register_narrowing_alias(target, Some(&node.value));
+                    self.try_register_narrowing_alias(target, Some(node.value()));
                 } else {
-                    let value = self.add_standalone_assigned_expression(&node.value, node);
+                    let value = self.add_standalone_assigned_expression(node.value(), node);
 
-                    for target in &node.targets {
+                    for target in node.targets() {
                         self.add_unpackable_assignment(&Unpackable::Assign(node), target, value);
                     }
                 }
             }
-            ast::Stmt::AnnAssign(node) => {
+            flat::StmtKind::AnnAssign(node) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
                 // For an assignment with a value, an exception from the annotation or RHS must
                 // not discard the declared type. The value is still bound only after the RHS
                 // completes, so a handler can observe an earlier binding (or an unbound name).
                 let pending = self.begin_annotated_assignment(node);
-                self.visit_annotation(&node.annotation);
-                if let Some(value) = &node.value {
+                self.visit_annotation(node.annotation());
+                if let Some(value) = node.value() {
                     self.visit_expr(value);
                     if self.is_method_or_eagerly_executed_in_method().is_some() {
                         // Record the right-hand side of the assignment as a standalone expression
@@ -4410,14 +4443,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                 }
 
-                if let ast::Expr::Name(name) = &*node.target {
-                    let symbol_id = self.add_symbol(name.id.clone());
+                if let flat::ExprKind::Name(name) = node.target().classify() {
+                    let symbol_id = self.add_symbol(name.id().clone());
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has been declared global.
                     if symbol.is_global() {
                         self.report_semantic_error(SemanticSyntaxError {
-                            kind: SemanticSyntaxErrorKind::AnnotatedGlobal(name.id.as_str().into()),
-                            range: name.range,
+                            kind: SemanticSyntaxErrorKind::AnnotatedGlobal(
+                                name.id().as_str().into(),
+                            ),
+                            range: name.range(),
                             python_version: self.python_version(),
                         });
                     }
@@ -4425,9 +4460,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     if symbol.is_nonlocal() {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::AnnotatedNonlocal(
-                                name.id.as_str().into(),
+                                name.id().as_str().into(),
                             ),
-                            range: name.range,
+                            range: name.range(),
                             python_version: self.python_version(),
                         });
                     }
@@ -4435,34 +4470,34 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // See https://docs.python.org/3/library/ast.html#ast.AnnAssign
                 if matches!(
-                    *node.target,
-                    ast::Expr::Attribute(_) | ast::Expr::Subscript(_) | ast::Expr::Name(_)
+                    node.target().classify(),
+                    flat::ExprKind::Attribute(_)
+                        | flat::ExprKind::Subscript(_)
+                        | flat::ExprKind::Name(_)
                 ) {
                     self.push_assignment(CurrentAssignment::AnnAssign { node, pending });
-                    self.visit_expr(&node.target);
+                    self.visit_expr(node.target());
                     self.pop_assignment();
 
-                    self.try_register_narrowing_alias(&node.target, node.value.as_deref());
+                    self.try_register_narrowing_alias(node.target(), node.value());
                 } else {
-                    self.visit_expr(&node.target);
+                    self.visit_expr(node.target());
                 }
             }
-            ast::Stmt::AugAssign(
-                aug_assign @ ast::StmtAugAssign {
-                    range: _,
-                    node_index: _,
-                    target,
-                    op,
-                    value,
-                },
-            ) => {
+            flat::StmtKind::AugAssign(aug_assign) => {
+                let target = aug_assign.target();
+                let op = aug_assign.op();
+                let value = aug_assign.value();
+
                 debug_assert_eq!(&self.current_assignments, &[]);
 
                 // An augmented assignment loads its target before evaluating the right-hand side,
                 // but only defines the target after the operation succeeds.
                 let is_place_target = matches!(
-                    &**target,
-                    ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_)
+                    target.classify(),
+                    flat::ExprKind::Name(_)
+                        | flat::ExprKind::Attribute(_)
+                        | flat::ExprKind::Subscript(_)
                 );
                 if is_place_target {
                     self.push_assignment(CurrentAssignment::AugAssign(aug_assign));
@@ -4474,7 +4509,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 self.visit_expr(value);
 
-                if let ast::Expr::Name(ast::ExprName { id, .. }) = &**target
+                if let ast::Expr::Name(ast::ExprName { id, .. }) = target.fields()
                     && id == "__all__"
                     && op.is_add()
                     && self.in_module_scope()
@@ -4482,7 +4517,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         value: module,
                         attr,
                         ..
-                    }) = &**value
+                    }) = value.fields()
                     && attr == "__all__"
                 {
                     self.add_standalone_expression(module);
@@ -4490,23 +4525,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 self.record_exception_checkpoint();
 
-                if is_place_target
-                    && let Some(place_expr) = PlaceExpr::try_from_expr(target.as_ref())
-                {
+                if is_place_target && let Some(place_expr) = PlaceExpr::try_from_expr(target) {
                     let place_id = self.add_place(place_expr);
                     self.push_assignment(CurrentAssignment::AugAssign(aug_assign));
                     self.record_place_definition(place_id, target);
                     self.pop_assignment();
                 }
             }
-            ast::Stmt::If(node) => {
+            flat::StmtKind::If(node) => {
                 let final_elif_test = node
-                    .elif_else_clauses
+                    .elif_else_clauses()
                     .last()
-                    .and_then(|clause| clause.test.as_ref());
+                    .and_then(flat::View::<ElifElseClause>::test);
                 let mut chain_start = final_elif_test.map(|_| self.flow_snapshot());
-                self.visit_condition(&node.test);
-                let condition_flow_snapshot = self.flow_snapshot_for_condition(&node.test);
+                self.visit_condition(node.test());
+                let condition_flow_snapshot = self.flow_snapshot_for_condition(node.test());
                 let mut falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
                     self.flow_restore(snapshots.truthy);
                     snapshots.falsy
@@ -4514,37 +4547,37 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.flow_snapshot()
                 };
                 let (mut last_predicate, mut last_narrowing_id) =
-                    self.record_expression_narrowing_constraint(&node.test);
+                    self.record_expression_narrowing_constraint(node.test());
                 let mut last_reachability_constraint =
                     self.record_reachability_constraint_id(last_narrowing_id);
 
                 let is_outer_block_in_type_checking = self.in_type_checking_block;
 
-                let if_block_in_type_checking = is_if_type_checking(&node.test);
+                let if_block_in_type_checking = is_if_type_checking(node.test());
 
                 // Track if we're in a chain that started with "not TYPE_CHECKING"
-                let mut is_in_not_type_checking_chain = is_if_not_type_checking(&node.test);
+                let mut is_in_not_type_checking_chain = is_if_not_type_checking(node.test());
 
                 self.in_type_checking_block =
                     if_block_in_type_checking || is_outer_block_in_type_checking;
 
-                self.visit_body(&node.body);
+                self.visit_body(node.body());
 
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
                 let elif_else_clauses = node
-                    .elif_else_clauses
+                    .elif_else_clauses()
                     .iter()
-                    .map(|clause| (clause.test.as_ref(), clause.body.as_slice()));
+                    .map(|clause| (clause.test(), clause.body()));
                 let has_else = node
-                    .elif_else_clauses
+                    .elif_else_clauses()
                     .last()
-                    .is_some_and(|clause| clause.test.is_none());
+                    .is_some_and(|clause| clause.test().is_none());
                 let elif_else_clauses = elif_else_clauses.chain(if has_else {
                     // if there's an `else` clause already, we don't need to add another
                     None
                 } else {
                     // if there's no `else` branch, we should add a no-op `else` branch
-                    Some((None, Default::default()))
+                    Some((None, node.body().slice(0..0)))
                 });
 
                 for (clause_test, clause_body) in elif_else_clauses {
@@ -4622,15 +4655,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 self.in_type_checking_block = is_outer_block_in_type_checking;
             }
-            ast::Stmt::While(
-                while_stmt @ ast::StmtWhile {
-                    test,
-                    body,
-                    orelse,
-                    range: _,
-                    node_index: _,
-                },
-            ) => {
+            flat::StmtKind::While(while_stmt) => {
+                let test = while_stmt.test();
+                let body = while_stmt.body();
+                let orelse = while_stmt.orelse();
+
                 // Pre-walk the loop to collect all the bound places, then create a loop header
                 // definition for each bound place. See `struct LoopHeader` for more on this. Loop
                 // header definitions store the ID of a reserved `LoopHeader` that we populate
@@ -4709,32 +4738,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.flow_merge(break_state);
                 }
             }
-            ast::Stmt::With(ast::StmtWith {
-                items,
-                body,
-                is_async,
-                ..
-            }) => {
-                for item @ ast::WithItem {
-                    range: _,
-                    node_index: _,
-                    context_expr,
-                    optional_vars,
-                } in items
-                {
+            flat::StmtKind::With(stmt_with) => {
+                let items = stmt_with.items();
+                let body = stmt_with.body();
+                let is_async = stmt_with.is_async();
+
+                for item in items {
+                    let context_expr = item.context_expr();
+                    let optional_vars = item.optional_vars();
                     self.visit_expr(context_expr);
                     self.record_exception_checkpoint();
 
                     self.exception_context_stack_manager
                         .push_context_manager_context();
 
-                    if let Some(optional_vars) = optional_vars.as_deref() {
+                    if let Some(optional_vars) = optional_vars {
                         let context_manager = self.add_standalone_expression(context_expr);
                         self.add_unpackable_assignment(
-                            &Unpackable::WithItem {
-                                item,
-                                is_async: *is_async,
-                            },
+                            &Unpackable::WithItem { item, is_async },
                             optional_vars,
                             context_manager,
                         );
@@ -4755,7 +4776,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             self.exception_context_stack_manager
                                 .record_deferred_terminal_context_manager_exit();
                         }
-                        let context_expr = &item.context_expr;
+                        let context_expr = item.context_expr();
                         let expression = self
                             .expressions_by_node
                             .get(&ExpressionNodeKey::from(context_expr))
@@ -4764,7 +4785,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         let predicate = PredicateOrLiteral::Predicate(Predicate {
                             node: PredicateNode::ContextManagerSuppresses {
                                 expression,
-                                is_async: *is_async,
+                                is_async,
                             },
                             is_positive: true,
                         });
@@ -4798,25 +4819,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
 
-            ast::Stmt::For(
-                for_stmt @ ast::StmtFor {
-                    range: _,
-                    node_index: _,
-                    is_async,
-                    target,
-                    iter,
-                    body,
-                    orelse,
-                },
-            ) => {
+            flat::StmtKind::For(for_stmt) => {
+                let is_async = for_stmt.is_async();
+                let target = for_stmt.target();
+                let iter = for_stmt.iter();
+                let body = for_stmt.body();
+                let orelse = for_stmt.orelse();
+
                 debug_assert_eq!(&self.current_assignments, &[]);
 
                 let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
-                let iteration_can_raise = *is_async || !Self::iteration_is_known_safe(iter);
+                let iteration_can_raise = is_async || !Self::iteration_is_known_safe(iter);
                 self.record_exception_checkpoint_if(iteration_can_raise);
 
-                let literal_iterable_is_non_empty = (!*is_async)
+                let literal_iterable_is_non_empty = (!is_async)
                     .then(|| literal_iterable_truthiness(iter))
                     .and_then(Truthiness::into_bool);
 
@@ -4910,12 +4927,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.flow_merge(break_state);
                 }
             }
-            ast::Stmt::Match(ast::StmtMatch {
-                subject,
-                cases,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::StmtKind::Match(stmt_match) => {
+                let subject = stmt_match.subject();
+                let cases = stmt_match.cases();
+
                 debug_assert_eq!(self.current_match_case, None);
 
                 let subject_expr = self.add_standalone_expression(subject);
@@ -4932,7 +4947,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         let place = PlaceExpr::try_from_expr(expression).and_then(|place| {
                             self.current_place_table().place_id((&place).into())
                         })?;
-                        Some((place, self.current_ast_ids().try_use_id(expression)))
+                        Some((
+                            place,
+                            self.ast_ids.try_use_id(self.current_scope(), expression),
+                        ))
                     })
                     .collect::<SmallVec<[_; 2]>>();
                 let mut subject_targets =
@@ -4953,25 +4971,25 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     };
                     subject_targets.push((place, bindings));
                 }
-                let subject_place = PlaceExpr::try_from_expr(subject.as_ref())
+                let subject_place = PlaceExpr::try_from_expr(subject)
                     .and_then(|place| self.current_place_table().place_id((&place).into()));
                 let places = self.current_place_table();
-                let ast_ids = self.current_ast_ids();
+                let current_scope = self.current_scope();
                 let mut sequence_subject_targets =
                     SmallVec::<[(ScopedPlaceId, ScopedUseId, ExpressionNodeKey); 2]>::new();
-                let mut subject_elements: Vec<&ast::Expr> = match subject.as_ref() {
-                    ast::Expr::List(list) => list.elts.iter().collect(),
-                    ast::Expr::Tuple(tuple) => tuple.elts.iter().collect(),
+                let mut subject_elements: Vec<flat::View<'_, Expr>> = match subject.classify() {
+                    flat::ExprKind::List(list) => list.elts().iter().collect(),
+                    flat::ExprKind::Tuple(tuple) => tuple.elts().iter().collect(),
                     _ => Vec::new(),
                 };
                 while let Some(element) = subject_elements.pop() {
-                    match element {
-                        ast::Expr::List(list) => subject_elements.extend(&list.elts),
-                        ast::Expr::Tuple(tuple) => subject_elements.extend(&tuple.elts),
+                    match element.classify() {
+                        flat::ExprKind::List(list) => subject_elements.extend(list.elts()),
+                        flat::ExprKind::Tuple(tuple) => subject_elements.extend(tuple.elts()),
                         _ => {
                             let Some(target) = PlaceExpr::try_from_expr(element)
                                 .and_then(|place| places.place_id((&place).into()))
-                                .zip(ast_ids.try_use_id(element))
+                                .zip(self.ast_ids.try_use_id(current_scope, element))
                             else {
                                 continue;
                             };
@@ -4988,7 +5006,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 let has_catchall = cases
                     .last()
-                    .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard());
+                    .is_some_and(|case| case.guard().is_none() && case.pattern().is_wildcard());
 
                 let mut post_case_snapshots = vec![];
                 let mut previous_pattern: Option<PatternPredicate<'_>> = None;
@@ -4996,22 +5014,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 for (i, case) in cases.iter().enumerate() {
                     let match_pattern_predicate = self.create_pattern_predicate(
                         subject_expr,
-                        &case.pattern,
-                        case.guard.as_deref(),
+                        case.pattern(),
+                        case.guard(),
                         previous_pattern,
                     );
                     self.current_match_case = Some(CurrentMatchCase::new(
-                        &case.pattern,
+                        case.pattern(),
                         match_pattern_predicate,
                     ));
-                    self.record_exception_checkpoint_if(Self::pattern_can_raise(&case.pattern));
-                    self.visit_pattern(&case.pattern);
+                    self.record_exception_checkpoint_if(Self::pattern_can_raise(case.pattern()));
+                    self.visit_pattern(case.pattern());
                     self.current_match_case = None;
                     if let Some((ScopedPlaceId::Symbol(symbol), bindings)) = subject_targets
                         .iter_mut()
                         .find(|(place, _)| Some(*place) == subject_place)
                     {
-                        self.extend_match_subject_bindings(&case.pattern, *symbol, bindings);
+                        self.extend_match_subject_bindings(case.pattern(), *symbol, bindings);
                     }
                     // unlike in [Stmt::If], we don't reset [no_case_matched]
                     // here because the effects of visiting a pattern is binding
@@ -5032,7 +5050,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // For a pattern `P` and guard `G`, the case body is reached through `P && G`,
                     // while the next case is reached through `!P || (P && !G)`. Save `P && !G`
                     // separately so it can be merged with the pattern-failure state after the body.
-                    let match_success_guard_failure = case.guard.as_ref().map(|guard| {
+                    let match_success_guard_failure = case.guard().map(|guard| {
                         self.visit_condition(guard);
                         let condition_flow_snapshot = self.flow_snapshot_for_condition(guard);
                         let falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches()
@@ -5064,7 +5082,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         match_success_guard_failure
                     });
 
-                    self.visit_body(&case.body);
+                    self.visit_body(case.body());
 
                     post_case_snapshots.push(self.flow_snapshot());
 
@@ -5081,11 +5099,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         if let Some(match_success_guard_failure) = match_success_guard_failure {
                             self.flow_merge(match_success_guard_failure);
                         } else {
-                            assert!(case.guard.is_none());
+                            assert!(case.guard().is_none());
                         }
                     } else {
                         debug_assert!(match_success_guard_failure.is_none());
-                        debug_assert!(case.guard.is_none());
+                        debug_assert!(case.guard().is_none());
                     }
 
                     no_case_matched = self.flow_snapshot();
@@ -5095,23 +5113,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.flow_merge(post_clause_state);
                 }
             }
-            ast::Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                is_star,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::StmtKind::Try(stmt_try) => {
+                let body = stmt_try.body();
+                let handlers = stmt_try.handlers();
+                let orelse = stmt_try.orelse();
+                let finalbody = stmt_try.finalbody();
+                let is_star = stmt_try.is_star();
+
                 let was_in_try_statement = std::mem::replace(&mut self.in_try_statement, true);
                 self.record_ambiguous_reachability();
 
                 let exception_handlers = if handlers.is_empty() {
                     ExceptionHandlers::None
                 } else if handlers.iter().any(|handler| {
-                    let ast::ExceptHandler::ExceptHandler(handler) = handler;
-                    handler.type_.is_none()
+                    let flat::ExceptHandlerKind::ExceptHandler(handler) = handler.classify();
+                    handler.type_().is_none()
                 }) {
                     ExceptionHandlers::catch_all()
                 } else {
@@ -5157,14 +5173,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     let num_handlers = handlers.len();
 
                     for (i, except_handler) in handlers.iter().enumerate() {
-                        let ast::ExceptHandler::ExceptHandler(except_handler) = except_handler;
-                        let ast::ExceptHandlerExceptHandler {
-                            name: symbol_name,
-                            type_: handled_exceptions,
-                            body: handler_body,
-                            range: _,
-                            node_index: _,
-                        } = except_handler;
+                        let flat::ExceptHandlerKind::ExceptHandler(except_handler) =
+                            except_handler.classify();
+                        let symbol_name = except_handler.name();
+                        let handled_exceptions = except_handler.type_();
+                        let handler_body = except_handler.body();
 
                         if let Some(handled_exceptions) = handled_exceptions {
                             self.visit_expr(handled_exceptions);
@@ -5174,13 +5187,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         // which is invalid syntax. However, it's still pretty obvious here that the user
                         // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
                         let symbol = if let Some(symbol_name) = symbol_name {
-                            let symbol = self.add_symbol(symbol_name.id.clone());
+                            let symbol = self.add_symbol(symbol_name.id().clone());
 
                             self.add_definition(
                                 symbol.into(),
                                 DefinitionNodeRef::ExceptHandler(ExceptHandlerDefinitionNodeRef {
                                     handler: except_handler,
-                                    is_star: *is_star,
+                                    is_star,
                                 }),
                             );
                             Some(symbol)
@@ -5349,7 +5362,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.in_try_statement = was_in_try_statement;
             }
 
-            ast::Stmt::Raise(_) => {
+            flat::StmtKind::Raise(_) => {
                 walk_stmt(self, stmt);
                 self.record_exception_checkpoint();
                 self.record_terminal_finally_entry();
@@ -5357,14 +5370,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.mark_unreachable();
             }
 
-            ast::Stmt::Return(_) => {
+            flat::StmtKind::Return(_) => {
                 walk_stmt(self, stmt);
                 self.record_terminal_finally_entry();
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
             }
 
-            ast::Stmt::Continue(_) | ast::Stmt::Break(_) => {
+            flat::StmtKind::Continue(_) | flat::StmtKind::Break(_) => {
                 if self
                     .exception_context_stack_manager
                     .has_context_manager_exception_checkpoint()
@@ -5383,15 +5396,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
             }
-            ast::Stmt::Global(ast::StmtGlobal {
-                range,
-                node_index: _,
-                names,
-            }) => {
+            flat::StmtKind::Global(stmt_global) => {
+                let range = stmt_global.range();
+                let names = stmt_global.names();
+
                 for name in names {
                     self.scopes_by_expression
-                        .record_expression(name, self.current_scope());
-                    let symbol_id = self.add_symbol(name.id.clone());
+                        .record_expression(&name, self.current_scope());
+                    let symbol_id = self.add_symbol(name.id().clone());
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has already been accessed in this scope.
                     if (symbol.is_bound() || symbol.is_declared() || symbol.is_used())
@@ -5400,9 +5412,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
                                 name: name.to_string(),
-                                start: name.range.start(),
+                                start: name.range().start(),
                             },
-                            range: name.range,
+                            range: name.range(),
                             python_version: self.python_version(),
                         });
                     }
@@ -5410,7 +5422,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     if symbol.is_nonlocal() {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::NonlocalAndGlobal(name.to_string()),
-                            range: name.range,
+                            range: name.range(),
                             python_version: self.python_version(),
                         });
                         // Never mark a symbol both global and nonlocal, even in this error case.
@@ -5434,19 +5446,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         .mark_global();
                     self.current_scope_info_mut()
                         .this_scope_global_or_nonlocal_declarations
-                        .insert(name.id.clone(), *range);
+                        .insert(name.id().clone(), range);
                 }
                 walk_stmt(self, stmt);
             }
-            ast::Stmt::Nonlocal(ast::StmtNonlocal {
-                range,
-                node_index: _,
-                names,
-            }) => {
+            flat::StmtKind::Nonlocal(stmt_nonlocal) => {
+                let range = stmt_nonlocal.range();
+                let names = stmt_nonlocal.names();
+
                 for name in names {
                     self.scopes_by_expression
-                        .record_expression(name, self.current_scope());
-                    let symbol_id = self.add_symbol(name.id.clone());
+                        .record_expression(&name, self.current_scope());
+                    let symbol_id = self.add_symbol(name.id().clone());
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has already been accessed in this scope.
                     if (symbol.is_bound() || symbol.is_declared() || symbol.is_used())
@@ -5455,9 +5466,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::LoadBeforeNonlocalDeclaration {
                                 name: name.to_string(),
-                                start: name.range.start(),
+                                start: name.range().start(),
                             },
-                            range: name.range,
+                            range: name.range(),
                             python_version: self.python_version(),
                         });
                     }
@@ -5465,7 +5476,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     if symbol.is_global() {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::NonlocalAndGlobal(name.to_string()),
-                            range: name.range,
+                            range: name.range(),
                             python_version: self.python_version(),
                         });
                         // Never mark a symbol both global and nonlocal, even in this error case.
@@ -5487,15 +5498,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         .mark_nonlocal();
                     self.current_scope_info_mut()
                         .this_scope_global_or_nonlocal_declarations
-                        .insert(name.id.clone(), *range);
+                        .insert(name.id().clone(), range);
                 }
                 walk_stmt(self, stmt);
             }
-            ast::Stmt::Delete(ast::StmtDelete {
-                targets,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::StmtKind::Delete(stmt_delete) => {
+                let targets = stmt_delete.targets();
+
                 // We will check the target expressions and then delete them.
                 walk_stmt(self, stmt);
                 for target in targets {
@@ -5524,11 +5533,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                 }
             }
-            ast::Stmt::Expr(ast::StmtExpr {
-                value,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::StmtKind::Expr(stmt_expr) => {
+                let value = stmt_expr.value();
+
                 if self.in_module_scope() {
                     if let Some(expr) = dunder_all_extend_argument(value) {
                         self.add_standalone_expression(expr);
@@ -5550,7 +5557,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 if let Some(StatementCall { call, is_await }) =
                     StatementCall::from_expression(value)
                 {
-                    let func = call.func.as_ref();
+                    let func = call.func();
                     // Avoid creating reachability nodes for calls on unannotated collection
                     // literals. Without this short-circuit, performing reachability analysis
                     // can lead to quadratic blowup of cycle dependencies during full-scope
@@ -5567,7 +5574,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         && func
                             .as_attribute_expr()
                             .and_then(|attribute| {
-                                self.unannotated_collection_literal_binding(&attribute.value)
+                                self.unannotated_collection_literal_binding(attribute.value())
                             })
                             .is_none()
                     {
@@ -5608,12 +5615,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 }
 
 impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
-    fn visit_annotation(&mut self, expression: &'ast ast::Expr) {
-        self.annotations.push(expression.node_index().load());
+    fn visit_annotation(&mut self, expression: flat::View<'ast, Expr>) {
+        self.annotations.push(expression.node_index());
         self.visit_expr(expression);
     }
 
-    fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
+    fn visit_stmt(&mut self, stmt: flat::View<'ast, Stmt>) {
         self.push_statement(CurrentStatement::default());
         self.visit_stmt_impl(stmt);
         let mut current_statement = self.pop_statement();
@@ -5625,33 +5632,39 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         current_statement
             .collection_uses
             .retain(|(_, use_expression)| {
-                match stmt {
+                match stmt.classify() {
                     // A return involving the collection object.
-                    ruff_python_ast::Stmt::Return(_) => true,
+                    flat::StmtKind::Return(_) => true,
 
                     // A subscript assignment on the collection object.
-                    ruff_python_ast::Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                        match targets.as_slice() {
-                            [ast::Expr::Subscript(ast::ExprSubscript { value, .. })] => {
-                                ExpressionNodeKey::from(value) == *use_expression
-                            }
-                            _ => false,
-                        }
+                    flat::StmtKind::Assign(stmt_assign) => {
+                        let targets = stmt_assign.targets();
+
+                        targets.as_array().is_some_and(|[target]| {
+                            target.as_subscript_expr().is_some_and(|subscript| {
+                                ExpressionNodeKey::from(subscript.value()) == *use_expression
+                            })
+                        })
                     }
 
                     // An annotated assignment assigning the collection object to a new binding.
-                    ruff_python_ast::Stmt::AnnAssign(_) => true,
+                    flat::StmtKind::AnnAssign(_) => true,
 
                     // A bound-method call on the collection object.
-                    ruff_python_ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
-                        match value.as_ref() {
-                            ast::Expr::Call(ast::ExprCall { func, .. }) => match func.as_ref() {
-                                ruff_python_ast::Expr::Attribute(ast::ExprAttribute {
-                                    value,
-                                    ..
-                                }) => ExpressionNodeKey::from(value) == *use_expression,
-                                _ => false,
-                            },
+                    flat::StmtKind::Expr(stmt_expr) => {
+                        let value = stmt_expr.value();
+
+                        match value.classify() {
+                            flat::ExprKind::Call(expr_call) => {
+                                let func = expr_call.func();
+                                match func.classify() {
+                                    flat::ExprKind::Attribute(expr_attribute) => {
+                                        let value = expr_attribute.value();
+                                        ExpressionNodeKey::from(value) == *use_expression
+                                    }
+                                    _ => false,
+                                }
+                            }
                             _ => false,
                         }
                     }
@@ -5701,16 +5714,16 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         }
     }
 
-    fn visit_keyword(&mut self, keyword: &'ast ast::Keyword) {
+    fn visit_keyword(&mut self, keyword: flat::View<'ast, Keyword>) {
         walk_keyword(self, keyword);
 
-        if keyword.arg.is_some() {
+        if keyword.arg().is_some() {
             return;
         }
 
         // Record a use of all members of `x` for a splatted keyword argument `**x`.
         let current_scope = self.current_scope();
-        let member_places = PlaceExpr::try_from_expr(&keyword.value)
+        let member_places = PlaceExpr::try_from_expr(keyword.value())
             .and_then(|value_place_expr| {
                 self.current_place_table()
                     .place_id((&value_place_expr).into())
@@ -5737,27 +5750,27 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     .map(|key_member_id| ScopedPlaceId::from(*key_member_id))
             });
 
-        let use_id = self.ast_ids[current_scope].record_use(keyword);
+        let use_id = self.ast_ids.record_use(current_scope, keyword);
         self.use_def_maps[current_scope]
             .record_multi_use(member_places.into_iter().flatten(), use_id);
     }
 
-    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+    fn visit_expr(&mut self, expr: flat::View<'ast, Expr>) {
         // Generic AST walking evaluates child expressions as values. Short-circuit syntax
         // propagates condition context explicitly through `visit_expr_with_context`.
         self.visit_expr_with_context(expr, ExpressionContext::Value);
     }
 
-    fn visit_parameters(&mut self, parameters: &'ast ast::Parameters) {
+    fn visit_parameters(&mut self, parameters: flat::View<'ast, Parameters>) {
         // Intentionally avoid walking default expressions, as we handle them in the enclosing
         // scope.
-        for parameter in parameters.iter().map(ast::AnyParameterRef::as_parameter) {
+        for parameter in parameters.iter().map(flat::AnyParameter::as_parameter) {
             self.visit_parameter(parameter);
         }
     }
 
-    fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
-        if let ast::Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) = pattern
+    fn visit_pattern(&mut self, pattern: flat::View<'ast, Pattern>) {
+        if let ast::Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) = pattern.fields()
             && let Some((last, alternatives)) = patterns.split_last()
             && (
                 // Capture-free alternatives do not affect bindings and need no flow merge.
@@ -5794,8 +5807,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         if let ast::Pattern::MatchStar(ast::PatternMatchStar {
             name: Some(name),
             range: _,
-            node_index: _,
-        }) = pattern
+            node: _,
+        }) = pattern.fields()
         {
             let symbol = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
@@ -5816,7 +5829,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         })
         | ast::Pattern::MatchMapping(ast::PatternMatchMapping {
             rest: Some(name), ..
-        }) = pattern
+        }) = pattern.fields()
         {
             let symbol = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
@@ -5884,7 +5897,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
             match scope.kind() {
                 ScopeKind::Class | ScopeKind::Lambda => return false,
                 ScopeKind::Function => {
-                    return scope.node().expect_function().node(self.module).is_async;
+                    return scope.node().expect_function().node(self.module).is_async();
                 }
                 ScopeKind::Comprehension
                 | ScopeKind::Module
@@ -5931,20 +5944,14 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
         for scope_info in self.scope_stack.iter().rev() {
             let scope = &self.scopes[scope_info.file_scope_id];
             let generators = match scope.node() {
-                NodeWithScopeKind::ListComprehension(node) => {
-                    node.node(self.module).generators.as_ref()
-                }
-                NodeWithScopeKind::SetComprehension(node) => {
-                    node.node(self.module).generators.as_ref()
-                }
-                NodeWithScopeKind::DictComprehension(node) => {
-                    node.node(self.module).generators.as_ref()
-                }
+                NodeWithScopeKind::ListComprehension(node) => node.node(self.module).generators(),
+                NodeWithScopeKind::SetComprehension(node) => node.node(self.module).generators(),
+                NodeWithScopeKind::DictComprehension(node) => node.node(self.module).generators(),
                 _ => continue,
             };
             if generators
                 .iter()
-                .all(|comprehension| !comprehension.is_async)
+                .all(|comprehension| !comprehension.is_async())
             {
                 return true;
             }
@@ -6015,7 +6022,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
         self.scopes[self.current_scope()]
             .node()
             .as_function()
-            .is_some_and(|func| func.node(self.module).parameters.includes(name))
+            .is_some_and(|func| func.node(self.module).parameters().includes(name))
     }
 }
 
@@ -6029,27 +6036,27 @@ struct PendingAnnotatedAssignment<'db> {
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum CurrentAssignment<'ast, 'db> {
     Assign {
-        node: &'ast ast::StmtAssign,
+        node: flat::View<'ast, StmtAssign>,
         unpack: Option<Unpack<'db>>,
         owner: BindingsOwner,
     },
     AnnAssign {
-        node: &'ast ast::StmtAnnAssign,
+        node: flat::View<'ast, StmtAnnAssign>,
         pending: Option<PendingAnnotatedAssignment<'db>>,
     },
-    AugAssign(&'ast ast::StmtAugAssign),
+    AugAssign(flat::View<'ast, StmtAugAssign>),
     For {
-        node: &'ast ast::StmtFor,
+        node: flat::View<'ast, StmtFor>,
         unpack: Option<(UnpackPosition, Unpack<'db>)>,
     },
-    Named(&'ast ast::ExprNamed),
+    Named(flat::View<'ast, ExprNamed>),
     Comprehension {
-        node: &'ast ast::Comprehension,
+        node: flat::View<'ast, Comprehension>,
         first: bool,
         unpack: Option<(UnpackPosition, Unpack<'db>)>,
     },
     WithItem {
-        item: &'ast ast::WithItem,
+        item: flat::View<'ast, WithItem>,
         is_async: bool,
         unpack: Option<(UnpackPosition, Unpack<'db>)>,
     },
@@ -6071,7 +6078,7 @@ impl CurrentAssignment<'_, '_> {
 #[derive(Default)]
 struct CurrentStatement<'ast, 'db> {
     /// A list of lambda expressions contained in this statement.
-    lambda_expressions: Vec<&'ast ast::ExprLambda>,
+    lambda_expressions: Vec<flat::View<'ast, ExprLambda>>,
     /// A list of collection definitions whose uses are contained in this statement.
     collection_uses: Vec<(Definition<'db>, ExpressionNodeKey)>,
 }
@@ -6079,43 +6086,40 @@ struct CurrentStatement<'ast, 'db> {
 #[derive(Debug, PartialEq)]
 struct CurrentMatchCase<'ast, 'db> {
     /// The pattern that's part of the current match case.
-    pattern: &'ast ast::Pattern,
+    pattern: flat::View<'ast, Pattern>,
 
     /// The predicate for the complete match case.
     predicate: PatternPredicate<'db>,
 }
 
 impl<'ast, 'db> CurrentMatchCase<'ast, 'db> {
-    fn new(pattern: &'ast ast::Pattern, predicate: PatternPredicate<'db>) -> Self {
+    fn new(pattern: flat::View<'ast, Pattern>, predicate: PatternPredicate<'db>) -> Self {
         Self { pattern, predicate }
     }
 }
 
 enum Unpackable<'ast> {
-    Assign(&'ast ast::StmtAssign),
-    For(&'ast ast::StmtFor),
+    Assign(flat::View<'ast, StmtAssign>),
+    For(flat::View<'ast, StmtFor>),
     WithItem {
-        item: &'ast ast::WithItem,
+        item: flat::View<'ast, WithItem>,
         is_async: bool,
     },
     Comprehension {
         first: bool,
-        node: &'ast ast::Comprehension,
+        node: flat::View<'ast, Comprehension>,
     },
 }
 
 impl<'ast> Unpackable<'ast> {
-    const fn kind(&self) -> UnpackKind {
+    fn kind(&self) -> UnpackKind {
         match self {
             Unpackable::Assign(_) => UnpackKind::Assign,
-            Unpackable::For(ast::StmtFor { is_async, .. }) => UnpackKind::Iterable {
-                mode: EvaluationMode::from_is_async(*is_async),
+            Unpackable::For(node) => UnpackKind::Iterable {
+                mode: EvaluationMode::from_is_async(node.is_async()),
             },
-            Unpackable::Comprehension {
-                node: ast::Comprehension { is_async, .. },
-                ..
-            } => UnpackKind::Iterable {
-                mode: EvaluationMode::from_is_async(*is_async),
+            Unpackable::Comprehension { node, .. } => UnpackKind::Iterable {
+                mode: EvaluationMode::from_is_async(node.is_async()),
             },
             Unpackable::WithItem { is_async, .. } => UnpackKind::ContextManager {
                 mode: EvaluationMode::from_is_async(*is_async),
@@ -6128,7 +6132,7 @@ impl<'ast> Unpackable<'ast> {
         unpack: Option<Unpack<'db>>,
     ) -> CurrentAssignment<'ast, 'db> {
         let positioned = unpack.map(|unpack| (UnpackPosition::First, unpack));
-        match self {
+        match *self {
             Unpackable::Assign(stmt) => CurrentAssignment::Assign {
                 node: stmt,
                 unpack,
@@ -6140,12 +6144,12 @@ impl<'ast> Unpackable<'ast> {
             },
             Unpackable::WithItem { item, is_async } => CurrentAssignment::WithItem {
                 item,
-                is_async: *is_async,
+                is_async,
                 unpack: positioned,
             },
             Unpackable::Comprehension { node, first } => CurrentAssignment::Comprehension {
                 node,
-                first: *first,
+                first,
                 unpack: positioned,
             },
         }
@@ -6155,22 +6159,17 @@ impl<'ast> Unpackable<'ast> {
 /// Returns the single argument to `__all__.extend()`, if it is a call to `__all__.extend()`
 /// where it looks like the argument might be a `submodule.__all__` expression.
 /// Else, returns `None`.
-fn dunder_all_extend_argument(value: &ast::Expr) -> Option<&ast::Expr> {
-    let ast::ExprCall {
-        func,
-        arguments:
-            ast::Arguments {
-                args,
-                keywords,
-                range: _,
-                node_index: _,
-            },
-        ..
-    } = value.as_call_expr()?;
+fn dunder_all_extend_argument(value: flat::View<'_, Expr>) -> Option<flat::View<'_, Expr>> {
+    let expr_call_node = value.as_call_expr()?;
+    let func = expr_call_node.func();
+    let arguments = expr_call_node.arguments();
 
-    let ast::ExprAttribute { value, attr, .. } = func.as_attribute_expr()?;
+    let expr_attribute_node = func.as_attribute_expr()?;
+    let value = expr_attribute_node.value();
+    let attr = expr_attribute_node.attr();
 
-    let ast::ExprName { id, .. } = value.as_name_expr()?;
+    let expr_name_node = value.as_name_expr()?;
+    let id = expr_name_node.id();
 
     if id != "__all__" {
         return None;
@@ -6180,15 +6179,15 @@ fn dunder_all_extend_argument(value: &ast::Expr) -> Option<&ast::Expr> {
         return None;
     }
 
-    if !keywords.is_empty() {
+    if !arguments.keywords().is_empty() {
         return None;
     }
 
-    let [single_argument] = &**args else {
-        return None;
-    };
+    let [single_argument] = arguments.args().as_array()?;
 
-    let ast::ExprAttribute { value, attr, .. } = single_argument.as_attribute_expr()?;
+    let expr_attribute_node = single_argument.as_attribute_expr()?;
+    let value = expr_attribute_node.value();
+    let attr = expr_attribute_node.attr();
 
     (attr == "__all__").then_some(value)
 }
@@ -6199,11 +6198,11 @@ fn dunder_all_extend_argument(value: &ast::Expr) -> Option<&ast::Expr> {
 /// emit the predicate for syntactically direct `range(...)` calls; type checking later verifies that
 /// the callee resolves to the built-in `range` and determines whether the range is statically
 /// non-empty.
-fn is_direct_range_call(expr: &ast::Expr) -> bool {
+fn is_direct_range_call(expr: flat::View<'_, Expr>) -> bool {
     expr.expression_value()
         .as_call_expr()
-        .and_then(|call| call.func.as_name_expr())
-        .is_some_and(|name| name.id == "range")
+        .and_then(|call| call.func().as_name_expr())
+        .is_some_and(|name| name.id() == "range")
 }
 
 /// Builds an interval-map that matches expressions (by their node index) to their enclosing scopes.
@@ -6216,26 +6215,39 @@ fn is_direct_range_call(expr: &ast::Expr) -> bool {
 ///    by collapsing adjacent node indices with the same scope
 ///    into a single interval.
 struct ExpressionsScopeMapBuilder {
-    expression_and_scope: Vec<(NodeIndex, FileScopeId)>,
+    module: Vec<Option<FileScopeId>>,
+    annotations: Vec<(NodeIndex, FileScopeId)>,
 }
 
 impl ExpressionsScopeMapBuilder {
     fn new() -> Self {
         Self {
-            expression_and_scope: vec![],
+            module: Vec::new(),
+            annotations: Vec::new(),
         }
     }
 
     fn record_expression(&mut self, expression: &impl HasTrackedScope, scope: FileScopeId) {
-        self.expression_and_scope
-            .push((expression.node_index().load(), scope));
+        let index = expression.node_index();
+        if let Some(row) = index.as_u32().filter(|&index| index <= MAX_REAL_INDEX) {
+            let row = row as usize;
+            if row >= self.module.len() {
+                self.module.resize(row + 1, None);
+            }
+            self.module[row] = Some(scope);
+        } else {
+            self.annotations.push((index, scope));
+        }
     }
 
     fn build(mut self) -> ExpressionsScopeMap {
-        self.expression_and_scope
-            .sort_unstable_by_key(|(index, _)| *index);
-
-        let mut iter = self.expression_and_scope.into_iter();
+        // Module indices already give source order. String annotations use sparse
+        // indices above the module, so only those entries need sorting.
+        self.annotations.sort_unstable_by_key(|(index, _)| *index);
+        let mut iter = (0_u32..)
+            .zip(self.module)
+            .filter_map(|(row, scope)| scope.map(|scope| (NodeIndex::from(row), scope)))
+            .chain(self.annotations);
         let Some(first) = iter.next() else {
             return ExpressionsScopeMap::default();
         };
@@ -6267,23 +6279,29 @@ impl ExpressionsScopeMapBuilder {
 ///
 /// Returns [`Truthiness::Unknown`] for other expressions and when starred elements or dictionary
 /// unpacking make the literal's emptiness ambiguous.
-fn literal_iterable_truthiness(expr: &ast::Expr) -> Truthiness {
-    match expr {
-        ast::Expr::Tuple(_)
-        | ast::Expr::List(_)
-        | ast::Expr::Set(_)
-        | ast::Expr::Dict(_)
-        | ast::Expr::StringLiteral(_)
-        | ast::Expr::BytesLiteral(_) => Truthiness::from_expr(expr, |_| false),
+fn literal_iterable_truthiness(expr: flat::View<'_, Expr>) -> Truthiness {
+    match expr.classify() {
+        flat::ExprKind::Tuple(_)
+        | flat::ExprKind::List(_)
+        | flat::ExprKind::Set(_)
+        | flat::ExprKind::Dict(_)
+        | flat::ExprKind::StringLiteral(_)
+        | flat::ExprKind::BytesLiteral(_) => Truthiness::from_view(expr, |_| false),
         _ => Truthiness::Unknown,
     }
 }
 
 /// Returns if the expression is a `TYPE_CHECKING` expression.
-fn is_if_type_checking(expr: &ast::Expr) -> bool {
-    match expr {
-        ast::Expr::Name(ast::ExprName { id, .. }) => id == "TYPE_CHECKING",
-        ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+fn is_if_type_checking(expr: flat::View<'_, Expr>) -> bool {
+    match expr.classify() {
+        flat::ExprKind::Name(expr_name) => {
+            let id = expr_name.id();
+            id == "TYPE_CHECKING"
+        }
+        flat::ExprKind::Attribute(expr_attribute) => {
+            let value = expr_attribute.value();
+            let attr = expr_attribute.attr();
+
             attr == "TYPE_CHECKING" && is_dotted_name(value)
         }
         _ => false,
@@ -6291,35 +6309,34 @@ fn is_if_type_checking(expr: &ast::Expr) -> bool {
 }
 
 /// Returns if the expression is a `not TYPE_CHECKING` expression.
-fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
+fn is_if_not_type_checking(expr: flat::View<'_, Expr>) -> bool {
     matches!(
-        expr,
+        expr.fields(),
         ast::Expr::UnaryOp(ast::ExprUnaryOp {
-            op: ast::UnaryOp::Not,
+            op: UnaryOp::Not,
             operand,
             ..
         }) if is_if_type_checking(operand)
     )
 }
 
-fn is_empty_collection_constructor_call(expr: &ast::Expr) -> bool {
-    let ast::Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = expr
-    else {
+fn is_empty_collection_constructor_call(expr: flat::View<'_, Expr>) -> bool {
+    let flat::ExprKind::Call(call_node) = expr.classify() else {
         return false;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
     arguments.is_empty()
         && func
             .as_name_expr()
-            .is_some_and(|name| matches!(name.id.as_str(), "list" | "set" | "dict"))
+            .is_some_and(|name| matches!(name.id().as_str(), "list" | "set" | "dict"))
 }
 
-fn is_collection_initializer(expr: &ast::Expr) -> bool {
+fn is_collection_initializer(expr: flat::View<'_, Expr>) -> bool {
     is_collection_literal(expr) || is_empty_collection_constructor_call(expr)
 }
 
-fn is_collection_literal(expr: &ast::Expr) -> bool {
+fn is_collection_literal(expr: flat::View<'_, Expr>) -> bool {
     expr.is_list_expr() || expr.is_set_expr() || expr.is_dict_expr()
 }

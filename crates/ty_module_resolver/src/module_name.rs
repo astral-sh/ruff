@@ -311,17 +311,15 @@ impl ModuleName {
     pub fn from_import_statement<'db>(
         db: &'db dyn Db,
         importing_file: ImportingFile<'db>,
-        node: &ast::StmtImportFrom,
+        node: ast::flat::View<'_, ast::StmtImportFrom>,
     ) -> Result<Self, ModuleNameResolutionError> {
-        let ast::StmtImportFrom {
-            module,
-            level,
-            names: _,
-            is_lazy: _,
-            range: _,
-            node_index: _,
-        } = node;
-        Self::from_identifier_parts(db, importing_file, module.as_deref(), *level)
+        Self::from_identifier_parts(
+            db,
+            importing_file,
+            node.module()
+                .map(ast::flat::View::<ast::Identifier>::as_str),
+            node.level(),
+        )
     }
 
     /// Computes the absolute module name from the LHS components of `from LHS import RHS`

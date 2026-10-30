@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use ruff_db::{PythonFile, files::File, parsed::ParsedModuleRef};
 use ruff_index::newtype_index;
-use ruff_python_ast::{self as ast, NodeIndex};
+use ruff_python_ast::{self as ast, NodeIndex, flat};
 
 use crate::{
     Db, Program, ProgramFile, SemanticIndex, ast_node_ref::AstNodeRef, definition::Definition,
@@ -72,18 +72,18 @@ impl<'db> ScopeId<'db> {
         match self.node(db) {
             NodeWithScopeKind::Module => "<module>",
             NodeWithScopeKind::Class(class) | NodeWithScopeKind::ClassTypeParameters(class) => {
-                class.node(module).name.as_str()
+                class.node(module).name().as_str()
             }
             NodeWithScopeKind::Function(function)
             | NodeWithScopeKind::FunctionTypeParameters(function) => {
-                function.node(module).name.as_str()
+                function.node(module).name().as_str()
             }
             NodeWithScopeKind::TypeAlias(type_alias)
             | NodeWithScopeKind::TypeAliasTypeParameters(type_alias) => type_alias
                 .node(module)
-                .name
+                .name()
                 .as_name_expr()
-                .map(|name| name.id.as_str())
+                .map(|name| name.id().as_str())
                 .unwrap_or("<type alias>"),
             NodeWithScopeKind::Lambda(_) => "<lambda>",
             NodeWithScopeKind::ListComprehension(_) => "<listcomp>",
@@ -284,17 +284,17 @@ impl ScopeKind {
 #[derive(Copy, Clone, Debug)]
 pub enum NodeWithScopeRef<'a> {
     Module,
-    Class(&'a ast::StmtClassDef),
-    Function(&'a ast::StmtFunctionDef),
-    Lambda(&'a ast::ExprLambda),
-    FunctionTypeParameters(&'a ast::StmtFunctionDef),
-    ClassTypeParameters(&'a ast::StmtClassDef),
-    TypeAlias(&'a ast::StmtTypeAlias),
-    TypeAliasTypeParameters(&'a ast::StmtTypeAlias),
-    ListComprehension(&'a ast::ExprListComp),
-    SetComprehension(&'a ast::ExprSetComp),
-    DictComprehension(&'a ast::ExprDictComp),
-    GeneratorExpression(&'a ast::ExprGenerator),
+    Class(flat::View<'a, ast::StmtClassDef>),
+    Function(flat::View<'a, ast::StmtFunctionDef>),
+    Lambda(flat::View<'a, ast::ExprLambda>),
+    FunctionTypeParameters(flat::View<'a, ast::StmtFunctionDef>),
+    ClassTypeParameters(flat::View<'a, ast::StmtClassDef>),
+    TypeAlias(flat::View<'a, ast::StmtTypeAlias>),
+    TypeAliasTypeParameters(flat::View<'a, ast::StmtTypeAlias>),
+    ListComprehension(flat::View<'a, ast::ExprListComp>),
+    SetComprehension(flat::View<'a, ast::ExprSetComp>),
+    DictComprehension(flat::View<'a, ast::ExprDictComp>),
+    GeneratorExpression(flat::View<'a, ast::ExprGenerator>),
 }
 
 impl NodeWithScopeRef<'_> {
@@ -305,37 +305,39 @@ impl NodeWithScopeRef<'_> {
         match self {
             NodeWithScopeRef::Module => NodeWithScopeKind::Module,
             NodeWithScopeRef::Class(class) => {
-                NodeWithScopeKind::Class(AstNodeRef::new(module, class))
+                NodeWithScopeKind::Class(AstNodeRef::from_view(module, class))
             }
             NodeWithScopeRef::Function(function) => {
-                NodeWithScopeKind::Function(AstNodeRef::new(module, function))
+                NodeWithScopeKind::Function(AstNodeRef::from_view(module, function))
             }
             NodeWithScopeRef::TypeAlias(type_alias) => {
-                NodeWithScopeKind::TypeAlias(AstNodeRef::new(module, type_alias))
+                NodeWithScopeKind::TypeAlias(AstNodeRef::from_view(module, type_alias))
             }
             NodeWithScopeRef::TypeAliasTypeParameters(type_alias) => {
-                NodeWithScopeKind::TypeAliasTypeParameters(AstNodeRef::new(module, type_alias))
+                NodeWithScopeKind::TypeAliasTypeParameters(AstNodeRef::from_view(
+                    module, type_alias,
+                ))
             }
             NodeWithScopeRef::Lambda(lambda) => {
-                NodeWithScopeKind::Lambda(AstNodeRef::new(module, lambda))
+                NodeWithScopeKind::Lambda(AstNodeRef::from_view(module, lambda))
             }
             NodeWithScopeRef::FunctionTypeParameters(function) => {
-                NodeWithScopeKind::FunctionTypeParameters(AstNodeRef::new(module, function))
+                NodeWithScopeKind::FunctionTypeParameters(AstNodeRef::from_view(module, function))
             }
             NodeWithScopeRef::ClassTypeParameters(class) => {
-                NodeWithScopeKind::ClassTypeParameters(AstNodeRef::new(module, class))
+                NodeWithScopeKind::ClassTypeParameters(AstNodeRef::from_view(module, class))
             }
             NodeWithScopeRef::ListComprehension(comprehension) => {
-                NodeWithScopeKind::ListComprehension(AstNodeRef::new(module, comprehension))
+                NodeWithScopeKind::ListComprehension(AstNodeRef::from_view(module, comprehension))
             }
             NodeWithScopeRef::SetComprehension(comprehension) => {
-                NodeWithScopeKind::SetComprehension(AstNodeRef::new(module, comprehension))
+                NodeWithScopeKind::SetComprehension(AstNodeRef::from_view(module, comprehension))
             }
             NodeWithScopeRef::DictComprehension(comprehension) => {
-                NodeWithScopeKind::DictComprehension(AstNodeRef::new(module, comprehension))
+                NodeWithScopeKind::DictComprehension(AstNodeRef::from_view(module, comprehension))
             }
             NodeWithScopeRef::GeneratorExpression(generator) => {
-                NodeWithScopeKind::GeneratorExpression(AstNodeRef::new(module, generator))
+                NodeWithScopeKind::GeneratorExpression(AstNodeRef::from_view(module, generator))
             }
         }
     }
