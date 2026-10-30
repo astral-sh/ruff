@@ -35,15 +35,16 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
         } = item;
 
         let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling(item);
 
         // Names and identifiers both preserve their source spelling. A contiguous `a.b`
         // can therefore share one slice, provided no comments or fluent layout intervene.
         if value.is_name_expr()
             && !call_chain_layout.is_fluent()
             && &f.context().source()[TextRange::new(value.end(), attr.start())] == "."
-            && !f.context().is_expression_parenthesized(value.into())
-            && !f.context().comments().has(value.as_ref())
-            && !f.context().comments().has_dangling(item)
+            && !comments.has(value.as_ref())
+            && dangling.is_empty()
         {
             return source_text_slice(item.range()).fmt(f);
         }
@@ -85,8 +86,6 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             } else {
                 value.format().with_options(Parentheses::Never).fmt(f)?;
             }
-
-            let comments = f.context().comments().clone();
 
             // Always add a line break if the value is parenthesized and there's an
             // end of line comment on the same line as the closing parenthesis.
@@ -160,7 +159,6 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             //      b
             // )
             // ```
-            let dangling = comments.dangling(item);
             let dot_start = attr.start() - TextSize::new(1);
             if dangling.is_empty()
                 && f.context().source().as_bytes()[usize::from(dot_start)] == b'.'
