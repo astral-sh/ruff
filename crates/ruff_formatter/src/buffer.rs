@@ -172,6 +172,8 @@ impl<W: Buffer<Context = Context> + ?Sized, Context> Buffer for &mut W {
 pub struct VecBuffer<'a, Context> {
     state: &'a mut FormatState<Context>,
     elements: Vec<FormatElement>,
+    /// Elements before this index belong to enclosing captures or the output.
+    start: usize,
 }
 
 impl<'a, Context> VecBuffer<'a, Context> {
@@ -180,7 +182,11 @@ impl<'a, Context> VecBuffer<'a, Context> {
     }
 
     fn new_with_vec(state: &'a mut FormatState<Context>, elements: Vec<FormatElement>) -> Self {
-        Self { state, elements }
+        Self {
+            state,
+            elements,
+            start: 0,
+        }
     }
 
     /// Creates a buffer with the specified capacity
@@ -188,12 +194,43 @@ impl<'a, Context> VecBuffer<'a, Context> {
         Self {
             state,
             elements: Vec::with_capacity(capacity),
+            start: 0,
         }
     }
 
     /// Consumes the buffer and returns the written [`FormatElement]`s as a vector.
     pub fn into_vec(self) -> Vec<FormatElement> {
         self.elements
+    }
+
+    /// Writes into the end of this buffer and drains the captured elements into
+    /// `finish`, retaining the allocation for subsequent writes. Enclosing
+    /// elements are hidden while formatting the capture.
+    pub(crate) fn capture<T>(
+        &mut self,
+        write: impl FnOnce(&mut Self) -> FormatResult<()>,
+        finish: impl FnOnce(std::vec::Drain<'_, FormatElement>) -> T,
+    ) -> FormatResult<T> {
+        struct Capture<'b, 'a, C> {
+            buffer: &'b mut VecBuffer<'a, C>,
+            previous_start: usize,
+        }
+        impl<C> Drop for Capture<'_, '_, C> {
+            fn drop(&mut self) {
+                self.buffer.elements.truncate(self.buffer.start);
+                self.buffer.start = self.previous_start;
+            }
+        }
+
+        let start = self.elements.len();
+        let previous_start = std::mem::replace(&mut self.start, start);
+        let capture = Capture {
+            buffer: self,
+            previous_start,
+        };
+        write(capture.buffer)?;
+        let result = finish(capture.buffer.elements.drain(start..));
+        Ok(result)
     }
 
     /// Takes the elements without consuming self
@@ -206,13 +243,13 @@ impl<Context> Deref for VecBuffer<'_, Context> {
     type Target = [FormatElement];
 
     fn deref(&self) -> &Self::Target {
-        &self.elements
+        &self.elements[self.start..]
     }
 }
 
 impl<Context> DerefMut for VecBuffer<'_, Context> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.elements
+        &mut self.elements[self.start..]
     }
 }
 
@@ -246,7 +283,7 @@ impl<Context> Buffer for VecBuffer<'_, Context> {
     fn restore_snapshot(&mut self, snapshot: BufferSnapshot) {
         let position = snapshot.unwrap_position();
         assert!(
-            self.elements.len() >= position,
+            self.start <= position && self.elements.len() >= position,
             r#"Outdated snapshot. This buffer contains fewer elements than at the time the snapshot was taken.
 Make sure that you take and restore the snapshot in order and that this snapshot belongs to the current buffer."#
         );
@@ -702,5 +739,102 @@ impl Deref for Recorded<'_> {
 
     fn deref(&self) -> &Self::Target {
         self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+
+    use super::*;
+    use crate::{FormatError, SimpleFormatContext};
+
+    #[test]
+    fn nested_captures() -> FormatResult<()> {
+        let mut state = FormatState::new(SimpleFormatContext::default());
+        let mut buffer = VecBuffer::new(&mut state);
+        buffer.write_element(FormatElement::Token { text: "output" });
+
+        let captured = buffer.capture(
+            |outer| {
+                assert!(outer.elements().is_empty());
+                outer.write_element(FormatElement::Space);
+                let snapshot = outer.snapshot();
+
+                let inner = outer.capture(
+                    |inner| {
+                        assert!(inner.elements().is_empty());
+                        inner.write_element(FormatElement::Space);
+                        inner[0] = FormatElement::ExpandParent;
+                        Ok(())
+                    },
+                    |elements| elements.collect::<Vec<_>>(),
+                )?;
+                assert_eq!(inner, [FormatElement::ExpandParent]);
+                assert_eq!(outer.elements(), &[FormatElement::Space]);
+
+                outer.write_element(FormatElement::ExpandParent);
+                outer.restore_snapshot(snapshot);
+                assert_eq!(outer.elements(), &[FormatElement::Space]);
+                Ok(())
+            },
+            |elements| elements.collect::<Vec<_>>(),
+        )?;
+
+        assert_eq!(captured, [FormatElement::Space]);
+        assert_eq!(
+            buffer.elements(),
+            &[FormatElement::Token { text: "output" }]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn capture_restores_buffer_after_error() {
+        let mut state = FormatState::new(SimpleFormatContext::default());
+        let mut buffer = VecBuffer::new(&mut state);
+        buffer.write_element(FormatElement::Token { text: "output" });
+        let mut finalized = false;
+
+        let result = buffer.capture(
+            |capture| {
+                capture.write_element(FormatElement::Space);
+                Err(FormatError::syntax_error("failed capture"))
+            },
+            |_| finalized = true,
+        );
+
+        assert!(result.is_err());
+        assert!(!finalized);
+        assert_eq!(
+            buffer.elements(),
+            &[FormatElement::Token { text: "output" }]
+        );
+    }
+
+    #[test]
+    fn capture_restores_buffer_after_panic() {
+        let mut state = FormatState::new(SimpleFormatContext::default());
+        let mut buffer = VecBuffer::new(&mut state);
+        buffer.write_element(FormatElement::Token { text: "output" });
+
+        for panic_while_writing in [true, false] {
+            let result = catch_unwind(AssertUnwindSafe(|| {
+                buffer.capture(
+                    |capture| {
+                        capture.write_element(FormatElement::Space);
+                        assert!(!panic_while_writing, "failed capture");
+                        Ok(())
+                    },
+                    |_| panic!("failed finalization"),
+                )
+            }));
+
+            assert!(result.is_err());
+            assert_eq!(
+                buffer.elements(),
+                &[FormatElement::Token { text: "output" }]
+            );
+        }
     }
 }
