@@ -1,5 +1,4 @@
 use std::fmt::Debug;
-use std::marker::PhantomData;
 
 #[cfg(debug_assertions)]
 use ruff_db::files::File;
@@ -36,8 +35,7 @@ use ruff_text_size::Ranged;
 /// run on every AST change. All other queries only run when the expression's identity changes.
 #[derive(Clone)]
 pub struct AstNodeRef<T> {
-    /// The index of the node in the AST.
-    index: NodeIndex,
+    handle: flat::Handle<T>,
 
     /// Debug information.
     #[cfg(debug_assertions)]
@@ -51,8 +49,6 @@ pub struct AstNodeRef<T> {
     file: File,
     #[cfg(debug_assertions)]
     python_version: PythonVersion,
-
-    _node: PhantomData<T>,
 }
 
 impl<T> AstNodeRef<T> {
@@ -69,7 +65,7 @@ impl<T> AstNodeRef<T> {
         );
     }
 
-    /// Resolves the stable source-order index in this parse.
+    /// Resolves the row in the current parse of the same module.
     #[track_caller]
     pub fn node<'ast>(&self, module_ref: &'ast ParsedModuleRef) -> flat::View<'ast, T>
     where
@@ -78,16 +74,15 @@ impl<T> AstNodeRef<T> {
         #[cfg(debug_assertions)]
         self.check_module(module_ref);
         module_ref
-            .get_by_index(self.index)
-            .cast()
+            .ast()
+            .view(self.handle)
             .expect("AST indices should never change within the same revision")
     }
 
     pub fn from_view(module_ref: &ParsedModuleRef, node: flat::View<'_, T>) -> Self {
-        let index = node.node_index();
-        debug_assert!(module_ref.get_by_index(index).is_same_node(node));
+        debug_assert!(std::ptr::eq(module_ref.ast(), node.ast()));
         Self {
-            index,
+            handle: node.handle(),
             #[cfg(debug_assertions)]
             file: module_ref.module().file(),
             #[cfg(debug_assertions)]
@@ -96,12 +91,11 @@ impl<T> AstNodeRef<T> {
             kind: node.erase().node_kind(),
             #[cfg(debug_assertions)]
             range: node.range(),
-            _node: PhantomData,
         }
     }
 
     pub fn index(&self) -> NodeIndex {
-        self.index
+        self.handle.module_index()
     }
 }
 
@@ -127,17 +121,50 @@ where
     }
 }
 
-#[cfg(all(test, debug_assertions))]
+#[cfg(test)]
 mod tests {
     use ruff_db::PythonFile;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_python_ast::PythonVersion;
+    use ruff_text_size::Ranged;
 
     use crate::ast_node_ref::AstNodeRef;
     use crate::db::tests::TestDbBuilder;
 
     #[test]
+    fn handles_survive_cache_eviction() {
+        let db = TestDbBuilder::new()
+            .with_file("test.py", "def f(x): return x.child(1)[0]\n")
+            .build()
+            .unwrap();
+        let file = system_path_to_file(&db, "test.py").unwrap();
+        let parsed = parsed_module(&db, PythonFile::new(&db, file, PythonVersion::PY312));
+        let references: Vec<_> = {
+            let first = parsed.load(&db);
+            first
+                .root()
+                .descendants()
+                .map(|node| {
+                    (
+                        AstNodeRef::from_view(&first, node),
+                        node.node_kind(),
+                        node.range(),
+                    )
+                })
+                .collect()
+        };
+        parsed.clear();
+
+        let fresh = parsed.load(&db);
+        for (reference, kind, range) in references {
+            let node = reference.node(&fresh);
+            assert_eq!((node.node_kind(), node.range()), (kind, range));
+        }
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
     #[should_panic(
         expected = "an `AstNodeRef` cannot be used with a module parsed for a different file or Python version"
     )]

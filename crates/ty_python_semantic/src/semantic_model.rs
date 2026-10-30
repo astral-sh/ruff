@@ -1157,10 +1157,15 @@ impl HasType for flat::View<'_, ast::ExceptHandlerExceptHandler> {
 
 #[cfg(test)]
 mod tests {
-    use crate::db::tests::TestDbBuilder;
+    use crate::db::tests::{TestDb, TestDbBuilder};
+    use crate::types::{ClassLiteral, Type};
     use crate::{HasType, SemanticModel};
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
+    use ruff_db::system::DbWithWritableSystem;
+    use ruff_python_ast::{ExprCall, flat};
+    use ruff_text_size::Ranged;
+    use salsa::plumbing::AsId;
     use ty_python_core::ProgramFile;
 
     #[test]
@@ -1200,6 +1205,42 @@ mod tests {
 
         assert!(ty.is_class_literal());
 
+        Ok(())
+    }
+
+    #[test]
+    fn dangling_class_rows_survive_edits_around_the_calls() -> anyhow::Result<()> {
+        let path = "/src/factory.py";
+        let source = "def make(flag):\n    if flag:\n        return type('C', (), {})\n    return type('C', (), {})\n";
+        let mut db = TestDbBuilder::new().with_file(path, source).build()?;
+        let file = system_path_to_file(&db, path)?;
+        let classes = |db: &TestDb| {
+            let file = ProgramFile::new(db, file, db.program_environment().program(db));
+            let module = parsed_module(db, file.python_file(db)).load(db);
+            let model = SemanticModel::new(db, file);
+            module
+                .root()
+                .descendants()
+                .filter_map(flat::View::cast::<ExprCall>)
+                .map(|call| {
+                    let literal = call
+                        .inferred_type(&model)
+                        .and_then(Type::as_class_literal)
+                        .unwrap();
+                    assert_eq!(literal.header_range(db), call.range());
+                    let ClassLiteral::Dynamic(class) = literal else {
+                        panic!("expected a dynamic class")
+                    };
+                    class.as_id()
+                })
+                .collect::<Vec<_>>()
+        };
+        let before = classes(&db);
+        assert_eq!(before.len(), 2);
+        assert_ne!(before[0], before[1]);
+        // Both the module row numbers and the function's closing row move.
+        db.write_file(path, format!("outside = [1, 2]\n\n{source}    pass\n"))?;
+        assert_eq!(classes(&db), before);
         Ok(())
     }
 

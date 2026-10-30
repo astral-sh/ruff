@@ -178,17 +178,15 @@ mod tests {
 
     #[test]
     fn uses_across_blocks_scopes_and_annotations() -> Result<(), ParseError> {
-        let mut module = parse_expression("(a, b, c)")?;
-        module.index_source_order(62, 65).unwrap();
+        let mut module = parse_expression(&format!("({}a, b, c)", "x, ".repeat(63)))?;
+        assert!(module.prepare_for_cache(0, MAX_REAL_INDEX));
         let tuple = module.expr().as_tuple_expr().unwrap();
-        let [a, b, c] = tuple.elts().as_array().unwrap();
+        let [a, b, c] = tuple.elts().slice(63..).as_array().unwrap();
         assert_eq!(a.node_index().as_u32(), Some(63));
         assert_eq!(b.node_index().as_u32(), Some(64));
 
         let mut annotation = parse_expression("T")?;
-        annotation
-            .index_source_order(MAX_REAL_INDEX + 1, MAX_REAL_INDEX + 1)
-            .unwrap();
+        assert!(annotation.prepare_for_cache(MAX_REAL_INDEX + 1, MAX_REAL_INDEX + 1));
         let t = annotation.expr();
 
         let mut builder = AstIdsBuilder::default();

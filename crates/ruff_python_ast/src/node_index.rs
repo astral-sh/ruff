@@ -2,7 +2,7 @@ use std::num::NonZeroU32;
 
 /// An AST node that has an index.
 pub trait HasNodeIndex {
-    /// Returns the source-order index of this node in its module.
+    /// Returns the key of this node in its module or string annotation.
     fn node_index(&self) -> NodeIndex;
 }
 

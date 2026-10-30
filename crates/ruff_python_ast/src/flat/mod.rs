@@ -106,6 +106,12 @@ impl<T> Handle<T> {
         self.row as usize
     }
 
+    /// The key of this row when its arena is a cached module.
+    /// Use the view's node index for a quoted annotation, which has its own namespace.
+    pub fn module_index(self) -> NodeIndex {
+        NodeIndex::from(self.row)
+    }
+
     const fn cast<U>(self) -> Handle<U> {
         Handle::new(self.row)
     }
@@ -175,11 +181,13 @@ impl<'a, T> View<'a, T> {
     }
 
     pub fn node_index(self) -> NodeIndex {
-        self.ast
-            .indices
-            .get(self.handle().index())
-            .copied()
-            .unwrap_or(NodeIndex::NONE)
+        if matches!(
+            self.row.payload.kind,
+            NodeKind::ModModule | NodeKind::ModExpression
+        ) {
+            return NodeIndex::NONE;
+        }
+        self.ast.keys.key(self.handle().row)
     }
 
     pub fn node_kind(self) -> NodeKind
@@ -377,6 +385,34 @@ struct Row {
 
 const _: () = assert!(size_of::<Row>() == 24);
 
+/// A module and most quoted annotations use their physical row numbers directly.
+#[derive(Clone, Default, Debug)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+enum RowKeys {
+    #[default]
+    Unindexed,
+    Direct(u32),
+    /// Only needed when auxiliary rows would exhaust a quoted annotation's reserved keys.
+    Annotation {
+        first: u32,
+        rows: Box<[u32]>,
+    },
+}
+
+impl RowKeys {
+    fn key(&self, row: u32) -> NodeIndex {
+        match self {
+            Self::Unindexed => NodeIndex::NONE,
+            Self::Direct(first) => NodeIndex::from(first + row),
+            Self::Annotation { first, rows } => {
+                rows.binary_search(&row).map_or(NodeIndex::NONE, |slot| {
+                    NodeIndex::from(first + offset(slot))
+                })
+            }
+        }
+    }
+}
+
 /// Each syntax node occupies one row. Variable-length fields live in the side tables.
 /// Variable-length fields and fields that do not fit inline refer to the extra-data arena.
 #[derive(Clone, Default, Debug)]
@@ -389,7 +425,7 @@ pub struct Ast {
     bytes: Vec<u8>,
     numbers: Vec<Number>,
     debug_text: Vec<DebugText>,
-    indices: Box<[NodeIndex]>,
+    keys: RowKeys,
     /// One past the last yield expression's row, or zero if the tree has none.
     yield_rows_end: u32,
 }
@@ -476,6 +512,11 @@ impl Ast {
             row,
             ty: PhantomData,
         })
+    }
+
+    /// Borrows an untyped row by its allocation index.
+    pub fn row(&self, index: u32) -> Option<AnyNodeRef<'_>> {
+        self.view(Handle::new(index))
     }
 
     /// Iterates the stored nodes in allocation order. Source-order traversal starts at the root.
@@ -870,19 +911,44 @@ impl<T> Tree<T> {
         })
     }
 
-    /// Assigns stable source-order indices to the root's descendants. String annotation
-    /// subtrees use the caller's reserved interval.
-    pub fn index(&mut self, first: u32, last: u32) -> Option<Box<[Handle<Any>]>> {
+    /// Shrinks the arena for caching and selects its module or string-annotation key range.
+    pub fn prepare_for_cache(&mut self, first: u32, last: u32) -> bool {
+        let Some(capacity) = last
+            .checked_sub(first)
+            .and_then(|width| width.checked_add(1))
+        else {
+            return false;
+        };
+        let count = self.ast.rows.len();
+        let required_keys = count - usize::from(self.root.index() + 1 == count);
+        let keys = if required_keys <= capacity as usize {
+            RowKeys::Direct(first)
+        } else if first > crate::MAX_REAL_INDEX {
+            // For example, an f-string's format spec has an arena row, but source-order
+            // traversal visits its contents directly. Count only reachable syntax when
+            // the physical rows would exceed the annotation's 256 or 8 reserved keys.
+            let mut rows: Vec<u32> = self
+                .root()
+                .erase()
+                .preorder_handles()
+                .skip(1)
+                .take(capacity as usize + 1)
+                .map(|handle| handle.row)
+                .collect();
+            if rows.len() > capacity as usize {
+                return false;
+            }
+            rows.sort_unstable();
+            RowKeys::Annotation {
+                first,
+                rows: rows.into_boxed_slice(),
+            }
+        } else {
+            return false;
+        };
         self.ast.shrink_to_fit();
-        let mut order = Vec::with_capacity(self.ast.nodes().len().saturating_sub(1));
-        let mut indices = vec![NodeIndex::NONE; self.ast.nodes().len()].into_boxed_slice();
-        let mut available = first..=last;
-        for handle in self.root().erase().preorder_handles().skip(1) {
-            indices[handle.index()] = NodeIndex::from(available.next()?);
-            order.push(handle);
-        }
-        self.ast.indices = indices;
-        Some(order.into_boxed_slice())
+        self.ast.keys = keys;
+        true
     }
 }
 

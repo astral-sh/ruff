@@ -448,14 +448,11 @@ impl<T> Parsed<T> {
         self.tree.ast()
     }
 
-    pub fn index_source_order(
-        &mut self,
-        first: u32,
-        last: u32,
-    ) -> Option<Box<[flat::Handle<flat::Any>]>> {
+    /// Trims the parse buffers and uses arena rows as keys in the given namespace.
+    pub fn prepare_for_cache(&mut self, first: u32, last: u32) -> bool {
         self.errors.shrink_to_fit();
         self.unsupported_syntax_errors.shrink_to_fit();
-        self.tree.index(first, last)
+        self.tree.prepare_for_cache(first, last)
     }
 
     /// Borrows the syntax root and its module-local storage.

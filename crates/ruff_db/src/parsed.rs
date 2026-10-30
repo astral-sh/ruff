@@ -4,7 +4,8 @@ use std::sync::Arc;
 use arc_swap::ArcSwapOption;
 use get_size2::GetSize;
 use ruff_python_ast::{
-    ModExpression, ModModule, NodeIndex, NodeIndexError, PythonVersion, StringLiteral,
+    MAX_REAL_INDEX, ModExpression, ModModule, NodeIndex, NodeIndexError, PythonVersion,
+    StringLiteral, sub_ast_level, sub_indices,
 };
 use ruff_python_parser::{
     ParseError, ParseErrorType, ParseOptions, Parsed, parse_cells_unchecked,
@@ -70,8 +71,7 @@ pub fn parsed_string_annotation(
 ) -> Result<Parsed<ModExpression>, ParseError> {
     let mut expr = parse_string_annotation(source, string)?;
 
-    // We need the sub-ast of the string annotation to be indexed
-    indexed::ensure_indexed(&mut expr, string.node_index()).map_err(|err| {
+    prepare_annotation(&mut expr, string.node_index()).map_err(|err| {
         let message = match err {
             NodeIndexError::NoParent => {
                 "Internal error: string annotation's parent had no NodeIndex"
@@ -113,7 +113,7 @@ pub struct ParsedModule {
     file: File,
     python_version: PythonVersion,
     #[get_size(size_fn = arc_swap_size)]
-    inner: Arc<ArcSwapOption<indexed::IndexedModule>>,
+    inner: Arc<ArcSwapOption<Parsed<ModModule>>>,
 }
 
 impl ParsedModule {
@@ -121,9 +121,7 @@ impl ParsedModule {
         Self {
             file,
             python_version,
-            inner: Arc::new(ArcSwapOption::new(Some(indexed::IndexedModule::new(
-                parsed,
-            )))),
+            inner: Arc::new(ArcSwapOption::new(Some(cache_module(parsed)))),
         }
     }
     /// Loads a reference to the parsed module.
@@ -135,11 +133,7 @@ impl ParsedModule {
             Some(parsed) => parsed,
             None => {
                 // Re-parse the file.
-                let parsed = indexed::IndexedModule::new(parsed_module_impl(
-                    db,
-                    self.file,
-                    self.python_version,
-                ));
+                let parsed = cache_module(parsed_module_impl(db, self.file, self.python_version));
                 tracing::debug!(
                     "File `{}` was reparsed after being collected in the current Salsa revision",
                     self.file.path(db)
@@ -152,7 +146,7 @@ impl ParsedModule {
 
         ParsedModuleRef {
             module: self.clone(),
-            indexed: parsed,
+            parsed,
         }
     }
 
@@ -207,7 +201,7 @@ impl Eq for ParsedModule {}
 #[derive(Clone)]
 pub struct ParsedModuleRef {
     module: ParsedModule,
-    indexed: Arc<indexed::IndexedModule>,
+    parsed: Arc<Parsed<ModModule>>,
 }
 
 impl ParsedModuleRef {
@@ -216,9 +210,12 @@ impl ParsedModuleRef {
         &self.module
     }
 
-    /// Looks up the canonical row at a logical source-order index.
+    /// Looks up a module row by its key.
     pub fn get_by_index(&self, index: NodeIndex) -> ruff_python_ast::flat::AnyNodeRef<'_> {
-        self.indexed.view(index)
+        index
+            .as_u32()
+            .and_then(|row| self.ast().row(row))
+            .expect("row belongs to the module")
     }
 }
 
@@ -226,7 +223,7 @@ impl std::ops::Deref for ParsedModuleRef {
     type Target = Parsed<ModModule>;
 
     fn deref(&self) -> &Self::Target {
-        &self.indexed.parsed
+        &self.parsed
     }
 }
 
@@ -264,110 +261,26 @@ where
     }
 }
 
-mod indexed {
-    use std::sync::Arc;
+fn cache_module(mut parsed: Parsed<ModModule>) -> Arc<Parsed<ModModule>> {
+    assert!(
+        parsed.prepare_for_cache(0, MAX_REAL_INDEX),
+        "module exceeds the supported number of rows"
+    );
+    Arc::new(parsed)
+}
 
-    use ruff_python_ast::*;
-    use ruff_python_parser::Parsed;
-
-    /// A wrapper around the AST that allows access to AST nodes by index.
-    #[derive(Debug, get_size2::GetSize)]
-    pub struct IndexedModule {
-        index: Box<[flat::Handle<flat::Any>]>,
-        pub parsed: Parsed<ModModule>,
-    }
-
-    /// Ensure the following sub-AST is indexed, using the parent node's index
-    /// as a basis for unambiguous AST node indices.
-    pub fn ensure_indexed(
-        parsed: &mut Parsed<ModExpression>,
-        parent_node_index: NodeIndex,
-    ) -> Result<(), NodeIndexError> {
-        let parent_index = parent_node_index.as_u32().ok_or(NodeIndexError::NoParent)?;
-        let (index, max_index) = sub_indices(parent_index)?;
-        if parsed.index_source_order(index, max_index).is_none() {
-            return Err(if sub_ast_level(parent_index) == 0 {
-                NodeIndexError::ExhaustedSubIndices
-            } else {
-                NodeIndexError::ExhaustedSubSubIndices
-            });
-        }
-
+fn prepare_annotation(
+    parsed: &mut Parsed<ModExpression>,
+    parent: NodeIndex,
+) -> Result<(), NodeIndexError> {
+    let parent = parent.as_u32().ok_or(NodeIndexError::NoParent)?;
+    let (first, last) = sub_indices(parent)?;
+    if parsed.prepare_for_cache(first, last) {
         Ok(())
-    }
-
-    impl IndexedModule {
-        /// Create a new [`IndexedModule`] from the given AST.
-        pub fn new(mut parsed: Parsed<ModModule>) -> Arc<Self> {
-            let index = parsed
-                .index_source_order(0, MAX_REAL_INDEX)
-                .expect("module exceeds the supported number of indexed nodes");
-            Arc::new(Self { index, parsed })
-        }
-
-        pub fn view(&self, index: NodeIndex) -> flat::View<'_, flat::Any> {
-            let index = index.as_u32().expect("uninitialized node index") as usize;
-            self.parsed
-                .ast()
-                .view(self.index[index])
-                .expect("the index belongs to this module")
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-
-        #[test]
-        #[should_panic(expected = "index out of bounds: the len is 65 but the index is 65")]
-        fn indexed_nodes_chunk_boundary() {
-            let parsed = ruff_python_parser::parse_module(&"pass\n".repeat(65)).unwrap();
-            let indexed = IndexedModule::new(parsed);
-
-            assert_eq!(indexed.index.len(), 65);
-            assert!(indexed.view(63.into()).is_statement());
-            assert!(indexed.view(64.into()).is_statement());
-            indexed.view(65.into());
-        }
-
-        #[test]
-        fn indexed_nodes_round_trip() {
-            let parsed = ruff_python_parser::parse_unchecked(
-                r#"
-import os as imported_os
-
-@decorator
-class C[T](Base, metaclass=Meta):
-    def method(self, value: int = 1, *args, keyword=2, **kwargs):
-        try:
-            with context() as items:
-                return [item for item in items if item]
-        except Error as error:
-            match error:
-                case Error(code=code):
-                    if code:
-                        return f"{code!r}"
-                    elif code is None:
-                        return t"{code}"
-                    else:
-                        return "string"
-                case _:
-                    return b"bytes"
-"#,
-                ruff_python_parser::ParseOptions::from(ruff_python_parser::Mode::Module),
-            )
-            .try_into_module()
-            .unwrap();
-            assert!(parsed.has_valid_syntax());
-            let indexed = IndexedModule::new(parsed);
-            let nodes: Vec<_> = indexed.parsed.root().descendants().skip(1).collect();
-            assert_eq!(nodes.len(), indexed.index.len());
-            for (i, node) in nodes.into_iter().enumerate() {
-                let index = NodeIndex::from(u32::try_from(i).unwrap());
-                assert_eq!(node.node_index(), index);
-                assert!(indexed.view(index).is_same_node(node));
-            }
-        }
+    } else if sub_ast_level(parent) == 0 {
+        Err(NodeIndexError::ExhaustedSubIndices)
+    } else {
+        Err(NodeIndexError::ExhaustedSubSubIndices)
     }
 }
 
@@ -376,14 +289,37 @@ mod tests {
     use crate::Db;
     use crate::PythonFile;
     use crate::files::{system_path_to_file, vendored_path_to_file};
-    use crate::parsed::parsed_module;
+    use crate::parsed::{parsed_module, prepare_annotation};
     use crate::system::{
         DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemVirtualPath,
     };
     use crate::tests::TestDb;
     use crate::vendored::{VendoredFileSystemBuilder, VendoredPath};
-    use ruff_python_ast::PythonVersion;
+    use ruff_python_ast::{NodeIndex, NodeIndexError, PythonVersion, sub_indices};
+    use ruff_python_parser::parse_expression;
     use zip::CompressionMethod;
+
+    #[test]
+    fn nested_annotation_at_key_limit() {
+        let (parent, _) = sub_indices(0).unwrap();
+        let (first, last) = sub_indices(parent).unwrap();
+        let mut annotation = parse_expression(r#"f"{x:0}{y:0}""#).unwrap();
+        prepare_annotation(&mut annotation, NodeIndex::from(parent)).unwrap();
+        let mut keys: Vec<_> = annotation
+            .root()
+            .descendants()
+            .skip(1)
+            .map(|node| node.node_index().as_u32().unwrap())
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(keys, (first..=last).collect::<Vec<_>>());
+
+        let mut over_limit = parse_expression(r#"not f"{x:0}{y:0}""#).unwrap();
+        assert!(matches!(
+            prepare_annotation(&mut over_limit, NodeIndex::from(parent)),
+            Err(NodeIndexError::ExhaustedSubSubIndices)
+        ));
+    }
 
     #[test]
     fn python_file() -> crate::system::Result<()> {

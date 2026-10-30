@@ -164,16 +164,26 @@ separate table keyed by source offset because two names in a concatenated string
 share an offset. If another tree overlaps a module name's offset, the linter looks up names from
 both trees in a shared offset table.
 
-## Source-order identity
+## Node identity
 
-ty assigns a logical `NodeIndex` in source order when it indexes a parsed module. It shrinks the
-row and side-table buffers before caching the module and stores both directions of the mapping.
-An `AstNodeRef<T>` can keep the logical index between queries and resolve it to a typed view
-for the duration of a module borrow. String annotations reserve logical indices relative to their
-containing string. This gives nodes in a separately parsed annotation distinct identities even
-when their ranges refer to the same source token.
+ty keeps a typed arena handle in each `AstNodeRef<T>`. Parsing the same source with the same
+options emits the same rows, so a reference still resolves after ty evicts and reparses the
+module. Before caching the parse, ty shrinks its row and side-table buffers. Resolving a handle
+then reads the row directly. Allocation order can differ from source order. In `a.b()[i]`,
+for example, the parser emits the attribute and call before the enclosing subscript.
 
-ty uses those indices to look up scoped use IDs and definitions. Each block of 64 module indices
+A separately parsed string annotation has its own arena. Its containing string reserves a range
+of keys for that arena, and adding the row number to the start of the range identifies a node.
+Nested strings reserve ranges in the same way. Ordinary module keys start at zero. If auxiliary
+rows would put an annotation over its 256-key limit (eight for a nested annotation), ty packs
+only the rows reached by source-order traversal into that range.
+
+The IDE finds the enclosing annotation by searching annotation roots sorted by source position.
+To identify an unassigned call such as `return type("C", (), {})`, ty records its row relative to
+the first expression row in its scope. Rows inserted before the scope shift both by the same
+amount. A diagnostic can recover the call's current range even after whitespace edits.
+
+ty uses row keys to look up scoped use IDs and definitions. Each block of 64 module indices
 stores a bitmap of the rows with a value and the starting offset of those values. Looking up a
 row counts the set bits before it and adds the block offset. Only rows with a value occupy space
 in the values array. Annotation indices use separate sparse tables.

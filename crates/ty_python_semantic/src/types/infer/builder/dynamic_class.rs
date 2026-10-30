@@ -42,19 +42,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &self,
         call: flat::View<'_, ast::ExprCall>,
     ) -> DynamicClassScopeOffset {
-        let scope_anchor = self
-            .scope()
-            .node(self.db())
-            .node_index()
-            .unwrap_or(NodeIndex::from(0));
-        let anchor_u32 = scope_anchor
-            .as_u32()
-            .expect("scope anchor should not be NodeIndex::NONE");
-        let relative_index = |index: NodeIndex| {
-            index
+        let anchor = self.scope().scope(self.db()).first_expression_row();
+        let relative_row = |index: NodeIndex| {
+            let row = index
                 .as_u32()
-                .expect("dynamic class anchor should not be NodeIndex::NONE")
-                - anchor_u32
+                .expect("dynamic class anchor is a module row");
+            i32::try_from(i64::from(row) - i64::from(anchor))
+                .expect("module rows are at most 30 bits")
         };
 
         if let DeferredExpressionState::InStringAnnotation(enclosing_node_key) = self.deferred_state
@@ -67,11 +61,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .expect("string annotation key should point to ExprStringLiteral");
 
             DynamicClassScopeOffset::StringAnnotation {
-                offset: relative_index(enclosing_index),
+                offset: relative_row(enclosing_index),
                 range: call.range() - string.start(),
             }
         } else {
-            DynamicClassScopeOffset::Node(relative_index(call.node_index()))
+            DynamicClassScopeOffset::Node(relative_row(call.node_index()))
         }
     }
 
