@@ -1116,6 +1116,59 @@ def takes_td_or_iterable(value: TD | Iterable[int]) -> None:
 takes_td_or_iterable({42: 42})
 ```
 
+When no `TypedDict` element matches, the items are inferred against a dictionary alternative with
+type context:
+
+```py
+x1: Foo | Bar | dict[str, list[int | str]] = {"other": [1]}
+reveal_type(x1)  # revealed: dict[str, list[int | str]]
+
+x2: Foo | dict[str, list[int]] | dict[str, list[int | str]] = {"other": [1]}
+reveal_type(x2)  # revealed: dict[str, list[int]] | dict[str, list[int | str]]
+
+def takes_mapping(value: Foo | Mapping[str, list[float]]): ...
+
+takes_mapping({"other": [1]})  # ok
+```
+
+When the dictionary literal is narrowed to a single matching `TypedDict` element, any diagnostics
+emitted use the types inferred using that element as type context.
+
+```py
+from typing import Callable, TypedDict
+
+class IntCallback(TypedDict):
+    f: Callable[[int], object]
+
+# revealed: int
+x1: IntCallback | str = {"f": lambda value: reveal_type(value)}
+reveal_type(x1)  # revealed: IntCallback
+
+class Inner(TypedDict):
+    value: int
+
+class Outer(TypedDict):
+    inner: Inner
+
+x2: Outer | str = {"inner": reveal_type({"value": 1})}  # revealed: Inner
+reveal_type(x2)  # revealed: Outer
+
+x3: Outer | dict[str, object] = {"inner": reveal_type({"value": 1})}  # revealed: Inner
+reveal_type(x3)  # revealed: Outer
+```
+
+When a literal instead produces a union of `TypedDict` types, diagnostics fall back to the types
+inferred without type context.
+
+```py
+class StrCallback(TypedDict):
+    f: Callable[[str], object]
+
+# revealed: Unknown
+x1: IntCallback | StrCallback = {"f": lambda value: reveal_type(value)}
+reveal_type(x1)  # revealed: IntCallback | StrCallback
+```
+
 ## Union of `TypedDict` behind a type alias
 
 ```toml
