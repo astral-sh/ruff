@@ -1610,7 +1610,7 @@ fn dependency_implicit_alias_definition() -> anyhow::Result<()> {
 #[test]
 fn declared_instance_attribute_avoids_inferring_method_assignments() -> anyhow::Result<()> {
     let mut db = setup_db();
-    db.write_file("/src/dependency.py", "value = 42")?;
+    db.write_file("/src/dependency.py", "def value() -> int: return 42")?;
     db.write_dedented(
         "/src/model.py",
         r#"
@@ -1619,7 +1619,8 @@ fn declared_instance_attribute_avoids_inferring_method_assignments() -> anyhow::
 
             def reset(self):
                 from dependency import value
-                self.value = value
+                self.value = value()
+                self.other: str = value()
         "#,
     )?;
     db.write_dedented(
@@ -1627,8 +1628,8 @@ fn declared_instance_attribute_avoids_inferring_method_assignments() -> anyhow::
         r#"
         from model import Model
 
-        def read(model: Model):
-            return model.value
+        def read(model: Model) -> tuple[int, str]:
+            return model.value, model.other
         "#,
     )?;
 
@@ -1637,10 +1638,14 @@ fn declared_instance_attribute_avoids_inferring_method_assignments() -> anyhow::
     assert_file_diagnostics(&db, "/src/main.py", &[]);
     let events = db.take_salsa_events();
 
-    // The declaration determines the result. Looking up `Model.value` should not even
-    // index modules that are only used by assignments to it in method bodies.
+    // Both declarations determine the type without indexing the initializer's dependency.
     assert_function_query_was_not_run(&db, semantic_index, program_file(&db, dependency), &events);
 
+    assert_file_diagnostics(
+        &db,
+        "/src/model.py",
+        &["Object of type `int` is not assignable to `str`"],
+    );
     Ok(())
 }
 

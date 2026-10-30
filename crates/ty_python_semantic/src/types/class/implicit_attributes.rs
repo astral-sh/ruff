@@ -10,7 +10,7 @@ use crate::{
     types::{
         KnownClass, Truthiness, Type, TypeContext, UnionBuilder, definition_expression_type,
         function::{is_implicit_classmethod, is_implicit_staticmethod},
-        infer::infer_unpack_types,
+        infer::{infer_receiver_annotation, infer_unpack_types},
         infer_expression_type, inferred_declaration,
         member::Member,
     },
@@ -21,6 +21,7 @@ use ty_python_core::{
     attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
+    reachability_constraints::ScopedReachabilityConstraintId,
     scope::{Scope, ScopeId},
     semantic_index, use_def_map,
 };
@@ -222,7 +223,26 @@ impl<'db> StaticClassLiteral<'db> {
                 //     self.name: <annotation>
                 //     self.name: <annotation> = …
 
-                let Some(annotation) = inferred_declaration(db, declaration).declared() else {
+                let annotation = if attribute_declaration.reachability_constraint
+                    == ScopedReachabilityConstraintId::ALWAYS_TRUE
+                    && assignment.value(&module).is_some()
+                {
+                    let annotation = infer_receiver_annotation(db, declaration);
+                    // Recover the assigned value for an invalid `self.x: TypeAlias = ...`,
+                    // even when the marker is imported under another name.
+                    if annotation.is_some_and(|ty| ty.inner_type().is_typealias_special_form()) {
+                        inferred_declaration(db, declaration).declared()
+                    } else {
+                        annotation
+                    }
+                } else {
+                    // A standalone annotation can conflict with an earlier binding. A conditional
+                    // initializer can depend on the absence of the very attribute it defines,
+                    // e.g. `if not hasattr(self, "limit"): self.limit: int = self.config.getint()`.
+                    // Keep the initializer in the inference cycle with that guard.
+                    inferred_declaration(db, declaration).declared()
+                };
+                let Some(annotation) = annotation else {
                     continue;
                 };
                 let annotation = Place::declared(annotation.inner)
