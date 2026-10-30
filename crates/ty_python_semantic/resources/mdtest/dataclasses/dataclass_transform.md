@@ -2602,6 +2602,89 @@ def _(m: ModelA | ModelB):
     m.x = b"1"  # error: [invalid-assignment]
 ```
 
+## Bare `Final` fields
+
+Dataclass transforms infer bare `Final` fields from their defaults, just like standard dataclasses.
+
+```py
+from typing import Final, dataclass_transform
+
+@dataclass_transform()
+class Model: ...
+
+class C(Model):
+    value: Final = 3
+
+reveal_type(C.__init__)  # revealed: (self: C, value: Literal[3] = 3) -> None
+reveal_type(C().value)  # revealed: Literal[3]
+C(3)  # no diagnostic
+C(4)  # error: [invalid-argument-type]
+C().value = 3  # error: [invalid-assignment] "Cannot assign to final attribute `value`"
+```
+
+Without a default, a final field needs an explicit type argument. The generated constructor cannot
+infer the field's type from its callers.
+
+```py
+class NoDefault(Model):
+    value: Final  # error: [untyped-final-field] "Cannot infer the type of final field `value`"
+```
+
+## Converters for bare `Final` fields
+
+A converter determines the inferred field type. The constructor accepts the converter's input type,
+and reading the attribute returns its output type.
+
+```py
+from typing import Callable, Final, dataclass_transform
+
+def field(*, converter: Callable[[str], int], default: str) -> int:
+    raise NotImplementedError
+
+@dataclass_transform(field_specifiers=(field,))
+class Model: ...
+
+def to_int(value: str) -> int:
+    return int(value)
+
+class C(Model):
+    value: Final = field(converter=to_int, default="3")
+
+C("4")  # no diagnostic
+C(4)  # error: [invalid-argument-type]
+reveal_type(C().value)  # revealed: int
+C().value = 4  # error: [invalid-assignment] "Cannot assign to final attribute `value`"
+```
+
+## Bare `Final` fields without defaults
+
+A field specifier without a default needs an explicit type argument for `Final`, unless a converter
+supplies the field's type.
+
+```py
+from typing import Callable, Final, dataclass_transform
+
+def field(*, converter: Callable[[str], int] | None = None) -> int:
+    raise NotImplementedError
+
+@dataclass_transform(field_specifiers=(field,))
+class Model: ...
+
+class Missing(Model):
+    value: Final = field()  # error: [untyped-final-field] "Cannot infer the type of final field `value`"
+
+def to_int(value: str) -> int:
+    return int(value)
+
+class Converted(Model):
+    value: Final = field(converter=to_int)  # no diagnostic
+
+reveal_type(Converted.__init__)  # revealed: (self: Converted, value: str) -> None
+reveal_type(Converted("3").value)  # revealed: int
+Converted(3)  # error: [invalid-argument-type]
+Converted("3").value = 4  # error: [invalid-assignment] "Cannot assign to final attribute `value`"
+```
+
 ## Recursive field specifiers in a transform
 
 The recursive field specifier does not prevent the other specifiers or transform options from being

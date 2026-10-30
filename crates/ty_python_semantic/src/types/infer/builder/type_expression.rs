@@ -2549,7 +2549,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     subscript,
                     AnnotatedExprContext::TypeExpression,
                 )
-                .map_or(Type::unknown(), |inferred| inferred.inner_type()),
+                .map_or(Type::unknown(), |inferred| {
+                    inferred.annotation_ty.inner_type()
+                }),
             SpecialFormType::Literal => match self.infer_literal_parameter_type(arguments_slice) {
                 Ok(ty) => ty,
                 Err(nodes) => {
