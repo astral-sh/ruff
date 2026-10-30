@@ -7765,6 +7765,32 @@ def inspect[T]() -> None:
     reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=int]]
 ```
 
+### Protocols in the arguments of runtime alias objects
+
+The `Node[int]` in `Tag[Node[int]]` is an argument of a runtime alias object. Comparing the return
+types of `pair` can infer `T` from the first tuple element without comparing another `Node`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions._internal import TypeOf, is_constraint_set_assignable_to
+
+type Tag[T] = int
+
+class Node[T](Protocol):
+    def pair(self) -> tuple[T, TypeOf[Tag[Node[int]]]]: ...
+
+def inspect[T]() -> None:
+    constraints = is_constraint_set_assignable_to(Node[str], Node[T])
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=str]]
+```
+
 ### Growing aliases in recursive protocol requirements
 
 A recursive alias can change its specialization every time its definition is expanded. Finite
