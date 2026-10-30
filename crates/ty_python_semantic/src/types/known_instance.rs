@@ -321,7 +321,13 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
             visitor.visit_type_var_type(db, typevar);
         }
         KnownInstanceType::TypeAliasType(type_alias) => {
-            visitor.visit_type_alias_type(db, type_alias);
+            // The runtime object's `__value__` is a lazy attribute, even for visitors that
+            // expand aliases used as types.
+            if visitor.should_visit_lazy_type_attributes() {
+                visitor.visit_type_alias_type(db, type_alias);
+            } else {
+                visitor.notify_skipped_lazy_type_attributes();
+            }
         }
         KnownInstanceType::Deprecated(_)
         | KnownInstanceType::Range { .. }

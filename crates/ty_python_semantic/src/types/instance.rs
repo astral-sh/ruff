@@ -12,7 +12,7 @@ use itertools::Itertools;
 use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView, StructuralMemberPriority};
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
-    KnownInstanceType, MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
+    MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -1437,11 +1437,7 @@ fn non_recursive_protocol_interface<'db>(
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-            // A runtime alias object can occur as a protocol type argument. Its value does
-            // not contribute to the type of the object and can depend on this protocol check.
-            if self.found.get()
-                || matches!(ty, Type::KnownInstance(KnownInstanceType::TypeAliasType(_)))
-            {
+            if self.found.get() {
                 return;
             }
 
