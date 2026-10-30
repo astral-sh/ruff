@@ -1,5 +1,6 @@
 use ruff_python_ast::flat::fields;
 use std::borrow::Cow;
+use std::cell::OnceCell;
 use std::path::Path;
 
 use bitflags::bitflags;
@@ -8,6 +9,7 @@ use rustc_hash::FxHashMap;
 use ruff_python_ast::flat::helpers::map_subscript;
 use ruff_python_ast::helpers::{from_relative_import, resolve_imported_module_path};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::{
     self as ast, Alias, Expr, ExprContext, PySourceType, PythonVersion, Stmt, flat,
 };
@@ -205,7 +207,7 @@ pub struct SemanticModel<'a> {
     pub handled_exceptions: Vec<Exceptions>,
 
     /// The binding resolved at each use of a name.
-    resolved_names: FxHashMap<NameId, BindingId>,
+    resolved_names: ResolvedNames<'a>,
 }
 
 impl<'a> SemanticModel<'a> {
@@ -244,7 +246,7 @@ impl<'a> SemanticModel<'a> {
             seen: Modules::empty(),
             lazy_modules: None,
             handled_exceptions: Vec::default(),
-            resolved_names: FxHashMap::default(),
+            resolved_names: ResolvedNames::new(ast, parsed.tokens()),
         };
 
         let builtin_count = python_builtins(target_version.minor, source_type.is_ipynb()).count()
@@ -527,7 +529,7 @@ impl<'a> SemanticModel<'a> {
                         self.bindings[binding_id].references.push(reference_id);
                     }
 
-                    self.resolved_names.insert(name.into(), binding_id);
+                    self.resolved_names.insert(name, binding_id);
                     return ReadResult::Resolved(binding_id);
                 }
             }
@@ -680,7 +682,7 @@ impl<'a> SemanticModel<'a> {
                                         name.range(),
                                     );
                                     self.bindings[shadowed_id].references.push(reference_id);
-                                    self.resolved_names.insert(name.into(), shadowed_id);
+                                    self.resolved_names.insert(name, shadowed_id);
                                     return ReadResult::Resolved(shadowed_id);
                                 }
                             }
@@ -745,7 +747,7 @@ impl<'a> SemanticModel<'a> {
                             self.bindings[binding_id].references.push(reference_id);
                         }
 
-                        self.resolved_names.insert(name.into(), binding_id);
+                        self.resolved_names.insert(name, binding_id);
                         return ReadResult::Resolved(binding_id);
                     }
 
@@ -762,13 +764,13 @@ impl<'a> SemanticModel<'a> {
                         self.bindings[binding_id].references.push(reference_id);
 
                         // Treat it as resolved.
-                        self.resolved_names.insert(name.into(), binding_id);
+                        self.resolved_names.insert(name, binding_id);
                         return ReadResult::Resolved(binding_id);
                     }
 
                     _ => {
                         // Otherwise, treat it as resolved.
-                        self.resolved_names.insert(name.into(), binding_id);
+                        self.resolved_names.insert(name, binding_id);
                         return ReadResult::Resolved(binding_id);
                     }
                 }
@@ -807,7 +809,7 @@ impl<'a> SemanticModel<'a> {
                 name.range(),
             );
             self.bindings[binding_id].references.push(reference_id);
-            self.resolved_names.insert(name.into(), binding_id);
+            self.resolved_names.insert(name, binding_id);
             return ReadResult::Resolved(binding_id);
         }
 
@@ -1174,7 +1176,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Resolves the [`ast::ExprName`] to the [`BindingId`] of the symbol it refers to, if any.
     pub fn resolve_name(&self, name: flat::View<'_, ast::ExprName>) -> Option<BindingId> {
-        self.resolved_names.get(&name.into()).copied()
+        self.resolved_names.get(name)
     }
 
     /// Resolves the [`ast::ExprName`] to the [`BindingId`] of the symbol it refers to, if it's the
@@ -3226,13 +3228,164 @@ impl Ranged for ImportedName {
     }
 }
 
-/// A unique identifier for an [`ast::ExprName`]. No two names can even appear at the same location
-/// in the source code, so the starting offset is a cheap and sufficient unique identifier.
-#[derive(Debug, Hash, PartialEq, Eq)]
-struct NameId(TextSize);
+/// Name resolution usually concerns a single parsed tree. A re-parsed string annotation
+/// has its own node handles, but shares source offsets with the surrounding module.
+#[derive(Debug)]
+struct ResolvedNames<'a> {
+    ast: &'a flat::Ast,
+    tokens: &'a Tokens,
+    by_node: Vec<Option<BindingId>>,
+    annotations: FxHashMap<TextSize, BindingId>,
+    by_offset: OnceCell<FxHashMap<TextSize, BindingId>>,
+}
 
-impl From<flat::View<'_, ast::ExprName>> for NameId {
-    fn from(name: flat::View<'_, ast::ExprName>) -> Self {
-        Self(name.start())
+impl<'a> ResolvedNames<'a> {
+    fn new(ast: &'a flat::Ast, tokens: &'a Tokens) -> Self {
+        Self {
+            ast,
+            tokens,
+            by_node: Vec::new(),
+            annotations: FxHashMap::default(),
+            by_offset: OnceCell::new(),
+        }
+    }
+
+    /// A name parsed from the contents of a string cannot share a source offset with a
+    /// name in the module tree. Concatenated string annotations can share an offset with
+    /// each other, so their bindings are still keyed by that offset.
+    fn in_string_token(&self, offset: TextSize) -> bool {
+        self.tokens
+            .at_offset(offset)
+            .any(|token| token.kind() == TokenKind::String && token.range().contains(offset))
+    }
+
+    fn get(&self, name: flat::View<'_, ast::ExprName>) -> Option<BindingId> {
+        if std::ptr::eq(self.ast, name.ast()) && self.by_offset.get().is_none() {
+            return self.by_node.get(name.handle().index()).copied().flatten();
+        }
+        self.get_by_offset(name.start())
+    }
+
+    #[cold]
+    fn get_by_offset(&self, offset: TextSize) -> Option<BindingId> {
+        if let Some(map) = self.by_offset.get() {
+            return map.get(&offset).copied();
+        }
+        if let Some(&binding) = self.annotations.get(&offset) {
+            return Some(binding);
+        }
+        if self.in_string_token(offset) {
+            return None;
+        }
+        self.by_offset
+            .get_or_init(|| self.offsets())
+            .get(&offset)
+            .copied()
+    }
+
+    fn insert(&mut self, name: flat::View<'a, ast::ExprName>, binding: BindingId) {
+        if std::ptr::eq(self.ast, name.ast()) && self.by_offset.get().is_none() {
+            if self.by_node.is_empty() {
+                self.by_node.resize(self.ast.nodes().len(), None);
+            }
+            self.by_node[name.handle().index()] = Some(binding);
+        } else {
+            self.insert_by_offset(name.start(), binding);
+        }
+    }
+
+    #[cold]
+    fn insert_by_offset(&mut self, offset: TextSize, binding: BindingId) {
+        if let Some(map) = self.by_offset.get_mut() {
+            map.insert(offset, binding);
+        } else if self.in_string_token(offset) {
+            self.annotations.insert(offset, binding);
+        } else {
+            let mut map = self.offsets();
+            map.insert(offset, binding);
+            self.by_offset = OnceCell::from(map);
+            self.by_node = Vec::new();
+            self.annotations = FxHashMap::default();
+        }
+    }
+
+    fn offsets(&self) -> FxHashMap<TextSize, BindingId> {
+        self.ast
+            .nodes()
+            .zip(&self.by_node)
+            .filter_map(|(node, &binding)| binding.map(|binding| (node.start(), binding)))
+            .chain(
+                self.annotations
+                    .iter()
+                    .map(|(&offset, &binding)| (offset, binding)),
+            )
+            .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_python_parser::{parse_expression, typing::parse_type_annotation};
+    use ruff_text_size::Ranged;
+
+    use super::{BindingId, ResolvedNames};
+
+    #[test]
+    fn names_in_overlapping_arenas_share_a_source_offset() {
+        let parsed = parse_expression("x").unwrap();
+        let other = parse_expression("y").unwrap();
+        let local = parsed.expr().as_name_expr().unwrap();
+        let foreign = other.expr().as_name_expr().unwrap();
+        let mut names = ResolvedNames::new(parsed.ast(), parsed.tokens());
+
+        names.insert(local, BindingId::from_u32(0));
+        assert_eq!(names.get(foreign), Some(BindingId::from_u32(0)));
+        names.insert(foreign, BindingId::from_u32(1));
+        assert_eq!(names.get(local), Some(BindingId::from_u32(1)));
+        names.insert(local, BindingId::from_u32(2));
+        assert_eq!(names.get(foreign), Some(BindingId::from_u32(2)));
+    }
+
+    #[test]
+    fn names_in_concatenated_annotations_share_a_source_offset() {
+        let source = r#""A | " "B""#;
+        let parsed = parse_expression(source).unwrap();
+        let literal = parsed.expr().as_string_literal_expr().unwrap();
+        let annotation = parse_type_annotation(literal, source).unwrap();
+        let union = annotation.expression().as_bin_op_expr().unwrap();
+        let left = union.left().as_name_expr().unwrap();
+        let right = union.right().as_name_expr().unwrap();
+        assert_eq!(left.start(), right.start());
+        let mut names = ResolvedNames::new(parsed.ast(), parsed.tokens());
+        names.insert(left, BindingId::from_u32(0));
+        names.insert(right, BindingId::from_u32(1));
+        assert_eq!(names.get(left), names.get(right));
+        assert_eq!(names.get(left), Some(BindingId::from_u32(1)));
+    }
+
+    #[test]
+    fn module_and_annotation_bindings_keep_their_source_offsets() {
+        let source = r#"x + "Y""#;
+        let parsed = parse_expression(source).unwrap();
+        let sum = parsed.expr().as_bin_op_expr().unwrap();
+        let x = sum.left().as_name_expr().unwrap();
+        let literal = sum.right().as_string_literal_expr().unwrap();
+        let annotation = parse_type_annotation(literal, source).unwrap();
+        let y = annotation.expression().as_name_expr().unwrap();
+        let first = BindingId::from_u32(0);
+        let second = BindingId::from_u32(1);
+        let mut names = ResolvedNames::new(parsed.ast(), parsed.tokens());
+        names.insert(x, first);
+        names.insert(y, second);
+        assert_eq!(names.get(x), Some(first));
+        assert_eq!(names.get(y), Some(second));
+        assert!(names.by_offset.get().is_none());
+
+        let other = parse_expression("x").unwrap();
+        let same_offset = other.expr().as_name_expr().unwrap();
+        assert_eq!(names.get(same_offset), Some(first));
+        names.insert(same_offset, second);
+        assert_eq!(names.get(x), Some(second));
+        assert_eq!(names.get(y), Some(second));
     }
 }

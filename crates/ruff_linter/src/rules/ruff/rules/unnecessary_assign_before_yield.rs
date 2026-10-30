@@ -76,6 +76,10 @@ pub(crate) fn unnecessary_assign_before_yield(
         return;
     };
 
+    if !function_def.body_may_contain_yield() {
+        return;
+    }
+
     let Some(function_scope) = checker.semantic().function_scope(function_def) else {
         return;
     };

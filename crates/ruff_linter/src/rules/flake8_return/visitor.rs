@@ -46,6 +46,7 @@ pub(super) struct AssignmentReturn<'a> {
 }
 
 pub(super) struct ReturnVisitor<'semantic, 'data> {
+    may_contain_yield: bool,
     /// The semantic model of the current file.
     semantic: &'semantic SemanticModel<'data>,
     /// The current stack of nodes.
@@ -57,8 +58,9 @@ pub(super) struct ReturnVisitor<'semantic, 'data> {
 }
 
 impl<'semantic, 'data> ReturnVisitor<'semantic, 'data> {
-    pub(super) fn new(semantic: &'semantic SemanticModel<'data>) -> Self {
+    pub(super) fn new(semantic: &'semantic SemanticModel<'data>, may_contain_yield: bool) -> Self {
         Self {
+            may_contain_yield,
             semantic,
             stack: Stack::default(),
             sibling: None,
@@ -195,6 +197,9 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
     }
 
     fn visit_expr(&mut self, expr: flat::View<'a, Expr>) {
+        if !self.may_contain_yield {
+            return;
+        }
         match expr.classify() {
             flat::ExprKind::YieldFrom(_) | flat::ExprKind::Yield(_) => {
                 self.stack.is_generator = true;

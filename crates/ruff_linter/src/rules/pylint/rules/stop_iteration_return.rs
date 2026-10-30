@@ -59,6 +59,10 @@ pub(crate) fn stop_iteration_return(
     checker: &Checker,
     function_def: flat::View<'_, ast::StmtFunctionDef>,
 ) {
+    if !function_def.body_may_contain_yield() {
+        return;
+    }
+
     let mut analyzer = GeneratorAnalyzer {
         checker,
         has_yield: false,

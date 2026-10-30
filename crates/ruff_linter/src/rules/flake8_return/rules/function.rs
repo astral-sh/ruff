@@ -754,7 +754,8 @@ fn create_stack<'a>(
 
     // Traverse the function body, to collect the stack.
     let stack = {
-        let mut visitor = ReturnVisitor::new(checker.semantic());
+        let mut visitor =
+            ReturnVisitor::new(checker.semantic(), function_def.body_may_contain_yield());
         for stmt in body {
             visitor.visit_stmt(stmt);
         }

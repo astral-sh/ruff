@@ -98,6 +98,10 @@ pub(crate) fn return_in_generator(
     checker: &Checker,
     function_def: flat::View<'_, StmtFunctionDef>,
 ) {
+    if !function_def.body_may_contain_yield() {
+        return;
+    }
+
     if function_def.name().id() == "__await__" {
         return;
     }
