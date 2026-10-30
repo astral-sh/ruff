@@ -131,7 +131,7 @@ pub(super) struct MemberNameHints {
 
 impl MemberNameHints {
     #[inline]
-    pub(super) fn bit(name: &str) -> u128 {
+    fn bit(name: &str) -> u128 {
         1 << (rustc_hash::FxBuildHasher.hash_one(name) & 127)
     }
 
