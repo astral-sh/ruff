@@ -47,7 +47,7 @@ pub(crate) mod type_param;
 mod verbatim;
 
 /// 'ast is the lifetime of the source code (input), 'buf is the lifetime of the buffer (output)
-pub(crate) type PyFormatter<'ast, 'buf> = Formatter<'buf, PyFormatContext<'ast>>;
+pub(crate) type PyFormatter<'ast, 'buf, 'state> = Formatter<'buf, 'state, PyFormatContext<'ast>>;
 
 /// Rule for formatting a Python AST node.
 pub(crate) trait FormatNodeRule<N>

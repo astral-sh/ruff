@@ -101,7 +101,7 @@ impl BufferSnapshot {
     /// # Panics
     ///
     /// If self is not a [`BufferSnapshot::Position`]
-    pub(crate) fn unwrap_position(&self) -> usize {
+    fn unwrap_position(&self) -> usize {
         match self {
             BufferSnapshot::Position(index) => *index,
             BufferSnapshot::Any(_) => panic!("Tried to unwrap Any snapshot as a position."),
@@ -170,8 +170,8 @@ impl<W: Buffer<Context = Context> + ?Sized, Context> Buffer for &mut W {
 /// The buffer writes all elements into the internal elements buffer.
 #[derive(Debug)]
 pub struct VecBuffer<'a, Context> {
-    pub(crate) state: &'a mut FormatState<Context>,
-    pub(crate) elements: Vec<FormatElement>,
+    state: &'a mut FormatState<Context>,
+    elements: Vec<FormatElement>,
 }
 
 impl<'a, Context> VecBuffer<'a, Context> {

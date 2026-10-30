@@ -6,11 +6,11 @@ use crate::{Arguments, Buffer, FormatContext, FormatState, GroupId, VecBuffer};
 /// Handles the formatting of a CST and stores the context how the CST should be formatted (user preferences).
 /// The formatter is passed to the [Format] implementation of every node in the CST so that they
 /// can use it to format their children.
-pub struct Formatter<'buf, Context> {
-    buffer: FormatterBuffer<'buf, Context>,
+pub struct Formatter<'buf, 'state, Context> {
+    buffer: FormatterBuffer<'buf, 'state, Context>,
 }
 
-impl<'buf, Context> Formatter<'buf, Context> {
+impl<'buf, 'state, Context> Formatter<'buf, 'state, Context> {
     /// Creates a new context that uses the given formatter context
     pub(crate) fn new(buffer: &'buf mut (dyn Buffer<Context = Context> + 'buf)) -> Self {
         Self {
@@ -19,12 +19,9 @@ impl<'buf, Context> Formatter<'buf, Context> {
     }
 
     /// Writes directly to a vector while retaining the buffer adapters for specialized writes.
-    pub(crate) fn new_vec(buffer: &'buf mut VecBuffer<'_, Context>) -> Self {
+    pub(crate) fn new_vec(buffer: &'buf mut VecBuffer<'state, Context>) -> Self {
         Self {
-            buffer: FormatterBuffer::Vec {
-                elements: &mut buffer.elements,
-                state: buffer.state,
-            },
+            buffer: FormatterBuffer::Vec(buffer),
         }
     }
 
@@ -79,7 +76,7 @@ impl<'buf, Context> Formatter<'buf, Context> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn join<'a>(&'a mut self) -> JoinBuilder<'a, 'buf, (), Context> {
+    pub fn join<'a>(&'a mut self) -> JoinBuilder<'a, 'buf, 'state, (), Context> {
         JoinBuilder::new(self)
     }
 
@@ -113,7 +110,7 @@ impl<'buf, Context> Formatter<'buf, Context> {
     pub fn join_with<'a, Joiner>(
         &'a mut self,
         joiner: Joiner,
-    ) -> JoinBuilder<'a, 'buf, Joiner, Context>
+    ) -> JoinBuilder<'a, 'buf, 'state, Joiner, Context>
     where
         Joiner: Format<Context>,
     {
@@ -171,7 +168,7 @@ impl<'buf, Context> Formatter<'buf, Context> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn fill<'a>(&'a mut self) -> FillBuilder<'a, 'buf, Context> {
+    pub fn fill<'a>(&'a mut self) -> FillBuilder<'a, 'buf, 'state, Context> {
         FillBuilder::new(self)
     }
 
@@ -198,7 +195,7 @@ impl<'buf, Context> Formatter<'buf, Context> {
     }
 }
 
-impl<Context> Formatter<'_, Context>
+impl<Context> Formatter<'_, '_, Context>
 where
     Context: FormatContext,
 {
@@ -217,7 +214,7 @@ where
     }
 }
 
-impl<Context> Buffer for Formatter<'_, Context> {
+impl<Context> Buffer for Formatter<'_, '_, Context> {
     type Context = Context;
 
     #[inline]
@@ -257,60 +254,53 @@ impl<Context> Buffer for Formatter<'_, Context> {
 /// Most formatting writes directly to a vector. Keep that path concrete so each
 /// element does not require a virtual call. Adapters such as `RemoveSoftLinesBuffer`
 /// still intercept writes, including snapshots and access to previously written elements.
-enum FormatterBuffer<'buf, Context> {
-    Vec {
-        elements: &'buf mut Vec<FormatElement>,
-        state: &'buf mut FormatState<Context>,
-    },
+enum FormatterBuffer<'buf, 'state, Context> {
+    Vec(&'buf mut VecBuffer<'state, Context>),
     Other(&'buf mut dyn Buffer<Context = Context>),
 }
 
-impl<Context> Buffer for FormatterBuffer<'_, Context> {
+impl<Context> Buffer for FormatterBuffer<'_, '_, Context> {
     type Context = Context;
 
     #[inline]
     fn write_element(&mut self, element: FormatElement) {
         match self {
-            Self::Vec { elements, .. } => elements.push(element),
+            Self::Vec(buffer) => buffer.write_element(element),
             Self::Other(buffer) => buffer.write_element(element),
         }
     }
 
     fn elements(&self) -> &[FormatElement] {
         match self {
-            Self::Vec { elements, .. } => elements,
+            Self::Vec(buffer) => buffer.elements(),
             Self::Other(buffer) => buffer.elements(),
         }
     }
 
     fn state(&self) -> &FormatState<Context> {
         match self {
-            Self::Vec { state, .. } => state,
+            Self::Vec(buffer) => buffer.state(),
             Self::Other(buffer) => buffer.state(),
         }
     }
 
     fn state_mut(&mut self) -> &mut FormatState<Context> {
         match self {
-            Self::Vec { state, .. } => state,
+            Self::Vec(buffer) => buffer.state_mut(),
             Self::Other(buffer) => buffer.state_mut(),
         }
     }
 
     fn snapshot(&self) -> BufferSnapshot {
         match self {
-            Self::Vec { elements, .. } => BufferSnapshot::Position(elements.len()),
+            Self::Vec(buffer) => buffer.snapshot(),
             Self::Other(buffer) => buffer.snapshot(),
         }
     }
 
     fn restore_snapshot(&mut self, snapshot: BufferSnapshot) {
         match self {
-            Self::Vec { elements, .. } => {
-                let position = snapshot.unwrap_position();
-                assert!(elements.len() >= position, "Outdated buffer snapshot");
-                elements.truncate(position);
-            }
+            Self::Vec(buffer) => buffer.restore_snapshot(snapshot),
             Self::Other(buffer) => buffer.restore_snapshot(snapshot),
         }
     }
