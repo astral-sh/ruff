@@ -248,6 +248,19 @@ impl<'db> CallableSignature<'db> {
         }))
     }
 
+    pub(super) fn freshen_for_owner_specialization(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        Self::from_overloads(
+            self.overloads.iter().map(|signature| {
+                signature.freshen_for_owner_specialization(db, env, specialization)
+            }),
+        )
+    }
+
     /// Returns the reduced overloaded signature exposed by a `functools.partial(...)` object.
     pub(crate) fn partially_apply(
         db: &'db dyn Db,
@@ -1221,6 +1234,39 @@ impl<'db> Signature<'db> {
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
         )
+    }
+
+    /// Keep incoming class arguments separate from this method's own type parameters.
+    fn freshen_for_owner_specialization(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        if let Some(generic_context) = self.generic_context
+            && specialization.types(db).iter().any(|ty| {
+                any_over_type(db, env, *ty, false, |ty| {
+                    matches!(ty, Type::TypeVar(typevar)
+                        if generic_context.contains(db, typevar.identity(db))
+                            && specialization.get(db, typevar).is_none())
+                })
+            })
+            && let Some(freshness) = max_typevar_freshness_matching_generic_context(
+                db,
+                specialization.types(db).iter().copied(),
+                generic_context,
+            )
+        {
+            // Accessing `Box[T]` inside `Box.method[T]` must keep the class argument separate
+            // from the projected method's local T. Rename the method's binders before
+            // substituting the class arguments, while those occurrences are distinguishable.
+            self.freshen_bound_typevars(db, env, freshness.increment().value())
+        } else {
+            // Identity substitutions introduce no new occurrences. A different nonce already
+            // distinguishes two occurrences; freshening just because they share a declaration
+            // would introduce unbounded new identities during recursive member projection.
+            self.clone()
+        }
     }
 
     fn max_typevar_freshness_matching_generic_context(
