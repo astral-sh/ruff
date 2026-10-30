@@ -468,6 +468,41 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
 }
 
 impl<'db> KnownBoundMethodType<'db> {
+    /// Return the relation in both directions when it can be decided without comparing
+    /// the methods' underlying callables or properties.
+    pub(super) fn trivial_relation_to(self, other: Self) -> Option<bool> {
+        if std::mem::discriminant(&self) != std::mem::discriminant(&other) {
+            return Some(false);
+        }
+
+        match self {
+            Self::FunctionTypeDunderGet(_)
+            | Self::DunderCall(_)
+            | Self::MethodTypeDunderGet(_)
+            | Self::PropertyDunderGet(_)
+            | Self::PropertyDunderSet(_)
+            | Self::PropertyDunderDelete(_) => None,
+            Self::StrStartswith(_) => Some(self == other),
+            Self::ConstraintSetLowerBound
+            | Self::ConstraintSetUpperBound
+            | Self::ConstraintSetEquality
+            | Self::ConstraintSetRange
+            | Self::ConstraintSetAlways
+            | Self::ConstraintSetNever
+            | Self::ConstraintSetImpliesSubtypeOf(_)
+            | Self::ConstraintSetSatisfies(_)
+            | Self::ConstraintSetExists(_)
+            | Self::ConstraintSetForAll(_)
+            | Self::ConstraintSetSolutionsFor(_)
+            | Self::ConstraintSetSolutions(_)
+            | Self::ConstraintSetIsAlwaysSatisfied(_)
+            | Self::ConstraintSetIsNeverSatisfied(_)
+            | Self::ConstraintSetIsTriviallyAlwaysSatisfied(_)
+            | Self::ConstraintSetIsTriviallyNeverSatisfied(_)
+            | Self::ConstraintSetWithDetailedDisplay(_) => Some(true),
+        }
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -876,6 +911,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: KnownBoundMethodType<'db>,
         target: KnownBoundMethodType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if let Some(related) = source.trivial_relation_to(target) {
+            return ConstraintSet::from_bool(self.constraints, related);
+        }
+
         match (source, target) {
             (
                 KnownBoundMethodType::FunctionTypeDunderGet(source_function),
@@ -905,129 +944,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 KnownBoundMethodType::PropertyDunderDelete(target_property),
             ) => self.check_property_instance_pair(db, source_property, target_property),
 
-            (KnownBoundMethodType::StrStartswith(_), KnownBoundMethodType::StrStartswith(_)) => {
-                ConstraintSet::from_bool(self.constraints, source == target)
-            }
-
-            (
-                KnownBoundMethodType::ConstraintSetLowerBound,
-                KnownBoundMethodType::ConstraintSetLowerBound,
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetUpperBound,
-                KnownBoundMethodType::ConstraintSetUpperBound,
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetEquality,
-                KnownBoundMethodType::ConstraintSetEquality,
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetRange,
-                KnownBoundMethodType::ConstraintSetRange,
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetAlways,
-                KnownBoundMethodType::ConstraintSetAlways,
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetNever,
-                KnownBoundMethodType::ConstraintSetNever,
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
-                KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetSatisfies(_),
-                KnownBoundMethodType::ConstraintSetSatisfies(_),
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetExists(_),
-                KnownBoundMethodType::ConstraintSetExists(_),
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetForAll(_),
-                KnownBoundMethodType::ConstraintSetForAll(_),
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetSolutionsFor(_),
-                KnownBoundMethodType::ConstraintSetSolutionsFor(_),
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetSolutions(_),
-                KnownBoundMethodType::ConstraintSetSolutions(_),
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_),
-                KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_),
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_),
-                KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_),
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_),
-                KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_),
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_),
-                KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_),
-            )
-            | (
-                KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
-                KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
-            ) => self.always(),
-
-            (
-                KnownBoundMethodType::FunctionTypeDunderGet(_)
-                | KnownBoundMethodType::DunderCall(_)
-                | KnownBoundMethodType::MethodTypeDunderGet(_)
-                | KnownBoundMethodType::PropertyDunderGet(_)
-                | KnownBoundMethodType::PropertyDunderSet(_)
-                | KnownBoundMethodType::PropertyDunderDelete(_)
-                | KnownBoundMethodType::StrStartswith(_)
-                | KnownBoundMethodType::ConstraintSetLowerBound
-                | KnownBoundMethodType::ConstraintSetUpperBound
-                | KnownBoundMethodType::ConstraintSetEquality
-                | KnownBoundMethodType::ConstraintSetRange
-                | KnownBoundMethodType::ConstraintSetAlways
-                | KnownBoundMethodType::ConstraintSetNever
-                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
-                | KnownBoundMethodType::ConstraintSetSatisfies(_)
-                | KnownBoundMethodType::ConstraintSetExists(_)
-                | KnownBoundMethodType::ConstraintSetForAll(_)
-                | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
-                | KnownBoundMethodType::ConstraintSetSolutions(_)
-                | KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
-                | KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_)
-                | KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_)
-                | KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_)
-                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
-                KnownBoundMethodType::FunctionTypeDunderGet(_)
-                | KnownBoundMethodType::DunderCall(_)
-                | KnownBoundMethodType::MethodTypeDunderGet(_)
-                | KnownBoundMethodType::PropertyDunderGet(_)
-                | KnownBoundMethodType::PropertyDunderSet(_)
-                | KnownBoundMethodType::PropertyDunderDelete(_)
-                | KnownBoundMethodType::StrStartswith(_)
-                | KnownBoundMethodType::ConstraintSetLowerBound
-                | KnownBoundMethodType::ConstraintSetUpperBound
-                | KnownBoundMethodType::ConstraintSetEquality
-                | KnownBoundMethodType::ConstraintSetRange
-                | KnownBoundMethodType::ConstraintSetAlways
-                | KnownBoundMethodType::ConstraintSetNever
-                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
-                | KnownBoundMethodType::ConstraintSetSatisfies(_)
-                | KnownBoundMethodType::ConstraintSetExists(_)
-                | KnownBoundMethodType::ConstraintSetForAll(_)
-                | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
-                | KnownBoundMethodType::ConstraintSetSolutions(_)
-                | KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
-                | KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_)
-                | KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_)
-                | KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_)
-                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
-            ) => self.never(),
+            _ => unreachable!("only matching method wrappers require a structural comparison"),
         }
     }
 }

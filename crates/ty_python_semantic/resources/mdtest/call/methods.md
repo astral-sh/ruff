@@ -1725,6 +1725,10 @@ static_assert(is_assignable_to(TypeOf[types.FunctionType.__call__], Callable[...
 reveal_type(f.__call__)
 static_assert(is_assignable_to(TypeOf[f.__call__], Callable[..., Any]))
 
+def distinct_wrappers(flag: bool):
+    # revealed: (<method-wrapper '__get__' of function 'f'>) | (<method-wrapper '__call__' of function 'f'>)
+    reveal_type(f.__get__ if flag else f.__call__)
+
 # revealed: <wrapper-descriptor '__get__' of 'property' objects>
 reveal_type(property.__get__)
 static_assert(is_assignable_to(TypeOf[property.__get__], Callable[..., Any]))

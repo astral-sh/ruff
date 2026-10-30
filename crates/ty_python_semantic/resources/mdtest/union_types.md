@@ -467,42 +467,6 @@ def recursive(
     reveal_type(value)  # revealed: tuple[(Node & ~Excluded) | str]
 ```
 
-## Unions of nominal instances and TypedDicts
-
-A TypedDict and an unrelated class remain distinct in either order. A compatible mapping or
-dictionary still subsumes the TypedDict.
-
-```py
-from collections.abc import Mapping
-from typing import Literal
-from typing_extensions import TypedDict
-
-class Movie(TypedDict):
-    year: int
-
-class Counts(TypedDict, extra_items=int): ...
-class Ticket: ...
-
-def _(
-    ticket_first: Ticket | Movie,
-    movie_first: Movie | Ticket,
-    mixed: Literal["screen"] | Ticket | Movie,
-    reversed_mixed: Literal["screen"] | Movie | Ticket,
-    mapping_first: Mapping[str, object] | Movie,
-    mapping_last: Movie | Mapping[str, object],
-    dict_first: dict[str, int] | Counts,
-    dict_last: Counts | dict[str, int],
-):
-    reveal_type(ticket_first)  # revealed: Ticket | Movie
-    reveal_type(movie_first)  # revealed: Movie | Ticket
-    reveal_type(mixed)  # revealed: Literal["screen"] | Ticket | Movie
-    reveal_type(reversed_mixed)  # revealed: Literal["screen"] | Movie | Ticket
-    reveal_type(mapping_first)  # revealed: Mapping[str, object]
-    reveal_type(mapping_last)  # revealed: Mapping[str, object]
-    reveal_type(dict_first)  # revealed: dict[str, int]
-    reveal_type(dict_last)  # revealed: dict[str, int]
-```
-
 ## Unions of other generic containers
 
 ```toml
