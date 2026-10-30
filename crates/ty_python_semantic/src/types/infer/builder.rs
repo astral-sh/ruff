@@ -2680,7 +2680,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let loop_range = root.kind(db).target_range(module);
         let mut work = vec![Work::Place(root_scope, root_place)];
         let mut places = FxHashSet::default();
-        let mut definitions = FxHashSet::default();
+        let mut definitions = FxIndexSet::default();
         let mut has_integer_literal = false;
         let mut has_other_counter = false;
         let mut has_counter_input = false;
@@ -2819,7 +2819,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn is_shared_unit_counter(
         &self,
         root: Definition<'db>,
-        definitions: &FxHashSet<Definition<'db>>,
+        definitions: &FxIndexSet<Definition<'db>>,
     ) -> bool {
         use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
         use ty_python_core::predicate::PredicateNode;
