@@ -150,15 +150,15 @@ use ty_python_core::definition::{
     ParameterDefinitionNodeKind, TargetKind, WithItemDefinitionKind,
 };
 use ty_python_core::expression::{Expression, ExpressionContext, ExpressionKind};
-use ty_python_core::narrowing_constraints::ConstraintKey;
+use ty_python_core::narrowing_constraints::{ConstraintKey, ScopedNarrowingConstraint};
 use ty_python_core::node_key::NodeKey;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
-use ty_python_core::predicate::PatternPredicate;
+use ty_python_core::predicate::{PatternPredicate, PredicateNode};
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
 use ty_python_core::symbol::ScopedSymbolId;
 use ty_python_core::{
-    ApplicableConstraints, EvaluationMode, ProgramFile, SemanticIndex, Truthiness, semantic_index,
-    unpack::UnpackPosition,
+    ApplicableConstraints, EvaluationMode, LoopHeader, ProgramFile, SemanticIndex, Truthiness,
+    semantic_index, unpack::UnpackPosition,
 };
 use ty_python_core::{ExpressionNodeKey, Statement};
 
@@ -2665,7 +2665,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Recognize an integer recurrence fed by another local counter. Following its assignments
     /// structurally avoids re-entering type inference for every path through the loop.
-    fn can_widen_loop_counter(&mut self, root: Definition<'db>) -> bool {
+    fn can_widen_loop_counter(&mut self, root: Definition<'db>, header: &LoopHeader) -> bool {
         enum Work<'ast, 'db> {
             Place(FileScopeId, ScopedPlaceId),
             Definition(Definition<'db>),
@@ -2677,6 +2677,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let module = self.module();
         let root_scope = root.file_scope(db);
         let root_place = root.place(db);
+        if header.bindings_for_place(root_place).nth(1).is_none() {
+            return false;
+        }
         let loop_range = root.kind(db).target_range(module);
         let mut work = vec![Work::Place(root_scope, root_place)];
         let mut places = FxHashSet::default();
@@ -2808,9 +2811,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 },
             }
         }
-        has_integer_literal
-            && (has_other_counter && has_counter_input
-                || self.is_shared_unit_counter(root, &definitions))
+        if !has_integer_literal {
+            return false;
+        }
+        if has_other_counter && has_counter_input {
+            // The structural walk gives an upper bound of `int`. A dead arithmetic update
+            // can still leave a finite set of literals. Require a reachable assignment that
+            // already contributes the full type after narrowing at the loop back edge.
+            let map = index.use_def_map(root_scope);
+            let env = self.program_environment();
+            let int = KnownClass::Int.to_instance(db, env);
+            return header.bindings_for_place(root_place).any(|edge| {
+                let Some(write) = map.definition(edge.binding()).definition() else {
+                    return false;
+                };
+                let DefinitionKind::Assignment(assignment) = write.kind(db) else {
+                    return false;
+                };
+                if !matches!(
+                    assignment.value(module),
+                    ast::Expr::Name(_) | ast::Expr::BinOp(_) | ast::Expr::Call(_)
+                ) || crate::reachability::evaluate_reachability(
+                    db,
+                    map,
+                    edge.reachability_constraint(),
+                )
+                .is_always_false()
+                {
+                    return false;
+                }
+                let ty = binding_type(db, write);
+                ty == int
+                    && map
+                        .narrowing_evaluator(edge.narrowing_constraint())
+                        .narrow(db, env, ty, root_place)
+                        == int
+            });
+        }
+        self.is_shared_unit_counter(root, header, &definitions)
     }
 
     /// A local and a nested function can both advance the same cursor. Only accept a literal
@@ -2819,10 +2857,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn is_shared_unit_counter(
         &self,
         root: Definition<'db>,
+        header: &LoopHeader,
         definitions: &FxIndexSet<Definition<'db>>,
     ) -> bool {
-        use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
-        use ty_python_core::predicate::PredicateNode;
         let db = self.db();
         let module = self.module();
         let root_scope = root.file_scope(db);
@@ -2884,7 +2921,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return false;
             }
         }
-        local && nested
+        if !local || !nested {
+            return false;
+        }
+
+        // The local increment must both reach the next iteration and be able to read the
+        // value carried by the header there. A syntactic increment may never execute.
+        let map = self.index.use_def_map(root_scope);
+        header.bindings_for_place(root_place).any(|edge| {
+            let Some(write) = map.definition(edge.binding()).definition() else {
+                return false;
+            };
+            let DefinitionKind::AugmentedAssignment(assignment) = write.kind(db) else {
+                return false;
+            };
+            if crate::reachability::evaluate_reachability(db, map, edge.reachability_constraint())
+                .is_always_false()
+            {
+                return false;
+            }
+            let Some(use_id) = self
+                .index
+                .try_expression_use_id(assignment.node(module).target.as_ref().into())
+            else {
+                return false;
+            };
+            map.bindings_at_use(use_id).any(|binding| {
+                binding.binding.definition() == Some(root)
+                    && !crate::reachability::evaluate_reachability(
+                        db,
+                        map,
+                        binding.reachability_constraint,
+                    )
+                    .is_always_false()
+            })
+        })
     }
 
     /// Infer the type for a loop header definition.
@@ -2917,15 +2988,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let place = loop_header_kind.place();
         let env = self.program_environment();
-        if nodes > crate::place::LOOP_SUMMARY_MIN_NODES
-            && use_def
-                .loop_header(loop_header_kind.loop_header_id())
-                .bindings_for_place(place)
-                .nth(1)
-                .is_some()
-            && crate::place::scope_has_branching_counter(db, definition.scope(db))
-            && self.can_widen_loop_counter(definition)
-        {
+        if crate::place::can_summarize_loop_header(
+            db,
+            definition,
+            use_def.reachability_constraints(),
+        ) && self.can_widen_loop_counter(
+            definition,
+            use_def.loop_header(loop_header_kind.loop_header_id()),
+        ) {
             self.bindings
                 .insert(definition, KnownClass::Int.to_instance(db, env));
             return;

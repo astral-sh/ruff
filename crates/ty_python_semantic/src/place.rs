@@ -1657,13 +1657,15 @@ fn loop_header_reachability_cycle_recover<'db>(
     result.cycle_normalized(previous, cycle)
 }
 
-/// Small scopes use full semantic evaluation of every loop-back edge.
-pub(crate) const LOOP_SUMMARY_MIN_NODES: usize = 1024;
+/// Small scopes are cheap to evaluate in full. Above the upper limit, loop headers already
+/// approximate reachability to bound the cost of evaluating their decision diagrams.
+const LOOP_SUMMARY_MIN_NODES: usize = 1024;
+const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 2048;
 
 /// Look for the shape that makes exact inference costly: several loop-back paths assign
 /// a counter from another expression, and an arithmetic update carries it around the loop.
 #[salsa::tracked(returns(copy), heap_size = get_size2::GetSize::get_heap_size)]
-pub(crate) fn scope_has_branching_counter<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> bool {
+fn scope_has_branching_counter<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> bool {
     let use_def = use_def_map(db, scope);
     let module =
         ruff_db::parsed::parsed_module(db, scope.program_file(db).python_file(db)).load(db);
@@ -1725,15 +1727,55 @@ fn loop_can_delete_binding<'db>(db: &'db dyn Db, definition: Definition<'db>) ->
         })
 }
 
+/// These loop headers can establish boundness from a single reachable write. A deletion
+/// still needs the full analysis, including the path on which it reaches the next iteration.
+pub(crate) fn can_summarize_loop_header<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    constraints: &ReachabilityConstraints,
+) -> bool {
+    (LOOP_SUMMARY_MIN_NODES + 1..=MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES)
+        .contains(&constraints.used_interiors().len())
+        && scope_has_branching_counter(db, definition.scope(db))
+        && !loop_can_delete_binding(db, definition)
+}
+
+/// The caller has ruled out deletions, so one surviving write is enough to establish that
+/// the header contributes a binding. Inferring its type can still require the individual writes.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _| true,
+    cycle_fn = loop_header_has_binding_cycle_recover,
+    heap_size = get_size2::GetSize::get_heap_size,
+)]
+fn loop_header_has_binding<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+    let DefinitionKind::LoopHeader(header) = definition.kind(db) else {
+        unreachable!("expected a loop header");
+    };
+    let map = use_def_map(db, definition.scope(db));
+    map.loop_header(header.loop_header_id())
+        .bindings_for_place(header.place())
+        .any(|edge| {
+            !evaluate_reachability(db, map, edge.reachability_constraint()).is_always_false()
+        })
+}
+
+fn loop_header_has_binding_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous: &bool,
+    result: bool,
+    _definition: Definition<'db>,
+) -> bool {
+    // Match the union of successive binding sets in LoopHeaderReachability::cycle_normalized.
+    result || (cycle.iteration() > crate::TAINTED_CYCLES && *previous)
+}
+
 fn loop_header_reachability_impl<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
     mut cycle_initial_cache: Option<&mut FxHashMap<Definition<'db>, Truthiness>>,
 ) -> LoopHeaderReachability<'db> {
-    // This cutoff was chosen by benchmarking real isort to keep loop analysis
-    // overhead minimal while preserving diagnostics.
-    const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 2048;
-
     let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
         unreachable!("`loop_header_reachability` called with non-loop-header definition");
     };
@@ -1746,42 +1788,12 @@ fn loop_header_reachability_impl<'db>(
     let mut deleted_reachability = Truthiness::AlwaysFalse;
     let mut deleted_narrowing_constraints = FxIndexSet::default();
     let mut reachable_bindings = FxIndexSet::default();
-    let nodes = use_def.reachability_constraints().used_interiors().len();
-    let use_literal_conditions = cycle_initial_cache.is_none()
-        && (LOOP_SUMMARY_MIN_NODES + 1..=MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES).contains(&nodes)
-        && scope_has_branching_counter(db, scope)
-        && !loop_can_delete_binding(db, definition);
-    let module = use_literal_conditions.then(|| {
-        ruff_db::parsed::parsed_module(db, scope.program_file(db).python_file(db)).load(db)
-    });
+    let use_exact_reachability = use_def.reachability_constraints().used_interiors().len()
+        <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES;
     for live_binding in loop_header.bindings_for_place(place) {
         let reachability = if cycle_initial_cache.is_some() {
             Truthiness::Ambiguous
-        } else if let Some(module) = &module
-            && !use_def
-                .definition(live_binding.binding())
-                .definition()
-                .is_some_and(|def| {
-                    // An unreachable literal must not enter the union: it can create a new type
-                    // even when every other path carries the same value.
-                    match def.kind(db) {
-                        DefinitionKind::Assignment(a) if a.unpack().is_none() => {
-                            a.value(module).is_literal_expr()
-                        }
-                        DefinitionKind::AnnotatedAssignment(a) => {
-                            a.value(module).is_some_and(ast::Expr::is_literal_expr)
-                        }
-                        _ => false,
-                    }
-                })
-        {
-            crate::reachability::evaluate_loop_literal_conditions(
-                db,
-                scope,
-                use_def,
-                live_binding.reachability_constraint(),
-            )
-        } else if nodes <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES {
+        } else if use_exact_reachability {
             evaluate_reachability(db, use_def, live_binding.reachability_constraint())
         } else if live_binding.reachability_constraint()
             == ScopedReachabilityConstraintId::ALWAYS_FALSE
@@ -2069,13 +2081,17 @@ fn place_from_bindings_impl<'db>(
             // like all other bindings, so that it can participate in fixpoint iteration.
             let binding_kind = binding.kind(db);
             if binding_kind.is_loop_header() {
-                let loop_header = loop_header_reachability(db, binding);
-                deleted_reachability = deleted_reachability.or(loop_header.deleted_reachability);
-                // If all the bindings in the loop are in statically false branches, it might be
-                // that none of them loop-back. In that case short-circuit, so that we don't
-                // produce an `Unknown` fallback type, and so that `Place::Undefined` is still a
-                // possibility below.
-                if loop_header.reachable_bindings.is_empty() {
+                let has_binding =
+                    if can_summarize_loop_header(db, binding, reachability_constraints) {
+                        loop_header_has_binding(db, binding)
+                    } else {
+                        let loop_header = loop_header_reachability(db, binding);
+                        deleted_reachability =
+                            deleted_reachability.or(loop_header.deleted_reachability);
+                        !loop_header.reachable_bindings.is_empty()
+                    };
+                // When no write reaches the next iteration, the place can still be undefined.
+                if !has_binding {
                     return None;
                 }
             } else if matches!(binding_kind, DefinitionKind::NestedBindings(_)) {

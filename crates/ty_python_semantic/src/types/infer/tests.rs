@@ -497,6 +497,8 @@ def check(flags: list[bool]) -> None:
     position = -1
     offset = -1
     bounded = 0
+    stationary = -1
+    step = 0
     sticky = 7
     def disabled() -> Literal[False]:
         return False
@@ -506,9 +508,15 @@ def check(flags: list[bool]) -> None:
         assert_type(offset, int)
         assert_type(bounded, Literal[0, 1, 2])
         assert_type(sticky, Literal[7])
+        assert_type(stationary, Literal[-1])
         require_zero(index)
         if disabled():
-            sticky = "unreachable"
+            sticky = str(index)
+            step += 1
+        if flags[-1]:
+            sticky = bytes(index)
+            if not disabled():
+                sticky = 7
         index += 1
         if bounded == 1:
             bounded += 1
@@ -524,11 +532,15 @@ def check(flags: list[bool]) -> None:
             "        if flags[{i}]:\n            position = index - 1"
         )?;
         if i < 12 {
-            source.push_str("            offset = index - 1\n");
+            source.push_str("            offset = index - 1\n            stationary = step - 1\n");
         }
         source.push_str("            continue\n");
     }
-    source.push_str("        offset -= len(flags)\n        position -= len(flags)\n");
+    source.push_str(concat!(
+        "        stationary += 0\n",
+        "        offset -= len(flags)\n",
+        "        position -= len(flags)\n",
+    ));
     db.write_file("/src/main.py", &source)?;
 
     let file = system_path_to_file(&db, "/src/main.py")?;
