@@ -25,6 +25,13 @@ impl<'buf, 'state, Context> Formatter<'buf, 'state, Context> {
         }
     }
 
+    pub(crate) fn plain_vec(&mut self) -> Option<&mut VecBuffer<'state, Context>> {
+        match &mut self.buffer {
+            FormatterBuffer::Vec(buffer) => Some(buffer),
+            FormatterBuffer::Other(_) => None,
+        }
+    }
+
     /// Returns the format options
     pub fn options(&self) -> &Context::Options
     where
@@ -177,6 +184,15 @@ impl<'buf, 'state, Context> Formatter<'buf, 'state, Context> {
         &mut self,
         content: &dyn Format<Context>,
     ) -> FormatResult<Option<FormatElement>> {
+        if let FormatterBuffer::Vec(buffer) = &mut self.buffer {
+            return buffer.capture(
+                |b| crate::write!(b, [content]),
+                |mut items| match items.len() {
+                    0 | 1 => items.next(),
+                    _ => Some(FormatElement::Interned(Interned::from_tail(items))),
+                },
+            );
+        }
         let mut buffer = VecBuffer::new(self.state_mut());
         crate::write!(&mut buffer, [content])?;
         let elements = buffer.into_vec();
