@@ -80,12 +80,10 @@ pub struct CallHierarchyItem {
 }
 
 impl CallHierarchyItem {
-    /// Build a [`CallHierarchyItem`] from a resolved definition, returning `None`
-    /// for kinds that are not callable (variables, type aliases, parameters, ...).
+    /// Build a [`CallHierarchyItem`] for a named function or class definition.
     ///
-    /// Takes an already-loaded `ParsedModuleRef` for `def.file(db)` so the name
-    /// is read directly from it instead of going through `def.name(db)`, which
-    /// would re-load the module internally.
+    /// `module` must be the parsed module for the definition's file. It supplies the ranges
+    /// of the whole definition and its name.
     fn from_definition(
         db: &dyn Db,
         resolved: &ResolvedDefinition<'_>,
