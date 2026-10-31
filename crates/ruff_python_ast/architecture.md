@@ -62,17 +62,24 @@ field can use its generated accessor directly.
 
 ## Row layout
 
-Each row occupies 24 bytes, with a 16-byte payload followed by an eight-byte source span. The payload
-holds up to 15 bytes of fields and a one-byte node kind. A visitor can read both the kind and the
-span from the row it already borrows. The parser appends each completed node in one operation.
+Each row occupies 24 bytes, with a 16-byte union followed by an eight-byte source span. The
+first 15 bytes hold naturally aligned integer fields for the node's kind. The last byte holds
+the kind itself. A visitor can read the kind and span from the row it already borrows.
+The parser appends each completed node in one operation.
 
 The schema declares each node's fields. The generator assigns their physical locations and
 generates constructors, typed accessors, and traversal from the same declarations. A binary
-expression fits both operand IDs and its operator inline. When the fields need more than 15
-bytes, the first four bytes hold an offset into extra data and the smallest fields occupy up to
-eleven bytes beside it. Each spilled field takes one or two four-byte words. The generated read
-and write offsets are checked against the payload size at compile time.
+expression fits both operand IDs and its operator inline. When the fields need more space, one
+aligned four-byte field points into extra data. The remaining inline fields can occupy up to
+eleven bytes. Each spilled field takes one or two four-byte words.
 [Schema](ast.toml) · [Generator](generate.py)
+
+Only the row constructor writes the kind. The union and its members are private. Construction
+initializes every field byte, and generated setters write individual integers. For example, when
+an assignment turns a name into a store target, the parser updates the name's expression context
+without touching its identifier or kind. Assigning a whole union member could overwrite the
+kind with trailing padding. Compile-time checks verify every field's offset and that it ends
+before the kind. [Row implementation](src/flat/row.rs)
 
 Lists store a starting slot and an element count. A `NodeList<T>` reads a row ID from one
 four-byte word for each element and returns a `View<T>` with the same tree borrow. A `Suite` is

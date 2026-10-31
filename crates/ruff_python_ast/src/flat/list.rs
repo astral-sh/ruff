@@ -250,7 +250,7 @@ impl Element for crate::FStringPart {
     type Item<'a> = FStringPartView<'a>;
 
     fn read(ast: &Ast, word: u64) -> Self::Item<'_> {
-        if ast.rows[split_words(word)[0] as usize].payload.kind == NodeKind::FString {
+        if ast.rows[split_words(word)[0] as usize].kind() == NodeKind::FString {
             FStringPartView::FString(ast.child(word))
         } else {
             FStringPartView::Literal(ast.child(word))

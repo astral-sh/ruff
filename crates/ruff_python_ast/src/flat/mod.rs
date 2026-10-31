@@ -22,6 +22,7 @@ use crate::{
 mod generated;
 mod list;
 mod nodes;
+mod row;
 mod scalar;
 mod string_like;
 pub use string_like::{StringLike, StringLikeKind, StringLikePart, StringLikePartKind};
@@ -48,6 +49,8 @@ pub type Suite<'a> = NodeList<'a, crate::Stmt>;
 /// Literal text and interpolation fields in an f-string or t-string.
 pub type InterpolatedStringElements<'a> = NodeList<'a, crate::InterpolatedStringElement>;
 use list::Interval;
+use row::Row;
+use scalar::Word;
 
 const ABSENT: u32 = u32::MAX;
 
@@ -254,7 +257,7 @@ impl<'a, T> View<'a, T> {
 
     pub fn node_index(self) -> NodeIndex {
         if matches!(
-            self.row.payload.kind,
+            self.row.kind(),
             NodeKind::ModModule | NodeKind::ModExpression
         ) {
             return NodeIndex::NONE;
@@ -266,7 +269,7 @@ impl<'a, T> View<'a, T> {
     where
         T: Node,
     {
-        T::KIND.unwrap_or(self.row.payload.kind)
+        T::KIND.unwrap_or(self.row.kind())
     }
 
     pub fn cast<U: Node>(self) -> Option<View<'a, U>>
@@ -305,7 +308,7 @@ impl<T> crate::HasNodeIndex for View<'_, T> {
 impl<T> Ranged for View<'_, T> {
     #[inline]
     fn range(&self) -> TextRange {
-        self.row.span
+        self.row.range()
     }
 }
 
@@ -405,58 +408,6 @@ fn visit_merged<'a>(
     right.for_each(visit);
 }
 
-#[derive(Clone, Copy, Debug)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-#[repr(C)]
-struct Payload {
-    bytes: [u8; 15],
-    kind: NodeKind,
-}
-
-impl Payload {
-    const fn new(kind: NodeKind) -> Self {
-        Self {
-            bytes: [0; 15],
-            kind,
-        }
-    }
-
-    #[inline]
-    fn read<const OFFSET: usize, const WIDTH: usize>(&self) -> u64 {
-        const { assert!(OFFSET + WIDTH <= 15 && WIDTH <= 8) };
-        let mut word = [0; 8];
-        word[..WIDTH].copy_from_slice(&self.bytes[OFFSET..OFFSET + WIDTH]);
-        u64::from_le_bytes(word)
-    }
-
-    #[inline]
-    fn offset<const OFFSET: usize>(&self) -> usize {
-        split_words(self.read::<OFFSET, 4>())[0] as usize
-    }
-
-    #[inline]
-    fn write<const OFFSET: usize, const WIDTH: usize>(&mut self, word: u64) {
-        const { assert!(OFFSET + WIDTH <= 15 && WIDTH <= 8) };
-        self.bytes[OFFSET..OFFSET + WIDTH].copy_from_slice(&word.to_le_bytes()[..WIDTH]);
-    }
-}
-
-const _: () = {
-    assert!(size_of::<Payload>() == 16);
-    assert!(size_of::<TextRange>() == 8);
-    assert!(size_of::<NodeKind>() == 1);
-};
-
-#[derive(Clone, Copy, Debug)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-#[repr(C)]
-struct Row {
-    payload: Payload,
-    span: TextRange,
-}
-
-const _: () = assert!(size_of::<Row>() == 24);
-
 /// Translates a zero-based allocation index to a module or string-annotation key.
 #[derive(Clone, Default, Debug)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
@@ -519,26 +470,18 @@ impl<'a> View<'a, crate::StmtFunctionDef> {
         if yield_end <= body.end {
             return true;
         }
-        self.ast.rows[body].iter().any(|row| {
-            matches!(
-                row.payload.kind,
-                NodeKind::ExprYield | NodeKind::ExprYieldFrom
-            )
-        })
+        self.ast.rows[body]
+            .iter()
+            .any(|row| matches!(row.kind(), NodeKind::ExprYield | NodeKind::ExprYieldFrom))
     }
 
     /// Includes nested scopes and any rows discarded by parser recovery.
     pub(super) fn body_row_kinds(self) -> Option<impl Iterator<Item = NodeKind> + 'a> {
-        Some(
-            self.ast.rows[self.body_row_range()?]
-                .iter()
-                .map(|row| row.payload.kind),
-        )
+        Some(self.ast.rows[self.body_row_range()?].iter().map(Row::kind))
     }
 
     fn body_row_range(self) -> Option<std::ops::Range<usize>> {
-        let bytes = &self.row.payload.bytes;
-        let count = usize::from(u16::from_le_bytes([bytes[13], bytes[14]]));
+        let count = usize::from(self.row.stmt_function_def_body_row_count());
         if count == 0 {
             return None;
         }
@@ -566,7 +509,7 @@ impl Ast {
 
     pub fn view<T: Node>(&self, handle: Handle<T>) -> Option<View<'_, T>> {
         let row = self.rows.get(handle.slot())?;
-        if !T::ANY && !T::matches(row.payload.kind) {
+        if !T::ANY && !T::matches(row.kind()) {
             return None;
         }
         Some(View {
@@ -666,10 +609,7 @@ impl Builder {
         };
         let mut rows = Vec::with_capacity(estimated_rows + 1);
         // No view can refer to this row. Its presence makes every child slot a nonzero index.
-        rows.push(Row {
-            payload: Payload::new(NodeKind::ModModule),
-            span: TextRange::default(),
-        });
+        rows.push(Row::new(NodeKind::ModModule, TextRange::default()));
         Self {
             source,
             ast: Ast {
@@ -748,7 +688,7 @@ impl Builder {
     ) {
         let end = function.index();
         let count = u16::try_from(end.saturating_sub(start)).unwrap_or(0);
-        self.ast.rows[function.slot()].payload.bytes[13..15].copy_from_slice(&count.to_le_bytes());
+        self.ast.rows[function.slot()].set_stmt_function_def_body_row_count(count);
     }
 
     pub fn finish_tree<T>(self, root: BuildId<T>) -> Tree<T> {
@@ -760,7 +700,7 @@ impl Builder {
 
     pub fn get<T: Node>(&self, id: BuildId<T>) -> View<'_, T> {
         let view = View::from_slot(&self.ast, id.slot());
-        debug_assert!(T::matches(view.row.payload.kind));
+        debug_assert!(T::matches(view.row.kind()));
         view
     }
 
@@ -778,13 +718,15 @@ impl Builder {
 
     /// Sets the load, store or delete context of an assignment target and its elements.
     pub fn set_expr_context(&mut self, expr: BuildId<crate::Expr>, context: crate::ExprContext) {
+        let slot = expr.slot();
+        let encoded = context.encode().to_le_bytes()[0];
         let elements = match self.get(expr).classify() {
-            ExprKind::Name(_) => return self.expr_name_context(expr, context),
-            ExprKind::Attribute(_) => return self.expr_attribute_context(expr, context),
-            ExprKind::Subscript(_) => return self.expr_subscript_context(expr, context),
+            ExprKind::Name(_) => return self.ast.rows[slot].set_expr_name_ctx(encoded),
+            ExprKind::Attribute(_) => return self.ast.rows[slot].set_expr_attribute_ctx(encoded),
+            ExprKind::Subscript(_) => return self.ast.rows[slot].set_expr_subscript_ctx(encoded),
             ExprKind::Starred(value) => {
                 let child = value.value().build_id();
-                self.expr_starred_context(expr, context);
+                self.ast.rows[slot].set_expr_starred_ctx(encoded);
                 return self.set_expr_context(child, context);
             }
             ExprKind::UnaryOp(value) => {
@@ -792,12 +734,12 @@ impl Builder {
             }
             ExprKind::Tuple(value) => {
                 let elements = value.elts().id();
-                self.expr_tuple_context(expr, context);
+                self.ast.rows[slot].set_expr_tuple_ctx(encoded);
                 elements
             }
             ExprKind::List(value) => {
                 let elements = value.elts().id();
-                self.expr_list_context(expr, context);
+                self.ast.rows[slot].set_expr_list_ctx(encoded);
                 elements
             }
             _ => return,
@@ -810,9 +752,8 @@ impl Builder {
     }
 
     #[inline]
-    fn push<T: Node>(&mut self, span: TextRange, payload: Payload) -> BuildId<T> {
+    fn push<T: Node>(&mut self, row: Row) -> BuildId<T> {
         let index = offset(self.ast.rows.len());
-        let row = Row { payload, span };
         if self.ast.rows.len() < self.ast.rows.capacity() {
             self.ast.rows.push(row);
         } else {
@@ -824,7 +765,7 @@ impl Builder {
     #[cold]
     fn grow_and_push(&mut self, row: Row) {
         if !self.source.is_empty() {
-            self.reserve_rows(row.span.end());
+            self.reserve_rows(row.end());
         }
         self.ast.rows.push(row);
     }
@@ -866,15 +807,16 @@ impl Builder {
     /// A string expression stores its decoded text range beside its parts list.
     /// Six bytes hold a text offset and a 16-bit length. Longer strings use a full range
     /// in the extra table, with the maximum inline length reserved for that case.
-    fn string_literal_text(&mut self, parts: u64) -> u64 {
-        let range = self.join_string_literals(parts).encode();
-        let [_, len] = split_words(range);
-        if len < u32::from(u16::MAX) {
-            return range;
+    fn string_literal_text(&mut self, parts: u64) -> (u32, u16) {
+        let [start, len] = split_words(self.join_string_literals(parts).encode());
+        if let Ok(len) = u16::try_from(len)
+            && len < u16::MAX
+        {
+            return (start, len);
         }
         let index = offset(self.ast.extra.len());
-        self.ast.extra.extend(split_words(range));
-        u64::from(index) | (u64::from(u16::MAX) << 32)
+        self.ast.extra.extend([start, len]);
+        (index, u16::MAX)
     }
 
     fn join_string_literals(&mut self, parts: u64) -> Interval {
@@ -988,7 +930,7 @@ impl<T> Tree<T> {
     }
 
     pub fn cast<U: Node>(self) -> Option<Tree<U>> {
-        U::matches(self.ast.rows[self.root.slot()].payload.kind).then(|| Tree {
+        U::matches(self.ast.rows[self.root.slot()].kind()).then(|| Tree {
             root: self.root.cast(),
             ast: self.ast,
         })
@@ -1064,10 +1006,10 @@ impl Tree<crate::ModExpression> {
     /// the containing string. Identifier and literal-part spans still describe the decoded text.
     pub fn relocate_expression(&mut self, range: TextRange) {
         for row in &mut self.ast.rows {
-            let kind = row.payload.kind;
+            let kind = row.kind();
             if crate::Expr::matches(kind) || matches!(kind, NodeKind::Arguments | NodeKind::Keyword)
             {
-                row.span = range;
+                row.set_range(range);
             }
         }
     }
