@@ -2631,10 +2631,8 @@ A structural type context can infer a gradual lower bound and a static upper bou
 values contribute their constraints. The preliminary solution should retain the gradual lower bound.
 
 ```py
-T_co = TypeVar("T_co", covariant=True)
-
-class DictLike(Protocol[T_co]):
-    def __getitem__(self, key: str, /) -> T_co: ...
+class DictLike[T](Protocol):
+    def __getitem__(self, key: str, /) -> T: ...
     def __setitem__(self, key: str, value: Any, /) -> None: ...
 
 class Command: ...
@@ -2642,6 +2640,26 @@ class Command: ...
 def _(command: Any):
     # revealed: dict[str, Any]
     mapping: DictLike[type[Command]] = reveal_type({"command": command})
+```
+
+Nested generic calls accept gradual type context from sibling arguments, even if they are invariant:
+
+```py
+from typing import Any
+
+class Box[T]:
+    def __init__(self, value: T, template: "Box[T] | None" = None) -> None:
+        self.value = value
+
+def combine_box[T](value: T, template: Box[T]) -> Box[T]:
+    return Box(value)
+
+def _(dynamic: Any, existing: Box[int]):
+    reveal_type(Box(dynamic, Box(1)))  # revealed: Box[Any | int]
+    reveal_type(combine_box(dynamic, Box(1)))  # revealed: Box[Any | int]
+
+    reveal_type(Box(dynamic, existing))  # revealed: Box[int]
+    reveal_type(combine_box(dynamic, existing))  # revealed: Box[int]
 ```
 
 Note that long chains of callables with constraint dependencies in reverse source-order may require
