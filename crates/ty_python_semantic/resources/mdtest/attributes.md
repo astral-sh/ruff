@@ -522,6 +522,35 @@ class Child(Base):
 reveal_type(Child().value)  # revealed: Before | After
 ```
 
+#### Repeated updates to an inherited tuple
+
+An instance starts with the empty tuple set by its base class. On later calls to `add`, `before`
+includes items appended by earlier calls.
+
+```py
+class Base:
+    def __init__(self) -> None:
+        self.values = ()
+
+class Entries(Base):
+    def add(self, item: int) -> tuple[()]:
+        before = self.values
+        self.values += (item,)  # ok
+        return before  # error: [invalid-return-type]
+```
+
+An explicit empty-tuple annotation still constrains the write.
+
+```py
+class Annotated:
+    def __init__(self) -> None:
+        self.values: tuple[()] = ()
+
+    def add(self, item: int) -> None:
+        self.values += (item,)  # error: [invalid-assignment]
+        reveal_type(self.values)  # revealed: tuple[()]
+```
+
 #### Augmented assignments preserve inherited instance bindings beneath class defaults
 
 A superclass initializer writes instance storage even when a subclass defines a class-level default
