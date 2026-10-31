@@ -65,6 +65,15 @@ use ty_python_core::{
     semantic_index, use_def_map,
 };
 
+/// Class-header facts used to decide whether the class can synthesize members.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::SalsaValue, get_size2::GetSize)]
+pub struct StaticClassHeader<'db> {
+    pub(crate) known: Option<KnownClass>,
+    pub(crate) dataclass_params: Option<DataclassParams<'db>>,
+    pub(crate) has_explicit_bases: bool,
+    pub(crate) has_explicit_metaclass: bool,
+}
+
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
 /// generic class that has not been specialized.
 ///
@@ -80,7 +89,7 @@ pub struct StaticClassLiteral<'db> {
     pub(crate) body_scope: ScopeId<'db>,
 
     #[returns(copy)]
-    pub(crate) known: Option<KnownClass>,
+    pub(crate) header: StaticClassHeader<'db>,
 
     /// If this class is deprecated, this holds the deprecation message.
     #[returns(copy)]
@@ -89,8 +98,6 @@ pub struct StaticClassLiteral<'db> {
     #[returns(copy)]
     pub(crate) type_check_only: bool,
 
-    #[returns(copy)]
-    pub(crate) dataclass_params: Option<DataclassParams<'db>>,
     #[returns(copy)]
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams<'db>>,
 
@@ -105,14 +112,6 @@ pub struct StaticClassLiteral<'db> {
     /// Whether this class has PEP 695 type parameters.
     #[returns(copy)]
     pub(crate) has_type_params: bool,
-
-    /// Whether this class has any explicit base classes.
-    #[returns(copy)]
-    pub(crate) has_explicit_bases: bool,
-
-    /// Whether this class has an explicit `metaclass` keyword argument.
-    #[returns(copy)]
-    pub(crate) has_explicit_metaclass: bool,
 }
 
 // The Salsa heap is tracked separately.
@@ -212,6 +211,22 @@ struct OwnClassFields<'db> {
 
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
+    pub(crate) fn known(self, db: &'db dyn Db) -> Option<KnownClass> {
+        self.header(db).known
+    }
+
+    pub(crate) fn dataclass_params(self, db: &'db dyn Db) -> Option<DataclassParams<'db>> {
+        self.header(db).dataclass_params
+    }
+
+    pub(crate) fn has_explicit_bases(self, db: &'db dyn Db) -> bool {
+        self.header(db).has_explicit_bases
+    }
+
+    pub(crate) fn has_explicit_metaclass(self, db: &'db dyn Db) -> bool {
+        self.header(db).has_explicit_metaclass
+    }
+
     /// Return `true` if this class represents `known_class`
     pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
@@ -264,16 +279,16 @@ impl<'db> StaticClassLiteral<'db> {
             db,
             self.name(db),
             self.body_scope(db),
-            self.known(db),
+            StaticClassHeader {
+                dataclass_params,
+                ..self.header(db)
+            },
             self.deprecated(db),
             self.type_check_only(db),
-            dataclass_params,
             self.dataclass_transformer_params(db),
             self.total_ordering(db),
             self.has_decorators(db),
             self.has_type_params(db),
-            self.has_explicit_bases(db),
-            self.has_explicit_metaclass(db),
         )
     }
 
@@ -1648,12 +1663,13 @@ impl<'db> StaticClassLiteral<'db> {
         if member.is_undefined()
             || name == "__slots__" && self.has_generated_slots(db) && !self.has_explicit_slots(db)
         {
-            if let Some(synthesized_member) = self.own_synthesized_member(
+            if let Some(synthesized_member) = self.own_synthesized_member_with_kind(
                 db,
                 env,
                 specialization,
                 inherited_generic_context,
                 name,
+                || code_generator,
             ) {
                 return Member::definitely_declared(synthesized_member);
             }
@@ -1706,6 +1722,25 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         inherited_generic_context: Option<GenericContext<'db>>,
         name: &str,
+    ) -> Option<Type<'db>> {
+        self.own_synthesized_member_with_kind(
+            db,
+            env,
+            specialization,
+            inherited_generic_context,
+            name,
+            || CodeGeneratorKind::from_static_class(db, self),
+        )
+    }
+
+    fn own_synthesized_member_with_kind(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Option<Specialization<'db>>,
+        inherited_generic_context: Option<GenericContext<'db>>,
+        name: &str,
+        code_generator: impl FnOnce() -> Option<CodeGeneratorKind<'db>>,
     ) -> Option<Type<'db>> {
         if let Some(member) = django::synthesized_member(db, env, self, specialization, name) {
             return Some(member);
@@ -1771,7 +1806,7 @@ impl<'db> StaticClassLiteral<'db> {
             return Some(synthesized_method);
         }
 
-        let field_policy = CodeGeneratorKind::from_class(db, self.into())?;
+        let field_policy = code_generator()?;
         let pydantic_constructor_fields_are_keyword_only =
             field_policy.is_pydantic() && pydantic::constructor_fields_are_keyword_only(db, self);
         let pydantic_constructor_fields_are_optional = name == "__init__"
@@ -2968,21 +3003,21 @@ impl<'db> StaticClassLiteral<'db> {
         // - `typing.Final`
         // - Proper diagnostics
 
-        // NamedTuple fields are modeled via synthesized descriptors on the class. Treating them
-        // as instance attributes here causes inherited fields to leak through after a subclass
-        // shadows the name with a normal class attribute.
-        if CodeGeneratorKind::NamedTuple.matches(db, self.into())
-            && self
-                .own_fields(db, None, CodeGeneratorKind::NamedTuple)
-                .contains_key(name)
-        {
-            return Member::unbound();
-        }
-
         let body_scope = self.body_scope(db);
         let table = place_table(db, body_scope);
 
         if let Some(symbol_id) = table.symbol_id(name) {
+            // NamedTuple fields are modeled via synthesized descriptors on the class. Treating them
+            // as instance attributes here causes inherited fields to leak through after a subclass
+            // shadows the name with a normal class attribute.
+            if CodeGeneratorKind::NamedTuple.matches(db, self.into())
+                && self
+                    .own_fields(db, None, CodeGeneratorKind::NamedTuple)
+                    .contains_key(name)
+            {
+                return Member::unbound();
+            }
+
             let use_def = use_def_map(db, body_scope);
 
             let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);

@@ -14,7 +14,7 @@ pub(super) use self::named_tuple::{
 };
 pub use self::slots::SlotDescriptorType;
 pub(crate) use self::static_literal::{
-    ExpandedClassBaseEntry, FrozenDataclassDispatch, StaticClassLiteral,
+    ExpandedClassBaseEntry, FrozenDataclassDispatch, StaticClassHeader, StaticClassLiteral,
     expanded_class_base_entries,
 };
 pub(super) use self::typed_dict::{
@@ -195,10 +195,11 @@ impl<'db> CodeGeneratorKind<'db> {
     }
 
     fn from_static_class(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> Option<Self> {
-        if class.dataclass_params(db).is_none()
-            && class.known(db).is_none()
-            && !class.has_explicit_bases(db)
-            && !class.has_explicit_metaclass(db)
+        let header = class.header(db);
+        if header.dataclass_params.is_none()
+            && header.known.is_none()
+            && !header.has_explicit_bases
+            && !header.has_explicit_metaclass
         {
             return None;
         }
