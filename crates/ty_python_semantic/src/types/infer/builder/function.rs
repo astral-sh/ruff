@@ -3,9 +3,9 @@ use crate::{
     reachability::is_end_of_scope_reachable,
     types::{
         Binding, CallArguments, CallableType, ClassBase, ClassLiteral, ClassType, DynamicType,
-        IntersectionBuilder, KnownClass, KnownInstanceType, ParamSpecAttrKind, SpecialFormType,
-        SubclassOfInner, SubclassOfType, Type, TypeContext, TypeVarBoundOrConstraints, TypeVarKind,
-        UnionBuilder, UnionType, UnionTypeInstance,
+        IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, ParamSpecAttrKind,
+        SpecialFormType, SubclassOfInner, SubclassOfType, Type, TypeContext,
+        TypeVarBoundOrConstraints, TypeVarKind, UnionBuilder, UnionType, UnionTypeInstance,
         callable::CallableTypeKind,
         constraints::ConstraintSetBuilder,
         context::InferContext,
@@ -2346,6 +2346,18 @@ fn is_instance_truthiness<'db>(
             Truthiness::Ambiguous
         }
     };
+
+    if let Some(protocol) = class.into_protocol_class(db)
+        && protocol.is_runtime_checkable(db)
+    {
+        let target =
+            Type::instance(db, env, class.unknown_specialization(db)).top_materialization(db, env);
+        let nonmatching = IntersectionType::from_positive_and_negative(db, env, ty, target);
+        // TODO: `IntersectionBuilder` should simplify any intersection disjoint from `object`
+        // to `Never`, so we could use `nonmatching.is_never()` here. It can still produce
+        // `~P` when every object satisfies the protocol `P`.
+        return always_true_if(nonmatching.is_disjoint_from(db, env, Type::object()));
+    }
 
     match ty {
         Type::Recursive(recursive) => recursive

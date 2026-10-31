@@ -233,9 +233,9 @@ def subclass_target(x: A, target: type[A]) -> bool:  # error: [invalid-return-ty
         return True
 ```
 
-The single-class path already leaves runtime-checkable protocol checks as `bool`. Tuple members use
-the same inference, so a class that only appears structurally compatible does not make the tuple
-check certain.
+For a runtime-checkable protocol, ty infers `Literal[True]` when the argument is a structural
+subtype of the protocol. As with narrowing, this assumes declared attributes exist on the instance.
+Here Python returns `False` for both checks because `value` is never initialized.
 
 ```py
 from typing import Protocol, runtime_checkable
@@ -247,8 +247,20 @@ class RuntimeProtocol(Protocol):
 class StructuralImplementation:
     value: int
 
-reveal_type(isinstance(StructuralImplementation(), RuntimeProtocol))  # revealed: bool
-reveal_type(isinstance(StructuralImplementation(), (RuntimeProtocol,)))  # revealed: bool
+reveal_type(isinstance(StructuralImplementation(), RuntimeProtocol))  # revealed: Literal[True]
+reveal_type(isinstance(StructuralImplementation(), (RuntimeProtocol,)))  # revealed: Literal[True]
+```
+
+Python excludes `__orig_bases__` from protocol members, so every object satisfies this protocol.
+
+```py
+@runtime_checkable
+class HasOriginalBases(Protocol):
+    __orig_bases__: tuple[object, ...]
+
+def check(value: object):
+    reveal_type(isinstance(value, HasOriginalBases))  # revealed: Literal[True]
+    reveal_type(isinstance(value, RuntimeProtocol))  # revealed: bool
 ```
 
 Single-class `isinstance` inference does not account for an overridden `__instancecheck__`. Tuple
