@@ -3224,7 +3224,6 @@ version = "0.0.20"
 dependencies = [
  "argfile",
  "clap",
- "colored",
 ]
 
 [[package]]

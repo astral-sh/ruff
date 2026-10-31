@@ -43,7 +43,7 @@ ty check [OPTIONS] [PATH]...
 </dd><dt id="ty-check--color"><a href="#ty-check--color"><code>--color</code></a> <i>when</i></dt><dd><p>Control when colored output is used</p>
 <p>Possible values:</p>
 <ul>
-<li><code>auto</code>:  Respect color environment variables and otherwise display colors in interactive terminals</li>
+<li><code>auto</code>:  Only display colors if the output goes to an interactive terminal, unless a certain environment variable has been set</li>
 <li><code>always</code>:  Always display colors</li>
 <li><code>never</code>:  Never display colors</li>
 </ul></dd><dt id="ty-check--config"><a href="#ty-check--config"><code>--config</code></a>, <code>-c</code> <i>config-option</i></dt><dd><p>A TOML <code>&lt;KEY&gt; = &lt;VALUE&gt;</code> pair (such as you might find in a <code>ty.toml</code> configuration file)

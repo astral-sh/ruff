@@ -96,11 +96,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
-    let color = TerminalColor::resolve(
-        args.color,
-        std::env::var_os(EnvVars::FORCE_COLOR).as_deref(),
-    );
-    color.set_colored_override();
+    let color = TerminalColor::resolve(args.color, || std::env::var_os(EnvVars::FORCE_COLOR));
+    if let Some(color_override) = color.as_override() {
+        colored::control::set_override(color_override);
+    }
 
     let verbosity = args.verbosity.level();
     let _guard = setup_tracing(verbosity, color)?;

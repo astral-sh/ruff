@@ -132,11 +132,10 @@ pub fn run(
     }: Args,
 ) -> Result<ExitStatus> {
     // Set color before so all outputs are properly colored
-    let color = TerminalColor::resolve(
-        global_options.color,
-        std::env::var_os("FORCE_COLOR").as_deref(),
-    );
-    color.set_colored_override();
+    let color = TerminalColor::resolve(global_options.color, || std::env::var_os("FORCE_COLOR"));
+    if let Some(color_override) = color.as_override() {
+        colored::control::set_override(color_override);
+    }
 
     {
         ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
