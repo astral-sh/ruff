@@ -185,6 +185,7 @@ impl Session {
         }
 
         let use_uv = initialization_options.use_uv(&*native_system);
+        let file_watcher = LspFileWatcher::new(&resolved_client_capabilities);
 
         Ok(Self {
             native_system,
@@ -205,7 +206,7 @@ impl Session {
             suspended_workspace_diagnostics_request: None,
             revision: 0,
             registrations: HashSet::new(),
-            file_watcher: LspFileWatcher::new(resolved_client_capabilities),
+            file_watcher,
             client_name,
         })
     }
@@ -307,7 +308,7 @@ impl Session {
                 db,
                 &scripts,
                 client,
-                self.resolved_client_capabilities,
+                &self.resolved_client_capabilities,
                 &self.script_progress,
             );
         }
@@ -362,7 +363,7 @@ impl Session {
         db: &mut ProjectDatabase,
         scripts: &[File],
         client: &Client,
-        capabilities: ResolvedClientCapabilities,
+        capabilities: &ResolvedClientCapabilities,
         progress: &ScriptProgress,
     ) {
         for &file in scripts {
@@ -386,7 +387,7 @@ impl Session {
         db: &mut ProjectDatabase,
         file: File,
         client: &Client,
-        capabilities: ResolvedClientCapabilities,
+        capabilities: &ResolvedClientCapabilities,
         availability: ScriptEnvironmentAvailability,
         progress: &ScriptProgress,
     ) {
@@ -554,7 +555,7 @@ impl Session {
     ) -> ChangeResult {
         self.bump_revision();
 
-        let capabilities = self.resolved_client_capabilities;
+        let capabilities = self.resolved_client_capabilities.clone();
         let script_progress = self.script_progress.clone();
         let db = self.project_db_mut(path);
         let result = db.apply_changes(changes);
@@ -569,12 +570,12 @@ impl Session {
                             message: None,
                             percentage: None,
                         },
-                        capabilities,
+                        &capabilities,
                     )))
                 });
         }
         let scripts = result.scripts_to_synchronize(db);
-        Self::synchronize_closed_scripts(db, &scripts, client, capabilities, &script_progress);
+        Self::synchronize_closed_scripts(db, &scripts, client, &capabilities, &script_progress);
         self.update_file_watcher(client);
         result
     }
@@ -843,7 +844,7 @@ impl Session {
             &mut db,
             &scripts,
             client,
-            self.resolved_client_capabilities,
+            &self.resolved_client_capabilities,
             &self.script_progress,
         );
         self.projects.insert(
@@ -1226,7 +1227,7 @@ impl Session {
         let document = self.document_target(uri)?;
 
         Ok(DocumentSnapshot {
-            resolved_client_capabilities: self.resolved_client_capabilities,
+            resolved_client_capabilities: self.resolved_client_capabilities.clone(),
             global_settings: self.global_settings.clone(),
             workspace_settings: self
                 .project_state_for_document(document.notebook_or_file_path())
@@ -1280,7 +1281,7 @@ impl Session {
             global_settings: self.global_settings.clone(),
             position_encoding: self.position_encoding,
             in_test: self.in_test,
-            resolved_client_capabilities: self.resolved_client_capabilities,
+            resolved_client_capabilities: self.resolved_client_capabilities.clone(),
             revision: self.revision,
             client_name: self.client_name,
         }
@@ -1350,7 +1351,7 @@ impl Session {
             && document.notebook().is_none()
             && let DocumentKey::File(system_path) = DocumentKey::from_uri(document.uri())
         {
-            let capabilities = self.resolved_client_capabilities;
+            let capabilities = self.resolved_client_capabilities.clone();
             let script_progress = self.script_progress.clone();
             let db = self.project_db_mut(&AnySystemPath::System(system_path.clone()));
 
@@ -1363,7 +1364,7 @@ impl Session {
                     db,
                     file,
                     client,
-                    capabilities,
+                    &capabilities,
                     ScriptEnvironmentAvailability::Pending,
                     &script_progress,
                 );
@@ -1461,8 +1462,8 @@ impl Session {
         }
     }
 
-    pub(crate) fn client_capabilities(&self) -> ResolvedClientCapabilities {
-        self.resolved_client_capabilities
+    pub(crate) fn client_capabilities(&self) -> &ResolvedClientCapabilities {
+        &self.resolved_client_capabilities
     }
 
     pub(crate) fn global_settings(&self) -> &GlobalSettings {
@@ -1532,8 +1533,8 @@ pub(crate) struct DocumentSnapshot {
 
 impl DocumentSnapshot {
     /// Returns the resolved client capabilities that were captured during initialization.
-    pub(crate) fn resolved_client_capabilities(&self) -> ResolvedClientCapabilities {
-        self.resolved_client_capabilities
+    pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {
+        &self.resolved_client_capabilities
     }
 
     /// Returns the position encoding that was negotiated during initialization.
@@ -1668,8 +1669,8 @@ impl SessionSnapshot {
         self.position_encoding
     }
 
-    pub(crate) fn resolved_client_capabilities(&self) -> ResolvedClientCapabilities {
-        self.resolved_client_capabilities
+    pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {
+        &self.resolved_client_capabilities
     }
 
     pub(crate) const fn in_test(&self) -> bool {
@@ -2016,7 +2017,7 @@ impl OpenDocumentHandle {
         let Some(system_path) = path.as_system() else {
             return;
         };
-        let capabilities = session.resolved_client_capabilities;
+        let capabilities = session.resolved_client_capabilities.clone();
         let script_progress = session.script_progress.clone();
         let db = session.project_db_mut(path);
         let Some(file) = db.files().try_system(db, system_path) else {
@@ -2026,7 +2027,7 @@ impl OpenDocumentHandle {
             db,
             file,
             client,
-            capabilities,
+            &capabilities,
             availability,
             &script_progress,
         );

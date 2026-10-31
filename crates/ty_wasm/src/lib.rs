@@ -510,7 +510,7 @@ impl Workspace {
 
         Ok(Some(Hover {
             markdown: range_info
-                .display(&self.db, MarkupKind::Markdown)
+                .display(&self.db, MarkupKind::Markdown, &[])
                 .to_string(),
             range: source_range,
         }))
@@ -565,7 +565,7 @@ impl Workspace {
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
                     documentation: comp
                         .documentation
-                        .map(|docstring| docstring.render(MarkupKind::PlainText)),
+                        .map(|docstring| docstring.render(MarkupKind::PlainText, &[])),
                 }
             })
             .collect())
@@ -757,7 +757,7 @@ impl Workspace {
                     label: sig.label,
                     documentation: sig
                         .documentation
-                        .map(|docstring| docstring.render(MarkupKind::PlainText)),
+                        .map(|docstring| docstring.render(MarkupKind::PlainText, &[])),
                     parameters,
                     active_parameter: sig.active_parameter.and_then(|p| u32::try_from(p).ok()),
                 }

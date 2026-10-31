@@ -1558,6 +1558,18 @@ impl TestServerBuilder {
         self
     }
 
+    pub(crate) fn with_allowed_html_tags(mut self, tags: &[&str]) -> Self {
+        self.client_capabilities
+            .general
+            .get_or_insert_default()
+            .markdown = Some(lsp_types::MarkdownClientCapabilities {
+            parser: "test".to_string(),
+            version: None,
+            allowed_tags: Some(tags.iter().map(|tag| (*tag).to_string()).collect()),
+        });
+        self
+    }
+
     /// Advertise support for ty's fully rendered diagnostic output.
     pub(crate) fn with_full_diagnostic_output(mut self) -> Self {
         let experimental = self
