@@ -1870,6 +1870,16 @@ impl<'db> DefinitionInference<'db> {
             .or_else(|| self.fallback_type())
     }
 
+    /// Returns whether inference parsed this expression as a string annotation.
+    pub(super) fn is_string_annotation(&self, expression: impl Into<ExpressionNodeKey>) -> bool {
+        let annotations = match self.extra.as_deref() {
+            Some(DefinitionInferenceExtra::StringAnnotations(annotations)) => annotations,
+            Some(DefinitionInferenceExtra::Other(extra)) => &extra.string_annotations,
+            _ => return false,
+        };
+        annotations.contains(&expression.into())
+    }
+
     fn collection_use_constraints(
         &self,
         collection_def: Definition<'db>,
