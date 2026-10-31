@@ -4418,33 +4418,22 @@ Source with applied edits:
 
     #[test]
     fn argument_name_hint_before_starred_argument_has_no_edit() {
-        // The unpacked `2` goes into `rest`, so only `1` gets a hint. Inserting `x=` would
-        // produce `f(x=1, *[2])`. Python would raise a `TypeError` at runtime because the
-        // unpacked `2` and the keyword argument `x=1` both supply `x`.
-        let mut test = inlay_hint_test(
+        let test = inlay_hint_test(
             "
             def f(x, *rest): ...
             f(1, *[2])
             ",
         );
+        let [hint] = test
+            .collect_hints(&InlayHintSettings::default())
+            .try_into()
+            .unwrap();
 
-        assert_snapshot!(test.inlay_hints(), @"
-
-        def f(x, *rest): ...
-        f([x=]1, *[2])
-
-        ---------------------------------------------
-        info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:2:7
-          |
-        2 | def f(x, *rest): ...
-          |       ^
-        info: Source
-         --> main2.py:3:4
-          |
-        3 | f([x=]1, *[2])
-          |    ^
-        ");
+        // The unpacked `2` goes into `rest`, so only `1` gets a hint. Inserting `x=` would
+        // produce `f(x=1, *[2])`. Python would raise a `TypeError` at runtime because the
+        // unpacked `2` and the keyword argument `x=1` both supply `x`.
+        assert_eq!(hint.display().to_string(), "x=");
+        assert!(hint.text_edits.is_empty());
     }
 
     #[test]
