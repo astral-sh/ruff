@@ -832,6 +832,10 @@ fn already_inherited<'db>(
 /// Return the owner of the parent's selected attribute if that declaration already violates
 /// a specialization of `target`. These comparisons bind to the parent, so every child can
 /// reuse them. The caller still checks how the selected declaration binds to its receiver.
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Salsa requires owned query keys, and lint expectations cannot observe diagnostics from the generated function"
+)]
 #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 fn conflicting_parent_member<'db>(
     db: &'db dyn Db,
