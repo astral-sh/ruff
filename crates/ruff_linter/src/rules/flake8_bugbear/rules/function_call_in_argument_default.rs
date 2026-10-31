@@ -11,6 +11,7 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::rules::ruff::helpers::is_frozen_dataclass_instantiation;
 
 /// ## What it does
 /// Checks for function calls in default function arguments.
@@ -22,7 +23,7 @@ use crate::codes::Category;
 ///
 /// Parameters with immutable type annotations will be ignored by this rule.
 /// Those whose default arguments are `NewType` calls where the original type
-/// is immutable are also ignored.
+/// is immutable are also ignored, as are instantiations of frozen dataclasses.
 ///
 /// Calls and types outside of the standard library can be marked as an exception
 /// to this rule with the [`lint.flake8-bugbear.extend-immutable-calls`] configuration option.
@@ -104,19 +105,19 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
     fn visit_expr(&mut self, expr: &Expr) {
         match expr {
             Expr::Call(ast::ExprCall { func, .. }) => {
-                if !is_mutable_func(func, self.checker.semantic())
-                    && !is_immutable_func(
-                        func,
-                        self.checker.semantic(),
-                        self.extend_immutable_calls,
-                    )
+                let semantic = self.checker.semantic();
+                if !is_mutable_func(func, semantic)
+                    && !is_immutable_func(func, semantic, self.extend_immutable_calls)
                     && !func.as_name_expr().is_some_and(|name| {
-                        is_immutable_newtype_call(
-                            name,
-                            self.checker.semantic(),
-                            self.extend_immutable_calls,
-                        )
+                        is_immutable_newtype_call(name, semantic, self.extend_immutable_calls)
                     })
+                    // Default values are evaluated in the scope enclosing the function, so resolve
+                    // the class from there rather than from the function's own scope.
+                    && !semantic
+                        .first_non_type_parent_scope_id(semantic.scope_id)
+                        .is_some_and(|scope_id| {
+                            is_frozen_dataclass_instantiation(func, semantic, scope_id)
+                        })
                 {
                     self.checker.report_diagnostic(
                         FunctionCallInDefaultArgument {
