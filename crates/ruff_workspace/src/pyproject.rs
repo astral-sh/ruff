@@ -146,8 +146,9 @@ fn check_required_version(value: &toml::de::DeTable, table_path: &[&str]) -> Res
 /// Derive target version from `requires-python` in `pyproject.toml`, if
 /// such a file exists in an ancestor directory.
 ///
-/// The returned version can be outside the range of versions that Ruff supports. See
-/// [`get_minimum_supported_version`].
+/// The returned version can be outside the range of versions that Ruff supports.
+/// [`Configuration::into_settings`](crate::configuration::Configuration::into_settings) clamps it
+/// into that range.
 pub fn find_fallback_target_version<P: AsRef<Path>>(path: P) -> Option<PythonVersion> {
     for directory in path.as_ref().ancestors() {
         if let Some(fallback) = get_fallback_target_version(directory) {
