@@ -1,6 +1,6 @@
 //! Implicit instance and class attributes inferred from method assignments.
 
-use std::{convert::Infallible, ops::ControlFlow};
+use std::{convert::Infallible, ops::ControlFlow, sync::Arc};
 
 use super::{MethodDecorator, static_literal::StaticClassLiteral};
 use crate::{
@@ -27,20 +27,6 @@ use ty_python_core::{
 
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
-    /// Tries to find declarations/bindings of an attribute named `name` that are only
-    /// "implicitly" defined (`self.x = …`, `cls.x = …`) in a method of this class.
-    /// The `target_method_decorator` parameter is used to skip methods that do not have the
-    /// expected decorator.
-    pub(super) fn implicit_attribute(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-        target_method_decorator: MethodDecorator,
-    ) -> Member<'db> {
-        self.implicit_attribute_bindings(db, name, target_method_decorator)
-            .member
-    }
-
     /// Separate assignments that establish an attribute from assignments that must first read it.
     ///
     /// ```python
@@ -57,7 +43,8 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> ImplicitAttribute<'db> {
-        self.implicit_attribute_name(db, name, target_method_decorator)
+        self.member_sources(db)
+            .implicit_attribute_name(db, name, target_method_decorator)
             .map_or_else(
                 || ImplicitAttribute {
                     member: Member::unbound(),
@@ -67,31 +54,24 @@ impl<'db> StaticClassLiteral<'db> {
             )
     }
 
-    /// Does a method establish instance storage for an attribute already typed by the class?
-    pub(super) fn has_implicit_instance_attribute(self, db: &'db dyn Db, name: &str) -> bool {
-        self.implicit_attribute_name(db, name, MethodDecorator::None)
-            .is_some_and(|attribute| Self::has_implicit_attribute_inner(db, attribute))
-    }
-
-    fn implicit_attribute_name(
+    /// Names assigned to a method's receiver, in sorted order.
+    pub(in crate::types) fn implicit_attribute_definition_names(
         self,
         db: &'db dyn Db,
-        name: &str,
-        target_method_decorator: MethodDecorator,
-    ) -> Option<ImplicitAttributeName<'db>> {
-        let class_body_scope = self.body_scope(db);
-        // Collect names in a tracked query so unrelated edits can preserve dependent member
-        // lookups, and avoid retaining query entries for names that no method can define.
-        let names = implicit_attribute_definition_names(db, class_body_scope);
-        let name_index = names
-            .binary_search_by(|candidate| candidate.as_str().cmp(name))
-            .ok()?;
-        Some(ImplicitAttributeName::new(
-            db,
-            class_body_scope,
-            &names[name_index],
-            target_method_decorator,
-        ))
+    ) -> &'db [Name] {
+        &self.member_sources(db).implicit_names
+    }
+
+    /// The class-body table and receiver assignments used by lookups on this class.
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    pub(super) fn member_sources(self, db: &'db dyn Db) -> ClassMemberSources<'db> {
+        let scope = self.body_scope(db);
+        let index = semantic_index(db, scope.program_file(db));
+        ClassMemberSources {
+            scope,
+            table: index.shared_place_table(scope.file_scope_id(db)),
+            implicit_names: collect_implicit_attribute_names(db, scope, true),
+        }
     }
 
     #[salsa::tracked(
@@ -500,12 +480,56 @@ pub(super) fn implicit_attribute_names<'db>(
     collect_implicit_attribute_names(db, class_body_scope, false)
 }
 
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub(in crate::types) fn implicit_attribute_definition_names<'db>(
-    db: &'db dyn Db,
-    class_body_scope: ScopeId<'db>,
-) -> Box<[Name]> {
-    collect_implicit_attribute_names(db, class_body_scope, true)
+/// Syntax-derived sources for an explicit class member or an implicit receiver attribute.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct ClassMemberSources<'db> {
+    pub(super) scope: ScopeId<'db>,
+    pub(super) table: Arc<ty_python_core::place::PlaceTable>,
+    implicit_names: Box<[Name]>,
+}
+
+impl<'db> ClassMemberSources<'db> {
+    fn implicit_attribute_name(
+        &self,
+        db: &'db dyn Db,
+        name: &str,
+        decorator: MethodDecorator,
+    ) -> Option<ImplicitAttributeName<'db>> {
+        let index = self
+            .implicit_names
+            .binary_search_by(|candidate| candidate.as_str().cmp(name))
+            .ok()?;
+        Some(ImplicitAttributeName::new(
+            db,
+            self.scope,
+            &self.implicit_names[index],
+            decorator,
+        ))
+    }
+
+    /// Does a method establish instance storage for an attribute already typed by the class?
+    pub(super) fn has_implicit_instance_attribute(&self, db: &'db dyn Db, name: &str) -> bool {
+        self.implicit_attribute_name(db, name, MethodDecorator::None)
+            .is_some_and(|attribute| {
+                StaticClassLiteral::has_implicit_attribute_inner(db, attribute)
+            })
+    }
+
+    /// Tries to find declarations/bindings of an attribute named `name` that are only
+    /// "implicitly" defined (`self.x = …`, `cls.x = …`) in a method of this class.
+    /// The `target_method_decorator` parameter is used to skip methods that do not have the
+    /// expected decorator.
+    pub(super) fn implicit_attribute(
+        &self,
+        db: &'db dyn Db,
+        name: &str,
+        decorator: MethodDecorator,
+    ) -> Member<'db> {
+        self.implicit_attribute_name(db, name, decorator)
+            .map_or_else(Member::unbound, |attribute| {
+                StaticClassLiteral::implicit_attribute_inner(db, attribute).member
+            })
+    }
 }
 
 fn collect_implicit_attribute_names<'db>(

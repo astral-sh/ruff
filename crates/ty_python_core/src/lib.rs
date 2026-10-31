@@ -92,7 +92,7 @@ pub fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable>
     let program_file = scope.program_file(db);
     let _span = tracing::trace_span!("place_table", scope=?scope.as_id(), ?program_file).entered();
     let index = semantic_index(db, program_file);
-    Arc::clone(&index.place_tables[scope.file_scope_id(db)])
+    index.shared_place_table(scope.file_scope_id(db))
 }
 
 /// Returns the use-def map for a specific `scope`.
@@ -381,6 +381,11 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub fn place_table(&self, scope_id: FileScopeId) -> &PlaceTable {
         &self.place_tables[scope_id]
+    }
+
+    /// Shares the existing place table with another per-scope query result.
+    pub fn shared_place_table(&self, scope_id: FileScopeId) -> Arc<PlaceTable> {
+        Arc::clone(&self.place_tables[scope_id])
     }
 
     /// Returns alias metadata for an alias Name node in a predicate, if one exists.

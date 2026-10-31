@@ -48,7 +48,7 @@ use crate::{
         generics::Specialization,
         inferred_declaration,
         known_instance::DeprecatedInstance,
-        member::{Member, class_member},
+        member::{Member, class_member, class_member_with_symbol},
         mro::{Mro, MroIterator},
         signatures::CallableSignature,
         tuple::{FixedLengthTuple, Tuple},
@@ -1619,8 +1619,9 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        let body_scope = self.body_scope(db);
-        let member = class_member(db, body_scope, name).map_type(|ty| {
+        let sources = self.member_sources(db);
+        let symbol = sources.table.symbol_id(name);
+        let member = class_member_with_symbol(db, sources.scope, symbol).map_type(|ty| {
             let ty = if name.starts_with("__") && name.ends_with("__") {
                 into_dunder_paramspec_callable(db, env, ty)
             } else {
@@ -1674,7 +1675,7 @@ impl<'db> StaticClassLiteral<'db> {
                 return Member::definitely_declared(synthesized_member);
             }
             // The symbol was not found in the class scope. It might still be implicitly defined in `@classmethod`s.
-            return self.implicit_attribute(db, name, MethodDecorator::ClassMethod);
+            return sources.implicit_attribute(db, name, MethodDecorator::ClassMethod);
         }
 
         // For dataclass-like classes, `KW_ONLY` sentinel fields are not real
@@ -3003,8 +3004,9 @@ impl<'db> StaticClassLiteral<'db> {
         // - `typing.Final`
         // - Proper diagnostics
 
-        let body_scope = self.body_scope(db);
-        let table = place_table(db, body_scope);
+        let sources = self.member_sources(db);
+        let body_scope = sources.scope;
+        let table = &sources.table;
 
         if let Some(symbol_id) = table.symbol_id(name) {
             // NamedTuple fields are modeled via synthesized descriptors on the class. Treating them
@@ -3049,7 +3051,7 @@ impl<'db> StaticClassLiteral<'db> {
                     if qualifiers.contains(TypeQualifiers::INIT_VAR) {
                         // We ignore `InitVar` declarations on the class body, unless that attribute is overwritten
                         // by an implicit assignment in a method
-                        if self
+                        if sources
                             .implicit_attribute(db, name, MethodDecorator::None)
                             .is_undefined()
                         {
@@ -3079,7 +3081,7 @@ impl<'db> StaticClassLiteral<'db> {
 
                         let implicit = match declaredness {
                             Definedness::AlwaysDefined
-                                if self.has_implicit_instance_attribute(db, name) =>
+                                if sources.has_implicit_instance_attribute(db, name) =>
                             {
                                 // A method assigns to this attribute, but its declared type
                                 // already determines what an instance can read.
@@ -3089,7 +3091,7 @@ impl<'db> StaticClassLiteral<'db> {
                             }
                             Definedness::AlwaysDefined => Member::unbound(),
                             Definedness::PossiblyUndefined => {
-                                self.implicit_attribute(db, name, MethodDecorator::None)
+                                sources.implicit_attribute(db, name, MethodDecorator::None)
                             }
                         };
                         if let Place::Defined(DefinedPlace {
@@ -3156,7 +3158,7 @@ impl<'db> StaticClassLiteral<'db> {
                                 ty: implicit_ty,
                                 provenance: implicit_provenance,
                                 ..
-                            }) = self
+                            }) = sources
                                 .implicit_attribute(db, name, MethodDecorator::None)
                                 .inner
                                 .place
@@ -3192,14 +3194,14 @@ impl<'db> StaticClassLiteral<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    self.implicit_attribute(db, name, MethodDecorator::None)
+                    sources.implicit_attribute(db, name, MethodDecorator::None)
                 }
             }
         } else {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            self.implicit_attribute(db, name, MethodDecorator::None)
+            sources.implicit_attribute(db, name, MethodDecorator::None)
         }
     }
 
