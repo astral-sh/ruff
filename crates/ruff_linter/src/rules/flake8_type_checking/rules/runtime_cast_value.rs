@@ -1,4 +1,5 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -59,7 +60,7 @@ impl AlwaysFixableViolation for RuntimeCastValue {
 }
 
 /// TC006
-pub(crate) fn runtime_cast_value(checker: &Checker, type_expr: &Expr) {
+pub(crate) fn runtime_cast_value(checker: &Checker, type_expr: flat::View<'_, Expr>) {
     if type_expr.is_string_literal_expr() {
         return;
     }

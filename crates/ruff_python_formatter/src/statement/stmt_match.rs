@@ -1,5 +1,6 @@
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::StmtMatch;
+use ruff_python_ast::flat;
 
 use crate::comments::leading_alternate_branch_comments;
 use crate::context::{NodeLevel, WithNodeLevel};
@@ -12,13 +13,9 @@ use crate::statement::clause::{ClauseHeader, clause_header};
 pub struct FormatStmtMatch;
 
 impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
-    fn fmt_fields(&self, item: &StmtMatch, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtMatch {
-            range: _,
-            node_index: _,
-            subject,
-            cases,
-        } = item;
+    fn fmt_fields(&self, item: flat::View<'_, StmtMatch>, f: &mut PyFormatter) -> FormatResult<()> {
+        let subject = item.subject();
+        let cases = item.cases();
 
         let comments = f.context().comments().clone();
         let dangling_item_comments = comments.dangling(item);
@@ -55,7 +52,7 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
                 [block_indent(&format_args!(
                     leading_alternate_branch_comments(
                         comments.leading(case),
-                        last_case.body.last(),
+                        last_case.body().last(),
                     ),
                     case.format().with_options(last_suite_in_statement)
                 ))]

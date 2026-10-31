@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Alias, Identifier, Stmt};
+use ruff_python_ast::{self as ast, Alias, Identifier, Stmt, flat};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -56,11 +56,16 @@ impl Violation for ManualFromImport {
 }
 
 /// PLR0402
-pub(crate) fn manual_from_import(checker: &Checker, stmt: &Stmt, alias: &Alias, names: &[Alias]) {
-    let Some(asname) = &alias.asname else {
+pub(crate) fn manual_from_import(
+    checker: &Checker,
+    stmt: flat::View<'_, Stmt>,
+    alias: flat::View<'_, Alias>,
+    names: flat::NodeList<'_, Alias>,
+) {
+    let Some(asname) = alias.asname() else {
         return;
     };
-    let Some((module, name)) = alias.name.rsplit_once('.') else {
+    let Some((module, name)) = alias.name().as_str().rsplit_once('.') else {
         return;
     };
     if asname != name {
@@ -68,11 +73,7 @@ pub(crate) fn manual_from_import(checker: &Checker, stmt: &Stmt, alias: &Alias, 
     }
 
     // Skip if this import is required by isort to prevent infinite loops with I002
-    if is_import_required_by_isort(
-        &checker.settings().isort.required_imports,
-        stmt.into(),
-        alias,
-    ) {
+    if is_import_required_by_isort(&checker.settings().isort.required_imports, stmt, alias) {
         return;
     }
 
@@ -86,22 +87,22 @@ pub(crate) fn manual_from_import(checker: &Checker, stmt: &Stmt, alias: &Alias, 
     if names.len() == 1 {
         let is_lazy = stmt
             .as_import_stmt()
-            .is_some_and(|import_stmt| import_stmt.is_lazy);
-        if !is_lazy && !checker.import_rewrite_preserves_laziness(&alias.name, module) {
+            .is_some_and(flat::View::<ast::StmtImport>::is_lazy);
+        if !is_lazy && !checker.import_rewrite_preserves_laziness(alias.name().as_str(), module) {
             return;
         }
         let node = ast::StmtImportFrom {
             module: Some(Identifier::new(module.to_string(), TextRange::default())),
             names: vec![Alias {
-                name: asname.clone(),
+                name: asname.to_owned_node(),
                 asname: None,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
             }],
             level: 0,
             is_lazy,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         };
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             checker.generator().stmt(&node.into()),

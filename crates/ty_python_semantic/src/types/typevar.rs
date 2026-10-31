@@ -644,12 +644,12 @@ impl<'db> TypeVarInstance<'db> {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
                 let typevar_node = typevar.node(&module);
-                definition_expression_type(db, definition, typevar_node.bound.as_ref()?)
+                definition_expression_type(db, definition, typevar_node.bound()?)
             }
             // legacy typevar
             DefinitionKind::Assignment(assignment) => {
                 let call_expr = assignment.value(&module).as_call_expr()?;
-                let expr = &call_expr.arguments.find_keyword("bound")?.value;
+                let expr = call_expr.arguments().find_keyword("bound")?.value();
                 definition_expression_type(db, definition, expr)
             }
             _ => return None,
@@ -686,8 +686,7 @@ impl<'db> TypeVarInstance<'db> {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
                 let typevar_node = typevar.node(&module);
-                let bound =
-                    definition_expression_type(db, definition, typevar_node.bound.as_ref()?);
+                let bound = definition_expression_type(db, definition, typevar_node.bound()?);
                 if let Some(tuple) = bound.tuple_instance_spec(db, &env)
                     && let Tuple::Fixed(tuple) = tuple.into_owned()
                 {
@@ -702,8 +701,8 @@ impl<'db> TypeVarInstance<'db> {
                 TypeVarConstraints::new(
                     db,
                     call_expr
-                        .arguments
-                        .args
+                        .arguments()
+                        .args()
                         .iter()
                         .skip(1)
                         .map(|arg| definition_expression_type(db, definition, arg))
@@ -791,14 +790,14 @@ impl<'db> TypeVarInstance<'db> {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
                 let typevar_node = typevar.node(&module);
-                definition_expression_type(db, definition, typevar_node.default.as_ref()?)
+                definition_expression_type(db, definition, typevar_node.default()?)
             }
             // legacy typevar / ParamSpec
             DefinitionKind::Assignment(assignment) => {
                 let call_expr = assignment.value(&module).as_call_expr()?;
-                let func_ty = definition_expression_type(db, definition, &call_expr.func);
+                let func_ty = definition_expression_type(db, definition, call_expr.func());
                 let known_class = func_ty.as_class_literal().and_then(|cls| cls.known(db));
-                let expr = &call_expr.arguments.find_keyword("default")?.value;
+                let expr = call_expr.arguments().find_keyword("default")?.value();
                 let default_type = definition_expression_type(db, definition, expr);
                 if matches!(
                     known_class,
@@ -813,13 +812,13 @@ impl<'db> TypeVarInstance<'db> {
             DefinitionKind::ParamSpec(paramspec) => {
                 let paramspec_node = paramspec.node(&module);
                 let default_ty =
-                    definition_expression_type(db, definition, paramspec_node.default.as_ref()?);
+                    definition_expression_type(db, definition, paramspec_node.default()?);
                 convert_type_to_paramspec_value(db, default_ty)
             }
             // PEP 695 TypeVarTuple
             DefinitionKind::TypeVarTuple(typevartuple) => {
                 let typevartuple_node = typevartuple.node(&module);
-                definition_expression_type(db, definition, typevartuple_node.default.as_ref()?)
+                definition_expression_type(db, definition, typevartuple_node.default()?)
             }
             _ => return None,
         };

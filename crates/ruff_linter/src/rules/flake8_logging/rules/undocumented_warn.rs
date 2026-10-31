@@ -1,4 +1,5 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
@@ -51,7 +52,7 @@ impl Violation for UndocumentedWarn {
 }
 
 /// LOG009
-pub(crate) fn undocumented_warn(checker: &Checker, expr: &Expr) {
+pub(crate) fn undocumented_warn(checker: &Checker, &expr: &flat::View<'_, Expr>) {
     if !checker.semantic().seen_module(Modules::LOGGING) {
         return;
     }

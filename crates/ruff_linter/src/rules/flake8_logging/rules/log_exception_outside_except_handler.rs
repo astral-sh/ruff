@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::ExprCall;
+use ruff_python_ast::flat;
 use ruff_python_semantic::analyze::logging;
 use ruff_text_size::Ranged;
 
@@ -87,31 +88,32 @@ impl Violation for LogExceptionOutsideExceptHandler {
 }
 
 /// LOG004
-pub(crate) fn log_exception_outside_except_handler(checker: &Checker, call: &ExprCall) {
+pub(crate) fn log_exception_outside_except_handler(
+    checker: &Checker,
+    call: flat::View<'_, ExprCall>,
+) {
     let semantic = checker.semantic();
 
     if !outside_handlers(call.start(), semantic) {
         return;
     }
 
-    let fix = match &*call.func {
-        func @ Expr::Attribute(ExprAttribute { attr, .. }) => {
+    let func = call.func();
+    let fix = match func.classify() {
+        flat::ExprKind::Attribute(attribute) => {
+            let attr = attribute.attr();
             let logger_objects = &checker.settings().logger_objects;
-
-            if !logging::is_logger_candidate(func, semantic, logger_objects) {
+            if attr != "exception" || !logging::is_logger_candidate(func, semantic, logger_objects)
+            {
                 return;
             }
 
-            if attr != "exception" {
-                return;
-            }
-
-            let edit = Edit::range_replacement("error".to_string(), attr.range);
+            let edit = Edit::range_replacement("error".to_string(), attr.range());
 
             Some(Fix::unsafe_edit(edit))
         }
 
-        func @ Expr::Name(_) => {
+        flat::ExprKind::Name(_) => {
             let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
                 return;
             };

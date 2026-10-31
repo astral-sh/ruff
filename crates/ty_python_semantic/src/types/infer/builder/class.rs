@@ -11,6 +11,7 @@ use crate::types::{
     },
     special_form::TypeQualifier,
 };
+use ruff_python_ast::flat;
 use ruff_python_ast::{self as ast, helpers::any_over_expr};
 use ty_module_resolver::{ImportingFile, KnownModule, file_to_module};
 use ty_python_core::{definition::Definition, scope::NodeWithScopeRef};
@@ -40,14 +41,13 @@ impl<'db> ClassDecoratorResult<'db> {
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    pub(super) fn infer_class_body(&mut self, class: &ast::StmtClassDef) {
-        self.infer_scope_body(&class.body);
+    pub(super) fn infer_class_body(&mut self, class: flat::View<'_, ast::StmtClassDef>) {
+        self.infer_scope_body(class.body());
     }
 
-    pub(super) fn infer_class_type_params(&mut self, class: &ast::StmtClassDef) {
+    pub(super) fn infer_class_type_params(&mut self, class: flat::View<'_, ast::StmtClassDef>) {
         let type_params = class
-            .type_params
-            .as_deref()
+            .type_params()
             .expect("class type params scope without type params");
 
         let binding_context = self.index.expect_single_definition(class);
@@ -56,7 +56,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         self.infer_type_parameters(type_params);
 
-        if class.arguments.is_some() {
+        if class.arguments().is_some() {
             let previous_deferred_state = self.replace_deferred_state(self.in_stub().into());
 
             // PEP 695 class headers are inferred in the type-parameter scope, before the completed
@@ -66,8 +66,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let mut is_typed_dict = false;
 
             for base in class.bases() {
-                let ty = if let ast::Expr::Starred(starred) = base {
-                    let ty = self.infer_expression(&starred.value, TypeContext::default());
+                let ty = if let flat::ExprKind::Starred(starred) = base.classify() {
+                    let ty = self.infer_expression(starred.value(), TypeContext::default());
                     self.store_expression_type(base, ty);
                     ty
                 } else {
@@ -82,10 +82,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             for keyword in class.keywords() {
-                if is_typed_dict && keyword.arg.as_deref() == Some("extra_items") {
-                    self.infer_extra_items_kwarg(&keyword.value);
+                if is_typed_dict
+                    && keyword.arg().map(flat::View::<ast::Identifier>::as_str)
+                        == Some("extra_items")
+                {
+                    self.infer_extra_items_kwarg(keyword.value());
                 } else {
-                    self.infer_expression(&keyword.value, TypeContext::default());
+                    self.infer_expression(keyword.value(), TypeContext::default());
                 }
             }
 
@@ -95,28 +98,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
-    pub(super) fn infer_class_definition_statement(&mut self, class: &ast::StmtClassDef) {
+    pub(super) fn infer_class_definition_statement(
+        &mut self,
+        class: flat::View<'_, ast::StmtClassDef>,
+    ) {
         self.infer_definition(class);
     }
 
     pub(super) fn infer_class_definition(
         &mut self,
-        class_node: &ast::StmtClassDef,
+        class_node: flat::View<'_, ast::StmtClassDef>,
         definition: Definition<'db>,
     ) {
         let env = self.program_environment();
-        let ast::StmtClassDef {
-            range: _,
-            node_index: _,
-            name,
-            type_params,
-            decorator_list,
-            arguments: _,
-            body: _,
-        } = class_node;
+        let name = class_node.name();
+        let type_params = class_node.type_params();
+        let decorator_list = class_node.decorator_list();
         let db = self.db();
 
-        let mut decorator_types_and_nodes: Vec<(Type<'db>, &ast::Decorator)> =
+        let mut decorator_types_and_nodes: Vec<(Type<'db>, flat::View<'_, ast::Decorator>)> =
             Vec::with_capacity(decorator_list.len());
         for decorator in decorator_list {
             let decorator_ty = self.infer_decorator(decorator);
@@ -130,7 +130,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let file = self.program_file();
         let importing_file = ImportingFile::File(file.file(db), env.resolver_environment(db));
-        let maybe_known_class = KnownClass::try_from_file_and_name(db, importing_file, name);
+        let maybe_known_class =
+            KnownClass::try_from_file_and_name(db, importing_file, name.as_str());
 
         let known_module = || {
             file_to_module(db, importing_file.resolver_file(db)).and_then(|module| module.known(db))
@@ -150,19 +151,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut dataclass_transformer_params = None;
         let mut total_ordering = false;
         let has_explicit_bases = class_node
-            .arguments
-            .as_deref()
-            .is_some_and(|arguments| !arguments.args.is_empty());
+            .arguments()
+            .is_some_and(|arguments| !arguments.args().is_empty());
         let has_explicit_metaclass = class_node
-            .arguments
-            .as_deref()
+            .arguments()
             .is_some_and(|arguments| arguments.find_keyword("metaclass").is_some());
         let infer_original_class_ty = |deprecated,
                                        type_check_only,
                                        dataclass_params,
                                        dataclass_transformer_params,
                                        total_ordering| {
-            match (maybe_known_class, &*name.id) {
+            match (maybe_known_class, name.id().as_str()) {
                 (None, "NamedTuple") if in_typing_module() => {
                     Type::SpecialForm(SpecialFormType::NamedTuple)
                 }
@@ -172,7 +171,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 _ => Type::from(StaticClassLiteral::new(
                     db,
-                    &name.id,
+                    name.id(),
                     body_scope,
                     maybe_known_class,
                     deprecated,
@@ -180,8 +179,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     dataclass_params,
                     dataclass_transformer_params,
                     total_ordering,
-                    !class_node.decorator_list.is_empty(),
-                    class_node.type_params.is_some(),
+                    !class_node.decorator_list().is_empty(),
+                    class_node.type_params().is_some(),
                     has_explicit_bases,
                     has_explicit_metaclass,
                 )),
@@ -236,9 +235,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             if decorator_ty.is_unknown()
-                && let ast::Expr::Call(call) = &decorator.expression
+                && let flat::ExprKind::Call(call) = decorator.expression().classify()
                 && self
-                    .expression_type(&call.func)
+                    .expression_type(call.func())
                     .as_function_literal()
                     .is_some_and(|function| function.is_known(db, KnownFunction::Dataclass))
             {
@@ -363,7 +362,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     } = apply_class_decorator(db, env, decorator_ty, inferred_ty)
                     {
                         self.report_deprecated_functions(
-                            &decorator_node.expression,
+                            decorator_node.expression(),
                             deprecated_functions,
                         );
                     }
@@ -386,7 +385,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     deprecated_functions,
                 } => {
                     self.report_deprecated_functions(
-                        &decorator_node.expression,
+                        decorator_node.expression(),
                         deprecated_functions,
                     );
                     return_type
@@ -443,8 +442,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // In stub files, keyword values may reference names that are defined later in the file.
             let previous_deferred_state = self.replace_deferred_state(self.in_stub().into());
             for keyword in class_node.keywords() {
-                if keyword.arg.as_deref() != Some("extra_items") {
-                    self.infer_expression(&keyword.value, TypeContext::default());
+                if keyword.arg().map(flat::View::<ast::Identifier>::as_str) != Some("extra_items") {
+                    self.infer_expression(keyword.value(), TypeContext::default());
                 }
             }
             self.deferred_state = previous_deferred_state;
@@ -454,10 +453,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 || class_node
                     .bases()
                     .iter()
-                    .any(|expr| any_over_expr(expr, &ast::Expr::is_string_literal_expr))
+                    .any(|expr| any_over_expr(expr, flat::View::is_string_literal_expr))
                 || class_node
-                    .arguments
-                    .as_deref()
+                    .arguments()
                     .and_then(|args| args.find_keyword("extra_items"))
                     .is_some()
             {
@@ -476,7 +474,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_class_deferred(
         &mut self,
         definition: Definition<'db>,
-        class: &ast::StmtClassDef,
+        class: flat::View<'_, ast::StmtClassDef>,
     ) {
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
         for base in class.bases() {
@@ -491,21 +489,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
 
-        if let Some(arguments) = class.arguments.as_deref()
+        if let Some(arguments) = class.arguments()
             && let Some(extra_items_keyword) = arguments.find_keyword("extra_items")
         {
             if original_class_type(self.db(), definition)
                 .is_some_and(|class_literal| class_literal.is_typed_dict(self.db()))
             {
-                self.infer_extra_items_kwarg(&extra_items_keyword.value);
+                self.infer_extra_items_kwarg(extra_items_keyword.value());
             } else if self.in_stub() {
                 self.infer_expression_with_state(
-                    &extra_items_keyword.value,
+                    extra_items_keyword.value(),
                     TypeContext::default(),
                     DeferredExpressionState::Deferred,
                 );
             } else {
-                self.infer_expression(&extra_items_keyword.value, TypeContext::default());
+                self.infer_expression(extra_items_keyword.value(), TypeContext::default());
             }
         }
 

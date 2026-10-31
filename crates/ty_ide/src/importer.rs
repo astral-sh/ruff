@@ -5,7 +5,7 @@ mod tests {
     use insta::assert_snapshot;
 
     use crate::tests::{CursorTest, cursor_test};
-    use ruff_python_ast::find_node::covering_node;
+    use ruff_python_ast::flat::find_node::covering_node;
     use ruff_text_size::{Ranged, TextRange};
     use ty_python_core::ProgramFile;
     use ty_python_semantic::importer::{ImportRequest, Importer};

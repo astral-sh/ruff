@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, Number};
+use ruff_python_ast::Number;
+use ruff_python_ast::flat::fields as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -46,11 +47,11 @@ impl AlwaysFixableViolation for WhileOne {
 }
 
 /// UP048
-pub(crate) fn while_one(checker: &Checker, while_stmt: &ast::StmtWhile) {
-    let Expr::NumberLiteral(ast::ExprNumberLiteral {
+pub(crate) fn while_one(checker: &Checker, while_stmt: &ast::StmtWhile<'_>) {
+    let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
         value: Number::Int(value),
         ..
-    }) = &*while_stmt.test
+    }) = while_stmt.test.fields()
     else {
         return;
     };

@@ -7,11 +7,16 @@ use compact_str::{CompactString, CompactStringExt};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::{SourceText, source_text};
 use ruff_diagnostics::Edit;
-use ruff_python_ast::find_node::{CoveringNode, covering_node};
+use ruff_python_ast::flat::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
-use ruff_python_ast::{self as ast, AnyNodeRef, StringFlags};
+use ruff_python_ast::{
+    Expr, ExprAttribute, ExprStringLiteral, ExprSubscript, Identifier, StmtClassDef, StmtImport,
+    StmtImportFrom, StringFlags,
+    flat::AnyNodeRef,
+    flat::{self, fields as ast},
+};
 use ruff_python_literal::escape::{Escape, UnicodeEscape};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
@@ -854,7 +859,7 @@ impl<'m> Context<'m> {
                     // same scope (in which case the bases refer to the prior
                     // definition).
                     if !model.is_class_name_reassigned(class_def) {
-                        bases.insert(CompactString::new(&class_def.name.id));
+                        bases.insert(CompactString::new(class_def.name().id()));
                     }
                     bases
                 });
@@ -1029,9 +1034,13 @@ impl<'m> ContextCursor<'m> {
     }
 
     /// Returns the string literal expression that the cursor is positioned within, if any.
-    fn enclosing_string_literal_expr(&self) -> Option<&'m ast::ExprStringLiteral> {
-        match self.covering_node.parent() {
-            Some(ast::AnyNodeRef::ExprStringLiteral(string_expr)) => Some(string_expr),
+    fn enclosing_string_literal_expr(&self) -> Option<flat::View<'m, ExprStringLiteral>> {
+        match self
+            .covering_node
+            .parent()
+            .map(flat::View::<flat::Any>::classify)
+        {
+            Some(flat::AnyKind::ExprStringLiteral(string_expr)) => Some(string_expr),
             _ => None,
         }
     }
@@ -1039,24 +1048,24 @@ impl<'m> ContextCursor<'m> {
     /// Returns the subscript whose complete slice is this string.
     fn subscript_for_string(
         &self,
-        string_expr: &ast::ExprStringLiteral,
-    ) -> Option<&'m ast::ExprSubscript> {
+        string_expr: flat::View<'_, ExprStringLiteral>,
+    ) -> Option<flat::View<'m, ExprSubscript>> {
         let parent = self
             .covering_node
             .ancestors()
             .skip_while(|node| {
                 !matches!(
-                    node,
-                    ast::AnyNodeRef::ExprStringLiteral(expr)
+                    node.classify(),
+                    flat::AnyKind::ExprStringLiteral(expr)
                         if expr.range() == string_expr.range()
                 )
             })
             .nth(1)?;
-        let ast::AnyNodeRef::ExprSubscript(subscript) = parent else {
+        let flat::AnyKind::ExprSubscript(subscript) = parent.classify() else {
             return None;
         };
 
-        (subscript.slice.range() == string_expr.range()).then_some(subscript)
+        (subscript.slice().range() == string_expr.range()).then_some(subscript)
     }
 
     /// Returns the quote style of the string literal that the cursor is positioned within, if any.
@@ -1099,20 +1108,22 @@ impl<'m> ContextCursor<'m> {
             // We bail if we're specifying arguments as we don't want
             // to suppress suggestions there.
             .take_while(|node| {
-                !matches!(node, ast::AnyNodeRef::Arguments(_)) && !node.is_statement()
+                !matches!(node.classify(), flat::AnyKind::Arguments(_)) && !node.is_statement()
             })
-            .any(|node| matches!(node, ast::AnyNodeRef::Decorator(_)))
+            .any(|node| matches!(node.classify(), flat::AnyKind::Decorator(_)))
     }
 
     fn suppress_class_parentheses(&self, model: &SemanticModel<'_>) -> bool {
         is_in_annotation_expression(model, &self.covering_node, self.range)
-            || self.covering_node.ancestors().any(|node| match node {
-                ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => handler
-                    .type_
-                    .as_deref()
-                    .is_some_and(|expr| expr.range().contains_range(self.range)),
-                _ => false,
-            })
+            || self
+                .covering_node
+                .ancestors()
+                .any(|node| match node.classify() {
+                    flat::AnyKind::ExceptHandlerExceptHandler(handler) => handler
+                        .type_()
+                        .is_some_and(|expr| expr.range().contains_range(self.range)),
+                    _ => false,
+                })
     }
 
     /// Returns true when the tokens indicate that the definition of a new
@@ -1153,34 +1164,36 @@ impl<'m> ContextCursor<'m> {
     /// Returns true when the cursor sits on a binding statement.
     /// E.g. naming a parameter, type parameter, or `for` `<name>`).
     fn is_in_variable_binding(&self) -> bool {
-        self.covering_node.ancestors().any(|node| match node {
-            ast::AnyNodeRef::Parameter(param) => param.name.range.contains_range(self.range),
-            ast::AnyNodeRef::TypeParamTypeVar(type_param) => {
-                type_param.name.range.contains_range(self.range)
-            }
-            ast::AnyNodeRef::StmtFor(stmt_for) => {
-                stmt_for.target.range().contains_range(self.range)
-            }
-            // The AST does not produce `ast::AnyNodeRef::Parameter` nodes for keywords
-            // or otherwise invalid syntax. Rather they are captured in a
-            // `ast::AnyNodeRef::Parameters` node as "empty space". To ensure
-            // we still suppress suggestions even when the syntax is technically
-            // invalid we extract the token under the self and check if it makes
-            // up that "empty space" inside the Parameters Node. If it does, we know
-            // that we are still binding variables, just that the current state is
-            // syntactically invalid. Hence we suppress autocomplete suggestions
-            // also in those cases.
-            ast::AnyNodeRef::Parameters(params) => {
-                if !params.range.contains_range(self.range) {
-                    return false;
+        self.covering_node
+            .ancestors()
+            .any(|node| match node.classify() {
+                flat::AnyKind::Parameter(param) => param.name().range().contains_range(self.range),
+                flat::AnyKind::TypeParamTypeVar(type_param) => {
+                    type_param.name().range().contains_range(self.range)
                 }
-                params
-                    .iter()
-                    .map(|param| param.range())
-                    .all(|r| !r.contains_range(self.range))
-            }
-            _ => false,
-        })
+                flat::AnyKind::StmtFor(stmt_for) => {
+                    stmt_for.target().range().contains_range(self.range)
+                }
+                // The AST does not produce `flat::AnyNodeRef::Parameter` nodes for keywords
+                // or otherwise invalid syntax. Rather they are captured in a
+                // `flat::AnyNodeRef::Parameters` node as "empty space". To ensure
+                // we still suppress suggestions even when the syntax is technically
+                // invalid we extract the token under the self and check if it makes
+                // up that "empty space" inside the Parameters Node. If it does, we know
+                // that we are still binding variables, just that the current state is
+                // syntactically invalid. Hence we suppress autocomplete suggestions
+                // also in those cases.
+                flat::AnyKind::Parameters(params) => {
+                    if !params.range().contains_range(self.range) {
+                        return false;
+                    }
+                    params
+                        .iter()
+                        .map(|param| param.range())
+                        .all(|r| !r.contains_range(self.range))
+                }
+                _ => false,
+            })
     }
 
     /// Returns the paired closing parentheses surrounding `range`, from innermost to outermost.
@@ -1327,35 +1340,40 @@ impl<'m> ContextCursor<'m> {
 
         // Loop and comprehension targets can only be followed by `in`.
         if matches_in
-            && let Some(keywords) = covering_node.ancestors().find_map(|node| match node {
-                ast::AnyNodeRef::StmtFor(stmt) => self
-                    .range_end_position(stmt.target.range(), node, token)
-                    .map(|position| position.select_keywords(IN, NONE)),
-                ast::AnyNodeRef::Comprehension(comprehension) => self
-                    .range_end_position(comprehension.target.range(), node, token)
-                    .map(|position| position.select_keywords(IN, NONE)),
-                _ => None,
-            })
+            && let Some(keywords) =
+                covering_node
+                    .ancestors()
+                    .find_map(|node| match node.classify() {
+                        flat::AnyKind::StmtFor(stmt) => self
+                            .range_end_position(stmt.target().range(), node, token)
+                            .map(|position| position.select_keywords(IN, NONE)),
+                        flat::AnyKind::Comprehension(comprehension) => self
+                            .range_end_position(comprehension.target().range(), node, token)
+                            .map(|position| position.select_keywords(IN, NONE)),
+                        _ => None,
+                    })
         {
             return Some(self.before_already_present(keywords));
         }
 
         // Context managers and exception types can be followed by `as`.
         if matches_as
-            && let Some(keywords) = covering_node.ancestors().find_map(|node| match node {
-                ast::AnyNodeRef::StmtWith(stmt) => stmt.items.iter().find_map(|item| {
-                    let range = item.context_expr.range();
-                    self.range_end_position(range, item.into(), token)
-                        .map(|position| position.select_keywords(AS, NONE))
-                        .or_else(|| self.range_end_position(range, node, token).map(|_| AS))
-                }),
-                ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => handler
-                    .type_
-                    .as_deref()
-                    .and_then(|type_| self.range_end_position(type_.range(), node, token))
-                    .map(|position| position.select_keywords(AS, NONE)),
-                _ => None,
-            })
+            && let Some(keywords) =
+                covering_node
+                    .ancestors()
+                    .find_map(|node| match node.classify() {
+                        flat::AnyKind::StmtWith(stmt) => stmt.items().iter().find_map(|item| {
+                            let range = item.context_expr().range();
+                            self.range_end_position(range, item.into(), token)
+                                .map(|position| position.select_keywords(AS, NONE))
+                                .or_else(|| self.range_end_position(range, node, token).map(|_| AS))
+                        }),
+                        flat::AnyKind::ExceptHandlerExceptHandler(handler) => handler
+                            .type_()
+                            .and_then(|type_| self.range_end_position(type_.range(), node, token))
+                            .map(|position| position.select_keywords(AS, NONE)),
+                        _ => None,
+                    })
         {
             return Some(self.before_already_present(keywords));
         }
@@ -1364,10 +1382,10 @@ impl<'m> ContextCursor<'m> {
         // followed by `if`.
         if (matches_as || matches_if)
             && let Some(keywords) = covering_node.ancestors().find_map(|node| {
-                let ast::AnyNodeRef::MatchCase(case) = node else {
+                let flat::AnyKind::MatchCase(case) = node.classify() else {
                     return None;
                 };
-                match &case.pattern {
+                match case.pattern().fields() {
                     ast::Pattern::MatchAs(ast::PatternMatchAs {
                         pattern: Some(pattern),
                         name: Some(name),
@@ -1375,7 +1393,7 @@ impl<'m> ContextCursor<'m> {
                     }) => {
                         if name.is_valid()
                             && let Some(position) =
-                                self.range_end_position(case.pattern.range(), node, token)
+                                self.range_end_position(case.pattern().range(), node, token)
                         {
                             Some(position.select_keywords(IF, NONE))
                         } else {
@@ -1384,7 +1402,7 @@ impl<'m> ContextCursor<'m> {
                         }
                     }
                     pattern => self
-                        .range_end_position(pattern.range(), node, token)
+                        .range_end_position(pattern.view().range(), node, token)
                         .map(|position| position.select_keywords(MATCH, AS)),
                 }
             })
@@ -1419,19 +1437,19 @@ impl<'m> ContextCursor<'m> {
             ],
         );
 
-        let contains = |expr: &ast::Expr| expr.range().contains_range(self.range);
+        let contains = |expr: flat::View<'_, Expr>| expr.range().contains_range(self.range);
 
         for node in self.covering_node.ancestors() {
-            match node {
-                ast::AnyNodeRef::StmtRaise(stmt) => {
-                    if stmt.exc.as_deref().is_some_and(contains) {
+            match node.classify() {
+                flat::AnyKind::StmtRaise(stmt) => {
+                    if stmt.exc().is_some_and(contains) {
                         return Some(raise_ty);
-                    } else if stmt.cause.as_deref().is_some_and(contains) {
+                    } else if stmt.cause().is_some_and(contains) {
                         return Some(cause_ty);
                     }
                 }
-                ast::AnyNodeRef::ExceptHandlerExceptHandler(handler)
-                    if handler.type_.as_deref().is_some_and(contains) =>
+                flat::AnyKind::ExceptHandlerExceptHandler(handler)
+                    if handler.type_().is_some_and(contains) =>
                 {
                     return Some(except_ty);
                 }
@@ -1448,13 +1466,12 @@ impl<'m> ContextCursor<'m> {
     /// arguments node.
     ///
     /// E.g. `class Foo(Bar<CURSOR>)`
-    fn enclosing_class_def(&self) -> Option<&'m ast::StmtClassDef> {
+    fn enclosing_class_def(&self) -> Option<flat::View<'m, StmtClassDef>> {
         for node in self.covering_node.ancestors() {
-            if let ast::AnyNodeRef::StmtClassDef(class_def) = node {
+            if let flat::AnyKind::StmtClassDef(class_def) = node.classify() {
                 return class_def
-                    .arguments
-                    .as_ref()
-                    .is_some_and(|args| args.range.contains_range(self.range))
+                    .arguments()
+                    .is_some_and(|args| args.range().contains_range(self.range))
                     .then_some(class_def);
             }
             if node.is_statement() {
@@ -1492,83 +1509,82 @@ impl<'m> ContextCursor<'m> {
     ///
     /// `node` should be the smallest AST node fully covering the
     /// typed text.
-    fn is_expecting_expression(&self, node: ast::AnyNodeRef) -> bool {
-        let contains = |expr: &ast::Expr| expr.range().contains_range(self.range);
+    fn is_expecting_expression(&self, node: flat::AnyNodeRef) -> bool {
+        let contains = |expr: flat::View<'_, Expr>| expr.range().contains_range(self.range);
 
-        match node {
+        match node.classify() {
             // All checks here are intended to find cases where
             // the python grammar disallows anything but expressions.
 
             // if_stmt := 'if' named_expression ':' block elif_stmt
-            ast::AnyNodeRef::StmtIf(stmt) => {
-                contains(&stmt.test)
+            flat::AnyKind::StmtIf(stmt) => {
+                contains(stmt.test())
                     || stmt
-                        .elif_else_clauses
+                        .elif_else_clauses()
                         .iter()
-                        .any(|clause| clause.test.as_ref().is_some_and(contains))
+                        .any(|clause| clause.test().is_some_and(contains))
             }
             // while_stmt := 'while' named_expression ':' block [else_block]
-            ast::AnyNodeRef::StmtWhile(stmt) => contains(&stmt.test),
+            flat::AnyKind::StmtWhile(stmt) => contains(stmt.test()),
 
             // for_stmt := 'for' star_targets 'in' ~ star_expressions ':' [TYPE_COMMENT] block [else_block]
-            ast::AnyNodeRef::StmtFor(stmt) => contains(&stmt.iter),
+            flat::AnyKind::StmtFor(stmt) => contains(stmt.iter()),
             // with_item := expression
-            ast::AnyNodeRef::StmtWith(stmt) => {
-                stmt.items.iter().any(|item| contains(&item.context_expr))
-            }
+            flat::AnyKind::StmtWith(stmt) => stmt
+                .items()
+                .iter()
+                .any(|item| contains(item.context_expr())),
             // match_stmt := "match" subject_expr ':' NEWLINE INDENT case_block+ DEDENT
-            ast::AnyNodeRef::StmtMatch(stmt) => contains(&stmt.subject),
+            flat::AnyKind::StmtMatch(stmt) => contains(stmt.subject()),
             // case_guard := 'if' named_expression
-            ast::AnyNodeRef::MatchCase(case) => {
-                case.guard.as_deref().is_some_and(contains)
-                    || case.pattern.range().contains_range(self.range)
+            flat::AnyKind::MatchCase(case) => {
+                case.guard().is_some_and(contains)
+                    || case.pattern().range().contains_range(self.range)
             }
             // assert_stmt := 'assert' expression [',' expression ]
-            ast::AnyNodeRef::StmtAssert(stmt) => {
-                contains(&stmt.test) || stmt.msg.as_deref().is_some_and(contains)
+            flat::AnyKind::StmtAssert(stmt) => {
+                contains(stmt.test()) || stmt.msg().is_some_and(contains)
             }
             // raise_stmt := 'raise' expression ['from' expression ]
-            ast::AnyNodeRef::StmtRaise(stmt) => {
-                stmt.exc.as_deref().is_some_and(contains)
-                    || stmt.cause.as_deref().is_some_and(contains)
+            flat::AnyKind::StmtRaise(stmt) => {
+                stmt.exc().is_some_and(contains) || stmt.cause().is_some_and(contains)
             }
             // return_stmt := 'return' [star_expressions]
-            ast::AnyNodeRef::StmtReturn(stmt) => stmt.value.as_deref().is_some_and(contains),
+            flat::AnyKind::StmtReturn(stmt) => stmt.value().is_some_and(contains),
 
-            ast::AnyNodeRef::StmtAssign(stmt) => contains(&stmt.value),
-            ast::AnyNodeRef::StmtAugAssign(stmt) => contains(&stmt.value),
-            ast::AnyNodeRef::StmtAnnAssign(stmt) => {
-                contains(&stmt.annotation) || stmt.value.as_deref().is_some_and(contains)
+            flat::AnyKind::StmtAssign(stmt) => contains(stmt.value()),
+            flat::AnyKind::StmtAugAssign(stmt) => contains(stmt.value()),
+            flat::AnyKind::StmtAnnAssign(stmt) => {
+                contains(stmt.annotation()) || stmt.value().is_some_and(contains)
             }
             // type_alias := "type" NAME [type_params] '=' expression
-            ast::AnyNodeRef::StmtTypeAlias(stmt) => contains(&stmt.value),
+            flat::AnyKind::StmtTypeAlias(stmt) => contains(stmt.value()),
             // except_clause := 'except' expression ':' block
-            ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
-                handler.type_.as_deref().is_some_and(contains)
+            flat::AnyKind::ExceptHandlerExceptHandler(handler) => {
+                handler.type_().is_some_and(contains)
             }
 
-            ast::AnyNodeRef::ExprList(expr) => expr.elts.iter().any(contains),
-            ast::AnyNodeRef::ExprTuple(expr) => expr.elts.iter().any(contains),
-            ast::AnyNodeRef::ExprSet(expr) => expr.elts.iter().any(contains),
-            ast::AnyNodeRef::ExprDict(expr) => expr
-                .items
+            flat::AnyKind::ExprList(expr) => expr.elts().iter().any(contains),
+            flat::AnyKind::ExprTuple(expr) => expr.elts().iter().any(contains),
+            flat::AnyKind::ExprSet(expr) => expr.elts().iter().any(contains),
+            flat::AnyKind::ExprDict(expr) => expr
+                .items()
                 .iter()
                 .any(|item| item.range().contains_range(self.range)),
 
             // with_item := expression
-            ast::AnyNodeRef::WithItem(item) => contains(&item.context_expr),
+            flat::AnyKind::WithItem(item) => contains(item.context_expr()),
 
             // lambdef := 'lambda' [lambda_params] ':' expression
-            ast::AnyNodeRef::ExprLambda(expr) => contains(&expr.body),
+            flat::AnyKind::ExprLambda(expr) => contains(expr.body()),
 
             // arguments := (positional arguments | keyword arguments | "*" expression | "**" expression)*
-            ast::AnyNodeRef::Arguments(args) => {
-                args.args.iter().any(contains) || args.keywords.iter().any(|kw| contains(&kw.value))
+            flat::AnyKind::Arguments(args) => {
+                args.args().iter().any(contains)
+                    || args.keywords().iter().any(|kw| contains(kw.value()))
             }
-            ast::AnyNodeRef::Parameter(param) => param.annotation.as_deref().is_some_and(contains),
-            ast::AnyNodeRef::ParameterWithDefault(param) => {
-                param.default.as_deref().is_some_and(contains)
-            }
+            flat::AnyKind::Parameter(param) => param.annotation().is_some_and(contains),
+            flat::AnyKind::ParameterWithDefault(param) => param.default().is_some_and(contains),
             _ => false,
         }
     }
@@ -1579,15 +1595,15 @@ impl<'m> ContextCursor<'m> {
     /// `node` should be the smallest AST node fully covering the
     /// typed text.
     fn is_in_for_statement_iterable(&self, node: AnyNodeRef) -> bool {
-        match node {
-            ast::AnyNodeRef::StmtFor(stmt_for) => stmt_for.iter.range().contains_range(self.range),
+        match node.classify() {
+            flat::AnyKind::StmtFor(stmt_for) => stmt_for.iter().range().contains_range(self.range),
             // Detects `for x in <CURSOR>` statements inside comprehensions.
             // E.g. `[for x in <CURSOR>]`
-            ast::AnyNodeRef::Comprehension(comprehension) => {
-                comprehension.target.range().contains_range(self.range)
-                    || comprehension.iter.range().contains_range(self.range)
+            flat::AnyKind::Comprehension(comprehension) => {
+                comprehension.target().range().contains_range(self.range)
+                    || comprehension.iter().range().contains_range(self.range)
                     || comprehension
-                        .ifs
+                        .ifs()
                         .iter()
                         .any(|expr| expr.range().contains_range(self.range))
             }
@@ -1677,10 +1693,10 @@ impl TypeCheckingBlock {
             covering_node(parsed.syntax().into(), self.range)
                 .ancestors()
                 .find_map(|node| {
-                    let ast::AnyNodeRef::StmtIf(statement) = node else {
+                    let flat::AnyKind::StmtIf(statement) = node.classify() else {
                         return None;
                     };
-                    index.try_expression_scope_id(statement.test.as_ref())
+                    index.try_expression_scope_id(&statement.test())
                 })
                 .is_some_and(|scope| index.is_in_type_checking_block(scope, self.range))
         })
@@ -1777,7 +1793,7 @@ impl<'db> CollectionContext<'db> {
 ///
 /// For simple name references (e.g., `Foo`), returns the name as-is.
 /// For attribute accesses (e.g., `mod.Foo`), returns the full dotted path.
-fn extract_base_class_names(class_def: &ast::StmtClassDef) -> FxHashSet<CompactString> {
+fn extract_base_class_names(class_def: flat::View<'_, StmtClassDef>) -> FxHashSet<CompactString> {
     class_def
         .bases()
         .iter()
@@ -2084,25 +2100,25 @@ fn add_argument_completions<'db>(
 ) {
     let mut in_arguments = false;
     for node in cursor.covering_node.ancestors() {
-        match node {
+        match node.classify() {
             // Do not suggest argument completions in value positions for
             // keyword arguments
-            ast::AnyNodeRef::Keyword(kw) => {
-                if kw.value.range().contains_range(cursor.range) {
+            flat::AnyKind::Keyword(kw) => {
+                if kw.value().range().contains_range(cursor.range) {
                     return;
                 }
             }
-            ast::AnyNodeRef::Arguments(_) => {
+            flat::AnyKind::Arguments(_) => {
                 in_arguments = true;
             }
-            ast::AnyNodeRef::ExprCall(_) => {
+            flat::AnyKind::ExprCall(_) => {
                 if in_arguments {
                     add_function_arg_completions(db, file, cursor, completions);
                 }
                 return;
             }
-            ast::AnyNodeRef::StmtClassDef(class_def) => {
-                if let Some(arguments) = class_def.arguments.as_deref()
+            flat::AnyKind::StmtClassDef(class_def) => {
+                if let Some(arguments) = class_def.arguments()
                     && arguments.range().contains_range(cursor.range)
                 {
                     add_class_arg_completions(model, class_def, completions);
@@ -2110,7 +2126,7 @@ fn add_argument_completions<'db>(
                 return;
             }
             node => {
-                if node.is_statement() {
+                if node.view().is_statement() {
                     return;
                 }
             }
@@ -2126,14 +2142,13 @@ fn add_argument_completions<'db>(
 /// `TypedDict` specific keywords like `total`.
 fn add_class_arg_completions<'db>(
     model: &SemanticModel<'db>,
-    class_def: &ast::StmtClassDef,
+    class_def: flat::View<'_, StmtClassDef>,
     completions: &mut Completions<'db>,
 ) {
     let db = model.db();
     let is_set = |name| {
         class_def
-            .arguments
-            .as_ref()
+            .arguments()
             .is_some_and(|args| args.find_keyword(name).is_some())
     };
     let env = model.program_environment();
@@ -2174,7 +2189,7 @@ fn add_function_arg_completions<'db>(
             .covering_node
             .ancestors()
             .take_while(|node| !node.is_statement())
-            .any(|node| node.is_arguments()),
+            .any(flat::View::is_arguments),
         "Should only be called if we're already certain we're in an arguments node to avoid \
         adding completions for something like `(<CURSOR>)(arg1, arg2)`-style expressions"
     );
@@ -2225,14 +2240,14 @@ fn detect_set_function_args<'m>(cursor: &ContextCursor<'m>) -> FxHashSet<&'m str
     cursor
         .covering_node
         .parent()
-        .and_then(|node| match node {
-            ast::AnyNodeRef::Arguments(args) => Some(args),
+        .and_then(|node| match node.classify() {
+            flat::AnyKind::Arguments(args) => Some(args),
             _ => None,
         })
         .map(|args| {
-            args.keywords
+            args.keywords()
                 .iter()
-                .filter_map(|kw| kw.arg.as_ref().map(|ident| ident.id.as_str()))
+                .filter_map(|kw| kw.arg().map(|ident| ident.id().as_str()))
                 .collect()
         })
         .unwrap_or_default()
@@ -2325,8 +2340,8 @@ fn add_keyword_completions<'db>(
 
 fn add_string_literal_completions<'db>(
     model: &SemanticModel<'db>,
-    string_expr: &ast::ExprStringLiteral,
-    subscript: Option<&ast::ExprSubscript>,
+    string_expr: flat::View<'_, ExprStringLiteral>,
+    subscript: Option<flat::View<'_, ExprSubscript>>,
     quote_style: Option<Quote>,
     completions: &mut Completions<'db>,
 ) {
@@ -2564,8 +2579,8 @@ impl<'t> CompletionTargetTokens<'t> {
                         node.is_stmt_import() || node.is_stmt_import_from()
                     })
                     .ok()?;
-                match covering_node.node() {
-                    ast::AnyNodeRef::ExprAttribute(expr) => {
+                match covering_node.node().classify() {
+                    flat::AnyKind::ExprAttribute(expr) => {
                         Some(CompletionTargetAst::ObjectDot { expr })
                     }
                     _ => None,
@@ -2587,7 +2602,7 @@ impl<'t> CompletionTargetTokens<'t> {
 enum CompletionTargetAst<'t> {
     /// A `object.attribute` scenario, where we want to
     /// list attributes on `object` for completions.
-    ObjectDot { expr: &'t ast::ExprAttribute },
+    ObjectDot { expr: flat::View<'t, ExprAttribute> },
     /// A scoped scenario, where we want to list all items available in
     /// the most narrow scope containing the giving AST node.
     Scoped(ScopedTarget<'t>),
@@ -2597,7 +2612,7 @@ enum CompletionTargetAst<'t> {
 struct ScopedTarget<'t> {
     /// The node with the smallest range that fully covers
     /// the token under the cursor.
-    node: ast::AnyNodeRef<'t>,
+    node: flat::AnyNodeRef<'t>,
 }
 
 /// A representation of the completion context for a possibly incomplete import
@@ -2613,7 +2628,7 @@ enum ImportStatement<'a> {
 /// `from ... import ...` statement.
 #[derive(Clone, Debug)]
 struct FromImport<'a> {
-    ast: &'a ast::StmtImportFrom,
+    ast: flat::View<'a, StmtImportFrom>,
     kind: FromImportKind,
 }
 
@@ -2645,7 +2660,7 @@ enum FromImportKind {
 #[derive(Clone, Debug)]
 struct Import<'a> {
     #[expect(dead_code)]
-    ast: &'a ast::StmtImport,
+    ast: flat::View<'a, StmtImport>,
     kind: ImportKind,
 }
 
@@ -3073,7 +3088,7 @@ impl<'a> ImportStatement<'a> {
                             let parent = to_complete_without_leading_dots
                                 .rsplit_once('.')
                                 .map(|(parent, _)| parent);
-                            ModuleName::from_identifier_parts(db, file, parent, ast.level).ok()?
+                            ModuleName::from_identifier_parts(db, file, parent, ast.level()).ok()?
                         };
                         FromImportKind::Relative {
                             parent,
@@ -3134,7 +3149,10 @@ impl<'a> ImportStatement<'a> {
                 }
                 FromImportKind::Attribute => {
                     let module_dependency_kind = model
-                        .resolve_module(ast.module.as_ref().map(ast::Identifier::as_str), ast.level)
+                        .resolve_module(
+                            ast.module().map(flat::View::<Identifier>::as_str),
+                            ast.level(),
+                        )
                         .map(|module| ModuleDependencyKind::from_module(db, module));
                     add_import_completions_with_module_dependency_kind(
                         db,
@@ -3214,11 +3232,11 @@ fn add_import_completions_impl<'db>(
 fn find_ast_for_from_import<'p>(
     parsed: &'p ParsedModuleRef,
     token: &Token,
-) -> Option<&'p ast::StmtImportFrom> {
+) -> Option<flat::View<'p, StmtImportFrom>> {
     let covering_node = covering_node(parsed.syntax().into(), token.range())
-        .find_first(|node| node.is_stmt_import_from())
+        .find_first(flat::View::is_stmt_import_from)
         .ok()?;
-    let ast::AnyNodeRef::StmtImportFrom(from_import) = covering_node.node() else {
+    let flat::AnyKind::StmtImportFrom(from_import) = covering_node.node().classify() else {
         return None;
     };
     Some(from_import)
@@ -3231,11 +3249,11 @@ fn find_ast_for_from_import<'p>(
 fn find_ast_for_import<'p>(
     parsed: &'p ParsedModuleRef,
     token: &Token,
-) -> Option<&'p ast::StmtImport> {
+) -> Option<flat::View<'p, StmtImport>> {
     let covering_node = covering_node(parsed.syntax().into(), token.range())
-        .find_first(|node| node.is_stmt_import())
+        .find_first(flat::View::is_stmt_import)
         .ok()?;
-    let ast::AnyNodeRef::StmtImport(import) = covering_node.node() else {
+    let flat::AnyKind::StmtImport(import) = covering_node.node().classify() else {
         return None;
     };
     Some(import)

@@ -2,6 +2,7 @@
 //! are omitted from the AST (e.g., commented lines).
 
 use ruff_python_ast::Stmt;
+use ruff_python_ast::flat;
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_trivia::{
     CommentRanges, has_leading_content, has_trailing_content, is_python_whitespace,
@@ -207,7 +208,11 @@ impl Indexer {
 
     /// Return `true` if a [`Stmt`] appears to be preceded by other statements in a multi-statement
     /// line.
-    pub fn preceded_by_multi_statement_line(&self, stmt: &Stmt, source: &str) -> bool {
+    pub fn preceded_by_multi_statement_line(
+        &self,
+        stmt: flat::View<'_, Stmt>,
+        source: &str,
+    ) -> bool {
         has_leading_content(stmt.start(), source)
             || self
                 .preceded_by_continuations(stmt.start(), source)
@@ -216,12 +221,16 @@ impl Indexer {
 
     /// Return `true` if a [`Stmt`] appears to be followed by other statements in a multi-statement
     /// line.
-    pub fn followed_by_multi_statement_line(&self, stmt: &Stmt, source: &str) -> bool {
+    pub fn followed_by_multi_statement_line(
+        &self,
+        stmt: flat::View<'_, Stmt>,
+        source: &str,
+    ) -> bool {
         has_trailing_content(stmt.end(), source)
     }
 
     /// Return `true` if a [`Stmt`] appears to be part of a multi-statement line.
-    pub fn in_multi_statement_line(&self, stmt: &Stmt, source: &str) -> bool {
+    pub fn in_multi_statement_line(&self, stmt: flat::View<'_, Stmt>, source: &str) -> bool {
         self.followed_by_multi_statement_line(stmt, source)
             || self.preceded_by_multi_statement_line(stmt, source)
     }

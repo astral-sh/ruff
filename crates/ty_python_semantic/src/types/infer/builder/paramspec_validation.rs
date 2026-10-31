@@ -8,6 +8,7 @@ use crate::{
     },
 };
 use ruff_python_ast as ast;
+use ruff_python_ast::flat;
 use ruff_text_size::Ranged;
 use ty_python_core::SemanticIndex;
 
@@ -22,14 +23,14 @@ use ty_python_core::SemanticIndex;
 pub(super) fn validate_paramspec_components<'db>(
     context: &'db InferContext<'db, '_>,
     index: &SemanticIndex<'db>,
-    parameters: &ast::Parameters,
-    infer_type: impl Fn(&ast::Expr) -> Type<'db>,
+    parameters: flat::View<'_, ast::Parameters>,
+    infer_type: impl Fn(flat::View<'_, ast::Expr>) -> Type<'db>,
 ) {
     let db = context.db();
     let env = context.program_environment();
 
     // Extract ParamSpec info from *args annotation
-    let args_paramspec = parameters.vararg.as_deref().and_then(|vararg| {
+    let args_paramspec = parameters.vararg().and_then(|vararg| {
         let annotation = vararg.annotation()?;
         let ty = infer_type(annotation);
         if let Type::TypeVar(typevar) = ty
@@ -43,7 +44,7 @@ pub(super) fn validate_paramspec_components<'db>(
     });
 
     // Extract ParamSpec info from **kwargs annotation
-    let kwargs_paramspec = parameters.kwarg.as_deref().and_then(|kwarg| {
+    let kwargs_paramspec = parameters.kwarg().and_then(|kwarg| {
         let annotation = kwarg.annotation()?;
         let ty = infer_type(annotation);
         if let Type::TypeVar(typevar) = ty
@@ -56,8 +57,8 @@ pub(super) fn validate_paramspec_components<'db>(
         }
     });
 
-    let vararg_name = parameters.vararg.as_deref().map(|v| v.name.as_str());
-    let kwarg_name = parameters.kwarg.as_deref().map(|k| k.name.as_str());
+    let vararg_name = parameters.vararg().map(|v| v.name().as_str());
+    let kwarg_name = parameters.kwarg().map(|k| k.name().as_str());
 
     match (args_paramspec, kwargs_paramspec) {
         // Both *args: P.args and **kwargs: P.kwargs present
@@ -76,7 +77,7 @@ pub(super) fn validate_paramspec_components<'db>(
             } else {
                 let paramspec_is_bound_by_parameter = parameters
                     .iter()
-                    .filter_map(ast::AnyParameterRef::annotation)
+                    .filter_map(flat::AnyParameter::annotation)
                     .map(&infer_type)
                     .filter(|ty| {
                         !matches!(
@@ -117,12 +118,12 @@ pub(super) fn validate_paramspec_components<'db>(
                 }
 
                 // Same ParamSpec - check no keyword-only params between them
-                if !parameters.kwonlyargs.is_empty() {
+                if !parameters.kwonlyargs().is_empty() {
                     let name = args_tv.name(db);
                     let vararg = vararg_name.unwrap_or("args");
                     let kwarg = kwarg_name.unwrap_or("kwargs");
                     if let Some(builder) =
-                        context.report_lint(&INVALID_PARAMSPEC, &parameters.kwonlyargs[0])
+                        context.report_lint(&INVALID_PARAMSPEC, parameters.kwonlyargs().at(0))
                     {
                         builder.into_diagnostic(format_args!(
                             "No parameters may appear between \
@@ -139,10 +140,10 @@ pub(super) fn validate_paramspec_components<'db>(
             let vararg = vararg_name.unwrap_or("args");
             let kwarg = kwarg_name.unwrap_or("kwargs");
             // Report on the kwarg annotation if it exists, otherwise on *args
-            let range = if let Some(kwarg_param) = parameters.kwarg.as_deref() {
+            let range = if let Some(kwarg_param) = parameters.kwarg() {
                 kwarg_param
                     .annotation()
-                    .map(Ranged::range)
+                    .map(|node| node.range())
                     .unwrap_or_else(|| kwarg_param.range())
             } else {
                 args_annotation.range()
@@ -160,10 +161,10 @@ pub(super) fn validate_paramspec_components<'db>(
             let vararg = vararg_name.unwrap_or("args");
             let kwarg = kwarg_name.unwrap_or("kwargs");
             // Report on the vararg annotation if it exists, otherwise on **kwargs
-            let range = if let Some(vararg_param) = parameters.vararg.as_deref() {
+            let range = if let Some(vararg_param) = parameters.vararg() {
                 vararg_param
                     .annotation()
-                    .map(Ranged::range)
+                    .map(|node| node.range())
                     .unwrap_or_else(|| vararg_param.range())
             } else {
                 kwargs_annotation.range()

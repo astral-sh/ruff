@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, Decorator, Expr, Parameters};
@@ -113,8 +114,8 @@ impl Violation for BooleanTypeHintPositionalArgument {
 pub(crate) fn boolean_type_hint_positional_argument(
     checker: &Checker,
     name: &str,
-    decorator_list: &[Decorator],
-    parameters: &Parameters,
+    decorator_list: flat::NodeList<'_, Decorator>,
+    parameters: flat::View<'_, Parameters>,
 ) {
     // https://github.com/astral-sh/ruff/issues/14535
     if checker.source_type.is_stub() {
@@ -125,7 +126,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
         return;
     }
 
-    for parameter in parameters.posonlyargs.iter().chain(&parameters.args) {
+    for parameter in parameters.posonlyargs().iter().chain(parameters.args()) {
         let Some(annotation) = parameter.annotation() else {
             continue;
         };
@@ -135,7 +136,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
 
         // Allow Boolean type hints in setters.
         if decorator_list.iter().any(|decorator| {
-            UnqualifiedName::from_expr(&decorator.expression)
+            UnqualifiedName::from_expr(decorator.expression())
                 .is_some_and(|unqualified_name| unqualified_name.segments() == [name, "setter"])
         }) {
             return;
@@ -161,24 +162,32 @@ pub(crate) fn boolean_type_hint_positional_argument(
 
 /// Returns `true` if the annotation is a boolean type hint (e.g., `bool`), or a type hint that
 /// includes boolean as a variant (e.g., `bool | int`).
-fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel) -> bool {
-    match annotation {
+fn match_annotation_to_complex_bool(
+    annotation: flat::View<'_, Expr>,
+    semantic: &SemanticModel,
+) -> bool {
+    match annotation.classify() {
         // Ex) `bool`
-        Expr::Name(name) => &name.id == "bool",
+        flat::ExprKind::Name(name) => name.id() == "bool",
         // Ex) `"bool"`
-        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value == "bool",
+        flat::ExprKind::StringLiteral(expr_string_literal) => {
+            let value = expr_string_literal.value();
+
+            value == "bool"
+        }
         // Ex) `bool | int`
-        Expr::BinOp(ast::ExprBinOp {
-            left,
-            op: ast::Operator::BitOr,
-            right,
-            ..
-        }) => {
+        flat::ExprKind::BinOp(expr_bin_op) if expr_bin_op.op() == ast::Operator::BitOr => {
+            let left = expr_bin_op.left();
+            let right = expr_bin_op.right();
+
             match_annotation_to_complex_bool(left, semantic)
                 || match_annotation_to_complex_bool(right, semantic)
         }
         // Ex) `typing.Union[bool, int]`
-        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+        flat::ExprKind::Subscript(expr_subscript) => {
+            let value = expr_subscript.value();
+            let slice = expr_subscript.slice();
+
             // If the typing modules were never imported, we'll never match below.
             if !semantic.seen_typing() {
                 return false;
@@ -188,7 +197,8 @@ fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel)
             if qualified_name.as_ref().is_some_and(|qualified_name| {
                 semantic.match_typing_qualified_name(qualified_name, "Union")
             }) {
-                if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
+                if let flat::ExprKind::Tuple(tuple) = slice.classify() {
+                    let elts = tuple.elts();
                     elts.iter()
                         .any(|elt| match_annotation_to_complex_bool(elt, semantic))
                 } else {

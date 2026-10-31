@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{Expr, StringLike};
+use ruff_python_ast::{Expr, flat::StringLike};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -71,8 +72,8 @@ impl Violation for ImplicitStringConcatenationInCollectionLiteral {
 /// ISC004
 pub(crate) fn implicit_string_concatenation_in_collection_literal(
     checker: &Checker,
-    expr: &Expr,
-    elements: &[Expr],
+    expr: flat::View<'_, Expr>,
+    elements: flat::NodeList<'_, Expr>,
 ) {
     for element in elements {
         let Ok(string_like) = StringLike::try_from(element) else {
@@ -81,13 +82,7 @@ pub(crate) fn implicit_string_concatenation_in_collection_literal(
         if !string_like.is_implicit_concatenated() {
             continue;
         }
-        if parenthesized_range(
-            string_like.as_expression_ref(),
-            expr.into(),
-            checker.tokens(),
-        )
-        .is_some()
-        {
+        if parenthesized_range(string_like.into(), expr.into(), checker.tokens()).is_some() {
             continue;
         }
 

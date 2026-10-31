@@ -7,10 +7,11 @@ use crate::rules::airflow::helpers::{
 };
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::flat::helpers::map_callable;
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_ast::{
-    Arguments, Expr, ExprAttribute, ExprCall, ExprContext, ExprName, ExprStringLiteral,
-    ExprSubscript, Stmt, StmtClassDef, StmtFunctionDef, name::QualifiedName,
+    Arguments, Expr, ExprAttribute, ExprCall, ExprContext, ExprName, ExprSubscript, StmtClassDef,
+    StmtFunctionDef, name::QualifiedName,
 };
 use ruff_python_semantic::Modules;
 use ruff_python_semantic::ScopeKind;
@@ -91,42 +92,42 @@ impl Violation for Airflow3Removal {
 }
 
 /// AIR301
-pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
+pub(crate) fn airflow_3_removal_expr(checker: &Checker, &expr: &flat::View<'_, Expr>) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
 
-    match expr {
-        Expr::Call(
-            call_expr @ ExprCall {
-                func, arguments, ..
-            },
-        ) => {
+    match expr.classify() {
+        flat::ExprKind::Call(call_expr) => {
+            let func = call_expr.func();
+            let arguments = call_expr.arguments();
+
             if let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) {
                 check_call_arguments(checker, &qualified_name, arguments);
             }
             check_method(checker, call_expr);
             check_context_key_usage_in_call(checker, call_expr);
         }
-        Expr::Attribute(attribute_expr @ ExprAttribute { range, .. }) => {
-            check_name(checker, expr, *range);
+        flat::ExprKind::Attribute(attribute_expr) => {
+            let range = attribute_expr.range();
+
+            check_name(checker, expr, range);
             check_class_attribute(checker, attribute_expr);
             check_removed_attribute_access_on_context_key(checker, attribute_expr);
         }
-        Expr::Name(ExprName {
-            id,
-            ctx,
-            range,
-            node_index: _,
-        }) => {
-            check_name(checker, expr, *range);
+        flat::ExprKind::Name(expr_name) => {
+            let id = expr_name.id();
+            let ctx = expr_name.ctx();
+            let range = expr_name.range();
+
+            check_name(checker, expr, range);
             if matches!(ctx, ExprContext::Store) {
                 if let ScopeKind::Class(class_def) = checker.semantic().current_scope().kind {
                     check_airflow_plugin_extension(checker, expr, id, class_def);
                 }
             }
         }
-        Expr::Subscript(subscript_expr) => {
+        flat::ExprKind::Subscript(subscript_expr) => {
             check_context_key_usage_in_subscript(checker, subscript_expr);
         }
         _ => {}
@@ -134,7 +135,10 @@ pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
 }
 
 /// AIR301
-pub(crate) fn airflow_3_removal_function_def(checker: &Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn airflow_3_removal_function_def(
+    checker: &Checker,
+    function_def: flat::View<'_, StmtFunctionDef>,
+) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
@@ -171,14 +175,14 @@ const REMOVED_CONTEXT_KEYS: [&str; 12] = [
 ///     #            'execution_date' is removed in Airflow 3.0
 ///     pass
 /// ```
-fn check_function_parameters(checker: &Checker, function_def: &StmtFunctionDef) {
+fn check_function_parameters(checker: &Checker, function_def: flat::View<'_, StmtFunctionDef>) {
     if !is_airflow_task(function_def, checker.semantic())
         && !is_execute_method_inherits_from_airflow_operator(function_def, checker.semantic())
     {
         return;
     }
 
-    for param in function_def.parameters.iter_non_variadic_params() {
+    for param in function_def.parameters().iter_non_variadic_params() {
         let param_name = param.name();
         if REMOVED_CONTEXT_KEYS.contains(&param_name.as_str()) {
             checker.report_diagnostic(
@@ -201,7 +205,11 @@ fn check_function_parameters(checker: &Checker, function_def: &StmtFunctionDef) 
 ///
 /// DAG(schedule_interval="@daily")
 /// ```
-fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, arguments: &Arguments) {
+fn check_call_arguments(
+    checker: &Checker,
+    qualified_name: &QualifiedName,
+    arguments: flat::View<'_, Arguments>,
+) {
     match qualified_name.segments() {
         ["airflow", .., "DAG" | "dag"] => {
             // with replacement
@@ -297,8 +305,9 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
 /// info = DatasetLineageInfo()
 /// info.dataset
 /// ```
-fn check_class_attribute(checker: &Checker, attribute_expr: &ExprAttribute) {
-    let ExprAttribute { value, attr, .. } = attribute_expr;
+fn check_class_attribute(checker: &Checker, attribute_expr: flat::View<'_, ExprAttribute>) {
+    let value = attribute_expr.value();
+    let attr = attribute_expr.attr();
 
     let Some(qualname) = typing::resolve_assignment(value, checker.semantic()) else {
         return;
@@ -343,7 +352,7 @@ fn check_class_attribute(checker: &Checker, attribute_expr: &ExprAttribute) {
 
 fn check_deprecated_context_key_value_access(
     checker: &Checker,
-    value: &Expr,
+    value: flat::View<'_, Expr>,
     range: TextRange,
 ) -> bool {
     // access context["inlet_events"] via a string key is deprecated.
@@ -418,29 +427,34 @@ fn check_deprecated_context_key(checker: &Checker, key: &str, range: TextRange) 
 /// def my_task(**context):
 ///     context.get("conf")  # 'conf' is removed in Airflow 3.0
 /// ```
-fn check_context_key_usage_in_call(checker: &Checker, call_expr: &ExprCall) {
+fn check_context_key_usage_in_call(checker: &Checker, call_expr: flat::View<'_, ExprCall>) {
     if !in_airflow_task_function(checker.semantic()) {
         return;
     }
 
-    let Expr::Attribute(ExprAttribute { value, attr, .. }) = &*call_expr.func else {
+    let flat::ExprKind::Attribute(attribute_node) = call_expr.func().classify() else {
         return;
     };
+    let value = attribute_node.value();
+    let attr = attribute_node.attr();
 
     if attr.as_str() != "get" {
         return;
     }
 
-    let Some(Expr::StringLiteral(ExprStringLiteral {
+    let Some(ast::Expr::StringLiteral(ast::ExprStringLiteral {
         value: key,
         range,
-        node_index: _,
-    })) = call_expr.arguments.find_positional(0)
+        node: _,
+    })) = call_expr
+        .arguments()
+        .find_positional(0)
+        .map(flat::View::<Expr>::fields)
     else {
         return;
     };
 
-    if check_deprecated_context_key_value_access(checker, value, *range) {
+    if check_deprecated_context_key_value_access(checker, value, range) {
         return;
     }
 
@@ -448,19 +462,26 @@ fn check_context_key_usage_in_call(checker: &Checker, call_expr: &ExprCall) {
         return;
     }
 
-    check_deprecated_context_key(checker, key.to_str(), *range);
+    check_deprecated_context_key(checker, key.to_str(), range);
 }
 
 /// Check if a subscript expression accesses a removed Airflow context variable.
 /// If a removed key is found, push a corresponding diagnostic.
-fn check_context_key_usage_in_subscript(checker: &Checker, subscript: &ExprSubscript) {
+fn check_context_key_usage_in_subscript(
+    checker: &Checker,
+    subscript: flat::View<'_, ExprSubscript>,
+) {
     if !in_airflow_task_function(checker.semantic()) {
         return;
     }
 
-    let ExprSubscript { value, slice, .. } = subscript;
+    let value = subscript.value();
+    let slice = subscript.slice();
 
-    let Some(ExprStringLiteral { value: key, .. }) = slice.as_string_literal_expr() else {
+    let Some(ast::ExprStringLiteral { value: key, .. }) = slice
+        .as_string_literal_expr()
+        .map(flat::View::<ruff_python_ast::ExprStringLiteral>::fields)
+    else {
         return;
     };
 
@@ -476,12 +497,15 @@ fn check_context_key_usage_in_subscript(checker: &Checker, subscript: &ExprSubsc
 }
 
 /// Check for removed attribute access on context key value.
-fn check_removed_attribute_access_on_context_key(checker: &Checker, attr_expr: &ExprAttribute) {
+fn check_removed_attribute_access_on_context_key(
+    checker: &Checker,
+    attr_expr: flat::View<'_, ExprAttribute>,
+) {
     if !in_airflow_task_function(checker.semantic()) {
         return;
     }
 
-    let attr = attr_expr.attr.as_str();
+    let attr = attr_expr.attr().as_str();
 
     let replacement = match attr {
         "external_trigger"
@@ -497,7 +521,7 @@ fn check_removed_attribute_access_on_context_key(checker: &Checker, attr_expr: &
     let fix = if let Replacement::AttrName(name) = replacement {
         Some(Fix::safe_edit(Edit::range_replacement(
             name.to_string(),
-            attr_expr.attr.range(),
+            attr_expr.attr().range(),
         )))
     } else {
         None
@@ -508,7 +532,7 @@ fn check_removed_attribute_access_on_context_key(checker: &Checker, attr_expr: &
             deprecated: attr.to_string(),
             replacement,
         },
-        attr_expr.attr.range(),
+        attr_expr.attr().range(),
     );
 
     if let Some(fix) = fix {
@@ -517,19 +541,20 @@ fn check_removed_attribute_access_on_context_key(checker: &Checker, attr_expr: &
 }
 
 /// Finds the parameter definition for a given name expression in a function.
-fn is_kwarg_parameter(semantic: &SemanticModel, name: &ExprName) -> bool {
+fn is_kwarg_parameter(semantic: &SemanticModel, name: flat::View<'_, ExprName>) -> bool {
     let Some(binding_id) = semantic.only_binding(name) else {
         return false;
     };
     let binding = semantic.binding(binding_id);
-    let Some(Stmt::FunctionDef(StmtFunctionDef { parameters, .. })) = binding.statement(semantic)
+    let Some(ast::Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })) = binding
+        .statement(semantic)
+        .map(flat::View::<ruff_python_ast::Stmt>::fields)
     else {
         return false;
     };
     parameters
-        .kwarg
-        .as_deref()
-        .is_some_and(|kwarg| kwarg.name.as_str() == name.id.as_str())
+        .kwarg()
+        .is_some_and(|kwarg| kwarg.name().as_str() == name.id().as_str())
 }
 
 /// Check whether a removed Airflow class method is called.
@@ -542,10 +567,12 @@ fn is_kwarg_parameter(semantic: &SemanticModel, name: &ExprName) -> bool {
 /// manager = DatasetManager()
 /// manager.register_dataset_change()
 /// ```
-fn check_method(checker: &Checker, call_expr: &ExprCall) {
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = &*call_expr.func else {
+fn check_method(checker: &Checker, call_expr: flat::View<'_, ExprCall>) {
+    let flat::ExprKind::Attribute(attribute_node) = call_expr.func().classify() else {
         return;
     };
+    let attr = attribute_node.attr();
+    let value = attribute_node.value();
 
     let Some(qualname) = typing::resolve_assignment(value, checker.semantic()) else {
         return;
@@ -652,7 +679,7 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
 /// # Or, directly
 /// SubDagOperator()
 /// ```
-fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
+fn check_name(checker: &Checker, expr: flat::View<'_, Expr>, range: TextRange) {
     let semantic = checker.semantic();
 
     let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
@@ -1118,9 +1145,9 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 /// ```
 fn check_airflow_plugin_extension(
     checker: &Checker,
-    expr: &Expr,
+    expr: flat::View<'_, Expr>,
     name: &str,
-    class_def: &StmtClassDef,
+    class_def: flat::View<'_, StmtClassDef>,
 ) {
     if matches!(name, "executors" | "operators" | "sensors" | "hooks") {
         if class_def.bases().iter().any(|class_base| {
@@ -1151,7 +1178,7 @@ fn check_airflow_plugin_extension(
 /// with a possible `replacement`.
 fn diagnostic_for_argument(
     checker: &Checker,
-    arguments: &Arguments,
+    arguments: flat::View<'_, Arguments>,
     deprecated: &str,
     replacement: Option<&'static str>,
 ) {
@@ -1159,9 +1186,8 @@ fn diagnostic_for_argument(
         return;
     };
     let range = keyword
-        .arg
-        .as_ref()
-        .map_or_else(|| keyword.range(), Ranged::range);
+        .arg()
+        .map_or_else(|| keyword.range(), |node| node.range());
     let mut diagnostic = checker.report_diagnostic(
         Airflow3Removal {
             deprecated: deprecated.to_string(),
@@ -1237,7 +1263,7 @@ fn is_airflow_auth_manager(segments: &[&str]) -> bool {
 ///         pass
 /// ```
 fn is_execute_method_inherits_from_airflow_operator(
-    function_def: &StmtFunctionDef,
+    function_def: flat::View<'_, StmtFunctionDef>,
     semantic: &SemanticModel,
 ) -> bool {
     is_method_in_subclass(function_def, semantic, "execute", |qualified_name| {
@@ -1246,7 +1272,7 @@ fn is_execute_method_inherits_from_airflow_operator(
 }
 
 /// Check if an expression is a valid Airflow context variable.
-fn is_context_variable(checker: &Checker, expr: &Expr) -> bool {
+fn is_context_variable(checker: &Checker, expr: flat::View<'_, Expr>) -> bool {
     let is_kwarg = expr
         .as_name_expr()
         .is_some_and(|name| is_kwarg_parameter(checker.semantic(), name));
@@ -1265,12 +1291,16 @@ fn is_context_variable(checker: &Checker, expr: &Expr) -> bool {
 /// Check if an expression accesses a specific context key. It returns `true` if `expr`
 /// accesses the given `key` from an Airflow context variable via either subscript or
 /// `.get()` method.
-fn is_context_key_access(checker: &Checker, expr: &Expr, key: &str) -> bool {
+fn is_context_key_access(checker: &Checker, expr: flat::View<'_, Expr>, key: &str) -> bool {
     // context["key"]
-    if let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr {
-        if let Some(ExprStringLiteral {
+    if let flat::ExprKind::Subscript(subscript_node) = expr.classify() {
+        let value = subscript_node.value();
+        let slice = subscript_node.slice();
+        if let Some(ast::ExprStringLiteral {
             value: slice_key, ..
-        }) = slice.as_string_literal_expr()
+        }) = slice
+            .as_string_literal_expr()
+            .map(flat::View::<ruff_python_ast::ExprStringLiteral>::fields)
         {
             if slice_key.to_str() == key && is_context_variable(checker, value) {
                 return true;
@@ -1278,14 +1308,17 @@ fn is_context_key_access(checker: &Checker, expr: &Expr, key: &str) -> bool {
         }
     }
     // context.get("key")
-    if let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = expr
-    {
-        if let Expr::Attribute(ExprAttribute { value, attr, .. }) = func.as_ref() {
+    if let flat::ExprKind::Call(call) = expr.classify() {
+        let func = call.func();
+        let arguments = call.arguments();
+        if let flat::ExprKind::Attribute(attribute_node_view) = func.classify() {
+            let value = attribute_node_view.value();
+            let attr = attribute_node_view.attr();
             if attr.as_str() == "get" {
-                if let Some(Expr::StringLiteral(ExprStringLiteral { value: arg_key, .. })) =
-                    arguments.find_positional(0)
+                if let Some(ast::Expr::StringLiteral(ast::ExprStringLiteral {
+                    value: arg_key,
+                    ..
+                })) = arguments.find_positional(0).map(flat::View::<Expr>::fields)
                 {
                     if arg_key.to_str() == key && is_context_variable(checker, value) {
                         return true;
@@ -1303,7 +1336,11 @@ fn is_context_key_access(checker: &Checker, expr: &Expr, key: &str) -> bool {
 /// Returns `true` if `expr` is:
 /// - Direct access: `context["key"]` or `context.get("key")`
 /// - Variable bound to context key: `x = context["key"]; x`
-fn is_value_from_context_key(checker: &Checker, expr: &Expr, context_key: &str) -> bool {
+fn is_value_from_context_key(
+    checker: &Checker,
+    expr: flat::View<'_, Expr>,
+    context_key: &str,
+) -> bool {
     if is_context_key_access(checker, expr, context_key) {
         return true;
     }
@@ -1329,11 +1366,12 @@ fn is_value_from_context_key(checker: &Checker, expr: &Expr, context_key: &str) 
 /// ```
 fn is_removed_context_key_attribute(
     checker: &Checker,
-    attr_expr: &ExprAttribute,
+    attr_expr: flat::View<'_, ExprAttribute>,
     context_key: &str,
     removed_attr: &str,
 ) -> bool {
-    let ExprAttribute { value, attr, .. } = attr_expr;
+    let value = attr_expr.value();
+    let attr = attr_expr.attr();
 
     if attr.as_str() != removed_attr {
         return false;
@@ -1358,11 +1396,14 @@ fn is_removed_context_key_attribute(
 ///         super().__init__(**kwargs)
 ///         self.message = message
 /// ```
-fn check_apply_defaults_decorator(checker: &Checker, function_def: &StmtFunctionDef) {
-    for decorator in &function_def.decorator_list {
+fn check_apply_defaults_decorator(
+    checker: &Checker,
+    function_def: flat::View<'_, StmtFunctionDef>,
+) {
+    for decorator in function_def.decorator_list() {
         if checker
             .semantic()
-            .resolve_qualified_name(map_callable(&decorator.expression))
+            .resolve_qualified_name(map_callable(decorator.expression()))
             .is_some_and(|qualified_name| {
                 matches!(
                     qualified_name.segments(),
@@ -1399,14 +1440,14 @@ fn check_apply_defaults_decorator(checker: &Checker, function_def: &StmtFunction
 /// # Enum value
 /// EmptyOperator(task_id="my_task", trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
 /// ```
-fn check_trigger_rule_argument_value(checker: &Checker, arguments: &Arguments) {
+fn check_trigger_rule_argument_value(checker: &Checker, arguments: flat::View<'_, Arguments>) {
     let Some(keyword) = arguments.find_keyword("trigger_rule") else {
         return;
     };
 
     // Check for string literal value
-    if let Some(value) = keyword.value.as_string_literal_expr() {
-        if value.value.to_str() == "none_failed_or_skipped" {
+    if let Some(value) = keyword.value().as_string_literal_expr() {
+        if value.value().to_str() == "none_failed_or_skipped" {
             let mut diagnostic = checker.report_diagnostic(
                 Airflow3Removal {
                     deprecated: "none_failed_or_skipped".to_string(),
@@ -1423,7 +1464,7 @@ fn check_trigger_rule_argument_value(checker: &Checker, arguments: &Arguments) {
     }
 
     // Check for TriggerRule enum value
-    if let Some(qualified_name) = checker.semantic().resolve_qualified_name(&keyword.value) {
+    if let Some(qualified_name) = checker.semantic().resolve_qualified_name(keyword.value()) {
         if matches!(
             qualified_name.segments(),
             [
@@ -1439,11 +1480,11 @@ fn check_trigger_rule_argument_value(checker: &Checker, arguments: &Arguments) {
                     deprecated: qualified_name.to_string(),
                     replacement: Replacement::AttrName("NONE_FAILED_MIN_ONE_SUCCESS"),
                 },
-                keyword.value.range(),
+                keyword.value().range(),
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 "TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS".to_string(),
-                keyword.value.range(),
+                keyword.value().range(),
             )));
         }
     }

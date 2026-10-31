@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{self as ast, Expr, name::Name, token::parenthesized_range};
+use ruff_python_ast::{PythonVersion, flat};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::{ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
@@ -18,7 +18,7 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
         id: name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     // Construct `name.method`.
     let attr = ast::ExprAttribute {
@@ -26,7 +26,7 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
         attr: ast::Identifier::new(method.to_string(), TextRange::default()),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     // Make it into a call `name.method()`
     let call = ast::ExprCall {
@@ -35,16 +35,16 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
             args: [].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         },
         range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(call.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     generator.stmt(&stmt.into())
 }
@@ -52,7 +52,7 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
 /// Returns a fix that replace `range` with
 /// a generated `a is None`/`a is not None` check.
 pub(super) fn replace_with_identity_check(
-    left: &Expr,
+    left: flat::View<'_, Expr>,
     range: TextRange,
     negate: bool,
     checker: &Checker,
@@ -67,9 +67,9 @@ pub(super) fn replace_with_identity_check(
 
     let new_expr = Expr::Compare(ast::ExprCompare {
         ops: [op].into(),
-        operands: [left.clone(), ast::ExprNoneLiteral::default().into()].into(),
+        operands: [left.to_owned_node(), ast::ExprNoneLiteral::default().into()].into(),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     });
 
     let new_content = generator.expr(&new_expr);
@@ -119,11 +119,11 @@ impl OpenMode {
 #[derive(Debug)]
 pub(super) struct FileOpen<'a> {
     /// With item where the open happens, we use it for the reporting range.
-    pub(super) item: &'a ast::WithItem,
+    pub(super) item: flat::View<'a, ast::WithItem>,
     /// The file open mode.
     pub(super) mode: OpenMode,
     /// The file open keywords.
-    pub(super) keywords: Vec<&'a ast::Keyword>,
+    pub(super) keywords: Vec<flat::View<'a, ast::Keyword>>,
     /// We only check `open` operations whose file handles are used exactly once.
     pub(super) reference: &'a ResolvedReference,
     pub(super) argument: OpenArgument<'a>,
@@ -132,7 +132,7 @@ pub(super) struct FileOpen<'a> {
 impl FileOpen<'_> {
     /// Determine whether an expression is a reference to the file handle, by comparing
     /// their ranges. If two expressions have the same range, they must be the same expression.
-    pub(super) fn is_ref(&self, expr: &Expr) -> bool {
+    pub(super) fn is_ref(&self, expr: flat::View<'_, Expr>) -> bool {
         expr.range() == self.reference.range()
     }
 }
@@ -144,7 +144,7 @@ pub(super) enum OpenArgument<'a> {
     /// ```py
     /// f = open("foo.txt")
     /// ```
-    Builtin { filename: &'a Expr },
+    Builtin { filename: flat::View<'a, Expr> },
     /// The `Path` receiver of a `pathlib.Path.open` call, e.g. the `p` in the
     /// context manager in:
     ///
@@ -158,7 +158,7 @@ pub(super) enum OpenArgument<'a> {
     /// ```py
     /// with Path("foo.txt").open() as f: ...
     /// ```
-    Pathlib { path: &'a Expr },
+    Pathlib { path: flat::View<'a, Expr> },
 }
 
 impl OpenArgument<'_> {
@@ -178,12 +178,12 @@ impl Ranged for OpenArgument<'_> {
 
 /// Find and return all `open` operations in the given `with` statement.
 pub(super) fn find_file_opens<'a>(
-    with: &'a ast::StmtWith,
+    with: flat::View<'a, ast::StmtWith>,
     semantic: &'a SemanticModel<'a>,
     read_mode: bool,
     python_version: PythonVersion,
 ) -> Vec<FileOpen<'a>> {
-    with.items
+    with.items()
         .iter()
         .filter_map(|item| {
             find_file_open(item, with, semantic, read_mode, python_version)
@@ -193,12 +193,12 @@ pub(super) fn find_file_opens<'a>(
 }
 
 fn resolve_file_open<'a>(
-    item: &'a ast::WithItem,
-    with: &'a ast::StmtWith,
+    item: flat::View<'a, ast::WithItem>,
+    with: flat::View<'a, ast::StmtWith>,
     semantic: &'a SemanticModel<'a>,
     read_mode: bool,
     mode: OpenMode,
-    keywords: Vec<&'a ast::Keyword>,
+    keywords: Vec<flat::View<'a, ast::Keyword>>,
     argument: OpenArgument<'a>,
 ) -> Option<FileOpen<'a>> {
     match mode {
@@ -218,9 +218,9 @@ fn resolve_file_open<'a>(
         return None;
     }
 
-    let var = item.optional_vars.as_deref()?.as_name_expr()?;
+    let var = item.optional_vars()?.as_name_expr()?;
     let scope = semantic.current_scope();
-    let binding = scope.get_all(var.id.as_str()).find_map(|id| {
+    let binding = scope.get_all(var.id().as_str()).find_map(|id| {
         let binding = semantic.binding(id);
         (binding.range() == var.range()).then_some(binding)
     })?;
@@ -252,24 +252,24 @@ fn resolve_file_open<'a>(
 
 /// Find `open` operation in the given `with` item.
 fn find_file_open<'a>(
-    item: &'a ast::WithItem,
-    with: &'a ast::StmtWith,
+    item: flat::View<'a, ast::WithItem>,
+    with: flat::View<'a, ast::StmtWith>,
     semantic: &'a SemanticModel<'a>,
     read_mode: bool,
     python_version: PythonVersion,
 ) -> Option<FileOpen<'a>> {
     // We want to match `open(...) as var`.
-    let ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
-    } = item.context_expr.as_call_expr()?;
+    let expr_call = item.context_expr().as_call_expr()?;
+    let func = expr_call.func();
+    let arguments = expr_call.arguments();
+    let args = arguments.args();
+    let keywords = arguments.keywords();
 
     // Ignore calls with `*args` and `**kwargs`. In the exact case of `open(*filename, mode="w")`,
     // it could be a match; but in all other cases, the call _could_ contain unsupported keyword
     // arguments, like `buffering`.
-    if args.iter().any(Expr::is_starred_expr)
-        || keywords.iter().any(|keyword| keyword.arg.is_none())
+    if args.iter().any(flat::View::is_starred_expr)
+        || keywords.iter().any(|keyword| keyword.arg().is_none())
     {
         return None;
     }
@@ -304,19 +304,19 @@ fn find_file_open<'a>(
 }
 
 fn find_path_open<'a>(
-    item: &'a ast::WithItem,
-    with: &'a ast::StmtWith,
+    item: flat::View<'a, ast::WithItem>,
+    with: flat::View<'a, ast::StmtWith>,
     semantic: &'a SemanticModel<'a>,
     read_mode: bool,
     python_version: PythonVersion,
 ) -> Option<FileOpen<'a>> {
-    let ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
-    } = item.context_expr.as_call_expr()?;
-    if args.iter().any(Expr::is_starred_expr)
-        || keywords.iter().any(|keyword| keyword.arg.is_none())
+    let expr_call = item.context_expr().as_call_expr()?;
+    let func = expr_call.func();
+    let arguments = expr_call.arguments();
+    let args = arguments.args();
+    let keywords = arguments.keywords();
+    if args.iter().any(flat::View::is_starred_expr)
+        || keywords.iter().any(|keyword| keyword.arg().is_none())
     {
         return None;
     }
@@ -342,17 +342,17 @@ fn find_path_open<'a>(
         read_mode,
         mode,
         keywords,
-        OpenArgument::Pathlib {
-            path: attr.value.as_ref(),
-        },
+        OpenArgument::Pathlib { path: attr.value() },
     )
 }
 
 /// Match positional arguments. Return expression for the file name and open mode.
-fn match_open_args(args: &[Expr]) -> Option<(&Expr, OpenMode)> {
+fn match_open_args(args: flat::NodeList<'_, Expr>) -> Option<(flat::View<'_, Expr>, OpenMode)> {
     match args {
-        [filename] => Some((filename, OpenMode::ReadText)),
-        [filename, mode_literal] => match_open_mode(mode_literal).map(|mode| (filename, mode)),
+        args if let Some([filename]) = args.as_array() => Some((filename, OpenMode::ReadText)),
+        args if let Some([filename, mode_literal]) = args.as_array() => {
+            match_open_mode(mode_literal).map(|mode| (filename, mode))
+        }
         // The third positional argument is `buffering` and the pathlib methods don't support it.
         _ => None,
     }
@@ -360,15 +360,15 @@ fn match_open_args(args: &[Expr]) -> Option<(&Expr, OpenMode)> {
 
 /// Match keyword arguments. Return keyword arguments to forward and mode.
 fn match_open_keywords(
-    keywords: &[ast::Keyword],
+    keywords: flat::NodeList<'_, ast::Keyword>,
     read_mode: bool,
     target_version: PythonVersion,
-) -> Option<(Vec<&ast::Keyword>, Option<OpenMode>)> {
-    let mut result: Vec<&ast::Keyword> = vec![];
+) -> Option<(Vec<flat::View<'_, ast::Keyword>>, Option<OpenMode>)> {
+    let mut result: Vec<flat::View<'_, ast::Keyword>> = vec![];
     let mut mode: Option<OpenMode> = None;
 
     for keyword in keywords {
-        match keyword.arg.as_ref()?.as_str() {
+        match keyword.arg()?.as_str() {
             "encoding" | "errors" => result.push(keyword),
             "newline" => {
                 if read_mode {
@@ -395,7 +395,7 @@ fn match_open_keywords(
             //
             // So, here we return None from this whole function if the mode
             // is incompatible.
-            "mode" => mode = Some(match_open_mode(&keyword.value)?),
+            "mode" => mode = Some(match_open_mode(keyword.value())?),
 
             // All other keywords cannot be directly forwarded.
             _ => return None,
@@ -405,10 +405,10 @@ fn match_open_keywords(
 }
 
 /// Match open mode to see if it is supported.
-fn match_open_mode(mode: &Expr) -> Option<OpenMode> {
+fn match_open_mode(mode: flat::View<'_, Expr>) -> Option<OpenMode> {
     let mode = mode.as_string_literal_expr()?.as_single_part_string()?;
 
-    match &*mode.value {
+    match mode.value() {
         "r" => Some(OpenMode::ReadText),
         "rb" => Some(OpenMode::ReadBytes),
         "w" => Some(OpenMode::WriteText),
@@ -434,15 +434,14 @@ fn match_open_mode(mode: &Expr) -> Option<OpenMode> {
 /// - `for x in lambda: 0: ...`              ->  `"(lambda: 0)"`
 /// - `for x in (1,) if True else (2,): ...` ->  `"((1,) if True else (2,))"`
 pub(crate) fn parenthesize_loop_iter_if_necessary<'a>(
-    for_stmt: &'a ast::StmtFor,
+    for_stmt: flat::View<'a, ast::StmtFor>,
     checker: &'a Checker,
     location: IterLocation,
 ) -> (Cow<'a, str>, TextRange) {
     let locator = checker.locator();
-    let iter = for_stmt.iter.as_ref();
+    let iter = for_stmt.iter();
 
-    let original_parenthesized_range =
-        parenthesized_range(iter.into(), for_stmt.into(), checker.tokens());
+    let original_parenthesized_range = parenthesized_range(iter, for_stmt.into(), checker.tokens());
 
     if let Some(range) = original_parenthesized_range {
         return (Cow::Borrowed(locator.slice(range)), range);
@@ -450,9 +449,13 @@ pub(crate) fn parenthesize_loop_iter_if_necessary<'a>(
 
     let iter_in_source = locator.slice(iter);
 
-    let contents = match iter {
-        Expr::Tuple(tuple) if !tuple.parenthesized => Cow::Owned(format!("({iter_in_source})")),
-        Expr::Lambda(_) | Expr::If(_) if matches!(location, IterLocation::Comprehension) => {
+    let contents = match iter.classify() {
+        flat::ExprKind::Tuple(tuple) if !tuple.parenthesized() => {
+            Cow::Owned(format!("({iter_in_source})"))
+        }
+        flat::ExprKind::Lambda(_) | flat::ExprKind::If(_)
+            if matches!(location, IterLocation::Comprehension) =>
+        {
             Cow::Owned(format!("({iter_in_source})"))
         }
         _ => Cow::Borrowed(iter_in_source),

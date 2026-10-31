@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::flat::{self, fields as ast};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -48,36 +48,37 @@ impl Violation for ContinueInFinally {
     }
 }
 
-fn traverse_body(checker: &Checker, body: &[Stmt]) {
+fn traverse_body(checker: &Checker, body: flat::Suite<'_>) {
     for stmt in body {
         if stmt.is_continue_stmt() {
             checker.report_diagnostic(ContinueInFinally, stmt.range());
         }
 
-        match stmt {
-            Stmt::If(ast::StmtIf {
+        match stmt.fields() {
+            ast::Stmt::If(ast::StmtIf {
                 body,
                 elif_else_clauses,
                 ..
             }) => {
                 traverse_body(checker, body);
                 for clause in elif_else_clauses {
-                    traverse_body(checker, &clause.body);
+                    traverse_body(checker, clause.body());
                 }
             }
-            Stmt::Try(ast::StmtTry { body, orelse, .. }) => {
+            ast::Stmt::Try(ast::StmtTry { body, orelse, .. }) => {
                 traverse_body(checker, body);
                 traverse_body(checker, orelse);
             }
-            Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
+            ast::Stmt::For(ast::StmtFor { orelse, .. })
+            | ast::Stmt::While(ast::StmtWhile { orelse, .. }) => {
                 traverse_body(checker, orelse);
             }
-            Stmt::With(ast::StmtWith { body, .. }) => {
+            ast::Stmt::With(ast::StmtWith { body, .. }) => {
                 traverse_body(checker, body);
             }
-            Stmt::Match(ast::StmtMatch { cases, .. }) => {
+            ast::Stmt::Match(ast::StmtMatch { cases, .. }) => {
                 for case in cases {
-                    traverse_body(checker, &case.body);
+                    traverse_body(checker, case.body());
                 }
             }
             _ => {}
@@ -86,6 +87,6 @@ fn traverse_body(checker: &Checker, body: &[Stmt]) {
 }
 
 /// PLE0116
-pub(crate) fn continue_in_finally(checker: &Checker, body: &[Stmt]) {
+pub(crate) fn continue_in_finally(checker: &Checker, body: flat::Suite<'_>) {
     traverse_body(checker, body);
 }

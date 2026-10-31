@@ -1,6 +1,7 @@
 use ruff_formatter::write;
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::PatternMatchStar;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::AnyNodeRef;
 
 use crate::comments::dangling_comments;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
@@ -10,8 +11,12 @@ use crate::prelude::*;
 pub struct FormatPatternMatchStar;
 
 impl FormatNodeRule<PatternMatchStar> for FormatPatternMatchStar {
-    fn fmt_fields(&self, item: &PatternMatchStar, f: &mut PyFormatter) -> FormatResult<()> {
-        let PatternMatchStar { name, .. } = item;
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, PatternMatchStar>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let name = item.name();
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
@@ -26,7 +31,7 @@ impl FormatNodeRule<PatternMatchStar> for FormatPatternMatchStar {
     }
 }
 
-impl NeedsParentheses for PatternMatchStar {
+impl NeedsParentheses for flat::View<'_, PatternMatchStar> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,

@@ -1,13 +1,14 @@
 use std::cmp::Ordering;
 use std::slice;
 
-use ruff_formatter::{
-    FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions, write,
-};
+use ruff_formatter::{FormatOwnedWithRule, FormatRule, FormatRuleWithOptions, write};
+use ruff_python_ast::flat::visitor::source_order::{SourceOrderVisitor, walk_expr};
 use ruff_python_ast::token::parentheses_iterator;
-use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, walk_expr};
-use ruff_python_ast::{self as ast};
-use ruff_python_ast::{AnyNodeRef, Expr, ExprRef, Operator};
+use ruff_python_ast::{
+    Expr, Operator,
+    flat::AnyNodeRef,
+    flat::{self, fields as ast},
+};
 use ruff_python_trivia::TriviaRanges;
 use ruff_text_size::Ranged;
 
@@ -63,7 +64,7 @@ pub struct FormatExpr {
     parentheses: Parentheses,
 }
 
-impl FormatRuleWithOptions<Expr, PyFormatContext<'_>> for FormatExpr {
+impl FormatRuleWithOptions<flat::View<'_, Expr>, PyFormatContext<'_>> for FormatExpr {
     type Options = Parentheses;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -72,47 +73,48 @@ impl FormatRuleWithOptions<Expr, PyFormatContext<'_>> for FormatExpr {
     }
 }
 
-impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
-    fn fmt(&self, expression: &Expr, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatRule<flat::View<'_, Expr>, PyFormatContext<'_>> for FormatExpr {
+    fn fmt(&self, expression: &flat::View<'_, Expr>, f: &mut PyFormatter) -> FormatResult<()> {
+        let expression = *expression;
         let parentheses = self.parentheses;
 
-        let format_expr = format_with(|f| match expression {
-            Expr::BoolOp(expr) => expr.format().fmt(f),
-            Expr::Named(expr) => expr.format().fmt(f),
-            Expr::BinOp(expr) => expr.format().fmt(f),
-            Expr::UnaryOp(expr) => expr.format().fmt(f),
-            Expr::Lambda(expr) => expr.format().fmt(f),
-            Expr::If(expr) => expr.format().fmt(f),
-            Expr::Dict(expr) => expr.format().fmt(f),
-            Expr::Set(expr) => expr.format().fmt(f),
-            Expr::ListComp(expr) => expr.format().fmt(f),
-            Expr::SetComp(expr) => expr.format().fmt(f),
-            Expr::DictComp(expr) => expr.format().fmt(f),
-            Expr::Generator(expr) => expr.format().fmt(f),
-            Expr::Await(expr) => expr.format().fmt(f),
-            Expr::Yield(expr) => expr.format().fmt(f),
-            Expr::YieldFrom(expr) => expr.format().fmt(f),
-            Expr::Compare(expr) => expr.format().fmt(f),
-            Expr::Call(expr) => expr.format().fmt(f),
-            Expr::FString(expr) => expr.format().fmt(f),
-            Expr::TString(expr) => expr.format().fmt(f),
-            Expr::StringLiteral(expr) => expr.format().fmt(f),
-            Expr::BytesLiteral(expr) => expr.format().fmt(f),
-            Expr::NumberLiteral(expr) => expr.format().fmt(f),
-            Expr::BooleanLiteral(expr) => expr.format().fmt(f),
-            Expr::NoneLiteral(expr) => expr.format().fmt(f),
-            Expr::EllipsisLiteral(expr) => expr.format().fmt(f),
-            Expr::Attribute(expr) => expr.format().fmt(f),
-            Expr::Subscript(expr) => expr.format().fmt(f),
-            Expr::Starred(expr) => expr.format().fmt(f),
-            Expr::Name(expr) => expr.format().fmt(f),
-            Expr::List(expr) => expr.format().fmt(f),
-            Expr::Tuple(expr) => expr.format().fmt(f),
-            Expr::Slice(expr) => expr.format().fmt(f),
-            Expr::IpyEscapeCommand(expr) => expr.format().fmt(f),
+        let format_expr = format_with(|f| match expression.classify() {
+            flat::ExprKind::BoolOp(expr) => expr.format().fmt(f),
+            flat::ExprKind::Named(expr) => expr.format().fmt(f),
+            flat::ExprKind::BinOp(expr) => expr.format().fmt(f),
+            flat::ExprKind::UnaryOp(expr) => expr.format().fmt(f),
+            flat::ExprKind::Lambda(expr) => expr.format().fmt(f),
+            flat::ExprKind::If(expr) => expr.format().fmt(f),
+            flat::ExprKind::Dict(expr) => expr.format().fmt(f),
+            flat::ExprKind::Set(expr) => expr.format().fmt(f),
+            flat::ExprKind::ListComp(expr) => expr.format().fmt(f),
+            flat::ExprKind::SetComp(expr) => expr.format().fmt(f),
+            flat::ExprKind::DictComp(expr) => expr.format().fmt(f),
+            flat::ExprKind::Generator(expr) => expr.format().fmt(f),
+            flat::ExprKind::Await(expr) => expr.format().fmt(f),
+            flat::ExprKind::Yield(expr) => expr.format().fmt(f),
+            flat::ExprKind::YieldFrom(expr) => expr.format().fmt(f),
+            flat::ExprKind::Compare(expr) => expr.format().fmt(f),
+            flat::ExprKind::Call(expr) => expr.format().fmt(f),
+            flat::ExprKind::FString(expr) => expr.format().fmt(f),
+            flat::ExprKind::TString(expr) => expr.format().fmt(f),
+            flat::ExprKind::StringLiteral(expr) => expr.format().fmt(f),
+            flat::ExprKind::BytesLiteral(expr) => expr.format().fmt(f),
+            flat::ExprKind::NumberLiteral(expr) => expr.format().fmt(f),
+            flat::ExprKind::BooleanLiteral(expr) => expr.format().fmt(f),
+            flat::ExprKind::NoneLiteral(expr) => expr.format().fmt(f),
+            flat::ExprKind::EllipsisLiteral(expr) => expr.format().fmt(f),
+            flat::ExprKind::Attribute(expr) => expr.format().fmt(f),
+            flat::ExprKind::Subscript(expr) => expr.format().fmt(f),
+            flat::ExprKind::Starred(expr) => expr.format().fmt(f),
+            flat::ExprKind::Name(expr) => expr.format().fmt(f),
+            flat::ExprKind::List(expr) => expr.format().fmt(f),
+            flat::ExprKind::Tuple(expr) => expr.format().fmt(f),
+            flat::ExprKind::Slice(expr) => expr.format().fmt(f),
+            flat::ExprKind::IpyEscapeCommand(expr) => expr.format().fmt(f),
         });
         let parenthesize = match parentheses {
-            Parentheses::Preserve => f.context().is_expression_parenthesized(expression.into()),
+            Parentheses::Preserve => f.context().is_expression_parenthesized(expression),
             Parentheses::Always => true,
             // Fluent style means we already have parentheses
             Parentheses::Never => false,
@@ -190,7 +192,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
 /// Style decision: When there are multiple nested parentheses around an expression, we consider the
 /// outermost parentheses the relevant ones and discard the others.
 fn format_with_parentheses_comments(
-    expression: &Expr,
+    expression: flat::View<'_, Expr>,
     node_comments: &LeadingDanglingTrailingComments,
     f: &mut PyFormatter,
 ) -> FormatResult<()> {
@@ -212,8 +214,7 @@ fn format_with_parentheses_comments(
     //     )
     // )
     // ```
-    let range_with_parens =
-        parentheses_iterator(expression.into(), None, f.context().tokens()).last();
+    let range_with_parens = parentheses_iterator(expression, None, f.context().tokens()).last();
 
     let (leading_split, trailing_split) = if let Some(range_with_parens) = range_with_parens {
         let leading_split = node_comments
@@ -256,40 +257,62 @@ fn format_with_parentheses_comments(
     // * the closing parenthesis
     // * outer trailing comments
 
-    let fmt_fields = format_with(|f| match expression {
-        Expr::BoolOp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::Named(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::BinOp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::UnaryOp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::Lambda(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::If(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::Dict(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::Set(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::ListComp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::SetComp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::DictComp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::Generator(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::Await(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::Yield(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::YieldFrom(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::Compare(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::Call(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::FString(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::TString(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::StringLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::BytesLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::NumberLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::BooleanLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::NoneLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::EllipsisLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::Attribute(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::Subscript(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::Starred(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::Name(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::List(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::Tuple(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::Slice(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::IpyEscapeCommand(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+    let fmt_fields = format_with(|f| match expression.classify() {
+        flat::ExprKind::BoolOp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::Named(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::BinOp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::UnaryOp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::Lambda(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::If(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::Dict(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::Set(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::ListComp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::SetComp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::DictComp(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::Generator(expr) => {
+            FormatNodeRule::fmt_fields(expr.format().rule(), expr, f)
+        }
+        flat::ExprKind::Await(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::Yield(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::YieldFrom(expr) => {
+            FormatNodeRule::fmt_fields(expr.format().rule(), expr, f)
+        }
+        flat::ExprKind::Compare(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::Call(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::FString(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::TString(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::StringLiteral(expr) => {
+            FormatNodeRule::fmt_fields(expr.format().rule(), expr, f)
+        }
+        flat::ExprKind::BytesLiteral(expr) => {
+            FormatNodeRule::fmt_fields(expr.format().rule(), expr, f)
+        }
+        flat::ExprKind::NumberLiteral(expr) => {
+            FormatNodeRule::fmt_fields(expr.format().rule(), expr, f)
+        }
+        flat::ExprKind::BooleanLiteral(expr) => {
+            FormatNodeRule::fmt_fields(expr.format().rule(), expr, f)
+        }
+        flat::ExprKind::NoneLiteral(expr) => {
+            FormatNodeRule::fmt_fields(expr.format().rule(), expr, f)
+        }
+        flat::ExprKind::EllipsisLiteral(expr) => {
+            FormatNodeRule::fmt_fields(expr.format().rule(), expr, f)
+        }
+        flat::ExprKind::Attribute(expr) => {
+            FormatNodeRule::fmt_fields(expr.format().rule(), expr, f)
+        }
+        flat::ExprKind::Subscript(expr) => {
+            FormatNodeRule::fmt_fields(expr.format().rule(), expr, f)
+        }
+        flat::ExprKind::Starred(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::Name(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::List(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::Tuple(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::Slice(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        flat::ExprKind::IpyEscapeCommand(expr) => {
+            FormatNodeRule::fmt_fields(expr.format().rule(), expr, f)
+        }
     });
 
     leading_comments(leading_outer).fmt(f)?;
@@ -322,7 +345,7 @@ fn format_with_parentheses_comments(
 /// indicates that it is okay to omit the parentheses. For example, parentheses can always be omitted for lists,
 /// because they already bring their own parentheses.
 pub(crate) fn maybe_parenthesize_expression<'a, T>(
-    expression: &'a Expr,
+    expression: flat::View<'a, Expr>,
     parent: T,
     parenthesize: Parenthesize,
 ) -> MaybeParenthesizeExpression<'a>
@@ -337,7 +360,7 @@ where
 }
 
 pub(crate) struct MaybeParenthesizeExpression<'a> {
-    expression: &'a Expr,
+    expression: flat::View<'a, Expr>,
     parent: AnyNodeRef<'a>,
     parenthesize: Parenthesize,
 }
@@ -350,9 +373,8 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             parenthesize,
         } = self;
 
-        let preserve_parentheses = parenthesize.is_optional()
-            && f.context()
-                .is_expression_parenthesized((*expression).into());
+        let preserve_parentheses =
+            parenthesize.is_optional() && f.context().is_expression_parenthesized(*expression);
 
         // If we want to preserve parentheses, short-circuit.
         if preserve_parentheses {
@@ -378,7 +400,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             _ if f.context().node_level().is_parenthesized() => {
                 return if matches!(parenthesize, Parenthesize::IfBreaksParenthesizedNested) {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
-                        .with_indent(!is_expression_huggable(expression, f.context()))
+                        .with_indent(!is_expression_huggable(*expression, f.context()))
                         .fmt(f)
                 } else {
                     expression.format().with_options(Parentheses::Never).fmt(f)
@@ -397,7 +419,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 | Parenthesize::IfBreaks
                 | Parenthesize::IfBreaksParenthesized
                 | Parenthesize::IfBreaksParenthesizedNested => {
-                    if can_omit_optional_parentheses(expression, f.context()) {
+                    if can_omit_optional_parentheses(*expression, f.context()) {
                         optional_parentheses(&unparenthesized).fmt(f)
                     } else {
                         parenthesize_if_expands(&unparenthesized).fmt(f)
@@ -408,7 +430,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 Parenthesize::IfBreaksParenthesized | Parenthesize::IfBreaksParenthesizedNested => {
                     // Can-omit layout is relevant for `"abcd".call`. We don't want to add unnecessary
                     // parentheses in this case.
-                    if can_omit_optional_parentheses(expression, f.context()) {
+                    if can_omit_optional_parentheses(*expression, f.context()) {
                         optional_parentheses(&unparenthesized).fmt(f)
                     } else {
                         parenthesize_if_expands(&unparenthesized).fmt(f)
@@ -446,60 +468,52 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
     }
 }
 
-impl NeedsParentheses for Expr {
+impl NeedsParentheses for flat::View<'_, Expr> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        match self {
-            Expr::BoolOp(expr) => expr.needs_parentheses(parent, context),
-            Expr::Named(expr) => expr.needs_parentheses(parent, context),
-            Expr::BinOp(expr) => expr.needs_parentheses(parent, context),
-            Expr::UnaryOp(expr) => expr.needs_parentheses(parent, context),
-            Expr::Lambda(expr) => expr.needs_parentheses(parent, context),
-            Expr::If(expr) => expr.needs_parentheses(parent, context),
-            Expr::Dict(expr) => expr.needs_parentheses(parent, context),
-            Expr::Set(expr) => expr.needs_parentheses(parent, context),
-            Expr::ListComp(expr) => expr.needs_parentheses(parent, context),
-            Expr::SetComp(expr) => expr.needs_parentheses(parent, context),
-            Expr::DictComp(expr) => expr.needs_parentheses(parent, context),
-            Expr::Generator(expr) => expr.needs_parentheses(parent, context),
-            Expr::Await(expr) => expr.needs_parentheses(parent, context),
-            Expr::Yield(expr) => expr.needs_parentheses(parent, context),
-            Expr::YieldFrom(expr) => expr.needs_parentheses(parent, context),
-            Expr::Compare(expr) => expr.needs_parentheses(parent, context),
-            Expr::Call(expr) => expr.needs_parentheses(parent, context),
-            Expr::FString(expr) => expr.needs_parentheses(parent, context),
-            Expr::TString(expr) => expr.needs_parentheses(parent, context),
-            Expr::StringLiteral(expr) => expr.needs_parentheses(parent, context),
-            Expr::BytesLiteral(expr) => expr.needs_parentheses(parent, context),
-            Expr::NumberLiteral(expr) => expr.needs_parentheses(parent, context),
-            Expr::BooleanLiteral(expr) => expr.needs_parentheses(parent, context),
-            Expr::NoneLiteral(expr) => expr.needs_parentheses(parent, context),
-            Expr::EllipsisLiteral(expr) => expr.needs_parentheses(parent, context),
-            Expr::Attribute(expr) => expr.needs_parentheses(parent, context),
-            Expr::Subscript(expr) => expr.needs_parentheses(parent, context),
-            Expr::Starred(expr) => expr.needs_parentheses(parent, context),
-            Expr::Name(expr) => expr.needs_parentheses(parent, context),
-            Expr::List(expr) => expr.needs_parentheses(parent, context),
-            Expr::Tuple(expr) => expr.needs_parentheses(parent, context),
-            Expr::Slice(expr) => expr.needs_parentheses(parent, context),
-            Expr::IpyEscapeCommand(expr) => expr.needs_parentheses(parent, context),
+        match self.classify() {
+            flat::ExprKind::BoolOp(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::Named(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::BinOp(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::UnaryOp(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::Lambda(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::If(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::Dict(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::Set(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::ListComp(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::SetComp(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::DictComp(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::Generator(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::Await(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::Yield(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::YieldFrom(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::Compare(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::Call(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::FString(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::TString(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::StringLiteral(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::BytesLiteral(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::NumberLiteral(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::BooleanLiteral(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::NoneLiteral(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::EllipsisLiteral(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::Attribute(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::Subscript(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::Starred(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::Name(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::List(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::Tuple(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::Slice(expr) => expr.needs_parentheses(parent, context),
+            flat::ExprKind::IpyEscapeCommand(expr) => expr.needs_parentheses(parent, context),
         }
     }
 }
 
-impl<'ast> AsFormat<PyFormatContext<'ast>> for Expr {
-    type Format<'a> = FormatRefWithRule<'a, Expr, FormatExpr, PyFormatContext<'ast>>;
-
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, FormatExpr::default())
-    }
-}
-
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
-    type Format = FormatOwnedWithRule<Expr, FormatExpr, PyFormatContext<'ast>>;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for flat::View<'_, Expr> {
+    type Format = FormatOwnedWithRule<Self, FormatExpr, PyFormatContext<'ast>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatExpr::default())
@@ -515,7 +529,10 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
 /// * The expression contains at least one parenthesized sub expression (optimization to avoid unnecessary work)
 ///
 /// This mimics Black's [`_maybe_split_omitting_optional_parens`](https://github.com/psf/black/blob/d1248ca9beaf0ba526d265f4108836d89cf551b7/src/black/linegen.py#L746-L820)
-pub(crate) fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool {
+pub(crate) fn can_omit_optional_parentheses(
+    expr: flat::View<'_, Expr>,
+    context: &PyFormatContext,
+) -> bool {
     let mut visitor = CanOmitOptionalParenthesesVisitor::new(context);
     visitor.visit_subexpression(expr);
 
@@ -581,7 +598,7 @@ pub(crate) fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatConte
         // ```
         true
     } else {
-        fn is_parenthesized(expr: &Expr, context: &PyFormatContext) -> bool {
+        fn is_parenthesized(expr: flat::View<'_, Expr>, context: &PyFormatContext) -> bool {
             // Don't break subscripts except in parenthesized context. It looks weird.
             !expr.is_subscript_expr()
                 && has_parentheses(expr, context).is_some_and(OwnParentheses::is_non_empty)
@@ -605,7 +622,7 @@ struct CanOmitOptionalParenthesesVisitor<'input> {
     max_precedence: OperatorPrecedence,
     max_precedence_count: u32,
     any_parenthesized_expressions: bool,
-    last: Option<&'input Expr>,
+    last: Option<flat::View<'input, Expr>>,
     first: First<'input>,
     context: &'input PyFormatContext<'input>,
 }
@@ -640,29 +657,26 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
     }
 
     // Visits a subexpression, ignoring whether it is parenthesized or not
-    fn visit_subexpression(&mut self, expr: &'input Expr) {
-        match expr {
-            Expr::Dict(_)
-            | Expr::List(_)
-            | Expr::Set(_)
-            | Expr::ListComp(_)
-            | Expr::SetComp(_)
-            | Expr::DictComp(_) => {
+    fn visit_subexpression(&mut self, expr: flat::View<'input, Expr>) {
+        match expr.classify() {
+            flat::ExprKind::Dict(_)
+            | flat::ExprKind::List(_)
+            | flat::ExprKind::Set(_)
+            | flat::ExprKind::ListComp(_)
+            | flat::ExprKind::SetComp(_)
+            | flat::ExprKind::DictComp(_) => {
                 self.any_parenthesized_expressions = true;
                 // The values are always parenthesized, don't visit.
                 return;
             }
 
-            Expr::Tuple(ast::ExprTuple {
-                parenthesized: true,
-                ..
-            }) => {
+            flat::ExprKind::Tuple(expr_tuple) if expr_tuple.parenthesized() => {
                 self.any_parenthesized_expressions = true;
                 // The values are always parenthesized, don't visit.
                 return;
             }
 
-            Expr::Generator(generator) if generator.parenthesized => {
+            flat::ExprKind::Generator(generator) if generator.parenthesized() => {
                 self.any_parenthesized_expressions = true;
                 // The values are always parenthesized, don't visit.
                 return;
@@ -671,24 +685,19 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             // It's impossible for a file smaller or equal to 4GB to contain more than 2^32 comparisons
             // because each comparison requires a left operand, and `n` `operands` and right sides.
             #[expect(clippy::cast_possible_truncation)]
-            Expr::BoolOp(ast::ExprBoolOp {
-                range: _,
-                node_index: _,
-                op: _,
-                values,
-            }) => self.update_max_precedence_with_count(
-                OperatorPrecedence::BooleanOperation,
-                values.len().saturating_sub(1) as u32,
-            ),
-            Expr::BinOp(ast::ExprBinOp {
-                op,
-                left: _,
-                right: _,
-                range: _,
-                node_index: _,
-            }) => self.update_max_precedence(OperatorPrecedence::from(*op)),
+            flat::ExprKind::BoolOp(expr_bool_op) => {
+                let values = expr_bool_op.values();
+                self.update_max_precedence_with_count(
+                    OperatorPrecedence::BooleanOperation,
+                    values.len().saturating_sub(1) as u32,
+                );
+            }
+            flat::ExprKind::BinOp(expr_bin_op) => {
+                let op = expr_bin_op.op();
+                self.update_max_precedence(OperatorPrecedence::from(op));
+            }
 
-            Expr::If(_) => {
+            flat::ExprKind::If(_) => {
                 // + 1 for the if and one for the else
                 self.update_max_precedence_with_count(OperatorPrecedence::Conditional, 2);
             }
@@ -696,30 +705,26 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             // It's impossible for a file smaller or equal to 4GB to contain more than 2^32 comparisons
             // because each comparison requires a left operand, and `n` `operands` and right sides.
             #[expect(clippy::cast_possible_truncation)]
-            Expr::Compare(ast::ExprCompare {
-                range: _,
-                node_index: _,
-                ops,
-                operands: _,
-            }) => {
+            flat::ExprKind::Compare(expr_compare) => {
+                let ops = expr_compare.ops();
+
                 self.update_max_precedence_with_count(
                     OperatorPrecedence::Comparator,
                     ops.len() as u32,
                 );
             }
-            Expr::Call(ast::ExprCall {
-                range_start: _,
-                node_index: _,
-                func,
-                arguments: _,
-            }) => {
+            flat::ExprKind::Call(expr_call) => {
+                let func = expr_call.func();
+
                 self.any_parenthesized_expressions = true;
                 // Only walk the function, the arguments are always parenthesized
                 self.visit_expr(func);
                 self.last = Some(expr);
                 return;
             }
-            Expr::Subscript(ast::ExprSubscript { value, .. }) => {
+            flat::ExprKind::Subscript(expr_subscript) => {
+                let value = expr_subscript.value();
+
                 self.any_parenthesized_expressions = true;
                 // Only walk the function, the subscript is always parenthesized
                 self.visit_expr(value);
@@ -729,13 +734,9 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             }
 
             // `[a, b].test.test[300].dot`
-            Expr::Attribute(ast::ExprAttribute {
-                range: _,
-                node_index: _,
-                value,
-                attr: _,
-                ctx: _,
-            }) => {
+            flat::ExprKind::Attribute(expr_attribute) => {
+                let value = expr_attribute.value();
+
                 self.visit_expr(value);
                 if has_parentheses(value, self.context).is_some() {
                     self.update_max_precedence(OperatorPrecedence::Attribute);
@@ -745,43 +746,40 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             }
 
             // Non terminal nodes that don't have a termination token.
-            Expr::Named(_) | Expr::Generator(_) | Expr::Tuple(_) => {}
+            flat::ExprKind::Named(_) | flat::ExprKind::Generator(_) | flat::ExprKind::Tuple(_) => {}
 
             // Expressions with sub expressions but a preceding token
             // Mark this expression as first expression and not the sub expression.
             // Visit the sub-expressions because the sub expressions may be the end of the entire expression.
-            Expr::UnaryOp(ast::ExprUnaryOp {
-                range: _,
-                node_index: _,
-                op,
-                operand: _,
-            }) => {
+            flat::ExprKind::UnaryOp(expr_unary_op) => {
+                let op = expr_unary_op.op();
+
                 if op.is_invert() {
                     self.update_max_precedence(OperatorPrecedence::BitwiseInversion);
                 }
                 self.first.set_if_none(First::Token);
             }
 
-            Expr::Lambda(_)
-            | Expr::Await(_)
-            | Expr::Yield(_)
-            | Expr::YieldFrom(_)
-            | Expr::Starred(_) => {
+            flat::ExprKind::Lambda(_)
+            | flat::ExprKind::Await(_)
+            | flat::ExprKind::Yield(_)
+            | flat::ExprKind::YieldFrom(_)
+            | flat::ExprKind::Starred(_) => {
                 self.first.set_if_none(First::Token);
             }
 
             // Terminal nodes or nodes that wrap a sub-expression (where the sub expression can never be at the end).
-            Expr::FString(_)
-            | Expr::TString(_)
-            | Expr::StringLiteral(_)
-            | Expr::BytesLiteral(_)
-            | Expr::NumberLiteral(_)
-            | Expr::BooleanLiteral(_)
-            | Expr::NoneLiteral(_)
-            | Expr::EllipsisLiteral(_)
-            | Expr::Name(_)
-            | Expr::Slice(_)
-            | Expr::IpyEscapeCommand(_) => {
+            flat::ExprKind::FString(_)
+            | flat::ExprKind::TString(_)
+            | flat::ExprKind::StringLiteral(_)
+            | flat::ExprKind::BytesLiteral(_)
+            | flat::ExprKind::NumberLiteral(_)
+            | flat::ExprKind::BooleanLiteral(_)
+            | flat::ExprKind::NoneLiteral(_)
+            | flat::ExprKind::EllipsisLiteral(_)
+            | flat::ExprKind::Name(_)
+            | flat::ExprKind::Slice(_)
+            | flat::ExprKind::IpyEscapeCommand(_) => {
                 return;
             }
         }
@@ -791,11 +789,11 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
 }
 
 impl<'input> SourceOrderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'input> {
-    fn visit_expr(&mut self, expr: &'input Expr) {
+    fn visit_expr(&mut self, expr: flat::View<'input, Expr>) {
         self.last = Some(expr);
 
         // Rule only applies for non-parenthesized expressions.
-        if self.context.is_expression_parenthesized(expr.into()) {
+        if self.context.is_expression_parenthesized(expr) {
             self.any_parenthesized_expressions = true;
         } else {
             self.visit_subexpression(expr);
@@ -812,7 +810,7 @@ enum First<'a> {
     /// Expression starts with a non-parentheses token. E.g. `not a`
     Token,
 
-    Expression(&'a Expr),
+    Expression(flat::View<'a, Expr>),
 }
 
 impl<'a> First<'a> {
@@ -823,7 +821,7 @@ impl<'a> First<'a> {
         }
     }
 
-    fn expression(self) -> Option<&'a Expr> {
+    fn expression(self) -> Option<flat::View<'a, Expr>> {
         match self {
             First::None | First::Token => None,
             First::Expression(expr) => Some(expr),
@@ -975,7 +973,7 @@ impl CallChainLayout {
     /// 3. If the root is parenthesized, add 1 to that value.
     /// 4. If the total is at least 2, return `Fluent`. Otherwise
     ///    return `NonFluent`
-    fn from_expression(mut expr: ExprRef, context: &PyFormatContext) -> Self {
+    fn from_expression(mut expr: flat::View<'_, Expr>, context: &PyFormatContext) -> Self {
         // TODO(dylan): Once the fluent layout preview style is
         // stabilized, see if it is possible to simplify some of
         // the logic around parenthesized roots. (While supporting
@@ -1022,23 +1020,26 @@ impl CallChainLayout {
         // our first break after this value.
         let mut root_value_parenthesized = false;
         loop {
-            match expr {
-                ExprRef::Attribute(ast::ExprAttribute { value, .. }) => {
+            match expr.fields() {
+                ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => {
                     // ```
                     // f().g
                     // ^^^ value
                     // data[:100].T
                     // ^^^^^^^^^^ value
                     // ```
-                    if context.is_expression_parenthesized(value.into()) {
+                    if context.is_expression_parenthesized(value) {
                         // `(a).b`. We preserve these parentheses so don't recurse
                         root_value_parenthesized = true;
                         break;
-                    } else if matches!(value.as_ref(), Expr::Call(_) | Expr::Subscript(_)) {
+                    } else if matches!(
+                        value.classify(),
+                        flat::ExprKind::Call(_) | flat::ExprKind::Subscript(_)
+                    ) {
                         computed_attribute_values_after_parentheses += 1;
                     }
 
-                    expr = ExprRef::from(value.as_ref());
+                    expr = value;
                 }
                 // ```
                 // f()
@@ -1048,12 +1049,12 @@ impl CallChainLayout {
                 // ^^^^^^^^^^ expr
                 // ^^^^ value
                 // ```
-                ExprRef::Call(ast::ExprCall { func: inner, .. })
-                | ExprRef::Subscript(ast::ExprSubscript { value: inner, .. }) => {
+                ast::Expr::Call(ast::ExprCall { func: inner, .. })
+                | ast::Expr::Subscript(ast::ExprSubscript { value: inner, .. }) => {
                     // We preserve these parentheses so don't recurse
                     // e.g. (a)[0].x().y().z()
                     //         ^stop here
-                    if context.is_expression_parenthesized(inner.into()) {
+                    if context.is_expression_parenthesized(inner) {
                         break;
                     }
 
@@ -1063,7 +1064,7 @@ impl CallChainLayout {
                         call_like_count += 1;
                     }
 
-                    expr = ExprRef::from(inner.as_ref());
+                    expr = inner;
                 }
                 _ => {
                     break;
@@ -1119,7 +1120,7 @@ impl CallChainLayout {
     /// formatting
     fn apply_in_node<'a>(
         self,
-        item: impl Into<ExprRef<'a>>,
+        item: impl Into<flat::View<'a, Expr>>,
         f: &mut PyFormatter,
     ) -> CallChainLayout {
         match self {
@@ -1159,7 +1160,10 @@ impl OwnParentheses {
 /// Differs from [`has_own_parentheses`] in that it returns [`OwnParentheses::NonEmpty`] for
 /// parenthesized expressions, like `(1)` or `([1])`, regardless of whether those expression have
 /// their _own_ parentheses.
-pub(crate) fn has_parentheses(expr: &Expr, context: &PyFormatContext) -> Option<OwnParentheses> {
+pub(crate) fn has_parentheses(
+    expr: flat::View<'_, Expr>,
+    context: &PyFormatContext,
+) -> Option<OwnParentheses> {
     let own_parentheses = has_own_parentheses(expr, context);
 
     // If the node has its own non-empty parentheses, we don't need to check for surrounding
@@ -1170,7 +1174,7 @@ pub(crate) fn has_parentheses(expr: &Expr, context: &PyFormatContext) -> Option<
 
     // Otherwise, if the node lacks parentheses (e.g., `(1)`) or only contains empty parentheses
     // (e.g., `([])`), we need to check for surrounding parentheses.
-    if context.is_expression_parenthesized(expr.into()) {
+    if context.is_expression_parenthesized(expr) {
         return Some(OwnParentheses::NonEmpty);
     }
 
@@ -1185,19 +1189,22 @@ pub(crate) fn has_parentheses(expr: &Expr, context: &PyFormatContext) -> Option<
 ///
 /// Parentheses are considered to be non-empty if they contain any elements or comments.
 pub(crate) fn has_own_parentheses(
-    expr: &Expr,
+    expr: flat::View<'_, Expr>,
     context: &PyFormatContext,
 ) -> Option<OwnParentheses> {
-    match expr {
+    match expr.fields() {
         // These expressions are always non-empty.
-        Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_) | Expr::Subscript(_) => {
-            Some(OwnParentheses::NonEmpty)
-        }
+        ast::Expr::ListComp(_)
+        | ast::Expr::SetComp(_)
+        | ast::Expr::DictComp(_)
+        | ast::Expr::Subscript(_) => Some(OwnParentheses::NonEmpty),
 
-        Expr::Generator(generator) if generator.parenthesized => Some(OwnParentheses::NonEmpty),
+        ast::Expr::Generator(ast::ExprGenerator {
+            node: generator, ..
+        }) if generator.parenthesized() => Some(OwnParentheses::NonEmpty),
 
         // These expressions must contain _some_ child or trivia token in order to be non-empty.
-        Expr::List(ast::ExprList { elts, .. }) | Expr::Set(ast::ExprSet { elts, .. }) => {
+        ast::Expr::List(ast::ExprList { elts, .. }) | ast::Expr::Set(ast::ExprSet { elts, .. }) => {
             if !elts.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
                 Some(OwnParentheses::NonEmpty)
             } else {
@@ -1205,27 +1212,26 @@ pub(crate) fn has_own_parentheses(
             }
         }
 
-        Expr::Tuple(
-            tuple @ ast::ExprTuple {
-                parenthesized: true,
-                ..
-            },
-        ) => {
-            if !tuple.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
+        ast::Expr::Tuple(ast::ExprTuple {
+            node: tuple,
+            parenthesized: true,
+            ..
+        }) => {
+            if !tuple.elts().is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
                 Some(OwnParentheses::NonEmpty)
             } else {
                 Some(OwnParentheses::Empty)
             }
         }
 
-        Expr::Dict(ast::ExprDict { items, .. }) => {
+        ast::Expr::Dict(ast::ExprDict { items, .. }) => {
             if !items.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
                 Some(OwnParentheses::NonEmpty)
             } else {
                 Some(OwnParentheses::Empty)
             }
         }
-        Expr::Call(ast::ExprCall { arguments, .. }) => {
+        ast::Expr::Call(ast::ExprCall { arguments, .. }) => {
             if !arguments.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
                 Some(OwnParentheses::NonEmpty)
             } else {
@@ -1264,43 +1270,51 @@ pub(crate) fn has_own_parentheses(
 ///     ]
 /// )
 /// ```
-pub(crate) fn is_expression_huggable(expr: &Expr, context: &PyFormatContext) -> bool {
-    match expr {
-        Expr::Tuple(_)
-        | Expr::List(_)
-        | Expr::Set(_)
-        | Expr::Dict(_)
-        | Expr::ListComp(_)
-        | Expr::SetComp(_)
-        | Expr::DictComp(_) => is_hug_parens_with_braces_and_square_brackets_enabled(context),
+pub(crate) fn is_expression_huggable(
+    expr: flat::View<'_, Expr>,
+    context: &PyFormatContext,
+) -> bool {
+    match expr.classify() {
+        flat::ExprKind::Tuple(_)
+        | flat::ExprKind::List(_)
+        | flat::ExprKind::Set(_)
+        | flat::ExprKind::Dict(_)
+        | flat::ExprKind::ListComp(_)
+        | flat::ExprKind::SetComp(_)
+        | flat::ExprKind::DictComp(_) => {
+            is_hug_parens_with_braces_and_square_brackets_enabled(context)
+        }
 
-        Expr::Starred(ast::ExprStarred { value, .. }) => is_expression_huggable(value, context),
+        flat::ExprKind::Starred(expr_starred) => {
+            let value = expr_starred.value();
+            is_expression_huggable(value, context)
+        }
 
-        Expr::BoolOp(_)
-        | Expr::Named(_)
-        | Expr::BinOp(_)
-        | Expr::UnaryOp(_)
-        | Expr::Lambda(_)
-        | Expr::If(_)
-        | Expr::Generator(_)
-        | Expr::Await(_)
-        | Expr::Yield(_)
-        | Expr::YieldFrom(_)
-        | Expr::Compare(_)
-        | Expr::Call(_)
-        | Expr::Attribute(_)
-        | Expr::Subscript(_)
-        | Expr::Name(_)
-        | Expr::Slice(_)
-        | Expr::IpyEscapeCommand(_)
-        | Expr::NumberLiteral(_)
-        | Expr::BooleanLiteral(_)
-        | Expr::NoneLiteral(_)
-        | Expr::StringLiteral(_)
-        | Expr::BytesLiteral(_)
-        | Expr::FString(_)
-        | Expr::TString(_)
-        | Expr::EllipsisLiteral(_) => false,
+        flat::ExprKind::BoolOp(_)
+        | flat::ExprKind::Named(_)
+        | flat::ExprKind::BinOp(_)
+        | flat::ExprKind::UnaryOp(_)
+        | flat::ExprKind::Lambda(_)
+        | flat::ExprKind::If(_)
+        | flat::ExprKind::Generator(_)
+        | flat::ExprKind::Await(_)
+        | flat::ExprKind::Yield(_)
+        | flat::ExprKind::YieldFrom(_)
+        | flat::ExprKind::Compare(_)
+        | flat::ExprKind::Call(_)
+        | flat::ExprKind::Attribute(_)
+        | flat::ExprKind::Subscript(_)
+        | flat::ExprKind::Name(_)
+        | flat::ExprKind::Slice(_)
+        | flat::ExprKind::IpyEscapeCommand(_)
+        | flat::ExprKind::NumberLiteral(_)
+        | flat::ExprKind::BooleanLiteral(_)
+        | flat::ExprKind::NoneLiteral(_)
+        | flat::ExprKind::StringLiteral(_)
+        | flat::ExprKind::BytesLiteral(_)
+        | flat::ExprKind::FString(_)
+        | flat::ExprKind::TString(_)
+        | flat::ExprKind::EllipsisLiteral(_) => false,
     }
 }
 
@@ -1348,72 +1362,88 @@ impl From<Operator> for OperatorPrecedence {
 /// Returns `true` if `expr` is an expression that can be split into multiple lines.
 ///
 /// Returns `false` for expressions that are guaranteed to never split.
-pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -> bool {
-    match expr {
+pub(crate) fn is_splittable_expression(
+    expr: flat::View<'_, Expr>,
+    context: &PyFormatContext,
+) -> bool {
+    match expr.fields() {
         // Single token expressions. They never have any split points.
-        Expr::Named(_)
-        | Expr::Name(_)
-        | Expr::NumberLiteral(_)
-        | Expr::BooleanLiteral(_)
-        | Expr::NoneLiteral(_)
-        | Expr::EllipsisLiteral(_)
-        | Expr::Slice(_)
-        | Expr::IpyEscapeCommand(_) => false,
+        ast::Expr::Named(_)
+        | ast::Expr::Name(_)
+        | ast::Expr::NumberLiteral(_)
+        | ast::Expr::BooleanLiteral(_)
+        | ast::Expr::NoneLiteral(_)
+        | ast::Expr::EllipsisLiteral(_)
+        | ast::Expr::Slice(_)
+        | ast::Expr::IpyEscapeCommand(_) => false,
 
         // Expressions that insert split points when parenthesized.
-        Expr::Compare(_)
-        | Expr::BinOp(_)
-        | Expr::BoolOp(_)
-        | Expr::If(_)
-        | Expr::Generator(_)
-        | Expr::Subscript(_)
-        | Expr::Await(_)
-        | Expr::ListComp(_)
-        | Expr::SetComp(_)
-        | Expr::DictComp(_)
-        | Expr::YieldFrom(_) => true,
+        ast::Expr::Compare(_)
+        | ast::Expr::BinOp(_)
+        | ast::Expr::BoolOp(_)
+        | ast::Expr::If(_)
+        | ast::Expr::Generator(_)
+        | ast::Expr::Subscript(_)
+        | ast::Expr::Await(_)
+        | ast::Expr::ListComp(_)
+        | ast::Expr::SetComp(_)
+        | ast::Expr::DictComp(_)
+        | ast::Expr::YieldFrom(_) => true,
 
         // Sequence types can split if they contain at least one element.
-        Expr::Tuple(tuple) => !tuple.is_empty(),
-        Expr::Dict(dict) => !dict.is_empty(),
-        Expr::Set(set) => !set.is_empty(),
-        Expr::List(list) => !list.is_empty(),
+        ast::Expr::Tuple(ast::ExprTuple { node: tuple, .. }) => !tuple.elts().is_empty(),
+        ast::Expr::Dict(ast::ExprDict { node: dict, .. }) => !dict.items().is_empty(),
+        ast::Expr::Set(ast::ExprSet { node: set, .. }) => !set.elts().is_empty(),
+        ast::Expr::List(ast::ExprList { node: list, .. }) => !list.elts().is_empty(),
 
-        Expr::UnaryOp(unary) => is_splittable_expression(unary.operand.as_ref(), context),
-        Expr::Yield(ast::ExprYield { value, .. }) => value.is_some(),
+        ast::Expr::UnaryOp(ast::ExprUnaryOp { node: unary, .. }) => {
+            is_splittable_expression(unary.operand(), context)
+        }
+        ast::Expr::Yield(ast::ExprYield { value, .. }) => value.is_some(),
 
-        Expr::Call(ast::ExprCall {
+        ast::Expr::Call(ast::ExprCall {
             arguments, func, ..
-        }) => !arguments.is_empty() || context.is_expression_parenthesized(func.as_ref().into()),
+        }) => !arguments.is_empty() || context.is_expression_parenthesized(func),
 
         // String like literals can expand if they are implicit concatenated.
-        Expr::FString(fstring) => fstring.value.is_implicit_concatenated(),
-        Expr::TString(tstring) => tstring.value.is_implicit_concatenated(),
-        Expr::StringLiteral(string) => string.value.is_implicit_concatenated(),
-        Expr::BytesLiteral(bytes) => bytes.value.is_implicit_concatenated(),
+        ast::Expr::FString(ast::ExprFString { node: fstring, .. }) => {
+            fstring.value().is_implicit_concatenated()
+        }
+        ast::Expr::TString(ast::ExprTString { node: tstring, .. }) => {
+            tstring.value().is_implicit_concatenated()
+        }
+        ast::Expr::StringLiteral(ast::ExprStringLiteral { node: string, .. }) => {
+            string.value().is_implicit_concatenated()
+        }
+        ast::Expr::BytesLiteral(ast::ExprBytesLiteral { node: bytes, .. }) => {
+            bytes.value().is_implicit_concatenated()
+        }
 
         // Expressions that have no split points per se, but they contain nested sub expressions that might expand.
-        Expr::Lambda(ast::ExprLambda {
+        ast::Expr::Lambda(ast::ExprLambda {
             body: expression, ..
         })
-        | Expr::Starred(ast::ExprStarred {
+        | ast::Expr::Starred(ast::ExprStarred {
             value: expression, ..
         })
-        | Expr::Attribute(ast::ExprAttribute {
+        | ast::Expr::Attribute(ast::ExprAttribute {
             value: expression, ..
         }) => {
-            context.is_expression_parenthesized(expression.into())
-                || is_splittable_expression(expression.as_ref(), context)
+            context.is_expression_parenthesized(expression)
+                || is_splittable_expression(expression, context)
         }
     }
 }
 
 /// Returns `true` if `expr` is invalid in a type-expression position unless the source keeps it
 /// parenthesized.
-pub(crate) const fn is_invalid_type_expression(expr: &Expr) -> bool {
+pub(crate) fn is_invalid_type_expression(expr: flat::View<'_, Expr>) -> bool {
     matches!(
-        expr,
-        Expr::Named(_) | Expr::Await(_) | Expr::Yield(_) | Expr::YieldFrom(_)
+        expr.classify(),
+        flat::ExprKind::Named(_)
+            | flat::ExprKind::Await(_)
+            | flat::ExprKind::Yield(_)
+            | flat::ExprKind::YieldFrom(_)
     )
 }
 
@@ -1425,49 +1455,60 @@ pub(crate) const fn is_invalid_type_expression(expr: &Expr) -> bool {
 ///
 /// Parenthesized expressions are treated as belonging to the enclosing expression. Therefore, the left
 /// most expression for `(a + b) * c` is `a + b` and not `a`.
-pub(crate) fn left_most<'expr>(expression: &'expr Expr, trivia: &TriviaRanges) -> &'expr Expr {
+pub(crate) fn left_most<'expr>(
+    expression: flat::View<'expr, Expr>,
+    trivia: &TriviaRanges,
+) -> flat::View<'expr, Expr> {
     let mut current = expression;
     loop {
-        let left = match current {
-            Expr::BinOp(ast::ExprBinOp { left, .. })
-            | Expr::If(ast::ExprIf { body: left, .. })
-            | Expr::Call(ast::ExprCall { func: left, .. })
-            | Expr::Attribute(ast::ExprAttribute { value: left, .. })
-            | Expr::Subscript(ast::ExprSubscript { value: left, .. }) => Some(&**left),
+        let left = match current.fields() {
+            ast::Expr::BinOp(ast::ExprBinOp { left, .. })
+            | ast::Expr::If(ast::ExprIf { body: left, .. })
+            | ast::Expr::Call(ast::ExprCall { func: left, .. })
+            | ast::Expr::Attribute(ast::ExprAttribute { value: left, .. })
+            | ast::Expr::Subscript(ast::ExprSubscript { value: left, .. }) => Some(left),
 
-            Expr::BoolOp(expr_bool_op) => expr_bool_op.values.first(),
-            Expr::Compare(compare) => Some(compare.first_operand()),
+            ast::Expr::BoolOp(ast::ExprBoolOp {
+                node: expr_bool_op, ..
+            }) => expr_bool_op.values().first(),
+            ast::Expr::Compare(ast::ExprCompare { node: compare, .. }) => {
+                Some(compare.first_operand())
+            }
 
-            Expr::Generator(generator) if !generator.parenthesized => Some(&*generator.elt),
+            ast::Expr::Generator(ast::ExprGenerator {
+                node: generator, ..
+            }) if !generator.parenthesized() => Some(generator.elt()),
 
-            Expr::Tuple(tuple) if !tuple.parenthesized => tuple.elts.first(),
-            Expr::Slice(slice) => slice.lower.as_deref(),
+            ast::Expr::Tuple(ast::ExprTuple { node: tuple, .. }) if !tuple.parenthesized() => {
+                tuple.elts().first()
+            }
+            ast::Expr::Slice(ast::ExprSlice { node: slice, .. }) => slice.lower(),
 
-            Expr::List(_)
-            | Expr::Tuple(_)
-            | Expr::Name(_)
-            | Expr::Starred(_)
-            | Expr::FString(_)
-            | Expr::TString(_)
-            | Expr::StringLiteral(_)
-            | Expr::BytesLiteral(_)
-            | Expr::NumberLiteral(_)
-            | Expr::BooleanLiteral(_)
-            | Expr::NoneLiteral(_)
-            | Expr::EllipsisLiteral(_)
-            | Expr::Yield(_)
-            | Expr::YieldFrom(_)
-            | Expr::Await(_)
-            | Expr::DictComp(_)
-            | Expr::SetComp(_)
-            | Expr::ListComp(_)
-            | Expr::Set(_)
-            | Expr::Dict(_)
-            | Expr::UnaryOp(_)
-            | Expr::Lambda(_)
-            | Expr::Named(_)
-            | Expr::IpyEscapeCommand(_)
-            | Expr::Generator(_) => None,
+            ast::Expr::List(_)
+            | ast::Expr::Tuple(_)
+            | ast::Expr::Name(_)
+            | ast::Expr::Starred(_)
+            | ast::Expr::FString(_)
+            | ast::Expr::TString(_)
+            | ast::Expr::StringLiteral(_)
+            | ast::Expr::BytesLiteral(_)
+            | ast::Expr::NumberLiteral(_)
+            | ast::Expr::BooleanLiteral(_)
+            | ast::Expr::NoneLiteral(_)
+            | ast::Expr::EllipsisLiteral(_)
+            | ast::Expr::Yield(_)
+            | ast::Expr::YieldFrom(_)
+            | ast::Expr::Await(_)
+            | ast::Expr::DictComp(_)
+            | ast::Expr::SetComp(_)
+            | ast::Expr::ListComp(_)
+            | ast::Expr::Set(_)
+            | ast::Expr::Dict(_)
+            | ast::Expr::UnaryOp(_)
+            | ast::Expr::Lambda(_)
+            | ast::Expr::Named(_)
+            | ast::Expr::IpyEscapeCommand(_)
+            | ast::Expr::Generator(_) => None,
         };
 
         let Some(left) = left else {

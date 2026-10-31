@@ -1,7 +1,10 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::{
+    ExprCall, Number,
+    flat::{self, fields as ast},
+};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
@@ -51,7 +54,7 @@ impl Violation for WeakCryptographicKey {
 }
 
 /// S505
-pub(crate) fn weak_cryptographic_key(checker: &Checker, call: &ExprCall) {
+pub(crate) fn weak_cryptographic_key(checker: &Checker, call: flat::View<'_, ExprCall>) {
     let Some((cryptographic_key, range)) = extract_cryptographic_key(checker, call) else {
         return;
     };
@@ -98,9 +101,9 @@ impl Display for CryptographicKey {
 
 fn extract_cryptographic_key(
     checker: &Checker,
-    call: &ExprCall,
+    call: flat::View<'_, ExprCall>,
 ) -> Option<(CryptographicKey, TextRange)> {
-    let qualified_name = checker.semantic().resolve_qualified_name(&call.func)?;
+    let qualified_name = checker.semantic().resolve_qualified_name(call.func())?;
     match qualified_name.segments() {
         [
             "cryptography",
@@ -119,8 +122,10 @@ fn extract_cryptographic_key(
                 Some((CryptographicKey::Rsa { key_size }, range))
             }
             "ec" => {
-                let argument = call.arguments.find_argument_value("curve", 0)?;
-                let ExprAttribute { attr, value, .. } = argument.as_attribute_expr()?;
+                let argument = call.arguments().find_argument_value("curve", 0)?;
+                let expr_attribute = argument.as_attribute_expr()?;
+                let attr = expr_attribute.attr();
+                let value = expr_attribute.value();
                 let qualified_name = checker.semantic().resolve_qualified_name(value)?;
                 if matches!(
                     qualified_name.segments(),
@@ -153,12 +158,16 @@ fn extract_cryptographic_key(
     }
 }
 
-fn extract_int_argument(call: &ExprCall, name: &str, position: usize) -> Option<(u16, TextRange)> {
-    let argument = call.arguments.find_argument_value(name, position)?;
-    let Expr::NumberLiteral(ast::ExprNumberLiteral {
-        value: ast::Number::Int(i),
+fn extract_int_argument(
+    call: flat::View<'_, ExprCall>,
+    name: &str,
+    position: usize,
+) -> Option<(u16, TextRange)> {
+    let argument = call.arguments().find_argument_value(name, position)?;
+    let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+        value: Number::Int(i),
         ..
-    }) = argument
+    }) = argument.fields()
     else {
         return None;
     };

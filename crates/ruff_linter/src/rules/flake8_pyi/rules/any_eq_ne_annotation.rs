@@ -1,4 +1,5 @@
 use ruff_python_ast::Parameters;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -63,16 +64,20 @@ impl AlwaysFixableViolation for AnyEqNeAnnotation {
 }
 
 /// PYI032
-pub(crate) fn any_eq_ne_annotation(checker: &Checker, name: &str, parameters: &Parameters) {
+pub(crate) fn any_eq_ne_annotation(
+    checker: &Checker,
+    name: &str,
+    parameters: flat::View<'_, Parameters>,
+) {
     if !matches!(name, "__eq__" | "__ne__") {
         return;
     }
 
-    if parameters.args.len() != 2 {
+    if parameters.args().len() != 2 {
         return;
     }
 
-    let Some(annotation) = &parameters.args[1].annotation() else {
+    let Some(annotation) = parameters.args().at(1).annotation() else {
         return;
     };
 

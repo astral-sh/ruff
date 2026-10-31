@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
+use ruff_python_ast::flat;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -27,7 +28,7 @@ impl Violation for GlobalAtModuleLevel {
 }
 
 /// PLW0604
-pub(crate) fn global_at_module_level(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn global_at_module_level(checker: &Checker, stmt: flat::View<'_, Stmt>) {
     if checker.semantic().current_scope().kind.is_module() {
         checker.report_diagnostic(GlobalAtModuleLevel, stmt.range());
     }

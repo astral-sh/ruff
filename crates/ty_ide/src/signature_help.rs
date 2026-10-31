@@ -12,9 +12,10 @@ use crate::docstring::Docstring;
 use crate::goto::docstring_for_call_definition;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
-use ruff_python_ast::find_node::covering_node;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::find_node::covering_node;
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::{self as ast, flat::AnyNodeRef};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextSize};
@@ -120,7 +121,7 @@ fn get_call_expr<'ast>(
     db: &dyn Db,
     parsed: &'ast ruff_db::parsed::ParsedModuleRef,
     offset: TextSize,
-) -> Option<(&'ast ast::ExprCall, usize)> {
+) -> Option<(flat::View<'ast, ast::ExprCall>, usize)> {
     let root_node: AnyNodeRef = parsed.syntax().into();
     let source = source_text(db, parsed.module().file());
     let line_range = source.line_range(offset);
@@ -172,7 +173,7 @@ fn get_call_expr<'ast>(
         .ok()?;
 
     // Get the function call expression.
-    let AnyNodeRef::ExprCall(call_expr) = call.node() else {
+    let flat::AnyKind::ExprCall(call_expr) = call.node().classify() else {
         return None;
     };
 
@@ -184,10 +185,10 @@ fn get_call_expr<'ast>(
 
 /// Determine which argument is associated with the specified offset.
 /// Returns zero if not within any argument.
-fn get_argument_index(call_expr: &ast::ExprCall, offset: TextSize) -> usize {
+fn get_argument_index(call_expr: flat::View<'_, ast::ExprCall>, offset: TextSize) -> usize {
     let mut current_arg = 0;
 
-    for (i, arg) in call_expr.arguments.iter_source_order().enumerate() {
+    for (i, arg) in call_expr.arguments().iter_source_order().enumerate() {
         if offset <= arg.end() {
             return i;
         }

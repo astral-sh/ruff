@@ -1,8 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::helpers::ReturnStatementVisitor;
-use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::trailing_comment_start_offset;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{Expr, StmtFunctionDef};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -53,30 +53,26 @@ impl AlwaysFixableViolation for UselessReturn {
 /// PLR1711
 pub(crate) fn useless_return(
     checker: &Checker,
-    stmt: &Stmt,
-    body: &[Stmt],
-    returns: Option<&Expr>,
+    function: flat::View<'_, StmtFunctionDef>,
+    returns: Option<flat::View<'_, Expr>>,
 ) {
     // Skip functions that have a return annotation that is not `None`.
-    if !returns.is_none_or(Expr::is_none_literal_expr) {
+    if !returns.is_none_or(flat::View::is_none_literal_expr) {
         return;
     }
 
     // Find the last statement in the function.
+    let body = function.body();
     let Some(last_stmt) = body.last() else {
         // Skip empty functions.
         return;
     };
 
     // Verify that the last statement is a return statement.
-    let Stmt::Return(ast::StmtReturn {
-        value,
-        range: _,
-        node_index: _,
-    }) = &last_stmt
-    else {
+    let flat::StmtKind::Return(return_stmt) = last_stmt.classify() else {
         return;
     };
+    let value = return_stmt.value();
 
     // Skip functions that consist of a single return statement.
     if body.len() == 1 {
@@ -85,12 +81,8 @@ pub(crate) fn useless_return(
 
     // Skip functions that consist of a docstring and a return statement.
     if body.len() == 2 {
-        if let Stmt::Expr(ast::StmtExpr {
-            value,
-            range: _,
-            node_index: _,
-        }) = &body[0]
-        {
+        if let flat::StmtKind::Expr(expr_node) = body.at(0).classify() {
+            let value = expr_node.value();
             if value.is_string_literal_expr() {
                 return;
             }
@@ -98,16 +90,12 @@ pub(crate) fn useless_return(
     }
 
     // Verify that the return statement is either bare or returns `None`.
-    if !value
-        .as_ref()
-        .is_none_or(|expr| expr.is_none_literal_expr())
-    {
+    if !value.is_none_or(flat::View::is_none_literal_expr) {
         return;
     }
 
     // Finally: verify that there are no _other_ return statements in the function.
-    let mut visitor = ReturnStatementVisitor::default();
-    visitor.visit_body(body);
+    let visitor = ReturnStatementVisitor::for_function(function);
     if visitor.returns.len() > 1 {
         return;
     }
@@ -115,10 +103,15 @@ pub(crate) fn useless_return(
     let mut diagnostic = checker.report_diagnostic(UselessReturn, last_stmt.range());
 
     // Preserve a trailing comment on the same line as the `return` statement.
-    let edit = if let Some(index) = trailing_comment_start_offset(last_stmt, checker.source()) {
+    let edit = if let Some(index) = trailing_comment_start_offset(&last_stmt, checker.source()) {
         Edit::range_deletion(last_stmt.range().add_end(index))
     } else {
-        fix::edits::delete_stmt(last_stmt, Some(stmt), checker.locator(), checker.indexer())
+        fix::edits::delete_stmt(
+            last_stmt,
+            Some(function.into()),
+            checker.locator(),
+            checker.indexer(),
+        )
     };
 
     // Mark the fix as unsafe if it would still delete comments, e.g., inside a parenthesized

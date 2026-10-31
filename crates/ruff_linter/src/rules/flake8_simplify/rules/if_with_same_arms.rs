@@ -6,7 +6,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableStmt;
 use ruff_python_ast::stmt_if::{IfElifBranch, if_elif_branches};
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, flat};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
@@ -54,7 +54,7 @@ impl Violation for IfWithSameArms {
 }
 
 /// SIM114
-pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
+pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: flat::View<'_, ast::StmtIf>) {
     let mut branches_iter = if_elif_branches(stmt_if).peekable();
     while let Some(current_branch) = branches_iter.next() {
         let Some(following_branch) = branches_iter.peek() else {
@@ -108,7 +108,7 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
 
 /// Generate a [`Fix`] to merge two [`IfElifBranch`] branches.
 fn merge_branches(
-    stmt_if: &ast::StmtIf,
+    stmt_if: flat::View<'_, ast::StmtIf>,
     current_branch: &IfElifBranch,
     following_branch: &IfElifBranch,
     locator: &Locator,
@@ -128,19 +128,18 @@ fn merge_branches(
     );
 
     // If the following test isn't parenthesized, consider parenthesizing it.
-    let following_branch_test = if let Some(range) =
-        parenthesized_range(following_branch.test.into(), stmt_if.into(), tokens)
-    {
-        Cow::Borrowed(locator.slice(range))
-    } else if matches!(
-        following_branch.test,
-        Expr::Lambda(_) | Expr::Named(_) | Expr::If(_)
-    ) {
-        // If the following expressions binds more tightly than `or`, parenthesize it.
-        Cow::Owned(format!("({})", locator.slice(following_branch.test)))
-    } else {
-        Cow::Borrowed(locator.slice(following_branch.test))
-    };
+    let following_branch_test =
+        if let Some(range) = parenthesized_range(following_branch.test, stmt_if.into(), tokens) {
+            Cow::Borrowed(locator.slice(range))
+        } else if matches!(
+            following_branch.test.classify(),
+            flat::ExprKind::Lambda(_) | flat::ExprKind::Named(_) | flat::ExprKind::If(_)
+        ) {
+            // If the following expressions binds more tightly than `or`, parenthesize it.
+            Cow::Owned(format!("({})", locator.slice(following_branch.test)))
+        } else {
+            Cow::Borrowed(locator.slice(following_branch.test))
+        };
 
     let insertion_edit = Edit::insertion(
         format!(" or {following_branch_test}"),
@@ -151,19 +150,19 @@ fn merge_branches(
     //
     // For example, if the current test is `x if x else y`, we should parenthesize it to
     // `(x if x else y) or ...`.
-    let parenthesize_edit =
-        if matches!(
-            current_branch.test,
-            Expr::Lambda(_) | Expr::Named(_) | Expr::If(_)
-        ) && parenthesized_range(current_branch.test.into(), stmt_if.into(), tokens).is_none()
-        {
-            Some(Edit::range_replacement(
-                format!("({})", locator.slice(current_branch.test)),
-                current_branch.test.range(),
-            ))
-        } else {
-            None
-        };
+    let parenthesize_edit = if matches!(
+        current_branch.test.classify(),
+        flat::ExprKind::Lambda(_) | flat::ExprKind::Named(_) | flat::ExprKind::If(_)
+    ) && parenthesized_range(current_branch.test, stmt_if.into(), tokens)
+        .is_none()
+    {
+        Some(Edit::range_replacement(
+            format!("({})", locator.slice(current_branch.test)),
+            current_branch.test.range(),
+        ))
+    } else {
+        None
+    };
 
     Ok(Fix::safe_edits(
         deletion_edit,

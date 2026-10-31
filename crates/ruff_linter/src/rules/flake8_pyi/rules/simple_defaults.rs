@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::flat::{self, fields};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Operator, Parameters, Stmt, UnaryOp};
 use ruff_python_semantic::{ScopeKind, SemanticModel, analyze::class::is_enumeration};
@@ -291,26 +292,26 @@ fn is_allowed_math_attribute(qualified_name: &QualifiedName) -> bool {
 }
 
 fn is_valid_default_value_with_annotation(
-    default: &Expr,
+    default: flat::View<'_, Expr>,
     allow_container: bool,
     locator: &Locator,
     semantic: &SemanticModel,
 ) -> bool {
-    match default {
-        Expr::StringLiteral(_)
-        | Expr::BytesLiteral(_)
-        | Expr::NumberLiteral(_)
-        | Expr::BooleanLiteral(_)
-        | Expr::NoneLiteral(_)
-        | Expr::EllipsisLiteral(_) => {
+    match default.fields() {
+        fields::Expr::StringLiteral(_)
+        | fields::Expr::BytesLiteral(_)
+        | fields::Expr::NumberLiteral(_)
+        | fields::Expr::BooleanLiteral(_)
+        | fields::Expr::NoneLiteral(_)
+        | fields::Expr::EllipsisLiteral(_) => {
             return true;
         }
-        Expr::List(ast::ExprList { elts, .. })
-        | Expr::Tuple(ast::ExprTuple { elts, .. })
-        | Expr::Set(ast::ExprSet {
+        fields::Expr::List(fields::ExprList { elts, .. })
+        | fields::Expr::Tuple(fields::ExprTuple { elts, .. })
+        | fields::Expr::Set(fields::ExprSet {
             elts,
             range: _,
-            node_index: _,
+            node: _,
         }) => {
             return allow_container
                 && elts.len() <= 10
@@ -318,26 +319,31 @@ fn is_valid_default_value_with_annotation(
                     .iter()
                     .all(|e| is_valid_default_value_with_annotation(e, false, locator, semantic));
         }
-        Expr::Dict(dict) => {
+        fields::Expr::Dict(fields::ExprDict { node: dict, .. }) => {
             return allow_container
-                && dict.len() <= 10
-                && dict.iter().all(|ast::DictItem { key, value }| {
-                    key.as_ref().is_some_and(|key| {
-                        is_valid_default_value_with_annotation(key, false, locator, semantic)
-                    }) && is_valid_default_value_with_annotation(value, false, locator, semantic)
-                });
+                && dict.items().len() <= 10
+                && dict
+                    .items()
+                    .iter()
+                    .all(|flat::DictItemView { key, value }| {
+                        key.is_some_and(|key| {
+                            is_valid_default_value_with_annotation(key, false, locator, semantic)
+                        }) && is_valid_default_value_with_annotation(
+                            value, false, locator, semantic,
+                        )
+                    });
         }
-        Expr::UnaryOp(ast::ExprUnaryOp {
+        fields::Expr::UnaryOp(fields::ExprUnaryOp {
             op: UnaryOp::USub,
             operand,
             range: _,
-            node_index: _,
+            node: _,
         }) => {
-            match operand.as_ref() {
+            match operand.classify() {
                 // Ex) `-1`, `-3.14`, `2j`
-                Expr::NumberLiteral(_) => return true,
+                flat::ExprKind::NumberLiteral(_) => return true,
                 // Ex) `-math.inf`, `-math.pi`, etc.
-                Expr::Attribute(_)
+                flat::ExprKind::Attribute(_)
                     if semantic
                         .resolve_qualified_name(operand)
                         .as_ref()
@@ -348,46 +354,46 @@ fn is_valid_default_value_with_annotation(
                 _ => {}
             }
         }
-        Expr::BinOp(ast::ExprBinOp {
+        fields::Expr::BinOp(fields::ExprBinOp {
             left,
             op: Operator::Add | Operator::Sub,
             right,
             range: _,
-            node_index: _,
+            node: _,
         }) => {
             // Ex) `1 + 2j`, `1 - 2j`, `-1 - 2j`, `-1 + 2j`
-            if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+            if let fields::Expr::NumberLiteral(fields::ExprNumberLiteral {
                 value: ast::Number::Complex { .. },
                 ..
-            }) = right.as_ref()
+            }) = right.fields()
             {
                 // Ex) `1 + 2j`, `1 - 2j`
-                if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                if let fields::Expr::NumberLiteral(fields::ExprNumberLiteral {
                     value: ast::Number::Int(..) | ast::Number::Float(..),
                     ..
-                }) = left.as_ref()
+                }) = left.fields()
                 {
-                    return locator.slice(left.as_ref()).len() <= 10;
-                } else if let Expr::UnaryOp(ast::ExprUnaryOp {
+                    return locator.slice(left).len() <= 10;
+                } else if let fields::Expr::UnaryOp(fields::ExprUnaryOp {
                     op: UnaryOp::USub,
                     operand,
                     range: _,
-                    node_index: _,
-                }) = left.as_ref()
+                    node: _,
+                }) = left.fields()
                 {
                     // Ex) `-1 + 2j`, `-1 - 2j`
-                    if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    if let fields::Expr::NumberLiteral(fields::ExprNumberLiteral {
                         value: ast::Number::Int(..) | ast::Number::Float(..),
                         ..
-                    }) = operand.as_ref()
+                    }) = operand.fields()
                     {
-                        return locator.slice(operand.as_ref()).len() <= 10;
+                        return locator.slice(operand).len() <= 10;
                     }
                 }
             }
         }
         // Ex) `math.inf`, `sys.stdin`, etc.
-        Expr::Attribute(_)
+        fields::Expr::Attribute(_)
             if semantic
                 .resolve_qualified_name(default)
                 .as_ref()
@@ -401,30 +407,31 @@ fn is_valid_default_value_with_annotation(
 }
 
 /// Returns `true` if an [`Expr`] appears to be a valid PEP 604 union. (e.g. `int | None`)
-fn is_valid_pep_604_union(annotation: &Expr) -> bool {
+fn is_valid_pep_604_union(annotation: flat::View<'_, Expr>) -> bool {
     /// Returns `true` if an [`Expr`] appears to be a valid PEP 604 union member.
-    fn is_valid_pep_604_union_member(value: &Expr) -> bool {
-        match value {
-            Expr::BinOp(ast::ExprBinOp {
-                left,
-                op: Operator::BitOr,
-                right,
-                range: _,
-                node_index: _,
-            }) => is_valid_pep_604_union_member(left) && is_valid_pep_604_union_member(right),
-            Expr::Name(_) | Expr::Subscript(_) | Expr::Attribute(_) | Expr::NoneLiteral(_) => true,
+    fn is_valid_pep_604_union_member(value: flat::View<'_, Expr>) -> bool {
+        match value.classify() {
+            flat::ExprKind::BinOp(expr_bin_op) if expr_bin_op.op() == Operator::BitOr => {
+                let left = expr_bin_op.left();
+                let right = expr_bin_op.right();
+                is_valid_pep_604_union_member(left) && is_valid_pep_604_union_member(right)
+            }
+            flat::ExprKind::Name(_)
+            | flat::ExprKind::Subscript(_)
+            | flat::ExprKind::Attribute(_)
+            | flat::ExprKind::NoneLiteral(_) => true,
             _ => false,
         }
     }
 
     // The top-level expression must be a bit-or operation.
-    let Expr::BinOp(ast::ExprBinOp {
+    let fields::Expr::BinOp(fields::ExprBinOp {
         left,
         op: Operator::BitOr,
         right,
         range: _,
-        node_index: _,
-    }) = annotation
+        node: _,
+    }) = annotation.fields()
     else {
         return false;
     };
@@ -434,15 +441,15 @@ fn is_valid_pep_604_union(annotation: &Expr) -> bool {
 }
 
 /// Returns `true` if an [`Expr`] appears to be a valid default value without an annotation.
-fn is_valid_default_value_without_annotation(default: &Expr) -> bool {
+fn is_valid_default_value_without_annotation(default: flat::View<'_, Expr>) -> bool {
     matches!(
-        default,
-        Expr::Call(_)
-            | Expr::Name(_)
-            | Expr::Attribute(_)
-            | Expr::Subscript(_)
-            | Expr::EllipsisLiteral(_)
-            | Expr::NoneLiteral(_)
+        default.classify(),
+        flat::ExprKind::Call(_)
+            | flat::ExprKind::Name(_)
+            | flat::ExprKind::Attribute(_)
+            | flat::ExprKind::Subscript(_)
+            | flat::ExprKind::EllipsisLiteral(_)
+            | flat::ExprKind::NoneLiteral(_)
     ) || is_valid_pep_604_union(default)
 }
 
@@ -450,10 +457,11 @@ fn is_valid_default_value_without_annotation(default: &Expr) -> bool {
 /// call.
 ///
 /// See also [`ruff_python_semantic::analyze::typing::TypeVarLikeChecker::is_type_var_like_call`].
-fn is_type_var_like_call(expr: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+fn is_type_var_like_call(expr: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
+    let flat::ExprKind::Call(call_node) = expr.classify() else {
         return false;
     };
+    let func = call_node.func();
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| {
@@ -469,8 +477,9 @@ fn is_type_var_like_call(expr: &Expr, semantic: &SemanticModel) -> bool {
 
 /// Returns `true` if this is a "special" assignment which must have a value (e.g., an assignment to
 /// `__all__`).
-fn is_special_assignment(target: &Expr, semantic: &SemanticModel) -> bool {
-    if let Expr::Name(ast::ExprName { id, .. }) = target {
+fn is_special_assignment(target: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
+    if let flat::ExprKind::Name(name_node_view) = target.classify() {
+        let id = name_node_view.id();
         match id.as_str() {
             "__all__" => semantic.current_scope().kind.is_module(),
             "__match_args__" | "__slots__" => semantic.current_scope().kind.is_class(),
@@ -482,8 +491,15 @@ fn is_special_assignment(target: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// Returns `true` if this is an assignment to a simple `Final`-annotated variable.
-fn is_final_assignment(annotation: &Expr, value: &Expr, semantic: &SemanticModel) -> bool {
-    if matches!(value, Expr::Name(_) | Expr::Attribute(_)) {
+fn is_final_assignment(
+    annotation: flat::View<'_, Expr>,
+    value: flat::View<'_, Expr>,
+    semantic: &SemanticModel,
+) -> bool {
+    if matches!(
+        value.classify(),
+        flat::ExprKind::Name(_) | flat::ExprKind::Attribute(_)
+    ) {
         if semantic.match_typing_expr(annotation, "Final") {
             return true;
         }
@@ -496,7 +512,7 @@ fn is_final_assignment(annotation: &Expr, value: &Expr, semantic: &SemanticModel
 /// This is relatively conservative, as it's hard to reliably detect whether a right-hand side is a
 /// valid type alias. In particular, this function checks for uses of `typing.Any`, `None`,
 /// parameterized generics, and PEP 604-style unions.
-fn is_annotatable_type_alias(value: &Expr, semantic: &SemanticModel) -> bool {
+fn is_annotatable_type_alias(value: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
     if value.is_none_literal_expr() {
         if let ScopeKind::Class(class_def) = semantic.current_scope().kind {
             !is_enumeration(class_def, semantic)
@@ -511,7 +527,10 @@ fn is_annotatable_type_alias(value: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// PYI011
-pub(crate) fn typed_argument_simple_defaults(checker: &Checker, parameters: &Parameters) {
+pub(crate) fn typed_argument_simple_defaults(
+    checker: &Checker,
+    parameters: flat::View<'_, Parameters>,
+) {
     for parameter in parameters.iter_non_variadic_params() {
         let Some(default) = parameter.default() else {
             continue;
@@ -536,7 +555,7 @@ pub(crate) fn typed_argument_simple_defaults(checker: &Checker, parameters: &Par
 }
 
 /// PYI014
-pub(crate) fn argument_simple_defaults(checker: &Checker, parameters: &Parameters) {
+pub(crate) fn argument_simple_defaults(checker: &Checker, parameters: flat::View<'_, Parameters>) {
     for parameter in parameters.iter_non_variadic_params() {
         let Some(default) = parameter.default() else {
             continue;
@@ -561,8 +580,12 @@ pub(crate) fn argument_simple_defaults(checker: &Checker, parameters: &Parameter
 }
 
 /// PYI015
-pub(crate) fn assignment_default_in_stub(checker: &Checker, targets: &[Expr], value: &Expr) {
-    let [target] = targets else {
+pub(crate) fn assignment_default_in_stub(
+    checker: &Checker,
+    targets: flat::NodeList<'_, Expr>,
+    value: flat::View<'_, Expr>,
+) {
+    let Some([target]) = targets.as_array() else {
         return;
     };
     if !target.is_name_expr() {
@@ -591,9 +614,9 @@ pub(crate) fn assignment_default_in_stub(checker: &Checker, targets: &[Expr], va
 /// PYI015
 pub(crate) fn annotated_assignment_default_in_stub(
     checker: &Checker,
-    target: &Expr,
-    value: &Expr,
-    annotation: &Expr,
+    target: flat::View<'_, Expr>,
+    value: flat::View<'_, Expr>,
+    annotation: flat::View<'_, Expr>,
 ) {
     if checker
         .semantic()
@@ -622,13 +645,18 @@ pub(crate) fn annotated_assignment_default_in_stub(
 }
 
 /// PYI052
-pub(crate) fn unannotated_assignment_in_stub(checker: &Checker, targets: &[Expr], value: &Expr) {
-    let [target] = targets else {
+pub(crate) fn unannotated_assignment_in_stub(
+    checker: &Checker,
+    targets: flat::NodeList<'_, Expr>,
+    value: flat::View<'_, Expr>,
+) {
+    let Some([target]) = targets.as_array() else {
         return;
     };
-    let Expr::Name(ast::ExprName { id, .. }) = target else {
+    let flat::ExprKind::Name(name_node) = target.classify() else {
         return;
     };
+    let id = name_node.id();
     let semantic = checker.semantic();
     if is_special_assignment(target, semantic) {
         return;
@@ -657,10 +685,15 @@ pub(crate) fn unannotated_assignment_in_stub(checker: &Checker, targets: &[Expr]
 }
 
 /// PYI035
-pub(crate) fn unassigned_special_variable_in_stub(checker: &Checker, target: &Expr, stmt: &Stmt) {
-    let Expr::Name(ast::ExprName { id, .. }) = target else {
+pub(crate) fn unassigned_special_variable_in_stub(
+    checker: &Checker,
+    target: flat::View<'_, Expr>,
+    stmt: flat::View<'_, Stmt>,
+) {
+    let flat::ExprKind::Name(name_node) = target.classify() else {
         return;
     };
+    let id = name_node.id();
 
     if !is_special_assignment(target, checker.semantic()) {
         return;
@@ -675,14 +708,19 @@ pub(crate) fn unassigned_special_variable_in_stub(checker: &Checker, target: &Ex
 }
 
 /// PYI026
-pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, targets: &[Expr]) {
-    let [target] = targets else {
+pub(crate) fn type_alias_without_annotation(
+    checker: &Checker,
+    value: flat::View<'_, Expr>,
+    targets: flat::NodeList<'_, Expr>,
+) {
+    let Some([target]) = targets.as_array() else {
         return;
     };
 
-    let Expr::Name(ast::ExprName { id, .. }) = target else {
+    let flat::ExprKind::Name(name_node) = target.classify() else {
         return;
     };
+    let id = name_node.id();
 
     if !is_annotatable_type_alias(value, checker.semantic()) {
         return;
@@ -702,7 +740,7 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
         TypeAliasWithoutAnnotation {
             module,
             name: id.to_string(),
-            value: checker.generator().expr(value),
+            value: checker.generator().expr_view(value),
         },
         target.range(),
     );

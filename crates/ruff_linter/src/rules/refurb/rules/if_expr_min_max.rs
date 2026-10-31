@@ -1,7 +1,8 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::{self as ast, CmpOp, Expr};
+use ruff_python_ast::flat;
+use ruff_python_ast::{self as ast, CmpOp};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -86,8 +87,8 @@ impl Violation for IfExprMinMax {
 }
 
 /// FURB136
-pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
-    let Expr::Compare(compare) = if_exp.test.as_ref() else {
+pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: flat::View<'_, ast::ExprIf>) {
+    let flat::ExprKind::Compare(compare) = if_exp.test().classify() else {
         return;
     };
 
@@ -106,8 +107,8 @@ pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
         _ => return,
     };
 
-    let body_cmp = ComparableExpr::from(if_exp.body.as_ref());
-    let orelse_cmp = ComparableExpr::from(if_exp.orelse.as_ref());
+    let body_cmp = ComparableExpr::from(if_exp.body());
+    let orelse_cmp = ComparableExpr::from(if_exp.orelse());
     let left_cmp = ComparableExpr::from(left);
     let right_cmp = ComparableExpr::from(right);
 
@@ -126,8 +127,8 @@ pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
 
     let replacement = format!(
         "{min_max}({}, {})",
-        checker.generator().expr(arg1),
-        checker.generator().expr(arg2),
+        checker.generator().expr_view(arg1),
+        checker.generator().expr_view(arg2),
     );
 
     let mut diagnostic = checker.report_diagnostic(

@@ -1,9 +1,10 @@
+use ruff_python_ast::flat::fields;
 use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{Arguments, Expr, Int};
+use ruff_python_ast::{Arguments, Int, flat};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::{is_dict, is_list, is_set, is_tuple};
 
@@ -89,23 +90,27 @@ impl Violation for UnnecessaryEnumerate {
 }
 
 /// FURB148
-pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) {
+pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: flat::View<'_, ast::StmtFor>) {
     // Check the for statement is of the form `for x, y in func(...)`.
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = stmt_for.target.as_ref() else {
+    let flat::ExprKind::Tuple(tuple_node) = stmt_for.target().classify() else {
         return;
     };
-    let [index, value] = elts.as_slice() else {
+    let elts = tuple_node.elts();
+    let Some([index, value]) = elts.as_array() else {
         return;
     };
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = stmt_for.iter.as_ref()
-    else {
+    let flat::ExprKind::Call(call_node) = stmt_for.iter().classify() else {
         return;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
     // Get the first argument, which is the sequence to iterate over.
-    let Some(Expr::Name(sequence)) = arguments.args.first() else {
+    let Some(flat::ExprKind::Name(sequence)) = arguments
+        .args()
+        .first()
+        .map(flat::View::<ast::Expr>::classify)
+    else {
         return;
     };
 
@@ -135,14 +140,14 @@ pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) 
 
             // The index is unused, so replace with `for value in sequence`.
             let replace_iter =
-                Edit::range_replacement(sequence.id.to_string(), stmt_for.iter.range());
+                Edit::range_replacement(sequence.id().to_string(), stmt_for.iter().range());
             let replace_target = Edit::range_replacement(
                 pad(
                     checker.locator().slice(value).to_string(),
-                    stmt_for.target.range(),
+                    stmt_for.target().range(),
                     checker.locator(),
                 ),
-                stmt_for.target.range(),
+                stmt_for.target().range(),
             );
             diagnostic.set_fix(Fix::unsafe_edits(replace_iter, [replace_target]));
         }
@@ -181,25 +186,25 @@ pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) 
                 let start = arguments.find_argument_value("start", 1);
                 if start.is_none_or(|start| {
                     matches!(
-                        start,
-                        Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        start.fields(),
+                        fields::Expr::NumberLiteral(fields::ExprNumberLiteral {
                             value: ast::Number::Int(Int::ZERO),
                             ..
                         })
                     )
                 }) {
                     let replace_iter = Edit::range_replacement(
-                        generate_range_len_call(sequence.id.clone(), checker.generator()),
-                        stmt_for.iter.range(),
+                        generate_range_len_call(sequence.id().clone(), checker.generator()),
+                        stmt_for.iter().range(),
                     );
 
                     let replace_target = Edit::range_replacement(
                         pad(
                             checker.locator().slice(index).to_string(),
-                            stmt_for.target.range(),
+                            stmt_for.target().range(),
                             checker.locator(),
                         ),
-                        stmt_for.target.range(),
+                        stmt_for.target().range(),
                     );
 
                     diagnostic.set_fix(Fix::unsafe_edits(replace_iter, [replace_target]));
@@ -234,7 +239,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
         id: name,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     // Construct `len(name)`.
     let len = ast::ExprCall {
@@ -243,7 +248,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
                 id: Name::new_static("len"),
                 ctx: ast::ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
             }
             .into(),
         ),
@@ -251,10 +256,10 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
             args: [var.into()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         },
         range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     // Construct `range(len(name))`.
     let range = ast::ExprCall {
@@ -263,7 +268,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
                 id: Name::new_static("range"),
                 ctx: ast::ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
             }
             .into(),
         ),
@@ -271,16 +276,16 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
             args: [len.into()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         },
         range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(range.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     generator.stmt(&stmt.into())
 }

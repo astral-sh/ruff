@@ -5,8 +5,10 @@
 
 use crate::{Db, HasType, SemanticModel};
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_ast::{
-    self as ast, visitor::source_order, visitor::source_order::SourceOrderVisitor,
+    Alias, Comprehension, Expr, Parameter, ParameterWithDefault, Stmt, flat::visitor::source_order,
+    flat::visitor::source_order::SourceOrderVisitor,
 };
 use ty_python_core::ProgramFile;
 
@@ -29,8 +31,8 @@ impl<'db> PullTypesVisitor<'db> {
         }
     }
 
-    fn visit_target(&mut self, target: &ast::Expr) {
-        match target {
+    fn visit_target(&mut self, target: flat::View<'_, Expr>) {
+        match target.fields() {
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 for element in elts {
@@ -43,91 +45,94 @@ impl<'db> PullTypesVisitor<'db> {
 }
 
 impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
-        match stmt {
-            ast::Stmt::FunctionDef(function) => {
+    fn visit_stmt(&mut self, stmt: flat::View<'_, Stmt>) {
+        match stmt.classify() {
+            flat::StmtKind::FunctionDef(function) => {
                 let _ty = function.inferred_type(&self.model);
             }
-            ast::Stmt::ClassDef(class) => {
+            flat::StmtKind::ClassDef(class) => {
                 let _ty = class.inferred_type(&self.model);
             }
-            ast::Stmt::Assign(assign) => {
-                for target in &assign.targets {
+            flat::StmtKind::Assign(assign) => {
+                for target in assign.targets() {
                     self.visit_target(target);
                 }
-                self.visit_expr(&assign.value);
+                self.visit_expr(assign.value());
                 return;
             }
-            ast::Stmt::For(for_stmt) => {
-                self.visit_target(&for_stmt.target);
-                self.visit_expr(&for_stmt.iter);
-                self.visit_body(&for_stmt.body);
-                self.visit_body(&for_stmt.orelse);
+            flat::StmtKind::For(for_stmt) => {
+                self.visit_target(for_stmt.target());
+                self.visit_expr(for_stmt.iter());
+                self.visit_body(for_stmt.body());
+                self.visit_body(for_stmt.orelse());
                 return;
             }
-            ast::Stmt::With(with_stmt) => {
-                for item in &with_stmt.items {
-                    if let Some(target) = &item.optional_vars {
+            flat::StmtKind::With(with_stmt) => {
+                for item in with_stmt.items() {
+                    if let Some(target) = item.optional_vars() {
                         self.visit_target(target);
                     }
-                    self.visit_expr(&item.context_expr);
+                    self.visit_expr(item.context_expr());
                 }
 
-                self.visit_body(&with_stmt.body);
+                self.visit_body(with_stmt.body());
                 return;
             }
-            ast::Stmt::AnnAssign(_)
-            | ast::Stmt::Return(_)
-            | ast::Stmt::Delete(_)
-            | ast::Stmt::AugAssign(_)
-            | ast::Stmt::TypeAlias(_)
-            | ast::Stmt::While(_)
-            | ast::Stmt::If(_)
-            | ast::Stmt::Match(_)
-            | ast::Stmt::Raise(_)
-            | ast::Stmt::Try(_)
-            | ast::Stmt::Assert(_)
-            | ast::Stmt::Import(_)
-            | ast::Stmt::ImportFrom(_)
-            | ast::Stmt::Global(_)
-            | ast::Stmt::Nonlocal(_)
-            | ast::Stmt::Expr(_)
-            | ast::Stmt::Pass(_)
-            | ast::Stmt::Break(_)
-            | ast::Stmt::Continue(_)
-            | ast::Stmt::IpyEscapeCommand(_) => {}
+            flat::StmtKind::AnnAssign(_)
+            | flat::StmtKind::Return(_)
+            | flat::StmtKind::Delete(_)
+            | flat::StmtKind::AugAssign(_)
+            | flat::StmtKind::TypeAlias(_)
+            | flat::StmtKind::While(_)
+            | flat::StmtKind::If(_)
+            | flat::StmtKind::Match(_)
+            | flat::StmtKind::Raise(_)
+            | flat::StmtKind::Try(_)
+            | flat::StmtKind::Assert(_)
+            | flat::StmtKind::Import(_)
+            | flat::StmtKind::ImportFrom(_)
+            | flat::StmtKind::Global(_)
+            | flat::StmtKind::Nonlocal(_)
+            | flat::StmtKind::Expr(_)
+            | flat::StmtKind::Pass(_)
+            | flat::StmtKind::Break(_)
+            | flat::StmtKind::Continue(_)
+            | flat::StmtKind::IpyEscapeCommand(_) => {}
         }
 
         source_order::walk_stmt(self, stmt);
     }
 
-    fn visit_expr(&mut self, expr: &ast::Expr) {
+    fn visit_expr(&mut self, expr: flat::View<'_, Expr>) {
         let _ty = expr.inferred_type(&self.model);
 
         source_order::walk_expr(self, expr);
     }
 
-    fn visit_comprehension(&mut self, comprehension: &ast::Comprehension) {
-        self.visit_expr(&comprehension.iter);
-        self.visit_target(&comprehension.target);
-        for if_expr in &comprehension.ifs {
+    fn visit_comprehension(&mut self, comprehension: flat::View<'_, Comprehension>) {
+        self.visit_expr(comprehension.iter());
+        self.visit_target(comprehension.target());
+        for if_expr in comprehension.ifs() {
             self.visit_expr(if_expr);
         }
     }
 
-    fn visit_parameter(&mut self, parameter: &ast::Parameter) {
+    fn visit_parameter(&mut self, parameter: flat::View<'_, Parameter>) {
         let _ty = parameter.inferred_type(&self.model);
 
         source_order::walk_parameter(self, parameter);
     }
 
-    fn visit_parameter_with_default(&mut self, parameter_with_default: &ast::ParameterWithDefault) {
+    fn visit_parameter_with_default(
+        &mut self,
+        parameter_with_default: flat::View<'_, ParameterWithDefault>,
+    ) {
         let _ty = parameter_with_default.inferred_type(&self.model);
 
         source_order::walk_parameter_with_default(self, parameter_with_default);
     }
 
-    fn visit_alias(&mut self, alias: &ast::Alias) {
+    fn visit_alias(&mut self, alias: flat::View<'_, Alias>) {
         let _ty = alias.inferred_type(&self.model);
 
         source_order::walk_alias(self, alias);

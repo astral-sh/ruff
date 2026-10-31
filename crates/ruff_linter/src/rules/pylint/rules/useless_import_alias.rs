@@ -1,4 +1,5 @@
 use ruff_python_ast::Alias;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -69,11 +70,11 @@ impl Violation for UselessImportAlias {
 }
 
 /// PLC0414
-pub(crate) fn useless_import_alias(checker: &Checker, alias: &Alias) {
-    let Some(asname) = &alias.asname else {
+pub(crate) fn useless_import_alias(checker: &Checker, alias: flat::View<'_, Alias>) {
+    let Some(asname) = alias.asname() else {
         return;
     };
-    if alias.name.as_str() != asname.as_str() {
+    if alias.name().as_str() != asname.as_str() {
         return;
     }
 
@@ -87,7 +88,7 @@ pub(crate) fn useless_import_alias(checker: &Checker, alias: &Alias) {
     let required_import_conflict = checker
         .settings()
         .isort
-        .requires_module_import(alias.name.to_string(), Some(asname.to_string()));
+        .requires_module_import(alias.name().to_string(), Some(asname.to_string()));
     let mut diagnostic = checker.report_diagnostic(
         UselessImportAlias {
             required_import_conflict,
@@ -105,14 +106,14 @@ pub(crate) fn useless_import_alias(checker: &Checker, alias: &Alias) {
 /// PLC0414
 pub(crate) fn useless_import_from_alias(
     checker: &Checker,
-    alias: &Alias,
+    alias: flat::View<'_, Alias>,
     module: Option<&str>,
     level: u32,
 ) {
-    let Some(asname) = &alias.asname else {
+    let Some(asname) = alias.asname() else {
         return;
     };
-    if alias.name.as_str() != asname.as_str() {
+    if alias.name().as_str() != asname.as_str() {
         return;
     }
 
@@ -125,7 +126,7 @@ pub(crate) fn useless_import_from_alias(
     // See https://github.com/astral-sh/ruff/issues/14283
     let required_import_conflict = checker.settings().isort.requires_member_import(
         module.map(str::to_string),
-        alias.name.to_string(),
+        alias.name().to_string(),
         Some(asname.to_string()),
         level,
     );

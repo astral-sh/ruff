@@ -1,6 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtClassDef;
+use ruff_python_ast::flat;
 use ruff_python_semantic::analyze::class::is_enumeration;
+use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -61,7 +63,7 @@ impl Violation for DataclassEnum {
 }
 
 /// RUF049
-pub(crate) fn dataclass_enum(checker: &Checker, class_def: &StmtClassDef) {
+pub(crate) fn dataclass_enum(checker: &Checker, class_def: flat::View<'_, StmtClassDef>) {
     let semantic = checker.semantic();
 
     let Some((DataclassKind::Stdlib, decorator)) = dataclass_kind(class_def, semantic) else {
@@ -72,5 +74,5 @@ pub(crate) fn dataclass_enum(checker: &Checker, class_def: &StmtClassDef) {
         return;
     }
 
-    checker.report_diagnostic(DataclassEnum, decorator.range);
+    checker.report_diagnostic(DataclassEnum, decorator.range());
 }

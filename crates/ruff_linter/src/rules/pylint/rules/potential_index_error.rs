@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat::{self, fields};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -31,11 +32,16 @@ impl Violation for PotentialIndexError {
 }
 
 /// PLE0643
-pub(crate) fn potential_index_error(checker: &Checker, value: &Expr, slice: &Expr) {
+pub(crate) fn potential_index_error(
+    checker: &Checker,
+    value: flat::View<'_, Expr>,
+    slice: flat::View<'_, Expr>,
+) {
     // Determine the length of the sequence.
-    let length = match value {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
-            if elts.iter().any(Expr::is_starred_expr) {
+    let length = match value.fields() {
+        fields::Expr::Tuple(fields::ExprTuple { elts, .. })
+        | fields::Expr::List(fields::ExprList { elts, .. }) => {
+            if elts.iter().any(flat::View::is_starred_expr) {
                 return;
             }
             match i64::try_from(elts.len()) {
@@ -49,17 +55,17 @@ pub(crate) fn potential_index_error(checker: &Checker, value: &Expr, slice: &Exp
     };
 
     // Determine the index value.
-    let index = match slice {
-        Expr::NumberLiteral(ast::ExprNumberLiteral {
+    let index = match slice.fields() {
+        fields::Expr::NumberLiteral(fields::ExprNumberLiteral {
             value: ast::Number::Int(number_value),
             ..
         }) => number_value.as_i64(),
-        Expr::UnaryOp(ast::ExprUnaryOp {
+        fields::Expr::UnaryOp(fields::ExprUnaryOp {
             op: ast::UnaryOp::USub,
             operand,
             ..
-        }) => match operand.as_ref() {
-            Expr::NumberLiteral(ast::ExprNumberLiteral {
+        }) => match operand.fields() {
+            fields::Expr::NumberLiteral(fields::ExprNumberLiteral {
                 value: ast::Number::Int(number_value),
                 ..
             }) => number_value.as_i64().map(|number| -number),

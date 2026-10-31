@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::Stmt;
+use ruff_python_ast::flat;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -59,42 +60,38 @@ where
 }
 
 /// UP023
-pub(crate) fn deprecated_c_element_tree(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn deprecated_c_element_tree(checker: &Checker, stmt: flat::View<'_, Stmt>) {
     let preserves_laziness = checker
         .import_rewrite_preserves_laziness("xml.etree.cElementTree", "xml.etree.ElementTree");
-    match stmt {
-        Stmt::Import(ast::StmtImport {
-            names,
-            is_lazy,
-            range: _,
-            node_index: _,
-        }) => {
+    match stmt.classify() {
+        flat::StmtKind::Import(stmt_import) => {
+            let names = stmt_import.names();
+            let is_lazy = stmt_import.is_lazy();
+
             // Ex) `import xml.etree.cElementTree as ET`
             for name in names {
-                if &name.name == "xml.etree.cElementTree" && name.asname.is_some() {
-                    add_check_for_node(checker, name, *is_lazy || preserves_laziness);
+                if name.name() == "xml.etree.cElementTree" && name.asname().is_some() {
+                    add_check_for_node(checker, &name, is_lazy || preserves_laziness);
                 }
             }
         }
-        Stmt::ImportFrom(ast::StmtImportFrom {
-            module,
-            names,
-            level,
-            is_lazy,
-            range: _,
-            node_index: _,
-        }) => {
-            if *level > 0 {
+        flat::StmtKind::ImportFrom(stmt_import_from) => {
+            let module = stmt_import_from.module();
+            let names = stmt_import_from.names();
+            let level = stmt_import_from.level();
+            let is_lazy = stmt_import_from.is_lazy();
+
+            if level > 0 {
                 // Ex) `import .xml.etree.cElementTree as ET`
             } else if let Some(module) = module {
                 if module == "xml.etree.cElementTree" {
                     // Ex) `from xml.etree.cElementTree import XML`
-                    add_check_for_node(checker, stmt, *is_lazy || preserves_laziness);
+                    add_check_for_node(checker, &stmt, is_lazy || preserves_laziness);
                 } else if module == "xml.etree" {
                     // Ex) `from xml.etree import cElementTree as ET`
                     for name in names {
-                        if &name.name == "cElementTree" && name.asname.is_some() {
-                            add_check_for_node(checker, name, true);
+                        if name.name() == "cElementTree" && name.asname().is_some() {
+                            add_check_for_node(checker, &name, true);
                         }
                     }
                 }

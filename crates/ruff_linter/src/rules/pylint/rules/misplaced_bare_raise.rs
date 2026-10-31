@@ -1,6 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
-use ruff_text_size::Ranged;
+use ruff_python_ast::flat::fields;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -53,7 +52,7 @@ impl Violation for MisplacedBareRaise {
 }
 
 /// PLE0704
-pub(crate) fn misplaced_bare_raise(checker: &Checker, raise: &ast::StmtRaise) {
+pub(crate) fn misplaced_bare_raise(checker: &Checker, raise: &fields::StmtRaise<'_>) {
     if raise.exc.is_some() {
         return;
     }
@@ -66,5 +65,5 @@ pub(crate) fn misplaced_bare_raise(checker: &Checker, raise: &ast::StmtRaise) {
         return;
     }
 
-    checker.report_diagnostic(MisplacedBareRaise, raise.range());
+    checker.report_diagnostic(MisplacedBareRaise, raise.range);
 }

@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, StmtFor};
+use ruff_python_ast::flat::visitor::Visitor;
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{Expr, ExprName};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -47,55 +48,60 @@ impl AlwaysFixableViolation for UnnecessaryDictIndexLookup {
 }
 
 /// PLR1733
-pub(crate) fn unnecessary_dict_index_lookup(checker: &Checker, stmt_for: &StmtFor) {
-    let Some((dict_name, index_name, value_name)) = dict_items(&stmt_for.iter, &stmt_for.target)
+pub(crate) fn unnecessary_dict_index_lookup(checker: &Checker, stmt_for: &ast::StmtFor<'_>) {
+    let Some((dict_name, index_name, value_name)) = dict_items(stmt_for.iter, stmt_for.target)
     else {
         return;
     };
 
     let ranges = {
-        let mut visitor = SequenceIndexVisitor::new(&dict_name.id, &index_name.id, &value_name.id);
-        visitor.visit_body(&stmt_for.body);
+        let mut visitor =
+            SequenceIndexVisitor::new(dict_name.id(), index_name.id(), value_name.id());
+        visitor.visit_body(stmt_for.body);
         visitor.into_accesses()
     };
 
     for range in ranges {
         let mut diagnostic = checker.report_diagnostic(UnnecessaryDictIndexLookup, range);
         diagnostic.set_fix(Fix::safe_edits(
-            Edit::range_replacement(value_name.id.to_string(), range),
+            Edit::range_replacement(value_name.id().to_string(), range),
             [noop(index_name), noop(value_name)],
         ));
     }
 }
 
 /// PLR1733
-pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &Checker, expr: &Expr) {
-    let (elt, generators) = match expr {
-        Expr::Generator(ast::ExprGenerator {
+pub(crate) fn unnecessary_dict_index_lookup_comprehension(
+    checker: &Checker,
+    &expr: &flat::View<'_, Expr>,
+) {
+    let (elt, generators) = match expr.fields() {
+        ast::Expr::Generator(ast::ExprGenerator {
             elt, generators, ..
         })
-        | Expr::SetComp(ast::ExprSetComp {
+        | ast::Expr::SetComp(ast::ExprSetComp {
             elt, generators, ..
         })
-        | Expr::ListComp(ast::ExprListComp {
+        | ast::Expr::ListComp(ast::ExprListComp {
             elt, generators, ..
-        }) => (elt.as_ref(), generators.as_slice()),
-        Expr::DictComp(ast::ExprDictComp {
+        }) => (elt, generators),
+        ast::Expr::DictComp(ast::ExprDictComp {
             value, generators, ..
-        }) => (value.as_ref(), generators.as_ref()),
+        }) => (value, generators),
         _ => return,
     };
 
     for comp in generators {
-        let Some((dict_name, index_name, value_name)) = dict_items(&comp.iter, &comp.target) else {
+        let Some((dict_name, index_name, value_name)) = dict_items(comp.iter(), comp.target())
+        else {
             continue;
         };
 
         let ranges = {
             let mut visitor =
-                SequenceIndexVisitor::new(&dict_name.id, &index_name.id, &value_name.id);
+                SequenceIndexVisitor::new(dict_name.id(), index_name.id(), value_name.id());
             visitor.visit_expr(elt);
-            for expr in &comp.ifs {
+            for expr in comp.ifs() {
                 visitor.visit_expr(expr);
             }
             visitor.into_accesses()
@@ -104,7 +110,7 @@ pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &Checker, exp
         for range in ranges {
             let mut diagnostic = checker.report_diagnostic(UnnecessaryDictIndexLookup, range);
             diagnostic.set_fix(Fix::safe_edits(
-                Edit::range_replacement(value_name.id.to_string(), range),
+                Edit::range_replacement(value_name.id().to_string(), range),
                 [noop(index_name), noop(value_name)],
             ));
         }
@@ -112,46 +118,51 @@ pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &Checker, exp
 }
 
 fn dict_items<'a>(
-    call_expr: &'a Expr,
-    tuple_expr: &'a Expr,
-) -> Option<(&'a ast::ExprName, &'a ast::ExprName, &'a ast::ExprName)> {
-    let ast::ExprCall {
-        func, arguments, ..
-    } = call_expr.as_call_expr()?;
+    call_expr: flat::View<'a, Expr>,
+    tuple_expr: flat::View<'a, Expr>,
+) -> Option<(
+    flat::View<'a, ExprName>,
+    flat::View<'a, ExprName>,
+    flat::View<'a, ExprName>,
+)> {
+    let expr_call = call_expr.as_call_expr()?;
+    let func = expr_call.func();
+    let arguments = expr_call.arguments();
 
     if !arguments.is_empty() {
         return None;
     }
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+    let flat::ExprKind::Attribute(attribute) = func.classify() else {
         return None;
     };
+    let value = attribute.value();
+    let attr = attribute.attr();
     if attr != "items" {
         return None;
     }
 
-    let Expr::Name(dict_name) = value.as_ref() else {
+    let flat::ExprKind::Name(dict_name) = value.classify() else {
         return None;
     };
 
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = tuple_expr else {
+    let flat::ExprKind::Tuple(tuple) = tuple_expr.classify() else {
         return None;
     };
-    let [index, value] = elts.as_slice() else {
-        return None;
-    };
+    let elts = tuple.elts();
+    let [index, value] = elts.as_array()?;
 
     // Grab the variable names.
-    let Expr::Name(index_name) = index else {
+    let flat::ExprKind::Name(index_name) = index.classify() else {
         return None;
     };
 
-    let Expr::Name(value_name) = value else {
+    let flat::ExprKind::Name(value_name) = value.classify() else {
         return None;
     };
 
     // If either of the variable names are intentionally ignored by naming them `_`, then don't
     // emit.
-    if index_name.id == "_" || value_name.id == "_" {
+    if index_name.id() == "_" || value_name.id() == "_" {
         return None;
     }
 
@@ -159,6 +170,6 @@ fn dict_items<'a>(
 }
 
 /// Return a no-op edit for the given name.
-fn noop(name: &ast::ExprName) -> Edit {
-    Edit::range_replacement(name.id.to_string(), name.range())
+fn noop(name: flat::View<'_, ExprName>) -> Edit {
+    Edit::range_replacement(name.id().to_string(), name.range())
 }

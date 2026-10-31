@@ -1,5 +1,6 @@
 use ruff_formatter::{FormatRuleWithOptions, RemoveSoftLinesBuffer, format_args, write};
-use ruff_python_ast::{AnyNodeRef, Expr, ExprLambda};
+use ruff_python_ast::flat;
+use ruff_python_ast::{Expr, ExprLambda, flat::AnyNodeRef};
 use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
@@ -15,16 +16,13 @@ pub struct FormatExprLambda {
 }
 
 impl FormatNodeRule<ExprLambda> for FormatExprLambda {
-    fn fmt_fields(&self, item: &ExprLambda, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprLambda {
-            range: _,
-            node_index: _,
-            parameters,
-            body,
-        } = item;
-
-        let body = &**body;
-        let parameters = parameters.as_deref();
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, ExprLambda>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let parameters = item.parameters();
+        let body = item.body();
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
@@ -176,7 +174,7 @@ pub enum ExprLambdaLayout {
     Assignment,
 }
 
-impl FormatRuleWithOptions<ExprLambda, PyFormatContext<'_>> for FormatExprLambda {
+impl FormatRuleWithOptions<flat::View<'_, ExprLambda>, PyFormatContext<'_>> for FormatExprLambda {
     type Options = ExprLambdaLayout;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -185,7 +183,7 @@ impl FormatRuleWithOptions<ExprLambda, PyFormatContext<'_>> for FormatExprLambda
     }
 }
 
-impl NeedsParentheses for ExprLambda {
+impl NeedsParentheses for flat::View<'_, ExprLambda> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,
@@ -200,7 +198,7 @@ impl NeedsParentheses for ExprLambda {
 }
 
 struct FormatBody<'a> {
-    body: &'a Expr,
+    body: flat::View<'a, Expr>,
 
     /// Dangling comments attached to the lambda header that should be formatted with the body.
     ///
@@ -265,9 +263,8 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
             needs_parentheses,
         } = self;
 
-        let body = *body;
         let comments = f.context().comments().clone();
-        let body_comments = comments.leading_dangling_trailing(body);
+        let body_comments = comments.leading_dangling_trailing(*body);
 
         if !dangling_header_comments.is_empty() {
             // Split the dangling header comments into trailing comments formatted with the lambda
@@ -320,7 +317,7 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
             // )
             // ```
             let comments = f.context().comments();
-            if f.context().is_expression_parenthesized(body.into()) && comments.has_leading(body) {
+            if f.context().is_expression_parenthesized(*body) && comments.has_leading(*body) {
                 trailing_comments(dangling_header_comments).fmt(f)?;
 
                 // Note that `leading_body_comments` have already been formatted as part of
@@ -401,7 +398,10 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         //     ),
         // )
         // ```
-        else if matches!(body, Expr::Call(_) | Expr::Subscript(_)) {
+        else if matches!(
+            body.classify(),
+            flat::ExprKind::Call(_) | flat::ExprKind::Subscript(_)
+        ) {
             let unparenthesized = body.format().with_options(Parentheses::Never).memoized();
             if unparenthesized.inspect(f)?.will_break() {
                 expand_parent().fmt(f)?;
@@ -434,7 +434,7 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         //     zzzzzzzzzzzzzzzzzzzz
         // ]
         // ```
-        else if has_own_parentheses(body, f.context()).is_some() {
+        else if has_own_parentheses(*body, f.context()).is_some() {
             body.format().fmt(f)
         }
         // Finally, for expressions without their own parentheses, use

@@ -1,8 +1,9 @@
 use crate::codes::Category;
 use crate::preview::is_enumerate_for_loop_int_index_enabled;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
-use ruff_python_ast::{self as ast, Expr, Int, Number, Operator, Stmt};
+use ruff_python_ast::flat::statement_visitor::{StatementVisitor, walk_stmt};
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{ExprName, Int, Number, Operator, Stmt, StmtFor};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
@@ -58,20 +59,20 @@ impl Violation for EnumerateForLoop {
 }
 
 /// SIM113
-pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
+pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: flat::View<'_, StmtFor>) {
     // If the loop is async, abort.
-    if for_stmt.is_async {
+    if for_stmt.is_async() {
         return;
     }
 
     // If the loop contains a `continue`, abort.
     let mut visitor = LoopControlFlowVisitor::default();
-    visitor.visit_body(&for_stmt.body);
+    visitor.visit_body(for_stmt.body());
     if visitor.has_continue {
         return;
     }
 
-    for stmt in &for_stmt.body {
+    for stmt in for_stmt.body() {
         // Find the augmented assignment expression (e.g., `i += 1`).
         if let Some(index) = match_index_increment(stmt) {
             // Find the binding corresponding to the initialization (e.g., `i = 1`).
@@ -96,8 +97,8 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
                 continue;
             };
             if !(matches!(
-                value,
-                Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value.fields(),
+                ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: Number::Int(Int::ZERO),
                     ..
                 })
@@ -130,7 +131,7 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
                 let mut bindings = checker
                     .semantic()
                     .current_scope()
-                    .get_all(&index.id)
+                    .get_all(index.id())
                     .map(|id| checker.semantic().binding(id))
                     .filter(|binding| for_stmt.range().contains_range(binding.range()));
 
@@ -159,7 +160,7 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
 
             checker.report_diagnostic(
                 EnumerateForLoop {
-                    index: index.id.to_string(),
+                    index: index.id().to_string(),
                 },
                 stmt.range(),
             );
@@ -169,13 +170,13 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
 
 /// If the statement is an index increment statement (e.g., `i += 1`), return
 /// the name of the index variable.
-fn match_index_increment(stmt: &Stmt) -> Option<&ast::ExprName> {
-    let Stmt::AugAssign(ast::StmtAugAssign {
+fn match_index_increment(stmt: flat::View<'_, Stmt>) -> Option<flat::View<'_, ExprName>> {
+    let ast::Stmt::AugAssign(ast::StmtAugAssign {
         target,
         op: Operator::Add,
         value,
         ..
-    }) = stmt
+    }) = stmt.fields()
     else {
         return None;
     };
@@ -183,8 +184,8 @@ fn match_index_increment(stmt: &Stmt) -> Option<&ast::ExprName> {
     let name = target.as_name_expr()?;
 
     if matches!(
-        value.as_ref(),
-        Expr::NumberLiteral(ast::ExprNumberLiteral {
+        value.fields(),
+        ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: Number::Int(Int::ONE),
             ..
         })
@@ -201,10 +202,10 @@ struct LoopControlFlowVisitor {
 }
 
 impl StatementVisitor<'_> for LoopControlFlowVisitor {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
-        match stmt {
-            Stmt::Continue(_) => self.has_continue = true,
-            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
+    fn visit_stmt(&mut self, stmt: flat::View<'_, Stmt>) {
+        match stmt.classify() {
+            flat::StmtKind::Continue(_) => self.has_continue = true,
+            flat::StmtKind::FunctionDef(_) | flat::StmtKind::ClassDef(_) => {
                 // Don't recurse.
             }
             _ => walk_stmt(self, stmt),

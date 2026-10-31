@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
+use ruff_python_ast::flat::fields;
+use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext, flat};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -58,7 +59,7 @@ impl AlwaysFixableViolation for OSErrorAlias {
 }
 
 /// Return `true` if an [`Expr`] is an alias of `OSError`.
-fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
+fn is_alias(expr: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| {
@@ -73,7 +74,7 @@ fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].
-fn atom_diagnostic(checker: &Checker, target: &Expr) {
+fn atom_diagnostic(checker: &Checker, target: flat::View<'_, Expr>) {
     let mut diagnostic = checker.report_diagnostic(
         OSErrorAlias {
             name: UnqualifiedName::from_expr(target).map(|name| name.to_string()),
@@ -94,7 +95,11 @@ fn atom_diagnostic(checker: &Checker, target: &Expr) {
 }
 
 /// Create a [`Diagnostic`] for a tuple of expressions.
-fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
+fn tuple_diagnostic(
+    checker: &Checker,
+    tuple: flat::View<'_, ast::ExprTuple>,
+    aliases: &[flat::View<'_, Expr>],
+) {
     let Some(first_alias) = aliases.first() else {
         return;
     };
@@ -118,7 +123,7 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
                 if aliases.contains(&element) {
                     None
                 } else {
-                    Some(element.clone())
+                    Some(element.to_owned_node())
                 }
             })
             .collect();
@@ -132,7 +137,7 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
                 id: Name::new_static("OSError"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
             };
             remaining.insert(0, node.into());
         }
@@ -144,7 +149,7 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
                 elts: remaining,
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
                 parenthesized: true,
             };
             format!("({})", checker.generator().expr(&node.into()))
@@ -158,19 +163,26 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
 }
 
 /// UP024
-pub(crate) fn os_error_alias_handlers(checker: &Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn os_error_alias_handlers(
+    checker: &Checker,
+    handlers: flat::NodeList<'_, ExceptHandler>,
+) {
     for handler in handlers {
-        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) = handler;
-        let Some(expr) = type_.as_ref() else {
+        let fields::ExceptHandler::ExceptHandler(fields::ExceptHandlerExceptHandler {
+            type_, ..
+        }) = handler.fields();
+        let Some(expr) = type_ else {
             continue;
         };
-        match expr.as_ref() {
-            Expr::Name(_) | Expr::Attribute(_) if is_alias(expr, checker.semantic()) => {
+        match expr.classify() {
+            flat::ExprKind::Name(_) | flat::ExprKind::Attribute(_)
+                if is_alias(expr, checker.semantic()) =>
+            {
                 atom_diagnostic(checker, expr);
             }
-            Expr::Tuple(tuple) => {
+            flat::ExprKind::Tuple(tuple) => {
                 // List of aliases to replace with `OSError`.
-                let mut aliases: Vec<&Expr> = vec![];
+                let mut aliases: Vec<flat::View<'_, Expr>> = vec![];
                 for element in tuple {
                     if is_alias(element, checker.semantic()) {
                         aliases.push(element);
@@ -186,15 +198,18 @@ pub(crate) fn os_error_alias_handlers(checker: &Checker, handlers: &[ExceptHandl
 }
 
 /// UP024
-pub(crate) fn os_error_alias_call(checker: &Checker, func: &Expr) {
+pub(crate) fn os_error_alias_call(checker: &Checker, func: flat::View<'_, Expr>) {
     if is_alias(func, checker.semantic()) {
         atom_diagnostic(checker, func);
     }
 }
 
 /// UP024
-pub(crate) fn os_error_alias_raise(checker: &Checker, expr: &Expr) {
-    if matches!(expr, Expr::Name(_) | Expr::Attribute(_)) {
+pub(crate) fn os_error_alias_raise(checker: &Checker, expr: flat::View<'_, Expr>) {
+    if matches!(
+        expr.classify(),
+        flat::ExprKind::Name(_) | flat::ExprKind::Attribute(_)
+    ) {
         if is_alias(expr, checker.semantic()) {
             atom_diagnostic(checker, expr);
         }

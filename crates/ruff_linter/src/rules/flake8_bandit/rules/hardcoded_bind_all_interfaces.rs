@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, StringLike};
+use ruff_python_ast::flat::StringLikeKind;
+use ruff_python_ast::{self as ast, flat::StringLike};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -40,23 +41,25 @@ impl Violation for HardcodedBindAllInterfaces {
 
 /// S104
 pub(crate) fn hardcoded_bind_all_interfaces(checker: &Checker, string: StringLike) {
-    match string {
-        StringLike::String(ast::ExprStringLiteral { value, .. }) => {
+    match string.classify() {
+        StringLikeKind::String(expr_string_literal) => {
+            let value = expr_string_literal.value();
             if value == "0.0.0.0" {
                 checker.report_diagnostic(HardcodedBindAllInterfaces, string.range());
             }
         }
-        StringLike::FString(ast::ExprFString { value, .. }) => {
+        StringLikeKind::FString(expr_fstring) => {
+            let value = expr_fstring.value();
             for part in value {
                 match part {
-                    ast::FStringPartRef::Literal(literal) => {
-                        if &**literal == "0.0.0.0" {
+                    ast::flat::FStringPartView::Literal(literal) => {
+                        if literal.value() == "0.0.0.0" {
                             checker.report_diagnostic(HardcodedBindAllInterfaces, literal.range());
                         }
                     }
-                    ast::FStringPartRef::FString(f_string) => {
-                        for literal in f_string.elements.literals() {
-                            if &**literal == "0.0.0.0" {
+                    ast::flat::FStringPartView::FString(f_string) => {
+                        for literal in f_string.elements().literals() {
+                            if literal.value() == "0.0.0.0" {
                                 checker
                                     .report_diagnostic(HardcodedBindAllInterfaces, literal.range());
                             }
@@ -66,8 +69,8 @@ pub(crate) fn hardcoded_bind_all_interfaces(checker: &Checker, string: StringLik
             }
         }
 
-        StringLike::Bytes(_) => (),
+        StringLikeKind::Bytes(_) => (),
         // TODO(dylan): decide whether to trigger here
-        StringLike::TString(_) => (),
+        StringLikeKind::TString(_) => (),
     }
 }

@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, ExprCall};
+use ruff_python_ast::{Expr, ExprCall, flat};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
@@ -90,7 +90,7 @@ impl Violation for UnsafeMarkupUse {
 }
 
 /// S704
-pub(crate) fn unsafe_markup_call(checker: &Checker, call: &ExprCall) {
+pub(crate) fn unsafe_markup_call(checker: &Checker, call: flat::View<'_, ExprCall>) {
     if checker
         .settings()
         .flake8_bandit
@@ -106,7 +106,7 @@ pub(crate) fn unsafe_markup_call(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(&call.func) else {
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func()) else {
         return;
     };
 
@@ -134,20 +134,29 @@ fn is_markup_call(qualified_name: &QualifiedName, settings: &LinterSettings) -> 
         .any(|target| *qualified_name == target)
 }
 
-fn is_unsafe_call(call: &ExprCall, semantic: &SemanticModel, settings: &LinterSettings) -> bool {
+fn is_unsafe_call(
+    call: flat::View<'_, ExprCall>,
+    semantic: &SemanticModel,
+    settings: &LinterSettings,
+) -> bool {
     // technically this could be circumvented by using a keyword argument
     // but without type-inference we can't really know which keyword argument
     // corresponds to the first positional argument and either way it is
     // unlikely that someone will actually use a keyword argument here
     // TODO: Eventually we may want to allow dynamic values, as long as they
     //       have a __html__ attribute, since that is part of the API
-    matches!(&*call.arguments.args, [first] if !first.is_string_literal_expr() && !first.is_bytes_literal_expr() && !is_whitelisted_call(first, semantic, settings))
+    matches!(call.arguments().args().as_array(), Some([first]) if !first.is_string_literal_expr() && !first.is_bytes_literal_expr() && !is_whitelisted_call(first, semantic, settings))
 }
 
-fn is_whitelisted_call(expr: &Expr, semantic: &SemanticModel, settings: &LinterSettings) -> bool {
-    let Expr::Call(ExprCall { func, .. }) = expr else {
+fn is_whitelisted_call(
+    expr: flat::View<'_, Expr>,
+    semantic: &SemanticModel,
+    settings: &LinterSettings,
+) -> bool {
+    let flat::ExprKind::Call(call_node) = expr.classify() else {
         return false;
     };
+    let func = call_node.func();
 
     let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
         return false;

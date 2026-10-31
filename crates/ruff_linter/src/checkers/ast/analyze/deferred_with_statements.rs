@@ -1,5 +1,3 @@
-use ruff_python_ast::Stmt;
-
 use crate::{checkers::ast::Checker, codes::Rule, rules::refurb};
 
 /// Run lint rules over all deferred with-statements in the [`SemanticModel`].
@@ -10,7 +8,7 @@ pub(crate) fn deferred_with_statements(checker: &mut Checker) {
 
         let checker = &*checker;
 
-        let Stmt::With(stmt_with) = checker.semantic.current_statement() else {
+        let Some(stmt_with) = checker.semantic.current_statement().as_with_stmt() else {
             unreachable!("Expected Stmt::With");
         };
         if checker.is_rule_enabled(Rule::ReadWholeFile) {

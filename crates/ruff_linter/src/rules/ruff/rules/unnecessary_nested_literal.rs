@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{AnyNodeRef, Expr, ExprContext, ExprSubscript, ExprTuple};
+use ruff_python_ast::flat;
+use ruff_python_ast::{Expr, ExprContext, ExprSubscript, ExprTuple, flat::AnyNodeRef};
 use ruff_python_semantic::analyze::typing::traverse_literal;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -77,12 +78,15 @@ impl Violation for UnnecessaryNestedLiteral {
 }
 
 /// RUF041
-pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'a Expr) {
+pub(crate) fn unnecessary_nested_literal<'a>(
+    checker: &Checker,
+    &literal_expr: &flat::View<'a, Expr>,
+) {
     let mut is_nested = false;
 
     // Traverse the type expressions in the `Literal`.
     traverse_literal(
-        &mut |_: &'a Expr, parent: &'a Expr| {
+        &mut |_: flat::View<'a, Expr>, parent: flat::View<'a, Expr>| {
             // If the parent is not equal to the `literal_expr` then we know we are traversing recursively.
             if !AnyNodeRef::ptr_eq(parent.into(), literal_expr.into()) {
                 is_nested = true;
@@ -97,7 +101,7 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'
     }
 
     // Collect the literal nodes for the fix
-    let mut nodes: Vec<&Expr> = Vec::new();
+    let mut nodes: Vec<flat::View<'_, Expr>> = Vec::new();
 
     traverse_literal(
         &mut |expr, _| {
@@ -110,22 +114,22 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'
     let mut diagnostic = checker.report_diagnostic(UnnecessaryNestedLiteral, literal_expr.range());
 
     // Create a [`Fix`] that flattens all nodes.
-    if let Expr::Subscript(subscript) = literal_expr {
+    if let flat::ExprKind::Subscript(subscript) = literal_expr.classify() {
         let subscript = Expr::Subscript(ExprSubscript {
             slice: Box::new(if let [elt] = nodes.as_slice() {
-                (*elt).clone()
+                (elt).to_owned_node()
             } else {
                 Expr::Tuple(ExprTuple {
-                    elts: nodes.into_iter().cloned().collect(),
+                    elts: nodes.into_iter().map(flat::View::to_owned_node).collect(),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                     ctx: ExprContext::Load,
                     parenthesized: false,
                 })
             }),
-            value: subscript.value.clone(),
+            value: Box::new(subscript.value().to_owned_node()),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
             ctx: ExprContext::Load,
         });
         let fix = Fix::applicable_edit(

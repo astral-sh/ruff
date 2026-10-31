@@ -1,9 +1,12 @@
 use bitflags::bitflags;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{AnyParameterRef, Expr, ExprBinOp, Operator, PythonVersion, StmtFunctionDef};
+use ruff_python_ast::{
+    Expr, PythonVersion, StmtFunctionDef, flat::AnyParameter as AnyParameterRef,
+};
 use ruff_python_semantic::analyze::typing::traverse_union;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -11,7 +14,7 @@ use crate::preview::is_resolve_string_annotation_pyi041_enabled;
 use crate::rules::flake8_type_checking::helpers::is_singledispatch_implementation;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
-use super::generate_union_fix;
+use super::{generate_pep604_fix, generate_union_fix};
 
 /// ## What it does
 /// Checks for parameter annotations that contain redundant unions between
@@ -82,12 +85,15 @@ impl Violation for RedundantNumericUnion {
 }
 
 /// PYI041
-pub(crate) fn redundant_numeric_union(checker: &Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn redundant_numeric_union(
+    checker: &Checker,
+    function_def: flat::View<'_, StmtFunctionDef>,
+) {
     let skip_dispatch_annotation =
         is_singledispatch_implementation(function_def, checker.semantic());
 
     for annotation in function_def
-        .parameters
+        .parameters()
         .iter()
         .filter_map(AnyParameterRef::annotation)
         .skip(usize::from(skip_dispatch_annotation))
@@ -96,13 +102,13 @@ pub(crate) fn redundant_numeric_union(checker: &Checker, function_def: &StmtFunc
     }
 }
 
-fn check_annotation<'a, 'b>(checker: &Checker<'a>, unresolved_annotation: &'b Expr)
+fn check_annotation<'a, 'b>(checker: &Checker<'a>, unresolved_annotation: flat::View<'b, Expr>)
 where
     'a: 'b,
 {
     let mut numeric_flags = NumericFlags::empty();
 
-    let mut find_numeric_type = |expr: &Expr, _parent: &Expr| {
+    let mut find_numeric_type = |expr: flat::View<'_, Expr>, _parent: flat::View<'_, Expr>| {
         let Some(builtin_type) = checker.semantic().resolve_builtin_symbol(expr) else {
             return;
         };
@@ -113,24 +119,24 @@ where
     let annotation = map_maybe_stringized_annotation(checker, unresolved_annotation);
 
     // Traverse the union, and remember which numeric types are found.
-    traverse_union(&mut find_numeric_type, checker.semantic(), &annotation);
+    traverse_union(&mut find_numeric_type, checker.semantic(), *annotation);
 
     let Some(redundancy) = Redundancy::from_numeric_flags(numeric_flags) else {
         return;
     };
 
     // Traverse the union a second time to construct the fix.
-    let mut necessary_nodes: Vec<&Expr> = Vec::new();
+    let mut necessary_nodes: Vec<flat::View<'_, Expr>> = Vec::new();
 
     let mut union_type = UnionKind::TypingUnion;
-    let mut remove_numeric_type = |expr: &'b Expr, parent: &'b Expr| {
+    let mut remove_numeric_type = |expr: flat::View<'b, Expr>, parent: flat::View<'b, Expr>| {
         let Some(builtin_type) = checker.semantic().resolve_builtin_symbol(expr) else {
             // Keep type annotations that are not numeric.
             necessary_nodes.push(expr);
             return;
         };
 
-        if matches!(parent, Expr::BinOp(_)) {
+        if matches!(parent.classify(), flat::ExprKind::BinOp(_)) {
             union_type = UnionKind::PEP604;
         }
 
@@ -144,7 +150,7 @@ where
     };
 
     // Traverse the union a second time to construct a [`Fix`].
-    traverse_union(&mut remove_numeric_type, checker.semantic(), &annotation);
+    traverse_union(&mut remove_numeric_type, checker.semantic(), *annotation);
 
     let mut diagnostic =
         checker.report_diagnostic(RedundantNumericUnion { redundancy }, annotation.range());
@@ -174,20 +180,23 @@ where
         };
 
     // Generate the flattened fix once.
-    let fix = if let &[edit_expr] = necessary_nodes.as_slice() {
+    let fix = if let [edit_expr] = necessary_nodes.as_slice() {
         // Generate a [`Fix`] for a single type expression, e.g. `int`.
         Some(Fix::applicable_edit(
-            Edit::range_replacement(checker.generator().expr(edit_expr), annotation.range()),
+            Edit::range_replacement(
+                checker.generator().expr_view(*edit_expr),
+                annotation.range(),
+            ),
             applicability,
         ))
     } else {
         match union_type {
-            UnionKind::PEP604 => Some(generate_pep604_fix(
-                checker,
-                necessary_nodes,
-                &annotation,
+            UnionKind::PEP604 => generate_pep604_fix(
+                checker.generator(),
+                necessary_nodes.into_iter().map(flat::View::to_owned_node),
+                *annotation,
                 applicability,
-            )),
+            ),
             UnionKind::TypingUnion => {
                 let Some(importer) = checker.typing_importer("Union", PythonVersion::lowest())
                 else {
@@ -196,8 +205,11 @@ where
                 generate_union_fix(
                     checker.generator(),
                     &importer,
-                    necessary_nodes,
-                    &annotation,
+                    necessary_nodes
+                        .into_iter()
+                        .map(flat::View::to_owned_node)
+                        .collect(),
+                    *annotation,
                     applicability,
                 )
                 .ok()
@@ -217,7 +229,7 @@ where
 /// `foo: "typing.Any"` means the same thing to a type checker as `foo: typing.Any`.
 fn map_maybe_stringized_annotation<'a, 'b>(
     checker: &Checker<'a>,
-    expr: &'b Expr,
+    expr: flat::View<'b, Expr>,
 ) -> AnnotationKind<'b>
 where
     'a: 'b,
@@ -226,7 +238,7 @@ where
         return AnnotationKind::Simple(expr);
     }
 
-    if let Expr::StringLiteral(string_annotation) = expr
+    if let flat::ExprKind::StringLiteral(string_annotation) = expr.classify()
         && let Ok(parsed_annotation) = checker.parse_type_annotation(string_annotation)
     {
         let expr = parsed_annotation.expression();
@@ -240,19 +252,19 @@ where
 
 enum AnnotationKind<'a> {
     /// A simple non-string annotation like `x: int`.
-    Simple(&'a Expr),
+    Simple(flat::View<'a, Expr>),
     /// A simple string annotation like `x: "Union[int, str]"`.
-    String(&'a Expr),
+    String(flat::View<'a, Expr>),
     /// A complex string annotation with a concatenated string, escaped
     /// character, or other complication.
     ///
     /// See [`ruff_python_parser::typing::AnnotationKind::Complex`] for more
     /// details.
-    Complex(&'a Expr),
+    Complex(flat::View<'a, Expr>),
 }
 
 impl<'a> std::ops::Deref for AnnotationKind<'a> {
-    type Target = &'a Expr;
+    type Target = flat::View<'a, Expr>;
 
     fn deref(&self) -> &Self::Target {
         match self {
@@ -331,39 +343,7 @@ enum UnionKind {
     PEP604,
 }
 
-/// Generate a [`Fix`] for two or more type expressions, e.g. `int | float | complex`.
-fn generate_pep604_fix(
-    checker: &Checker,
-    nodes: Vec<&Expr>,
-    annotation: &Expr,
-    applicability: Applicability,
-) -> Fix {
-    debug_assert!(nodes.len() >= 2, "At least two nodes required");
-
-    let new_expr = nodes
-        .into_iter()
-        .fold(None, |acc: Option<Expr>, right: &Expr| {
-            if let Some(left) = acc {
-                Some(Expr::BinOp(ExprBinOp {
-                    left: Box::new(left),
-                    op: Operator::BitOr,
-                    right: Box::new(right.clone()),
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                }))
-            } else {
-                Some(right.clone())
-            }
-        })
-        .unwrap();
-
-    Fix::applicable_edit(
-        Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range()),
-        applicability,
-    )
-}
-
 /// Check whether the proposed fix starts with two `None` literals.
-fn fix_starts_with_none_none(nodes: &[&Expr]) -> bool {
+fn fix_starts_with_none_none(nodes: &[flat::View<'_, Expr>]) -> bool {
     nodes.len() >= 2 && nodes.iter().take(2).all(|node| node.is_none_literal_expr())
 }

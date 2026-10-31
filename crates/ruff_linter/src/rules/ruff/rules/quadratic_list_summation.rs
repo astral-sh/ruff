@@ -1,5 +1,6 @@
 use anyhow::Result;
 use itertools::Itertools;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::parenthesized_range;
@@ -110,15 +111,11 @@ impl AlwaysFixableViolation for QuadraticListSummation {
 }
 
 /// RUF017
-pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCall) {
-    let ast::ExprCall {
-        func,
-        arguments,
-        range_start: _,
-        node_index: _,
-    } = call;
+pub(crate) fn quadratic_list_summation(checker: &Checker, call: flat::View<'_, ast::ExprCall>) {
+    let func = call.func();
+    let arguments = call.arguments();
 
-    let Some(iterable) = arguments.args.first() else {
+    let Some(iterable) = arguments.args().first() else {
         return;
     };
 
@@ -139,8 +136,8 @@ pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCall) 
 }
 
 fn convert_to_fix(
-    iterable: &Expr,
-    call: &ast::ExprCall,
+    iterable: flat::View<'_, Expr>,
+    call: flat::View<'_, ast::ExprCall>,
     checker: &Checker,
     fix_style: QuadraticListSummationFixStyle,
 ) -> Result<Fix> {
@@ -155,12 +152,12 @@ fn convert_to_fix(
 }
 
 fn convert_to_starred_list_comprehension(
-    iterable: &Expr,
-    call: &ast::ExprCall,
+    iterable: flat::View<'_, Expr>,
+    call: flat::View<'_, ast::ExprCall>,
     checker: &Checker,
 ) -> Fix {
     let iterable = checker.locator().slice(
-        parenthesized_range(iterable.into(), (&call.arguments).into(), checker.tokens())
+        parenthesized_range(iterable, (call.arguments()).into(), checker.tokens())
             .unwrap_or(iterable.range()),
     );
 
@@ -171,7 +168,11 @@ fn convert_to_starred_list_comprehension(
 }
 
 /// Generate a [`Fix`] to convert a `sum()` call to a `functools.reduce()` call.
-fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -> Result<Fix> {
+fn convert_to_reduce(
+    iterable: flat::View<'_, Expr>,
+    call: flat::View<'_, ast::ExprCall>,
+    checker: &Checker,
+) -> Result<Fix> {
     let (reduce_edit, reduce_binding) = checker.importer().get_or_import_symbol(
         &ImportRequest::import("functools", "reduce"),
         call.start(),
@@ -185,7 +186,7 @@ fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -
     )?;
 
     let iterable = checker.locator().slice(
-        parenthesized_range(iterable.into(), (&call.arguments).into(), checker.tokens())
+        parenthesized_range(iterable, (call.arguments()).into(), checker.tokens())
             .unwrap_or(iterable.range()),
     );
 
@@ -199,16 +200,18 @@ fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -
 }
 
 /// Returns `true` if the `start` argument to a `sum()` call is an empty list.
-fn start_is_empty_list(arguments: &Arguments, semantic: &SemanticModel) -> bool {
+fn start_is_empty_list(arguments: flat::View<'_, Arguments>, semantic: &SemanticModel) -> bool {
     let Some(start_arg) = arguments.find_argument_value("start", 1) else {
         return false;
     };
 
-    match start_arg {
-        Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) => arguments.is_empty() && semantic.match_builtin_expr(func, "list"),
-        Expr::List(list) => list.is_empty() && list.ctx.is_load(),
+    match start_arg.classify() {
+        flat::ExprKind::Call(expr_call) => {
+            let func = expr_call.func();
+            let arguments = expr_call.arguments();
+            arguments.is_empty() && semantic.match_builtin_expr(func, "list")
+        }
+        flat::ExprKind::List(list) => list.elts().is_empty() && list.ctx().is_load(),
         _ => false,
     }
 }

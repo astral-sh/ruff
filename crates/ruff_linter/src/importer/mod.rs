@@ -3,6 +3,7 @@
 //! Enables rules to make module members available (that may be not yet be imported) during fix
 //! execution.
 
+use ruff_python_ast::flat::{self, fields as ast};
 use std::error::Error;
 
 use anyhow::Result;
@@ -10,7 +11,7 @@ use libcst_native as cst;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::token::Tokens;
-use ruff_python_ast::{self as ast, Expr, ModModule, Stmt};
+use ruff_python_ast::{Identifier, ModModule, Stmt, helpers};
 use ruff_python_codegen::Stylist;
 use ruff_python_importer::Insertion;
 use ruff_python_parser::Parsed;
@@ -27,7 +28,7 @@ use crate::fix::codemods::CodegenStylist;
 
 pub(crate) struct Importer<'a> {
     /// The Python AST to which we are adding imports.
-    python_ast: &'a [Stmt],
+    python_ast: flat::Suite<'a>,
     /// The tokens representing the Python AST.
     tokens: &'a Tokens,
     /// The source code text for `python_ast`.
@@ -35,9 +36,9 @@ pub(crate) struct Importer<'a> {
     /// The [`Stylist`] for the Python AST.
     stylist: &'a Stylist<'a>,
     /// The list of visited, top-level runtime imports in the Python AST.
-    runtime_imports: Vec<&'a Stmt>,
+    runtime_imports: Vec<flat::View<'a, Stmt>>,
     /// The list of visited, top-level `if TYPE_CHECKING:` blocks in the Python AST.
-    type_checking_blocks: Vec<&'a Stmt>,
+    type_checking_blocks: Vec<flat::View<'a, Stmt>>,
 }
 
 impl<'a> Importer<'a> {
@@ -57,12 +58,12 @@ impl<'a> Importer<'a> {
     }
 
     /// Visit a top-level import statement.
-    pub(crate) fn visit_import(&mut self, import: &'a Stmt) {
+    pub(crate) fn visit_import(&mut self, import: flat::View<'a, Stmt>) {
         self.runtime_imports.push(import);
     }
 
     /// Visit a top-level type-checking block.
-    pub(crate) fn visit_type_checking_block(&mut self, type_checking_block: &'a Stmt) {
+    pub(crate) fn visit_type_checking_block(&mut self, type_checking_block: flat::View<'a, Stmt>) {
         self.type_checking_blocks.push(type_checking_block);
     }
 
@@ -87,7 +88,7 @@ impl<'a> Importer<'a> {
     }
 
     /// Add an existing import statement to the start of the file.
-    pub(crate) fn add_import_at_start(&self, import: &Stmt) -> Edit {
+    pub(crate) fn add_import_at_start(&self, import: flat::View<'_, Stmt>) -> Edit {
         let range = TextRange::new(import.start(), self.source.line_end(import.end()));
         self.add_at_start(self.source[range].trim_whitespace())
     }
@@ -246,14 +247,15 @@ impl<'a> Importer<'a> {
 
     fn type_checking_binding_statement(
         semantic: &SemanticModel<'a>,
-        type_checking_block: &Stmt,
-    ) -> Option<&'a Stmt> {
-        let Stmt::If(ast::StmtIf { test, .. }) = type_checking_block else {
+        type_checking_block: flat::View<'_, Stmt>,
+    ) -> Option<flat::View<'a, Stmt>> {
+        let flat::StmtKind::If(if_stmt) = type_checking_block.classify() else {
             return None;
         };
+        let test = if_stmt.test();
 
         let mut source = test;
-        while let Expr::Attribute(ast::ExprAttribute { value, .. }) = source.as_ref() {
+        while let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = source.fields() {
             source = value;
         }
         semantic
@@ -395,12 +397,12 @@ impl<'a> Importer<'a> {
         &self,
         symbol: &ImportRequest,
         at: TextSize,
-        except: Option<&Stmt>,
+        except: Option<flat::View<'_, Stmt>>,
         semantic: &SemanticModel,
     ) -> Result<(Edit, String), ResolutionError> {
         if let Some(stmt) = self
             .find_import_from(symbol.module, at)
-            .filter(|stmt| except != Some(stmt))
+            .filter(|stmt| except != Some(*stmt))
         {
             // Case 1: `from functools import lru_cache` is in scope, and we're trying to reference
             // `functools.cache`; thus, we add `cache` to the import, and return `"cache"` as the
@@ -461,26 +463,21 @@ impl<'a> Importer<'a> {
 
     /// Return the top-level [`Stmt`] that imports the given module using `Stmt::ImportFrom`
     /// preceding the given position, if any.
-    fn find_import_from(&self, module: &str, at: TextSize) -> Option<&Stmt> {
+    fn find_import_from(&self, module: &str, at: TextSize) -> Option<flat::View<'_, Stmt>> {
         let mut import_from = None;
-        for stmt in &self.runtime_imports {
+        for stmt in self.runtime_imports.clone() {
             if stmt.start() >= at {
                 break;
             }
-            if let Stmt::ImportFrom(ast::StmtImportFrom {
-                module: name,
-                names,
-                level,
-                is_lazy: _,
-                range: _,
-                node_index: _,
-            }) = stmt
-            {
-                if *level == 0
-                    && name.as_ref().is_some_and(|name| name == module)
-                    && names.iter().all(|alias| alias.name.as_str() != "*")
+            if let flat::StmtKind::ImportFrom(import_from_node) = stmt.classify() {
+                let name = import_from_node.module();
+                let names = import_from_node.names();
+                let level = import_from_node.level();
+                if level == 0
+                    && name.is_some_and(|name| name == module)
+                    && names.iter().all(|alias| alias.name().as_str() != "*")
                 {
-                    import_from = Some(*stmt);
+                    import_from = Some(stmt);
                 }
             }
         }
@@ -488,7 +485,7 @@ impl<'a> Importer<'a> {
     }
 
     /// Add the given member to an existing `Stmt::ImportFrom` statement.
-    fn add_member(&self, stmt: &Stmt, member: &str) -> Result<Edit> {
+    fn add_member(&self, stmt: flat::View<'_, Stmt>, member: &str) -> Result<Edit> {
         let mut statement = match_statement(&self.source[stmt.range()])?;
         let (_, names, _) = match_import_from(&mut statement)?;
         let aliases = match_aliases(names)?;
@@ -531,7 +528,7 @@ impl<'a> Importer<'a> {
     }
 
     /// Return the import statement that precedes the given position, if any.
-    fn preceding_import(&self, at: TextSize) -> Option<&'a Stmt> {
+    fn preceding_import(&self, at: TextSize) -> Option<flat::View<'a, Stmt>> {
         self.runtime_imports
             .partition_point(|stmt| stmt.start() < at)
             .checked_sub(1)
@@ -539,23 +536,25 @@ impl<'a> Importer<'a> {
     }
 
     /// Return the `TYPE_CHECKING` block that precedes the given position, if any.
-    fn preceding_type_checking_block(&self, at: TextSize) -> Option<&'a Stmt> {
+    fn preceding_type_checking_block(&self, at: TextSize) -> Option<flat::View<'a, Stmt>> {
         let block = self.type_checking_blocks.first()?;
         if block.start() <= at {
-            Some(block)
+            Some(*block)
         } else {
             None
         }
     }
 
     /// Find the last `from __future__` import statement in the AST.
-    fn find_last_future_import(&self) -> Option<&'a Stmt> {
+    fn find_last_future_import(&self) -> Option<flat::View<'a, Stmt>> {
         let mut body = self.python_ast.iter().peekable();
-        let _docstring = body.next_if(|stmt| ast::helpers::is_docstring_stmt(stmt));
+        let _docstring = body.next_if(|stmt| helpers::is_docstring_stmt(*stmt));
 
         body.take_while(|stmt| {
             stmt.as_import_from_stmt().is_some_and(|import_from| {
-                !import_from.is_lazy && import_from.module.as_deref() == Some("__future__")
+                !import_from.is_lazy()
+                    && import_from.module().map(flat::View::<Identifier>::as_str)
+                        == Some("__future__")
             })
         })
         .last()
@@ -649,7 +648,7 @@ impl<'a> ImportRequest<'a> {
 /// An existing list of module or member imports, located within an import statement.
 pub(crate) struct ImportedMembers<'a> {
     /// The import statement.
-    pub(crate) statement: &'a Stmt,
+    pub(crate) statement: flat::View<'a, Stmt>,
     /// The "names" of the imported members.
     pub(crate) names: Vec<&'a str>,
 }

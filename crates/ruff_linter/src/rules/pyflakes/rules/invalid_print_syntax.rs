@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -59,7 +60,7 @@ impl Violation for InvalidPrintSyntax {
 }
 
 /// F633
-pub(crate) fn invalid_print_syntax(checker: &Checker, left: &Expr) {
+pub(crate) fn invalid_print_syntax(checker: &Checker, left: flat::View<'_, Expr>) {
     if checker.semantic().match_builtin_expr(left, "print") {
         checker.report_diagnostic(InvalidPrintSyntax, left.range());
     }

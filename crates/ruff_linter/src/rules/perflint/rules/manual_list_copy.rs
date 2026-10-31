@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields;
+use ruff_python_ast::flat::helpers::any_over_expr;
 use ruff_python_semantic::analyze::typing::is_list;
 use ruff_text_size::Ranged;
 
@@ -49,64 +50,60 @@ impl Violation for ManualListCopy {
 }
 
 /// PERF402
-pub(crate) fn manual_list_copy(checker: &Checker, for_stmt: &ast::StmtFor) {
+pub(crate) fn manual_list_copy(checker: &Checker, for_stmt: &fields::StmtFor<'_>) {
     if for_stmt.is_async {
         return;
     }
 
-    let Expr::Name(ast::ExprName { id, .. }) = &*for_stmt.target else {
+    let flat::ExprKind::Name(name_node) = for_stmt.target.classify() else {
+        return;
+    };
+    let id = name_node.id();
+
+    let Some([stmt]) = for_stmt.body.as_array() else {
         return;
     };
 
-    let [stmt] = &*for_stmt.body else {
+    let flat::StmtKind::Expr(expr_node) = stmt.classify() else {
         return;
     };
+    let value = expr_node.value();
 
-    let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
+    let flat::ExprKind::Call(call_node) = value.classify() else {
         return;
     };
-
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments:
-            Arguments {
-                args,
-                keywords,
-                range: _,
-                node_index: _,
-            },
-        range_start: _,
-        node_index: _,
-    }) = value.as_ref()
-    else {
-        return;
-    };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
+    let args = arguments.args();
+    let keywords = arguments.keywords();
     let call_range = value.range();
 
     if !keywords.is_empty() {
         return;
     }
 
-    let [arg] = &**args else {
+    let Some([arg]) = args.as_array() else {
         return;
     };
 
-    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
+    let flat::ExprKind::Attribute(attribute) = func.classify() else {
         return;
     };
+    let attr = attribute.attr();
+    let value = attribute.value();
 
     if !matches!(attr.as_str(), "append" | "insert") {
         return;
     }
 
     // Only flag direct list copies (e.g., `for x in y: filtered.append(x)`).
-    if arg.as_name_expr().is_none_or(|arg| arg.id != *id) {
+    if arg.as_name_expr().is_none_or(|arg| *arg.id() != *id) {
         return;
     }
 
     // Avoid, e.g., `for x in y: filtered[x].append(x)`.
     if any_over_expr(value, |expr| {
-        expr.as_name_expr().is_some_and(|expr| expr.id == *id)
+        expr.as_name_expr().is_some_and(|expr| *expr.id() == *id)
     }) {
         return;
     }

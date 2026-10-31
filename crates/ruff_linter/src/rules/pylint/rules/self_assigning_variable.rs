@@ -1,5 +1,7 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields as ast;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -39,7 +41,7 @@ impl Violation for SelfAssigningVariable {
 }
 
 /// PLW0127
-pub(crate) fn self_assignment(checker: &Checker, assign: &ast::StmtAssign) {
+pub(crate) fn self_assignment(checker: &Checker, assign: &ast::StmtAssign<'_>) {
     // Assignments in class bodies are attributes (e.g., `x = x` assigns `x` to `self.x`, and thus
     // is not a self-assignment).
     if checker.semantic().current_scope().kind.is_class() {
@@ -49,7 +51,7 @@ pub(crate) fn self_assignment(checker: &Checker, assign: &ast::StmtAssign) {
     for [left, right] in assign
         .targets
         .iter()
-        .chain(std::iter::once(assign.value.as_ref()))
+        .chain(std::iter::once(assign.value))
         .array_combinations()
     {
         visit_assignments(checker, left, right);
@@ -57,8 +59,8 @@ pub(crate) fn self_assignment(checker: &Checker, assign: &ast::StmtAssign) {
 }
 
 /// PLW0127
-pub(crate) fn self_annotated_assignment(checker: &Checker, assign: &ast::StmtAnnAssign) {
-    let Some(value) = assign.value.as_ref() else {
+pub(crate) fn self_annotated_assignment(checker: &Checker, assign: &ast::StmtAnnAssign<'_>) {
+    let Some(value) = assign.value else {
         return;
     };
 
@@ -68,22 +70,22 @@ pub(crate) fn self_annotated_assignment(checker: &Checker, assign: &ast::StmtAnn
         return;
     }
 
-    visit_assignments(checker, &assign.target, value);
+    visit_assignments(checker, assign.target, value);
 }
 
-fn visit_assignments(checker: &Checker, left: &Expr, right: &Expr) {
-    match (left, right) {
-        (Expr::Tuple(lhs), Expr::Tuple(rhs)) if lhs.len() == rhs.len() => lhs
-            .iter()
-            .zip(rhs)
-            .for_each(|(lhs_elem, rhs_elem)| visit_assignments(checker, lhs_elem, rhs_elem)),
-        (
-            Expr::Name(ast::ExprName { id: lhs_name, .. }),
-            Expr::Name(ast::ExprName { id: rhs_name, .. }),
-        ) if lhs_name == rhs_name => {
+fn visit_assignments(checker: &Checker, left: flat::View<'_, Expr>, right: flat::View<'_, Expr>) {
+    match (left.classify(), right.classify()) {
+        (flat::ExprKind::Tuple(lhs), flat::ExprKind::Tuple(rhs))
+            if lhs.elts().len() == rhs.elts().len() =>
+        {
+            for (lhs_elem, rhs_elem) in lhs.iter().zip(rhs) {
+                visit_assignments(checker, lhs_elem, rhs_elem);
+            }
+        }
+        (flat::ExprKind::Name(lhs), flat::ExprKind::Name(rhs)) if lhs.id() == rhs.id() => {
             checker.report_diagnostic(
                 SelfAssigningVariable {
-                    name: lhs_name.to_string(),
+                    name: lhs.id().to_string(),
                 },
                 left.range(),
             );

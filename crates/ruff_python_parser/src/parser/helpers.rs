@@ -1,34 +1,8 @@
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{self as ast, CmpOp, Expr, ExprContext, Number};
+use ruff_python_ast::{self as ast, CmpOp, Expr, Number};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::error::RelaxedDecoratorError;
-
-/// Set the `ctx` for `Expr::Id`, `Expr::Attribute`, `Expr::Subscript`, `Expr::Starred`,
-/// `Expr::Tuple` and `Expr::List`. If `expr` is either `Expr::Tuple` or `Expr::List`,
-/// recursively sets the `ctx` for their elements.
-pub(super) fn set_expr_ctx(expr: &mut Expr, new_ctx: ExprContext) {
-    match expr {
-        Expr::Name(ast::ExprName { ctx, .. })
-        | Expr::Attribute(ast::ExprAttribute { ctx, .. })
-        | Expr::Subscript(ast::ExprSubscript { ctx, .. }) => *ctx = new_ctx,
-        Expr::Starred(ast::ExprStarred { value, ctx, .. }) => {
-            *ctx = new_ctx;
-            set_expr_ctx(value, new_ctx);
-        }
-        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => {
-            set_expr_ctx(operand, new_ctx);
-        }
-        Expr::List(ast::ExprList { elts, ctx, .. })
-        | Expr::Tuple(ast::ExprTuple { elts, ctx, .. }) => {
-            *ctx = new_ctx;
-            for element in elts.iter_mut() {
-                set_expr_ctx(element, new_ctx);
-            }
-        }
-        _ => {}
-    }
-}
 
 /// Converts a [`TokenKind`] into its corresponding [`CmpOp`].
 ///
@@ -59,52 +33,54 @@ pub(super) const fn token_kind_to_cmp_op(
 ///
 /// [`dotted_name`]: https://docs.python.org/3.8/reference/compound_stmts.html#grammar-token-dotted-name
 pub(super) fn detect_invalid_pre_py39_decorator_node(
-    expr: &Expr,
+    expr: ast::flat::View<'_, Expr>,
 ) -> Option<(RelaxedDecoratorError, TextRange)> {
-    let description = match expr {
-        Expr::Name(_) => return None,
+    let description = match expr.classify() {
+        ast::flat::ExprKind::Name(_) => return None,
 
-        Expr::Attribute(attribute) => {
-            return detect_invalid_pre_py39_decorator_node(&attribute.value);
+        ast::flat::ExprKind::Attribute(attribute) => {
+            return detect_invalid_pre_py39_decorator_node(attribute.value());
         }
 
-        Expr::Call(_) => return Some((RelaxedDecoratorError::CallExpression, expr.range())),
+        ast::flat::ExprKind::Call(_) => {
+            return Some((RelaxedDecoratorError::CallExpression, expr.range()));
+        }
 
-        Expr::NumberLiteral(number) => match &number.value {
+        ast::flat::ExprKind::NumberLiteral(number) => match number.value() {
             Number::Int(_) => "an int literal",
             Number::Float(_) => "a float literal",
             Number::Complex { .. } => "a complex literal",
         },
 
-        Expr::BoolOp(_) => "boolean expression",
-        Expr::BinOp(_) => "binary-operation expression",
-        Expr::UnaryOp(_) => "unary-operation expression",
-        Expr::Await(_) => "`await` expression",
-        Expr::Lambda(_) => "lambda expression",
-        Expr::If(_) => "conditional expression",
-        Expr::Dict(_) => "a dict literal",
-        Expr::Set(_) => "a set literal",
-        Expr::List(_) => "a list literal",
-        Expr::Tuple(_) => "a tuple literal",
-        Expr::Starred(_) => "starred expression",
-        Expr::Slice(_) => "slice expression",
-        Expr::BytesLiteral(_) => "a bytes literal",
-        Expr::StringLiteral(_) => "a string literal",
-        Expr::EllipsisLiteral(_) => "an ellipsis literal",
-        Expr::NoneLiteral(_) => "a `None` literal",
-        Expr::BooleanLiteral(_) => "a boolean literal",
-        Expr::ListComp(_) => "a list comprehension",
-        Expr::SetComp(_) => "a set comprehension",
-        Expr::DictComp(_) => "a dict comprehension",
-        Expr::Generator(_) => "generator expression",
-        Expr::Yield(_) => "`yield` expression",
-        Expr::YieldFrom(_) => "`yield from` expression",
-        Expr::Compare(_) => "comparison expression",
-        Expr::FString(_) => "f-string",
-        Expr::TString(_) => "t-string",
-        Expr::Named(_) => "assignment expression",
-        Expr::Subscript(_) => "subscript expression",
-        Expr::IpyEscapeCommand(_) => "IPython escape command",
+        ast::flat::ExprKind::BoolOp(_) => "boolean expression",
+        ast::flat::ExprKind::BinOp(_) => "binary-operation expression",
+        ast::flat::ExprKind::UnaryOp(_) => "unary-operation expression",
+        ast::flat::ExprKind::Await(_) => "`await` expression",
+        ast::flat::ExprKind::Lambda(_) => "lambda expression",
+        ast::flat::ExprKind::If(_) => "conditional expression",
+        ast::flat::ExprKind::Dict(_) => "a dict literal",
+        ast::flat::ExprKind::Set(_) => "a set literal",
+        ast::flat::ExprKind::List(_) => "a list literal",
+        ast::flat::ExprKind::Tuple(_) => "a tuple literal",
+        ast::flat::ExprKind::Starred(_) => "starred expression",
+        ast::flat::ExprKind::Slice(_) => "slice expression",
+        ast::flat::ExprKind::BytesLiteral(_) => "a bytes literal",
+        ast::flat::ExprKind::StringLiteral(_) => "a string literal",
+        ast::flat::ExprKind::EllipsisLiteral(_) => "an ellipsis literal",
+        ast::flat::ExprKind::NoneLiteral(_) => "a `None` literal",
+        ast::flat::ExprKind::BooleanLiteral(_) => "a boolean literal",
+        ast::flat::ExprKind::ListComp(_) => "a list comprehension",
+        ast::flat::ExprKind::SetComp(_) => "a set comprehension",
+        ast::flat::ExprKind::DictComp(_) => "a dict comprehension",
+        ast::flat::ExprKind::Generator(_) => "generator expression",
+        ast::flat::ExprKind::Yield(_) => "`yield` expression",
+        ast::flat::ExprKind::YieldFrom(_) => "`yield from` expression",
+        ast::flat::ExprKind::Compare(_) => "comparison expression",
+        ast::flat::ExprKind::FString(_) => "f-string",
+        ast::flat::ExprKind::TString(_) => "t-string",
+        ast::flat::ExprKind::Named(_) => "assignment expression",
+        ast::flat::ExprKind::Subscript(_) => "subscript expression",
+        ast::flat::ExprKind::IpyEscapeCommand(_) => "IPython escape command",
     };
 
     Some((RelaxedDecoratorError::Other(description), expr.range()))

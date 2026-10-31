@@ -1,4 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields;
 use ruff_python_ast::{self as ast, comparable::ComparableExpr};
 use ruff_text_size::{Ranged, TextSize};
 
@@ -58,43 +60,37 @@ impl Violation for RedundantFinalLiteral {
 }
 
 /// PYI064
-pub(crate) fn redundant_final_literal(checker: &Checker, ann_assign: &ast::StmtAnnAssign) {
+pub(crate) fn redundant_final_literal(checker: &Checker, ann_assign: &fields::StmtAnnAssign<'_>) {
     if !checker.semantic().seen_typing() {
         return;
     }
 
-    let ast::StmtAnnAssign {
-        value: assign_value,
-        annotation,
-        ..
-    } = ann_assign;
+    let assign_value = ann_assign.value;
+    let annotation = ann_assign.annotation;
 
-    let ast::Expr::Subscript(annotation) = &**annotation else {
+    let flat::ExprKind::Subscript(annotation) = annotation.classify() else {
         return;
     };
 
     // Ensure it is `Final[Literal[...]]`.
-    let ast::Expr::Subscript(ast::ExprSubscript {
-        value,
-        slice: literal,
-        ..
-    }) = &*annotation.slice
-    else {
+    let flat::ExprKind::Subscript(subscript) = annotation.slice().classify() else {
         return;
     };
+    let value = subscript.value();
+    let literal = subscript.slice();
     if !checker.semantic().match_typing_expr(value, "Literal") {
         return;
     }
 
     // Discards tuples like `Literal[1, 2, 3]` and complex literals like `Literal[{1, 2}]`.
     if !matches!(
-        &**literal,
-        ast::Expr::StringLiteral(_)
-            | ast::Expr::BytesLiteral(_)
-            | ast::Expr::NumberLiteral(_)
-            | ast::Expr::BooleanLiteral(_)
-            | ast::Expr::NoneLiteral(_)
-            | ast::Expr::EllipsisLiteral(_)
+        literal.classify(),
+        flat::ExprKind::StringLiteral(_)
+            | flat::ExprKind::BytesLiteral(_)
+            | flat::ExprKind::NumberLiteral(_)
+            | flat::ExprKind::BooleanLiteral(_)
+            | flat::ExprKind::NoneLiteral(_)
+            | flat::ExprKind::EllipsisLiteral(_)
     ) {
         return;
     }
@@ -103,12 +99,12 @@ pub(crate) fn redundant_final_literal(checker: &Checker, ann_assign: &ast::StmtA
         RedundantFinalLiteral {
             literal: SourceCodeSnippet::from_str(checker.locator().slice(literal.range())),
         },
-        ann_assign.range(),
+        ann_assign.range,
     );
 
     // The literal value and the assignment value being different doesn't make sense, so we skip
     // fixing in that case.
-    if let Some(assign_value) = assign_value.as_ref() {
+    if let Some(assign_value) = assign_value {
         if ComparableExpr::from(assign_value) == ComparableExpr::from(literal) {
             diagnostic.set_fix(generate_fix(annotation, None, checker.locator()));
         }
@@ -119,14 +115,14 @@ pub(crate) fn redundant_final_literal(checker: &Checker, ann_assign: &ast::StmtA
 
 /// Generate a fix to convert a `Final[Literal[...]]` annotation to a `Final` annotation.
 fn generate_fix(
-    annotation: &ast::ExprSubscript,
-    literal: Option<&ast::Expr>,
+    annotation: flat::View<'_, ast::ExprSubscript>,
+    literal: Option<flat::View<'_, ast::Expr>>,
     locator: &Locator,
 ) -> Fix {
     // Remove the `Literal[...]` part from `Final[Literal[...]]`.
     let deletion = Edit::range_deletion(
         annotation
-            .slice
+            .slice()
             .range()
             .sub_start(TextSize::new(1))
             .add_end(TextSize::new(1)),

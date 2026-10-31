@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Arguments, StmtClassDef, helpers::map_subscript};
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::helpers::map_subscript;
 use ruff_text_size::Ranged;
 
 use crate::codes::Category;
@@ -86,17 +87,20 @@ impl AlwaysFixableViolation for SubclassBuiltin {
 }
 
 /// FURB189
-pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
+pub(crate) fn subclass_builtin(checker: &Checker, class: &ast::StmtClassDef<'_>) {
     if checker.source_type.is_stub() {
         return;
     }
 
-    let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
+    let Some(ast::Arguments { args: bases, .. }) = class
+        .arguments
+        .map(flat::View::<ruff_python_ast::Arguments>::fields)
+    else {
         return;
     };
 
     // Expect only one base class else return
-    let [base] = &**bases else {
+    let Some([base]) = bases.as_array() else {
         return;
     };
 

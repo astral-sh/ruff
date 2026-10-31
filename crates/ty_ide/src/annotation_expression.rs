@@ -1,7 +1,8 @@
 //! Identifies ranges inside annotation expressions.
 
 use ruff_python_ast as ast;
-use ruff_python_ast::find_node::CoveringNode;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::find_node::CoveringNode;
 use ruff_text_size::{Ranged, TextRange};
 use ty_python_semantic::SemanticModel;
 
@@ -22,27 +23,24 @@ pub(crate) fn is_in_annotation_expression(
     covering_node: &CoveringNode<'_>,
     range: TextRange,
 ) -> bool {
-    let contains = |expr: &ast::Expr| expr.range().contains_range(range);
+    let contains = |expr: flat::View<'_, ast::Expr>| expr.range().contains_range(range);
 
-    covering_node.ancestors().any(|node| match node {
-        ast::AnyNodeRef::StmtAnnAssign(stmt) => {
-            contains(&stmt.annotation)
-                || (stmt.value.as_deref().is_some_and(contains)
-                    && model.is_type_alias_annotation(&stmt.annotation))
+    covering_node.ancestors().any(|node| match node.classify() {
+        flat::AnyKind::StmtAnnAssign(stmt) => {
+            contains(stmt.annotation())
+                || (stmt.value().is_some_and(contains)
+                    && model.is_type_alias_annotation(stmt.annotation()))
         }
-        ast::AnyNodeRef::StmtFunctionDef(stmt) => stmt.returns.as_deref().is_some_and(contains),
-        ast::AnyNodeRef::StmtTypeAlias(stmt) => contains(&stmt.value),
-        ast::AnyNodeRef::Parameter(param) => param.annotation.as_deref().is_some_and(contains),
-        ast::AnyNodeRef::TypeParamTypeVar(type_param) => {
-            type_param.bound.as_deref().is_some_and(contains)
-                || type_param.default.as_deref().is_some_and(contains)
+        flat::AnyKind::StmtFunctionDef(stmt) => stmt.returns().is_some_and(contains),
+        flat::AnyKind::StmtTypeAlias(stmt) => contains(stmt.value()),
+        flat::AnyKind::Parameter(param) => param.annotation().is_some_and(contains),
+        flat::AnyKind::TypeParamTypeVar(type_param) => {
+            type_param.bound().is_some_and(contains) || type_param.default().is_some_and(contains)
         }
-        ast::AnyNodeRef::TypeParamTypeVarTuple(type_param) => {
-            type_param.default.as_deref().is_some_and(contains)
+        flat::AnyKind::TypeParamTypeVarTuple(type_param) => {
+            type_param.default().is_some_and(contains)
         }
-        ast::AnyNodeRef::TypeParamParamSpec(type_param) => {
-            type_param.default.as_deref().is_some_and(contains)
-        }
+        flat::AnyKind::TypeParamParamSpec(type_param) => type_param.default().is_some_and(contains),
         _ => false,
     })
 }

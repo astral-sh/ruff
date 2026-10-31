@@ -1,19 +1,18 @@
 use ruff_diagnostics::Applicability::{Safe, Unsafe};
+use ruff_python_ast::flat;
 use std::borrow::Cow;
 
 use anyhow::{Result, bail};
 use libcst_native::ParenthesizedNode;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt, whitespace};
-use ruff_python_codegen::Stylist;
+use ruff_python_ast::flat::AnyNodeRef;
+use ruff_python_ast::{BoolOp, ElifElseClause, Expr, Stmt, StmtIf, whitespace};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_source_file::LineRanges;
+use ruff_source_file::{LineRanges, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::cst::helpers::space;
@@ -83,8 +82,8 @@ impl Violation for CollapsibleIf {
 /// SIM102
 pub(crate) fn nested_if_statements(
     checker: &Checker,
-    stmt_if: &ast::StmtIf,
-    parent: Option<&Stmt>,
+    stmt_if: flat::View<'_, StmtIf>,
+    parent: Option<flat::View<'_, Stmt>>,
 ) {
     let Some(nested_if) = nested_if_body(stmt_if) else {
         return;
@@ -96,12 +95,12 @@ pub(crate) fn nested_if_statements(
     };
 
     // Check if the parent is already emitting a larger diagnostic including this if statement
-    if let Some(Stmt::If(stmt_if)) = parent {
+    if let Some(flat::StmtKind::If(stmt_if)) = parent.map(flat::View::<Stmt>::classify) {
         if let Some(nested_if) = nested_if_body(stmt_if) {
             // In addition to repeating the `nested_if_body` and `find_last_nested_if` check, we
             // also need to be the first child in the parent
             let body = nested_if.body();
-            if matches!(&body[0], Stmt::If(inner) if *inner == *stmt_if)
+            if matches!(body.at(0).classify(), flat::StmtKind::If(inner) if inner == stmt_if)
                 && find_last_nested_if(body).is_some()
             {
                 return;
@@ -134,49 +133,47 @@ pub(crate) fn nested_if_statements(
     // statements.
     if !checker.comment_ranges().intersects(TextRange::new(
         nested_if.start(),
-        nested_if.body()[0].start(),
+        nested_if.body().at(0).start(),
     )) {
-        diagnostic.try_set_optional_fix(|| {
-            match collapse_nested_if(checker.locator(), checker.stylist(), nested_if) {
-                Ok(edit) => {
-                    if edit.content().is_none_or(|content| {
-                        fits(
-                            content,
-                            (&nested_if).into(),
-                            checker.locator(),
-                            checker.settings().pycodestyle.max_line_length,
-                            checker.settings().tab_size,
-                        )
-                    }) {
-                        Ok(Some(Fix::applicable_edit(
-                            edit,
-                            if is_collapsible_if_fix_safe_enabled(checker.settings()) {
-                                Safe
-                            } else {
-                                Unsafe
-                            },
-                        )))
-                    } else {
-                        Ok(None)
-                    }
+        diagnostic.try_set_optional_fix(|| match collapse_nested_if(checker, nested_if) {
+            Ok(edit) => {
+                if edit.content().is_none_or(|content| {
+                    fits(
+                        content,
+                        (&nested_if).into(),
+                        checker.locator(),
+                        checker.settings().pycodestyle.max_line_length,
+                        checker.settings().tab_size,
+                    )
+                }) {
+                    Ok(Some(Fix::applicable_edit(
+                        edit,
+                        if is_collapsible_if_fix_safe_enabled(checker.settings()) {
+                            Safe
+                        } else {
+                            Unsafe
+                        },
+                    )))
+                } else {
+                    Ok(None)
                 }
-                Err(err) => bail!("Failed to collapse `if`: {err}"),
             }
+            Err(err) => bail!("Failed to collapse `if`: {err}"),
         });
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub(super) enum NestedIf<'a> {
-    If(&'a ast::StmtIf),
-    Elif(&'a ElifElseClause),
+    If(flat::View<'a, StmtIf>),
+    Elif(flat::View<'a, ElifElseClause>),
 }
 
 impl<'a> NestedIf<'a> {
-    fn body(self) -> &'a [Stmt] {
+    fn body(self) -> flat::Suite<'a> {
         match self {
-            NestedIf::If(stmt_if) => &stmt_if.body,
-            NestedIf::Elif(clause) => &clause.body,
+            NestedIf::If(stmt_if) => stmt_if.body(),
+            NestedIf::Elif(clause) => clause.body(),
         }
     }
 
@@ -197,31 +194,26 @@ impl Ranged for NestedIf<'_> {
 impl<'a> From<&NestedIf<'a>> for AnyNodeRef<'a> {
     fn from(value: &NestedIf<'a>) -> Self {
         match value {
-            NestedIf::If(stmt_if) => (*stmt_if).into(),
-            NestedIf::Elif(clause) => (*clause).into(),
+            NestedIf::If(stmt_if) => (stmt_if).into(),
+            NestedIf::Elif(clause) => (clause).into(),
         }
     }
 }
 
 /// Returns the body, the range of the `if` or `elif` and whether the range is for an `if` or `elif`
-fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf<'_>> {
-    let ast::StmtIf {
-        test,
-        elif_else_clauses,
-        ..
-    } = stmt_if;
+fn nested_if_body(stmt_if: flat::View<'_, StmtIf>) -> Option<NestedIf<'_>> {
+    let test = stmt_if.test();
+    let elif_else_clauses = stmt_if.elif_else_clauses();
 
     // It must be the last condition, otherwise there could be another `elif` or `else` that only
     // depends on the outer of the two conditions
     let (test, nested_if) = if let Some(clause) = elif_else_clauses.last() {
-        if let Some(test) = &clause.test {
+        {
+            let test = clause.test()?;
             (test, NestedIf::Elif(clause))
-        } else {
-            // The last condition is an `else` (different rule)
-            return None;
         }
     } else {
-        (test.as_ref(), NestedIf::If(stmt_if))
+        (test, NestedIf::If(stmt_if))
     };
 
     // The nested if must be the only child, otherwise there is at least one more statement that
@@ -253,36 +245,28 @@ fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf<'_>> {
 ///         z = 1
 ///         ...
 /// ```
-fn find_last_nested_if(body: &[Stmt]) -> Option<&Expr> {
-    let [
-        Stmt::If(ast::StmtIf {
-            test,
-            body: inner_body,
-            elif_else_clauses,
-            ..
-        }),
-    ] = body
-    else {
-        return None;
-    };
-    if !elif_else_clauses.is_empty() {
+fn find_last_nested_if(body: flat::Suite<'_>) -> Option<flat::View<'_, Expr>> {
+    let [nested] = body.as_array()?;
+    let nested = nested.as_if_stmt()?;
+    if !nested.elif_else_clauses().is_empty() {
         return None;
     }
-    find_last_nested_if(inner_body).or(Some(test))
+    Some(find_last_nested_if(nested.body()).unwrap_or_else(|| nested.test()))
 }
 
 /// Returns `true` if an expression is an `if __name__ == "__main__":` check.
-fn is_main_check(expr: &Expr) -> bool {
-    if let Expr::Compare(ast::ExprCompare { operands, .. }) = expr
-        && let [
-            Expr::Name(ast::ExprName { id, .. }),
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }),
-        ] = &**operands
-    {
-        id == "__name__" && value == "__main__"
-    } else {
-        false
-    }
+fn is_main_check(expr: flat::View<'_, Expr>) -> bool {
+    let Some([left, right]) = expr
+        .as_compare_expr()
+        .and_then(|compare| compare.operands().as_array())
+    else {
+        return false;
+    };
+    left.as_name_expr()
+        .is_some_and(|name| name.id() == "__name__")
+        && right
+            .as_string_literal_expr()
+            .is_some_and(|string| string.value().to_str() == "__main__")
 }
 
 fn parenthesize_and_operand(expr: libcst_native::Expression) -> libcst_native::Expression {
@@ -310,7 +294,12 @@ fn parenthesize_and_operand(expr: libcst_native::Expression) -> libcst_native::E
 }
 
 /// Convert `if a: if b:` to `if a and b:`.
-fn collapse_nested_if(locator: &Locator, stylist: &Stylist, nested_if: NestedIf) -> Result<Edit> {
+fn collapse_nested_if(checker: &Checker, nested_if: NestedIf) -> Result<Edit> {
+    if let Some(edit) = collapse_single_line_headers(checker, nested_if) {
+        return Ok(edit);
+    }
+    let locator = checker.locator();
+    let stylist = checker.stylist();
     // Infer the indentation of the outer block.
     let Some(outer_indent) = whitespace::indentation(locator.contents(), &nested_if) else {
         bail!("Unable to fix multiline statement");
@@ -406,4 +395,76 @@ fn collapse_nested_if(locator: &Locator, stylist: &Stylist, nested_if: NestedIf)
 
     let range = locator.lines_range(nested_if.range());
     Ok(Edit::range_replacement(contents.to_string(), range))
+}
+
+/// Join two single-line headers and remove one level of indentation from the inner suite.
+/// Multiline strings, continuation lines, and trivia around the tests need the CST.
+fn collapse_single_line_headers(checker: &Checker, outer: NestedIf) -> Option<Edit> {
+    let locator = checker.locator();
+    let (keyword, left) = match outer {
+        NestedIf::If(stmt) => ("if ", stmt.test()),
+        NestedIf::Elif(clause) => ("elif ", clause.test()?),
+    };
+    let [inner] = outer.body().as_array()?;
+    let inner = inner.as_if_stmt()?;
+    let right = inner.test();
+    let range = locator.lines_range(outer.range());
+    let inner_line = locator.line_range(inner.start());
+
+    if locator.slice(TextRange::new(outer.start(), left.start())) != keyword
+        || locator.slice(TextRange::new(inner.start(), right.start())) != "if "
+        || locator.line_end(left.start()) < left.end()
+        || inner_line.end() < right.end()
+        || locator.slice(TextRange::new(left.end(), locator.line_end(left.end()))) != ":"
+        || !locator.after(right.end()).starts_with(':')
+        || checker.indexer().multiline_ranges().intersects(range)
+        || checker
+            .indexer()
+            .interpolated_string_ranges()
+            .intersects(range)
+    {
+        return None;
+    }
+
+    let indent = locator.slice(TextRange::new(range.start(), outer.start()));
+    let inner_indent = locator.slice(TextRange::new(inner_line.start(), inner.start()));
+    if !inner_indent.starts_with(indent) || !inner_indent.bytes().all(|byte| byte == b' ') {
+        return None;
+    }
+
+    let mut replacement = String::with_capacity(range.len().to_usize());
+    replacement.push_str(indent);
+    replacement.push_str(keyword);
+    let write_operand = |output: &mut String, operand: flat::View<'_, Expr>| {
+        let parens = match operand.classify() {
+            flat::ExprKind::BoolOp(op) => op.op() == BoolOp::Or,
+            flat::ExprKind::If(_) | flat::ExprKind::Lambda(_) | flat::ExprKind::Named(_) => true,
+            _ => false,
+        };
+        if parens {
+            output.push('(');
+        }
+        output.push_str(locator.slice(operand));
+        if parens {
+            output.push(')');
+        }
+    };
+    write_operand(&mut replacement, left);
+    replacement.push_str(" and ");
+    write_operand(&mut replacement, right);
+
+    let mut body = locator
+        .slice(TextRange::new(right.end(), range.end()))
+        .universal_newlines();
+    replacement.push_str(body.next()?.as_full_str());
+    for line in body {
+        if line.as_str().is_empty() {
+            replacement.push_str(line.as_full_str());
+        } else {
+            let suffix = line.as_full_str().strip_prefix(inner_indent)?;
+            replacement.push_str(indent);
+            replacement.push_str(suffix);
+        }
+    }
+    Some(Edit::range_replacement(replacement, range))
 }

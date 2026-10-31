@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::flat;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -53,18 +53,17 @@ impl Violation for AirflowDagNoScheduleArgument {
 }
 
 /// AIR002
-pub(crate) fn dag_no_schedule_argument(checker: &Checker, expr: &Expr) {
+pub(crate) fn dag_no_schedule_argument(checker: &Checker, &expr: &flat::View<'_, Expr>) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
 
     // Don't check non-call expressions.
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = expr
-    else {
+    let flat::ExprKind::Call(call_node) = expr.classify() else {
         return;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
     // We don't do anything unless this is a `DAG` (class) or `dag` (decorator
     // function) from Airflow.

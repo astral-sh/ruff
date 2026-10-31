@@ -1,12 +1,12 @@
+use ruff_python_ast::flat::StringLikePartKind;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::iter::FusedIterator;
 
 use ruff_formatter::FormatContext;
-use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
+use ruff_python_ast::flat::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{
-    AnyStringFlags, BytesLiteral, FString, InterpolatedStringElement, InterpolatedStringElements,
-    StringFlags, StringLikePart, StringLiteral,
+    AnyStringFlags, BytesLiteral, FString, StringFlags, StringLiteral, flat, flat::StringLikePart,
 };
 use ruff_text_size::{Ranged, TextRange, TextSlice};
 
@@ -88,8 +88,8 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
         }
 
         // There are cases where it is necessary to preserve the quotes to prevent an invalid f-string or t-string.
-        match string {
-            StringLikePart::FString(fstring) => {
+        match string.classify() {
+            StringLikePartKind::FString(fstring) => {
                 // There are two cases where it's necessary to preserve the quotes if the
                 // target version is pre 3.12 and the part is an f-string.
                 if !supports_pep_701 {
@@ -113,17 +113,17 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
                 // An f-string expression element contains a debug text and the corresponding
                 // format specifier has a literal element with a quote character.
                 if is_interpolated_string_with_quoted_format_spec_and_debug(
-                    &fstring.elements,
-                    fstring.flags.into(),
+                    fstring.elements(),
+                    fstring.flags().into(),
                     self.context,
                 ) {
                     return QuoteStyle::Preserve;
                 }
             }
-            StringLikePart::TString(tstring)
+            StringLikePartKind::TString(tstring)
                 if is_interpolated_string_with_quoted_format_spec_and_debug(
-                    &tstring.elements,
-                    tstring.flags.into(),
+                    tstring.elements(),
+                    tstring.flags().into(),
                     self.context,
                 ) =>
             {
@@ -289,28 +289,28 @@ impl QuoteMetadata {
         context: &PyFormatContext,
         preferred_quote: Quote,
     ) -> Self {
-        match part {
-            StringLikePart::String(_) | StringLikePart::Bytes(_) => {
+        match part.classify() {
+            StringLikePartKind::String(_) | StringLikePartKind::Bytes(_) => {
                 let text = &context.source()[part.content_range()];
 
                 Self::from_str(text, part.flags(), preferred_quote)
             }
-            StringLikePart::FString(fstring) => {
+            StringLikePartKind::FString(fstring) => {
                 let metadata = QuoteMetadata::from_str("", part.flags(), preferred_quote);
 
                 metadata.merge_interpolated_string_elements(
-                    &fstring.elements,
-                    fstring.flags.into(),
+                    fstring.elements(),
+                    fstring.flags().into(),
                     context,
                     preferred_quote,
                 )
             }
-            StringLikePart::TString(tstring) => {
+            StringLikePartKind::TString(tstring) => {
                 let metadata = QuoteMetadata::from_str("", part.flags(), preferred_quote);
 
                 metadata.merge_interpolated_string_elements(
-                    &tstring.elements,
-                    tstring.flags.into(),
+                    tstring.elements(),
+                    tstring.flags().into(),
                     context,
                     preferred_quote,
                 )
@@ -425,7 +425,7 @@ impl QuoteMetadata {
     /// ```
     fn merge_interpolated_string_elements(
         self,
-        elements: &InterpolatedStringElements,
+        elements: ruff_python_ast::flat::InterpolatedStringElements<'_>,
         flags: AnyStringFlags,
         context: &PyFormatContext,
         preferred_quote: Quote,
@@ -433,8 +433,8 @@ impl QuoteMetadata {
         let mut merged = self;
 
         for element in elements {
-            match element {
-                InterpolatedStringElement::Literal(literal) => {
+            match element.classify() {
+                flat::InterpolatedStringElementKind::Literal(literal) => {
                     merged = merged
                         .merge(&QuoteMetadata::from_str(
                             context.source().slice(literal),
@@ -443,11 +443,11 @@ impl QuoteMetadata {
                         ))
                         .expect("Merge to succeed because all parts have the same flags");
                 }
-                InterpolatedStringElement::Interpolation(expression) => {
-                    if let Some(spec) = expression.format_spec.as_deref() {
-                        if expression.debug_text.is_none() {
+                flat::InterpolatedStringElementKind::Interpolation(expression) => {
+                    if let Some(spec) = expression.format_spec() {
+                        if expression.debug_text().is_none() {
                             merged = merged.merge_interpolated_string_elements(
-                                &spec.elements,
+                                spec.elements(),
                                 flags,
                                 context,
                                 preferred_quote,
@@ -922,13 +922,13 @@ impl UnicodeEscape {
 /// f""""{10 + len('''bar''')=}"""
 /// ```
 pub(super) fn is_fstring_with_quoted_debug_expression(
-    fstring: &FString,
+    fstring: flat::View<'_, FString>,
     context: &PyFormatContext,
 ) -> bool {
-    fstring.elements.interpolations().any(|expression| {
-        if expression.debug_text.is_some() {
+    fstring.elements().interpolations().any(|expression| {
+        if expression.debug_text().is_some() {
             let content = context.source().slice(expression);
-            contains_opposite_quote(content, fstring.flags.into())
+            contains_opposite_quote(content, fstring.flags().into())
         } else {
             false
         }
@@ -947,7 +947,7 @@ pub(super) fn is_fstring_with_quoted_debug_expression(
 /// f"{'''other " '''}'
 /// ```
 pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes(
-    fstring: &FString,
+    fstring: flat::View<'_, FString>,
     context: &PyFormatContext,
 ) -> bool {
     struct Visitor<'a> {
@@ -961,14 +961,14 @@ pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes
                 return;
             }
 
-            let contains_quotes = match part {
-                StringLikePart::String(_) | StringLikePart::Bytes(_) => {
+            let contains_quotes = match part.classify() {
+                StringLikePartKind::String(_) | StringLikePartKind::Bytes(_) => {
                     self.contains_quote(part.content_range(), part.flags())
                 }
-                StringLikePart::FString(fstring) => {
+                StringLikePartKind::FString(fstring) => {
                     let mut contains_quotes = false;
-                    for literal in fstring.elements.literals() {
-                        if self.contains_quote(literal.range(), fstring.flags.into()) {
+                    for literal in fstring.elements().literals() {
+                        if self.contains_quote(literal.range(), fstring.flags().into()) {
                             contains_quotes = true;
                             break;
                         }
@@ -976,10 +976,10 @@ pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes
 
                     contains_quotes
                 }
-                StringLikePart::TString(tstring) => {
+                StringLikePartKind::TString(tstring) => {
                     let mut contains_quotes = false;
-                    for literal in tstring.elements.literals() {
-                        if self.contains_quote(literal.range(), tstring.flags.into()) {
+                    for literal in tstring.elements().literals() {
+                        if self.contains_quote(literal.range(), tstring.flags().into()) {
                             contains_quotes = true;
                             break;
                         }
@@ -1000,16 +1000,16 @@ pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes
     }
 
     impl SourceOrderVisitor<'_> for Visitor<'_> {
-        fn visit_f_string(&mut self, f_string: &FString) {
-            self.visit_string_like_part(StringLikePart::FString(f_string));
+        fn visit_f_string(&mut self, f_string: flat::View<'_, FString>) {
+            self.visit_string_like_part(StringLikePart::from(f_string));
         }
 
-        fn visit_string_literal(&mut self, string_literal: &StringLiteral) {
-            self.visit_string_like_part(StringLikePart::String(string_literal));
+        fn visit_string_literal(&mut self, string_literal: flat::View<'_, StringLiteral>) {
+            self.visit_string_like_part(StringLikePart::from(string_literal));
         }
 
-        fn visit_bytes_literal(&mut self, bytes_literal: &BytesLiteral) {
-            self.visit_string_like_part(StringLikePart::Bytes(bytes_literal));
+        fn visit_bytes_literal(&mut self, bytes_literal: flat::View<'_, BytesLiteral>) {
+            self.visit_string_like_part(StringLikePart::from(bytes_literal));
         }
     }
 
@@ -1018,7 +1018,7 @@ pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes
         found: false,
     };
 
-    ruff_python_ast::visitor::source_order::walk_f_string(&mut visitor, fstring);
+    ruff_python_ast::flat::visitor::source_order::walk_f_string(&mut visitor, fstring);
 
     visitor.found
 }
@@ -1033,29 +1033,29 @@ pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes
 /// t'{x=:a{y:{z:"abcd"}}}'
 /// ```
 pub(super) fn is_interpolated_string_with_quoted_format_spec_and_debug(
-    elements: &InterpolatedStringElements,
+    elements: ruff_python_ast::flat::InterpolatedStringElements<'_>,
     flags: AnyStringFlags,
     context: &PyFormatContext,
 ) -> bool {
     fn has_format_spec_with_opposite_quote(
-        elements: &InterpolatedStringElements,
+        elements: ruff_python_ast::flat::InterpolatedStringElements<'_>,
         flags: AnyStringFlags,
         context: &PyFormatContext,
         in_debug: bool,
     ) -> bool {
-        elements.iter().any(|element| match element {
-            InterpolatedStringElement::Literal(literal) => {
+        elements.iter().any(|element| match element.classify() {
+            flat::InterpolatedStringElementKind::Literal(literal) => {
                 let content = context.source().slice(literal);
 
                 in_debug && contains_opposite_quote(content, flags)
             }
-            InterpolatedStringElement::Interpolation(expression) => {
-                expression.format_spec.as_deref().is_some_and(|spec| {
+            flat::InterpolatedStringElementKind::Interpolation(expression) => {
+                expression.format_spec().is_some_and(|spec| {
                     has_format_spec_with_opposite_quote(
-                        &spec.elements,
+                        spec.elements(),
                         flags,
                         context,
-                        in_debug || expression.debug_text.is_some(),
+                        in_debug || expression.debug_text().is_some(),
                     )
                 })
             }
@@ -1063,12 +1063,12 @@ pub(super) fn is_interpolated_string_with_quoted_format_spec_and_debug(
     }
 
     elements.interpolations().any(|expression| {
-        if let Some(spec) = expression.format_spec.as_deref() {
+        if let Some(spec) = expression.format_spec() {
             return has_format_spec_with_opposite_quote(
-                &spec.elements,
+                spec.elements(),
                 flags,
                 context,
-                expression.debug_text.is_some(),
+                expression.debug_text().is_some(),
             );
         }
 

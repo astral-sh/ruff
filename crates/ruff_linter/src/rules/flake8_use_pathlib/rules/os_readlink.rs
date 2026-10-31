@@ -1,5 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{ExprCall, PythonVersion};
 
 use crate::checkers::ast::Checker;
@@ -68,7 +69,7 @@ impl Violation for OsReadlink {
 }
 
 /// PTH115
-pub(crate) fn os_readlink(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_readlink(checker: &Checker, call: flat::View<'_, ExprCall>, segments: &[&str]) {
     // Python 3.9+
     if checker.target_version() < PythonVersion::PY39 {
         return;
@@ -79,7 +80,7 @@ pub(crate) fn os_readlink(checker: &Checker, call: &ExprCall, segments: &[&str])
     //               0         1
     // os.readlink(path, *, dir_fd=None)
     // ```
-    if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
+    if is_keyword_only_argument_non_default(call.arguments(), "dir_fd") {
         return;
     }
 

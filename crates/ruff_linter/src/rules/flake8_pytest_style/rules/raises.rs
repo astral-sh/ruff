@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_ast::helpers::is_compound_statement;
-use ruff_python_ast::{self as ast, Expr, Stmt, WithItem};
+use ruff_python_ast::{Expr, Stmt, WithItem};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -174,14 +175,14 @@ impl Violation for PytestRaisesWithoutException {
     }
 }
 
-pub(crate) fn is_pytest_raises(func: &Expr, semantic: &SemanticModel) -> bool {
+pub(crate) fn is_pytest_raises(func: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "raises"]))
 }
 
-const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
-    if let [stmt] = body {
+fn is_non_trivial_with_body(body: flat::Suite<'_>) -> bool {
+    if let Some([stmt]) = body.as_array() {
         is_compound_statement(stmt)
     } else {
         true
@@ -189,8 +190,8 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 }
 
 /// PT010
-pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
-    if is_pytest_raises(&call.func, checker.semantic()) {
+pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall<'_>) {
+    if is_pytest_raises(call.func, checker.semantic()) {
         if checker.is_rule_enabled(Rule::PytestRaisesWithoutException) {
             if call
                 .arguments
@@ -216,11 +217,11 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
                     let match_is_empty_or_absent = call
                         .arguments
                         .find_keyword("match")
-                        .is_none_or(|k| is_empty_or_null_string(&k.value));
+                        .is_none_or(|k| is_empty_or_null_string(k.value()));
                     let check_is_absent_or_none = call
                         .arguments
                         .find_keyword("check")
-                        .is_none_or(|k| k.value.is_none_literal_expr());
+                        .is_none_or(|k| k.value().is_none_literal_expr());
                     if match_is_empty_or_absent && check_is_absent_or_none {
                         exception_needs_match(checker, exception);
                     }
@@ -231,26 +232,45 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
 }
 
 /// PT012
-pub(crate) fn complex_raises(checker: &Checker, stmt: &Stmt, items: &[WithItem], body: &[Stmt]) {
-    let raises_called = items.iter().any(|item| match &item.context_expr {
-        Expr::Call(ast::ExprCall { func, .. }) => is_pytest_raises(func, checker.semantic()),
-        _ => false,
-    });
+pub(crate) fn complex_raises(
+    checker: &Checker,
+    stmt: flat::View<'_, Stmt>,
+    items: flat::NodeList<'_, WithItem>,
+    body: flat::Suite<'_>,
+) {
+    let raises_called = items
+        .iter()
+        .any(|item| match item.context_expr().classify() {
+            flat::ExprKind::Call(expr_call) => {
+                let func = expr_call.func();
+
+                is_pytest_raises(func, checker.semantic())
+            }
+            _ => false,
+        });
 
     // Check body for `pytest.raises` context manager
     if raises_called {
-        let is_too_complex = if let [stmt] = body {
-            match stmt {
-                Stmt::With(ast::StmtWith { body, .. }) => is_non_trivial_with_body(body),
+        let is_too_complex = if let Some([stmt]) = body.as_array() {
+            match stmt.fields() {
+                ast::Stmt::With(ast::StmtWith { body, .. }) => is_non_trivial_with_body(body),
                 // Allow function and class definitions to test decorators.
-                Stmt::ClassDef(_) | Stmt::FunctionDef(_) => false,
+                ast::Stmt::ClassDef(_) | ast::Stmt::FunctionDef(_) => false,
                 // Allow empty `for` loops to test iterators.
-                Stmt::For(ast::StmtFor { body, .. }) => match &body[..] {
-                    [Stmt::Pass(_)] => false,
-                    [Stmt::Expr(ast::StmtExpr { value, .. })] => !value.is_ellipsis_literal_expr(),
+                ast::Stmt::For(ast::StmtFor { body, .. }) => match body.slice(..) {
+                    body if let Some([stmt]) = body.as_array()
+                        && let flat::StmtKind::Pass(_) = stmt.classify() =>
+                    {
+                        false
+                    }
+                    body if let Some([stmt]) = body.as_array()
+                        && let ast::Stmt::Expr(ast::StmtExpr { value, .. }) = stmt.fields() =>
+                    {
+                        !value.is_ellipsis_literal_expr()
+                    }
                     _ => true,
                 },
-                stmt => is_compound_statement(stmt),
+                stmt => is_compound_statement(stmt.view()),
             }
         } else {
             true
@@ -263,7 +283,7 @@ pub(crate) fn complex_raises(checker: &Checker, stmt: &Stmt, items: &[WithItem],
 }
 
 /// PT011
-fn exception_needs_match(checker: &Checker, exception: &Expr) {
+fn exception_needs_match(checker: &Checker, exception: flat::View<'_, Expr>) {
     if let Some(qualified_name) = checker
         .semantic()
         .resolve_qualified_name(exception)

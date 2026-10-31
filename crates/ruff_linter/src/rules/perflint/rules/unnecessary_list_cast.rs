@@ -1,7 +1,8 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_ast::flat::statement_visitor::{StatementVisitor, walk_stmt};
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{Expr, Stmt};
 use ruff_python_semantic::analyze::typing::find_assigned_value;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -67,24 +68,19 @@ impl AlwaysFixableViolation for UnnecessaryListCast {
 }
 
 /// PERF101
-pub(crate) fn unnecessary_list_cast(checker: &Checker, iter: &Expr, body: &[Stmt]) {
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments:
-            Arguments {
-                args,
-                keywords: _,
-                range: _,
-                node_index: _,
-            },
-        range_start: _,
-        node_index: _,
-    }) = iter
-    else {
+pub(crate) fn unnecessary_list_cast(
+    checker: &Checker,
+    iter: flat::View<'_, Expr>,
+    body: flat::Suite<'_>,
+) {
+    let flat::ExprKind::Call(call_node) = iter.classify() else {
         return;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
+    let args = arguments.args();
 
-    let [arg] = &**args else {
+    let Some([arg]) = args.as_array() else {
         return;
     };
 
@@ -92,23 +88,23 @@ pub(crate) fn unnecessary_list_cast(checker: &Checker, iter: &Expr, body: &[Stmt
         return;
     }
 
-    match arg {
-        Expr::Tuple(ast::ExprTuple {
+    match arg.fields() {
+        ast::Expr::Tuple(ast::ExprTuple {
             range: iterable_range,
             ..
         })
-        | Expr::List(ast::ExprList {
+        | ast::Expr::List(ast::ExprList {
             range: iterable_range,
             ..
         })
-        | Expr::Set(ast::ExprSet {
+        | ast::Expr::Set(ast::ExprSet {
             range: iterable_range,
             ..
         }) => {
             let mut diagnostic = checker.report_diagnostic(UnnecessaryListCast, iter.range());
-            diagnostic.set_fix(remove_cast(checker, iter.range(), *iterable_range));
+            diagnostic.set_fix(remove_cast(checker, iter.range(), iterable_range));
         }
-        Expr::Name(ast::ExprName {
+        ast::Expr::Name(ast::ExprName {
             id,
             range: iterable_range,
             ..
@@ -116,7 +112,10 @@ pub(crate) fn unnecessary_list_cast(checker: &Checker, iter: &Expr, body: &[Stmt
             let Some(value) = find_assigned_value(id, checker.semantic()) else {
                 return;
             };
-            if matches!(value, Expr::Tuple(_) | Expr::List(_) | Expr::Set(_)) {
+            if matches!(
+                value.classify(),
+                flat::ExprKind::Tuple(_) | flat::ExprKind::List(_) | flat::ExprKind::Set(_)
+            ) {
                 // If the variable is being modified to, don't suggest removing the cast:
                 //
                 // ```python
@@ -133,7 +132,7 @@ pub(crate) fn unnecessary_list_cast(checker: &Checker, iter: &Expr, body: &[Stmt
                 }
 
                 let mut diagnostic = checker.report_diagnostic(UnnecessaryListCast, iter.range());
-                diagnostic.set_fix(remove_cast(checker, iter.range(), *iterable_range));
+                diagnostic.set_fix(remove_cast(checker, iter.range(), iterable_range));
             }
         }
         _ => {}
@@ -174,7 +173,7 @@ impl<'a> MutationVisitor<'a> {
 }
 
 impl<'a> StatementVisitor<'a> for MutationVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+    fn visit_stmt(&mut self, stmt: flat::View<'a, Stmt>) {
         if match_mutation(stmt, self.target) {
             self.is_mutated = true;
         } else {
@@ -186,14 +185,22 @@ impl<'a> StatementVisitor<'a> for MutationVisitor<'a> {
 /// Check if a statement is (probably) a modification to the list assigned to the given identifier.
 ///
 /// For example, `foo.append(bar)` would return `true` if `id` is `foo`.
-fn match_mutation(stmt: &Stmt, id: &str) -> bool {
-    match stmt {
+fn match_mutation(stmt: flat::View<'_, Stmt>, id: &str) -> bool {
+    match stmt.classify() {
         // Ex) `foo.append(bar)`
-        Stmt::Expr(ast::StmtExpr { value, .. }) => {
-            let Some(ast::ExprCall { func, .. }) = value.as_call_expr() else {
+        flat::StmtKind::Expr(stmt_expr) => {
+            let value = stmt_expr.value();
+
+            let Some(ast::ExprCall { func, .. }) = value
+                .as_call_expr()
+                .map(flat::View::<ruff_python_ast::ExprCall>::fields)
+            else {
                 return false;
             };
-            let Some(ast::ExprAttribute { value, attr, .. }) = func.as_attribute_expr() else {
+            let Some(ast::ExprAttribute { value, attr, .. }) = func
+                .as_attribute_expr()
+                .map(flat::View::<ruff_python_ast::ExprAttribute>::fields)
+            else {
                 return false;
             };
             if !matches!(
@@ -202,46 +209,82 @@ fn match_mutation(stmt: &Stmt, id: &str) -> bool {
             ) {
                 return false;
             }
-            let Some(ast::ExprName { id: target_id, .. }) = value.as_name_expr() else {
+            let Some(ast::ExprName { id: target_id, .. }) = value
+                .as_name_expr()
+                .map(flat::View::<ruff_python_ast::ExprName>::fields)
+            else {
                 return false;
             };
             target_id == id
         }
         // Ex) `foo[0] = bar`
-        Stmt::Assign(ast::StmtAssign { targets, .. }) => targets.iter().any(|target| {
-            if let Some(ast::ExprSubscript { value: target, .. }) = target.as_subscript_expr() {
-                if let Some(ast::ExprName { id: target_id, .. }) = target.as_name_expr() {
-                    return target_id == id;
+        flat::StmtKind::Assign(stmt_assign) => {
+            let targets = stmt_assign.targets();
+
+            targets.iter().any(|target| {
+                if let Some(ast::ExprSubscript { value: target, .. }) = target
+                    .as_subscript_expr()
+                    .map(flat::View::<ruff_python_ast::ExprSubscript>::fields)
+                {
+                    if let Some(ast::ExprName { id: target_id, .. }) = target
+                        .as_name_expr()
+                        .map(flat::View::<ruff_python_ast::ExprName>::fields)
+                    {
+                        return target_id == id;
+                    }
                 }
-            }
-            false
-        }),
+                false
+            })
+        }
         // Ex) `foo += bar`
-        Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
-            if let Some(ast::ExprName { id: target_id, .. }) = target.as_name_expr() {
+        flat::StmtKind::AugAssign(stmt_aug_assign) => {
+            let target = stmt_aug_assign.target();
+
+            if let Some(ast::ExprName { id: target_id, .. }) = target
+                .as_name_expr()
+                .map(flat::View::<ruff_python_ast::ExprName>::fields)
+            {
                 target_id == id
             } else {
                 false
             }
         }
         // Ex) `foo[0]: int = bar`
-        Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
-            if let Some(ast::ExprSubscript { value: target, .. }) = target.as_subscript_expr() {
-                if let Some(ast::ExprName { id: target_id, .. }) = target.as_name_expr() {
+        flat::StmtKind::AnnAssign(stmt_ann_assign) => {
+            let target = stmt_ann_assign.target();
+
+            if let Some(ast::ExprSubscript { value: target, .. }) = target
+                .as_subscript_expr()
+                .map(flat::View::<ruff_python_ast::ExprSubscript>::fields)
+            {
+                if let Some(ast::ExprName { id: target_id, .. }) = target
+                    .as_name_expr()
+                    .map(flat::View::<ruff_python_ast::ExprName>::fields)
+                {
                     return target_id == id;
                 }
             }
             false
         }
         // Ex) `del foo[0]`
-        Stmt::Delete(ast::StmtDelete { targets, .. }) => targets.iter().any(|target| {
-            if let Some(ast::ExprSubscript { value: target, .. }) = target.as_subscript_expr() {
-                if let Some(ast::ExprName { id: target_id, .. }) = target.as_name_expr() {
-                    return target_id == id;
+        flat::StmtKind::Delete(stmt_delete) => {
+            let targets = stmt_delete.targets();
+
+            targets.iter().any(|target| {
+                if let Some(ast::ExprSubscript { value: target, .. }) = target
+                    .as_subscript_expr()
+                    .map(flat::View::<ruff_python_ast::ExprSubscript>::fields)
+                {
+                    if let Some(ast::ExprName { id: target_id, .. }) = target
+                        .as_name_expr()
+                        .map(flat::View::<ruff_python_ast::ExprName>::fields)
+                    {
+                        return target_id == id;
+                    }
                 }
-            }
-            false
-        }),
+                false
+            })
+        }
         _ => false,
     }
 }

@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Stmt;
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_ast::whitespace::trailing_comment_start_offset;
-use ruff_python_ast::{Expr, ExprStringLiteral, Stmt, StmtExpr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -82,15 +83,15 @@ impl AlwaysFixableViolation for UnnecessaryPlaceholder {
 }
 
 /// PIE790
-pub(crate) fn unnecessary_placeholder(checker: &Checker, body: &[Stmt]) {
+pub(crate) fn unnecessary_placeholder(checker: &Checker, body: flat::Suite<'_>) {
     if body.len() < 2 {
         return;
     }
 
     for (index, stmt) in body.iter().enumerate() {
-        let kind = match stmt {
-            Stmt::Pass(_) => Placeholder::Pass,
-            Stmt::Expr(expr) if expr.value.is_ellipsis_literal_expr() => {
+        let kind = match stmt.classify() {
+            flat::StmtKind::Pass(_) => Placeholder::Pass,
+            flat::StmtKind::Expr(expr) if expr.value().is_ellipsis_literal_expr() => {
                 // In a type-checking block, a trailing ellipsis might be meaningful.
                 // A user might be using the type-checking context to declare a stub.
                 if checker.semantic().in_type_checking_block() {
@@ -116,20 +117,20 @@ pub(crate) fn unnecessary_placeholder(checker: &Checker, body: &[Stmt]) {
 /// Add a diagnostic for the given statement.
 fn add_diagnostic(
     checker: &Checker,
-    stmt: &Stmt,
-    next_stmt: Option<&Stmt>,
+    stmt: flat::View<'_, Stmt>,
+    next_stmt: Option<flat::View<'_, Stmt>>,
     placeholder_kind: Placeholder,
 ) {
-    let edit = if let Some(index) = trailing_comment_start_offset(stmt, checker.source()) {
+    let edit = if let Some(index) = trailing_comment_start_offset(&stmt, checker.source()) {
         Edit::range_deletion(stmt.range().add_end(index))
     } else {
         fix::edits::delete_stmt(stmt, None, checker.locator(), checker.indexer())
     };
-    let applicability = match next_stmt {
+    let applicability = match next_stmt.map(flat::View::<Stmt>::fields) {
         // Mark the fix as unsafe if the following statement is a string literal,
         // as it will become the module/class/function's docstring after the fix.
-        Some(Stmt::Expr(StmtExpr { value, .. })) => match value.as_ref() {
-            Expr::StringLiteral(ExprStringLiteral { .. }) => Applicability::Unsafe,
+        Some(ast::Stmt::Expr(ast::StmtExpr { value, .. })) => match value.classify() {
+            flat::ExprKind::StringLiteral(_) => Applicability::Unsafe,
             _ => Applicability::Safe,
         },
         _ => Applicability::Safe,

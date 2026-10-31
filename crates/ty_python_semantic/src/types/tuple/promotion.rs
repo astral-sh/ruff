@@ -1,5 +1,6 @@
 use crate::Db;
 use crate::ProgramEnvironment;
+use ruff_python_ast::flat;
 use rustc_hash::FxHashSet;
 use std::cell::Cell;
 
@@ -131,7 +132,7 @@ impl<'db> TupleSizePromotionConstraints<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar_identity: BoundTypeVarIdentity<'db>,
-        expression: &ast::Expr,
+        expression: flat::View<'_, ast::Expr>,
         ty: Type<'db>,
     ) {
         if !Self::allows_expression(db, env, Some(expression), ty) {
@@ -171,7 +172,7 @@ impl<'db> TupleSizePromotionConstraints<'db> {
     pub(crate) fn allows_expression(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        expression: Option<&ast::Expr>,
+        expression: Option<flat::View<'_, ast::Expr>>,
         ty: Type<'db>,
     ) -> bool {
         expression
@@ -184,10 +185,10 @@ impl<'db> TupleSizePromotionConstraints<'db> {
     fn is_promotable_tuple_literal(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        expression: &ast::Expr,
+        expression: flat::View<'_, ast::Expr>,
         ty: Type<'db>,
     ) -> bool {
-        matches!(expression, ast::Expr::Tuple(tuple) if !tuple.iter().any(ast::Expr::is_starred_expr))
+        matches!(expression.classify(), flat::ExprKind::Tuple(tuple) if !tuple.iter().any(flat::View::is_starred_expr))
             && TupleSizePromotionCandidate::from_type(db, env, ty).is_some()
     }
 }

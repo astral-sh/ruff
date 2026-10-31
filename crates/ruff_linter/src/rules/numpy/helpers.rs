@@ -1,13 +1,11 @@
-use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::statement_visitor::StatementVisitor;
+use ruff_python_ast::helpers::any_over_body;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::visitor::{walk_expr, walk_stmt};
-use ruff_python_ast::{Alias, Stmt, StmtImportFrom, statement_visitor};
+use ruff_python_ast::{Stmt, flat::statement_visitor};
 use ruff_python_semantic::SemanticModel;
 
-/// AST visitor that searches an AST tree for [`ast::StmtImportFrom`] nodes
-/// that match a certain [`QualifiedName`].
+/// Searches for a particular name imported from a module.
 pub(crate) struct ImportSearcher<'a> {
     module: &'a str,
     name: &'a str,
@@ -24,13 +22,18 @@ impl<'a> ImportSearcher<'a> {
     }
 }
 impl StatementVisitor<'_> for ImportSearcher<'_> {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+    fn visit_stmt(&mut self, stmt: flat::View<'_, Stmt>) {
         if self.found_import {
             return;
         }
-        if let Stmt::ImportFrom(StmtImportFrom { module, names, .. }) = stmt {
-            if module.as_ref().is_some_and(|module| module == self.module)
-                && names.iter().any(|Alias { name, .. }| name == self.name)
+        if let flat::StmtKind::ImportFrom(import_from) = stmt.classify() {
+            let module = import_from.module();
+            let names = import_from.names();
+            if module.is_some_and(|module| module == self.module)
+                && names.iter().any(|alias| {
+                    let name = alias.name();
+                    *name == *self.name
+                })
             {
                 self.found_import = true;
                 return;
@@ -39,7 +42,7 @@ impl StatementVisitor<'_> for ImportSearcher<'_> {
         statement_visitor::walk_stmt(self, stmt);
     }
 
-    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
+    fn visit_body(&mut self, body: flat::Suite<'_>) {
         for stmt in body {
             self.visit_stmt(stmt);
             if self.found_import {
@@ -49,56 +52,17 @@ impl StatementVisitor<'_> for ImportSearcher<'_> {
     }
 }
 
-/// AST visitor that searches an AST tree for [`ast::ExprAttribute`] nodes
-/// that match a certain [`QualifiedName`].
-pub(crate) struct AttributeSearcher<'a> {
-    attribute_to_find: QualifiedName<'a>,
-    semantic: &'a SemanticModel<'a>,
-    pub found_attribute: bool,
-}
-
-impl<'a> AttributeSearcher<'a> {
-    pub(crate) fn new(
-        attribute_to_find: QualifiedName<'a>,
-        semantic: &'a SemanticModel<'a>,
-    ) -> Self {
-        Self {
-            attribute_to_find,
-            semantic,
-            found_attribute: false,
-        }
-    }
-}
-
-impl Visitor<'_> for AttributeSearcher<'_> {
-    fn visit_expr(&mut self, expr: &'_ Expr) {
-        if self.found_attribute {
-            return;
-        }
-        if expr.is_attribute_expr()
-            && self
-                .semantic
+pub(crate) fn body_contains_attribute(
+    body: flat::Suite<'_>,
+    module: &str,
+    member: &str,
+    semantic: &SemanticModel,
+) -> bool {
+    let target = QualifiedName::user_defined(module).append_member(member);
+    any_over_body(body, |expr| {
+        expr.is_attribute_expr()
+            && semantic
                 .resolve_qualified_name(expr)
-                .is_some_and(|qualified_name| qualified_name == self.attribute_to_find)
-        {
-            self.found_attribute = true;
-            return;
-        }
-        walk_expr(self, expr);
-    }
-
-    fn visit_stmt(&mut self, stmt: &ruff_python_ast::Stmt) {
-        if !self.found_attribute {
-            walk_stmt(self, stmt);
-        }
-    }
-
-    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
-        for stmt in body {
-            self.visit_stmt(stmt);
-            if self.found_attribute {
-                return;
-            }
-        }
-    }
+                .is_some_and(|name| name == target)
+    })
 }

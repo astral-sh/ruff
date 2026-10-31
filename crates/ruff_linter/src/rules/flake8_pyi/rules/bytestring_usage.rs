@@ -1,5 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -60,7 +62,7 @@ impl std::fmt::Display for ByteStringOrigin {
 }
 
 /// PYI057
-pub(crate) fn bytestring_attribute(checker: &Checker, attribute: &Expr) {
+pub(crate) fn bytestring_attribute(checker: &Checker, &attribute: &flat::View<'_, Expr>) {
     let semantic = checker.semantic();
     if !semantic
         .seen
@@ -81,11 +83,12 @@ pub(crate) fn bytestring_attribute(checker: &Checker, attribute: &Expr) {
 }
 
 /// PYI057
-pub(crate) fn bytestring_import(checker: &Checker, import_from: &ast::StmtImportFrom) {
-    let ast::StmtImportFrom { names, module, .. } = import_from;
+pub(crate) fn bytestring_import(checker: &Checker, import_from: &fields::StmtImportFrom<'_>) {
+    let names = import_from.names;
+    let module = import_from.module;
 
     let module_id = match module {
-        Some(module) => module.id.as_str(),
+        Some(module) => module.id().as_str(),
         None => return,
     };
 
@@ -96,7 +99,7 @@ pub(crate) fn bytestring_import(checker: &Checker, import_from: &ast::StmtImport
     };
 
     for name in names {
-        if name.name.as_str() == "ByteString" {
+        if name.name().as_str() == "ByteString" {
             let mut diagnostic =
                 checker.report_diagnostic(ByteStringUsage { origin }, name.range());
             diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);

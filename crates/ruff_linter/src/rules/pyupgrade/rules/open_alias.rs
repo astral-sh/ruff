@@ -1,5 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -51,7 +52,11 @@ impl Violation for OpenAlias {
 }
 
 /// UP020
-pub(crate) fn open_alias(checker: &Checker, expr: &Expr, func: &Expr) {
+pub(crate) fn open_alias(
+    checker: &Checker,
+    &expr: &flat::View<'_, Expr>,
+    func: flat::View<'_, Expr>,
+) {
     if checker
         .semantic()
         .resolve_qualified_name(func)

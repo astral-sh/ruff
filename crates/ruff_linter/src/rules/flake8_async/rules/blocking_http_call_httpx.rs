@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_ast::ExprCall;
+use ruff_python_ast::flat::{self, fields as ast};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing::{TypeChecker, check_type, traverse_union_and_optional};
@@ -59,7 +60,7 @@ struct HttpxClientChecker;
 
 impl TypeChecker for HttpxClientChecker {
     fn match_annotation(
-        annotation: &ruff_python_ast::Expr,
+        annotation: flat::View<'_, ruff_python_ast::Expr>,
         semantic: &ruff_python_semantic::SemanticModel,
     ) -> bool {
         // match base annotation directly
@@ -90,12 +91,13 @@ impl TypeChecker for HttpxClientChecker {
     }
 
     fn match_initializer(
-        initializer: &ruff_python_ast::Expr,
+        initializer: flat::View<'_, ruff_python_ast::Expr>,
         semantic: &ruff_python_semantic::SemanticModel,
     ) -> bool {
-        let Expr::Call(ExprCall { func, .. }) = initializer else {
+        let flat::ExprKind::Call(call_node) = initializer.classify() else {
             return false;
         };
+        let func = call_node.func();
 
         semantic
             .resolve_qualified_name(func)
@@ -104,13 +106,17 @@ impl TypeChecker for HttpxClientChecker {
 }
 
 /// ASYNC212
-pub(crate) fn blocking_http_call_httpx(checker: &Checker, call: &ExprCall) {
+pub(crate) fn blocking_http_call_httpx(checker: &Checker, call: flat::View<'_, ExprCall>) {
     let semantic = checker.semantic();
     if !semantic.in_async_context() {
         return;
     }
 
-    let Some(ast::ExprAttribute { value, attr, .. }) = call.func.as_attribute_expr() else {
+    let Some(ast::ExprAttribute { value, attr, .. }) = call
+        .func()
+        .as_attribute_expr()
+        .map(flat::View::<ruff_python_ast::ExprAttribute>::fields)
+    else {
         return;
     };
     let Some(name) = value.as_name_expr() else {
@@ -122,7 +128,7 @@ pub(crate) fn blocking_http_call_httpx(checker: &Checker, call: &ExprCall) {
 
     if check_type::<HttpxClientChecker>(binding, semantic) {
         if matches!(
-            attr.id.as_str(),
+            attr.id().as_str(),
             "close"
                 | "delete"
                 | "get"
@@ -137,10 +143,10 @@ pub(crate) fn blocking_http_call_httpx(checker: &Checker, call: &ExprCall) {
         ) {
             checker.report_diagnostic(
                 BlockingHttpCallHttpxInAsyncFunction {
-                    name: name.id.to_string(),
-                    call: attr.id.to_string(),
+                    name: name.id().to_string(),
+                    call: attr.id().to_string(),
                 },
-                call.func.range(),
+                call.func().range(),
             );
         }
     }

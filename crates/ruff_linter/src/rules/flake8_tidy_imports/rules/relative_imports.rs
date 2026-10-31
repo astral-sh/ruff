@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Identifier, Stmt};
+use ruff_python_ast::{self as ast, Identifier, Stmt, flat};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -85,7 +85,7 @@ impl Violation for RelativeImports {
 }
 
 fn fix_banned_relative_import(
-    stmt: &Stmt,
+    stmt: flat::View<'_, Stmt>,
     level: u32,
     module: Option<&str>,
     module_path: Option<&[String]>,
@@ -100,19 +100,21 @@ fn fix_banned_relative_import(
         return None;
     }
 
-    let Stmt::ImportFrom(ast::StmtImportFrom { names, is_lazy, .. }) = stmt else {
+    let flat::StmtKind::ImportFrom(import_from) = stmt.classify() else {
         panic!("Expected Stmt::ImportFrom");
     };
+    let names = import_from.names();
+    let is_lazy = import_from.is_lazy();
     let node = ast::StmtImportFrom {
         module: Some(Identifier::new(
             module_path.to_string(),
             TextRange::default(),
         )),
-        names: names.clone(),
+        names: names.iter().map(flat::View::to_owned_node).collect(),
         level: 0,
-        is_lazy: *is_lazy,
+        is_lazy,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     let content = generator.stmt(&node.into());
     Some(Fix::unsafe_edit(Edit::range_replacement(
@@ -124,7 +126,7 @@ fn fix_banned_relative_import(
 /// TID252
 pub(crate) fn banned_relative_import(
     checker: &Checker,
-    stmt: &Stmt,
+    stmt: flat::View<'_, Stmt>,
     level: u32,
     module: Option<&str>,
     module_path: Option<&[String]>,

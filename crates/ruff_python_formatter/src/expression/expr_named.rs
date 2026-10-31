@@ -1,6 +1,7 @@
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprNamed;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::AnyNodeRef;
 
 use crate::comments::dangling_comments;
 use crate::expression::parentheses::{
@@ -12,13 +13,9 @@ use crate::prelude::*;
 pub struct FormatExprNamed;
 
 impl FormatNodeRule<ExprNamed> for FormatExprNamed {
-    fn fmt_fields(&self, item: &ExprNamed, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprNamed {
-            target,
-            value,
-            range: _,
-            node_index: _,
-        } = item;
+    fn fmt_fields(&self, item: flat::View<'_, ExprNamed>, f: &mut PyFormatter) -> FormatResult<()> {
+        let target = item.target();
+        let value = item.value();
 
         // This context, a dangling comment is a comment between the `:=` and the value.
         let comments = f.context().comments().clone();
@@ -45,7 +42,7 @@ impl FormatNodeRule<ExprNamed> for FormatExprNamed {
     }
 }
 
-impl NeedsParentheses for ExprNamed {
+impl NeedsParentheses for flat::View<'_, ExprNamed> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,

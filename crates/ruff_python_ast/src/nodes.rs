@@ -1,6 +1,6 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
-use crate::AtomicNodeIndex;
+use crate::NodeIndex;
 use crate::generated::{
     ExprBytesLiteral, ExprCall, ExprCompare, ExprDict, ExprFString, ExprList, ExprName, ExprSet,
     ExprStringLiteral, ExprTString, ExprTuple, PatternMatchAs, PatternMatchOr, StmtClassDef,
@@ -22,8 +22,7 @@ use crate::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix, TStringPrefix,
 };
 use crate::{
-    Expr, ExprRef, InterpolatedStringElement, LiteralExpressionRef, OperatorPrecedence, Pattern,
-    Stmt, TypeParam, int,
+    Expr, InterpolatedStringElement, OperatorPrecedence, Pattern, Stmt, TypeParam, int,
     name::Name,
     str::{Quote, TripleQuotes},
 };
@@ -50,7 +49,7 @@ impl StmtClassDef {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ElifElseClause {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub test: Option<Expr>,
     pub body: Suite,
 }
@@ -70,19 +69,6 @@ impl Expr {
                 | Expr::NoneLiteral(_)
                 | Expr::EllipsisLiteral(_)
         )
-    }
-
-    /// Returns [`LiteralExpressionRef`] if the expression is a literal expression.
-    pub fn as_literal_expr(&self) -> Option<LiteralExpressionRef<'_>> {
-        match self {
-            Expr::StringLiteral(expr) => Some(LiteralExpressionRef::StringLiteral(expr)),
-            Expr::BytesLiteral(expr) => Some(LiteralExpressionRef::BytesLiteral(expr)),
-            Expr::NumberLiteral(expr) => Some(LiteralExpressionRef::NumberLiteral(expr)),
-            Expr::BooleanLiteral(expr) => Some(LiteralExpressionRef::BooleanLiteral(expr)),
-            Expr::NoneLiteral(expr) => Some(LiteralExpressionRef::NoneLiteral(expr)),
-            Expr::EllipsisLiteral(expr) => Some(LiteralExpressionRef::EllipsisLiteral(expr)),
-            _ => None,
-        }
     }
 
     /// Return the value expression after peeling off any nested named expressions.
@@ -166,25 +152,6 @@ impl ExprCompare {
     }
 }
 
-impl ExprRef<'_> {
-    /// See [`Expr::is_literal_expr`].
-    pub fn is_literal_expr(&self) -> bool {
-        matches!(
-            self,
-            ExprRef::StringLiteral(_)
-                | ExprRef::BytesLiteral(_)
-                | ExprRef::NumberLiteral(_)
-                | ExprRef::BooleanLiteral(_)
-                | ExprRef::NoneLiteral(_)
-                | ExprRef::EllipsisLiteral(_)
-        )
-    }
-
-    pub fn precedence(&self) -> OperatorPrecedence {
-        OperatorPrecedence::from(*self)
-    }
-}
-
 /// Represents an item in a [dictionary literal display][1].
 ///
 /// Consider the following Python dictionary literal:
@@ -235,18 +202,6 @@ impl Ranged for DictItem {
 }
 
 impl ExprDict {
-    /// Returns an `Iterator` over the AST nodes representing the
-    /// dictionary's keys.
-    pub fn iter_keys(&self) -> DictKeyIterator<'_> {
-        DictKeyIterator::new(&self.items)
-    }
-
-    /// Returns an `Iterator` over the AST nodes representing the
-    /// dictionary's values.
-    pub fn iter_values(&self) -> DictValueIterator<'_> {
-        DictValueIterator::new(&self.items)
-    }
-
     /// Returns the AST node representing the *n*th key of this
     /// dictionary.
     ///
@@ -285,90 +240,6 @@ impl<'a> IntoIterator for &'a ExprDict {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct DictKeyIterator<'a> {
-    items: Iter<'a, DictItem>,
-}
-
-impl<'a> DictKeyIterator<'a> {
-    fn new(items: &'a [DictItem]) -> Self {
-        Self {
-            items: items.iter(),
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
-impl<'a> Iterator for DictKeyIterator<'a> {
-    type Item = Option<&'a Expr>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.items.next().map(DictItem::key)
-    }
-
-    fn last(mut self) -> Option<Self::Item> {
-        self.next_back()
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.items.size_hint()
-    }
-}
-
-impl DoubleEndedIterator for DictKeyIterator<'_> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.items.next_back().map(DictItem::key)
-    }
-}
-
-impl FusedIterator for DictKeyIterator<'_> {}
-impl ExactSizeIterator for DictKeyIterator<'_> {}
-
-#[derive(Debug, Clone)]
-pub struct DictValueIterator<'a> {
-    items: Iter<'a, DictItem>,
-}
-
-impl<'a> DictValueIterator<'a> {
-    fn new(items: &'a [DictItem]) -> Self {
-        Self {
-            items: items.iter(),
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
-impl<'a> Iterator for DictValueIterator<'a> {
-    type Item = &'a Expr;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.items.next().map(DictItem::value)
-    }
-
-    fn last(mut self) -> Option<Self::Item> {
-        self.next_back()
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.items.size_hint()
-    }
-}
-
-impl DoubleEndedIterator for DictValueIterator<'_> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.items.next_back().map(DictItem::value)
-    }
-}
-
-impl FusedIterator for DictValueIterator<'_> {}
-impl ExactSizeIterator for DictValueIterator<'_> {}
-
 impl ExprSet {
     pub fn iter(&self) -> std::slice::Iter<'_, Expr> {
         self.elts.iter()
@@ -396,7 +267,7 @@ impl<'a> IntoIterator for &'a ExprSet {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct InterpolatedStringFormatSpec {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub elements: InterpolatedStringElements,
 }
 
@@ -405,7 +276,7 @@ pub struct InterpolatedStringFormatSpec {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct InterpolatedElement {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub expression: Box<Expr>,
     pub debug_text: Option<DebugText>,
     pub conversion: ConversionFlag,
@@ -417,7 +288,7 @@ pub struct InterpolatedElement {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct InterpolatedStringLiteralElement {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub value: Box<str>,
 }
 
@@ -1383,7 +1254,7 @@ impl fmt::Debug for TStringFlags {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct FString {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub elements: InterpolatedStringElements,
     pub flags: FStringFlags,
 }
@@ -1391,7 +1262,7 @@ pub struct FString {
 impl From<FString> for Expr {
     fn from(payload: FString) -> Self {
         ExprFString {
-            node_index: payload.node_index.clone(),
+            node_index: payload.node_index,
             range: payload.range,
             value: FStringValue::single(payload),
         }
@@ -1413,6 +1284,12 @@ impl InterpolatedStringElements {
     /// Returns an iterator over all the [`InterpolatedElement`] nodes contained in this f-string.
     pub fn interpolations(&self) -> impl Iterator<Item = &InterpolatedElement> {
         self.iter().filter_map(|element| element.as_interpolation())
+    }
+}
+
+impl FromIterator<InterpolatedStringElement> for InterpolatedStringElements {
+    fn from_iter<I: IntoIterator<Item = InterpolatedStringElement>>(iter: I) -> Self {
+        Self(iter.into_iter().collect())
     }
 }
 
@@ -1465,7 +1342,7 @@ impl fmt::Debug for InterpolatedStringElements {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct TString {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub elements: InterpolatedStringElements,
     pub flags: TStringFlags,
 }
@@ -1483,7 +1360,7 @@ impl TString {
 impl From<TString> for Expr {
     fn from(payload: TString) -> Self {
         ExprTString {
-            node_index: payload.node_index.clone(),
+            node_index: payload.node_index,
             range: payload.range,
             value: TStringValue::single(payload),
         }
@@ -1895,7 +1772,7 @@ impl fmt::Debug for StringLiteralFlags {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StringLiteral {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub value: Box<str>,
     pub flags: StringLiteralFlags,
 }
@@ -1919,7 +1796,7 @@ impl StringLiteral {
         Self {
             range,
             value: "".into(),
-            node_index: AtomicNodeIndex::NONE,
+            node_index: NodeIndex::NONE,
             flags: StringLiteralFlags::empty().with_invalid(),
         }
     }
@@ -1939,7 +1816,7 @@ impl From<StringLiteral> for Expr {
     fn from(payload: StringLiteral) -> Self {
         ExprStringLiteral {
             range: payload.range,
-            node_index: AtomicNodeIndex::NONE,
+            node_index: NodeIndex::NONE,
             value: StringLiteralValue::single(payload),
         }
         .into()
@@ -2187,6 +2064,25 @@ impl get_size2::GetSize for BytesLiteralFlagsInner {}
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct BytesLiteralFlags(BytesLiteralFlagsInner);
 
+macro_rules! string_flag_bits {
+    ($flags:ty, $bits:ty) => {
+        impl $flags {
+            pub(crate) const fn bits(self) -> u8 {
+                self.0.bits()
+            }
+
+            pub(crate) const fn from_bits(bits: u8) -> Self {
+                Self(<$bits>::from_bits_retain(bits))
+            }
+        }
+    };
+}
+
+string_flag_bits!(StringLiteralFlags, StringLiteralFlagsInner);
+string_flag_bits!(BytesLiteralFlags, BytesLiteralFlagsInner);
+string_flag_bits!(FStringFlags, InterpolatedStringFlagsInner);
+string_flag_bits!(TStringFlags, InterpolatedStringFlagsInner);
+
 impl BytesLiteralFlags {
     /// Construct a new [`BytesLiteralFlags`] with **no flags set**.
     ///
@@ -2313,7 +2209,7 @@ impl fmt::Debug for BytesLiteralFlags {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct BytesLiteral {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub value: Box<[u8]>,
     pub flags: BytesLiteralFlags,
 }
@@ -2337,7 +2233,7 @@ impl BytesLiteral {
         Self {
             range,
             value: Box::new([]),
-            node_index: AtomicNodeIndex::NONE,
+            node_index: NodeIndex::NONE,
             flags: BytesLiteralFlags::empty().with_invalid(),
         }
     }
@@ -2357,7 +2253,7 @@ impl From<BytesLiteral> for Expr {
     fn from(payload: BytesLiteral) -> Self {
         ExprBytesLiteral {
             range: payload.range,
-            node_index: AtomicNodeIndex::NONE,
+            node_index: NodeIndex::NONE,
             value: BytesLiteralValue::single(payload),
         }
         .into()
@@ -2983,7 +2879,7 @@ impl fmt::Display for CmpOp {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Comprehension {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub target: Expr,
     pub iter: Expr,
     pub ifs: Vec<Expr>,
@@ -2995,7 +2891,7 @@ pub struct Comprehension {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExceptHandlerExceptHandler {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub type_: Option<Box<Expr>>,
     pub name: Option<Identifier>,
     pub body: Suite,
@@ -3006,7 +2902,7 @@ pub struct ExceptHandlerExceptHandler {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Parameter {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub name: Identifier,
     pub annotation: Option<Box<Expr>>,
 }
@@ -3026,7 +2922,7 @@ impl Parameter {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Keyword {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub arg: Option<Identifier>,
     pub value: Expr,
 }
@@ -3036,7 +2932,7 @@ pub struct Keyword {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Alias {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub name: Identifier,
     pub asname: Option<Identifier>,
 }
@@ -3046,7 +2942,7 @@ pub struct Alias {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct WithItem {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub context_expr: Expr,
     pub optional_vars: Option<Box<Expr>>,
 }
@@ -3056,7 +2952,7 @@ pub struct WithItem {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct MatchCase {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub pattern: Pattern,
     pub guard: Option<Box<Expr>>,
     pub body: Suite,
@@ -3084,12 +2980,12 @@ impl Pattern {
                     Some(name) => Some(IrrefutablePattern {
                         kind: IrrefutablePatternKind::Name(name.id.clone()),
                         range: *range,
-                        node_index: node_index.clone(),
+                        node_index: *node_index,
                     }),
                     None => Some(IrrefutablePattern {
                         kind: IrrefutablePatternKind::Wildcard,
                         range: *range,
-                        node_index: node_index.clone(),
+                        node_index: *node_index,
                     }),
                 },
             },
@@ -3127,7 +3023,7 @@ impl Pattern {
 pub struct IrrefutablePattern {
     pub kind: IrrefutablePatternKind,
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -3145,7 +3041,7 @@ pub enum IrrefutablePatternKind {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternArguments {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub patterns: ThinVec<Pattern>,
     pub keywords: Vec<PatternKeyword>,
 }
@@ -3158,7 +3054,7 @@ pub struct PatternArguments {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternKeyword {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub attr: Identifier,
     pub pattern: Pattern,
 }
@@ -3237,7 +3133,7 @@ impl TypeParam {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Decorator {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub expression: Expr,
 }
 
@@ -3312,7 +3208,7 @@ impl Ranged for AnyParameterRef<'_> {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Parameters {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub posonlyargs: ThinVec<ParameterWithDefault>,
     pub args: ThinVec<ParameterWithDefault>,
     pub vararg: Option<Box<Parameter>>,
@@ -3621,7 +3517,7 @@ impl FusedIterator for ParametersSourceOrderIterator<'_> {}
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ParameterWithDefault {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub parameter: Parameter,
     pub default: Option<Box<Expr>>,
 }
@@ -3674,7 +3570,7 @@ impl ParameterWithDefault {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Arguments {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub args: ThinVec<Expr>,
     pub keywords: ThinVec<Keyword>,
 }
@@ -3881,7 +3777,7 @@ impl FusedIterator for ArgumentsSourceOrder<'_> {}
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct TypeParams {
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
     pub type_params: Vec<TypeParam>,
 }
 
@@ -4015,7 +3911,7 @@ impl IpyEscapeKind {
 pub struct Identifier {
     pub id: Name,
     pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
+    pub node_index: NodeIndex,
 }
 
 impl Identifier {
@@ -4023,7 +3919,7 @@ impl Identifier {
     pub fn new(id: impl Into<Name>, range: TextRange) -> Self {
         Self {
             id: id.into(),
-            node_index: AtomicNodeIndex::NONE,
+            node_index: NodeIndex::NONE,
             range,
         }
     }
@@ -4110,15 +4006,15 @@ mod tests {
 
     use crate::generated::*;
     use crate::{
-        Arguments, AtomicNodeIndex, FString, FStringFlags, FStringPart, FStringPartMut,
-        FStringValue, Mod, Parameters, StringLiteral, StringLiteralFlags,
+        Arguments, FString, FStringFlags, FStringPart, FStringPartMut, FStringValue, Mod,
+        NodeIndex, Parameters, StringLiteral, StringLiteralFlags,
     };
 
     #[test]
     fn f_string_parts() {
         let fstring = |start| FString {
             range: TextRange::at(TextSize::new(start), TextSize::new(3)),
-            node_index: AtomicNodeIndex::NONE,
+            node_index: NodeIndex::NONE,
             elements: Vec::new().into(),
             flags: FStringFlags::empty(),
         };
@@ -4127,7 +4023,7 @@ mod tests {
             FStringPart::FString(fstring(0)),
             FStringPart::Literal(StringLiteral {
                 range: TextRange::at(TextSize::new(3), TextSize::new(3)),
-                node_index: AtomicNodeIndex::NONE,
+                node_index: NodeIndex::NONE,
                 value: "x".into(),
                 flags: StringLiteralFlags::empty(),
             }),

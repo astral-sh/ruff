@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StringLiteral;
+use ruff_python_ast::flat;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -41,9 +42,9 @@ impl AlwaysFixableViolation for UnicodeKindPrefix {
 }
 
 /// UP025
-pub(crate) fn unicode_kind_prefix(checker: &Checker, string: &StringLiteral) {
-    if string.flags.prefix().is_unicode() {
-        let mut diagnostic = checker.report_diagnostic(UnicodeKindPrefix, string.range);
+pub(crate) fn unicode_kind_prefix(checker: &Checker, string: flat::View<'_, StringLiteral>) {
+    if string.flags().prefix().is_unicode() {
+        let mut diagnostic = checker.report_diagnostic(UnicodeKindPrefix, string.range());
 
         let prefix_range = TextRange::at(string.start(), TextSize::new(1));
         let locator = checker.locator();

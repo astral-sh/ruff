@@ -1,9 +1,10 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_ast::{
-    self as ast, Expr, ExprContext, StmtFor,
+    Expr, ExprContext, ExprName, StmtFor,
+    flat::visitor::{self, Visitor},
     token::parenthesized_range,
-    visitor::{self, Visitor},
 };
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
@@ -67,8 +68,9 @@ impl Violation for DictIndexMissingItems<'_> {
 }
 
 /// PLC0206
-pub(crate) fn dict_index_missing_items(checker: &Checker, stmt_for: &StmtFor) {
-    let StmtFor { iter, body, .. } = stmt_for;
+pub(crate) fn dict_index_missing_items(checker: &Checker, stmt_for: flat::View<'_, StmtFor>) {
+    let iter = stmt_for.iter();
+    let body = stmt_for.body();
 
     // Extract the name of the iteration object (e.g., `obj` in `for key in obj:`).
     let Some(dict_name) = extract_dict_name(iter) else {
@@ -77,7 +79,7 @@ pub(crate) fn dict_index_missing_items(checker: &Checker, stmt_for: &StmtFor) {
 
     // Determine if the right-hand side is a dictionary literal (i.e. `for key in (dict := {"a": 1}):`).
     let is_dict_literal = matches!(
-        ResolvedPythonType::from(&**iter),
+        ResolvedPythonType::from(iter),
         ResolvedPythonType::Atom(PythonType::Dict),
     );
 
@@ -91,9 +93,9 @@ pub(crate) fn dict_index_missing_items(checker: &Checker, stmt_for: &StmtFor) {
 /// A visitor to detect subscript operations on a target dictionary.
 struct SubscriptVisitor<'a, 'b> {
     /// The target of the for loop (e.g., `key` in `for key in obj:`).
-    target: &'a Expr,
+    target: flat::View<'a, Expr>,
     /// The name of the iterated object (e.g., `obj` in `for key in obj:`).
-    dict_name: &'a ast::ExprName,
+    dict_name: flat::View<'a, ExprName>,
     /// The range to use for the primary diagnostic.
     range: TextRange,
     /// The [`Checker`] used to emit diagnostics.
@@ -105,12 +107,16 @@ struct SubscriptVisitor<'a, 'b> {
 }
 
 impl<'a, 'b> SubscriptVisitor<'a, 'b> {
-    fn new(stmt_for: &'a StmtFor, dict_name: &'a ast::ExprName, checker: &'a Checker<'b>) -> Self {
-        let StmtFor { target, iter, .. } = stmt_for;
+    fn new(
+        stmt_for: flat::View<'a, StmtFor>,
+        dict_name: flat::View<'a, ExprName>,
+        checker: &'a Checker<'b>,
+    ) -> Self {
+        let target = stmt_for.target();
+        let iter = stmt_for.iter();
         let range = {
-            let target_start =
-                parenthesized_range(target.into(), stmt_for.into(), checker.tokens())
-                    .map_or(target.start(), TextRange::start);
+            let target_start = parenthesized_range(target, stmt_for.into(), checker.tokens())
+                .map_or(target.start(), TextRange::start);
             TextRange::new(target_start, iter.end())
         };
 
@@ -125,21 +131,21 @@ impl<'a, 'b> SubscriptVisitor<'a, 'b> {
 }
 
 impl<'a> Visitor<'a> for SubscriptVisitor<'a, '_> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: flat::View<'a, Expr>) {
         // Given `obj[key]`, `value` must be `obj` and `slice` must be `key`.
-        if let Expr::Subscript(ast::ExprSubscript {
+        if let ast::Expr::Subscript(ast::ExprSubscript {
             value,
             slice,
             ctx: ExprContext::Load,
             ..
-        }) = expr
+        }) = expr.fields()
         {
-            let Expr::Name(name) = value.as_ref() else {
+            let flat::ExprKind::Name(name) = value.classify() else {
                 return;
             };
 
             // Check that the sliced dictionary name is the same as the iterated object name.
-            if name.id != self.dict_name.id {
+            if name.id() != self.dict_name.id() {
                 return;
             }
 
@@ -166,17 +172,20 @@ impl<'a> Visitor<'a> for SubscriptVisitor<'a, '_> {
 }
 
 /// Extracts the name of the dictionary from the expression.
-fn extract_dict_name(expr: &Expr) -> Option<&ast::ExprName> {
+fn extract_dict_name(expr: flat::View<'_, Expr>) -> Option<flat::View<'_, ExprName>> {
     // Ex) `for key in obj:`
     if let Some(name_expr) = expr.as_name_expr() {
         return Some(name_expr);
     }
 
     // Ex) `for key in obj.keys():`
-    if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-        if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() {
+    if let flat::ExprKind::Call(call) = expr.classify() {
+        let func = call.func();
+        if let flat::ExprKind::Attribute(attribute) = func.classify() {
+            let attr = attribute.attr();
+            let value = attribute.value();
             if attr == "keys" {
-                if let Expr::Name(var_name) = value.as_ref() {
+                if let flat::ExprKind::Name(var_name) = value.classify() {
                     return Some(var_name);
                 }
             }
@@ -184,9 +193,11 @@ fn extract_dict_name(expr: &Expr) -> Option<&ast::ExprName> {
     }
 
     // Ex) `for key in (my_dict := {"foo": "bar"}):`
-    if let Expr::Named(ast::ExprNamed { target, value, .. }) = expr {
-        if let Expr::Dict(ast::ExprDict { .. }) = value.as_ref() {
-            if let Expr::Name(var_name) = target.as_ref() {
+    if let flat::ExprKind::Named(named) = expr.classify() {
+        let target = named.target();
+        let value = named.value();
+        if let ast::Expr::Dict(ast::ExprDict { .. }) = value.fields() {
+            if let flat::ExprKind::Name(var_name) = target.classify() {
                 return Some(var_name);
             }
         }
@@ -196,7 +207,7 @@ fn extract_dict_name(expr: &Expr) -> Option<&ast::ExprName> {
 }
 
 /// Returns `true` if the binding is a dictionary, inferred from the type.
-fn is_inferred_dict(name: &ast::ExprName, semantic: &SemanticModel) -> bool {
+fn is_inferred_dict(name: flat::View<'_, ExprName>, semantic: &SemanticModel) -> bool {
     semantic
         .only_binding(name)
         .map(|id| semantic.binding(id))

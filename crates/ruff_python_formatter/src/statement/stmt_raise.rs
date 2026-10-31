@@ -1,5 +1,6 @@
 use ruff_formatter::write;
 use ruff_python_ast::StmtRaise;
+use ruff_python_ast::flat;
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
@@ -9,13 +10,9 @@ use crate::prelude::*;
 pub struct FormatStmtRaise;
 
 impl FormatNodeRule<StmtRaise> for FormatStmtRaise {
-    fn fmt_fields(&self, item: &StmtRaise, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtRaise {
-            range: _,
-            node_index: _,
-            exc,
-            cause,
-        } = item;
+    fn fmt_fields(&self, item: flat::View<'_, StmtRaise>, f: &mut PyFormatter) -> FormatResult<()> {
+        let exc = item.exc();
+        let cause = item.cause();
 
         token("raise").fmt(f)?;
 

@@ -1,5 +1,6 @@
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::StmtGlobal;
+use ruff_python_ast::flat;
 
 use crate::prelude::*;
 
@@ -7,14 +8,18 @@ use crate::prelude::*;
 pub struct FormatStmtGlobal;
 
 impl FormatNodeRule<StmtGlobal> for FormatStmtGlobal {
-    fn fmt_fields(&self, item: &StmtGlobal, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, StmtGlobal>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Join the `global` names, breaking across continuation lines if necessary, unless the
         // `global` statement has a trailing comment, in which case, breaking the names would
         // move the comment "off" of the `global` statement.
         if f.context().comments().has_trailing(item) {
             let joined = format_with(|f| {
                 f.join_with(format_args![token(","), space()])
-                    .entries(item.names.iter().formatted())
+                    .entries(item.names().iter().formatted())
                     .finish()
             });
 
@@ -27,7 +32,7 @@ impl FormatNodeRule<StmtGlobal> for FormatStmtGlobal {
                     if_group_breaks(&token("\\")),
                     soft_line_break(),
                 ])
-                .entries(item.names.iter().formatted())
+                .entries(item.names().iter().formatted())
                 .finish()
             });
 

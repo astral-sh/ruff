@@ -1,10 +1,11 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StringFlags;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields as ast;
 use ruff_python_ast::{
-    Expr, ExprCall, ExprContext, ExprList, ExprUnaryOp, StringLiteral, StringLiteralFlags,
-    StringLiteralValue, UnaryOp, str::TripleQuotes,
+    Expr, ExprContext, ExprList, StringLiteral, StringLiteralFlags, UnaryOp, str::TripleQuotes,
 };
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::TextRange;
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 
@@ -92,10 +93,10 @@ impl Violation for SplitStaticString {
 pub(crate) fn split_static_string(
     checker: &Checker,
     attr: &str,
-    call: &ExprCall,
-    str_value: &StringLiteralValue,
+    call: &ast::ExprCall<'_>,
+    str_value: flat::StringValue<'_>,
 ) {
-    let ExprCall { arguments, .. } = call;
+    let arguments = call.arguments;
 
     let maxsplit_arg = arguments.find_argument_value("maxsplit", 1);
     let Some(maxsplit_value) = get_maxsplit_value(maxsplit_arg) else {
@@ -111,10 +112,10 @@ pub(crate) fn split_static_string(
 
     let sep_arg = arguments.find_argument_value("sep", 0);
     let split_replacement = if let Some(sep) = sep_arg {
-        match sep {
-            Expr::NoneLiteral(_) => split_default(str_value, maxsplit_value, method),
-            Expr::StringLiteral(sep_value) => {
-                let sep_value_str = sep_value.value.to_str();
+        match sep.classify() {
+            flat::ExprKind::NoneLiteral(_) => split_default(str_value, maxsplit_value, method),
+            flat::ExprKind::StringLiteral(sep_value) => {
+                let sep_value_str = sep_value.value().to_str();
                 Some(split_sep(str_value, sep_value_str, maxsplit_value, method))
             }
             // Ignore names until type inference is available.
@@ -126,12 +127,12 @@ pub(crate) fn split_static_string(
         split_default(str_value, maxsplit_value, method)
     };
 
-    let mut diagnostic = checker.report_diagnostic(SplitStaticString { method }, call.range());
+    let mut diagnostic = checker.report_diagnostic(SplitStaticString { method }, call.range);
     if let Some(ref replacement_expr) = split_replacement {
         diagnostic.set_fix(Fix::applicable_edit(
-            Edit::range_replacement(checker.generator().expr(replacement_expr), call.range()),
+            Edit::range_replacement(checker.generator().expr(replacement_expr), call.range),
             // The fix does not preserve comments within implicit string concatenations.
-            if checker.comment_ranges().intersects(call.range()) {
+            if checker.comment_ranges().intersects(call.range) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
@@ -182,18 +183,18 @@ fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
                 Expr::from(StringLiteral {
                     value: Box::from(*elt),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                     flags: element_flags,
                 })
             })
             .collect(),
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     })
 }
 
-fn split_default(str_value: &StringLiteralValue, max_split: i32, method: Method) -> Option<Expr> {
+fn split_default(str_value: flat::StringValue<'_>, max_split: i32, method: Method) -> Option<Expr> {
     let string_val = str_value.to_str();
     match max_split.cmp(&0) {
         Ordering::Greater | Ordering::Equal => {
@@ -220,7 +221,7 @@ fn split_default(str_value: &StringLiteralValue, max_split: i32, method: Method)
 }
 
 fn split_sep(
-    str_value: &StringLiteralValue,
+    str_value: flat::StringValue<'_>,
     sep_value: &str,
     max_split: i32,
     method: Method,
@@ -250,18 +251,16 @@ fn split_sep(
 }
 
 /// Returns the value of the `maxsplit` argument as an `i32`, if it is a numeric value.
-fn get_maxsplit_value(arg: Option<&Expr>) -> Option<i32> {
+fn get_maxsplit_value(arg: Option<flat::View<'_, Expr>>) -> Option<i32> {
     if let Some(maxsplit) = arg {
-        match maxsplit {
+        match maxsplit.classify() {
             // Negative number.
-            Expr::UnaryOp(ExprUnaryOp {
-                op: UnaryOp::USub,
-                operand,
-                ..
-            }) => {
-                match &**operand {
-                    Expr::NumberLiteral(maxsplit_val) => maxsplit_val
-                        .value
+            flat::ExprKind::UnaryOp(expr_unary_op) if expr_unary_op.op() == UnaryOp::USub => {
+                let operand = expr_unary_op.operand();
+
+                match operand.classify() {
+                    flat::ExprKind::NumberLiteral(maxsplit_val) => maxsplit_val
+                        .value()
                         .as_int()
                         .and_then(ruff_python_ast::Int::as_i32)
                         .map(|f| -f),
@@ -270,8 +269,8 @@ fn get_maxsplit_value(arg: Option<&Expr>) -> Option<i32> {
                 }
             }
             // Positive number
-            Expr::NumberLiteral(maxsplit_val) => maxsplit_val
-                .value
+            flat::ExprKind::NumberLiteral(maxsplit_val) => maxsplit_val
+                .value()
                 .as_int()
                 .and_then(ruff_python_ast::Int::as_i32),
             // Ignore when `maxsplit` is not a numeric value.

@@ -1,7 +1,7 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{Expr, flat};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::is_const_true;
+use ruff_python_ast::flat::helpers::is_const_true;
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
@@ -56,17 +56,19 @@ impl Violation for DjangoNullableModelStringField {
 }
 
 /// DJ001
-pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) {
+pub(crate) fn nullable_model_string_field(checker: &Checker, body: flat::Suite<'_>) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
 
     for statement in body {
-        let value = match statement {
-            Stmt::Assign(ast::StmtAssign { value, .. }) => value,
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                value: Some(value), ..
-            }) => value,
+        let value = match statement.classify() {
+            flat::StmtKind::Assign(stmt_assign) => stmt_assign.value(),
+            flat::StmtKind::AnnAssign(stmt_ann_assign)
+                if let Some(value) = stmt_ann_assign.value() =>
+            {
+                value
+            }
             _ => continue,
         };
 
@@ -81,10 +83,13 @@ pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) {
     }
 }
 
-fn is_nullable_field<'a>(value: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a str> {
+fn is_nullable_field<'a>(
+    value: flat::View<'a, Expr>,
+    semantic: &'a SemanticModel,
+) -> Option<&'a str> {
     let call = value.as_call_expr()?;
 
-    let field_name = helpers::get_model_field_name(&call.func, semantic)?;
+    let field_name = helpers::get_model_field_name(call.func(), semantic)?;
     if !matches!(
         field_name,
         "CharField" | "TextField" | "SlugField" | "EmailField" | "FilePathField" | "URLField"
@@ -95,11 +100,11 @@ fn is_nullable_field<'a>(value: &'a Expr, semantic: &'a SemanticModel) -> Option
     let mut null_key = false;
     let mut blank_key = false;
     let mut unique_key = false;
-    for keyword in &*call.arguments.keywords {
-        let Some(argument) = &keyword.arg else {
+    for keyword in call.arguments().keywords() {
+        let Some(argument) = keyword.arg() else {
             continue;
         };
-        if !is_const_true(&keyword.value) {
+        if !is_const_true(keyword.value()) {
             continue;
         }
         match argument.as_str() {

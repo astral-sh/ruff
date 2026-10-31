@@ -1,4 +1,5 @@
 use itertools::Either::{Left, Right};
+use ruff_python_ast::flat;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Operator};
 
@@ -20,9 +21,9 @@ fn is_known_type(qualified_name: &QualifiedName, version: ast::PythonVersion) ->
 
 /// Returns an iterator over the expressions in a slice. If the slice is not a
 /// tuple, the iterator will only yield the slice.
-fn resolve_slice_value(slice: &Expr) -> impl Iterator<Item = &Expr> {
-    match slice {
-        Expr::Tuple(tuple) => Left(tuple.iter()),
+fn resolve_slice_value(slice: flat::View<'_, Expr>) -> impl Iterator<Item = flat::View<'_, Expr>> {
+    match slice.classify() {
+        flat::ExprKind::Tuple(tuple) => Left(tuple.iter()),
         _ => Right(std::iter::once(slice)),
     }
 }
@@ -39,22 +40,22 @@ enum TypingTarget<'a> {
     Object,
 
     /// Forward reference to a type e.g., `"List[str]"`.
-    ForwardReference(&'a Expr),
+    ForwardReference(flat::View<'a, Expr>),
 
     /// A `typing.Union` type e.g., `Union[int, str]`.
-    Union(Option<&'a Expr>),
+    Union(Option<flat::View<'a, Expr>>),
 
     /// A PEP 604 union type e.g., `int | str`.
-    PEP604Union(&'a Expr, &'a Expr),
+    PEP604Union(flat::View<'a, Expr>, flat::View<'a, Expr>),
 
     /// A `typing.Literal` type e.g., `Literal[1, 2, 3]`.
-    Literal(Option<&'a Expr>),
+    Literal(Option<flat::View<'a, Expr>>),
 
     /// A `typing.Optional` type e.g., `Optional[int]`.
-    Optional(Option<&'a Expr>),
+    Optional(Option<flat::View<'a, Expr>>),
 
     /// A `typing.Annotated` type e.g., `Annotated[int, ...]`.
-    Annotated(Option<&'a Expr>),
+    Annotated(Option<flat::View<'a, Expr>>),
 
     /// The `typing.Hashable` type.
     Hashable,
@@ -71,29 +72,30 @@ enum TypingTarget<'a> {
 
 impl<'a> TypingTarget<'a> {
     fn try_from_expr(
-        expr: &'a Expr,
+        expr: flat::View<'a, Expr>,
         checker: &'a Checker,
         version: ast::PythonVersion,
     ) -> Option<Self> {
         let semantic = checker.semantic();
-        match expr {
-            Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+        match expr.classify() {
+            flat::ExprKind::Subscript(expr_subscript) => {
+                let value = expr_subscript.value();
+                let slice = expr_subscript.slice();
+
                 semantic.resolve_qualified_name(value).map_or(
                     // If we can't resolve the call path, it must be defined
                     // in the same file and could be a type alias.
                     Some(TypingTarget::Unknown),
                     |qualified_name| {
                         if semantic.match_typing_qualified_name(&qualified_name, "Optional") {
-                            Some(TypingTarget::Optional(Some(slice.as_ref())))
+                            Some(TypingTarget::Optional(Some(slice)))
                         } else if semantic.match_typing_qualified_name(&qualified_name, "Literal") {
-                            Some(TypingTarget::Literal(Some(slice.as_ref())))
+                            Some(TypingTarget::Literal(Some(slice)))
                         } else if semantic.match_typing_qualified_name(&qualified_name, "Union") {
-                            Some(TypingTarget::Union(Some(slice.as_ref())))
+                            Some(TypingTarget::Union(Some(slice)))
                         } else if semantic.match_typing_qualified_name(&qualified_name, "Annotated")
                         {
-                            Some(TypingTarget::Annotated(
-                                resolve_slice_value(slice.as_ref()).next(),
-                            ))
+                            Some(TypingTarget::Annotated(resolve_slice_value(slice).next()))
                         } else {
                             if is_known_type(&qualified_name, version) {
                                 Some(TypingTarget::Known)
@@ -104,14 +106,13 @@ impl<'a> TypingTarget<'a> {
                     },
                 )
             }
-            Expr::BinOp(ast::ExprBinOp {
-                left,
-                op: Operator::BitOr,
-                right,
-                ..
-            }) => Some(TypingTarget::PEP604Union(left, right)),
-            Expr::NoneLiteral(_) => Some(TypingTarget::None),
-            Expr::StringLiteral(string_expr) => checker
+            flat::ExprKind::BinOp(expr_bin_op) if expr_bin_op.op() == Operator::BitOr => {
+                let left = expr_bin_op.left();
+                let right = expr_bin_op.right();
+                Some(TypingTarget::PEP604Union(left, right))
+            }
+            flat::ExprKind::NoneLiteral(_) => Some(TypingTarget::None),
+            flat::ExprKind::StringLiteral(string_expr) => checker
                 .parse_type_annotation(string_expr)
                 .ok()
                 .and_then(|parsed_annotation| {
@@ -119,8 +120,8 @@ impl<'a> TypingTarget<'a> {
                     if inner.is_string_literal_expr() {
                         // A forward reference that resolves to another string literal
                         // (e.g. `"'int'"`) is not a valid type annotation. Avoid
-                        // recursing, which would loop forever when `relocate_expr`
-                        // gives the inner literal the same text range as the outer.
+                        // recursing because the parser gives the inner literal the
+                        // same source range as the outer literal.
                         None
                     } else {
                         Some(TypingTarget::ForwardReference(inner))
@@ -191,7 +192,7 @@ impl<'a> TypingTarget<'a> {
                 })
             }),
             TypingTarget::PEP604Union(left, right) => [left, right].iter().any(|element| {
-                TypingTarget::try_from_expr(element, checker, version)
+                TypingTarget::try_from_expr(**element, checker, version)
                     .is_none_or(|new_target| new_target.contains_none(checker, version))
             }),
             TypingTarget::Annotated(expr) => expr.is_some_and(|expr| {
@@ -199,7 +200,7 @@ impl<'a> TypingTarget<'a> {
                     .is_none_or(|new_target| new_target.contains_none(checker, version))
             }),
             TypingTarget::ForwardReference(expr) => {
-                TypingTarget::try_from_expr(expr, checker, version)
+                TypingTarget::try_from_expr(*expr, checker, version)
                     .is_none_or(|new_target| new_target.contains_none(checker, version))
             }
         }
@@ -223,7 +224,7 @@ impl<'a> TypingTarget<'a> {
                 })
             }),
             TypingTarget::PEP604Union(left, right) => [left, right].iter().any(|element| {
-                TypingTarget::try_from_expr(element, checker, version)
+                TypingTarget::try_from_expr(**element, checker, version)
                     .is_none_or(|new_target| new_target.contains_any(checker, version))
             }),
             TypingTarget::Annotated(expr) | TypingTarget::Optional(expr) => {
@@ -233,7 +234,7 @@ impl<'a> TypingTarget<'a> {
                 })
             }
             TypingTarget::ForwardReference(expr) => {
-                TypingTarget::try_from_expr(expr, checker, version)
+                TypingTarget::try_from_expr(*expr, checker, version)
                     .is_none_or(|new_target| new_target.contains_any(checker, version))
             }
         }
@@ -248,10 +249,10 @@ impl<'a> TypingTarget<'a> {
 ///
 /// This function assumes that the annotation is a valid typing annotation expression.
 pub(crate) fn type_hint_explicitly_allows_none<'a>(
-    annotation: &'a Expr,
+    annotation: flat::View<'a, Expr>,
     checker: &'a Checker,
     version: ast::PythonVersion,
-) -> Option<&'a Expr> {
+) -> Option<flat::View<'a, Expr>> {
     match TypingTarget::try_from_expr(annotation, checker, version) {
         // Short-circuit on top level `None`, `Any` or `Optional`
         None | Some(TypingTarget::None | TypingTarget::Optional(_) | TypingTarget::Any) => None,
@@ -275,7 +276,7 @@ pub(crate) fn type_hint_explicitly_allows_none<'a>(
 ///
 /// This function assumes that the annotation is a valid typing annotation expression.
 pub(crate) fn type_hint_resolves_to_any(
-    annotation: &Expr,
+    annotation: flat::View<'_, Expr>,
     checker: &Checker,
     version: ast::PythonVersion,
 ) -> bool {

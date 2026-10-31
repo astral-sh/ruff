@@ -1,7 +1,8 @@
 use anyhow::Result;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_ast::{
-    self as ast, Expr, ExprBinOp, ExprContext, ExprNoneLiteral, Operator, PythonVersion,
+    Expr, ExprContext, ExprNoneLiteral, ExprSubscript, ExprTuple, Operator, PythonVersion,
     helpers::{pep_604_union, typing_optional},
     name::Name,
     operator_precedence::OperatorPrecedence,
@@ -85,31 +86,29 @@ impl Violation for RedundantNoneLiteral {
 }
 
 /// PYI061
-pub(crate) fn redundant_none_literal<'a>(checker: &Checker, literal_expr: &'a Expr) {
+pub(crate) fn redundant_none_literal<'a>(checker: &Checker, &literal_expr: &flat::View<'a, Expr>) {
     let semantic = checker.semantic();
 
     if !semantic.seen_typing() {
         return;
     }
 
-    let Expr::Subscript(ast::ExprSubscript {
-        value: literal_subscript,
-        ..
-    }) = literal_expr
-    else {
+    let flat::ExprKind::Subscript(subscript) = literal_expr.classify() else {
         return;
     };
+    let literal_subscript = subscript.value();
 
-    let mut none_exprs: SmallVec<[&ExprNoneLiteral; 1]> = SmallVec::new();
+    let mut none_exprs: SmallVec<[flat::View<'_, ExprNoneLiteral>; 1]> = SmallVec::new();
     let mut literal_elements = vec![];
 
-    let mut partition_literal_elements = |expr: &'a Expr, _parent: &'a Expr| {
-        if let Expr::NoneLiteral(none_expr) = expr {
-            none_exprs.push(none_expr);
-        } else {
-            literal_elements.push(expr);
-        }
-    };
+    let mut partition_literal_elements =
+        |expr: flat::View<'a, Expr>, _parent: flat::View<'a, Expr>| {
+            if let flat::ExprKind::NoneLiteral(none_expr) = expr.classify() {
+                none_exprs.push(none_expr);
+            } else {
+                literal_elements.push(expr);
+            }
+        };
 
     traverse_literal(&mut partition_literal_elements, semantic, literal_expr);
 
@@ -158,9 +157,9 @@ pub(crate) fn redundant_none_literal<'a>(checker: &Checker, literal_expr: &'a Ex
 /// [`typing.Union`]: https://docs.python.org/3/library/typing.html#typing.Union
 fn create_fix(
     checker: &Checker,
-    literal_expr: &Expr,
-    literal_subscript: &Expr,
-    literal_elements: Vec<&Expr>,
+    literal_expr: flat::View<'_, Expr>,
+    literal_subscript: flat::View<'_, Expr>,
+    literal_elements: Vec<flat::View<'_, Expr>>,
     union_kind: UnionKind,
 ) -> Result<Option<Fix>> {
     let semantic = checker.semantic();
@@ -170,8 +169,8 @@ fn create_fix(
         .skip(1)
         .take_while(|expr| {
             matches!(
-                expr,
-                Expr::BinOp(ExprBinOp {
+                expr.fields(),
+                ast::Expr::BinOp(ast::ExprBinOp {
                     op: Operator::BitOr,
                     ..
                 })
@@ -212,21 +211,24 @@ fn create_fix(
         )));
     }
 
-    let new_literal_expr = Expr::Subscript(ast::ExprSubscript {
-        value: Box::new(literal_subscript.clone()),
+    let new_literal_expr = Expr::Subscript(ExprSubscript {
+        value: Box::new(literal_subscript.to_owned_node()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
         ctx: ExprContext::Load,
         slice: Box::new(if literal_elements.len() > 1 {
-            Expr::Tuple(ast::ExprTuple {
-                elts: literal_elements.into_iter().cloned().collect(),
+            Expr::Tuple(ExprTuple {
+                elts: literal_elements
+                    .into_iter()
+                    .map(flat::View::to_owned_node)
+                    .collect(),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
                 ctx: ExprContext::Load,
                 parenthesized: true,
             })
         } else {
-            literal_elements[0].clone()
+            literal_elements[0].to_owned_node()
         }),
     });
 
@@ -245,9 +247,9 @@ fn create_fix(
         UnionKind::BitOr => {
             let none_expr = Expr::NoneLiteral(ExprNoneLiteral {
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
             });
-            let union_expr = pep_604_union(&[new_literal_expr, none_expr]);
+            let union_expr = pep_604_union([new_literal_expr, none_expr]);
 
             // Check if we need parentheses to preserve operator precedence
             let content =
@@ -280,7 +282,7 @@ enum UnionKind {
 /// has lower precedence than the surrounding operations (like attribute access).
 fn needs_parentheses_for_precedence(
     semantic: &ruff_python_semantic::SemanticModel,
-    literal_expr: &Expr,
+    literal_expr: flat::View<'_, Expr>,
     tokens: &Tokens,
 ) -> bool {
     // Get the parent expression to check if we're in a context that needs parentheses
@@ -289,7 +291,7 @@ fn needs_parentheses_for_precedence(
     };
 
     // Check if the literal expression is already parenthesized
-    if parenthesized_range(literal_expr.into(), parent_expr.into(), tokens).is_some() {
+    if parenthesized_range(literal_expr, parent_expr.into(), tokens).is_some() {
         return false; // Already parenthesized, don't add more
     }
 

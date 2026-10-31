@@ -1,5 +1,6 @@
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::{Stmt, StmtWhile};
+use ruff_python_ast::StmtWhile;
+use ruff_python_ast::flat;
 use ruff_text_size::Ranged;
 
 use crate::expression::maybe_parenthesize_expression;
@@ -12,19 +13,15 @@ use crate::statement::suite::SuiteKind;
 pub struct FormatStmtWhile;
 
 impl FormatNodeRule<StmtWhile> for FormatStmtWhile {
-    fn fmt_fields(&self, item: &StmtWhile, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtWhile {
-            range: _,
-            node_index: _,
-            test,
-            body,
-            orelse,
-        } = item;
+    fn fmt_fields(&self, item: flat::View<'_, StmtWhile>, f: &mut PyFormatter) -> FormatResult<()> {
+        let test = item.test();
+        let body = item.body();
+        let orelse = item.orelse();
 
         let comments = f.context().comments().clone();
         let dangling_comments = comments.dangling(item);
 
-        let body_start = body.first().map_or(test.end(), Stmt::start);
+        let body_start = body.first().map_or(test.end(), |node| node.start());
         let or_else_comments_start =
             dangling_comments.partition_point(|comment| comment.end() < body_start);
 

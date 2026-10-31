@@ -1,8 +1,9 @@
 use itertools::Itertools;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
+use ruff_python_ast::{ExceptHandler, Expr, ExprContext, ExprTuple};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -114,12 +115,12 @@ impl AlwaysFixableViolation for DuplicateHandlerException {
     }
 }
 
-fn type_pattern(elts: Vec<&Expr>) -> Expr {
-    ast::ExprTuple {
-        elts: elts.into_iter().cloned().collect(),
+fn type_pattern(elts: Vec<flat::View<'_, Expr>>) -> Expr {
+    ExprTuple {
+        elts: elts.into_iter().map(flat::View::to_owned_node).collect(),
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
         parenthesized: true,
     }
     .into()
@@ -128,12 +129,12 @@ fn type_pattern(elts: Vec<&Expr>) -> Expr {
 /// B014
 fn duplicate_handler_exceptions<'a>(
     checker: &Checker,
-    expr: &'a Expr,
-    elts: &'a [Expr],
-) -> FxHashMap<UnqualifiedName<'a>, &'a Expr> {
-    let mut seen: FxHashMap<UnqualifiedName, &Expr> = FxHashMap::default();
+    expr: flat::View<'a, Expr>,
+    elts: flat::NodeList<'a, Expr>,
+) -> FxHashMap<UnqualifiedName<'a>, flat::View<'a, Expr>> {
+    let mut seen: FxHashMap<UnqualifiedName, flat::View<'_, Expr>> = FxHashMap::default();
     let mut duplicates: FxHashSet<UnqualifiedName> = FxHashSet::default();
-    let mut unique_elts: Vec<&Expr> = Vec::default();
+    let mut unique_elts: Vec<flat::View<'_, Expr>> = Vec::default();
     for type_ in elts {
         if let Some(name) = UnqualifiedName::from_expr(type_) {
             if seen.contains_key(&name) {
@@ -171,7 +172,7 @@ fn duplicate_handler_exceptions<'a>(
                     // parentheses, insert whitespace as needed.
                     if let [elt] = unique_elts.as_slice() {
                         pad(
-                            checker.generator().expr(elt),
+                            checker.generator().expr_view(*elt),
                             expr.range(),
                             checker.locator(),
                         )
@@ -191,19 +192,20 @@ fn duplicate_handler_exceptions<'a>(
 }
 
 /// B025
-pub(crate) fn duplicate_exceptions(checker: &Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn duplicate_exceptions(checker: &Checker, handlers: flat::NodeList<'_, ExceptHandler>) {
     let mut seen: FxHashSet<UnqualifiedName> = FxHashSet::default();
-    let mut duplicates: FxHashMap<UnqualifiedName, Vec<&Expr>> = FxHashMap::default();
+    let mut duplicates: FxHashMap<UnqualifiedName, Vec<flat::View<'_, Expr>>> =
+        FxHashMap::default();
     for handler in handlers {
-        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
             type_: Some(type_),
             ..
-        }) = handler
+        }) = handler.fields()
         else {
             continue;
         };
-        match type_.as_ref() {
-            Expr::Attribute(_) | Expr::Name(_) => {
+        match type_.classify() {
+            flat::ExprKind::Attribute(_) | flat::ExprKind::Name(_) => {
                 if let Some(name) = UnqualifiedName::from_expr(type_) {
                     if seen.contains(&name) {
                         duplicates.entry(name).or_default().push(type_);
@@ -212,7 +214,9 @@ pub(crate) fn duplicate_exceptions(checker: &Checker, handlers: &[ExceptHandler]
                     }
                 }
             }
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            flat::ExprKind::Tuple(expr_tuple) => {
+                let elts = expr_tuple.elts();
+
                 #[expect(
                     clippy::iter_over_hash_type,
                     reason = "each distinct exception name updates independent set and map entries"
@@ -240,7 +244,7 @@ pub(crate) fn duplicate_exceptions(checker: &Checker, handlers: &[ExceptHandler]
                     .semantic()
                     .current_statement()
                     .as_try_stmt()
-                    .is_some_and(|try_stmt| try_stmt.is_star);
+                    .is_some_and(flat::View::is_star);
                 checker.report_diagnostic(
                     DuplicateTryBlockException {
                         name: name.segments().join("."),

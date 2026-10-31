@@ -1,11 +1,11 @@
 use itertools::Itertools;
+use ruff_python_ast::flat;
 use rustc_hash::FxHashSet;
 
 use ruff_python_ast::helpers::{
     ReturnStatementVisitor, pep_604_union, typing_optional, typing_union,
 };
 use ruff_python_ast::name::Name;
-use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
 use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
@@ -23,8 +23,8 @@ pub(crate) fn overloaded_name<'a>(
     semantic: &SemanticModel,
 ) -> Option<&'a str> {
     let function = definition.as_function_def()?;
-    if visibility::is_overload(&function.decorator_list, semantic) {
-        Some(function.name.as_str())
+    if visibility::is_overload(function.decorator_list(), semantic) {
+        Some(function.name().as_str())
     } else {
         None
     }
@@ -40,22 +40,21 @@ pub(crate) fn is_overload_impl(
     let Some(function) = definition.as_function_def() else {
         return false;
     };
-    if visibility::is_overload(&function.decorator_list, semantic) {
+    if visibility::is_overload(function.decorator_list(), semantic) {
         false
     } else {
-        function.name.as_str() == overloaded_name
+        function.name().as_str() == overloaded_name
     }
 }
 
 /// Given a function, guess its return type.
 pub(crate) fn auto_return_type(
-    function: &ast::StmtFunctionDef,
+    function: flat::View<'_, ast::StmtFunctionDef>,
     semantic: &SemanticModel,
 ) -> Option<AutoPythonType> {
     // Collect all the `return` statements.
     let returns = {
-        let mut visitor = ReturnStatementVisitor::default();
-        visitor.visit_body(&function.body);
+        let visitor = ReturnStatementVisitor::for_function(function);
 
         // Ignore generators.
         if visitor.is_generator {
@@ -84,14 +83,14 @@ pub(crate) fn auto_return_type(
     let Some((return_statement, returns)) = returns.split_first() else {
         return Some(AutoPythonType::Atom(PythonType::None));
     };
-    let mut return_type = return_statement.value.as_deref().map_or(
+    let mut return_type = return_statement.value().map_or(
         ResolvedPythonType::Atom(PythonType::None),
         ResolvedPythonType::from,
     );
 
     // Merge the return types of the remaining `return` statements.
     for return_statement in returns {
-        return_type = return_type.union(return_statement.value.as_deref().map_or(
+        return_type = return_type.union(return_statement.value().map_or(
             ResolvedPythonType::Atom(PythonType::None),
             ResolvedPythonType::from,
         ));
@@ -147,7 +146,7 @@ impl AutoPythonType {
                 let expr = Expr::Name(ast::ExprName {
                     id: Name::from(binding),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                     ctx: ExprContext::Load,
                 });
                 Some((expr, vec![no_return_edit]))
@@ -168,7 +167,7 @@ impl AutoPythonType {
                         .collect::<Option<Vec<_>>>()?;
 
                     // Wrap in a bitwise union (e.g., `int | float`).
-                    let expr = pep_604_union(&names);
+                    let expr = pep_604_union(names);
 
                     Some((expr, all_edits))
                 } else {
@@ -206,7 +205,7 @@ impl AutoPythonType {
                                 .typing_importer("Union", PythonVersion::lowest())?
                                 .import(at)
                                 .ok()?;
-                            let expr = typing_union(&elements, Name::from(binding));
+                            let expr = typing_union(elements, Name::from(binding));
                             all_edits.push(union_edit);
                             Some((expr, all_edits))
                         }
@@ -234,7 +233,7 @@ pub(crate) fn type_expr(
         let expr = Expr::Name(ast::ExprName {
             id: binding.into(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
             ctx: ExprContext::Load,
         });
         Some((expr, edit.map_or_else(Vec::new, |edit| vec![edit])))

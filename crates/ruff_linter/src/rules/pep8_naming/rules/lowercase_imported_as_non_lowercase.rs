@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{Alias, Stmt};
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
@@ -55,8 +56,8 @@ pub(crate) fn lowercase_imported_as_non_lowercase(
     checker: &Checker,
     name: &str,
     asname: &str,
-    alias: &Alias,
-    stmt: &Stmt,
+    alias: flat::View<'_, Alias>,
+    stmt: flat::View<'_, Stmt>,
     ignore_names: &IgnoreNames,
 ) {
     if !str::is_cased_uppercase(name) && str::is_cased_lowercase(name) && !str::is_lowercase(asname)

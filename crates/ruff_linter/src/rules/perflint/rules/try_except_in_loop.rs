@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
-use ruff_python_ast::{self as ast, PythonVersion, Stmt};
+use ruff_python_ast::flat::statement_visitor::{StatementVisitor, walk_stmt};
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{PythonVersion, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -89,12 +90,15 @@ impl Violation for TryExceptInLoop {
 }
 
 /// PERF203
-pub(crate) fn try_except_in_loop(checker: &Checker, body: &[Stmt]) {
+pub(crate) fn try_except_in_loop(checker: &Checker, body: flat::Suite<'_>) {
     if checker.target_version() >= PythonVersion::PY311 {
         return;
     }
 
-    let [Stmt::Try(ast::StmtTry { handlers, body, .. })] = body else {
+    let Some([ast::Stmt::Try(ast::StmtTry { handlers, body, .. })]) = body
+        .as_array()
+        .map(|items| items.map(flat::View::<Stmt>::fields))
+    else {
         return;
     };
 
@@ -112,7 +116,7 @@ pub(crate) fn try_except_in_loop(checker: &Checker, body: &[Stmt]) {
 }
 
 /// Returns `true` if a `break` or `continue` statement is present in `body`.
-fn has_break_or_continue(body: &[Stmt]) -> bool {
+fn has_break_or_continue(body: flat::Suite<'_>) -> bool {
     let mut visitor = LoopControlFlowVisitor::default();
     visitor.visit_body(body);
     visitor.has_break_or_continue
@@ -124,10 +128,12 @@ struct LoopControlFlowVisitor {
 }
 
 impl StatementVisitor<'_> for LoopControlFlowVisitor {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
-        match stmt {
-            Stmt::Break(_) | Stmt::Continue(_) => self.has_break_or_continue = true,
-            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
+    fn visit_stmt(&mut self, stmt: flat::View<'_, Stmt>) {
+        match stmt.classify() {
+            flat::StmtKind::Break(_) | flat::StmtKind::Continue(_) => {
+                self.has_break_or_continue = true;
+            }
+            flat::StmtKind::FunctionDef(_) | flat::StmtKind::ClassDef(_) => {
                 // Don't recurse.
             }
             _ => walk_stmt(self, stmt),

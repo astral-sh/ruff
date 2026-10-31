@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{Arguments, Expr, ExprCall};
 use ruff_python_edits::unwrapped_call_argument;
 use ruff_python_semantic::SemanticModel;
@@ -58,7 +59,7 @@ impl AlwaysFixableViolation for UnnecessaryCastToInt {
 }
 
 /// RUF046
-pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call: &ExprCall) {
+pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call: flat::View<'_, ExprCall>) {
     let Some(argument) = single_argument_to_int_call(call, checker.semantic()) else {
         return;
     };
@@ -68,7 +69,7 @@ pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call: &ExprCall) {
         ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
     ) {
         Some(Applicability::Safe)
-    } else if let Expr::Call(inner_call) = argument {
+    } else if let flat::ExprKind::Call(inner_call) = argument.classify() {
         call_applicability(checker, inner_call)
     } else {
         None
@@ -123,8 +124,11 @@ pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call: &ExprCall) {
 
 /// Returns `Some` if `call` in `int(call(...))` is a method that returns an `int`
 /// and `None` otherwise.
-fn call_applicability(checker: &Checker, inner_call: &ExprCall) -> Option<Applicability> {
-    let (func, arguments) = (&inner_call.func, &inner_call.arguments);
+fn call_applicability(
+    checker: &Checker,
+    inner_call: flat::View<'_, ExprCall>,
+) -> Option<Applicability> {
+    let (func, arguments) = (inner_call.func(), inner_call.arguments());
 
     let qualified_name = checker.semantic().resolve_qualified_name(func)?;
 
@@ -147,24 +151,21 @@ fn call_applicability(checker: &Checker, inner_call: &ExprCall) -> Option<Applic
 }
 
 fn single_argument_to_int_call<'a>(
-    call: &'a ExprCall,
+    call: flat::View<'a, ExprCall>,
     semantic: &SemanticModel,
-) -> Option<&'a Expr> {
-    let ExprCall {
-        func, arguments, ..
-    } = call;
+) -> Option<flat::View<'a, Expr>> {
+    let func = call.func();
+    let arguments = call.arguments();
 
     if !semantic.match_builtin_expr(func, "int") {
         return None;
     }
 
-    if !arguments.keywords.is_empty() {
+    if !arguments.keywords().is_empty() {
         return None;
     }
 
-    let [argument] = &*arguments.args else {
-        return None;
-    };
+    let [argument] = arguments.args().as_array()?;
 
     Some(argument)
 }
@@ -172,7 +173,10 @@ fn single_argument_to_int_call<'a>(
 /// Determines the [`Applicability`] for a `round(..)` call.
 ///
 /// The Applicability depends on the `ndigits` and the number argument.
-fn round_applicability(arguments: &Arguments, semantic: &SemanticModel) -> Option<Applicability> {
+fn round_applicability(
+    arguments: flat::View<'_, Arguments>,
+    semantic: &SemanticModel,
+) -> Option<Applicability> {
     let (_rounded, rounded_value, ndigits_value) = rounded_and_ndigits(arguments, semantic)?;
 
     match (rounded_value, ndigits_value) {

@@ -2,7 +2,8 @@
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_imports.html>
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::Stmt;
+use ruff_python_ast::flat;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -372,7 +373,7 @@ impl Violation for SuspiciousPyghmiImport {
 }
 
 /// S401, S402, S403, S404, S405, S406, S407, S408, S409, S410, S411, S412, S413, S415
-pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn suspicious_imports(checker: &Checker, stmt: flat::View<'_, Stmt>) {
     // Skip stub files.
     if checker.source_type.is_stub() {
         return;
@@ -383,58 +384,67 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
         return;
     }
 
-    match stmt {
-        Stmt::Import(ast::StmtImport { names, .. }) => {
+    match stmt.classify() {
+        flat::StmtKind::Import(stmt_import) => {
+            let names = stmt_import.names();
+
             for name in names {
-                match name.name.as_str() {
+                match name.name().as_str() {
                     "telnetlib" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousTelnetlibImport, name.range);
+                        checker
+                            .report_diagnostic_if_enabled(SuspiciousTelnetlibImport, name.range());
                     }
                     "ftplib" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousFtplibImport, name.range);
+                        checker.report_diagnostic_if_enabled(SuspiciousFtplibImport, name.range());
                     }
                     "pickle" | "cPickle" | "dill" | "shelve" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousPickleImport, name.range);
+                        checker.report_diagnostic_if_enabled(SuspiciousPickleImport, name.range());
                     }
                     "subprocess" => {
                         checker
-                            .report_diagnostic_if_enabled(SuspiciousSubprocessImport, name.range);
+                            .report_diagnostic_if_enabled(SuspiciousSubprocessImport, name.range());
                     }
                     "xml.etree.cElementTree" | "xml.etree.ElementTree" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousXmlEtreeImport, name.range);
+                        checker
+                            .report_diagnostic_if_enabled(SuspiciousXmlEtreeImport, name.range());
                     }
                     "xml.sax" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousXmlSaxImport, name.range);
+                        checker.report_diagnostic_if_enabled(SuspiciousXmlSaxImport, name.range());
                     }
                     "xml.dom.expatbuilder" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousXmlExpatImport, name.range);
+                        checker
+                            .report_diagnostic_if_enabled(SuspiciousXmlExpatImport, name.range());
                     }
                     "xml.dom.minidom" => {
                         checker
-                            .report_diagnostic_if_enabled(SuspiciousXmlMinidomImport, name.range);
+                            .report_diagnostic_if_enabled(SuspiciousXmlMinidomImport, name.range());
                     }
                     "xml.dom.pulldom" => {
                         checker
-                            .report_diagnostic_if_enabled(SuspiciousXmlPulldomImport, name.range);
+                            .report_diagnostic_if_enabled(SuspiciousXmlPulldomImport, name.range());
                     }
                     "lxml" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousLxmlImport, name.range);
+                        checker.report_diagnostic_if_enabled(SuspiciousLxmlImport, name.range());
                     }
                     "xmlrpc" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousXmlrpcImport, name.range);
+                        checker.report_diagnostic_if_enabled(SuspiciousXmlrpcImport, name.range());
                     }
                     "Crypto.Cipher" | "Crypto.Hash" | "Crypto.IO" | "Crypto.Protocol"
                     | "Crypto.PublicKey" | "Crypto.Random" | "Crypto.Signature" | "Crypto.Util" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousPycryptoImport, name.range);
+                        checker
+                            .report_diagnostic_if_enabled(SuspiciousPycryptoImport, name.range());
                     }
                     "pyghmi" => {
-                        checker.report_diagnostic_if_enabled(SuspiciousPyghmiImport, name.range);
+                        checker.report_diagnostic_if_enabled(SuspiciousPyghmiImport, name.range());
                     }
                     _ => {}
                 }
             }
         }
-        Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) => {
+        flat::StmtKind::ImportFrom(stmt_import_from) => {
+            let module = stmt_import_from.module();
+            let names = stmt_import_from.names();
+
             let Some(identifier) = module else { return };
             match identifier.as_str() {
                 "telnetlib" => {
@@ -459,7 +469,7 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                 }
                 "xml.etree" => {
                     for name in names {
-                        if matches!(name.name.as_str(), "cElementTree" | "ElementTree") {
+                        if matches!(name.name().as_str(), "cElementTree" | "ElementTree") {
                             checker.report_diagnostic_if_enabled(
                                 SuspiciousXmlEtreeImport,
                                 identifier.range(),
@@ -473,7 +483,7 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                 }
                 "xml" => {
                     for name in names {
-                        if name.name.as_str() == "sax" {
+                        if name.name().as_str() == "sax" {
                             checker.report_diagnostic_if_enabled(
                                 SuspiciousXmlSaxImport,
                                 identifier.range(),
@@ -487,7 +497,7 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                 }
                 "xml.dom" => {
                     for name in names {
-                        match name.name.as_str() {
+                        match name.name().as_str() {
                             "expatbuilder" => {
                                 checker.report_diagnostic_if_enabled(
                                     SuspiciousXmlExpatImport,
@@ -535,7 +545,7 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                 }
                 "wsgiref.handlers" => {
                     for name in names {
-                        if name.name.as_str() == "CGIHandler" {
+                        if name.name().as_str() == "CGIHandler" {
                             checker.report_diagnostic_if_enabled(
                                 SuspiciousHttpoxyImport,
                                 identifier.range(),
@@ -545,7 +555,7 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                 }
                 "twisted.web.twcgi" => {
                     for name in names {
-                        if name.name.as_str() == "CGIScript" {
+                        if name.name().as_str() == "CGIScript" {
                             checker.report_diagnostic_if_enabled(
                                 SuspiciousHttpoxyImport,
                                 identifier.range(),
@@ -556,7 +566,7 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                 "Crypto" => {
                     for name in names {
                         if matches!(
-                            name.name.as_str(),
+                            name.name().as_str(),
                             "Cipher"
                                 | "Hash"
                                 | "IO"

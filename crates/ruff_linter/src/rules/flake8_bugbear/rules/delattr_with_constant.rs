@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, Expr, ExprContext, Identifier, Stmt};
+use ruff_python_ast::flat::fields;
+use ruff_python_ast::{self as ast, Expr, ExprContext, Identifier, Stmt, flat};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -62,19 +63,28 @@ impl AlwaysFixableViolation for DelAttrWithConstant {
 }
 
 /// B043
-pub(crate) fn delattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub(crate) fn delattr_with_constant(
+    checker: &Checker,
+    &expr: &flat::View<'_, Expr>,
+    func: flat::View<'_, Expr>,
+    args: flat::NodeList<'_, Expr>,
+) {
     if !checker.semantic().match_builtin_expr(func, "delattr") {
         return;
     }
 
-    let [
-        obj,
-        Expr::StringLiteral(ast::ExprStringLiteral { value: name, .. }),
-    ] = args
+    let Some(
+        [
+            obj,
+            fields::Expr::StringLiteral(fields::ExprStringLiteral { value: name, .. }),
+        ],
+    ) = args
+        .as_array()
+        .map(|items| items.map(flat::View::<Expr>::fields))
     else {
         return;
     };
-    if obj.is_starred_expr() {
+    if obj.view().is_starred_expr() {
         return;
     }
 
@@ -96,16 +106,12 @@ pub(crate) fn delattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     // We can only replace a `delattr` call (which is an `Expr`) with a `del`
     // statement (which is a `Stmt`) if the `Expr` is already being used as a
     // `Stmt` (i.e., it's directly within an `Stmt::Expr`).
-    if let Stmt::Expr(ast::StmtExpr {
-        value: child,
-        range: _,
-        node_index: _,
-    }) = checker.semantic().current_statement()
-    {
-        if expr == child.as_ref() {
+    if let flat::StmtKind::Expr(expr_node) = checker.semantic().current_statement().classify() {
+        let child = expr_node.value();
+        if expr == child {
             let mut diagnostic = checker.report_diagnostic(DelAttrWithConstant, expr.range());
             let edit = Edit::range_replacement(
-                generate_del_statement(obj, attr_name, checker.generator()),
+                generate_del_statement(obj.view(), attr_name, checker.generator()),
                 expr.range(),
             );
             diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
@@ -113,17 +119,21 @@ pub(crate) fn delattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     }
 }
 
-fn generate_del_statement(obj: &Expr, attr_name: &str, generator: Generator) -> String {
+fn generate_del_statement(
+    obj: flat::View<'_, Expr>,
+    attr_name: &str,
+    generator: Generator,
+) -> String {
     let stmt = Stmt::Delete(ast::StmtDelete {
         targets: vec![Expr::Attribute(ast::ExprAttribute {
-            value: Box::new(obj.clone()),
+            value: Box::new(obj.to_owned_node()),
             attr: Identifier::new(attr_name.to_string(), TextRange::default()),
             ctx: ExprContext::Del,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         })],
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     });
     generator.stmt(&stmt)
 }

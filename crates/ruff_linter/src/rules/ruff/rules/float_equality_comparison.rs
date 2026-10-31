@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::{
     SemanticModel,
@@ -121,7 +122,10 @@ impl Violation for FloatEqualityComparison<'_> {
 }
 
 /// RUF069
-pub(crate) fn float_equality_comparison(checker: &Checker, compare: &ast::ExprCompare) {
+pub(crate) fn float_equality_comparison(
+    checker: &Checker,
+    compare: flat::View<'_, ast::ExprCompare>,
+) {
     let locator = checker.locator();
     let semantic = checker.semantic();
 
@@ -129,11 +133,11 @@ pub(crate) fn float_equality_comparison(checker: &Checker, compare: &ast::ExprCo
         .iter()
         .filter(|(_, op, _)| matches!(op, CmpOp::Eq | CmpOp::NotEq))
         .filter(|(left, _, right)| {
-            if should_skip_comparison(left, semantic) || should_skip_comparison(right, semantic) {
+            if should_skip_comparison(*left, semantic) || should_skip_comparison(*right, semantic) {
                 return false;
             }
 
-            has_float(left, semantic) || has_float(right, semantic)
+            has_float(*left, semantic) || has_float(*right, semantic)
         })
     {
         checker.report_diagnostic(
@@ -147,29 +151,40 @@ pub(crate) fn float_equality_comparison(checker: &Checker, compare: &ast::ExprCo
     }
 }
 
-fn has_float(expr: &Expr, semantic: &SemanticModel) -> bool {
+fn has_float(expr: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
     match ResolvedPythonType::from(expr) {
         ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float | NumberLike::Complex)) => {
             true
         }
-        _ => match expr {
-            Expr::Call(ast::ExprCall { func, .. }) => ["float", "complex"]
-                .iter()
-                .any(|s| semantic.match_builtin_expr(func, s)),
-            Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
+        _ => match expr.classify() {
+            flat::ExprKind::Call(expr_call) => {
+                let func = expr_call.func();
+                ["float", "complex"]
+                    .iter()
+                    .any(|s| semantic.match_builtin_expr(func, s))
+            }
+            flat::ExprKind::BinOp(expr_bin_op) => {
+                let left = expr_bin_op.left();
+                let right = expr_bin_op.right();
+
                 has_float(left, semantic) || has_float(right, semantic)
             }
-            Expr::Named(ast::ExprNamed { value, .. }) => has_float(value, semantic),
+            flat::ExprKind::Named(expr_named) => {
+                let value = expr_named.value();
+
+                has_float(value, semantic)
+            }
             _ => false,
         },
     }
 }
 
-fn should_skip_comparison(expr: &Expr, semantic: &SemanticModel) -> bool {
-    match expr {
-        Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) => {
+fn should_skip_comparison(expr: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
+    match expr.classify() {
+        flat::ExprKind::Call(expr_call) => {
+            let func = expr_call.func();
+            let arguments = expr_call.arguments();
+
             // Skip `pytest.approx`
             if let Some(qualified_name) = semantic.resolve_qualified_name(func) {
                 if matches!(qualified_name.segments(), ["pytest", "approx"]) {
@@ -182,9 +197,9 @@ fn should_skip_comparison(expr: &Expr, semantic: &SemanticModel) -> bool {
                 .iter()
                 .any(|s| semantic.match_builtin_expr(func, s))
             {
-                return arguments.args.len() == 1
-                    && arguments.keywords.is_empty()
-                    && is_infinity_string_literal(&arguments.args[0]).is_some();
+                return arguments.args().len() == 1
+                    && arguments.keywords().is_empty()
+                    && is_infinity_string_literal(arguments.args().at(0)).is_some();
             }
 
             false

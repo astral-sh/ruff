@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
+use ruff_python_ast::flat::fields;
+use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, flat};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -100,8 +101,8 @@ impl Violation for NestedMinMax {
 impl MinMax {
     /// Converts a function call [`Expr`] into a [`MinMax`] if it is a call to `min` or `max`.
     fn try_from_call(
-        func: &Expr,
-        keywords: &[Keyword],
+        func: flat::View<'_, Expr>,
+        keywords: flat::NodeList<'_, Keyword>,
         semantic: &SemanticModel,
     ) -> Option<MinMax> {
         if !keywords.is_empty() {
@@ -126,30 +127,34 @@ impl std::fmt::Display for MinMax {
 
 /// Collect a new set of arguments to by either accepting existing args as-is or
 /// collecting child arguments, if it's a call to the same function.
-fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel) -> Vec<Expr> {
-    fn inner(min_max: MinMax, args: &[Expr], semantic: &SemanticModel, new_args: &mut Vec<Expr>) {
+fn collect_nested_args(
+    min_max: MinMax,
+    args: flat::NodeList<'_, Expr>,
+    semantic: &SemanticModel,
+) -> Vec<Expr> {
+    fn inner(
+        min_max: MinMax,
+        args: flat::NodeList<'_, Expr>,
+        semantic: &SemanticModel,
+        new_args: &mut Vec<Expr>,
+    ) {
         for arg in args {
-            if let Expr::Call(ast::ExprCall {
+            if let fields::Expr::Call(fields::ExprCall {
                 func,
-                arguments:
-                    Arguments {
-                        args,
-                        keywords,
-                        range: _,
-                        node_index: _,
-                    },
-                range_start: _,
-                node_index: _,
-            }) = arg
+                arguments,
+                range: _,
+                node: _,
+            }) = arg.fields()
+                && let fields::Arguments { args, keywords, .. } = arguments.fields()
             {
                 if MinMax::try_from_call(func, keywords, semantic) == Some(min_max) {
-                    if let [arg] = &**args {
+                    if let Some([arg]) = args.as_array() {
                         if arg.as_starred_expr().is_none() {
                             let new_arg = Expr::Starred(ast::ExprStarred {
-                                value: Box::new(arg.clone()),
+                                value: Box::new(arg.to_owned_node()),
                                 ctx: ast::ExprContext::Load,
                                 range: TextRange::default(),
-                                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                                node_index: ruff_python_ast::NodeIndex::NONE,
                             });
                             new_args.push(new_arg);
                             continue;
@@ -159,7 +164,7 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
                     continue;
                 }
             }
-            new_args.push(arg.clone());
+            new_args.push(arg.to_owned_node());
         }
     }
 
@@ -171,10 +176,10 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
 /// PLW3301
 pub(crate) fn nested_min_max(
     checker: &Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
+    &expr: &flat::View<'_, Expr>,
+    func: flat::View<'_, Expr>,
+    args: flat::NodeList<'_, Expr>,
+    keywords: flat::NodeList<'_, Keyword>,
 ) {
     let Some(min_max) = MinMax::try_from_call(func, keywords, checker.semantic()) else {
         return;
@@ -188,28 +193,26 @@ pub(crate) fn nested_min_max(
     }
 
     if args.iter().any(|arg| {
-        let Expr::Call(ast::ExprCall {
-            func,
-            arguments: Arguments { keywords, .. },
-            ..
-        }) = arg
-        else {
+        let flat::ExprKind::Call(call_node) = arg.classify() else {
             return false;
         };
-        MinMax::try_from_call(func.as_ref(), keywords.as_ref(), checker.semantic()) == Some(min_max)
+        let func = call_node.func();
+        let arguments = call_node.arguments();
+        let keywords = arguments.keywords();
+        MinMax::try_from_call(func, keywords, checker.semantic()) == Some(min_max)
     }) {
         let mut diagnostic =
             checker.report_diagnostic(NestedMinMax { func: min_max }, expr.range());
         let flattened_expr = Expr::Call(ast::ExprCall {
-            func: Box::new(func.clone()),
+            func: Box::new(func.to_owned_node()),
             arguments: Arguments {
                 args: collect_nested_args(min_max, args, checker.semantic()).into(),
-                keywords: keywords.iter().cloned().collect(),
+                keywords: keywords.iter().map(flat::View::to_owned_node).collect(),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
             },
             range_start: ruff_text_size::TextSize::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         });
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             checker.generator().expr(&flattened_expr),

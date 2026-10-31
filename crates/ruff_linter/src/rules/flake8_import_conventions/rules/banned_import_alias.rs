@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Stmt;
+use ruff_python_ast::{Stmt, flat};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -52,7 +52,7 @@ impl Violation for BannedImportAlias {
 /// ICN002
 pub(crate) fn banned_import_alias(
     checker: &Checker,
-    stmt: &Stmt,
+    stmt: flat::View<'_, Stmt>,
     name: &str,
     asname: &str,
     banned_conventions: &FxHashMap<String, BannedAliases>,

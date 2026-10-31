@@ -1,5 +1,6 @@
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprBooleanLiteral;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::AnyNodeRef;
 
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
@@ -8,8 +9,12 @@ use crate::prelude::*;
 pub struct FormatExprBooleanLiteral;
 
 impl FormatNodeRule<ExprBooleanLiteral> for FormatExprBooleanLiteral {
-    fn fmt_fields(&self, item: &ExprBooleanLiteral, f: &mut PyFormatter) -> FormatResult<()> {
-        if item.value {
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, ExprBooleanLiteral>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        if item.value() {
             token("True").fmt(f)
         } else {
             token("False").fmt(f)
@@ -17,7 +22,7 @@ impl FormatNodeRule<ExprBooleanLiteral> for FormatExprBooleanLiteral {
     }
 }
 
-impl NeedsParentheses for ExprBooleanLiteral {
+impl NeedsParentheses for flat::View<'_, ExprBooleanLiteral> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,

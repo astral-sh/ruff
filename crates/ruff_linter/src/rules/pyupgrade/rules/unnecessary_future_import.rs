@@ -5,7 +5,10 @@ use ruff_python_semantic::NodeId;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
-use ruff_python_ast::{self as ast, Alias, Stmt, StmtRef};
+use ruff_python_ast::{
+    Alias, Stmt,
+    flat::{self, fields as ast},
+};
 use ruff_python_semantic::{NameImport, Scope};
 use ruff_text_size::Ranged;
 
@@ -84,26 +87,27 @@ pub(crate) type RequiredImports = BTreeSet<NameImport>;
 
 pub(crate) fn is_import_required_by_isort(
     required_imports: &RequiredImports,
-    stmt: StmtRef,
-    alias: &Alias,
+    stmt: flat::View<'_, Stmt>,
+    alias: flat::View<'_, Alias>,
 ) -> bool {
-    match stmt {
-        StmtRef::ImportFrom(ast::StmtImportFrom {
-            module: Some(module),
-            ..
-        }) => {
+    match stmt.classify() {
+        flat::StmtKind::ImportFrom(stmt_import_from)
+            if let ast::StmtImportFrom {
+                module: Some(module),
+                ..
+            } = stmt_import_from.fields() =>
+        {
             let mut builder = QualifiedNameBuilder::with_capacity(module.split('.').count() + 1);
             builder.extend(module.split('.'));
-            builder.push(alias.name.as_str());
+            builder.push(alias.name().as_str());
             let qualified = builder.build();
 
             required_imports
                 .iter()
                 .any(|required_import| required_import.qualified_name() == qualified)
         }
-        StmtRef::ImportFrom(ast::StmtImportFrom { module: None, .. })
-        | StmtRef::Import(ast::StmtImport { .. }) => {
-            let name = alias.name.as_str();
+        flat::StmtKind::ImportFrom(_) | flat::StmtKind::Import(_) => {
+            let name = alias.name().as_str();
             let qualified = if name.contains('.') {
                 QualifiedName::from_dotted_name(name)
             } else {
@@ -120,7 +124,7 @@ pub(crate) fn is_import_required_by_isort(
 
 /// UP010
 pub(crate) fn unnecessary_future_import(checker: &Checker, scope: &Scope) {
-    let mut unused_imports: HashMap<NodeId, Vec<&Alias>> = HashMap::new();
+    let mut unused_imports: HashMap<NodeId, Vec<flat::View<'_, Alias>>> = HashMap::new();
     for future_name in REMOVE_FUTURES {
         for binding_id in scope.get_all(future_name) {
             let binding = checker.semantic().binding(binding_id);
@@ -130,21 +134,22 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, scope: &Scope) {
                 };
 
                 let stmt = checker.semantic().statement(node_id);
-                if let Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) = stmt {
+                if let flat::StmtKind::ImportFrom(import_from) = stmt.classify() {
+                    let names = import_from.names();
                     let Some(alias) = names
                         .iter()
-                        .find(|alias| alias.name.as_str() == binding.name(checker.source()))
+                        .find(|alias| alias.name().as_str() == binding.name(checker.source()))
                     else {
                         continue;
                     };
 
-                    if alias.asname.is_some() {
+                    if alias.asname().is_some() {
                         continue;
                     }
 
                     if is_import_required_by_isort(
                         &checker.settings().isort.required_imports,
-                        stmt.into(),
+                        stmt,
                         alias,
                     ) {
                         continue;
@@ -162,7 +167,7 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, scope: &Scope) {
     for (node_id, unused_aliases) in unused_imports {
         let names: Vec<_> = unused_aliases
             .iter()
-            .map(|alias| alias.name.as_str())
+            .map(|alias| alias.name().as_str())
             .sorted()
             .collect();
         let mut diagnostic = checker.report_diagnostic(

@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_python_ast::helpers::map_subscript;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
@@ -90,12 +91,15 @@ impl Violation for GeneratorReturnFromIterMethod {
 }
 
 /// PYI058
-pub(crate) fn bad_generator_return_type(function_def: &ast::StmtFunctionDef, checker: &Checker) {
-    if function_def.is_async {
+pub(crate) fn bad_generator_return_type(
+    function_def: flat::View<'_, ast::StmtFunctionDef>,
+    checker: &Checker,
+) {
+    if function_def.is_async() {
         return;
     }
 
-    let name = function_def.name.as_str();
+    let name = function_def.name().as_str();
 
     let semantic = checker.semantic();
 
@@ -103,22 +107,21 @@ pub(crate) fn bad_generator_return_type(function_def: &ast::StmtFunctionDef, che
         return;
     }
 
-    let parameters = &function_def.parameters;
+    let parameters = function_def.parameters();
 
-    if !parameters.kwonlyargs.is_empty()
-        || parameters.kwarg.is_some()
-        || parameters.vararg.is_some()
+    if !parameters.kwonlyargs().is_empty()
+        || parameters.kwarg().is_some()
+        || parameters.vararg().is_some()
     {
         return;
     }
 
-    if (parameters.args.len() + parameters.posonlyargs.len()) != 1 {
+    if (parameters.args().len() + parameters.posonlyargs().len()) != 1 {
         return;
     }
 
-    let returns = match &function_def.returns {
-        Some(returns) => returns.as_ref(),
-        _ => return,
+    let Some(returns) = function_def.returns() else {
+        return;
     };
 
     // Determine the module from which the existing annotation is imported (e.g., `typing` or
@@ -159,28 +162,36 @@ pub(crate) fn bad_generator_return_type(function_def: &ast::StmtFunctionDef, che
     // check that all parameters except the first one are either `typing.Any` or `None`:
     // - if so, collect information on the first parameter for use in the rule's autofix;
     // - if not, don't emit the diagnostic
-    let yield_type_info = match returns {
-        ast::Expr::Subscript(ast::ExprSubscript { slice, .. }) => match slice.as_ref() {
-            ast::Expr::Tuple(slice_tuple) => {
-                if !slice_tuple
-                    .iter()
-                    .skip(1)
-                    .all(|element| is_any_or_none(element, semantic))
-                {
-                    return;
+    let yield_type_info = match returns.classify() {
+        flat::ExprKind::Subscript(expr_subscript) => {
+            let slice = expr_subscript.slice();
+
+            match slice.classify() {
+                flat::ExprKind::Tuple(slice_tuple) => {
+                    if !slice_tuple
+                        .iter()
+                        .skip(1)
+                        .all(|element| is_any_or_none(element, semantic))
+                    {
+                        return;
+                    }
+                    let yield_type = match (name, slice_tuple.elts()) {
+                        ("__iter__", args) if let Some([yield_type, _, _]) = args.as_array() => {
+                            yield_type
+                        }
+                        ("__aiter__", args) if let Some([yield_type, _]) = args.as_array() => {
+                            yield_type
+                        }
+                        _ => return,
+                    };
+                    Some(YieldTypeInfo {
+                        expr: yield_type,
+                        range: slice_tuple.range(),
+                    })
                 }
-                let yield_type = match (name, slice_tuple.elts.as_slice()) {
-                    ("__iter__", [yield_type, _, _]) => yield_type,
-                    ("__aiter__", [yield_type, _]) => yield_type,
-                    _ => return,
-                };
-                Some(YieldTypeInfo {
-                    expr: yield_type,
-                    range: slice_tuple.range,
-                })
+                _ => return,
             }
-            _ => return,
-        },
+        }
         _ => None,
     };
 
@@ -190,24 +201,32 @@ pub(crate) fn bad_generator_return_type(function_def: &ast::StmtFunctionDef, che
     // it's more likely we'll be emitting a false positive here
     if !checker.source_type.is_stub() {
         let mut yield_encountered = false;
-        for stmt in &function_def.body {
-            match stmt {
-                ast::Stmt::Pass(_) => continue,
-                ast::Stmt::Return(ast::StmtReturn { value, .. }) => {
+        for stmt in function_def.body() {
+            match stmt.classify() {
+                flat::StmtKind::Pass(_) => continue,
+                flat::StmtKind::Return(stmt_return) => {
+                    let value = stmt_return.value();
+
                     if let Some(ret_val) = value {
                         if yield_encountered && !ret_val.is_none_literal_expr() {
                             return;
                         }
                     }
                 }
-                ast::Stmt::Expr(ast::StmtExpr { value, .. }) => match value.as_ref() {
-                    ast::Expr::StringLiteral(_) | ast::Expr::EllipsisLiteral(_) => continue,
-                    ast::Expr::Yield(_) | ast::Expr::YieldFrom(_) => {
-                        yield_encountered = true;
-                        continue;
+                flat::StmtKind::Expr(stmt_expr) => {
+                    let value = stmt_expr.value();
+
+                    match value.classify() {
+                        flat::ExprKind::StringLiteral(_) | flat::ExprKind::EllipsisLiteral(_) => {
+                            continue;
+                        }
+                        flat::ExprKind::Yield(_) | flat::ExprKind::YieldFrom(_) => {
+                            yield_encountered = true;
+                            continue;
+                        }
+                        _ => return,
                     }
-                    _ => return,
-                },
+                }
                 _ => return,
             }
         }
@@ -233,14 +252,14 @@ pub(crate) fn bad_generator_return_type(function_def: &ast::StmtFunctionDef, che
 }
 
 /// Returns `true` if the [`ast::Expr`] is a `None` literal or a `typing.Any` expression.
-fn is_any_or_none(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
+fn is_any_or_none(expr: flat::View<'_, ast::Expr>, semantic: &SemanticModel) -> bool {
     expr.is_none_literal_expr() || semantic.match_typing_expr(expr, "Any")
 }
 
 /// Generate a [`Fix`] to convert the return type annotation to `Iterator` or `AsyncIterator`.
 fn generate_fix(
-    function_def: &ast::StmtFunctionDef,
-    returns: &ast::Expr,
+    function_def: flat::View<'_, ast::StmtFunctionDef>,
+    returns: flat::View<'_, ast::Expr>,
     yield_type_info: Option<YieldTypeInfo>,
     module: Module,
     member: Generator,
@@ -256,13 +275,13 @@ fn generate_fix(
     let binding_edit = Edit::range_replacement(binding, expr.range());
     let yield_edit = yield_type_info.map(|yield_type_info| {
         Edit::range_replacement(
-            checker.generator().expr(yield_type_info.expr),
+            checker.generator().expr_view(yield_type_info.expr),
             yield_type_info.range(),
         )
     });
 
     // Mark as unsafe if it's a runtime Python file and the body has more than one statement in it.
-    let applicability = if checker.source_type.is_stub() || function_def.body.len() == 1 {
+    let applicability = if checker.source_type.is_stub() || function_def.body().len() == 1 {
         Applicability::Safe
     } else {
         Applicability::Unsafe
@@ -277,7 +296,7 @@ fn generate_fix(
 
 #[derive(Debug)]
 struct YieldTypeInfo<'a> {
-    expr: &'a ast::Expr,
+    expr: flat::View<'a, ast::Expr>,
     range: TextRange,
 }
 

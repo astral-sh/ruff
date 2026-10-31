@@ -1,5 +1,6 @@
 use ruff_diagnostics::Applicability;
-use ruff_python_ast::{self as ast, Arguments, Decorator, Expr};
+use ruff_python_ast::Decorator;
+use ruff_python_ast::flat::{self, fields as ast};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -137,7 +138,7 @@ impl AlwaysFixableViolation for PytestUseFixturesWithoutParameters {
 
 fn pytest_mark_parentheses(
     checker: &Checker,
-    decorator: &Decorator,
+    decorator: flat::View<'_, Decorator>,
     marker: &str,
     fix: Fix,
     preferred: Parentheses,
@@ -154,17 +155,14 @@ fn pytest_mark_parentheses(
     diagnostic.set_fix(fix);
 }
 
-fn check_mark_parentheses(checker: &Checker, decorator: &Decorator, marker: &str) {
-    match &decorator.expression {
-        Expr::Call(ast::ExprCall {
-            func: _,
-            arguments,
-            range_start: _,
-            node_index: _,
-        }) => {
+fn check_mark_parentheses(checker: &Checker, decorator: flat::View<'_, Decorator>, marker: &str) {
+    match decorator.expression().classify() {
+        flat::ExprKind::Call(expr_call) => {
+            let arguments = expr_call.arguments();
+
             if !checker.settings().flake8_pytest_style.mark_parentheses
-                && arguments.args.is_empty()
-                && arguments.keywords.is_empty()
+                && arguments.args().is_empty()
+                && arguments.keywords().is_empty()
             {
                 let fix = Fix::applicable_edit(
                     Edit::range_deletion(arguments.range()),
@@ -203,19 +201,22 @@ fn check_mark_parentheses(checker: &Checker, decorator: &Decorator, marker: &str
     }
 }
 
-fn check_useless_usefixtures(checker: &Checker, decorator: &Decorator, marker: &str) {
+fn check_useless_usefixtures(
+    checker: &Checker,
+    decorator: flat::View<'_, Decorator>,
+    marker: &str,
+) {
     if marker != "usefixtures" {
         return;
     }
 
-    match &decorator.expression {
+    match decorator.expression().fields() {
         // @pytest.mark.usefixtures
-        Expr::Attribute(..) => {}
+        ast::Expr::Attribute(..) => {}
         // @pytest.mark.usefixtures(...)
-        Expr::Call(ast::ExprCall {
-            arguments: Arguments { args, keywords, .. },
-            ..
-        }) => {
+        ast::Expr::Call(ast::ExprCall { arguments, .. }) => {
+            let args = arguments.args();
+            let keywords = arguments.keywords();
             if !args.is_empty() || !keywords.is_empty() {
                 return;
             }
@@ -229,7 +230,7 @@ fn check_useless_usefixtures(checker: &Checker, decorator: &Decorator, marker: &
 }
 
 /// PT023, PT026
-pub(crate) fn marks(checker: &Checker, decorators: &[Decorator]) {
+pub(crate) fn marks(checker: &Checker, decorators: flat::NodeList<'_, Decorator>) {
     let enforce_parentheses = checker.is_rule_enabled(Rule::PytestIncorrectMarkParenthesesStyle);
     let enforce_useless_usefixtures =
         checker.is_rule_enabled(Rule::PytestUseFixturesWithoutParameters);

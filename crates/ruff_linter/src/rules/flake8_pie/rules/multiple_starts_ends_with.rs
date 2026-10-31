@@ -1,3 +1,4 @@
+use ruff_python_ast::flat::fields;
 use std::collections::BTreeMap;
 use std::iter;
 
@@ -6,7 +7,7 @@ use itertools::Either::{Left, Right};
 use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr, ExprContext, Identifier};
+use ruff_python_ast::{self as ast, Arguments, BoolOp, Expr, ExprContext, Identifier, flat};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
@@ -69,53 +70,48 @@ impl AlwaysFixableViolation for MultipleStartsEndsWith {
 }
 
 /// PIE810
-pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
-    let Expr::BoolOp(ast::ExprBoolOp {
+pub(crate) fn multiple_starts_ends_with(checker: &Checker, &expr: &flat::View<'_, Expr>) {
+    let fields::Expr::BoolOp(fields::ExprBoolOp {
         op: BoolOp::Or,
         values,
         range: _,
-        node_index: _,
-    }) = expr
+        node: _,
+    }) = expr.fields()
     else {
         return;
     };
 
     let mut duplicates = BTreeMap::new();
     for (index, call) in values.iter().enumerate() {
-        let Expr::Call(ast::ExprCall {
-            func,
-            arguments:
-                Arguments {
-                    args,
-                    keywords,
-                    range: _,
-                    node_index: _,
-                },
-            range_start: _,
-            node_index: _,
-        }) = &call
-        else {
+        let flat::ExprKind::Call(call_node) = call.classify() else {
             continue;
         };
+        let func = call_node.func();
+        let arguments = call_node.arguments();
+        let args = arguments.args();
+        let keywords = arguments.keywords();
 
         if !keywords.is_empty() {
             continue;
         }
 
-        let [arg] = &**args else {
+        let Some([arg]) = args.as_array() else {
             continue;
         };
 
-        let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+        let flat::ExprKind::Attribute(attribute) = func.classify() else {
             continue;
         };
+        let value = attribute.value();
+        let attr = attribute.attr();
         if attr != "startswith" && attr != "endswith" {
             continue;
         }
 
-        let Expr::Name(ast::ExprName { id: arg_name, .. }) = value.as_ref() else {
+        let flat::ExprKind::Name(name) = value.classify() else {
             continue;
         };
+        let arg_name = name.id();
 
         // If the argument is bound to a tuple, skip it, since we don't want to suggest
         // `startswith((x, y))` where `x` or `y` are tuples. (Tuple literals are okay, since we
@@ -139,28 +135,18 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                 },
                 expr.range(),
             );
-            let words: Vec<&Expr> = indices
+            let words: Vec<flat::View<'_, Expr>> = indices
                 .iter()
-                .map(|index| &values[*index])
+                .map(|index| values.at(*index))
                 .map(|expr| {
-                    let Expr::Call(ast::ExprCall {
-                        func: _,
-                        arguments:
-                            Arguments {
-                                args,
-                                keywords: _,
-                                range: _,
-                                node_index: _,
-                            },
-                        range_start: _,
-                        node_index: _,
-                    }) = expr
-                    else {
+                    let flat::ExprKind::Call(call_node) = expr.classify() else {
                         unreachable!(
                             "{}",
                             format!("Indices should only contain `{attr_name}` calls")
                         )
                     };
+                    let arguments = call_node.arguments();
+                    let args = arguments.args();
                     args.first()
                         .unwrap_or_else(|| panic!("`{attr_name}` should have one argument"))
                 })
@@ -168,33 +154,33 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
 
             let node = Expr::Tuple(ast::ExprTuple {
                 elts: words
-                    .iter()
+                    .into_iter()
                     .flat_map(|value| {
-                        if let Expr::Tuple(tuple) = value {
+                        if let flat::ExprKind::Tuple(tuple) = value.classify() {
                             Left(tuple.iter())
                         } else {
-                            Right(iter::once(*value))
+                            Right(iter::once(value))
                         }
                     })
-                    .cloned()
+                    .map(flat::View::to_owned_node)
                     .collect(),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
                 parenthesized: true,
             });
             let node1 = Expr::Name(ast::ExprName {
                 id: arg_name.into(),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
             });
             let node2 = Expr::Attribute(ast::ExprAttribute {
                 value: Box::new(node1),
                 attr: Identifier::new(attr_name.to_string(), TextRange::default()),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
             });
             let node3 = Expr::Call(ast::ExprCall {
                 func: Box::new(node2),
@@ -202,10 +188,10 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                     args: [node].into(),
                     keywords: std::iter::empty().collect(),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                 },
                 range_start: ruff_text_size::TextSize::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
             });
             let call = node3;
 
@@ -220,12 +206,12 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                         if indices.contains(&index) {
                             std::mem::take(&mut call)
                         } else {
-                            Some(elt.clone())
+                            Some(elt.to_owned_node())
                         }
                     })
                     .collect(),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
             });
             let bool_op = node;
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
@@ -237,10 +223,11 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
 }
 
 /// Returns `true` if the expression definitively resolves to a tuple (e.g., `x` in `x = (1, 2)`).
-fn is_bound_to_tuple(arg: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Name(ast::ExprName { id, .. }) = arg else {
+fn is_bound_to_tuple(arg: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
+    let flat::ExprKind::Name(name) = arg.classify() else {
         return false;
     };
+    let id = name.id();
 
     let Some(binding_id) = semantic.lookup_symbol(id.as_str()).binding_id() else {
         return false;

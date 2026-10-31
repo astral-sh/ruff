@@ -1,7 +1,6 @@
 use std::ffi::OsStr;
 use std::path::Path;
 
-pub use expression::*;
 pub use generated::*;
 pub use int::*;
 pub use node_index::*;
@@ -11,8 +10,7 @@ pub use python_version::*;
 
 pub mod comparable;
 pub mod docstrings;
-mod expression;
-pub mod find_node;
+pub mod flat;
 mod generated;
 pub mod helpers;
 pub mod identifier;
@@ -24,14 +22,11 @@ mod nodes;
 pub mod operator_precedence;
 pub mod parenthesize;
 mod python_version;
-pub mod relocate;
 pub mod script;
-pub mod statement_visitor;
 pub mod stmt_if;
 pub mod str;
 pub mod str_prefix;
 pub mod token;
-pub mod traversal;
 pub mod types;
 pub mod visitor;
 pub mod whitespace;

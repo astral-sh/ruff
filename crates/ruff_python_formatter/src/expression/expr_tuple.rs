@@ -1,6 +1,7 @@
 use ruff_formatter::{FormatRuleWithOptions, format_args};
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprTuple;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::AnyNodeRef;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::builders::parenthesize_if_expands;
@@ -101,7 +102,7 @@ pub struct FormatExprTuple {
     parentheses: TupleParentheses,
 }
 
-impl FormatRuleWithOptions<ExprTuple, PyFormatContext<'_>> for FormatExprTuple {
+impl FormatRuleWithOptions<flat::View<'_, ExprTuple>, PyFormatContext<'_>> for FormatExprTuple {
     type Options = TupleParentheses;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -111,14 +112,9 @@ impl FormatRuleWithOptions<ExprTuple, PyFormatContext<'_>> for FormatExprTuple {
 }
 
 impl FormatNodeRule<ExprTuple> for FormatExprTuple {
-    fn fmt_fields(&self, item: &ExprTuple, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprTuple {
-            elts,
-            ctx: _,
-            range: _,
-            node_index: _,
-            parenthesized: is_parenthesized,
-        } = item;
+    fn fmt_fields(&self, item: flat::View<'_, ExprTuple>, f: &mut PyFormatter) -> FormatResult<()> {
+        let elts = item.elts();
+        let is_parenthesized = item.parenthesized();
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
@@ -133,9 +129,9 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
         // )
         // ```
         // In all other cases comments get assigned to a list element
-        match elts.as_slice() {
-            [] => empty_parenthesized("(", dangling, ")").fmt(f),
-            [single] => match self.parentheses {
+        match elts {
+            args if args.is_empty() => empty_parenthesized("(", dangling, ")").fmt(f),
+            args if let Some([single]) = args.as_array() => match self.parentheses {
                 TupleParentheses::Preserve if !is_parenthesized => {
                     single.format().fmt(f)?;
                     // The `TupleParentheses::Preserve` is only set by subscript expression
@@ -172,7 +168,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
             //
             // Unlike other expression parentheses, tuple parentheses are part of the range of the
             // tuple itself.
-            _ if *is_parenthesized
+            _ if is_parenthesized
                 && !(self.parentheses == TupleParentheses::NeverPreserve
                     && dangling.is_empty()) =>
             {
@@ -192,7 +188,7 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                 TupleParentheses::NeverPreserve => {
                     optional_parentheses(&ExprSequence::new(item)).fmt(f)
                 }
-                TupleParentheses::OptionalParentheses if item.len() == 2 => {
+                TupleParentheses::OptionalParentheses if item.elts().len() == 2 => {
                     optional_parentheses(&ExprSequence::new(item)).fmt(f)
                 }
                 TupleParentheses::Default | TupleParentheses::OptionalParentheses => {
@@ -205,11 +201,11 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
 
 #[derive(Debug)]
 struct ExprSequence<'a> {
-    tuple: &'a ExprTuple,
+    tuple: flat::View<'a, ExprTuple>,
 }
 
 impl<'a> ExprSequence<'a> {
-    const fn new(expr: &'a ExprTuple) -> Self {
+    const fn new(expr: flat::View<'a, ExprTuple>) -> Self {
         Self { tuple: expr }
     }
 }
@@ -217,12 +213,12 @@ impl<'a> ExprSequence<'a> {
 impl Format<PyFormatContext<'_>> for ExprSequence<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         f.join_comma_separated(self.tuple.end())
-            .nodes(&self.tuple.elts)
+            .nodes(self.tuple.elts())
             .finish()
     }
 }
 
-impl NeedsParentheses for ExprTuple {
+impl NeedsParentheses for flat::View<'_, ExprTuple> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,

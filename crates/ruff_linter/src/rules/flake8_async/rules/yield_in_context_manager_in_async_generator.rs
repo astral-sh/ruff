@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::helpers::map_callable;
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 
@@ -82,7 +83,10 @@ impl Violation for YieldInContextManagerInAsyncGenerator {
 }
 
 /// ASYNC119
-pub(crate) fn yield_in_context_manager_in_async_generator(checker: &Checker, expr: &Expr) {
+pub(crate) fn yield_in_context_manager_in_async_generator(
+    checker: &Checker,
+    &expr: &flat::View<'_, Expr>,
+) {
     // Check that the enclosing scope is an async function.
     let Some(function_def) = enclosing_async_function(checker) else {
         return;
@@ -98,22 +102,24 @@ pub(crate) fn yield_in_context_manager_in_async_generator(checker: &Checker, exp
     // Walk up the statement hierarchy to check if this yield is inside a `with` block.
     // Stop at function/class boundaries, since nested definitions create a new scope.
     for stmt in checker.semantic().current_statements() {
-        match stmt {
-            Stmt::With(_) => {
+        match stmt.classify() {
+            flat::StmtKind::With(_) => {
                 checker.report_diagnostic(YieldInContextManagerInAsyncGenerator, expr.range());
                 return;
             }
-            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => return,
+            flat::StmtKind::FunctionDef(_) | flat::StmtKind::ClassDef(_) => return,
             _ => {}
         }
     }
 }
 
 /// Returns the enclosing `async` function definition, if any.
-fn enclosing_async_function<'a>(checker: &Checker<'a>) -> Option<&'a ast::StmtFunctionDef> {
+fn enclosing_async_function<'a>(
+    checker: &Checker<'a>,
+) -> Option<flat::View<'a, ast::StmtFunctionDef>> {
     for scope in checker.semantic().current_scopes() {
         match scope.kind {
-            ScopeKind::Function(function_def) if function_def.is_async => {
+            ScopeKind::Function(function_def) if function_def.is_async() => {
                 return Some(function_def);
             }
             // Nested functions, lambdas, and classes break the chain.
@@ -127,11 +133,14 @@ fn enclosing_async_function<'a>(checker: &Checker<'a>) -> Option<&'a ast::StmtFu
 /// Returns `true` if the function is decorated with `@asynccontextmanager`,
 /// `@pytest.fixture`, or `@trio.as_safe_channel`, which are known to handle
 /// async generator cleanup safely.
-fn has_safe_decorator(checker: &Checker, function_def: &ast::StmtFunctionDef) -> bool {
-    function_def.decorator_list.iter().any(|decorator| {
+fn has_safe_decorator(
+    checker: &Checker,
+    function_def: flat::View<'_, ast::StmtFunctionDef>,
+) -> bool {
+    function_def.decorator_list().iter().any(|decorator| {
         checker
             .semantic()
-            .resolve_qualified_name(map_callable(&decorator.expression))
+            .resolve_qualified_name(map_callable(decorator.expression()))
             .is_some_and(|qualified_name| {
                 matches!(
                     qualified_name.segments(),

@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::flat;
+use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -48,7 +49,10 @@ impl Violation for DjangoExcludeWithModelForm {
 }
 
 /// DJ006
-pub(crate) fn exclude_with_model_form(checker: &Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn exclude_with_model_form(
+    checker: &Checker,
+    class_def: flat::View<'_, ast::StmtClassDef>,
+) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
@@ -57,21 +61,25 @@ pub(crate) fn exclude_with_model_form(checker: &Checker, class_def: &ast::StmtCl
         return;
     }
 
-    for element in &class_def.body {
-        let Stmt::ClassDef(ast::StmtClassDef { name, body, .. }) = element else {
+    for element in class_def.body() {
+        let flat::StmtKind::ClassDef(class_def_node) = element.classify() else {
             continue;
         };
+        let name = class_def_node.name();
+        let body = class_def_node.body();
         if name != "Meta" {
             continue;
         }
         for element in body {
-            let Stmt::Assign(ast::StmtAssign { targets, .. }) = element else {
+            let flat::StmtKind::Assign(assign) = element.classify() else {
                 continue;
             };
+            let targets = assign.targets();
             for target in targets {
-                let Expr::Name(ast::ExprName { id, .. }) = target else {
+                let flat::ExprKind::Name(name_node) = target.classify() else {
                     continue;
                 };
+                let id = name_node.id();
                 if id == "exclude" {
                     checker.report_diagnostic(DjangoExcludeWithModelForm, target.range());
                     return;

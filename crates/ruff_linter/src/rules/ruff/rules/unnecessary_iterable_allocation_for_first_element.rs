@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, Int};
+use ruff_python_ast::{Comprehension, Expr, Int, Number, flat};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::builtins::is_iterator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -74,31 +74,40 @@ impl AlwaysFixableViolation for UnnecessaryIterableAllocationForFirstElement {
 }
 
 /// RUF015
-pub(crate) fn unnecessary_iterable_allocation_for_first_element(checker: &Checker, expr: &Expr) {
-    let value = match expr {
+pub(crate) fn unnecessary_iterable_allocation_for_first_element(
+    checker: &Checker,
+    &expr: &flat::View<'_, Expr>,
+) {
+    let value = match expr.classify() {
         // Ex) `list(x)[0]`
-        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+        flat::ExprKind::Subscript(expr_subscript) => {
+            let value = expr_subscript.value();
+            let slice = expr_subscript.slice();
+
             if !is_zero(slice) {
                 return;
             }
             value
         }
         // Ex) `list(x).pop(0)`
-        Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) => {
-            if !arguments.keywords.is_empty() {
+        flat::ExprKind::Call(expr_call) => {
+            let func = expr_call.func();
+            let arguments = expr_call.arguments();
+
+            if !arguments.keywords().is_empty() {
                 return;
             }
-            let [arg] = arguments.args.as_ref() else {
+            let Some([arg]) = arguments.args().as_array() else {
                 return;
             };
             if !is_zero(arg) {
                 return;
             }
-            let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+            let flat::ExprKind::Attribute(attribute) = func.classify() else {
                 return;
             };
+            let value = attribute.value();
+            let attr = attribute.attr();
             if !matches!(attr.as_str(), "pop") {
                 return;
             }
@@ -131,14 +140,9 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(checker: &Checke
 }
 
 /// Check that the slice [`Expr`] is a slice of the first element (e.g., `x[0]`).
-fn is_zero(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::NumberLiteral(ast::ExprNumberLiteral {
-            value: ast::Number::Int(Int::ZERO),
-            ..
-        })
-    )
+fn is_zero(expr: flat::View<'_, Expr>) -> bool {
+    expr.as_number_literal_expr()
+        .is_some_and(|number| matches!(number.value(), Number::Int(Int::ZERO)))
 }
 
 #[derive(Debug)]
@@ -158,58 +162,66 @@ struct IterationTarget {
 ///
 /// As a special-case, given `[x for x in y]`, returns the range of `y` (rather than the
 /// redundant comprehension).
-fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<IterationTarget> {
-    let result = match expr {
-        Expr::Call(ast::ExprCall {
-            func,
-            arguments: Arguments { args, .. },
-            ..
-        }) => {
-            let [arg] = &**args else {
-                return None;
-            };
+fn match_iteration_target(
+    expr: flat::View<'_, Expr>,
+    semantic: &SemanticModel,
+) -> Option<IterationTarget> {
+    let result = match expr.classify() {
+        flat::ExprKind::Call(expr_call) => {
+            let func = expr_call.func();
+            let arguments = expr_call.arguments();
+
+            let args = arguments.args();
+            let [arg] = args.as_array()?;
 
             let builtin_function_name = semantic.resolve_builtin_symbol(func)?;
             if !matches!(builtin_function_name, "tuple" | "list") {
                 return None;
             }
 
-            match arg {
-                Expr::Generator(ast::ExprGenerator {
-                    elt, generators, ..
-                }) => match match_simple_comprehension(elt, generators) {
-                    Some(range) => IterationTarget {
-                        range,
-                        iterable: false,
-                    },
-                    None => IterationTarget {
+            match arg.classify() {
+                flat::ExprKind::Generator(expr_generator) => {
+                    let elt = expr_generator.elt();
+                    let generators = expr_generator.generators();
+                    match match_simple_comprehension(elt, generators) {
+                        Some(range) => IterationTarget {
+                            range,
+                            iterable: false,
+                        },
+                        None => IterationTarget {
+                            range: arg.range(),
+                            iterable: true,
+                        },
+                    }
+                }
+                flat::ExprKind::ListComp(expr_list_comp) => {
+                    let elt = expr_list_comp.elt();
+                    let generators = expr_list_comp.generators();
+                    match match_simple_comprehension(elt, generators) {
+                        Some(range) => IterationTarget {
+                            range,
+                            iterable: false,
+                        },
+                        None => IterationTarget {
+                            range: arg
+                                .range()
+                                // Remove the `[`
+                                .add_start(TextSize::from(1))
+                                // Remove the `]`
+                                .sub_end(TextSize::from(1)),
+                            iterable: true,
+                        },
+                    }
+                }
+                flat::ExprKind::Call(expr_call) => {
+                    let func = expr_call.func();
+                    IterationTarget {
                         range: arg.range(),
-                        iterable: true,
-                    },
-                },
-                Expr::ListComp(ast::ExprListComp {
-                    elt, generators, ..
-                }) => match match_simple_comprehension(elt, generators) {
-                    Some(range) => IterationTarget {
-                        range,
-                        iterable: false,
-                    },
-                    None => IterationTarget {
-                        range: arg
-                            .range()
-                            // Remove the `[`
-                            .add_start(TextSize::from(1))
-                            // Remove the `]`
-                            .sub_end(TextSize::from(1)),
-                        iterable: true,
-                    },
-                },
-                Expr::Call(ast::ExprCall { func, .. }) => IterationTarget {
-                    range: arg.range(),
-                    iterable: semantic
-                        .resolve_builtin_symbol(func)
-                        .is_some_and(is_iterator),
-                },
+                        iterable: semantic
+                            .resolve_builtin_symbol(func)
+                            .is_some_and(is_iterator),
+                    }
+                }
                 _ => IterationTarget {
                     range: arg.range(),
                     iterable: false,
@@ -217,32 +229,36 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
             }
         }
 
-        Expr::ListComp(ast::ExprListComp {
-            elt, generators, ..
-        }) => match match_simple_comprehension(elt, generators) {
-            Some(range) => IterationTarget {
-                range,
-                iterable: false,
-            },
-            None => IterationTarget {
-                range: expr
-                    .range()
-                    // Remove the `[`
-                    .add_start(TextSize::from(1))
-                    // Remove the `]`
-                    .sub_end(TextSize::from(1)),
-                iterable: true,
-            },
-        },
-        Expr::List(ast::ExprList { elts, .. }) => {
-            let [elt] = elts.as_slice() else {
-                return None;
-            };
-            let Expr::Starred(ast::ExprStarred { value, .. }) = elt else {
-                return None;
-            };
+        flat::ExprKind::ListComp(expr_list_comp) => {
+            let elt = expr_list_comp.elt();
+            let generators = expr_list_comp.generators();
+            match match_simple_comprehension(elt, generators) {
+                Some(range) => IterationTarget {
+                    range,
+                    iterable: false,
+                },
+                None => IterationTarget {
+                    range: expr
+                        .range()
+                        // Remove the `[`
+                        .add_start(TextSize::from(1))
+                        // Remove the `]`
+                        .sub_end(TextSize::from(1)),
+                    iterable: true,
+                },
+            }
+        }
+        flat::ExprKind::List(expr_list) => {
+            let elts = expr_list.elts();
 
-            let iterable = if let ast::Expr::Call(ast::ExprCall { func, .. }) = &**value {
+            let [elt] = elts.as_array()?;
+            let flat::ExprKind::Starred(starred) = elt.classify() else {
+                return None;
+            };
+            let value = starred.value();
+
+            let iterable = if let flat::ExprKind::Call(call_node) = value.classify() {
+                let func = call_node.func();
                 semantic
                     .resolve_builtin_symbol(func)
                     .is_some_and(is_iterator)
@@ -262,27 +278,26 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
 
 /// Returns the [`Expr`] target for a comprehension, if the comprehension is "simple"
 /// (e.g., `x` for `[i for i in x]`).
-fn match_simple_comprehension(elt: &Expr, generators: &[Comprehension]) -> Option<TextRange> {
-    let [
-        generator @ Comprehension {
-            is_async: false, ..
-        },
-    ] = generators
-    else {
+fn match_simple_comprehension(
+    elt: flat::View<'_, Expr>,
+    generators: flat::NodeList<'_, Comprehension>,
+) -> Option<TextRange> {
+    let [generator] = generators.as_array()?;
+    if generator.is_async() {
         return None;
-    };
+    }
 
     // Ignore if there's an `if` statement in the comprehension, since it filters the list.
-    if !generator.ifs.is_empty() {
+    if !generator.ifs().is_empty() {
         return None;
     }
 
     // Verify that the generator is, e.g. `i for i in x`, as opposed to `i for j in x`.
     let elt = elt.as_name_expr()?;
-    let target = generator.target.as_name_expr()?;
-    if elt.id != target.id {
+    let target = generator.target().as_name_expr()?;
+    if elt.id() != target.id() {
         return None;
     }
 
-    Some(generator.iter.range())
+    Some(generator.iter().range())
 }

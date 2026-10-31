@@ -1,7 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat::statement_visitor::{StatementVisitor, walk_stmt};
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{Arguments, Expr, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::logging;
 use ruff_text_size::Ranged;
@@ -83,12 +84,14 @@ impl Violation for BlindExcept {
 
 fn contains_blind_exception<'a>(
     semantic: &'a SemanticModel,
-    expr: &'a Expr,
+    expr: flat::View<'a, Expr>,
 ) -> Option<(&'a str, ruff_text_size::TextRange)> {
-    match expr {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
-            .iter()
-            .find_map(|elt| contains_blind_exception(semantic, elt)),
+    match expr.classify() {
+        flat::ExprKind::Tuple(expr_tuple) => {
+            let elts = expr_tuple.elts();
+            elts.iter()
+                .find_map(|elt| contains_blind_exception(semantic, elt))
+        }
         _ => {
             let builtin_exception_type = semantic.resolve_builtin_symbol(expr)?;
             matches!(builtin_exception_type, "BaseException" | "Exception")
@@ -100,9 +103,9 @@ fn contains_blind_exception<'a>(
 /// BLE001
 pub(crate) fn blind_except(
     checker: &Checker,
-    type_: Option<&Expr>,
+    type_: Option<flat::View<'_, Expr>>,
     name: Option<&str>,
-    body: &[Stmt],
+    body: flat::Suite<'_>,
 ) {
     let Some(type_) = type_ else {
         return;
@@ -154,23 +157,34 @@ impl<'a> ReraiseVisitor<'a> {
 }
 
 impl<'a> StatementVisitor<'a> for ReraiseVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+    fn visit_stmt(&mut self, stmt: flat::View<'a, Stmt>) {
         if self.seen {
             return;
         }
-        match stmt {
-            Stmt::Raise(ast::StmtRaise { exc, cause, .. }) => {
+        match stmt.classify() {
+            flat::StmtKind::Raise(stmt_raise) => {
+                let exc = stmt_raise.exc();
+                let cause = stmt_raise.cause();
+
                 // except Exception [as <name>]:
                 //     raise [<exc> [from <cause>]]
-                let reraised = match (self.name, exc.as_deref(), cause.as_deref()) {
+                let reraised = match (
+                    self.name,
+                    exc.map(flat::View::<Expr>::fields),
+                    cause.map(flat::View::<Expr>::fields),
+                ) {
                     // `raise`
                     (_, None, None) => true,
                     // `raise SomeExc from <name>`
-                    (Some(name), _, Some(Expr::Name(ast::ExprName { id, .. }))) if name == id => {
+                    (Some(name), _, Some(ast::Expr::Name(ast::ExprName { id, .. })))
+                        if name == id =>
+                    {
                         true
                     }
                     // `raise <name>` and `raise <name> from SomeCause`
-                    (Some(name), Some(Expr::Name(ast::ExprName { id, .. })), _) if name == id => {
+                    (Some(name), Some(ast::Expr::Name(ast::ExprName { id, .. })), _)
+                        if name == id =>
+                    {
                         true
                     }
                     _ => false,
@@ -179,16 +193,18 @@ impl<'a> StatementVisitor<'a> for ReraiseVisitor<'a> {
                     self.seen = true;
                 }
             }
-            Stmt::Try(_) | Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
+            flat::StmtKind::Try(_)
+            | flat::StmtKind::FunctionDef(_)
+            | flat::StmtKind::ClassDef(_) => {}
             _ => walk_stmt(self, stmt),
         }
     }
 }
 
 /// Returns `true` if the `exc_info` keyword argument is truthy.
-fn is_exc_info_enabled(arguments: &ast::Arguments, semantic: &SemanticModel) -> bool {
+fn is_exc_info_enabled(arguments: flat::View<'_, Arguments>, semantic: &SemanticModel) -> bool {
     arguments.find_keyword("exc_info").is_some_and(|keyword| {
-        Truthiness::from_expr(&keyword.value, |id| semantic.has_builtin_binding(id)).into_bool()
+        Truthiness::from_expr(keyword.value(), |id| semantic.has_builtin_binding(id)).into_bool()
             != Some(false)
     })
 }
@@ -217,25 +233,26 @@ impl<'a> LogExceptionVisitor<'a> {
 }
 
 impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+    fn visit_stmt(&mut self, stmt: flat::View<'a, Stmt>) {
         if self.seen {
             return;
         }
-        match stmt {
-            Stmt::Expr(ast::StmtExpr { value, .. }) => {
-                if let Expr::Call(ast::ExprCall {
-                    func, arguments, ..
-                }) = value.as_ref()
-                {
-                    match func.as_ref() {
-                        Expr::Attribute(ast::ExprAttribute { attr, .. })
+        match stmt.classify() {
+            flat::StmtKind::Expr(stmt_expr) => {
+                let value = stmt_expr.value();
+
+                if let flat::ExprKind::Call(call) = value.classify() {
+                    let func = call.func();
+                    let arguments = call.arguments();
+                    match func.classify() {
+                        flat::ExprKind::Attribute(expr_attribute)
                             if logging::is_logger_candidate(
                                 func,
                                 self.semantic,
                                 self.logger_objects,
-                            ) && match attr.as_str() {
+                            ) && match expr_attribute.attr().as_str() {
                                 "exception" => true,
-                                _ if is_logger_method_name(attr) => {
+                                _ if is_logger_method_name(expr_attribute.attr().as_str()) => {
                                     is_exc_info_enabled(arguments, self.semantic)
                                 }
                                 _ => false,
@@ -243,7 +260,7 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                         {
                             self.seen = true;
                         }
-                        Expr::Name(ast::ExprName { .. })
+                        flat::ExprKind::Name(_)
                             if self.semantic.resolve_qualified_name(func).is_some_and(
                                 |qualified_name| match qualified_name.segments() {
                                     ["logging", "exception"] => true,
@@ -260,7 +277,9 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                     }
                 }
             }
-            Stmt::Try(_) | Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
+            flat::StmtKind::Try(_)
+            | flat::StmtKind::FunctionDef(_)
+            | flat::StmtKind::ClassDef(_) => {}
             _ => walk_stmt(self, stmt),
         }
     }

@@ -1,4 +1,5 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -41,7 +42,7 @@ impl Violation for YieldInInit {
 }
 
 /// PLE0100
-pub(crate) fn yield_in_init(checker: &Checker, expr: &Expr) {
+pub(crate) fn yield_in_init(checker: &Checker, &expr: &flat::View<'_, Expr>) {
     if in_dunder_method("__init__", checker.semantic(), checker.settings()) {
         checker.report_diagnostic(YieldInInit, expr.range());
     }

@@ -1,4 +1,5 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 use ruff_text_size::TextRange;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -66,7 +67,11 @@ impl Violation for CallDatetimeToday {
 }
 
 /// DTZ002
-pub(crate) fn call_datetime_today(checker: &Checker, func: &Expr, location: TextRange) {
+pub(crate) fn call_datetime_today(
+    checker: &Checker,
+    func: flat::View<'_, Expr>,
+    location: TextRange,
+) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
     }

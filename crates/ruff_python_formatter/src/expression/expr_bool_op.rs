@@ -1,5 +1,6 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::AnyNodeRef;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 
 use crate::expression::binary_like::BinaryLike;
@@ -11,12 +12,16 @@ pub struct FormatExprBoolOp;
 
 impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
     #[inline]
-    fn fmt_fields(&self, item: &ExprBoolOp, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, ExprBoolOp>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         BinaryLike::Bool(item).fmt(f)
     }
 }
 
-impl NeedsParentheses for ExprBoolOp {
+impl NeedsParentheses for flat::View<'_, ExprBoolOp> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,

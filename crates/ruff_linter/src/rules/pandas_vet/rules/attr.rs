@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::flat;
+use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -46,18 +47,18 @@ impl Violation for PandasUseOfDotValues {
 }
 
 /// PD011
-pub(crate) fn attr(checker: &Checker, attribute: &ast::ExprAttribute) {
+pub(crate) fn attr(checker: &Checker, attribute: flat::View<'_, ast::ExprAttribute>) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
 
     // Avoid, e.g., `x.values = y`.
-    if !attribute.ctx.is_load() {
+    if !attribute.ctx().is_load() {
         return;
     }
 
     // Check for, e.g., `df.values`.
-    if attribute.attr.as_str() != "values" {
+    if attribute.attr().as_str() != "values" {
         return;
     }
 
@@ -65,7 +66,7 @@ pub(crate) fn attr(checker: &Checker, attribute: &ast::ExprAttribute) {
     if checker
         .semantic()
         .current_expression_parent()
-        .is_some_and(Expr::is_call_expr)
+        .is_some_and(flat::View::is_call_expr)
     {
         return;
     }
@@ -73,7 +74,7 @@ pub(crate) fn attr(checker: &Checker, attribute: &ast::ExprAttribute) {
     // Avoid flagging on non-DataFrames (e.g., `{"a": 1}.values`), and on irrelevant bindings
     // (like imports).
     if !matches!(
-        test_expression(attribute.value.as_ref(), checker.semantic()),
+        test_expression(attribute.value(), checker.semantic()),
         Resolution::RelevantLocal
     ) {
         return;

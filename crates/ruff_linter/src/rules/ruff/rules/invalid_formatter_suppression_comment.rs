@@ -2,9 +2,12 @@ use std::fmt::Display;
 
 use smallvec::SmallVec;
 
-use ast::{StmtClassDef, StmtFunctionDef};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, AnyNodeRef, helpers::comment_indentation_after};
+use ruff_python_ast::{
+    flat::AnyNodeRef,
+    flat::{self, fields as ast},
+    helpers::comment_indentation_after,
+};
 use ruff_python_trivia::{SuppressionKind, indentation_at_offset};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
@@ -76,7 +79,7 @@ impl AlwaysFixableViolation for InvalidFormatterSuppressionComment {
 }
 
 /// RUF028
-pub(crate) fn ignored_formatter_suppression_comment(checker: &Checker, suite: &ast::Suite) {
+pub(crate) fn ignored_formatter_suppression_comment(checker: &Checker, suite: flat::Suite<'_>) {
     let locator = checker.locator();
     let comment_ranges: SmallVec<[SuppressionComment; 8]> = checker
         .comment_ranges()
@@ -145,17 +148,17 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
 
         if comment.kind == SuppressionKind::Off || comment.kind == SuppressionKind::On {
             if let Some(
-                AnyNodeRef::StmtClassDef(StmtClassDef {
+                ast::AnyFields::StmtClassDef(ast::StmtClassDef {
                     name,
                     decorator_list,
                     ..
                 })
-                | AnyNodeRef::StmtFunctionDef(StmtFunctionDef {
+                | ast::AnyFields::StmtFunctionDef(ast::StmtFunctionDef {
                     name,
                     decorator_list,
                     ..
                 }),
-            ) = comment.enclosing
+            ) = comment.enclosing.map(flat::View::<flat::Any>::fields)
             {
                 if comment.line_position.is_own_line() && comment.range.start() < name.start() {
                     if let Some(decorator) = decorator_list.first() {
@@ -253,102 +256,102 @@ impl Display for IgnoredReason {
 }
 
 /// Checks if an enclosing node is allowed to enclose a suppression comment.
-const fn is_valid_enclosing_node(node: AnyNodeRef) -> bool {
-    match node {
-        AnyNodeRef::ModModule(_)
-        | AnyNodeRef::ModExpression(_)
-        | AnyNodeRef::StmtFunctionDef(_)
-        | AnyNodeRef::StmtClassDef(_)
-        | AnyNodeRef::StmtReturn(_)
-        | AnyNodeRef::StmtDelete(_)
-        | AnyNodeRef::StmtTypeAlias(_)
-        | AnyNodeRef::StmtAssign(_)
-        | AnyNodeRef::StmtAugAssign(_)
-        | AnyNodeRef::StmtAnnAssign(_)
-        | AnyNodeRef::StmtFor(_)
-        | AnyNodeRef::StmtWhile(_)
-        | AnyNodeRef::StmtIf(_)
-        | AnyNodeRef::StmtWith(_)
-        | AnyNodeRef::StmtMatch(_)
-        | AnyNodeRef::StmtRaise(_)
-        | AnyNodeRef::StmtTry(_)
-        | AnyNodeRef::StmtAssert(_)
-        | AnyNodeRef::StmtImport(_)
-        | AnyNodeRef::StmtImportFrom(_)
-        | AnyNodeRef::StmtGlobal(_)
-        | AnyNodeRef::StmtNonlocal(_)
-        | AnyNodeRef::StmtExpr(_)
-        | AnyNodeRef::StmtPass(_)
-        | AnyNodeRef::StmtBreak(_)
-        | AnyNodeRef::StmtContinue(_)
-        | AnyNodeRef::StmtIpyEscapeCommand(_)
-        | AnyNodeRef::ExceptHandlerExceptHandler(_)
-        | AnyNodeRef::MatchCase(_)
-        | AnyNodeRef::Decorator(_)
-        | AnyNodeRef::ElifElseClause(_) => true,
+fn is_valid_enclosing_node(node: AnyNodeRef) -> bool {
+    match node.classify() {
+        flat::AnyKind::ModModule(_)
+        | flat::AnyKind::ModExpression(_)
+        | flat::AnyKind::StmtFunctionDef(_)
+        | flat::AnyKind::StmtClassDef(_)
+        | flat::AnyKind::StmtReturn(_)
+        | flat::AnyKind::StmtDelete(_)
+        | flat::AnyKind::StmtTypeAlias(_)
+        | flat::AnyKind::StmtAssign(_)
+        | flat::AnyKind::StmtAugAssign(_)
+        | flat::AnyKind::StmtAnnAssign(_)
+        | flat::AnyKind::StmtFor(_)
+        | flat::AnyKind::StmtWhile(_)
+        | flat::AnyKind::StmtIf(_)
+        | flat::AnyKind::StmtWith(_)
+        | flat::AnyKind::StmtMatch(_)
+        | flat::AnyKind::StmtRaise(_)
+        | flat::AnyKind::StmtTry(_)
+        | flat::AnyKind::StmtAssert(_)
+        | flat::AnyKind::StmtImport(_)
+        | flat::AnyKind::StmtImportFrom(_)
+        | flat::AnyKind::StmtGlobal(_)
+        | flat::AnyKind::StmtNonlocal(_)
+        | flat::AnyKind::StmtExpr(_)
+        | flat::AnyKind::StmtPass(_)
+        | flat::AnyKind::StmtBreak(_)
+        | flat::AnyKind::StmtContinue(_)
+        | flat::AnyKind::StmtIpyEscapeCommand(_)
+        | flat::AnyKind::ExceptHandlerExceptHandler(_)
+        | flat::AnyKind::MatchCase(_)
+        | flat::AnyKind::Decorator(_)
+        | flat::AnyKind::ElifElseClause(_) => true,
 
-        AnyNodeRef::ExprBoolOp(_)
-        | AnyNodeRef::ExprNamed(_)
-        | AnyNodeRef::ExprBinOp(_)
-        | AnyNodeRef::ExprUnaryOp(_)
-        | AnyNodeRef::ExprLambda(_)
-        | AnyNodeRef::ExprIf(_)
-        | AnyNodeRef::ExprDict(_)
-        | AnyNodeRef::ExprSet(_)
-        | AnyNodeRef::ExprListComp(_)
-        | AnyNodeRef::ExprSetComp(_)
-        | AnyNodeRef::ExprDictComp(_)
-        | AnyNodeRef::ExprGenerator(_)
-        | AnyNodeRef::ExprAwait(_)
-        | AnyNodeRef::ExprYield(_)
-        | AnyNodeRef::ExprYieldFrom(_)
-        | AnyNodeRef::ExprCompare(_)
-        | AnyNodeRef::ExprCall(_)
-        | AnyNodeRef::InterpolatedElement(_)
-        | AnyNodeRef::InterpolatedStringLiteralElement(_)
-        | AnyNodeRef::InterpolatedStringFormatSpec(_)
-        | AnyNodeRef::ExprFString(_)
-        | AnyNodeRef::ExprTString(_)
-        | AnyNodeRef::ExprStringLiteral(_)
-        | AnyNodeRef::ExprBytesLiteral(_)
-        | AnyNodeRef::ExprNumberLiteral(_)
-        | AnyNodeRef::ExprBooleanLiteral(_)
-        | AnyNodeRef::ExprNoneLiteral(_)
-        | AnyNodeRef::ExprEllipsisLiteral(_)
-        | AnyNodeRef::ExprAttribute(_)
-        | AnyNodeRef::ExprSubscript(_)
-        | AnyNodeRef::ExprStarred(_)
-        | AnyNodeRef::ExprName(_)
-        | AnyNodeRef::ExprList(_)
-        | AnyNodeRef::ExprTuple(_)
-        | AnyNodeRef::ExprSlice(_)
-        | AnyNodeRef::ExprIpyEscapeCommand(_)
-        | AnyNodeRef::PatternMatchValue(_)
-        | AnyNodeRef::PatternMatchSingleton(_)
-        | AnyNodeRef::PatternMatchSequence(_)
-        | AnyNodeRef::PatternMatchMapping(_)
-        | AnyNodeRef::PatternMatchClass(_)
-        | AnyNodeRef::PatternMatchStar(_)
-        | AnyNodeRef::PatternMatchAs(_)
-        | AnyNodeRef::PatternMatchOr(_)
-        | AnyNodeRef::PatternArguments(_)
-        | AnyNodeRef::PatternKeyword(_)
-        | AnyNodeRef::Comprehension(_)
-        | AnyNodeRef::Arguments(_)
-        | AnyNodeRef::Parameters(_)
-        | AnyNodeRef::Parameter(_)
-        | AnyNodeRef::ParameterWithDefault(_)
-        | AnyNodeRef::Keyword(_)
-        | AnyNodeRef::Alias(_)
-        | AnyNodeRef::WithItem(_)
-        | AnyNodeRef::TypeParams(_)
-        | AnyNodeRef::TypeParamTypeVar(_)
-        | AnyNodeRef::TypeParamTypeVarTuple(_)
-        | AnyNodeRef::TypeParamParamSpec(_)
-        | AnyNodeRef::FString(_)
-        | AnyNodeRef::TString(_)
-        | AnyNodeRef::StringLiteral(_)
-        | AnyNodeRef::BytesLiteral(_)
-        | AnyNodeRef::Identifier(_) => false,
+        flat::AnyKind::ExprBoolOp(_)
+        | flat::AnyKind::ExprNamed(_)
+        | flat::AnyKind::ExprBinOp(_)
+        | flat::AnyKind::ExprUnaryOp(_)
+        | flat::AnyKind::ExprLambda(_)
+        | flat::AnyKind::ExprIf(_)
+        | flat::AnyKind::ExprDict(_)
+        | flat::AnyKind::ExprSet(_)
+        | flat::AnyKind::ExprListComp(_)
+        | flat::AnyKind::ExprSetComp(_)
+        | flat::AnyKind::ExprDictComp(_)
+        | flat::AnyKind::ExprGenerator(_)
+        | flat::AnyKind::ExprAwait(_)
+        | flat::AnyKind::ExprYield(_)
+        | flat::AnyKind::ExprYieldFrom(_)
+        | flat::AnyKind::ExprCompare(_)
+        | flat::AnyKind::ExprCall(_)
+        | flat::AnyKind::InterpolatedElement(_)
+        | flat::AnyKind::InterpolatedStringLiteralElement(_)
+        | flat::AnyKind::InterpolatedStringFormatSpec(_)
+        | flat::AnyKind::ExprFString(_)
+        | flat::AnyKind::ExprTString(_)
+        | flat::AnyKind::ExprStringLiteral(_)
+        | flat::AnyKind::ExprBytesLiteral(_)
+        | flat::AnyKind::ExprNumberLiteral(_)
+        | flat::AnyKind::ExprBooleanLiteral(_)
+        | flat::AnyKind::ExprNoneLiteral(_)
+        | flat::AnyKind::ExprEllipsisLiteral(_)
+        | flat::AnyKind::ExprAttribute(_)
+        | flat::AnyKind::ExprSubscript(_)
+        | flat::AnyKind::ExprStarred(_)
+        | flat::AnyKind::ExprName(_)
+        | flat::AnyKind::ExprList(_)
+        | flat::AnyKind::ExprTuple(_)
+        | flat::AnyKind::ExprSlice(_)
+        | flat::AnyKind::ExprIpyEscapeCommand(_)
+        | flat::AnyKind::PatternMatchValue(_)
+        | flat::AnyKind::PatternMatchSingleton(_)
+        | flat::AnyKind::PatternMatchSequence(_)
+        | flat::AnyKind::PatternMatchMapping(_)
+        | flat::AnyKind::PatternMatchClass(_)
+        | flat::AnyKind::PatternMatchStar(_)
+        | flat::AnyKind::PatternMatchAs(_)
+        | flat::AnyKind::PatternMatchOr(_)
+        | flat::AnyKind::PatternArguments(_)
+        | flat::AnyKind::PatternKeyword(_)
+        | flat::AnyKind::Comprehension(_)
+        | flat::AnyKind::Arguments(_)
+        | flat::AnyKind::Parameters(_)
+        | flat::AnyKind::Parameter(_)
+        | flat::AnyKind::ParameterWithDefault(_)
+        | flat::AnyKind::Keyword(_)
+        | flat::AnyKind::Alias(_)
+        | flat::AnyKind::WithItem(_)
+        | flat::AnyKind::TypeParams(_)
+        | flat::AnyKind::TypeParamTypeVar(_)
+        | flat::AnyKind::TypeParamTypeVarTuple(_)
+        | flat::AnyKind::TypeParamParamSpec(_)
+        | flat::AnyKind::FString(_)
+        | flat::AnyKind::TString(_)
+        | flat::AnyKind::StringLiteral(_)
+        | flat::AnyKind::BytesLiteral(_)
+        | flat::AnyKind::Identifier(_) => false,
     }
 }

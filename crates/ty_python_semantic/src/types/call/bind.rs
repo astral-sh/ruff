@@ -8,6 +8,7 @@
 //! have a `target` field, which is the name of the module the message appears in — in this case,
 //! `ty_python_semantic::types::call::bind`.
 
+use ruff_python_ast::flat;
 mod constructor;
 mod property;
 
@@ -85,7 +86,7 @@ use crate::types::{
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
-use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
+use ruff_python_ast::{self as ast, PythonVersion, flat::AnyNodeRef, flat::ArgOrKeyword};
 use ty_python_core::definition::Definition;
 use ty_python_core::{ProgramFile, semantic_index};
 
@@ -126,7 +127,7 @@ impl<'db> CallDiagnosticContext<'_, '_, 'db, '_> {
         })
     }
 
-    fn get_range(&self, node: ast::AnyNodeRef<'_>, argument_index: Option<usize>) -> TextRange {
+    fn get_range(&self, node: flat::AnyNodeRef<'_>, argument_index: Option<usize>) -> TextRange {
         let argument_index = argument_index.map(|index| index + self.argument_index_offset);
         self.overrides
             .and_then(|overrides| {
@@ -1536,7 +1537,7 @@ impl<'db> Bindings<'db> {
     pub(crate) fn report_diagnostics(
         &self,
         context: &InferContext<'db, '_>,
-        node: ast::AnyNodeRef,
+        node: flat::AnyNodeRef,
     ) {
         self.report_diagnostics_impl(
             &CallDiagnosticContext {
@@ -1551,7 +1552,7 @@ impl<'db> Bindings<'db> {
     pub(crate) fn report_diagnostics_with_override(
         &self,
         context: &InferContext<'db, '_>,
-        node: ast::AnyNodeRef,
+        node: flat::AnyNodeRef,
         overrides: &CallDiagnosticOverride<'_>,
     ) {
         self.report_diagnostics_impl(
@@ -1567,7 +1568,7 @@ impl<'db> Bindings<'db> {
     fn report_diagnostics_impl(
         &self,
         context: &CallDiagnosticContext<'_, '_, 'db, '_>,
-        node: ast::AnyNodeRef,
+        node: flat::AnyNodeRef,
     ) {
         let db = context.db();
         let env = context.program_environment();
@@ -1621,7 +1622,7 @@ impl<'db> Bindings<'db> {
     fn report_element_diagnostics(
         &self,
         context: &CallDiagnosticContext<'_, '_, 'db, '_>,
-        node: ast::AnyNodeRef,
+        node: flat::AnyNodeRef,
         element: &BindingsElement<'db>,
     ) {
         // If this element succeeded, no diagnostics to report
@@ -4738,7 +4739,7 @@ impl<'db> CallableBinding<'db> {
     fn report_diagnostics(
         &self,
         context: &CallDiagnosticContext<'_, '_, 'db, '_>,
-        node: ast::AnyNodeRef,
+        node: flat::AnyNodeRef,
         compound_diag: Option<&dyn CompoundDiagnostic>,
     ) {
         let db = context.db();
@@ -4890,7 +4891,7 @@ impl<'db> CallableBinding<'db> {
                                 .load(context.db());
                         let node =
                             overload.node(context.db(), function.file(context.db()), &module);
-                        let span = if node.body.len() == 1 {
+                        let span = if node.body().len() == 1 {
                             Span::from(file).with_range(node.range())
                         } else {
                             overload.spans(context.db()).decorators_and_header
@@ -9052,7 +9053,7 @@ impl<'db> Binding<'db> {
     fn report_diagnostics(
         &self,
         context: &CallDiagnosticContext<'_, '_, 'db, '_>,
-        node: ast::AnyNodeRef,
+        node: flat::AnyNodeRef,
         callable_ty: Type<'db>,
         callable_description: Option<&CallableDescription>,
         compound_diag: Option<&dyn CompoundDiagnostic>,
@@ -9879,7 +9880,7 @@ impl<'db> BindingError<'db> {
     fn report_diagnostic(
         &self,
         context: &CallDiagnosticContext<'_, '_, 'db, '_>,
-        node: ast::AnyNodeRef,
+        node: flat::AnyNodeRef,
         callable_ty: Type<'db>,
         callable_description: Option<&CallableDescription>,
         compound_diag: Option<&dyn CompoundDiagnostic>,
@@ -10554,29 +10555,30 @@ impl<'db> BindingError<'db> {
         }
     }
 
-    fn get_node(node: ast::AnyNodeRef<'_>, argument_index: Option<usize>) -> ast::AnyNodeRef<'_> {
+    fn get_node(node: flat::AnyNodeRef<'_>, argument_index: Option<usize>) -> flat::AnyNodeRef<'_> {
         // If we have a Call node and an argument index, report the diagnostic on the correct
         // argument node; otherwise, report it on the entire provided node.
-        match (Self::get_argument_node(node, argument_index), node) {
-            (Some(ast::ArgOrKeyword::Arg(expr)), _) => expr.into(),
-            (Some(ast::ArgOrKeyword::Keyword(expr)), _) => expr.into(),
-            (None, ast::AnyNodeRef::StmtClassDef(class_def)) => class_def
-                .arguments
-                .as_deref()
-                .map(ast::AnyNodeRef::Arguments)
-                .unwrap_or(node),
+        match (
+            Self::get_argument_node(node, argument_index),
+            node.classify(),
+        ) {
+            (Some(flat::ArgOrKeyword::Arg(expr)), _) => expr.into(),
+            (Some(flat::ArgOrKeyword::Keyword(expr)), _) => expr.into(),
+            (None, flat::AnyKind::StmtClassDef(class_def)) => {
+                class_def.arguments().map(flat::View::erase).unwrap_or(node)
+            }
             (None, _) => node,
         }
     }
 
     fn get_argument_node(
-        node: ast::AnyNodeRef<'_>,
+        node: flat::AnyNodeRef<'_>,
         argument_index: Option<usize>,
     ) -> Option<ArgOrKeyword<'_>> {
-        match (node, argument_index) {
-            (ast::AnyNodeRef::ExprCall(call_node), Some(argument_index)) => Some(
+        match (node.classify(), argument_index) {
+            (flat::AnyKind::ExprCall(call_node), Some(argument_index)) => Some(
                 call_node
-                    .arguments
+                    .arguments()
                     .iter_source_order()
                     .nth(argument_index)
                     .expect("argument index should not be out of range"),
@@ -10586,15 +10588,13 @@ impl<'db> BindingError<'db> {
             // or `__new__`/`__prepare__` on the metaclass -- but positional arguments are not, and neither
             // is the special keyword argument `metaclass`. These need to be excluded from the
             // argument index when looking up the relevant keyword-argument node.
-            (ast::AnyNodeRef::StmtClassDef(class_def), Some(argument_index)) => {
-                class_def.arguments.as_deref().and_then(|args| {
+            (flat::AnyKind::StmtClassDef(class_def), Some(argument_index)) => {
+                class_def.arguments().and_then(|args| {
                     args.iter_source_order()
                         .filter_map(ArgOrKeyword::as_keyword)
-                        .filter(|keyword| {
-                            keyword.arg.as_deref().is_none_or(|arg| arg != "metaclass")
-                        })
+                        .filter(|keyword| keyword.arg().is_none_or(|arg| arg != "metaclass"))
                         .nth(argument_index)
-                        .map(ast::ArgOrKeyword::Keyword)
+                        .map(flat::ArgOrKeyword::Keyword)
                 })
             }
             _ => None,
@@ -10871,10 +10871,9 @@ fn all_arguments_range(node: AnyNodeRef) -> TextRange {
             TextRange::new(
                 class.start(),
                 class
-                    .arguments
-                    .as_deref()
-                    .map(Ranged::end)
-                    .unwrap_or(class.name.end()),
+                    .arguments()
+                    .map(|node| node.end())
+                    .unwrap_or(class.name().end()),
             )
         })
         .unwrap_or(node.range())

@@ -4,7 +4,10 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::comment_indentation_after;
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{Stmt, StmtExpr, StmtFor, StmtIf, StmtTry, StmtWhile};
+use ruff_python_ast::{
+    Stmt, StmtFor, StmtIf, StmtTry, StmtWhile,
+    flat::{self, fields as ast},
+};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -78,10 +81,13 @@ pub(crate) fn needless_else(checker: &Checker, stmt: AnyNodeWithOrElse) {
 }
 
 /// Whether `body` contains only one `pass` or `...` statement.
-fn body_is_no_op(body: &[Stmt]) -> bool {
-    match body {
-        [Stmt::Pass(_)] => true,
-        [Stmt::Expr(StmtExpr { value, .. })] => value.is_ellipsis_literal_expr(),
+fn body_is_no_op(body: flat::Suite<'_>) -> bool {
+    match body
+        .as_array()
+        .map(|items| items.map(flat::View::<Stmt>::fields))
+    {
+        Some([ast::Stmt::Pass(_)]) => true,
+        Some([ast::Stmt::Expr(ast::StmtExpr { value, .. })]) => value.is_ellipsis_literal_expr(),
         _ => false,
     }
 }
@@ -128,7 +134,7 @@ fn else_contains_comments(
 ///     pass
 /// ```
 fn else_branch_has_preceding_comment(
-    preceding_stmt: &Stmt,
+    preceding_stmt: flat::View<'_, Stmt>,
     else_range: TextRange,
     checker: &Checker,
 ) -> bool {
@@ -168,7 +174,7 @@ fn else_branch_has_preceding_comment(
 ///     # some comment
 /// ```
 fn else_branch_has_trailing_comment(
-    last_else_stmt: &Stmt,
+    last_else_stmt: flat::View<'_, Stmt>,
     else_full_end: TextSize,
     checker: &Checker,
 ) -> bool {
@@ -204,10 +210,10 @@ fn else_branch_has_trailing_comment(
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum AnyNodeWithOrElse<'a> {
-    While(&'a StmtWhile),
-    For(&'a StmtFor),
-    Try(&'a StmtTry),
-    If(&'a StmtIf),
+    While(flat::View<'a, StmtWhile>),
+    For(flat::View<'a, StmtFor>),
+    Try(flat::View<'a, StmtTry>),
+    If(flat::View<'a, StmtIf>),
 }
 
 impl<'a> AnyNodeWithOrElse<'a> {
@@ -229,78 +235,85 @@ impl<'a> AnyNodeWithOrElse<'a> {
                 Some(TextRange::new(start, end))
             }
 
-            Self::If(StmtIf {
-                elif_else_clauses, ..
-            }) => elif_else_clauses
-                .last()
-                .filter(|clause| clause.test.is_none())
-                .map(Ranged::range),
+            Self::If(stmt_if) => {
+                let elif_else_clauses = stmt_if.elif_else_clauses();
+                elif_else_clauses
+                    .last()
+                    .filter(|clause| clause.test().is_none())
+                    .map(|node| node.range())
+            }
         }
     }
 
     /// Returns the suite before the else block.
-    fn body_before_else(self) -> &'a [Stmt] {
+    fn body_before_else(self) -> flat::Suite<'a> {
         match self {
-            Self::Try(StmtTry { body, handlers, .. }) => handlers
-                .last()
-                .and_then(|handler| handler.as_except_handler())
-                .map(|handler| &handler.body)
-                .unwrap_or(body),
+            Self::Try(stmt_try) => {
+                let body = stmt_try.body();
+                let handlers = stmt_try.handlers();
+                handlers
+                    .last()
+                    .and_then(flat::View::as_except_handler)
+                    .map(flat::View::<ruff_python_ast::ExceptHandlerExceptHandler>::body)
+                    .unwrap_or(body)
+            }
 
-            Self::While(StmtWhile { body, .. }) | Self::For(StmtFor { body, .. }) => body,
+            Self::While(node) => node.body(),
+            Self::For(node) => node.body(),
 
-            Self::If(StmtIf {
-                body,
-                elif_else_clauses,
-                ..
-            }) => elif_else_clauses
-                .iter()
-                .rev()
-                .find(|clause| clause.test.is_some())
-                .map(|clause| &*clause.body)
-                .unwrap_or(body),
+            Self::If(stmt_if) => {
+                let body = stmt_if.body();
+                let elif_else_clauses = stmt_if.elif_else_clauses();
+                elif_else_clauses
+                    .iter()
+                    .rev()
+                    .find(|clause| clause.test().is_some())
+                    .map(flat::View::<ruff_python_ast::ElifElseClause>::body)
+                    .unwrap_or(body)
+            }
         }
     }
 
     /// Returns the `else` suite.
     /// Defaults to an empty suite if the statement has no `else` block.
-    fn else_body(self) -> &'a [Stmt] {
+    fn else_body(self) -> flat::Suite<'a> {
         match self {
-            Self::While(StmtWhile { orelse, .. })
-            | Self::For(StmtFor { orelse, .. })
-            | Self::Try(StmtTry { orelse, .. }) => orelse,
+            Self::While(node) => node.orelse(),
+            Self::For(node) => node.orelse(),
+            Self::Try(node) => node.orelse(),
 
-            Self::If(StmtIf {
-                elif_else_clauses, ..
-            }) => elif_else_clauses
-                .last()
-                .filter(|clause| clause.test.is_none())
-                .map(|clause| &*clause.body)
-                .unwrap_or_default(),
+            Self::If(stmt_if) => {
+                let elif_else_clauses = stmt_if.elif_else_clauses();
+                elif_else_clauses
+                    .last()
+                    .filter(|clause| clause.test().is_none())
+                    .map(flat::View::<ruff_python_ast::ElifElseClause>::body)
+                    .unwrap_or_default()
+            }
         }
     }
 }
 
-impl<'a> From<&'a StmtFor> for AnyNodeWithOrElse<'a> {
-    fn from(value: &'a StmtFor) -> Self {
+impl<'a> From<flat::View<'a, StmtFor>> for AnyNodeWithOrElse<'a> {
+    fn from(value: flat::View<'a, StmtFor>) -> Self {
         Self::For(value)
     }
 }
 
-impl<'a> From<&'a StmtWhile> for AnyNodeWithOrElse<'a> {
-    fn from(value: &'a StmtWhile) -> Self {
+impl<'a> From<flat::View<'a, StmtWhile>> for AnyNodeWithOrElse<'a> {
+    fn from(value: flat::View<'a, StmtWhile>) -> Self {
         Self::While(value)
     }
 }
 
-impl<'a> From<&'a StmtIf> for AnyNodeWithOrElse<'a> {
-    fn from(value: &'a StmtIf) -> Self {
+impl<'a> From<flat::View<'a, StmtIf>> for AnyNodeWithOrElse<'a> {
+    fn from(value: flat::View<'a, StmtIf>) -> Self {
         Self::If(value)
     }
 }
 
-impl<'a> From<&'a StmtTry> for AnyNodeWithOrElse<'a> {
-    fn from(value: &'a StmtTry) -> Self {
+impl<'a> From<flat::View<'a, StmtTry>> for AnyNodeWithOrElse<'a> {
+    fn from(value: flat::View<'a, StmtTry>) -> Self {
         Self::Try(value)
     }
 }

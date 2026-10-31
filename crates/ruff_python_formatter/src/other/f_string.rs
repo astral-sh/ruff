@@ -4,6 +4,7 @@ use crate::other::interpolated_string::{InterpolatedStringContext, InterpolatedS
 use crate::prelude::*;
 use crate::string::{StringNormalizer, StringQuotes};
 use ruff_formatter::write;
+use ruff_python_ast::flat;
 use ruff_python_ast::{FString, StringFlags};
 
 /// Formats an f-string which is part of a larger f-string expression.
@@ -14,7 +15,7 @@ use ruff_python_ast::{FString, StringFlags};
 pub struct FormatFString;
 
 impl FormatNodeRule<FString> for FormatFString {
-    fn fmt_fields(&self, item: &FString, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, item: flat::View<'_, FString>, f: &mut PyFormatter) -> FormatResult<()> {
         let normalizer = StringNormalizer::from_context(f.context());
 
         let string_kind = normalizer.choose_quotes(item.into()).flags();
@@ -22,7 +23,7 @@ impl FormatNodeRule<FString> for FormatFString {
         let context = InterpolatedStringContext::new(
             string_kind,
             InterpolatedStringLayout::from_interpolated_string_elements(
-                &item.elements,
+                item.elements(),
                 f.context().source(),
             ),
         );
@@ -37,7 +38,7 @@ impl FormatNodeRule<FString> for FormatFString {
                 .interpolated_string_state()
                 .enter_string(context);
             let f = &mut WithInterpolatedStringState::new(state, &mut *f);
-            for element in &item.elements {
+            for element in item.elements() {
                 FormatInterpolatedStringElement::new(element, context).fmt(f)?;
             }
         }

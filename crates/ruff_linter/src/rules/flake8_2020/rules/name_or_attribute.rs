@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -48,7 +49,7 @@ impl Violation for SixPY3 {
 }
 
 /// YTT202
-pub(crate) fn name_or_attribute(checker: &Checker, expr: &Expr) {
+pub(crate) fn name_or_attribute(checker: &Checker, &expr: &flat::View<'_, Expr>) {
     if !checker.semantic().seen_module(Modules::SIX) {
         return;
     }

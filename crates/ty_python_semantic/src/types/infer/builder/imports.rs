@@ -1,4 +1,5 @@
 use ruff_python_ast as ast;
+use ruff_python_ast::flat;
 use ruff_text_size::{Ranged, TextRange};
 use ty_module_resolver::{
     ImportingFile, Module, ModuleName, ModuleNameResolutionError, ModuleResolveMode,
@@ -42,7 +43,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// ```
     fn add_imported_binding(
         &mut self,
-        alias: &'ast ast::Alias,
+        alias: flat::View<'ast, ast::Alias>,
         definition: Definition<'db>,
         ty: Type<'db>,
         qualifiers: TypeQualifiers,
@@ -64,13 +65,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    pub(super) fn infer_import_statement(&mut self, import: &ast::StmtImport) {
-        let ast::StmtImport {
-            names,
-            is_lazy: _,
-            range: _,
-            node_index: _,
-        } = import;
+    pub(super) fn infer_import_statement(&mut self, import: flat::View<'_, ast::StmtImport>) {
+        let names = import.names();
 
         for alias in names {
             self.infer_definition(alias);
@@ -255,18 +251,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     pub(super) fn infer_import_definition(
         &mut self,
-        alias: &'ast ast::Alias,
+        alias: flat::View<'ast, ast::Alias>,
         definition: Definition<'db>,
     ) {
-        let ast::Alias {
-            range: _,
-            node_index: _,
-            name,
-            asname,
-        } = alias;
+        let name = alias.name();
+        let asname = alias.asname();
 
         // The name of the module being imported
-        let Some(full_module_name) = ModuleName::new(name) else {
+        let Some(full_module_name) = ModuleName::new(name.as_str()) else {
             tracing::debug!("Failed to resolve import due to invalid syntax");
             self.add_binding(alias.into(), definition)
                 .insert(self, Type::unknown());
@@ -286,7 +278,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Resolve the module being imported.
         let Some(full_module_ty) = self.module_type_from_name(&full_module_name) else {
-            self.report_unresolved_import(alias.range(), 0, Some(name), Some(&full_module_name));
+            self.report_unresolved_import(
+                alias.range(),
+                0,
+                Some(name.as_str()),
+                Some(&full_module_name),
+            );
             self.add_binding(alias.into(), definition)
                 .insert(self, Type::unknown());
             return;
@@ -322,20 +319,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .insert(self, binding_ty);
     }
 
-    pub(super) fn infer_import_from_statement(&mut self, import: &ast::StmtImportFrom) {
-        let ast::StmtImportFrom {
-            module: _,
-            names,
-            level: _,
-            is_lazy: _,
-            range: _,
-            node_index: _,
-        } = import;
+    pub(super) fn infer_import_from_statement(
+        &mut self,
+        import: flat::View<'_, ast::StmtImportFrom>,
+    ) {
+        let names = import.names();
 
         let db = self.db();
 
         let module = self.check_import_from_module_is_resolvable(import);
-        let import_range = import.module.as_ref().map_or(import.range(), Ranged::range);
+        let import_range = import.module().map_or(import.range(), |node| node.range());
 
         for alias in names {
             let mut checked_dependency = false;
@@ -377,7 +370,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 && let child = literal.module(db)
                                 && let child_name = child.name(db)
                                 && child_name.parent().as_ref() == Some(parent.name(db))
-                                && child_name.components().next_back() == Some(alias.name.as_str())
+                                && child_name.components().next_back()
+                                    == Some(alias.name().as_str())
                             {
                                 child
                             } else {
@@ -407,23 +401,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// reported elsewhere.
     fn check_import_from_module_is_resolvable(
         &mut self,
-        import_from: &ast::StmtImportFrom,
+        import_from: flat::View<'_, ast::StmtImportFrom>,
     ) -> Option<Module<'db>> {
-        let ast::StmtImportFrom { module, level, .. } = import_from;
+        let module = import_from.module();
+        let level = import_from.level();
 
         let db = self.db();
 
         // For diagnostics, we want to highlight the unresolvable
         // module and not the entire `from ... import ...` statement.
         let module_ref = module
-            .as_ref()
-            .map(ast::AnyNodeRef::from)
-            .unwrap_or_else(|| ast::AnyNodeRef::from(import_from));
-        let module = module.as_deref();
+            .map(flat::AnyNodeRef::from)
+            .unwrap_or_else(|| flat::AnyNodeRef::from(import_from));
 
         tracing::trace!(
             "Resolving import statement from module `{}` into file `{}`",
-            format_import_from_module(*level, module),
+            format_import_from_module(level, module.map(flat::View::<ast::Identifier>::as_str)),
             self.file().path(db),
         );
         let importing_file = ImportingFile::File(
@@ -442,26 +435,47 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Err(ModuleNameResolutionError::TooManyDots) => {
                 tracing::debug!(
                     "Relative module resolution `{}` failed: too many leading dots",
-                    format_import_from_module(*level, module),
+                    format_import_from_module(
+                        level,
+                        module.map(flat::View::<ast::Identifier>::as_str)
+                    ),
                 );
-                self.report_unresolved_import(module_ref.range(), *level, module, None);
+                self.report_unresolved_import(
+                    module_ref.range(),
+                    level,
+                    module.map(flat::View::<ast::Identifier>::as_str),
+                    None,
+                );
                 return None;
             }
             Err(ModuleNameResolutionError::UnknownCurrentModule) => {
                 tracing::debug!(
                     "Relative module resolution `{}` failed: could not resolve file `{}` to a module \
                     (try adjusting configured search paths?)",
-                    format_import_from_module(*level, module),
+                    format_import_from_module(
+                        level,
+                        module.map(flat::View::<ast::Identifier>::as_str)
+                    ),
                     self.file().path(db)
                 );
-                self.report_unresolved_import(module_ref.range(), *level, module, None);
+                self.report_unresolved_import(
+                    module_ref.range(),
+                    level,
+                    module.map(flat::View::<ast::Identifier>::as_str),
+                    None,
+                );
                 return None;
             }
         };
 
         let resolved = resolve_module(db, importing_file, &module_name);
         if resolved.is_none() {
-            self.report_unresolved_import(module_ref.range(), *level, module, Some(&module_name));
+            self.report_unresolved_import(
+                module_ref.range(),
+                level,
+                module.map(flat::View::<ast::Identifier>::as_str),
+                Some(&module_name),
+            );
         }
 
         resolved
@@ -469,8 +483,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     pub(super) fn infer_import_from_definition(
         &mut self,
-        import_from: &ast::StmtImportFrom,
-        alias: &'ast ast::Alias,
+        import_from: flat::View<'_, ast::StmtImportFrom>,
+        alias: flat::View<'ast, ast::Alias>,
         definition: Definition<'db>,
     ) {
         let db = self.db();
@@ -516,7 +530,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .symbol(star_import.symbol_id())
                 .name()
         } else {
-            &alias.name.id
+            alias.name().id()
         };
 
         // Avoid looking up attributes on a module if a module imports from itself
@@ -550,12 +564,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .unwrap_or_else(|error| error.fallback_member(db))
                 .member(db)
             {
-                if &alias.name != "*" && boundness == Definedness::PossiblyUndefined {
+                if alias.name() != "*" && boundness == Definedness::PossiblyUndefined {
                     // TODO: Consider loading _both_ the attribute and any submodule and unioning them
                     // together if the attribute exists but is possibly-unbound.
                     if let Some(builder) = self
                         .context
-                        .report_lint(&POSSIBLY_MISSING_IMPORT, ast::AnyNodeRef::Alias(alias))
+                        .report_lint(&POSSIBLY_MISSING_IMPORT, alias.erase())
                     {
                         builder.into_diagnostic(format_args!(
                             "Member `{name}` of module `{module_name}` may be missing",
@@ -622,7 +636,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.add_binding(alias.into(), definition)
             .insert(self, Type::unknown());
 
-        if &alias.name == "*" {
+        if alias.name() == "*" {
             return;
         }
 
@@ -635,10 +649,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let Some(builder) = self
-            .context
-            .report_lint(&UNRESOLVED_IMPORT, ast::AnyNodeRef::Alias(alias))
-        else {
+        let Some(builder) = self.context.report_lint(&UNRESOLVED_IMPORT, alias.erase()) else {
             return;
         };
 
@@ -686,7 +697,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// is all we need to be doing here).
     pub(super) fn infer_import_from_submodule_definition(
         &mut self,
-        import_from: &'ast ast::StmtImportFrom,
+        import_from: flat::View<'ast, ast::StmtImportFrom>,
         definition: Definition<'db>,
     ) {
         let db = self.db();
@@ -715,8 +726,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(final_part) = ModuleName::from_identifier_parts(
             db,
             importing_file,
-            import_from.module.as_deref(),
-            import_from.level,
+            import_from
+                .module()
+                .map(flat::View::<ast::Identifier>::as_str),
+            import_from.level(),
         )
         .ok()
         // `whatever.thispackage.x.y` => `x.y`
@@ -762,10 +775,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let Some(builder) = self.context.report_lint(
-            &UNRESOLVED_IMPORT,
-            ast::AnyNodeRef::StmtImportFrom(import_from),
-        ) else {
+        let Some(builder) = self
+            .context
+            .report_lint(&UNRESOLVED_IMPORT, import_from.erase())
+        else {
             return;
         };
 

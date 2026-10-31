@@ -1,5 +1,6 @@
 use ruff_formatter::{FormatContext, write};
-use ruff_python_ast::{ArgOrKeyword, Arguments, Expr, StringFlags, StringLike};
+use ruff_python_ast::flat;
+use ruff_python_ast::{Arguments, Expr, StringFlags, flat::ArgOrKeyword, flat::StringLike};
 use ruff_python_trivia::{PythonWhitespace, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -14,13 +15,10 @@ use crate::string::StringLikeExtensions;
 pub struct FormatArguments;
 
 impl FormatNodeRule<Arguments> for FormatArguments {
-    fn fmt_fields(&self, item: &Arguments, f: &mut PyFormatter) -> FormatResult<()> {
-        let Arguments {
-            range,
-            args,
-            keywords,
-            node_index: _,
-        } = item;
+    fn fmt_fields(&self, item: flat::View<'_, Arguments>, f: &mut PyFormatter) -> FormatResult<()> {
+        let range = item.range();
+        let args = item.args();
+        let keywords = item.keywords();
         // We have a case with `f()` without any argument, which is a special case because we can
         // have a comment with no node attachment inside:
         // ```python
@@ -37,11 +35,11 @@ impl FormatNodeRule<Arguments> for FormatArguments {
         let all_arguments = format_with(|f: &mut PyFormatter| {
             let source = f.context().source();
             let mut joiner = f.join_comma_separated(range.end());
-            match args.as_ref() {
-                [arg] if keywords.is_empty() => {
-                    match arg {
-                        Expr::Generator(generator_exp) => joiner.entry(
-                            generator_exp,
+            match args.as_array() {
+                Some([arg]) if keywords.is_empty() => {
+                    match arg.classify() {
+                        flat::ExprKind::Generator(generator_exp) => joiner.entry(
+                            &generator_exp,
                             &generator_exp
                                 .format()
                                 .with_options(GeneratorExpParentheses::Preserve),
@@ -56,7 +54,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                                     // parenthesized.
                                     Parentheses::Never
                                 };
-                            joiner.entry(other, &other.format().with_options(parentheses))
+                            joiner.entry(&other, &other.view().format().with_options(parentheses))
                         }
                     };
                 }
@@ -64,10 +62,10 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                     for arg_or_keyword in item.iter_source_order() {
                         match arg_or_keyword {
                             ArgOrKeyword::Arg(arg) => {
-                                joiner.entry(arg, &arg.format());
+                                joiner.entry(&arg, &arg.format());
                             }
                             ArgOrKeyword::Keyword(keyword) => {
-                                joiner.entry(keyword, &keyword.format());
+                                joiner.entry(&keyword, &keyword.format());
                             }
                         }
                     }
@@ -114,7 +112,11 @@ impl FormatNodeRule<Arguments> for FormatArguments {
     }
 }
 
-fn is_single_argument_parenthesized(argument: &Expr, call_end: TextSize, source: &str) -> bool {
+fn is_single_argument_parenthesized(
+    argument: flat::View<'_, Expr>,
+    call_end: TextSize,
+    source: &str,
+) -> bool {
     let mut has_seen_r_paren = false;
 
     for token in
@@ -169,12 +171,22 @@ fn is_single_argument_parenthesized(argument: &Expr, call_end: TextSize, source:
 ///
 /// Hugging should only be applied to single-argument collections, like lists, or starred versions
 /// of those collections.
-fn is_arguments_huggable(arguments: &Arguments, context: &PyFormatContext) -> bool {
+fn is_arguments_huggable(arguments: flat::View<'_, Arguments>, context: &PyFormatContext) -> bool {
     // Find the lone argument or `**kwargs` keyword.
-    let arg = match (arguments.args.as_ref(), arguments.keywords.as_ref()) {
-        ([arg], []) => arg,
-        ([], [keyword]) if keyword.arg.is_none() && !context.comments().has(keyword) => {
-            &keyword.value
+    let arg = match (arguments.args(), arguments.keywords()) {
+        (args, keywords)
+            if let Some([arg]) = args.as_array()
+                && keywords.is_empty() =>
+        {
+            arg
+        }
+        (args, keywords)
+            if args.is_empty()
+                && let Some([keyword]) = keywords.as_array()
+                && keyword.arg().is_none()
+                && !context.comments().has(keyword) =>
+        {
+            keyword.value()
         }
         _ => return false,
     };
@@ -222,7 +234,7 @@ fn is_arguments_huggable(arguments: &Arguments, context: &PyFormatContext) -> bo
 /// ```
 fn is_huggable_string_argument(
     string: StringLike,
-    arguments: &Arguments,
+    arguments: flat::View<'_, Arguments>,
     context: &PyFormatContext,
 ) -> bool {
     if string.is_implicit_concatenated()

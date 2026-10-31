@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{ArgOrKeyword, Expr, ExprBooleanLiteral, ExprCall};
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{ExprCall, flat::ArgOrKeyword};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -68,7 +69,7 @@ impl Violation for BuiltinOpen {
 }
 
 // PTH123
-pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn builtin_open(checker: &Checker, call: flat::View<'_, ExprCall>, segments: &[&str]) {
     // `closefd` and `opener` are not supported by pathlib, so check if they
     // are set to non-default values.
     // https://github.com/astral-sh/ruff/issues/7620
@@ -89,18 +90,18 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
     // ```text
     // Path.open(mode='r', buffering=-1, encoding=None, errors=None, newline=None)
     // ```
-    let file_arg = call.arguments.find_argument_value("file", 0);
+    let file_arg = call.arguments().find_argument_value("file", 0);
 
     if call
-        .arguments
+        .arguments()
         .find_argument_value("closefd", 6)
         .is_some_and(|expr| {
             !matches!(
-                expr,
-                Expr::BooleanLiteral(ExprBooleanLiteral { value: true, .. })
+                expr.fields(),
+                ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. })
             )
         })
-        || is_argument_non_default(&call.arguments, "opener", 7)
+        || is_argument_non_default(call.arguments(), "opener", 7)
         || file_arg.is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
     {
         return;
@@ -110,7 +111,7 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(BuiltinOpen, call.func.range());
+    let mut diagnostic = checker.report_diagnostic(BuiltinOpen, call.func().range());
 
     if !is_fix_builtin_open_enabled(checker.settings()) {
         return;
@@ -121,7 +122,7 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
     };
 
     if has_unknown_keywords_or_starred_expr(
-        &call.arguments,
+        call.arguments(),
         &[
             "file",
             "mode",
@@ -154,7 +155,10 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
                     Some(locator.slice(expr.range()))
                 }
             }
-            ArgOrKeyword::Keyword(kw) => match kw.arg.as_deref() {
+            ArgOrKeyword::Keyword(kw) => match kw
+                .arg()
+                .map(flat::View::<ruff_python_ast::Identifier>::as_str)
+            {
                 Some("mode" | "buffering" | "encoding" | "errors" | "newline") => {
                     Some(locator.slice(kw))
                 }
@@ -163,7 +167,7 @@ pub(crate) fn builtin_open(checker: &Checker, call: &ExprCall, segments: &[&str]
         };
 
         let open_args = itertools::join(
-            call.arguments
+            call.arguments()
                 .iter_source_order()
                 .enumerate()
                 .filter_map(|(i, arg)| args(i, arg)),

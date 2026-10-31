@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{Decorator, Parameters, Stmt, identifier::Identifier};
 use ruff_python_semantic::analyze::visibility::is_property;
 
@@ -53,9 +54,9 @@ impl Violation for PropertyWithParameters {
 /// PLR0206
 pub(crate) fn property_with_parameters(
     checker: &Checker,
-    stmt: &Stmt,
-    decorator_list: &[Decorator],
-    parameters: &Parameters,
+    stmt: flat::View<'_, Stmt>,
+    decorator_list: flat::NodeList<'_, Decorator>,
+    parameters: flat::View<'_, Parameters>,
 ) {
     if parameters.len() <= 1 {
         return;

@@ -1,7 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::map_subscript;
+use ruff_python_ast::Keyword;
+use ruff_python_ast::flat::helpers::map_subscript;
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr};
+
 use ruff_python_semantic::Modules;
 use ruff_python_semantic::analyze::typing::{is_immutable_func, is_mutable_expr, is_mutable_func};
 use ruff_text_size::Ranged;
@@ -70,7 +72,7 @@ impl Violation for MutableContextvarDefault {
 }
 
 /// B039
-pub(crate) fn mutable_contextvar_default(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn mutable_contextvar_default(checker: &Checker, call: &ast::ExprCall<'_>) {
     if !checker.semantic().seen_module(Modules::CONTEXTVARS) {
         return;
     }
@@ -78,7 +80,7 @@ pub(crate) fn mutable_contextvar_default(checker: &Checker, call: &ast::ExprCall
     let Some(default) = call
         .arguments
         .find_keyword("default")
-        .map(|keyword| &keyword.value)
+        .map(flat::View::<Keyword>::value)
     else {
         return;
     };
@@ -93,13 +95,13 @@ pub(crate) fn mutable_contextvar_default(checker: &Checker, call: &ast::ExprCall
 
     if (is_mutable_expr(default, checker.semantic())
         || matches!(
-            default,
-            Expr::Call(ast::ExprCall { func, .. })
+            default.fields(),
+            ast::Expr::Call(ast::ExprCall { func, .. })
                 if !is_mutable_func(func, checker.semantic())
                     && !is_immutable_func(func, checker.semantic(), &extend_immutable_calls)))
         && checker
             .semantic()
-            .resolve_qualified_name(map_subscript(&call.func))
+            .resolve_qualified_name(map_subscript(call.func))
             .is_some_and(|qualified_name| {
                 matches!(qualified_name.segments(), ["contextvars", "ContextVar"])
             })

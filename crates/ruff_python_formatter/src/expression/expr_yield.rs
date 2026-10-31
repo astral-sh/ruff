@@ -1,5 +1,6 @@
 use ruff_formatter::write;
-use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprYield, ExprYieldFrom};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -10,8 +11,8 @@ use crate::expression::parentheses::{
 use crate::prelude::*;
 
 pub(super) enum AnyExpressionYield<'a> {
-    Yield(&'a ExprYield),
-    YieldFrom(&'a ExprYieldFrom),
+    Yield(flat::View<'a, ExprYield>),
+    YieldFrom(flat::View<'a, ExprYieldFrom>),
 }
 
 impl AnyExpressionYield<'_> {
@@ -19,10 +20,10 @@ impl AnyExpressionYield<'_> {
         matches!(self, AnyExpressionYield::YieldFrom(_))
     }
 
-    fn value(&self) -> Option<&Expr> {
+    fn value(&self) -> Option<flat::View<'_, Expr>> {
         match self {
-            AnyExpressionYield::Yield(yld) => yld.value.as_deref(),
-            AnyExpressionYield::YieldFrom(yld) => Some(&yld.value),
+            AnyExpressionYield::Yield(yld) => yld.value(),
+            AnyExpressionYield::YieldFrom(yld) => Some(yld.value()),
         }
     }
 }
@@ -54,7 +55,7 @@ impl NeedsParentheses for AnyExpressionYield<'_> {
         // FormatStmtExpr, does not add parenthesis
         if parent.is_stmt_assign() || parent.is_stmt_ann_assign() || parent.is_stmt_aug_assign() {
             if let Some(value) = self.value() {
-                if context.is_expression_parenthesized(value.into()) {
+                if context.is_expression_parenthesized(value) {
                     // Ex) `x = yield (1)`
                     OptionalParentheses::Never
                 } else {
@@ -75,14 +76,14 @@ impl NeedsParentheses for AnyExpressionYield<'_> {
     }
 }
 
-impl<'a> From<&'a ExprYield> for AnyExpressionYield<'a> {
-    fn from(value: &'a ExprYield) -> Self {
+impl<'a> From<flat::View<'a, ExprYield>> for AnyExpressionYield<'a> {
+    fn from(value: flat::View<'a, ExprYield>) -> Self {
         AnyExpressionYield::Yield(value)
     }
 }
 
-impl<'a> From<&'a ExprYieldFrom> for AnyExpressionYield<'a> {
-    fn from(value: &'a ExprYieldFrom) -> Self {
+impl<'a> From<flat::View<'a, ExprYieldFrom>> for AnyExpressionYield<'a> {
+    fn from(value: flat::View<'a, ExprYieldFrom>) -> Self {
         AnyExpressionYield::YieldFrom(value)
     }
 }
@@ -90,8 +91,8 @@ impl<'a> From<&'a ExprYieldFrom> for AnyExpressionYield<'a> {
 impl<'a> From<&AnyExpressionYield<'a>> for AnyNodeRef<'a> {
     fn from(value: &AnyExpressionYield<'a>) -> Self {
         match value {
-            AnyExpressionYield::Yield(yld) => AnyNodeRef::ExprYield(yld),
-            AnyExpressionYield::YieldFrom(yld) => AnyNodeRef::ExprYieldFrom(yld),
+            AnyExpressionYield::Yield(yld) => yld.erase(),
+            AnyExpressionYield::YieldFrom(yld) => yld.erase(),
         }
     }
 }
@@ -125,17 +126,17 @@ impl Format<PyFormatContext<'_>> for AnyExpressionYield<'_> {
 pub struct FormatExprYield;
 
 impl FormatNodeRule<ExprYield> for FormatExprYield {
-    fn fmt_fields(&self, item: &ExprYield, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, item: flat::View<'_, ExprYield>, f: &mut PyFormatter) -> FormatResult<()> {
         AnyExpressionYield::from(item).fmt(f)
     }
 }
 
-impl NeedsParentheses for ExprYield {
+impl NeedsParentheses for flat::View<'_, ExprYield> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        AnyExpressionYield::from(self).needs_parentheses(parent, context)
+        AnyExpressionYield::from(*self).needs_parentheses(parent, context)
     }
 }

@@ -46,7 +46,7 @@
 use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast as ast;
+use ruff_python_ast::flat;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use salsa;
@@ -1691,10 +1691,10 @@ impl<'db> DefinitionInference<'db> {
             let program_file = definition.program_file(db);
             let python_file = program_file.python_file(db);
             let module = parsed_module(db, python_file).load(db);
-            let known_collection = match assignment.value(&module) {
-                ast::Expr::Set(_) => Some(KnownClass::Set),
-                ast::Expr::List(_) => Some(KnownClass::List),
-                ast::Expr::Dict(_) => Some(KnownClass::Dict),
+            let known_collection = match assignment.value(&module).classify() {
+                flat::ExprKind::Set(_) => Some(KnownClass::Set),
+                flat::ExprKind::List(_) => Some(KnownClass::List),
+                flat::ExprKind::Dict(_) => Some(KnownClass::Dict),
                 _ => None,
             };
 

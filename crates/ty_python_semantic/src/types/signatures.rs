@@ -11,6 +11,7 @@
 //! arguments must match _at least one_ overload.
 
 use crate::ProgramEnvironment;
+use ruff_python_ast::flat::{self, fields as ast};
 use std::fmt;
 use std::num::NonZeroU32;
 use std::slice::Iter;
@@ -51,7 +52,7 @@ use crate::types::{
 };
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast::{Expr, ParameterWithDefault, StmtFunctionDef, name, name::Name};
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 
 /// Selects which binding context to use for type variables that only appear in a return-position
@@ -75,11 +76,11 @@ pub(super) enum ReturnCallableTypeVarScope {
 pub(super) fn function_signature_expression_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    expression: &ast::Expr,
+    expression: flat::View<'_, Expr>,
 ) -> Type<'db> {
     let file = definition.program_file(db);
     let index = semantic_index(db, file);
-    let file_scope = index.expression_scope_id(expression);
+    let file_scope = index.expression_scope_id(&expression);
     let scope = file_scope.to_scope_id(db, file);
     if scope == definition.scope(db) {
         // expression is in the function definition scope, but always deferred
@@ -93,11 +94,11 @@ pub(super) fn function_signature_expression_type<'db>(
 fn function_signature_type_expression_flags<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    expression: &ast::Expr,
+    expression: flat::View<'_, Expr>,
 ) -> TypeExpressionFlags {
     let file = definition.program_file(db);
     let index = semantic_index(db, file);
-    let file_scope = index.expression_scope_id(expression);
+    let file_scope = index.expression_scope_id(&expression);
     let scope = file_scope.to_scope_id(db, file);
     if scope == definition.scope(db) {
         // expression is in the function definition scope, but always deferred
@@ -984,20 +985,19 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         pep695_generic_context: Option<GenericContext<'db>>,
         definition: Definition<'db>,
-        function_node: &ast::StmtFunctionDef,
+        function_node: flat::View<'_, StmtFunctionDef>,
         has_implicitly_positional_first_parameter: bool,
         return_callable_typevar_scope: ReturnCallableTypeVarScope,
     ) -> Self {
         let parameters = Parameters::from_parameters(
             db,
             definition,
-            function_node.parameters.as_ref(),
+            function_node.parameters(),
             has_implicitly_positional_first_parameter,
         );
         let return_ty = function_node
-            .returns
-            .as_ref()
-            .map(|returns| function_signature_expression_type(db, definition, returns.as_ref()))
+            .returns()
+            .map(|returns| function_signature_expression_type(db, definition, returns))
             .unwrap_or_else(Type::unknown);
         let legacy_generic_context =
             GenericContext::from_function_params(db, definition, &parameters, return_ty);
@@ -5407,7 +5407,7 @@ impl<'db> Parameters<'db> {
     fn from_parameters(
         db: &'db dyn Db,
         definition: Definition<'db>,
-        parameters: &ast::Parameters,
+        parameters: flat::View<'_, ruff_python_ast::Parameters>,
         has_implicitly_positional_first_parameter: bool,
     ) -> Self {
         let ast::Parameters {
@@ -5417,23 +5417,23 @@ impl<'db> Parameters<'db> {
             kwonlyargs,
             kwarg,
             range: _,
-            node_index: _,
-        } = parameters;
+            node: _,
+        } = parameters.fields();
 
         let index = semantic_index(db, definition.program_file(db));
-        let default_type = |param: &ast::ParameterWithDefault| {
+        let default_type = |param: flat::View<'_, ParameterWithDefault>| {
             param.default().map(|_| {
-                ParameterDefault::Deferred(index.expect_single_definition(&param.parameter))
+                ParameterDefault::Deferred(index.expect_single_definition(param.parameter()))
             })
         };
 
-        let pos_only_param = |param: &ast::ParameterWithDefault| {
+        let pos_only_param = |param: flat::View<'_, ParameterWithDefault>| {
             Parameter::from_node_and_kind(
                 db,
                 definition,
-                &param.parameter,
+                param.parameter(),
                 ParameterKind::PositionalOnly {
-                    name: Some(param.parameter.name.id.clone()),
+                    name: Some(param.parameter().name().id().clone()),
                     default_type: default_type(param),
                 },
             )
@@ -5441,7 +5441,7 @@ impl<'db> Parameters<'db> {
 
         let mut positional_only: Vec<Parameter> = posonlyargs.iter().map(pos_only_param).collect();
 
-        let mut pos_or_keyword_iter = args.iter();
+        let mut pos_or_keyword_iter = args.iter().peekable();
 
         // If there are no PEP-570 positional-only parameters, check for the legacy PEP-484 convention
         // for denoting positional-only parameters (parameters that start with `__` and do not end with `__`)
@@ -5452,32 +5452,32 @@ impl<'db> Parameters<'db> {
                 positional_only.extend(pos_or_keyword_iter.next().map(pos_only_param));
             }
 
-            positional_only.extend(
-                pos_or_keyword_iter
-                    .peeking_take_while(|param| param.uses_pep_484_positional_only_convention())
-                    .map(pos_only_param),
-            );
+            while let Some(param) =
+                pos_or_keyword_iter.next_if(|param| param.uses_pep_484_positional_only_convention())
+            {
+                positional_only.push(pos_only_param(param));
+            }
         }
 
         let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
             Parameter::from_node_and_kind(
                 db,
                 definition,
-                &arg.parameter,
+                arg.parameter(),
                 ParameterKind::PositionalOrKeyword {
-                    name: arg.parameter.name.id.clone(),
+                    name: arg.parameter().name().id().clone(),
                     default_type: default_type(arg),
                 },
             )
         });
 
-        let variadic = vararg.as_ref().map(|arg| {
+        let variadic = vararg.map(|arg| {
             Parameter::from_node_and_kind(
                 db,
                 definition,
                 arg,
                 ParameterKind::Variadic {
-                    name: arg.name.id.clone(),
+                    name: arg.name().id().clone(),
                 },
             )
         });
@@ -5486,21 +5486,21 @@ impl<'db> Parameters<'db> {
             Parameter::from_node_and_kind(
                 db,
                 definition,
-                &arg.parameter,
+                arg.parameter(),
                 ParameterKind::KeywordOnly {
-                    name: arg.parameter.name.id.clone(),
+                    name: arg.parameter().name().id().clone(),
                     default_type: default_type(arg),
                 },
             )
         });
 
-        let keywords = kwarg.as_ref().map(|arg| {
+        let keywords = kwarg.map(|arg| {
             Parameter::from_node_and_kind(
                 db,
                 definition,
                 arg,
                 ParameterKind::KeywordVariadic {
-                    name: arg.name.id.clone(),
+                    name: arg.name().id().clone(),
                 },
             )
         });
@@ -6160,7 +6160,7 @@ impl<'db> Parameter<'db> {
     fn from_node_and_kind(
         db: &'db dyn Db,
         function_definition: Definition<'db>,
-        parameter: &ast::Parameter,
+        parameter: flat::View<'_, ruff_python_ast::Parameter>,
         kind: ParameterKind<'db>,
     ) -> Self {
         let index = semantic_index(db, function_definition.program_file(db));
@@ -6291,7 +6291,7 @@ impl<'db> Parameter<'db> {
     }
 
     /// Name of the parameter (if it has one).
-    pub(crate) fn name(&self) -> Option<&ast::name::Name> {
+    pub(crate) fn name(&self) -> Option<&name::Name> {
         match &self.kind {
             ParameterKind::PositionalOnly { name, .. } => name.as_ref(),
             ParameterKind::PositionalOrKeyword { name, .. } => Some(name),

@@ -1,6 +1,8 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprCall, Int, Number};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields as ast;
+use ruff_python_ast::{Int, Number};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -69,7 +71,7 @@ impl AlwaysFixableViolation for AsyncZeroSleep {
 }
 
 /// ASYNC115
-pub(crate) fn async_zero_sleep(checker: &Checker, call: &ExprCall) {
+pub(crate) fn async_zero_sleep(checker: &Checker, call: &ast::ExprCall<'_>) {
     if !(checker.semantic().seen_module(Modules::TRIO)
         || checker.semantic().seen_module(Modules::ANYIO))
     {
@@ -80,10 +82,7 @@ pub(crate) fn async_zero_sleep(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let Some(qualified_name) = checker
-        .semantic()
-        .resolve_qualified_name(call.func.as_ref())
-    else {
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func) else {
         return;
     };
 
@@ -102,8 +101,10 @@ pub(crate) fn async_zero_sleep(checker: &Checker, call: &ExprCall) {
         return;
     };
 
-    match arg {
-        Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
+    match arg.classify() {
+        flat::ExprKind::NumberLiteral(expr_number_literal) => {
+            let value = expr_number_literal.value();
+
             if !matches!(value, Number::Int(Int::ZERO)) {
                 return;
             }
@@ -111,10 +112,7 @@ pub(crate) fn async_zero_sleep(checker: &Checker, call: &ExprCall) {
         _ => return,
     }
 
-    let Some(qualified_name) = checker
-        .semantic()
-        .resolve_qualified_name(call.func.as_ref())
-    else {
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func) else {
         return;
     };
 
@@ -127,7 +125,7 @@ pub(crate) fn async_zero_sleep(checker: &Checker, call: &ExprCall) {
             return;
         }
 
-        let mut diagnostic = checker.report_diagnostic(AsyncZeroSleep { module }, call.range());
+        let mut diagnostic = checker.report_diagnostic(AsyncZeroSleep { module }, call.range);
         diagnostic.try_set_fix(|| {
             // `anyio.lowlevel` is a submodule, so we need `import anyio.lowlevel`
             // rather than `from anyio import lowlevel`.
@@ -145,7 +143,7 @@ pub(crate) fn async_zero_sleep(checker: &Checker, call: &ExprCall) {
             Ok(Fix::applicable_edits(
                 import_edit,
                 [reference_edit, arg_edit],
-                if checker.comment_ranges().intersects(call.range()) {
+                if checker.comment_ranges().intersects(call.range) {
                     Applicability::Unsafe
                 } else {
                     Applicability::Safe

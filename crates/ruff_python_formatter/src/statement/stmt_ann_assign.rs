@@ -1,5 +1,6 @@
 use ruff_formatter::write;
 use ruff_python_ast::StmtAnnAssign;
+use ruff_python_ast::flat;
 
 use crate::expression::is_splittable_expression;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
@@ -13,19 +14,16 @@ use crate::statement::trailing_semicolon;
 pub struct FormatStmtAnnAssign;
 
 impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
-    fn fmt_fields(&self, item: &StmtAnnAssign, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtAnnAssign {
-            range: _,
-            node_index: _,
-            target,
-            annotation,
-            value,
-            simple: _,
-        } = item;
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, StmtAnnAssign>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let target = item.target();
+        let annotation = item.annotation();
+        let value = item.value();
         let comments = f.context().comments().clone();
-        let annotation_parentheses = annotation
-            .as_ref()
-            .needs_parentheses(item.into(), f.context());
+        let annotation_parentheses = annotation.needs_parentheses(item.into(), f.context());
 
         write!(f, [target.format(), token(":"), space()])?;
 
@@ -43,8 +41,8 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
             } else {
                 // Remove unnecessary parentheses around the annotation if the parenthesize long type hints preview style is enabled.
                 // Ensure we keep the parentheses if the annotation has any comments.
-                let parentheses = if comments.has_leading(annotation.as_ref())
-                    || comments.has_trailing(annotation.as_ref())
+                let parentheses = if comments.has_leading(annotation)
+                    || comments.has_trailing(annotation)
                     || annotation_parentheses == OptionalParentheses::Always
                 {
                     Parentheses::Always

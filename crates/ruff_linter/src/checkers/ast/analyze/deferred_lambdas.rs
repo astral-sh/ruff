@@ -1,4 +1,4 @@
-use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
@@ -12,7 +12,11 @@ pub(crate) fn deferred_lambdas(checker: &mut Checker) {
 
         let checker = &*checker;
 
-        let Some(Expr::Lambda(lambda)) = checker.semantic.current_expression() else {
+        let Some(flat::ExprKind::Lambda(lambda)) = checker
+            .semantic
+            .current_expression()
+            .map(flat::View::<ruff_python_ast::Expr>::classify)
+        else {
             unreachable!("Expected Expr::Lambda");
         };
 

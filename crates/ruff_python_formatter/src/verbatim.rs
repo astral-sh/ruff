@@ -2,11 +2,10 @@ use std::borrow::Cow;
 use std::iter::FusedIterator;
 use std::slice::Iter;
 
-use itertools::PeekingNext;
 use ruff_formatter::{FormatError, write};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::Stmt;
+use ruff_python_ast::flat::AnyNodeRef;
 use ruff_python_ast::token::{Token as AstToken, TokenKind};
+use ruff_python_ast::{Stmt, flat};
 use ruff_python_trivia::lines_before;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -63,9 +62,9 @@ pub(crate) fn ends_suppression(
 pub(crate) fn write_suppressed_statements_starting_with_leading_comment<'a>(
     // The first suppressed statement
     first_suppressed: SuiteChildStatement<'a>,
-    statements: &mut std::slice::Iter<'a, Stmt>,
+    statements: &mut flat::ListIter<'a, flat::Handle<Stmt>>,
     f: &mut PyFormatter,
-) -> FormatResult<&'a Stmt> {
+) -> FormatResult<flat::View<'a, Stmt>> {
     let comments = f.context().comments().clone();
     let source = f.context().source();
 
@@ -115,9 +114,9 @@ pub(crate) fn write_suppressed_statements_starting_with_leading_comment<'a>(
 #[cold]
 pub(crate) fn write_suppressed_statements_starting_with_trailing_comment<'a>(
     last_formatted: SuiteChildStatement<'a>,
-    statements: &mut std::slice::Iter<'a, Stmt>,
+    statements: &mut flat::ListIter<'a, flat::Handle<Stmt>>,
     f: &mut PyFormatter,
-) -> FormatResult<&'a Stmt> {
+) -> FormatResult<flat::View<'a, Stmt>> {
     let comments = f.context().comments().clone();
     let source = f.context().source();
     let indentation = Indentation::from_stmt(last_formatted.statement(), source);
@@ -268,9 +267,9 @@ fn write_suppressed_statements<'a>(
     // The leading comments of `first_suppressed` that come after the `format_off_comment`
     first_suppressed_leading_comments: &[SourceComment],
     // The remaining statements
-    statements: &mut std::slice::Iter<'a, Stmt>,
+    statements: &mut flat::ListIter<'a, flat::Handle<Stmt>>,
     f: &mut PyFormatter,
-) -> FormatResult<&'a Stmt> {
+) -> FormatResult<flat::View<'a, Stmt>> {
     let comments = f.context().comments().clone();
     let source = f.context().source();
 
@@ -454,17 +453,17 @@ fn write_suppressed_statements<'a>(
 
 #[cold]
 pub(crate) fn write_skipped_statements<'a>(
-    first_skipped: &'a Stmt,
-    statements: &mut std::slice::Iter<'a, Stmt>,
+    first_skipped: flat::View<'a, Stmt>,
+    statements: &mut flat::ListIter<'a, flat::Handle<Stmt>>,
     verbatim_range: TextRange,
     f: &mut PyFormatter,
-) -> FormatResult<&'a Stmt> {
+) -> FormatResult<flat::View<'a, Stmt>> {
     let comments = f.context().comments().clone();
     comments.mark_verbatim_node_comments_formatted(first_skipped.into());
 
     let mut preceding = first_skipped;
 
-    while let Some(prec) = statements.peeking_next(|next| next.end() <= verbatim_range.end()) {
+    while let Some(prec) = statements.next_if(|next| next.end() <= verbatim_range.end()) {
         comments.mark_verbatim_node_comments_formatted(prec.into());
         preceding = prec;
     }
@@ -681,7 +680,7 @@ impl Format<PyFormatContext<'_>> for TrailingFormatOffComment<'_> {
 struct Indentation(u32);
 
 impl Indentation {
-    fn from_stmt(stmt: &Stmt, source: &str) -> Indentation {
+    fn from_stmt(stmt: flat::View<'_, Stmt>, source: &str) -> Indentation {
         let line_start = source.line_start(stmt.start());
 
         let mut indentation = 0u32;

@@ -1,4 +1,5 @@
 use ruff_python_ast::StmtImportFrom;
+use ruff_python_ast::flat::{self, fields as ast};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
@@ -38,13 +39,13 @@ impl Violation for FutureAnnotationsInStub {
 }
 
 /// PYI044
-pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
-    let StmtImportFrom {
+pub(crate) fn from_future_import(checker: &Checker, target: flat::View<'_, StmtImportFrom>) {
+    let ast::StmtImportFrom {
         range,
         module: Some(module_name),
         names,
         ..
-    } = target
+    } = target.fields()
     else {
         return;
     };
@@ -53,11 +54,11 @@ pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
         return;
     }
 
-    if names.iter().all(|alias| &*alias.name != "annotations") {
+    if names.iter().all(|alias| &alias.name() != "annotations") {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(FutureAnnotationsInStub, *range);
+    let mut diagnostic = checker.report_diagnostic(FutureAnnotationsInStub, range);
 
     let stmt = checker.semantic().current_statement();
 

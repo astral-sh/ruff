@@ -1,7 +1,8 @@
 use ruff_text_size::{Ranged, TextRange};
 
 use super::{TokenKind, Tokens};
-use crate::{AnyNodeRef, ExprRef};
+use crate::Expr;
+use crate::flat::{AnyNodeRef, View};
 
 /// Returns an iterator over the ranges of the optional parentheses surrounding an expression.
 ///
@@ -11,7 +12,7 @@ use crate::{AnyNodeRef, ExprRef};
 /// parentheses around `a` even if the parentheses actually belong to `f`. That is why you should
 /// generally prefer [`parenthesized_range`].
 pub fn parentheses_iterator<'a>(
-    expr: ExprRef<'a>,
+    expr: View<'a, Expr>,
     parent: Option<AnyNodeRef>,
     tokens: &'a Tokens,
 ) -> impl Iterator<Item = TextRange> + 'a {
@@ -54,7 +55,7 @@ pub fn parentheses_iterator<'a>(
 /// Returns the [`TextRange`] of a given expression including parentheses, if the expression is
 /// parenthesized; or `None`, if the expression is not parenthesized.
 pub fn parenthesized_range(
-    expr: ExprRef,
+    expr: View<'_, Expr>,
     parent: AnyNodeRef,
     tokens: &Tokens,
 ) -> Option<TextRange> {

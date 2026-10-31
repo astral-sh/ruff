@@ -1,7 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::flat::helpers::any_over_expr;
+use ruff_python_ast::flat::traversal;
+use ruff_python_ast::flat::{self, fields};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::traversal;
 use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprContext, Stmt, UnaryOp};
 use ruff_python_codegen::Generator;
 use ruff_source_file::LineRanges;
@@ -72,7 +73,7 @@ impl Violation for ReimplementedBuiltin {
 }
 
 /// SIM110, SIM111
-pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: flat::View<'_, Stmt>) {
     if !checker.semantic().current_scope().kind.is_function() {
         return;
     }
@@ -104,7 +105,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
         (true, false) => {
             let contents = return_stmt(
                 Name::new_static("any"),
-                loop_.test,
+                loop_.test.to_owned_node(),
                 loop_.target,
                 loop_.iter,
                 checker.generator(),
@@ -139,37 +140,41 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
         (false, true) => {
             // Invert the condition.
             let test = {
-                if let Expr::UnaryOp(ast::ExprUnaryOp {
+                if let fields::Expr::UnaryOp(fields::ExprUnaryOp {
                     op: UnaryOp::Not,
                     operand,
                     range: _,
-                    node_index: _,
-                }) = &loop_.test
+                    node: _,
+                }) = loop_.test.fields()
                 {
-                    *operand.clone()
-                } else if let Expr::Compare(compare) = &loop_.test
+                    operand.to_owned_node()
+                } else if let flat::ExprKind::Compare(compare) = loop_.test.classify()
                     && let Some((_, op, _)) = compare.as_single()
                 {
                     let node = ast::ExprCompare {
                         ops: [op.negate()].into(),
-                        operands: compare.operands.clone(),
+                        operands: compare
+                            .operands()
+                            .iter()
+                            .map(flat::View::to_owned_node)
+                            .collect(),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                        node_index: ruff_python_ast::NodeIndex::NONE,
                     };
                     node.into()
                 } else {
                     let node = ast::ExprUnaryOp {
                         op: UnaryOp::Not,
-                        operand: Box::new(loop_.test.clone()),
+                        operand: Box::new(loop_.test.to_owned_node()),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                        node_index: ruff_python_ast::NodeIndex::NONE,
                     };
                     node.into()
                 }
             };
             let contents = return_stmt(
                 Name::new_static("all"),
-                &test,
+                test,
                 loop_.target,
                 loop_.iter,
                 checker.generator(),
@@ -218,11 +223,11 @@ struct Loop<'a> {
     /// The `return` value of the loop.
     return_value: bool,
     /// The test condition in the loop.
-    test: &'a Expr,
+    test: flat::View<'a, Expr>,
     /// The target of the loop.
-    target: &'a Expr,
+    target: flat::View<'a, Expr>,
     /// The iterator of the loop.
-    iter: &'a Expr,
+    iter: flat::View<'a, Expr>,
 }
 
 /// Represents a `return` statement following a `for` loop, like:
@@ -244,50 +249,51 @@ struct Loop<'a> {
 #[derive(Debug)]
 struct Terminal<'a> {
     return_value: bool,
-    stmt: &'a Stmt,
+    stmt: flat::View<'a, Stmt>,
 }
 
-fn match_loop(stmt: &Stmt) -> Option<Loop<'_>> {
-    let Stmt::For(ast::StmtFor {
-        body, target, iter, ..
-    }) = stmt
-    else {
+fn match_loop(stmt: flat::View<'_, Stmt>) -> Option<Loop<'_>> {
+    let flat::StmtKind::For(for_stmt) = stmt.classify() else {
         return None;
     };
+    let body = for_stmt.body();
+    let target = for_stmt.target();
+    let iter = for_stmt.iter();
 
     // The loop itself should contain a single `if` statement, with a single `return` statement in
     // the body.
-    let [
-        Stmt::If(ast::StmtIf {
-            body: nested_body,
-            test: nested_test,
-            elif_else_clauses: nested_elif_else_clauses,
-            range: _,
-            node_index: _,
-        }),
-    ] = body.as_slice()
+    let Some(
+        [
+            fields::Stmt::If(fields::StmtIf {
+                body: nested_body,
+                test: nested_test,
+                elif_else_clauses: nested_elif_else_clauses,
+                ..
+            }),
+        ],
+    ) = body
+        .as_array()
+        .map(|items| items.map(flat::View::<Stmt>::fields))
     else {
         return None;
     };
     if !nested_elif_else_clauses.is_empty() {
         return None;
     }
-    let [
-        Stmt::Return(ast::StmtReturn {
-            value: Some(value),
-            range: _,
-            node_index: _,
-        }),
-    ] = nested_body.as_slice()
+    let [stmt] = nested_body.as_array()?;
+    let fields::Stmt::Return(fields::StmtReturn {
+        value: Some(value), ..
+    }) = stmt.fields()
     else {
         return None;
     };
-    let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = value.as_ref() else {
+    let flat::ExprKind::BooleanLiteral(boolean_literal) = value.classify() else {
         return None;
     };
+    let value = boolean_literal.value();
 
     Some(Loop {
-        return_value: *value,
+        return_value: value,
         test: nested_test,
         target,
         iter,
@@ -304,31 +310,33 @@ fn match_loop(stmt: &Stmt) -> Option<Loop<'_>> {
 ///         return True
 /// return False
 /// ```
-fn match_else_return(stmt: &Stmt) -> Option<Terminal<'_>> {
-    let Stmt::For(ast::StmtFor { orelse, .. }) = stmt else {
+fn match_else_return(stmt: flat::View<'_, Stmt>) -> Option<Terminal<'_>> {
+    let flat::StmtKind::For(for_stmt) = stmt.classify() else {
         return None;
     };
+    let orelse = for_stmt.orelse();
 
     // The `else` block has to contain a single `return True` or `return False`.
-    let [
-        Stmt::Return(ast::StmtReturn {
-            value: Some(next_value),
-            range: _,
-            node_index: _,
-        }),
-    ] = orelse.as_slice()
+    let Some(
+        [
+            fields::Stmt::Return(fields::StmtReturn {
+                value: Some(next_value),
+                ..
+            }),
+        ],
+    ) = orelse
+        .as_array()
+        .map(|items| items.map(flat::View::<Stmt>::fields))
     else {
         return None;
     };
-    let Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-        value: next_value, ..
-    }) = next_value.as_ref()
-    else {
+    let flat::ExprKind::BooleanLiteral(boolean_literal) = next_value.classify() else {
         return None;
     };
+    let next_value = boolean_literal.value();
 
     Some(Terminal {
-        return_value: *next_value,
+        return_value: next_value,
         stmt,
     })
 }
@@ -344,10 +352,14 @@ fn match_else_return(stmt: &Stmt) -> Option<Terminal<'_>> {
 /// else:
 ///     return False
 /// ```
-fn match_sibling_return<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Terminal<'a>> {
-    let Stmt::For(ast::StmtFor { orelse, .. }) = stmt else {
+fn match_sibling_return<'a>(
+    stmt: flat::View<'a, Stmt>,
+    sibling: flat::View<'a, Stmt>,
+) -> Option<Terminal<'a>> {
+    let flat::StmtKind::For(for_stmt) = stmt.classify() else {
         return None;
     };
+    let orelse = for_stmt.orelse();
 
     // The loop itself shouldn't have an `else` block.
     if !orelse.is_empty() {
@@ -355,48 +367,52 @@ fn match_sibling_return<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Termina
     }
 
     // The next statement has to be a `return True` or `return False`.
-    let Stmt::Return(ast::StmtReturn {
+    let fields::Stmt::Return(fields::StmtReturn {
         value: Some(next_value),
         range: _,
-        node_index: _,
-    }) = &sibling
+        node: _,
+    }) = sibling.fields()
     else {
         return None;
     };
-    let Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-        value: next_value, ..
-    }) = next_value.as_ref()
-    else {
+    let flat::ExprKind::BooleanLiteral(boolean_literal) = next_value.classify() else {
         return None;
     };
+    let next_value = boolean_literal.value();
 
     Some(Terminal {
-        return_value: *next_value,
+        return_value: next_value,
         stmt: sibling,
     })
 }
 
 /// Generate a return statement for an `any` or `all` builtin comprehension.
-fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Generator) -> String {
+fn return_stmt(
+    id: Name,
+    test: Expr,
+    target: flat::View<'_, Expr>,
+    iter: flat::View<'_, Expr>,
+    generator: Generator,
+) -> String {
     let node = ast::ExprGenerator {
-        elt: Box::new(test.clone()),
+        elt: Box::new(test),
         generators: vec![Comprehension {
-            target: target.clone(),
-            iter: iter.clone(),
+            target: target.to_owned_node(),
+            iter: iter.to_owned_node(),
             ifs: vec![],
             is_async: false,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         }],
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
         parenthesized: false,
     };
     let node1 = ast::ExprName {
         id,
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     let node2 = ast::ExprCall {
         func: Box::new(node1.into()),
@@ -404,22 +420,22 @@ fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
             args: [node.into()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         },
         range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     let node3 = ast::StmtReturn {
         value: Some(Box::new(node2.into())),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     generator.stmt(&node3.into())
 }
 
 /// Return `true` if the [`Expr`] contains an `await`, `yield`, or `yield from` expression.
-fn contains_yield_like(expr: &Expr) -> bool {
-    any_over_expr(expr, &Expr::is_await_expr)
-        || any_over_expr(expr, &Expr::is_yield_expr)
-        || any_over_expr(expr, &Expr::is_yield_from_expr)
+fn contains_yield_like(expr: flat::View<'_, Expr>) -> bool {
+    any_over_expr(expr, flat::View::is_await_expr)
+        || any_over_expr(expr, flat::View::is_yield_expr)
+        || any_over_expr(expr, flat::View::is_yield_from_expr)
 }

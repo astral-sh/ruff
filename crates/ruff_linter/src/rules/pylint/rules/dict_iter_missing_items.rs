@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing::is_dict;
@@ -67,16 +68,20 @@ impl AlwaysFixableViolation for DictIterMissingItems {
 }
 
 /// PLE1141
-pub(crate) fn dict_iter_missing_items(checker: &Checker, target: &Expr, iter: &Expr) {
-    let Expr::Tuple(tuple) = target else {
+pub(crate) fn dict_iter_missing_items(
+    checker: &Checker,
+    target: flat::View<'_, Expr>,
+    iter: flat::View<'_, Expr>,
+) {
+    let flat::ExprKind::Tuple(tuple) = target.classify() else {
         return;
     };
 
-    if tuple.len() != 2 {
+    if tuple.elts().len() != 2 {
         return;
     }
 
-    let Expr::Name(name) = iter else {
+    let flat::ExprKind::Name(name) = iter.classify() else {
         return;
     };
 
@@ -98,7 +103,7 @@ pub(crate) fn dict_iter_missing_items(checker: &Checker, target: &Expr, iter: &E
 
     let mut diagnostic = checker.report_diagnostic(DictIterMissingItems, iter.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        format!("{}.items()", name.id),
+        format!("{}.items()", name.id()),
         iter.range(),
     )));
 }
@@ -109,22 +114,21 @@ fn is_dict_key_tuple_with_two_elements(binding: &Binding, semantic: &SemanticMod
         return false;
     };
 
-    let (value, annotation) = match statement {
-        Stmt::Assign(assign_stmt) => (assign_stmt.value.as_ref(), None),
-        Stmt::AnnAssign(ast::StmtAnnAssign {
-            value: Some(value),
-            annotation,
-            ..
-        }) => (value.as_ref(), Some(annotation.as_ref())),
+    let (value, annotation) = match statement.classify() {
+        flat::StmtKind::Assign(assign_stmt) => (assign_stmt.value(), None),
+        flat::StmtKind::AnnAssign(stmt_ann_assign) if let Some(value) = stmt_ann_assign.value() => {
+            let annotation = stmt_ann_assign.annotation();
+            (value, Some(annotation))
+        }
         _ => return false,
     };
 
-    let Expr::Dict(dict_expr) = value else {
+    let flat::ExprKind::Dict(dict_expr) = value.classify() else {
         return false;
     };
 
     // Check if dict is empty
-    let is_empty = dict_expr.is_empty();
+    let is_empty = dict_expr.items().is_empty();
 
     if is_empty {
         // For empty dicts, check type annotation
@@ -135,30 +139,33 @@ fn is_dict_key_tuple_with_two_elements(binding: &Binding, semantic: &SemanticMod
     // For non-empty dicts, check if all keys are 2-tuples
     dict_expr
         .iter_keys()
-        .all(|key| matches!(key, Some(Expr::Tuple(tuple)) if tuple.len() == 2))
+        .all(|key| matches!(key.map(flat::View::<Expr>::classify), Some(flat::ExprKind::Tuple(tuple)) if tuple.elts().len() == 2))
 }
 
 /// Returns true if the annotation is `dict[tuple[T1, T2], ...]` where tuple has exactly 2 elements.
-fn is_annotation_dict_with_tuple_keys(annotation: &Expr, semantic: &SemanticModel) -> bool {
+fn is_annotation_dict_with_tuple_keys(
+    annotation: flat::View<'_, Expr>,
+    semantic: &SemanticModel,
+) -> bool {
     // Check if it's a subscript: dict[...]
-    let Expr::Subscript(subscript) = annotation else {
+    let flat::ExprKind::Subscript(subscript) = annotation.classify() else {
         return false;
     };
 
     // Check if it's dict or typing.Dict
-    if !semantic.match_builtin_expr(subscript.value.as_ref(), "dict")
-        && !semantic.match_typing_expr(subscript.value.as_ref(), "Dict")
+    if !semantic.match_builtin_expr(subscript.value(), "dict")
+        && !semantic.match_typing_expr(subscript.value(), "Dict")
     {
         return false;
     }
 
     // Extract the slice (should be a tuple: (key_type, value_type))
-    let Expr::Tuple(tuple) = subscript.slice.as_ref() else {
+    let flat::ExprKind::Tuple(tuple) = subscript.slice().classify() else {
         return false;
     };
 
     // dict[K, V] format - check if K is tuple with 2 elements
-    if let [key, _value] = tuple.elts.as_slice() {
+    if let Some([key, _value]) = tuple.elts().as_array() {
         return is_tuple_type_with_two_elements(key, semantic);
     }
 
@@ -166,16 +173,16 @@ fn is_annotation_dict_with_tuple_keys(annotation: &Expr, semantic: &SemanticMode
 }
 
 /// Returns true if the expression represents a tuple type with exactly 2 elements.
-fn is_tuple_type_with_two_elements(expr: &Expr, semantic: &SemanticModel) -> bool {
+fn is_tuple_type_with_two_elements(expr: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
     // Handle tuple[...] subscript
-    if let Expr::Subscript(subscript) = expr {
+    if let flat::ExprKind::Subscript(subscript) = expr.classify() {
         // Check if it's tuple or typing.Tuple
-        if semantic.match_builtin_expr(subscript.value.as_ref(), "tuple")
-            || semantic.match_typing_expr(subscript.value.as_ref(), "Tuple")
+        if semantic.match_builtin_expr(subscript.value(), "tuple")
+            || semantic.match_typing_expr(subscript.value(), "Tuple")
         {
             // Check the slice - tuple[T1, T2]
-            if let Expr::Tuple(tuple_slice) = subscript.slice.as_ref() {
-                return tuple_slice.elts.len() == 2;
+            if let flat::ExprKind::Tuple(tuple_slice) = subscript.slice().classify() {
+                return tuple_slice.elts().len() == 2;
             }
             return false;
         }

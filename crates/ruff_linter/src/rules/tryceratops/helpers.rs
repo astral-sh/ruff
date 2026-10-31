@@ -1,6 +1,6 @@
-use ruff_python_ast::visitor;
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, ExceptHandler, Expr};
+use ruff_python_ast::flat::visitor;
+use ruff_python_ast::flat::visitor::Visitor;
+use ruff_python_ast::{self as ast, ExceptHandler, Expr, flat};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
@@ -9,7 +9,7 @@ use ruff_python_stdlib::logging::LoggingLevel;
 pub(super) struct LoggerCandidateVisitor<'a, 'b> {
     semantic: &'a SemanticModel<'b>,
     logger_objects: &'a [String],
-    pub(super) calls: Vec<(&'b ast::ExprCall, LoggingLevel)>,
+    pub(super) calls: Vec<(flat::View<'b, ast::ExprCall>, LoggingLevel)>,
 }
 
 impl<'a, 'b> LoggerCandidateVisitor<'a, 'b> {
@@ -23,20 +23,21 @@ impl<'a, 'b> LoggerCandidateVisitor<'a, 'b> {
 }
 
 impl<'b> Visitor<'b> for LoggerCandidateVisitor<'_, 'b> {
-    fn visit_expr(&mut self, expr: &'b Expr) {
-        if let Expr::Call(call) = expr {
-            match call.func.as_ref() {
-                Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-                    if logging::is_logger_candidate(&call.func, self.semantic, self.logger_objects)
+    fn visit_expr(&mut self, expr: flat::View<'b, Expr>) {
+        if let flat::ExprKind::Call(call) = expr.classify() {
+            match call.func().classify() {
+                flat::ExprKind::Attribute(expr_attribute) => {
+                    let attr = expr_attribute.attr();
+
+                    if logging::is_logger_candidate(call.func(), self.semantic, self.logger_objects)
                     {
-                        if let Some(logging_level) = LoggingLevel::from_attribute(attr) {
+                        if let Some(logging_level) = LoggingLevel::from_attribute(attr.as_str()) {
                             self.calls.push((call, logging_level));
                         }
                     }
                 }
-                Expr::Name(_) => {
-                    if let Some(qualified_name) =
-                        self.semantic.resolve_qualified_name(call.func.as_ref())
+                flat::ExprKind::Name(_) => {
+                    if let Some(qualified_name) = self.semantic.resolve_qualified_name(call.func())
                     {
                         if let ["logging", attribute] = qualified_name.segments() {
                             if let Some(logging_level) = LoggingLevel::from_attribute(attribute) {
@@ -53,7 +54,7 @@ impl<'b> Visitor<'b> for LoggerCandidateVisitor<'_, 'b> {
         visitor::walk_expr(self, expr);
     }
 
-    fn visit_except_handler(&mut self, _except_handler: &'b ExceptHandler) {
+    fn visit_except_handler(&mut self, _except_handler: flat::View<'b, ExceptHandler>) {
         // Don't recurse into exception handlers, since we'll re-run the visitor on any such
         // handlers.
     }

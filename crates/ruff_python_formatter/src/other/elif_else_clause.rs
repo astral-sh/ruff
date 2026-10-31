@@ -1,4 +1,5 @@
 use ruff_python_ast::ElifElseClause;
+use ruff_python_ast::flat;
 
 use crate::prelude::*;
 use crate::statement::stmt_if::format_elif_else_clause;
@@ -11,7 +12,11 @@ use crate::statement::suite::SuiteKind;
 pub struct FormatElifElseClause;
 
 impl FormatNodeRule<ElifElseClause> for FormatElifElseClause {
-    fn fmt_fields(&self, item: &ElifElseClause, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, ElifElseClause>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         format_elif_else_clause(
             item,
             f,

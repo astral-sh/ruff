@@ -2,12 +2,12 @@ use std::fmt::Debug;
 use std::iter::Peekable;
 
 use ruff_formatter::{SourceCode, SourceCodeSlice};
-use ruff_python_ast::{AnyNodeRef, Identifier};
-use ruff_python_ast::{Mod, Stmt};
+use ruff_python_ast::Mod;
+use ruff_python_ast::{Identifier, flat, flat::AnyNodeRef};
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.
 #[allow(clippy::wildcard_imports)]
-use ruff_python_ast::visitor::source_order::*;
+use ruff_python_ast::flat::visitor::source_order::*;
 use ruff_python_trivia::{CommentLinePosition, CommentRanges, TriviaRanges};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -18,7 +18,7 @@ use crate::comments::{CommentsMap, SourceComment};
 /// Collect the preceding, following and enclosing node for each comment without applying
 /// [`place_comment`] for debugging.
 pub(crate) fn collect_comments<'a>(
-    root: &'a Mod,
+    root: flat::View<'a, Mod>,
     source_code: SourceCode<'a>,
     comment_ranges: &'a CommentRanges,
 ) -> Vec<DecoratedComment<'a>> {
@@ -147,13 +147,13 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
         self.preceding_node = Some(node);
     }
 
-    fn visit_body(&mut self, body: &'ast [Stmt]) {
-        match body {
-            [] => {
+    fn visit_body(&mut self, body: flat::Suite<'ast>) {
+        match (body.first(), body.last()) {
+            (None, _) | (_, None) => {
                 // no-op
             }
-            [only] => self.visit_stmt(only),
-            [first, .., last] => {
+            (Some(only), _) if body.len() == 1 => self.visit_stmt(only),
+            (Some(first), Some(last)) => {
                 if self.can_skip(last.end()) {
                     // Skip traversing the body when there's no comment between the first and last statement.
                     // It is still necessary to visit the first statement to process all comments between
@@ -167,7 +167,7 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
         }
     }
 
-    fn visit_identifier(&mut self, _identifier: &'ast Identifier) {
+    fn visit_identifier(&mut self, _identifier: flat::View<'ast, Identifier>) {
         // TODO: Visit and associate comments with identifiers
     }
 }

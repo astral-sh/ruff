@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::helpers::is_docstring_stmt;
-use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -44,9 +44,9 @@ impl AlwaysFixableViolation for NonEmptyStubBody {
 }
 
 /// PYI010
-pub(crate) fn non_empty_stub_body(checker: &Checker, body: &[Stmt]) {
+pub(crate) fn non_empty_stub_body(checker: &Checker, body: flat::Suite<'_>) {
     // Ignore multi-statement bodies (covered by PYI048).
-    let [stmt] = body else {
+    let Some([stmt]) = body.as_array() else {
         return;
     };
 
@@ -61,12 +61,8 @@ pub(crate) fn non_empty_stub_body(checker: &Checker, body: &[Stmt]) {
     }
 
     // Ignore `...` (the desired case).
-    if let Stmt::Expr(ast::StmtExpr {
-        value,
-        range: _,
-        node_index: _,
-    }) = stmt
-    {
+    if let flat::StmtKind::Expr(expr) = stmt.classify() {
+        let value = expr.value();
         if value.is_ellipsis_literal_expr() {
             return;
         }

@@ -5,7 +5,7 @@ use ruff_python_ast::{
     self as ast, BytesLiteralFlags, Expr, FStringFlags, FStringPartRef, InterpolatedStringElement,
     InterpolatedStringLiteralElement, Stmt, StringFlags,
 };
-use ruff_python_ast::{AtomicNodeIndex, visitor::transformer::Transformer};
+use ruff_python_ast::{NodeIndex, visitor::transformer::Transformer};
 use ruff_python_ast::{StringLiteralFlags, visitor::transformer};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -69,7 +69,7 @@ impl Transformer for Normalizer {
                         value: Box::from(string.value.to_str()),
                         range: string.range,
                         flags: StringLiteralFlags::empty(),
-                        node_index: AtomicNodeIndex::NONE,
+                        node_index: NodeIndex::NONE,
                     });
                 }
             }
@@ -84,7 +84,7 @@ impl Transformer for Normalizer {
                         value: bytes.value.bytes().collect(),
                         range: bytes.range,
                         flags: BytesLiteralFlags::empty(),
-                        node_index: AtomicNodeIndex::NONE,
+                        node_index: NodeIndex::NONE,
                     });
                 }
             }
@@ -126,7 +126,7 @@ impl Transformer for Normalizer {
                                     InterpolatedStringLiteralElement {
                                         range,
                                         value: literal.into(),
-                                        node_index: AtomicNodeIndex::NONE,
+                                        node_index: NodeIndex::NONE,
                                     },
                                 ));
                             }
@@ -166,7 +166,7 @@ impl Transformer for Normalizer {
                         elements: collector.elements.into(),
                         range: fstring.range,
                         flags: FStringFlags::empty(),
-                        node_index: AtomicNodeIndex::NONE,
+                        node_index: NodeIndex::NONE,
                     });
                 }
             }

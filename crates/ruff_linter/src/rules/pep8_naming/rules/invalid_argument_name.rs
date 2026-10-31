@@ -1,5 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{ExprLambda, Parameters, StmtFunctionDef};
+use ruff_python_ast::Parameters;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields as ast;
 use ruff_python_semantic::ScopeKind;
 use ruff_python_semantic::analyze::visibility::is_override;
 use ruff_python_stdlib::str;
@@ -61,22 +63,25 @@ impl Violation for InvalidArgumentName {
 }
 
 /// N803
-pub(crate) fn invalid_argument_name_function(checker: &Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn invalid_argument_name_function(
+    checker: &Checker,
+    function_def: &ast::StmtFunctionDef<'_>,
+) {
     let semantic = checker.semantic();
     let scope = semantic.current_scope();
 
     if matches!(scope.kind, ScopeKind::Class(_))
-        && is_override(&function_def.decorator_list, semantic)
+        && is_override(function_def.decorator_list, semantic)
     {
         return;
     }
 
-    invalid_argument_name(checker, &function_def.parameters);
+    invalid_argument_name(checker, function_def.parameters);
 }
 
 /// N803
-pub(crate) fn invalid_argument_name_lambda(checker: &Checker, lambda: &ExprLambda) {
-    let Some(parameters) = &lambda.parameters else {
+pub(crate) fn invalid_argument_name_lambda(checker: &Checker, lambda: &ast::ExprLambda<'_>) {
+    let Some(parameters) = lambda.parameters else {
         return;
     };
 
@@ -84,10 +89,10 @@ pub(crate) fn invalid_argument_name_lambda(checker: &Checker, lambda: &ExprLambd
 }
 
 /// N803
-fn invalid_argument_name(checker: &Checker, parameters: &Parameters) {
+fn invalid_argument_name(checker: &Checker, parameters: flat::View<'_, Parameters>) {
     let ignore_names = &checker.settings().pep8_naming.ignore_names;
 
-    for parameter in parameters {
+    for parameter in parameters.iter() {
         let name = parameter.name().as_str();
 
         if str::is_lowercase(name) {

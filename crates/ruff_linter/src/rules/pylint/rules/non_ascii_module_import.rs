@@ -1,4 +1,5 @@
 use ruff_python_ast::Alias;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -65,8 +66,8 @@ enum Kind {
 }
 
 /// PLC2403
-pub(crate) fn non_ascii_module_import(checker: &Checker, alias: &Alias) {
-    if let Some(asname) = &alias.asname {
+pub(crate) fn non_ascii_module_import(checker: &Checker, alias: flat::View<'_, Alias>) {
+    if let Some(asname) = alias.asname() {
         if asname.as_str().is_ascii() {
             return;
         }
@@ -79,16 +80,16 @@ pub(crate) fn non_ascii_module_import(checker: &Checker, alias: &Alias) {
             asname.range(),
         );
     } else {
-        if alias.name.as_str().is_ascii() {
+        if alias.name().as_str().is_ascii() {
             return;
         }
 
         checker.report_diagnostic(
             NonAsciiImportName {
-                name: alias.name.to_string(),
+                name: alias.name().to_string(),
                 kind: Kind::Unaliased,
             },
-            alias.name.range(),
+            alias.name().range(),
         );
     }
 }

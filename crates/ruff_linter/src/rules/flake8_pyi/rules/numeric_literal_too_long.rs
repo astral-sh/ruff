@@ -1,4 +1,5 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 use ruff_text_size::{Ranged, TextSize};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -47,7 +48,7 @@ impl AlwaysFixableViolation for NumericLiteralTooLong {
 }
 
 /// PYI054
-pub(crate) fn numeric_literal_too_long(checker: &Checker, expr: &Expr) {
+pub(crate) fn numeric_literal_too_long(checker: &Checker, &expr: &flat::View<'_, Expr>) {
     if expr.range().len() <= TextSize::new(10) {
         return;
     }

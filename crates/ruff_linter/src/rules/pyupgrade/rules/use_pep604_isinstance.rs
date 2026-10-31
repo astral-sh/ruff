@@ -1,8 +1,8 @@
 use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Expr;
 use ruff_python_ast::helpers::pep_604_union;
+use ruff_python_ast::{Expr, flat};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -90,19 +90,24 @@ impl AlwaysFixableViolation for NonPEP604Isinstance {
 }
 
 /// UP038
-pub(crate) fn use_pep604_isinstance(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub(crate) fn use_pep604_isinstance(
+    checker: &Checker,
+    &expr: &flat::View<'_, Expr>,
+    func: flat::View<'_, Expr>,
+    args: flat::NodeList<'_, Expr>,
+) {
     let Some(types) = args.get(1) else {
         return;
     };
-    let Expr::Tuple(tuple) = types else {
+    let flat::ExprKind::Tuple(tuple) = types.classify() else {
         return;
     };
     // Ex) `()`
-    if tuple.is_empty() {
+    if tuple.elts().is_empty() {
         return;
     }
     // Ex) `(*args,)`
-    if tuple.iter().any(Expr::is_starred_expr) {
+    if tuple.iter().any(flat::View::is_starred_expr) {
         return;
     }
     let Some(builtin_function_name) = checker.semantic().resolve_builtin_symbol(func) else {
@@ -114,7 +119,9 @@ pub(crate) fn use_pep604_isinstance(checker: &Checker, expr: &Expr, func: &Expr,
     checker
         .report_diagnostic(NonPEP604Isinstance { kind }, expr.range())
         .set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            checker.generator().expr(&pep_604_union(&tuple.elts)),
+            checker.generator().expr(&pep_604_union(
+                tuple.elts().iter().map(flat::View::to_owned_node),
+            )),
             types.range(),
         )));
 }

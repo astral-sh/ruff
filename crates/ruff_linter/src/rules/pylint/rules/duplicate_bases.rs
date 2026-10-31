@@ -1,5 +1,6 @@
 use ruff_diagnostics::Applicability;
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_ast::Arguments;
+use ruff_python_ast::flat;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -77,15 +78,20 @@ impl Violation for DuplicateBases {
 }
 
 /// PLE0241
-pub(crate) fn duplicate_bases(checker: &Checker, name: &str, arguments: Option<&Arguments>) {
+pub(crate) fn duplicate_bases(
+    checker: &Checker,
+    name: &str,
+    arguments: Option<flat::View<'_, Arguments>>,
+) {
     let Some(arguments) = arguments else {
         return;
     };
-    let bases = &arguments.args;
+    let bases = arguments.args();
 
     let mut seen: FxHashSet<&str> = FxHashSet::with_capacity_and_hasher(bases.len(), FxBuildHasher);
     for base in bases {
-        if let Expr::Name(ast::ExprName { id, .. }) = base {
+        if let flat::ExprKind::Name(name_node) = base.classify() {
+            let id = name_node.id();
             if !seen.insert(id) {
                 let mut diagnostic = checker.report_diagnostic(
                     DuplicateBases {
@@ -96,7 +102,7 @@ pub(crate) fn duplicate_bases(checker: &Checker, name: &str, arguments: Option<&
                 );
                 diagnostic.try_set_fix(|| {
                     remove_argument(
-                        base,
+                        &base,
                         arguments,
                         Parentheses::Remove,
                         checker.locator().contents(),

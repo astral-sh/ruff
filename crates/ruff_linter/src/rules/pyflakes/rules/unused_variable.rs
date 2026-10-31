@@ -1,10 +1,10 @@
 use itertools::Itertools;
+use ruff_python_ast::flat::{self, fields as ast};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::token::{TokenKind, Tokens};
-use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_semantic::Binding;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -162,7 +162,9 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
     let isolation = Checker::isolation(checker.semantic().parent_statement_id(node_id));
 
     // First case: simple assignment (`x = 1`)
-    if let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = statement {
+    if let flat::StmtKind::Assign(assign) = statement.classify() {
+        let targets = assign.targets();
+        let value = assign.value();
         if let Some(target) = targets
             .iter()
             .find(|target| binding.range() == target.range())
@@ -173,10 +175,9 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                 {
                     // If the expression is complex (`x = foo()`), remove the assignment,
                     // but preserve the right-hand side.
-                    let start =
-                        parenthesized_range(target.into(), statement.into(), checker.tokens())
-                            .unwrap_or(target.range())
-                            .start();
+                    let start = parenthesized_range(target, statement.into(), checker.tokens())
+                        .unwrap_or(target.range())
+                        .start();
                     let end = match_token_after(checker.tokens(), target.end(), |token| {
                         token == TokenKind::Equal
                     })?
@@ -201,11 +202,11 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
     }
 
     // Second case: simple annotated assignment (`x: int = 1`)
-    if let Stmt::AnnAssign(ast::StmtAnnAssign {
+    if let ast::Stmt::AnnAssign(ast::StmtAnnAssign {
         target,
         value: Some(value),
         ..
-    }) = statement
+    }) = statement.fields()
     {
         if target.is_name_expr() {
             return if contains_effect(value, |id| checker.semantic().has_builtin_binding(id)) {
@@ -226,18 +227,20 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
     }
 
     // Third case: with_item (`with foo() as x:`)
-    if let Stmt::With(ast::StmtWith { items, .. }) = statement {
+    if let flat::StmtKind::With(with_node) = statement.classify() {
+        let items = with_node.items();
         // Find the binding that matches the given `Range`.
         // TODO(charlie): Store the `WithItem` in the `Binding`.
         for item in items {
-            if let Some(optional_vars) = &item.optional_vars {
+            if let Some(optional_vars) = item.optional_vars() {
                 if optional_vars.range() == binding.range() {
                     // Find the first token before the `as` keyword.
-                    let start =
-                        match_token_before(checker.tokens(), item.context_expr.start(), |token| {
-                            token == TokenKind::As
-                        })?
-                        .end();
+                    let start = match_token_before(
+                        checker.tokens(),
+                        item.context_expr().start(),
+                        |token| token == TokenKind::As,
+                    )?
+                    .end();
 
                     // Find the first colon, comma, or closing bracket after the `as` keyword.
                     let end = match_token_or_closing_brace(checker.tokens(), start, |token| {

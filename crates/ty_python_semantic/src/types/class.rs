@@ -1,4 +1,5 @@
 use crate::ProgramEnvironment;
+use ruff_python_ast::flat;
 use std::fmt::Write;
 
 pub(crate) use self::dynamic_literal::{
@@ -88,14 +89,14 @@ enum DynamicClassHeaderAnchor<'db> {
 /// Identifies a dangling dynamic-class call relative to its enclosing scope.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum DynamicClassScopeOffset {
-    /// A call in the module AST, identified by its scope-relative node index.
-    Node(u32),
+    /// A call in the module AST, identified relative to the first expression row of its scope.
+    Node(i32),
 
     /// A call in a parsed string annotation, whose nodes are not in the module AST.
     ///
     /// `offset` identifies the outermost string expression in the module AST, relative to the
-    /// scope's node index. `range` identifies the call within that string expression.
-    StringAnnotation { offset: u32, range: TextRange },
+    /// scope's first expression row. `range` identifies the call within that string expression.
+    StringAnnotation { offset: i32, range: TextRange },
 }
 
 /// Returns the source range of a call that creates a dynamic class.
@@ -123,21 +124,22 @@ fn dynamic_class_header_range<'db>(
                     (offset, Some(range))
                 }
             };
-            let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
-            let anchor_u32 = scope_anchor
-                .as_u32()
-                .expect("anchor should not be NodeIndex::NONE");
-            let absolute_index = NodeIndex::from(anchor_u32 + offset);
+            let anchor = scope.scope(db).first_expression_row();
+            let absolute_index = NodeIndex::from(
+                anchor
+                    .checked_add_signed(offset)
+                    .expect("dynamic class anchor belongs to the module"),
+            );
             if let Some(relative_range) = relative_range {
-                let string: &ast::ExprStringLiteral = module
+                let string: flat::View<'_, ast::ExprStringLiteral> = module
                     .get_by_index(absolute_index)
-                    .try_into()
+                    .cast()
                     .expect("string annotation offset should point to ExprStringLiteral");
                 return relative_range + string.start();
             }
-            let node: &ast::ExprCall = module
+            let node: flat::View<'_, ast::ExprCall> = module
                 .get_by_index(absolute_index)
-                .try_into()
+                .cast()
                 .expect("scope offset should point to ExprCall");
             node.range()
         }

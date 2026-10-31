@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{Decorator, Stmt, identifier::Identifier};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::{class::any_base_class, visibility};
@@ -65,9 +66,9 @@ impl Violation for InvalidFunctionName {
 /// N802
 pub(crate) fn invalid_function_name(
     checker: &Checker,
-    stmt: &Stmt,
+    stmt: flat::View<'_, Stmt>,
     name: &str,
-    decorator_list: &[Decorator],
+    decorator_list: flat::NodeList<'_, Decorator>,
     ignore_names: &IgnoreNames,
     semantic: &SemanticModel,
 ) {
@@ -92,7 +93,7 @@ pub(crate) fn invalid_function_name(
 
     let parent_class = semantic
         .current_statement_parent()
-        .and_then(|parent| parent.as_class_def_stmt());
+        .and_then(flat::View::as_class_def_stmt);
 
     // Ignore the visit_* methods of the ast.NodeVisitor and ast.NodeTransformer classes.
     if name.starts_with("visit_")

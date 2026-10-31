@@ -1,4 +1,4 @@
-use ruff_python_ast::{PythonVersion, StmtFunctionDef};
+use ruff_python_ast::{PythonVersion, StmtFunctionDef, flat};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 
 use crate::rules::flake8_type_checking;
@@ -80,7 +80,7 @@ impl AnnotationContext {
 
     /// Determine the [`AnnotationContext`] to use for annotations in a function signature.
     pub(super) fn from_function(
-        function_def: &StmtFunctionDef,
+        function_def: flat::View<'_, StmtFunctionDef>,
         semantic: &SemanticModel,
         settings: &LinterSettings,
         version: PythonVersion,

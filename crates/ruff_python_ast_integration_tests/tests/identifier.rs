@@ -11,8 +11,8 @@ else:
     pass
 "
     .trim();
-    let stmts = parse_module(contents)?.into_suite();
-    let stmt = stmts.first().unwrap();
+    let parsed = parse_module(contents)?;
+    let stmt = parsed.suite().first().unwrap();
     let range = identifier::else_(stmt, contents).unwrap();
     assert_eq!(&contents[range], "else");
     assert_eq!(

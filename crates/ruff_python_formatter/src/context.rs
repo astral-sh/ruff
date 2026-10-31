@@ -2,9 +2,9 @@ use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
-use ruff_python_ast::ExprRef;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::Tokens;
+use ruff_python_ast::{Expr, flat::View};
 use ruff_python_trivia::TriviaRanges;
 use ruff_text_size::Ranged;
 
@@ -86,7 +86,7 @@ impl<'a> PyFormatContext<'a> {
         self.tokens
     }
 
-    pub(crate) fn is_expression_parenthesized(&self, expression: ExprRef) -> bool {
+    pub(crate) fn is_expression_parenthesized(&self, expression: View<'_, Expr>) -> bool {
         self.trivia.parenthesized().contains(expression.range())
     }
 

@@ -1,3 +1,5 @@
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields;
 use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -49,15 +51,15 @@ impl AlwaysFixableViolation for DecimalFromFloatLiteral {
 }
 
 /// RUF032: `Decimal()` called with float literal argument
-pub(crate) fn decimal_from_float_literal_syntax(checker: &Checker, call: &ast::ExprCall) {
-    let Some(arg) = call.arguments.args.first() else {
+pub(crate) fn decimal_from_float_literal_syntax(checker: &Checker, call: &fields::ExprCall<'_>) {
+    let Some(arg) = call.arguments.args().first() else {
         return;
     };
 
     if let Some(float) = extract_float_literal(arg, Sign::Positive) {
         if checker
             .semantic()
-            .resolve_qualified_name(call.func.as_ref())
+            .resolve_qualified_name(call.func)
             .is_some_and(|qualified_name| {
                 matches!(qualified_name.segments(), ["decimal", "Decimal"])
             })
@@ -111,24 +113,24 @@ struct Float {
     sign: Sign,
 }
 
-fn extract_float_literal(arg: &ast::Expr, sign: Sign) -> Option<Float> {
-    match arg {
-        ast::Expr::NumberLiteral(number_literal_expr) if number_literal_expr.value.is_float() => {
+fn extract_float_literal(arg: flat::View<'_, ast::Expr>, sign: Sign) -> Option<Float> {
+    match arg.classify() {
+        flat::ExprKind::NumberLiteral(number_literal_expr)
+            if number_literal_expr.value().is_float() =>
+        {
             Some(Float {
                 value_range: arg.range(),
                 sign,
             })
         }
-        ast::Expr::UnaryOp(ast::ExprUnaryOp {
-            operand,
-            op: ast::UnaryOp::UAdd,
-            ..
-        }) => extract_float_literal(operand, sign),
-        ast::Expr::UnaryOp(ast::ExprUnaryOp {
-            operand,
-            op: ast::UnaryOp::USub,
-            ..
-        }) => extract_float_literal(operand, sign.flip()),
+        flat::ExprKind::UnaryOp(expr_unary_op) if expr_unary_op.op() == ast::UnaryOp::UAdd => {
+            let operand = expr_unary_op.operand();
+            extract_float_literal(operand, sign)
+        }
+        flat::ExprKind::UnaryOp(expr_unary_op) if expr_unary_op.op() == ast::UnaryOp::USub => {
+            let operand = expr_unary_op.operand();
+            extract_float_literal(operand, sign.flip())
+        }
         _ => None,
     }
 }

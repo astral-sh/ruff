@@ -7,7 +7,8 @@
 //! designed to support multiple environments.
 
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::{self as ast, helpers::any_over_expr, name::Name};
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{ElifElseClause, Expr, helpers::any_over_expr, name::Name};
 use rustc_hash::FxHashMap;
 use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::{
@@ -151,17 +152,24 @@ impl RedundantConditionContext {
     /// fixed truthiness. A redundant operand can be part of an otherwise ambiguous condition.
     pub(super) fn for_if_statement(
         builder: &TypeInferenceBuilder<'_, '_>,
-        body: &[ast::Stmt],
-        following_clauses: &[ast::ElifElseClause],
-        following_statements: &[ast::Stmt],
+        body: flat::Suite<'_>,
+        following_clauses: flat::NodeList<'_, ElifElseClause>,
+        following_statements: flat::Suite<'_>,
     ) -> Self {
         if !builder.context.is_lint_enabled(&REDUNDANT_CONDITION_STRICT) {
             return Self::Standalone;
         }
 
         let falsy_suite = match following_clauses {
-            [else_clause] if else_clause.test.is_none() => Some(else_clause.body.as_slice()),
-            [] if suite_ends_with_exit(builder, body, SuiteExitKind::Any) => {
+            items
+                if let Some([else_clause]) = items.as_array()
+                    && else_clause.test().is_none() =>
+            {
+                Some(else_clause.body())
+            }
+            items
+                if items.is_empty() && suite_ends_with_exit(builder, body, SuiteExitKind::Any) =>
+            {
                 Some(following_statements)
             }
             _ => None,
@@ -217,7 +225,7 @@ impl RedundantConditionContext {
             ConditionKind::ContainsWalrus | ConditionKind::Value => {}
         }
 
-        match condition.expression {
+        match condition.expression.classify() {
             // The inferred types for these will always be the same,
             // even if a subexpression is defined in terms of `sys.version_info`, `sys.platform`, `os.name`, or
             // `typing.TYPE_CHECKING`. We don't need to recurse into them *at the top level*, and it's more
@@ -229,44 +237,44 @@ impl RedundantConditionContext {
             // generator is a subexpression of a call expression, e.g.
             // `any(x for x in range(10) if sys.version_info >= (3, 14))`. Similar concerns apply to lambdas,
             // which can be eagerly called, etc. etc.
-            ast::Expr::StringLiteral(_)
-            | ast::Expr::BytesLiteral(_)
-            | ast::Expr::NumberLiteral(_)
-            | ast::Expr::BooleanLiteral(_)
-            | ast::Expr::EllipsisLiteral(_)
-            | ast::Expr::Dict(_)
-            | ast::Expr::DictComp(_)
-            | ast::Expr::Generator(_)
-            | ast::Expr::Lambda(_)
-            | ast::Expr::Set(_)
-            | ast::Expr::SetComp(_)
-            | ast::Expr::List(_)
-            | ast::Expr::ListComp(_)
-            | ast::Expr::TString(_)
-            | ast::Expr::NoneLiteral(_) => false,
+            flat::ExprKind::StringLiteral(_)
+            | flat::ExprKind::BytesLiteral(_)
+            | flat::ExprKind::NumberLiteral(_)
+            | flat::ExprKind::BooleanLiteral(_)
+            | flat::ExprKind::EllipsisLiteral(_)
+            | flat::ExprKind::Dict(_)
+            | flat::ExprKind::DictComp(_)
+            | flat::ExprKind::Generator(_)
+            | flat::ExprKind::Lambda(_)
+            | flat::ExprKind::Set(_)
+            | flat::ExprKind::SetComp(_)
+            | flat::ExprKind::List(_)
+            | flat::ExprKind::ListComp(_)
+            | flat::ExprKind::TString(_)
+            | flat::ExprKind::NoneLiteral(_) => false,
 
             // These expressions can contain subexpressions that are defined in terms of `sys.version_info`,
             // `sys.platform`, `os.name`, or `typing.TYPE_CHECKING`. We need to recurse into them to check for
             // those subexpressions, since the type of the overall expression can depend on the types of those
             // subexpressions.
-            ast::Expr::Name(_)
-            | ast::Expr::UnaryOp(_)
-            | ast::Expr::If(_)
-            | ast::Expr::FString(_)
-            | ast::Expr::Yield(_)
-            | ast::Expr::YieldFrom(_)
-            | ast::Expr::Attribute(_)
-            | ast::Expr::Named(_)
-            | ast::Expr::Call(_)
-            | ast::Expr::Subscript(_)
-            | ast::Expr::BinOp(_)
-            | ast::Expr::Await(_)
-            | ast::Expr::BoolOp(_)
-            | ast::Expr::Tuple(_)
-            | ast::Expr::Slice(_)
-            | ast::Expr::Starred(_)
-            | ast::Expr::IpyEscapeCommand(_)
-            | ast::Expr::Compare(_) => any_over_expr(condition.expression, |expression| {
+            flat::ExprKind::Name(_)
+            | flat::ExprKind::UnaryOp(_)
+            | flat::ExprKind::If(_)
+            | flat::ExprKind::FString(_)
+            | flat::ExprKind::Yield(_)
+            | flat::ExprKind::YieldFrom(_)
+            | flat::ExprKind::Attribute(_)
+            | flat::ExprKind::Named(_)
+            | flat::ExprKind::Call(_)
+            | flat::ExprKind::Subscript(_)
+            | flat::ExprKind::BinOp(_)
+            | flat::ExprKind::Await(_)
+            | flat::ExprKind::BoolOp(_)
+            | flat::ExprKind::Tuple(_)
+            | flat::ExprKind::Slice(_)
+            | flat::ExprKind::Starred(_)
+            | flat::ExprKind::IpyEscapeCommand(_)
+            | flat::ExprKind::Compare(_) => any_over_expr(condition.expression, |expression| {
                 is_special_cased_condition_expression(
                     builder.db(),
                     builder.program_file(),
@@ -334,37 +342,44 @@ impl RedundantConditionContext {
 fn is_special_cased_condition_expression<'db>(
     db: &'db dyn Db,
     file: ProgramFile<'db>,
-    expression: &ast::Expr,
-    mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+    expression: flat::View<'_, Expr>,
+    mut expression_type: impl FnMut(flat::View<'_, Expr>) -> Type<'db>,
 ) -> bool {
-    match expression {
-        ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING" => return true,
-        ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => match &**attr {
-            "TYPE_CHECKING" => return true,
-            "name" => {
-                let value_type = expression_type(value);
-                if let Type::ModuleLiteral(module) = value_type
-                    && module.module(db).is_known(db, KnownModule::Os)
-                {
-                    return true;
+    match expression.classify() {
+        flat::ExprKind::Name(expr_name) if expr_name.id() == "TYPE_CHECKING" => {
+            return true;
+        }
+        flat::ExprKind::Attribute(expr_attribute) => {
+            let value = expr_attribute.value();
+            let attr = expr_attribute.attr();
+
+            match attr.as_str() {
+                "TYPE_CHECKING" => return true,
+                "name" => {
+                    let value_type = expression_type(value);
+                    if let Type::ModuleLiteral(module) = value_type
+                        && module.module(db).is_known(db, KnownModule::Os)
+                    {
+                        return true;
+                    }
+                    if value_type.is_never() {
+                        return true;
+                    }
                 }
-                if value_type.is_never() {
-                    return true;
+                "version_info" | "platform" => {
+                    let value_type = expression_type(value);
+                    if let Type::ModuleLiteral(module) = value_type
+                        && module.module(db).is_known(db, KnownModule::Sys)
+                    {
+                        return true;
+                    }
+                    if value_type.is_never() {
+                        return true;
+                    }
                 }
+                _ => {}
             }
-            "version_info" | "platform" => {
-                let value_type = expression_type(value);
-                if let Type::ModuleLiteral(module) = value_type
-                    && module.module(db).is_known(db, KnownModule::Sys)
-                {
-                    return true;
-                }
-                if value_type.is_never() {
-                    return true;
-                }
-            }
-            _ => {}
-        },
+        }
         _ => {}
     }
 
@@ -378,13 +393,13 @@ fn is_special_cased_condition_expression<'db>(
 pub(super) fn condition_definition_info<'db>(
     db: &'db dyn Db,
     file: ProgramFile<'db>,
-    expression: &ast::Expr,
-    expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+    expression: flat::View<'_, Expr>,
+    expression_type: impl FnMut(flat::View<'_, Expr>) -> Type<'db>,
 ) -> ConditionDefinitionInfo<'db> {
     // Walking assignment expressions also visits their targets, which have no use-site bindings.
-    match expression {
-        ast::Expr::Name(name) if name.ctx.is_load() => {}
-        ast::Expr::Attribute(attribute) if attribute.ctx.is_load() => {}
+    match expression.classify() {
+        flat::ExprKind::Name(name) if name.ctx().is_load() => {}
+        flat::ExprKind::Attribute(attribute) if attribute.ctx().is_load() => {}
         _ => return ConditionDefinitionInfo::default(),
     }
     place_condition_definition_info(db, file, expression, expression_type)
@@ -394,12 +409,12 @@ pub(super) fn condition_definition_info<'db>(
 fn place_condition_definition_info<'db>(
     db: &'db dyn Db,
     file: ProgramFile<'db>,
-    expression: &ast::Expr,
-    mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+    expression: flat::View<'_, Expr>,
+    mut expression_type: impl FnMut(flat::View<'_, Expr>) -> Type<'db>,
 ) -> ConditionDefinitionInfo<'db> {
     let mut info = ConditionDefinitionInfo::default();
     let index = semantic_index(db, file);
-    if let Some(scope) = index.try_expression_scope_id(expression)
+    if let Some(scope) = index.try_expression_scope_id(&expression)
         && let Some(place_expr) = PlaceExpr::try_from_expr(expression)
     {
         let scope = scope.to_scope_id(db, file);
@@ -409,7 +424,7 @@ fn place_condition_definition_info<'db>(
             index,
             scope,
             &place_expr,
-            PlaceLoadMode::AtExpression(expression.into()),
+            PlaceLoadMode::AtExpression(expression),
         );
         for step in procedure {
             let source = match step {
@@ -463,12 +478,12 @@ fn place_condition_definition_info<'db>(
         }
     }
 
-    if let ast::Expr::Attribute(attribute) = expression {
+    if let flat::ExprKind::Attribute(attribute) = expression.classify() {
         info.merge(attribute_condition_definition_info(
             db,
             file.program(db),
-            expression_type(&attribute.value),
-            attribute.attr.id.clone(),
+            expression_type(attribute.value()),
+            attribute.attr().id().clone(),
         ));
     }
     info
@@ -710,7 +725,8 @@ fn definition_contains_special_cased_condition<'db>(
 
     if let DefinitionKind::AnnotatedAssignment(annotated_assignment) = definition_kind
         && file.is_stub(db)
-        && let ast::Expr::Name(ast::ExprName { id, .. }) = annotated_assignment.target(&module)
+        && let ast::Expr::Name(ast::ExprName { id, .. }) =
+            annotated_assignment.target(&module).fields()
     {
         match &**id {
             "version_info" | "platform" if in_known_module(KnownModule::Sys) => {
@@ -729,7 +745,7 @@ fn definition_contains_special_cased_condition<'db>(
     let source_expression = match definition_kind {
         DefinitionKind::Assignment(assignment) => Some(assignment.value(&module)),
         DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(&module),
-        DefinitionKind::NamedExpression(named) => Some(&*named.node(&module).value),
+        DefinitionKind::NamedExpression(named) => Some(named.node(&module).value()),
         DefinitionKind::For(for_statement) => Some(for_statement.iterable(&module)),
         DefinitionKind::Comprehension(comprehension) => Some(comprehension.iterable(&module)),
         DefinitionKind::WithItem(with_item) => Some(with_item.context_expr(&module)),
@@ -763,14 +779,14 @@ fn definition_contains_special_cased_condition<'db>(
         }
         DefinitionKind::AugmentedAssignment(assignment) => {
             let assignment = assignment.node(&module);
-            if place_condition_definition_info(db, program_file, &assignment.target, |expr| {
+            if place_condition_definition_info(db, program_file, assignment.target(), |expr| {
                 infer_definition_types(db, definition).expression_type(expr)
             })
             .contains_special_cased_condition
             {
                 return true;
             }
-            Some(&*assignment.value)
+            Some(assignment.value())
         }
         DefinitionKind::Import(_)
         | DefinitionKind::ImportFrom(_)

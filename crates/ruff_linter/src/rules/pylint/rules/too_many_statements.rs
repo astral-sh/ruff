@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
+use ruff_python_ast::flat;
 use ruff_python_ast::identifier::Identifier;
 
 use crate::Violation;
@@ -70,8 +71,8 @@ impl Violation for TooManyStatements {
 /// PLR0915
 pub(crate) fn too_many_statements(
     checker: &Checker,
-    stmt: &Stmt,
-    body: &[Stmt],
+    stmt: flat::View<'_, Stmt>,
+    body: flat::Suite<'_>,
     max_statements: usize,
 ) {
     let statements = num_statements(body);

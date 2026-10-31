@@ -1,5 +1,6 @@
 use ast::ExprContext;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::helpers::pep_604_union;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
@@ -60,7 +61,7 @@ impl Violation for UnnecessaryTypeUnion {
 }
 
 /// PYI055
-pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
+pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, &union: &flat::View<'a, Expr>) {
     let semantic = checker.semantic();
 
     // The `|` operator isn't always safe to allow to runtime-evaluated annotations.
@@ -72,7 +73,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
     let subscript = union.as_subscript_expr();
     let mut union_kind = match subscript {
         Some(subscript) => {
-            if !semantic.match_typing_expr(&subscript.value, "Union") {
+            if !semantic.match_typing_expr(subscript.value(), "Union") {
                 return;
             }
             UnionKind::TypingUnion
@@ -80,22 +81,26 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
         None => UnionKind::PEP604,
     };
 
-    let mut type_exprs: Vec<&Expr> = Vec::new();
-    let mut other_exprs: Vec<&Expr> = Vec::new();
+    let mut type_exprs: Vec<flat::View<'_, Expr>> = Vec::new();
+    let mut other_exprs: Vec<flat::View<'_, Expr>> = Vec::new();
 
-    let mut collect_type_exprs = |expr: &'a Expr, parent: &'a Expr| {
+    let mut collect_type_exprs = |expr: flat::View<'a, Expr>, parent: flat::View<'a, Expr>| {
         // If a PEP604-style union is used within a `typing.Union`, then the fix can
         // use PEP604-style unions.
-        if matches!(parent, Expr::BinOp(_)) {
+        if matches!(parent.classify(), flat::ExprKind::BinOp(_)) {
             union_kind = UnionKind::PEP604;
         }
-        match expr {
-            Expr::Subscript(ast::ExprSubscript { slice, value, .. }) => {
+        match expr.classify() {
+            flat::ExprKind::Subscript(expr_subscript) => {
+                let slice = expr_subscript.slice();
+                let value = expr_subscript.value();
+
                 // The annotation `type[a, b]` is not valid since `type` accepts
                 // a single parameter. This likely is a confusion with `type[a | b]` or
                 // `type[Union[a, b]]`. Do not emit a diagnostic for invalid type
                 // annotations.
-                if !matches!(**slice, Expr::Tuple(_)) && semantic.match_builtin_expr(value, "type")
+                if !matches!(slice.classify(), flat::ExprKind::Tuple(_))
+                    && semantic.match_builtin_expr(value, "type")
                 {
                     type_exprs.push(slice);
                 } else {
@@ -130,41 +135,44 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
         // Construct the content for the [`Fix`] based on if we encountered a PEP604 union.
         let content = match union_kind {
             UnionKind::PEP604 => {
-                let elts: Vec<Expr> = type_exprs.into_iter().cloned().collect();
+                let elts: Vec<Expr> = type_exprs
+                    .into_iter()
+                    .map(flat::View::to_owned_node)
+                    .collect();
                 let types = Expr::Subscript(ast::ExprSubscript {
                     value: Box::new(Expr::Name(ast::ExprName {
                         id: Name::new_static("type"),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                        node_index: ruff_python_ast::NodeIndex::NONE,
                     })),
-                    slice: Box::new(pep_604_union(&elts)),
+                    slice: Box::new(pep_604_union(elts)),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                 });
 
                 if other_exprs.is_empty() {
                     checker.generator().expr(&types)
                 } else {
                     let elts: Vec<Expr> = std::iter::once(types)
-                        .chain(other_exprs.into_iter().cloned())
+                        .chain(other_exprs.into_iter().map(flat::View::to_owned_node))
                         .collect();
-                    checker.generator().expr(&pep_604_union(&elts))
+                    checker.generator().expr(&pep_604_union(elts))
                 }
             }
             UnionKind::TypingUnion => {
                 // When subscript is None, it uses the previous match case.
                 let subscript = subscript.unwrap();
-                let types = &Expr::Subscript(ast::ExprSubscript {
+                let types = Expr::Subscript(ast::ExprSubscript {
                     value: Box::new(Expr::Name(ast::ExprName {
                         id: Name::new_static("type"),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                        node_index: ruff_python_ast::NodeIndex::NONE,
                     })),
                     slice: Box::new(Expr::Subscript(ast::ExprSubscript {
-                        value: subscript.value.clone(),
+                        value: Box::new(subscript.value().to_owned_node()),
                         slice: Box::new(Expr::Tuple(ast::ExprTuple {
                             elts: type_members
                                 .into_iter()
@@ -173,43 +181,43 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
                                         id: type_member,
                                         ctx: ExprContext::Load,
                                         range: TextRange::default(),
-                                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                                        node_index: ruff_python_ast::NodeIndex::NONE,
                                     })
                                 })
                                 .collect(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                            node_index: ruff_python_ast::NodeIndex::NONE,
                             parenthesized: true,
                         })),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                        node_index: ruff_python_ast::NodeIndex::NONE,
                     })),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                 });
 
                 if other_exprs.is_empty() {
-                    checker.generator().expr(types)
+                    checker.generator().expr(&types)
                 } else {
                     let mut exprs = Vec::new();
                     exprs.push(types);
-                    exprs.extend(other_exprs);
+                    exprs.extend(other_exprs.into_iter().map(flat::View::to_owned_node));
 
                     let union = Expr::Subscript(ast::ExprSubscript {
-                        value: subscript.value.clone(),
+                        value: Box::new(subscript.value().to_owned_node()),
                         slice: Box::new(Expr::Tuple(ast::ExprTuple {
-                            elts: exprs.into_iter().cloned().collect(),
+                            elts: exprs,
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                            node_index: ruff_python_ast::NodeIndex::NONE,
                             parenthesized: true,
                         })),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                        node_index: ruff_python_ast::NodeIndex::NONE,
                     });
 
                     checker.generator().expr(&union)

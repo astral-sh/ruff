@@ -1,8 +1,11 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Expr};
+use ruff_python_ast::{
+    ExceptHandler, Expr, ExprName,
+    flat::{self, fields as ast},
+};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::visitor;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::flat::visitor;
+use ruff_python_ast::flat::visitor::Visitor;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
@@ -50,9 +53,10 @@ impl Violation for VerboseLogMessage {
 }
 
 /// TRY401
-pub(crate) fn verbose_log_message(checker: &Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn verbose_log_message(checker: &Checker, handlers: flat::NodeList<'_, ExceptHandler>) {
     for handler in handlers {
-        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) = handler;
+        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) =
+            handler.fields();
 
         // Find all calls to `logging.exception`.
         let calls = {
@@ -65,9 +69,9 @@ pub(crate) fn verbose_log_message(checker: &Checker, handlers: &[ExceptHandler])
         for (expr, logging_level) in calls {
             if matches!(logging_level, LoggingLevel::Exception) {
                 // Collect all referenced names in the `logging.exception` call.
-                let names: Vec<&ast::ExprName> = {
-                    expr.arguments
-                        .args
+                let names: Vec<flat::View<'_, ExprName>> = {
+                    expr.arguments()
+                        .args()
                         .iter()
                         .flat_map(|arg| {
                             let mut visitor = NameVisitor::default();
@@ -94,14 +98,14 @@ pub(crate) fn verbose_log_message(checker: &Checker, handlers: &[ExceptHandler])
 
 #[derive(Default)]
 struct NameVisitor<'a> {
-    names: Vec<&'a ast::ExprName>,
+    names: Vec<flat::View<'a, ExprName>>,
 }
 
 impl<'a> Visitor<'a> for NameVisitor<'a> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Name(name) if name.ctx.is_load() => self.names.push(name),
-            Expr::Attribute(_) => {}
+    fn visit_expr(&mut self, expr: flat::View<'a, Expr>) {
+        match expr.classify() {
+            flat::ExprKind::Name(name) if name.ctx().is_load() => self.names.push(name),
+            flat::ExprKind::Attribute(_) => {}
             _ => visitor::walk_expr(self, expr),
         }
     }

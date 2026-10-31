@@ -1,5 +1,6 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, HasNodeIndex};
+use ruff_python_ast::flat;
+use ruff_python_ast::{self as ast};
 use rustc_hash::FxHashMap;
 
 use super::{ArgExpr, TypeInferenceBuilder};
@@ -12,13 +13,13 @@ use crate::types::{KnownClass, Type, TypeContext};
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_keyword_only_dict_call(
         &mut self,
-        func: &ast::Expr,
-        arguments: &ast::Arguments,
-        collection_expr: Option<ast::ExprRef<'_>>,
+        func: flat::View<'_, ast::Expr>,
+        arguments: flat::View<'_, ast::Arguments>,
+        collection_expr: Option<flat::View<'_, ast::Expr>>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db();
-        if !arguments.args.is_empty() {
+        if !arguments.args().is_empty() {
             return None;
         }
 
@@ -70,9 +71,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         if arguments
-            .keywords
+            .keywords()
             .iter()
-            .any(|keyword| keyword.arg.is_none())
+            .any(|keyword| keyword.arg().is_none())
         {
             return None;
         }
@@ -81,24 +82,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // reuse dict-literal inference. We key the synthetic name off the value node because
         // `infer_collection_literal` operates on expressions rather than keywords.
         let items = arguments
-            .keywords
+            .keywords()
             .iter()
-            .map(|keyword| [Some(&keyword.value), Some(&keyword.value)])
+            .map(|keyword| [Some(keyword.value()), Some(keyword.value())])
             .collect_vec();
         let keyword_names = arguments
-            .keywords
+            .keywords()
             .iter()
-            .filter_map(|keyword| {
-                Some((
-                    keyword.value.node_index().load(),
-                    keyword.arg.as_ref()?.id.clone(),
-                ))
-            })
+            .filter_map(|keyword| Some((keyword.value().node_index(), keyword.arg()?.id().clone())))
             .collect::<FxHashMap<_, _>>();
         let mut infer_elt_ty = |builder: &mut Self, (i, elt, tcx): ArgExpr<'db, '_>| {
             if i == 0 {
                 let key = keyword_names
-                    .get(&elt.node_index().load())
+                    .get(&elt.node_index())
                     .expect("keyword-only dict() fast-path requires named keywords");
                 Type::string_literal(builder.db(), key)
             } else {

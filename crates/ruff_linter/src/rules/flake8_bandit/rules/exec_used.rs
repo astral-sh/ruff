@@ -1,4 +1,5 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -34,7 +35,7 @@ impl Violation for ExecBuiltin {
 }
 
 /// S102
-pub(crate) fn exec_used(checker: &Checker, func: &Expr) {
+pub(crate) fn exec_used(checker: &Checker, func: flat::View<'_, Expr>) {
     if checker.semantic().match_builtin_expr(func, "exec") {
         checker.report_diagnostic(ExecBuiltin, func.range());
     }

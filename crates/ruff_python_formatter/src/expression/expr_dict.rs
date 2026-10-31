@@ -1,5 +1,6 @@
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::{AnyNodeRef, DictItem, Expr, ExprDict};
+use ruff_python_ast::flat;
+use ruff_python_ast::{Expr, ExprDict, flat::AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{SourceComment, dangling_comments, leading_comments};
@@ -12,12 +13,8 @@ use crate::prelude::*;
 pub struct FormatExprDict;
 
 impl FormatNodeRule<ExprDict> for FormatExprDict {
-    fn fmt_fields(&self, item: &ExprDict, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprDict {
-            range: _,
-            node_index: _,
-            items,
-        } = item;
+    fn fmt_fields(&self, item: flat::View<'_, ExprDict>, f: &mut PyFormatter) -> FormatResult<()> {
+        let items = item.items();
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
@@ -63,7 +60,7 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
     }
 }
 
-impl NeedsParentheses for ExprDict {
+impl NeedsParentheses for flat::View<'_, ExprDict> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
@@ -75,16 +72,16 @@ impl NeedsParentheses for ExprDict {
 
 #[derive(Debug)]
 struct KeyValuePair<'a> {
-    key: &'a Option<Expr>,
-    value: &'a Expr,
+    key: Option<flat::View<'a, Expr>>,
+    value: flat::View<'a, Expr>,
     comments: &'a [SourceComment],
 }
 
 impl<'a> KeyValuePair<'a> {
-    fn new(item: &'a DictItem) -> Self {
+    fn new(item: flat::DictItemView<'a>) -> Self {
         Self {
-            key: &item.key,
-            value: &item.value,
+            key: item.key,
+            value: item.value,
             comments: &[],
         }
     }

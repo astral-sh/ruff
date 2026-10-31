@@ -34,7 +34,7 @@ impl ruff_text_size::Ranged for Mod {
 }
 
 impl crate::HasNodeIndex for Mod {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::Module(node) => node.node_index(),
             Self::Expression(node) => node.node_index(),
@@ -333,7 +333,7 @@ impl ruff_text_size::Ranged for Stmt {
 }
 
 impl crate::HasNodeIndex for Stmt {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::FunctionDef(node) => node.node_index(),
             Self::ClassDef(node) => node.node_index(),
@@ -1570,7 +1570,7 @@ impl ruff_text_size::Ranged for Expr {
 }
 
 impl crate::HasNodeIndex for Expr {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::BoolOp(node) => node.node_index(),
             Self::Named(node) => node.node_index(),
@@ -2855,7 +2855,7 @@ impl ruff_text_size::Ranged for ExceptHandler {
 }
 
 impl crate::HasNodeIndex for ExceptHandler {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::ExceptHandler(node) => node.node_index(),
         }
@@ -2927,7 +2927,7 @@ impl ruff_text_size::Ranged for InterpolatedStringElement {
 }
 
 impl crate::HasNodeIndex for InterpolatedStringElement {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::Interpolation(node) => node.node_index(),
             Self::Literal(node) => node.node_index(),
@@ -3090,7 +3090,7 @@ impl ruff_text_size::Ranged for Pattern {
 }
 
 impl crate::HasNodeIndex for Pattern {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::MatchValue(node) => node.node_index(),
             Self::MatchSingleton(node) => node.node_index(),
@@ -3441,7 +3441,7 @@ impl ruff_text_size::Ranged for TypeParam {
 }
 
 impl crate::HasNodeIndex for TypeParam {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             Self::TypeVar(node) => node.node_index(),
             Self::TypeVarTuple(node) => node.node_index(),
@@ -4123,566 +4123,566 @@ impl ruff_text_size::Ranged for crate::Identifier {
 }
 
 impl crate::HasNodeIndex for crate::ModModule {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ModExpression {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtFunctionDef {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtClassDef {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtReturn {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtDelete {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtTypeAlias {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtAssign {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtAugAssign {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtAnnAssign {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtFor {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtWhile {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtIf {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtWith {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtMatch {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtRaise {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtTry {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtAssert {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtImport {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtImportFrom {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtGlobal {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtNonlocal {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtExpr {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtPass {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtBreak {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtContinue {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StmtIpyEscapeCommand {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprBoolOp {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprNamed {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprBinOp {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprUnaryOp {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprLambda {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprIf {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprDict {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprSet {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprListComp {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprSetComp {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprDictComp {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprGenerator {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprAwait {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprYield {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprYieldFrom {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprCompare {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprCall {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprFString {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprTString {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprStringLiteral {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprBytesLiteral {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprNumberLiteral {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprBooleanLiteral {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprNoneLiteral {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprEllipsisLiteral {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprAttribute {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprSubscript {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprStarred {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprName {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprList {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprTuple {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprSlice {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExprIpyEscapeCommand {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ExceptHandlerExceptHandler {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::InterpolatedElement {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::InterpolatedStringLiteralElement {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchValue {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchSingleton {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchSequence {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchMapping {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchClass {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchStar {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchAs {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternMatchOr {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::TypeParamTypeVar {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::TypeParamTypeVarTuple {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::TypeParamParamSpec {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::InterpolatedStringFormatSpec {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternArguments {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::PatternKeyword {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Comprehension {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Arguments {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Parameters {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Parameter {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ParameterWithDefault {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Keyword {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Alias {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::WithItem {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::MatchCase {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Decorator {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::ElifElseClause {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::TypeParams {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::FString {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::TString {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::StringLiteral {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::BytesLiteral {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
 impl crate::HasNodeIndex for crate::Identifier {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
+    fn node_index(&self) -> crate::NodeIndex {
+        self.node_index
     }
 }
 
@@ -4837,994 +4837,6 @@ impl TypeParam {
     }
 }
 
-/// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
-#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub enum ModRef<'a> {
-    Module(&'a crate::ModModule),
-    Expression(&'a crate::ModExpression),
-}
-
-impl<'a> From<&'a Mod> for ModRef<'a> {
-    fn from(node: &'a Mod) -> Self {
-        match node {
-            Mod::Module(node) => ModRef::Module(node),
-            Mod::Expression(node) => ModRef::Expression(node),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::ModModule> for ModRef<'a> {
-    fn from(node: &'a crate::ModModule) -> Self {
-        Self::Module(node)
-    }
-}
-
-impl<'a> From<&'a crate::ModExpression> for ModRef<'a> {
-    fn from(node: &'a crate::ModExpression) -> Self {
-        Self::Expression(node)
-    }
-}
-
-impl ruff_text_size::Ranged for ModRef<'_> {
-    fn range(&self) -> ruff_text_size::TextRange {
-        match self {
-            Self::Module(node) => node.range(),
-            Self::Expression(node) => node.range(),
-        }
-    }
-}
-
-impl crate::HasNodeIndex for ModRef<'_> {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        match self {
-            Self::Module(node) => node.node_index(),
-            Self::Expression(node) => node.node_index(),
-        }
-    }
-}
-
-/// See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)
-#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub enum StmtRef<'a> {
-    #[is(name = "function_def_stmt")]
-    FunctionDef(&'a crate::StmtFunctionDef),
-    #[is(name = "class_def_stmt")]
-    ClassDef(&'a crate::StmtClassDef),
-    #[is(name = "return_stmt")]
-    Return(&'a crate::StmtReturn),
-    #[is(name = "delete_stmt")]
-    Delete(&'a crate::StmtDelete),
-    #[is(name = "type_alias_stmt")]
-    TypeAlias(&'a crate::StmtTypeAlias),
-    #[is(name = "assign_stmt")]
-    Assign(&'a crate::StmtAssign),
-    #[is(name = "aug_assign_stmt")]
-    AugAssign(&'a crate::StmtAugAssign),
-    #[is(name = "ann_assign_stmt")]
-    AnnAssign(&'a crate::StmtAnnAssign),
-    #[is(name = "for_stmt")]
-    For(&'a crate::StmtFor),
-    #[is(name = "while_stmt")]
-    While(&'a crate::StmtWhile),
-    #[is(name = "if_stmt")]
-    If(&'a crate::StmtIf),
-    #[is(name = "with_stmt")]
-    With(&'a crate::StmtWith),
-    #[is(name = "match_stmt")]
-    Match(&'a crate::StmtMatch),
-    #[is(name = "raise_stmt")]
-    Raise(&'a crate::StmtRaise),
-    #[is(name = "try_stmt")]
-    Try(&'a crate::StmtTry),
-    #[is(name = "assert_stmt")]
-    Assert(&'a crate::StmtAssert),
-    #[is(name = "import_stmt")]
-    Import(&'a crate::StmtImport),
-    #[is(name = "import_from_stmt")]
-    ImportFrom(&'a crate::StmtImportFrom),
-    #[is(name = "global_stmt")]
-    Global(&'a crate::StmtGlobal),
-    #[is(name = "nonlocal_stmt")]
-    Nonlocal(&'a crate::StmtNonlocal),
-    #[is(name = "expr_stmt")]
-    Expr(&'a crate::StmtExpr),
-    #[is(name = "pass_stmt")]
-    Pass(&'a crate::StmtPass),
-    #[is(name = "break_stmt")]
-    Break(&'a crate::StmtBreak),
-    #[is(name = "continue_stmt")]
-    Continue(&'a crate::StmtContinue),
-    #[is(name = "ipy_escape_command_stmt")]
-    IpyEscapeCommand(&'a crate::StmtIpyEscapeCommand),
-}
-
-impl<'a> From<&'a Stmt> for StmtRef<'a> {
-    fn from(node: &'a Stmt) -> Self {
-        match node {
-            Stmt::FunctionDef(node) => StmtRef::FunctionDef(node),
-            Stmt::ClassDef(node) => StmtRef::ClassDef(node),
-            Stmt::Return(node) => StmtRef::Return(node),
-            Stmt::Delete(node) => StmtRef::Delete(node),
-            Stmt::TypeAlias(node) => StmtRef::TypeAlias(node),
-            Stmt::Assign(node) => StmtRef::Assign(node),
-            Stmt::AugAssign(node) => StmtRef::AugAssign(node),
-            Stmt::AnnAssign(node) => StmtRef::AnnAssign(node),
-            Stmt::For(node) => StmtRef::For(node),
-            Stmt::While(node) => StmtRef::While(node),
-            Stmt::If(node) => StmtRef::If(node),
-            Stmt::With(node) => StmtRef::With(node),
-            Stmt::Match(node) => StmtRef::Match(node),
-            Stmt::Raise(node) => StmtRef::Raise(node),
-            Stmt::Try(node) => StmtRef::Try(node),
-            Stmt::Assert(node) => StmtRef::Assert(node),
-            Stmt::Import(node) => StmtRef::Import(node),
-            Stmt::ImportFrom(node) => StmtRef::ImportFrom(node),
-            Stmt::Global(node) => StmtRef::Global(node),
-            Stmt::Nonlocal(node) => StmtRef::Nonlocal(node),
-            Stmt::Expr(node) => StmtRef::Expr(node),
-            Stmt::Pass(node) => StmtRef::Pass(node),
-            Stmt::Break(node) => StmtRef::Break(node),
-            Stmt::Continue(node) => StmtRef::Continue(node),
-            Stmt::IpyEscapeCommand(node) => StmtRef::IpyEscapeCommand(node),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::StmtFunctionDef> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtFunctionDef) -> Self {
-        Self::FunctionDef(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtClassDef> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtClassDef) -> Self {
-        Self::ClassDef(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtReturn> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtReturn) -> Self {
-        Self::Return(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtDelete> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtDelete) -> Self {
-        Self::Delete(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtTypeAlias> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtTypeAlias) -> Self {
-        Self::TypeAlias(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtAssign> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtAssign) -> Self {
-        Self::Assign(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtAugAssign> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtAugAssign) -> Self {
-        Self::AugAssign(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtAnnAssign> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtAnnAssign) -> Self {
-        Self::AnnAssign(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtFor> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtFor) -> Self {
-        Self::For(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtWhile> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtWhile) -> Self {
-        Self::While(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtIf> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtIf) -> Self {
-        Self::If(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtWith> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtWith) -> Self {
-        Self::With(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtMatch> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtMatch) -> Self {
-        Self::Match(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtRaise> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtRaise) -> Self {
-        Self::Raise(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtTry> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtTry) -> Self {
-        Self::Try(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtAssert> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtAssert) -> Self {
-        Self::Assert(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtImport> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtImport) -> Self {
-        Self::Import(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtImportFrom> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtImportFrom) -> Self {
-        Self::ImportFrom(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtGlobal> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtGlobal) -> Self {
-        Self::Global(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtNonlocal> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtNonlocal) -> Self {
-        Self::Nonlocal(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtExpr> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtExpr) -> Self {
-        Self::Expr(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtPass> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtPass) -> Self {
-        Self::Pass(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtBreak> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtBreak) -> Self {
-        Self::Break(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtContinue> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtContinue) -> Self {
-        Self::Continue(node)
-    }
-}
-
-impl<'a> From<&'a crate::StmtIpyEscapeCommand> for StmtRef<'a> {
-    fn from(node: &'a crate::StmtIpyEscapeCommand) -> Self {
-        Self::IpyEscapeCommand(node)
-    }
-}
-
-impl ruff_text_size::Ranged for StmtRef<'_> {
-    fn range(&self) -> ruff_text_size::TextRange {
-        match self {
-            Self::FunctionDef(node) => node.range(),
-            Self::ClassDef(node) => node.range(),
-            Self::Return(node) => node.range(),
-            Self::Delete(node) => node.range(),
-            Self::TypeAlias(node) => node.range(),
-            Self::Assign(node) => node.range(),
-            Self::AugAssign(node) => node.range(),
-            Self::AnnAssign(node) => node.range(),
-            Self::For(node) => node.range(),
-            Self::While(node) => node.range(),
-            Self::If(node) => node.range(),
-            Self::With(node) => node.range(),
-            Self::Match(node) => node.range(),
-            Self::Raise(node) => node.range(),
-            Self::Try(node) => node.range(),
-            Self::Assert(node) => node.range(),
-            Self::Import(node) => node.range(),
-            Self::ImportFrom(node) => node.range(),
-            Self::Global(node) => node.range(),
-            Self::Nonlocal(node) => node.range(),
-            Self::Expr(node) => node.range(),
-            Self::Pass(node) => node.range(),
-            Self::Break(node) => node.range(),
-            Self::Continue(node) => node.range(),
-            Self::IpyEscapeCommand(node) => node.range(),
-        }
-    }
-}
-
-impl crate::HasNodeIndex for StmtRef<'_> {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        match self {
-            Self::FunctionDef(node) => node.node_index(),
-            Self::ClassDef(node) => node.node_index(),
-            Self::Return(node) => node.node_index(),
-            Self::Delete(node) => node.node_index(),
-            Self::TypeAlias(node) => node.node_index(),
-            Self::Assign(node) => node.node_index(),
-            Self::AugAssign(node) => node.node_index(),
-            Self::AnnAssign(node) => node.node_index(),
-            Self::For(node) => node.node_index(),
-            Self::While(node) => node.node_index(),
-            Self::If(node) => node.node_index(),
-            Self::With(node) => node.node_index(),
-            Self::Match(node) => node.node_index(),
-            Self::Raise(node) => node.node_index(),
-            Self::Try(node) => node.node_index(),
-            Self::Assert(node) => node.node_index(),
-            Self::Import(node) => node.node_index(),
-            Self::ImportFrom(node) => node.node_index(),
-            Self::Global(node) => node.node_index(),
-            Self::Nonlocal(node) => node.node_index(),
-            Self::Expr(node) => node.node_index(),
-            Self::Pass(node) => node.node_index(),
-            Self::Break(node) => node.node_index(),
-            Self::Continue(node) => node.node_index(),
-            Self::IpyEscapeCommand(node) => node.node_index(),
-        }
-    }
-}
-
-/// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)
-#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub enum ExprRef<'a> {
-    #[is(name = "bool_op_expr")]
-    BoolOp(&'a crate::ExprBoolOp),
-    #[is(name = "named_expr")]
-    Named(&'a crate::ExprNamed),
-    #[is(name = "bin_op_expr")]
-    BinOp(&'a crate::ExprBinOp),
-    #[is(name = "unary_op_expr")]
-    UnaryOp(&'a crate::ExprUnaryOp),
-    #[is(name = "lambda_expr")]
-    Lambda(&'a crate::ExprLambda),
-    #[is(name = "if_expr")]
-    If(&'a crate::ExprIf),
-    #[is(name = "dict_expr")]
-    Dict(&'a crate::ExprDict),
-    #[is(name = "set_expr")]
-    Set(&'a crate::ExprSet),
-    #[is(name = "list_comp_expr")]
-    ListComp(&'a crate::ExprListComp),
-    #[is(name = "set_comp_expr")]
-    SetComp(&'a crate::ExprSetComp),
-    #[is(name = "dict_comp_expr")]
-    DictComp(&'a crate::ExprDictComp),
-    #[is(name = "generator_expr")]
-    Generator(&'a crate::ExprGenerator),
-    #[is(name = "await_expr")]
-    Await(&'a crate::ExprAwait),
-    #[is(name = "yield_expr")]
-    Yield(&'a crate::ExprYield),
-    #[is(name = "yield_from_expr")]
-    YieldFrom(&'a crate::ExprYieldFrom),
-    #[is(name = "compare_expr")]
-    Compare(&'a crate::ExprCompare),
-    #[is(name = "call_expr")]
-    Call(&'a crate::ExprCall),
-    #[is(name = "f_string_expr")]
-    FString(&'a crate::ExprFString),
-    #[is(name = "t_string_expr")]
-    TString(&'a crate::ExprTString),
-    #[is(name = "string_literal_expr")]
-    StringLiteral(&'a crate::ExprStringLiteral),
-    #[is(name = "bytes_literal_expr")]
-    BytesLiteral(&'a crate::ExprBytesLiteral),
-    #[is(name = "number_literal_expr")]
-    NumberLiteral(&'a crate::ExprNumberLiteral),
-    #[is(name = "boolean_literal_expr")]
-    BooleanLiteral(&'a crate::ExprBooleanLiteral),
-    #[is(name = "none_literal_expr")]
-    NoneLiteral(&'a crate::ExprNoneLiteral),
-    #[is(name = "ellipsis_literal_expr")]
-    EllipsisLiteral(&'a crate::ExprEllipsisLiteral),
-    #[is(name = "attribute_expr")]
-    Attribute(&'a crate::ExprAttribute),
-    #[is(name = "subscript_expr")]
-    Subscript(&'a crate::ExprSubscript),
-    #[is(name = "starred_expr")]
-    Starred(&'a crate::ExprStarred),
-    #[is(name = "name_expr")]
-    Name(&'a crate::ExprName),
-    #[is(name = "list_expr")]
-    List(&'a crate::ExprList),
-    #[is(name = "tuple_expr")]
-    Tuple(&'a crate::ExprTuple),
-    #[is(name = "slice_expr")]
-    Slice(&'a crate::ExprSlice),
-    #[is(name = "ipy_escape_command_expr")]
-    IpyEscapeCommand(&'a crate::ExprIpyEscapeCommand),
-}
-
-impl<'a> From<&'a Expr> for ExprRef<'a> {
-    fn from(node: &'a Expr) -> Self {
-        match node {
-            Expr::BoolOp(node) => ExprRef::BoolOp(node),
-            Expr::Named(node) => ExprRef::Named(node),
-            Expr::BinOp(node) => ExprRef::BinOp(node),
-            Expr::UnaryOp(node) => ExprRef::UnaryOp(node),
-            Expr::Lambda(node) => ExprRef::Lambda(node),
-            Expr::If(node) => ExprRef::If(node),
-            Expr::Dict(node) => ExprRef::Dict(node),
-            Expr::Set(node) => ExprRef::Set(node),
-            Expr::ListComp(node) => ExprRef::ListComp(node),
-            Expr::SetComp(node) => ExprRef::SetComp(node),
-            Expr::DictComp(node) => ExprRef::DictComp(node),
-            Expr::Generator(node) => ExprRef::Generator(node),
-            Expr::Await(node) => ExprRef::Await(node),
-            Expr::Yield(node) => ExprRef::Yield(node),
-            Expr::YieldFrom(node) => ExprRef::YieldFrom(node),
-            Expr::Compare(node) => ExprRef::Compare(node),
-            Expr::Call(node) => ExprRef::Call(node),
-            Expr::FString(node) => ExprRef::FString(node),
-            Expr::TString(node) => ExprRef::TString(node),
-            Expr::StringLiteral(node) => ExprRef::StringLiteral(node),
-            Expr::BytesLiteral(node) => ExprRef::BytesLiteral(node),
-            Expr::NumberLiteral(node) => ExprRef::NumberLiteral(node),
-            Expr::BooleanLiteral(node) => ExprRef::BooleanLiteral(node),
-            Expr::NoneLiteral(node) => ExprRef::NoneLiteral(node),
-            Expr::EllipsisLiteral(node) => ExprRef::EllipsisLiteral(node),
-            Expr::Attribute(node) => ExprRef::Attribute(node),
-            Expr::Subscript(node) => ExprRef::Subscript(node),
-            Expr::Starred(node) => ExprRef::Starred(node),
-            Expr::Name(node) => ExprRef::Name(node),
-            Expr::List(node) => ExprRef::List(node),
-            Expr::Tuple(node) => ExprRef::Tuple(node),
-            Expr::Slice(node) => ExprRef::Slice(node),
-            Expr::IpyEscapeCommand(node) => ExprRef::IpyEscapeCommand(node),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::ExprBoolOp> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprBoolOp) -> Self {
-        Self::BoolOp(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprNamed> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprNamed) -> Self {
-        Self::Named(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprBinOp> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprBinOp) -> Self {
-        Self::BinOp(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprUnaryOp> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprUnaryOp) -> Self {
-        Self::UnaryOp(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprLambda> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprLambda) -> Self {
-        Self::Lambda(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprIf> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprIf) -> Self {
-        Self::If(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprDict> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprDict) -> Self {
-        Self::Dict(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprSet> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprSet) -> Self {
-        Self::Set(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprListComp> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprListComp) -> Self {
-        Self::ListComp(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprSetComp> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprSetComp) -> Self {
-        Self::SetComp(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprDictComp> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprDictComp) -> Self {
-        Self::DictComp(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprGenerator> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprGenerator) -> Self {
-        Self::Generator(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprAwait> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprAwait) -> Self {
-        Self::Await(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprYield> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprYield) -> Self {
-        Self::Yield(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprYieldFrom> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprYieldFrom) -> Self {
-        Self::YieldFrom(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprCompare> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprCompare) -> Self {
-        Self::Compare(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprCall> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprCall) -> Self {
-        Self::Call(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprFString> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprFString) -> Self {
-        Self::FString(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprTString> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprTString) -> Self {
-        Self::TString(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprStringLiteral> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprStringLiteral) -> Self {
-        Self::StringLiteral(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprBytesLiteral> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprBytesLiteral) -> Self {
-        Self::BytesLiteral(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprNumberLiteral> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprNumberLiteral) -> Self {
-        Self::NumberLiteral(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprBooleanLiteral> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprBooleanLiteral) -> Self {
-        Self::BooleanLiteral(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprNoneLiteral> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprNoneLiteral) -> Self {
-        Self::NoneLiteral(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprEllipsisLiteral> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprEllipsisLiteral) -> Self {
-        Self::EllipsisLiteral(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprAttribute> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprAttribute) -> Self {
-        Self::Attribute(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprSubscript> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprSubscript) -> Self {
-        Self::Subscript(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprStarred> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprStarred) -> Self {
-        Self::Starred(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprName> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprName) -> Self {
-        Self::Name(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprList> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprList) -> Self {
-        Self::List(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprTuple> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprTuple) -> Self {
-        Self::Tuple(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprSlice> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprSlice) -> Self {
-        Self::Slice(node)
-    }
-}
-
-impl<'a> From<&'a crate::ExprIpyEscapeCommand> for ExprRef<'a> {
-    fn from(node: &'a crate::ExprIpyEscapeCommand) -> Self {
-        Self::IpyEscapeCommand(node)
-    }
-}
-
-impl ruff_text_size::Ranged for ExprRef<'_> {
-    fn range(&self) -> ruff_text_size::TextRange {
-        match self {
-            Self::BoolOp(node) => node.range(),
-            Self::Named(node) => node.range(),
-            Self::BinOp(node) => node.range(),
-            Self::UnaryOp(node) => node.range(),
-            Self::Lambda(node) => node.range(),
-            Self::If(node) => node.range(),
-            Self::Dict(node) => node.range(),
-            Self::Set(node) => node.range(),
-            Self::ListComp(node) => node.range(),
-            Self::SetComp(node) => node.range(),
-            Self::DictComp(node) => node.range(),
-            Self::Generator(node) => node.range(),
-            Self::Await(node) => node.range(),
-            Self::Yield(node) => node.range(),
-            Self::YieldFrom(node) => node.range(),
-            Self::Compare(node) => node.range(),
-            Self::Call(node) => node.range(),
-            Self::FString(node) => node.range(),
-            Self::TString(node) => node.range(),
-            Self::StringLiteral(node) => node.range(),
-            Self::BytesLiteral(node) => node.range(),
-            Self::NumberLiteral(node) => node.range(),
-            Self::BooleanLiteral(node) => node.range(),
-            Self::NoneLiteral(node) => node.range(),
-            Self::EllipsisLiteral(node) => node.range(),
-            Self::Attribute(node) => node.range(),
-            Self::Subscript(node) => node.range(),
-            Self::Starred(node) => node.range(),
-            Self::Name(node) => node.range(),
-            Self::List(node) => node.range(),
-            Self::Tuple(node) => node.range(),
-            Self::Slice(node) => node.range(),
-            Self::IpyEscapeCommand(node) => node.range(),
-        }
-    }
-}
-
-impl crate::HasNodeIndex for ExprRef<'_> {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        match self {
-            Self::BoolOp(node) => node.node_index(),
-            Self::Named(node) => node.node_index(),
-            Self::BinOp(node) => node.node_index(),
-            Self::UnaryOp(node) => node.node_index(),
-            Self::Lambda(node) => node.node_index(),
-            Self::If(node) => node.node_index(),
-            Self::Dict(node) => node.node_index(),
-            Self::Set(node) => node.node_index(),
-            Self::ListComp(node) => node.node_index(),
-            Self::SetComp(node) => node.node_index(),
-            Self::DictComp(node) => node.node_index(),
-            Self::Generator(node) => node.node_index(),
-            Self::Await(node) => node.node_index(),
-            Self::Yield(node) => node.node_index(),
-            Self::YieldFrom(node) => node.node_index(),
-            Self::Compare(node) => node.node_index(),
-            Self::Call(node) => node.node_index(),
-            Self::FString(node) => node.node_index(),
-            Self::TString(node) => node.node_index(),
-            Self::StringLiteral(node) => node.node_index(),
-            Self::BytesLiteral(node) => node.node_index(),
-            Self::NumberLiteral(node) => node.node_index(),
-            Self::BooleanLiteral(node) => node.node_index(),
-            Self::NoneLiteral(node) => node.node_index(),
-            Self::EllipsisLiteral(node) => node.node_index(),
-            Self::Attribute(node) => node.node_index(),
-            Self::Subscript(node) => node.node_index(),
-            Self::Starred(node) => node.node_index(),
-            Self::Name(node) => node.node_index(),
-            Self::List(node) => node.node_index(),
-            Self::Tuple(node) => node.node_index(),
-            Self::Slice(node) => node.node_index(),
-            Self::IpyEscapeCommand(node) => node.node_index(),
-        }
-    }
-}
-
-/// See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)
-#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub enum ExceptHandlerRef<'a> {
-    ExceptHandler(&'a crate::ExceptHandlerExceptHandler),
-}
-
-impl<'a> From<&'a ExceptHandler> for ExceptHandlerRef<'a> {
-    fn from(node: &'a ExceptHandler) -> Self {
-        match node {
-            ExceptHandler::ExceptHandler(node) => ExceptHandlerRef::ExceptHandler(node),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::ExceptHandlerExceptHandler> for ExceptHandlerRef<'a> {
-    fn from(node: &'a crate::ExceptHandlerExceptHandler) -> Self {
-        Self::ExceptHandler(node)
-    }
-}
-
-impl ruff_text_size::Ranged for ExceptHandlerRef<'_> {
-    fn range(&self) -> ruff_text_size::TextRange {
-        match self {
-            Self::ExceptHandler(node) => node.range(),
-        }
-    }
-}
-
-impl crate::HasNodeIndex for ExceptHandlerRef<'_> {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        match self {
-            Self::ExceptHandler(node) => node.node_index(),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub enum InterpolatedStringElementRef<'a> {
-    Interpolation(&'a crate::InterpolatedElement),
-    Literal(&'a crate::InterpolatedStringLiteralElement),
-}
-
-impl<'a> From<&'a InterpolatedStringElement> for InterpolatedStringElementRef<'a> {
-    fn from(node: &'a InterpolatedStringElement) -> Self {
-        match node {
-            InterpolatedStringElement::Interpolation(node) => {
-                InterpolatedStringElementRef::Interpolation(node)
-            }
-            InterpolatedStringElement::Literal(node) => InterpolatedStringElementRef::Literal(node),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::InterpolatedElement> for InterpolatedStringElementRef<'a> {
-    fn from(node: &'a crate::InterpolatedElement) -> Self {
-        Self::Interpolation(node)
-    }
-}
-
-impl<'a> From<&'a crate::InterpolatedStringLiteralElement> for InterpolatedStringElementRef<'a> {
-    fn from(node: &'a crate::InterpolatedStringLiteralElement) -> Self {
-        Self::Literal(node)
-    }
-}
-
-impl ruff_text_size::Ranged for InterpolatedStringElementRef<'_> {
-    fn range(&self) -> ruff_text_size::TextRange {
-        match self {
-            Self::Interpolation(node) => node.range(),
-            Self::Literal(node) => node.range(),
-        }
-    }
-}
-
-impl crate::HasNodeIndex for InterpolatedStringElementRef<'_> {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        match self {
-            Self::Interpolation(node) => node.node_index(),
-            Self::Literal(node) => node.node_index(),
-        }
-    }
-}
-
-/// See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)
-#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub enum PatternRef<'a> {
-    MatchValue(&'a crate::PatternMatchValue),
-    MatchSingleton(&'a crate::PatternMatchSingleton),
-    MatchSequence(&'a crate::PatternMatchSequence),
-    MatchMapping(&'a crate::PatternMatchMapping),
-    MatchClass(&'a crate::PatternMatchClass),
-    MatchStar(&'a crate::PatternMatchStar),
-    MatchAs(&'a crate::PatternMatchAs),
-    MatchOr(&'a crate::PatternMatchOr),
-}
-
-impl<'a> From<&'a Pattern> for PatternRef<'a> {
-    fn from(node: &'a Pattern) -> Self {
-        match node {
-            Pattern::MatchValue(node) => PatternRef::MatchValue(node),
-            Pattern::MatchSingleton(node) => PatternRef::MatchSingleton(node),
-            Pattern::MatchSequence(node) => PatternRef::MatchSequence(node),
-            Pattern::MatchMapping(node) => PatternRef::MatchMapping(node),
-            Pattern::MatchClass(node) => PatternRef::MatchClass(node),
-            Pattern::MatchStar(node) => PatternRef::MatchStar(node),
-            Pattern::MatchAs(node) => PatternRef::MatchAs(node),
-            Pattern::MatchOr(node) => PatternRef::MatchOr(node),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::PatternMatchValue> for PatternRef<'a> {
-    fn from(node: &'a crate::PatternMatchValue) -> Self {
-        Self::MatchValue(node)
-    }
-}
-
-impl<'a> From<&'a crate::PatternMatchSingleton> for PatternRef<'a> {
-    fn from(node: &'a crate::PatternMatchSingleton) -> Self {
-        Self::MatchSingleton(node)
-    }
-}
-
-impl<'a> From<&'a crate::PatternMatchSequence> for PatternRef<'a> {
-    fn from(node: &'a crate::PatternMatchSequence) -> Self {
-        Self::MatchSequence(node)
-    }
-}
-
-impl<'a> From<&'a crate::PatternMatchMapping> for PatternRef<'a> {
-    fn from(node: &'a crate::PatternMatchMapping) -> Self {
-        Self::MatchMapping(node)
-    }
-}
-
-impl<'a> From<&'a crate::PatternMatchClass> for PatternRef<'a> {
-    fn from(node: &'a crate::PatternMatchClass) -> Self {
-        Self::MatchClass(node)
-    }
-}
-
-impl<'a> From<&'a crate::PatternMatchStar> for PatternRef<'a> {
-    fn from(node: &'a crate::PatternMatchStar) -> Self {
-        Self::MatchStar(node)
-    }
-}
-
-impl<'a> From<&'a crate::PatternMatchAs> for PatternRef<'a> {
-    fn from(node: &'a crate::PatternMatchAs) -> Self {
-        Self::MatchAs(node)
-    }
-}
-
-impl<'a> From<&'a crate::PatternMatchOr> for PatternRef<'a> {
-    fn from(node: &'a crate::PatternMatchOr) -> Self {
-        Self::MatchOr(node)
-    }
-}
-
-impl ruff_text_size::Ranged for PatternRef<'_> {
-    fn range(&self) -> ruff_text_size::TextRange {
-        match self {
-            Self::MatchValue(node) => node.range(),
-            Self::MatchSingleton(node) => node.range(),
-            Self::MatchSequence(node) => node.range(),
-            Self::MatchMapping(node) => node.range(),
-            Self::MatchClass(node) => node.range(),
-            Self::MatchStar(node) => node.range(),
-            Self::MatchAs(node) => node.range(),
-            Self::MatchOr(node) => node.range(),
-        }
-    }
-}
-
-impl crate::HasNodeIndex for PatternRef<'_> {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        match self {
-            Self::MatchValue(node) => node.node_index(),
-            Self::MatchSingleton(node) => node.node_index(),
-            Self::MatchSequence(node) => node.node_index(),
-            Self::MatchMapping(node) => node.node_index(),
-            Self::MatchClass(node) => node.node_index(),
-            Self::MatchStar(node) => node.node_index(),
-            Self::MatchAs(node) => node.node_index(),
-            Self::MatchOr(node) => node.node_index(),
-        }
-    }
-}
-
-/// See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)
-#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub enum TypeParamRef<'a> {
-    TypeVar(&'a crate::TypeParamTypeVar),
-    TypeVarTuple(&'a crate::TypeParamTypeVarTuple),
-    ParamSpec(&'a crate::TypeParamParamSpec),
-}
-
-impl<'a> From<&'a TypeParam> for TypeParamRef<'a> {
-    fn from(node: &'a TypeParam) -> Self {
-        match node {
-            TypeParam::TypeVar(node) => TypeParamRef::TypeVar(node),
-            TypeParam::TypeVarTuple(node) => TypeParamRef::TypeVarTuple(node),
-            TypeParam::ParamSpec(node) => TypeParamRef::ParamSpec(node),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::TypeParamTypeVar> for TypeParamRef<'a> {
-    fn from(node: &'a crate::TypeParamTypeVar) -> Self {
-        Self::TypeVar(node)
-    }
-}
-
-impl<'a> From<&'a crate::TypeParamTypeVarTuple> for TypeParamRef<'a> {
-    fn from(node: &'a crate::TypeParamTypeVarTuple) -> Self {
-        Self::TypeVarTuple(node)
-    }
-}
-
-impl<'a> From<&'a crate::TypeParamParamSpec> for TypeParamRef<'a> {
-    fn from(node: &'a crate::TypeParamParamSpec) -> Self {
-        Self::ParamSpec(node)
-    }
-}
-
-impl ruff_text_size::Ranged for TypeParamRef<'_> {
-    fn range(&self) -> ruff_text_size::TextRange {
-        match self {
-            Self::TypeVar(node) => node.range(),
-            Self::TypeVarTuple(node) => node.range(),
-            Self::ParamSpec(node) => node.range(),
-        }
-    }
-}
-
-impl crate::HasNodeIndex for TypeParamRef<'_> {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        match self {
-            Self::TypeVar(node) => node.node_index(),
-            Self::TypeVarTuple(node) => node.node_index(),
-            Self::ParamSpec(node) => node.node_index(),
-        }
-    }
-}
-
 /// A flattened enumeration of all AST nodes.
 #[derive(Copy, Clone, Debug, is_macro::Is, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
@@ -5934,26 +4946,6 @@ impl<'a> From<&'a Mod> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<ModRef<'a>> for AnyNodeRef<'a> {
-    fn from(node: ModRef<'a>) -> AnyNodeRef<'a> {
-        match node {
-            ModRef::Module(node) => AnyNodeRef::ModModule(node),
-            ModRef::Expression(node) => AnyNodeRef::ModExpression(node),
-        }
-    }
-}
-
-impl<'a> AnyNodeRef<'a> {
-    pub fn as_mod_ref(self) -> Option<ModRef<'a>> {
-        match self {
-            Self::ModModule(node) => Some(ModRef::Module(node)),
-            Self::ModExpression(node) => Some(ModRef::Expression(node)),
-
-            _ => None,
-        }
-    }
-}
-
 impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
     fn from(node: &'a Stmt) -> AnyNodeRef<'a> {
         match node {
@@ -5982,72 +4974,6 @@ impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
             Stmt::Break(node) => AnyNodeRef::StmtBreak(node),
             Stmt::Continue(node) => AnyNodeRef::StmtContinue(node),
             Stmt::IpyEscapeCommand(node) => AnyNodeRef::StmtIpyEscapeCommand(node),
-        }
-    }
-}
-
-impl<'a> From<StmtRef<'a>> for AnyNodeRef<'a> {
-    fn from(node: StmtRef<'a>) -> AnyNodeRef<'a> {
-        match node {
-            StmtRef::FunctionDef(node) => AnyNodeRef::StmtFunctionDef(node),
-            StmtRef::ClassDef(node) => AnyNodeRef::StmtClassDef(node),
-            StmtRef::Return(node) => AnyNodeRef::StmtReturn(node),
-            StmtRef::Delete(node) => AnyNodeRef::StmtDelete(node),
-            StmtRef::TypeAlias(node) => AnyNodeRef::StmtTypeAlias(node),
-            StmtRef::Assign(node) => AnyNodeRef::StmtAssign(node),
-            StmtRef::AugAssign(node) => AnyNodeRef::StmtAugAssign(node),
-            StmtRef::AnnAssign(node) => AnyNodeRef::StmtAnnAssign(node),
-            StmtRef::For(node) => AnyNodeRef::StmtFor(node),
-            StmtRef::While(node) => AnyNodeRef::StmtWhile(node),
-            StmtRef::If(node) => AnyNodeRef::StmtIf(node),
-            StmtRef::With(node) => AnyNodeRef::StmtWith(node),
-            StmtRef::Match(node) => AnyNodeRef::StmtMatch(node),
-            StmtRef::Raise(node) => AnyNodeRef::StmtRaise(node),
-            StmtRef::Try(node) => AnyNodeRef::StmtTry(node),
-            StmtRef::Assert(node) => AnyNodeRef::StmtAssert(node),
-            StmtRef::Import(node) => AnyNodeRef::StmtImport(node),
-            StmtRef::ImportFrom(node) => AnyNodeRef::StmtImportFrom(node),
-            StmtRef::Global(node) => AnyNodeRef::StmtGlobal(node),
-            StmtRef::Nonlocal(node) => AnyNodeRef::StmtNonlocal(node),
-            StmtRef::Expr(node) => AnyNodeRef::StmtExpr(node),
-            StmtRef::Pass(node) => AnyNodeRef::StmtPass(node),
-            StmtRef::Break(node) => AnyNodeRef::StmtBreak(node),
-            StmtRef::Continue(node) => AnyNodeRef::StmtContinue(node),
-            StmtRef::IpyEscapeCommand(node) => AnyNodeRef::StmtIpyEscapeCommand(node),
-        }
-    }
-}
-
-impl<'a> AnyNodeRef<'a> {
-    pub fn as_stmt_ref(self) -> Option<StmtRef<'a>> {
-        match self {
-            Self::StmtFunctionDef(node) => Some(StmtRef::FunctionDef(node)),
-            Self::StmtClassDef(node) => Some(StmtRef::ClassDef(node)),
-            Self::StmtReturn(node) => Some(StmtRef::Return(node)),
-            Self::StmtDelete(node) => Some(StmtRef::Delete(node)),
-            Self::StmtTypeAlias(node) => Some(StmtRef::TypeAlias(node)),
-            Self::StmtAssign(node) => Some(StmtRef::Assign(node)),
-            Self::StmtAugAssign(node) => Some(StmtRef::AugAssign(node)),
-            Self::StmtAnnAssign(node) => Some(StmtRef::AnnAssign(node)),
-            Self::StmtFor(node) => Some(StmtRef::For(node)),
-            Self::StmtWhile(node) => Some(StmtRef::While(node)),
-            Self::StmtIf(node) => Some(StmtRef::If(node)),
-            Self::StmtWith(node) => Some(StmtRef::With(node)),
-            Self::StmtMatch(node) => Some(StmtRef::Match(node)),
-            Self::StmtRaise(node) => Some(StmtRef::Raise(node)),
-            Self::StmtTry(node) => Some(StmtRef::Try(node)),
-            Self::StmtAssert(node) => Some(StmtRef::Assert(node)),
-            Self::StmtImport(node) => Some(StmtRef::Import(node)),
-            Self::StmtImportFrom(node) => Some(StmtRef::ImportFrom(node)),
-            Self::StmtGlobal(node) => Some(StmtRef::Global(node)),
-            Self::StmtNonlocal(node) => Some(StmtRef::Nonlocal(node)),
-            Self::StmtExpr(node) => Some(StmtRef::Expr(node)),
-            Self::StmtPass(node) => Some(StmtRef::Pass(node)),
-            Self::StmtBreak(node) => Some(StmtRef::Break(node)),
-            Self::StmtContinue(node) => Some(StmtRef::Continue(node)),
-            Self::StmtIpyEscapeCommand(node) => Some(StmtRef::IpyEscapeCommand(node)),
-
-            _ => None,
         }
     }
 }
@@ -6092,110 +5018,10 @@ impl<'a> From<&'a Expr> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<ExprRef<'a>> for AnyNodeRef<'a> {
-    fn from(node: ExprRef<'a>) -> AnyNodeRef<'a> {
-        match node {
-            ExprRef::BoolOp(node) => AnyNodeRef::ExprBoolOp(node),
-            ExprRef::Named(node) => AnyNodeRef::ExprNamed(node),
-            ExprRef::BinOp(node) => AnyNodeRef::ExprBinOp(node),
-            ExprRef::UnaryOp(node) => AnyNodeRef::ExprUnaryOp(node),
-            ExprRef::Lambda(node) => AnyNodeRef::ExprLambda(node),
-            ExprRef::If(node) => AnyNodeRef::ExprIf(node),
-            ExprRef::Dict(node) => AnyNodeRef::ExprDict(node),
-            ExprRef::Set(node) => AnyNodeRef::ExprSet(node),
-            ExprRef::ListComp(node) => AnyNodeRef::ExprListComp(node),
-            ExprRef::SetComp(node) => AnyNodeRef::ExprSetComp(node),
-            ExprRef::DictComp(node) => AnyNodeRef::ExprDictComp(node),
-            ExprRef::Generator(node) => AnyNodeRef::ExprGenerator(node),
-            ExprRef::Await(node) => AnyNodeRef::ExprAwait(node),
-            ExprRef::Yield(node) => AnyNodeRef::ExprYield(node),
-            ExprRef::YieldFrom(node) => AnyNodeRef::ExprYieldFrom(node),
-            ExprRef::Compare(node) => AnyNodeRef::ExprCompare(node),
-            ExprRef::Call(node) => AnyNodeRef::ExprCall(node),
-            ExprRef::FString(node) => AnyNodeRef::ExprFString(node),
-            ExprRef::TString(node) => AnyNodeRef::ExprTString(node),
-            ExprRef::StringLiteral(node) => AnyNodeRef::ExprStringLiteral(node),
-            ExprRef::BytesLiteral(node) => AnyNodeRef::ExprBytesLiteral(node),
-            ExprRef::NumberLiteral(node) => AnyNodeRef::ExprNumberLiteral(node),
-            ExprRef::BooleanLiteral(node) => AnyNodeRef::ExprBooleanLiteral(node),
-            ExprRef::NoneLiteral(node) => AnyNodeRef::ExprNoneLiteral(node),
-            ExprRef::EllipsisLiteral(node) => AnyNodeRef::ExprEllipsisLiteral(node),
-            ExprRef::Attribute(node) => AnyNodeRef::ExprAttribute(node),
-            ExprRef::Subscript(node) => AnyNodeRef::ExprSubscript(node),
-            ExprRef::Starred(node) => AnyNodeRef::ExprStarred(node),
-            ExprRef::Name(node) => AnyNodeRef::ExprName(node),
-            ExprRef::List(node) => AnyNodeRef::ExprList(node),
-            ExprRef::Tuple(node) => AnyNodeRef::ExprTuple(node),
-            ExprRef::Slice(node) => AnyNodeRef::ExprSlice(node),
-            ExprRef::IpyEscapeCommand(node) => AnyNodeRef::ExprIpyEscapeCommand(node),
-        }
-    }
-}
-
-impl<'a> AnyNodeRef<'a> {
-    pub fn as_expr_ref(self) -> Option<ExprRef<'a>> {
-        match self {
-            Self::ExprBoolOp(node) => Some(ExprRef::BoolOp(node)),
-            Self::ExprNamed(node) => Some(ExprRef::Named(node)),
-            Self::ExprBinOp(node) => Some(ExprRef::BinOp(node)),
-            Self::ExprUnaryOp(node) => Some(ExprRef::UnaryOp(node)),
-            Self::ExprLambda(node) => Some(ExprRef::Lambda(node)),
-            Self::ExprIf(node) => Some(ExprRef::If(node)),
-            Self::ExprDict(node) => Some(ExprRef::Dict(node)),
-            Self::ExprSet(node) => Some(ExprRef::Set(node)),
-            Self::ExprListComp(node) => Some(ExprRef::ListComp(node)),
-            Self::ExprSetComp(node) => Some(ExprRef::SetComp(node)),
-            Self::ExprDictComp(node) => Some(ExprRef::DictComp(node)),
-            Self::ExprGenerator(node) => Some(ExprRef::Generator(node)),
-            Self::ExprAwait(node) => Some(ExprRef::Await(node)),
-            Self::ExprYield(node) => Some(ExprRef::Yield(node)),
-            Self::ExprYieldFrom(node) => Some(ExprRef::YieldFrom(node)),
-            Self::ExprCompare(node) => Some(ExprRef::Compare(node)),
-            Self::ExprCall(node) => Some(ExprRef::Call(node)),
-            Self::ExprFString(node) => Some(ExprRef::FString(node)),
-            Self::ExprTString(node) => Some(ExprRef::TString(node)),
-            Self::ExprStringLiteral(node) => Some(ExprRef::StringLiteral(node)),
-            Self::ExprBytesLiteral(node) => Some(ExprRef::BytesLiteral(node)),
-            Self::ExprNumberLiteral(node) => Some(ExprRef::NumberLiteral(node)),
-            Self::ExprBooleanLiteral(node) => Some(ExprRef::BooleanLiteral(node)),
-            Self::ExprNoneLiteral(node) => Some(ExprRef::NoneLiteral(node)),
-            Self::ExprEllipsisLiteral(node) => Some(ExprRef::EllipsisLiteral(node)),
-            Self::ExprAttribute(node) => Some(ExprRef::Attribute(node)),
-            Self::ExprSubscript(node) => Some(ExprRef::Subscript(node)),
-            Self::ExprStarred(node) => Some(ExprRef::Starred(node)),
-            Self::ExprName(node) => Some(ExprRef::Name(node)),
-            Self::ExprList(node) => Some(ExprRef::List(node)),
-            Self::ExprTuple(node) => Some(ExprRef::Tuple(node)),
-            Self::ExprSlice(node) => Some(ExprRef::Slice(node)),
-            Self::ExprIpyEscapeCommand(node) => Some(ExprRef::IpyEscapeCommand(node)),
-
-            _ => None,
-        }
-    }
-}
-
 impl<'a> From<&'a ExceptHandler> for AnyNodeRef<'a> {
     fn from(node: &'a ExceptHandler) -> AnyNodeRef<'a> {
         match node {
             ExceptHandler::ExceptHandler(node) => AnyNodeRef::ExceptHandlerExceptHandler(node),
-        }
-    }
-}
-
-impl<'a> From<ExceptHandlerRef<'a>> for AnyNodeRef<'a> {
-    fn from(node: ExceptHandlerRef<'a>) -> AnyNodeRef<'a> {
-        match node {
-            ExceptHandlerRef::ExceptHandler(node) => AnyNodeRef::ExceptHandlerExceptHandler(node),
-        }
-    }
-}
-
-impl<'a> AnyNodeRef<'a> {
-    pub fn as_except_handler_ref(self) -> Option<ExceptHandlerRef<'a>> {
-        match self {
-            Self::ExceptHandlerExceptHandler(node) => Some(ExceptHandlerRef::ExceptHandler(node)),
-
-            _ => None,
         }
     }
 }
@@ -6207,34 +5033,6 @@ impl<'a> From<&'a InterpolatedStringElement> for AnyNodeRef<'a> {
             InterpolatedStringElement::Literal(node) => {
                 AnyNodeRef::InterpolatedStringLiteralElement(node)
             }
-        }
-    }
-}
-
-impl<'a> From<InterpolatedStringElementRef<'a>> for AnyNodeRef<'a> {
-    fn from(node: InterpolatedStringElementRef<'a>) -> AnyNodeRef<'a> {
-        match node {
-            InterpolatedStringElementRef::Interpolation(node) => {
-                AnyNodeRef::InterpolatedElement(node)
-            }
-            InterpolatedStringElementRef::Literal(node) => {
-                AnyNodeRef::InterpolatedStringLiteralElement(node)
-            }
-        }
-    }
-}
-
-impl<'a> AnyNodeRef<'a> {
-    pub fn as_interpolated_string_element_ref(self) -> Option<InterpolatedStringElementRef<'a>> {
-        match self {
-            Self::InterpolatedElement(node) => {
-                Some(InterpolatedStringElementRef::Interpolation(node))
-            }
-            Self::InterpolatedStringLiteralElement(node) => {
-                Some(InterpolatedStringElementRef::Literal(node))
-            }
-
-            _ => None,
         }
     }
 }
@@ -6254,66 +5052,12 @@ impl<'a> From<&'a Pattern> for AnyNodeRef<'a> {
     }
 }
 
-impl<'a> From<PatternRef<'a>> for AnyNodeRef<'a> {
-    fn from(node: PatternRef<'a>) -> AnyNodeRef<'a> {
-        match node {
-            PatternRef::MatchValue(node) => AnyNodeRef::PatternMatchValue(node),
-            PatternRef::MatchSingleton(node) => AnyNodeRef::PatternMatchSingleton(node),
-            PatternRef::MatchSequence(node) => AnyNodeRef::PatternMatchSequence(node),
-            PatternRef::MatchMapping(node) => AnyNodeRef::PatternMatchMapping(node),
-            PatternRef::MatchClass(node) => AnyNodeRef::PatternMatchClass(node),
-            PatternRef::MatchStar(node) => AnyNodeRef::PatternMatchStar(node),
-            PatternRef::MatchAs(node) => AnyNodeRef::PatternMatchAs(node),
-            PatternRef::MatchOr(node) => AnyNodeRef::PatternMatchOr(node),
-        }
-    }
-}
-
-impl<'a> AnyNodeRef<'a> {
-    pub fn as_pattern_ref(self) -> Option<PatternRef<'a>> {
-        match self {
-            Self::PatternMatchValue(node) => Some(PatternRef::MatchValue(node)),
-            Self::PatternMatchSingleton(node) => Some(PatternRef::MatchSingleton(node)),
-            Self::PatternMatchSequence(node) => Some(PatternRef::MatchSequence(node)),
-            Self::PatternMatchMapping(node) => Some(PatternRef::MatchMapping(node)),
-            Self::PatternMatchClass(node) => Some(PatternRef::MatchClass(node)),
-            Self::PatternMatchStar(node) => Some(PatternRef::MatchStar(node)),
-            Self::PatternMatchAs(node) => Some(PatternRef::MatchAs(node)),
-            Self::PatternMatchOr(node) => Some(PatternRef::MatchOr(node)),
-
-            _ => None,
-        }
-    }
-}
-
 impl<'a> From<&'a TypeParam> for AnyNodeRef<'a> {
     fn from(node: &'a TypeParam) -> AnyNodeRef<'a> {
         match node {
             TypeParam::TypeVar(node) => AnyNodeRef::TypeParamTypeVar(node),
             TypeParam::TypeVarTuple(node) => AnyNodeRef::TypeParamTypeVarTuple(node),
             TypeParam::ParamSpec(node) => AnyNodeRef::TypeParamParamSpec(node),
-        }
-    }
-}
-
-impl<'a> From<TypeParamRef<'a>> for AnyNodeRef<'a> {
-    fn from(node: TypeParamRef<'a>) -> AnyNodeRef<'a> {
-        match node {
-            TypeParamRef::TypeVar(node) => AnyNodeRef::TypeParamTypeVar(node),
-            TypeParamRef::TypeVarTuple(node) => AnyNodeRef::TypeParamTypeVarTuple(node),
-            TypeParamRef::ParamSpec(node) => AnyNodeRef::TypeParamParamSpec(node),
-        }
-    }
-}
-
-impl<'a> AnyNodeRef<'a> {
-    pub fn as_type_param_ref(self) -> Option<TypeParamRef<'a>> {
-        match self {
-            Self::TypeParamTypeVar(node) => Some(TypeParamRef::TypeVar(node)),
-            Self::TypeParamTypeVarTuple(node) => Some(TypeParamRef::TypeVarTuple(node)),
-            Self::TypeParamParamSpec(node) => Some(TypeParamRef::ParamSpec(node)),
-
-            _ => None,
         }
     }
 }
@@ -6984,7 +5728,7 @@ impl ruff_text_size::Ranged for AnyNodeRef<'_> {
 }
 
 impl crate::HasNodeIndex for AnyNodeRef<'_> {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
+    fn node_index(&self) -> crate::NodeIndex {
         match self {
             AnyNodeRef::ModModule(node) => node.node_index(),
             AnyNodeRef::ModExpression(node) => node.node_index(),
@@ -7417,1662 +6161,7 @@ impl AnyNodeRef<'_> {
     }
 }
 
-/// An enumeration of all AST nodes.
-///
-/// Unlike `AnyNodeRef`, this type does not flatten nested enums, so its variants only
-/// consist of the "root" AST node types. This is useful as it exposes references to the
-/// original enums, not just references to their inner values.
-///
-/// For example, `AnyRootNodeRef::Mod` contains a reference to the `Mod` enum, while
-/// `AnyNodeRef` has top-level `AnyNodeRef::ModModule` and `AnyNodeRef::ModExpression`
-/// variants.
-#[derive(Copy, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub enum AnyRootNodeRef<'a> {
-    Mod(&'a Mod),
-    Stmt(&'a Stmt),
-    Expr(&'a Expr),
-    ExceptHandler(&'a ExceptHandler),
-    InterpolatedStringElement(&'a InterpolatedStringElement),
-    Pattern(&'a Pattern),
-    TypeParam(&'a TypeParam),
-    InterpolatedStringFormatSpec(&'a crate::InterpolatedStringFormatSpec),
-    PatternArguments(&'a crate::PatternArguments),
-    PatternKeyword(&'a crate::PatternKeyword),
-    Comprehension(&'a crate::Comprehension),
-    Arguments(&'a crate::Arguments),
-    Parameters(&'a crate::Parameters),
-    Parameter(&'a crate::Parameter),
-    ParameterWithDefault(&'a crate::ParameterWithDefault),
-    Keyword(&'a crate::Keyword),
-    Alias(&'a crate::Alias),
-    WithItem(&'a crate::WithItem),
-    MatchCase(&'a crate::MatchCase),
-    Decorator(&'a crate::Decorator),
-    ElifElseClause(&'a crate::ElifElseClause),
-    TypeParams(&'a crate::TypeParams),
-    FString(&'a crate::FString),
-    TString(&'a crate::TString),
-    StringLiteral(&'a crate::StringLiteral),
-    BytesLiteral(&'a crate::BytesLiteral),
-    Identifier(&'a crate::Identifier),
-}
-
-/// The unflattened enum or struct type stored by an [`AnyRootNodeRef`].
-///
-/// Unlike [`NodeKind`], this does not distinguish variants of root enums such as [`Stmt`]
-/// and [`Expr`].
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 #[repr(u8)]
-pub enum RootNodeKind {
-    Mod,
-    Stmt,
-    Expr,
-    ExceptHandler,
-    InterpolatedStringElement,
-    Pattern,
-    TypeParam,
-    InterpolatedStringFormatSpec,
-    PatternArguments,
-    PatternKeyword,
-    Comprehension,
-    Arguments,
-    Parameters,
-    Parameter,
-    ParameterWithDefault,
-    Keyword,
-    Alias,
-    WithItem,
-    MatchCase,
-    Decorator,
-    ElifElseClause,
-    TypeParams,
-    FString,
-    TString,
-    StringLiteral,
-    BytesLiteral,
-    Identifier,
-}
-
-impl RootNodeKind {
-    /// All root node kinds in discriminant order.
-    pub const ALL: &'static [Self] = &[
-        Self::Mod,
-        Self::Stmt,
-        Self::Expr,
-        Self::ExceptHandler,
-        Self::InterpolatedStringElement,
-        Self::Pattern,
-        Self::TypeParam,
-        Self::InterpolatedStringFormatSpec,
-        Self::PatternArguments,
-        Self::PatternKeyword,
-        Self::Comprehension,
-        Self::Arguments,
-        Self::Parameters,
-        Self::Parameter,
-        Self::ParameterWithDefault,
-        Self::Keyword,
-        Self::Alias,
-        Self::WithItem,
-        Self::MatchCase,
-        Self::Decorator,
-        Self::ElifElseClause,
-        Self::TypeParams,
-        Self::FString,
-        Self::TString,
-        Self::StringLiteral,
-        Self::BytesLiteral,
-        Self::Identifier,
-    ];
-
-    /// Returns the root node kind with the given discriminant.
-    #[inline]
-    pub fn from_u8(value: u8) -> Option<Self> {
-        match value {
-            0 => Some(Self::Mod),
-            1 => Some(Self::Stmt),
-            2 => Some(Self::Expr),
-            3 => Some(Self::ExceptHandler),
-            4 => Some(Self::InterpolatedStringElement),
-            5 => Some(Self::Pattern),
-            6 => Some(Self::TypeParam),
-            7 => Some(Self::InterpolatedStringFormatSpec),
-            8 => Some(Self::PatternArguments),
-            9 => Some(Self::PatternKeyword),
-            10 => Some(Self::Comprehension),
-            11 => Some(Self::Arguments),
-            12 => Some(Self::Parameters),
-            13 => Some(Self::Parameter),
-            14 => Some(Self::ParameterWithDefault),
-            15 => Some(Self::Keyword),
-            16 => Some(Self::Alias),
-            17 => Some(Self::WithItem),
-            18 => Some(Self::MatchCase),
-            19 => Some(Self::Decorator),
-            20 => Some(Self::ElifElseClause),
-            21 => Some(Self::TypeParams),
-            22 => Some(Self::FString),
-            23 => Some(Self::TString),
-            24 => Some(Self::StringLiteral),
-            25 => Some(Self::BytesLiteral),
-            26 => Some(Self::Identifier),
-
-            _ => None,
-        }
-    }
-}
-
-impl<'a> From<&'a Mod> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a Mod) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::Mod(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a Mod {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a Mod, ()> {
-        match node {
-            AnyRootNodeRef::Mod(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ModModule {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ModModule, ()> {
-        match node {
-            AnyRootNodeRef::Mod(Mod::Module(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ModExpression {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ModExpression, ()> {
-        match node {
-            AnyRootNodeRef::Mod(Mod::Expression(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a Stmt> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a Stmt) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::Stmt(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a Stmt {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a Stmt, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtFunctionDef {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtFunctionDef, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::FunctionDef(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtClassDef {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtClassDef, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::ClassDef(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtReturn {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtReturn, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::Return(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtDelete {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtDelete, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::Delete(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtTypeAlias {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtTypeAlias, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::TypeAlias(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtAssign {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtAssign, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::Assign(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtAugAssign {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtAugAssign, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::AugAssign(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtAnnAssign {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtAnnAssign, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::AnnAssign(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtFor {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtFor, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::For(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtWhile {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtWhile, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::While(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtIf {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtIf, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::If(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtWith {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtWith, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::With(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtMatch {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtMatch, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::Match(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtRaise {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtRaise, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::Raise(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtTry {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtTry, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::Try(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtAssert {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtAssert, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::Assert(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtImport {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtImport, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::Import(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtImportFrom {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtImportFrom, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::ImportFrom(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtGlobal {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtGlobal, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::Global(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtNonlocal {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtNonlocal, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::Nonlocal(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtExpr {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtExpr, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::Expr(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtPass {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtPass, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::Pass(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtBreak {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtBreak, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::Break(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtContinue {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtContinue, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::Continue(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtIpyEscapeCommand {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StmtIpyEscapeCommand, ()> {
-        match node {
-            AnyRootNodeRef::Stmt(Stmt::IpyEscapeCommand(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a Expr> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a Expr) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::Expr(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a Expr {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a Expr, ()> {
-        match node {
-            AnyRootNodeRef::Expr(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprBoolOp {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprBoolOp, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::BoolOp(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprNamed {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprNamed, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::Named(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprBinOp {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprBinOp, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::BinOp(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprUnaryOp {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprUnaryOp, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::UnaryOp(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprLambda {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprLambda, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::Lambda(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprIf {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprIf, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::If(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprDict {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprDict, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::Dict(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprSet {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprSet, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::Set(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprListComp {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprListComp, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::ListComp(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprSetComp {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprSetComp, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::SetComp(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprDictComp {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprDictComp, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::DictComp(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprGenerator {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprGenerator, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::Generator(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprAwait {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprAwait, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::Await(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprYield {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprYield, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::Yield(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprYieldFrom {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprYieldFrom, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::YieldFrom(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprCompare {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprCompare, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::Compare(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprCall {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprCall, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::Call(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprFString {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprFString, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::FString(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprTString {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprTString, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::TString(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprStringLiteral {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprStringLiteral, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::StringLiteral(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprBytesLiteral {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprBytesLiteral, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::BytesLiteral(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprNumberLiteral {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprNumberLiteral, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::NumberLiteral(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprBooleanLiteral {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprBooleanLiteral, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::BooleanLiteral(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprNoneLiteral {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprNoneLiteral, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::NoneLiteral(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprEllipsisLiteral {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprEllipsisLiteral, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::EllipsisLiteral(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprAttribute {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprAttribute, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::Attribute(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprSubscript {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprSubscript, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::Subscript(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprStarred {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprStarred, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::Starred(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprName {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprName, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::Name(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprList {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprList, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::List(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprTuple {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprTuple, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::Tuple(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprSlice {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprSlice, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::Slice(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprIpyEscapeCommand {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExprIpyEscapeCommand, ()> {
-        match node {
-            AnyRootNodeRef::Expr(Expr::IpyEscapeCommand(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a ExceptHandler> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a ExceptHandler) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::ExceptHandler(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a ExceptHandler {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a ExceptHandler, ()> {
-        match node {
-            AnyRootNodeRef::ExceptHandler(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExceptHandlerExceptHandler {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ExceptHandlerExceptHandler, ()> {
-        match node {
-            AnyRootNodeRef::ExceptHandler(ExceptHandler::ExceptHandler(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a InterpolatedStringElement> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a InterpolatedStringElement) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::InterpolatedStringElement(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a InterpolatedStringElement {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a InterpolatedStringElement, ()> {
-        match node {
-            AnyRootNodeRef::InterpolatedStringElement(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::InterpolatedElement {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::InterpolatedElement, ()> {
-        match node {
-            AnyRootNodeRef::InterpolatedStringElement(
-                InterpolatedStringElement::Interpolation(node),
-            ) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::InterpolatedStringLiteralElement {
-    type Error = ();
-    fn try_from(
-        node: AnyRootNodeRef<'a>,
-    ) -> Result<&'a crate::InterpolatedStringLiteralElement, ()> {
-        match node {
-            AnyRootNodeRef::InterpolatedStringElement(InterpolatedStringElement::Literal(node)) => {
-                Ok(node)
-            }
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a Pattern> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a Pattern) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::Pattern(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a Pattern {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a Pattern, ()> {
-        match node {
-            AnyRootNodeRef::Pattern(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::PatternMatchValue {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::PatternMatchValue, ()> {
-        match node {
-            AnyRootNodeRef::Pattern(Pattern::MatchValue(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::PatternMatchSingleton {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::PatternMatchSingleton, ()> {
-        match node {
-            AnyRootNodeRef::Pattern(Pattern::MatchSingleton(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::PatternMatchSequence {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::PatternMatchSequence, ()> {
-        match node {
-            AnyRootNodeRef::Pattern(Pattern::MatchSequence(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::PatternMatchMapping {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::PatternMatchMapping, ()> {
-        match node {
-            AnyRootNodeRef::Pattern(Pattern::MatchMapping(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::PatternMatchClass {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::PatternMatchClass, ()> {
-        match node {
-            AnyRootNodeRef::Pattern(Pattern::MatchClass(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::PatternMatchStar {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::PatternMatchStar, ()> {
-        match node {
-            AnyRootNodeRef::Pattern(Pattern::MatchStar(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::PatternMatchAs {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::PatternMatchAs, ()> {
-        match node {
-            AnyRootNodeRef::Pattern(Pattern::MatchAs(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::PatternMatchOr {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::PatternMatchOr, ()> {
-        match node {
-            AnyRootNodeRef::Pattern(Pattern::MatchOr(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a TypeParam> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a TypeParam) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::TypeParam(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a TypeParam {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a TypeParam, ()> {
-        match node {
-            AnyRootNodeRef::TypeParam(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::TypeParamTypeVar {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::TypeParamTypeVar, ()> {
-        match node {
-            AnyRootNodeRef::TypeParam(TypeParam::TypeVar(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::TypeParamTypeVarTuple {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::TypeParamTypeVarTuple, ()> {
-        match node {
-            AnyRootNodeRef::TypeParam(TypeParam::TypeVarTuple(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::TypeParamParamSpec {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::TypeParamParamSpec, ()> {
-        match node {
-            AnyRootNodeRef::TypeParam(TypeParam::ParamSpec(node)) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::InterpolatedStringFormatSpec> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::InterpolatedStringFormatSpec) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::InterpolatedStringFormatSpec(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::InterpolatedStringFormatSpec {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::InterpolatedStringFormatSpec, ()> {
-        match node {
-            AnyRootNodeRef::InterpolatedStringFormatSpec(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::PatternArguments> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::PatternArguments) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::PatternArguments(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::PatternArguments {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::PatternArguments, ()> {
-        match node {
-            AnyRootNodeRef::PatternArguments(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::PatternKeyword> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::PatternKeyword) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::PatternKeyword(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::PatternKeyword {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::PatternKeyword, ()> {
-        match node {
-            AnyRootNodeRef::PatternKeyword(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::Comprehension> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::Comprehension) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::Comprehension(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Comprehension {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::Comprehension, ()> {
-        match node {
-            AnyRootNodeRef::Comprehension(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::Arguments> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::Arguments) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::Arguments(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Arguments {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::Arguments, ()> {
-        match node {
-            AnyRootNodeRef::Arguments(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::Parameters> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::Parameters) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::Parameters(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Parameters {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::Parameters, ()> {
-        match node {
-            AnyRootNodeRef::Parameters(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::Parameter> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::Parameter) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::Parameter(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Parameter {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::Parameter, ()> {
-        match node {
-            AnyRootNodeRef::Parameter(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::ParameterWithDefault> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::ParameterWithDefault) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::ParameterWithDefault(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ParameterWithDefault {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ParameterWithDefault, ()> {
-        match node {
-            AnyRootNodeRef::ParameterWithDefault(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::Keyword> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::Keyword) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::Keyword(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Keyword {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::Keyword, ()> {
-        match node {
-            AnyRootNodeRef::Keyword(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::Alias> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::Alias) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::Alias(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Alias {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::Alias, ()> {
-        match node {
-            AnyRootNodeRef::Alias(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::WithItem> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::WithItem) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::WithItem(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::WithItem {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::WithItem, ()> {
-        match node {
-            AnyRootNodeRef::WithItem(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::MatchCase> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::MatchCase) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::MatchCase(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::MatchCase {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::MatchCase, ()> {
-        match node {
-            AnyRootNodeRef::MatchCase(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::Decorator> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::Decorator) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::Decorator(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Decorator {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::Decorator, ()> {
-        match node {
-            AnyRootNodeRef::Decorator(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::ElifElseClause> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::ElifElseClause) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::ElifElseClause(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ElifElseClause {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::ElifElseClause, ()> {
-        match node {
-            AnyRootNodeRef::ElifElseClause(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::TypeParams> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::TypeParams) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::TypeParams(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::TypeParams {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::TypeParams, ()> {
-        match node {
-            AnyRootNodeRef::TypeParams(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::FString> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::FString) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::FString(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::FString {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::FString, ()> {
-        match node {
-            AnyRootNodeRef::FString(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::TString> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::TString) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::TString(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::TString {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::TString, ()> {
-        match node {
-            AnyRootNodeRef::TString(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::StringLiteral> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::StringLiteral) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::StringLiteral(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StringLiteral {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::StringLiteral, ()> {
-        match node {
-            AnyRootNodeRef::StringLiteral(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::BytesLiteral> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::BytesLiteral) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::BytesLiteral(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::BytesLiteral {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::BytesLiteral, ()> {
-        match node {
-            AnyRootNodeRef::BytesLiteral(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl<'a> From<&'a crate::Identifier> for AnyRootNodeRef<'a> {
-    #[inline]
-    fn from(node: &'a crate::Identifier) -> AnyRootNodeRef<'a> {
-        AnyRootNodeRef::Identifier(node)
-    }
-}
-
-impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Identifier {
-    type Error = ();
-    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::Identifier, ()> {
-        match node {
-            AnyRootNodeRef::Identifier(node) => Ok(node),
-            _ => Err(()),
-        }
-    }
-}
-
-impl ruff_text_size::Ranged for AnyRootNodeRef<'_> {
-    fn range(&self) -> ruff_text_size::TextRange {
-        match self {
-            AnyRootNodeRef::Mod(node) => node.range(),
-            AnyRootNodeRef::Stmt(node) => node.range(),
-            AnyRootNodeRef::Expr(node) => node.range(),
-            AnyRootNodeRef::ExceptHandler(node) => node.range(),
-            AnyRootNodeRef::InterpolatedStringElement(node) => node.range(),
-            AnyRootNodeRef::Pattern(node) => node.range(),
-            AnyRootNodeRef::TypeParam(node) => node.range(),
-            AnyRootNodeRef::InterpolatedStringFormatSpec(node) => node.range(),
-            AnyRootNodeRef::PatternArguments(node) => node.range(),
-            AnyRootNodeRef::PatternKeyword(node) => node.range(),
-            AnyRootNodeRef::Comprehension(node) => node.range(),
-            AnyRootNodeRef::Arguments(node) => node.range(),
-            AnyRootNodeRef::Parameters(node) => node.range(),
-            AnyRootNodeRef::Parameter(node) => node.range(),
-            AnyRootNodeRef::ParameterWithDefault(node) => node.range(),
-            AnyRootNodeRef::Keyword(node) => node.range(),
-            AnyRootNodeRef::Alias(node) => node.range(),
-            AnyRootNodeRef::WithItem(node) => node.range(),
-            AnyRootNodeRef::MatchCase(node) => node.range(),
-            AnyRootNodeRef::Decorator(node) => node.range(),
-            AnyRootNodeRef::ElifElseClause(node) => node.range(),
-            AnyRootNodeRef::TypeParams(node) => node.range(),
-            AnyRootNodeRef::FString(node) => node.range(),
-            AnyRootNodeRef::TString(node) => node.range(),
-            AnyRootNodeRef::StringLiteral(node) => node.range(),
-            AnyRootNodeRef::BytesLiteral(node) => node.range(),
-            AnyRootNodeRef::Identifier(node) => node.range(),
-        }
-    }
-}
-
-impl crate::HasNodeIndex for AnyRootNodeRef<'_> {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        match self {
-            AnyRootNodeRef::Mod(node) => node.node_index(),
-            AnyRootNodeRef::Stmt(node) => node.node_index(),
-            AnyRootNodeRef::Expr(node) => node.node_index(),
-            AnyRootNodeRef::ExceptHandler(node) => node.node_index(),
-            AnyRootNodeRef::InterpolatedStringElement(node) => node.node_index(),
-            AnyRootNodeRef::Pattern(node) => node.node_index(),
-            AnyRootNodeRef::TypeParam(node) => node.node_index(),
-            AnyRootNodeRef::InterpolatedStringFormatSpec(node) => node.node_index(),
-            AnyRootNodeRef::PatternArguments(node) => node.node_index(),
-            AnyRootNodeRef::PatternKeyword(node) => node.node_index(),
-            AnyRootNodeRef::Comprehension(node) => node.node_index(),
-            AnyRootNodeRef::Arguments(node) => node.node_index(),
-            AnyRootNodeRef::Parameters(node) => node.node_index(),
-            AnyRootNodeRef::Parameter(node) => node.node_index(),
-            AnyRootNodeRef::ParameterWithDefault(node) => node.node_index(),
-            AnyRootNodeRef::Keyword(node) => node.node_index(),
-            AnyRootNodeRef::Alias(node) => node.node_index(),
-            AnyRootNodeRef::WithItem(node) => node.node_index(),
-            AnyRootNodeRef::MatchCase(node) => node.node_index(),
-            AnyRootNodeRef::Decorator(node) => node.node_index(),
-            AnyRootNodeRef::ElifElseClause(node) => node.node_index(),
-            AnyRootNodeRef::TypeParams(node) => node.node_index(),
-            AnyRootNodeRef::FString(node) => node.node_index(),
-            AnyRootNodeRef::TString(node) => node.node_index(),
-            AnyRootNodeRef::StringLiteral(node) => node.node_index(),
-            AnyRootNodeRef::BytesLiteral(node) => node.node_index(),
-            AnyRootNodeRef::Identifier(node) => node.node_index(),
-        }
-    }
-}
-
-impl<'a> AnyRootNodeRef<'a> {
-    /// Decomposes this reference into its root node kind and a type-erased pointer.
-    #[inline]
-    pub fn into_raw_parts(self) -> (RootNodeKind, std::ptr::NonNull<()>) {
-        match self {
-            AnyRootNodeRef::Mod(node) => (RootNodeKind::Mod, std::ptr::NonNull::from(node).cast()),
-            AnyRootNodeRef::Stmt(node) => {
-                (RootNodeKind::Stmt, std::ptr::NonNull::from(node).cast())
-            }
-            AnyRootNodeRef::Expr(node) => {
-                (RootNodeKind::Expr, std::ptr::NonNull::from(node).cast())
-            }
-            AnyRootNodeRef::ExceptHandler(node) => (
-                RootNodeKind::ExceptHandler,
-                std::ptr::NonNull::from(node).cast(),
-            ),
-            AnyRootNodeRef::InterpolatedStringElement(node) => (
-                RootNodeKind::InterpolatedStringElement,
-                std::ptr::NonNull::from(node).cast(),
-            ),
-            AnyRootNodeRef::Pattern(node) => {
-                (RootNodeKind::Pattern, std::ptr::NonNull::from(node).cast())
-            }
-            AnyRootNodeRef::TypeParam(node) => (
-                RootNodeKind::TypeParam,
-                std::ptr::NonNull::from(node).cast(),
-            ),
-            AnyRootNodeRef::InterpolatedStringFormatSpec(node) => (
-                RootNodeKind::InterpolatedStringFormatSpec,
-                std::ptr::NonNull::from(node).cast(),
-            ),
-            AnyRootNodeRef::PatternArguments(node) => (
-                RootNodeKind::PatternArguments,
-                std::ptr::NonNull::from(node).cast(),
-            ),
-            AnyRootNodeRef::PatternKeyword(node) => (
-                RootNodeKind::PatternKeyword,
-                std::ptr::NonNull::from(node).cast(),
-            ),
-            AnyRootNodeRef::Comprehension(node) => (
-                RootNodeKind::Comprehension,
-                std::ptr::NonNull::from(node).cast(),
-            ),
-            AnyRootNodeRef::Arguments(node) => (
-                RootNodeKind::Arguments,
-                std::ptr::NonNull::from(node).cast(),
-            ),
-            AnyRootNodeRef::Parameters(node) => (
-                RootNodeKind::Parameters,
-                std::ptr::NonNull::from(node).cast(),
-            ),
-            AnyRootNodeRef::Parameter(node) => (
-                RootNodeKind::Parameter,
-                std::ptr::NonNull::from(node).cast(),
-            ),
-            AnyRootNodeRef::ParameterWithDefault(node) => (
-                RootNodeKind::ParameterWithDefault,
-                std::ptr::NonNull::from(node).cast(),
-            ),
-            AnyRootNodeRef::Keyword(node) => {
-                (RootNodeKind::Keyword, std::ptr::NonNull::from(node).cast())
-            }
-            AnyRootNodeRef::Alias(node) => {
-                (RootNodeKind::Alias, std::ptr::NonNull::from(node).cast())
-            }
-            AnyRootNodeRef::WithItem(node) => {
-                (RootNodeKind::WithItem, std::ptr::NonNull::from(node).cast())
-            }
-            AnyRootNodeRef::MatchCase(node) => (
-                RootNodeKind::MatchCase,
-                std::ptr::NonNull::from(node).cast(),
-            ),
-            AnyRootNodeRef::Decorator(node) => (
-                RootNodeKind::Decorator,
-                std::ptr::NonNull::from(node).cast(),
-            ),
-            AnyRootNodeRef::ElifElseClause(node) => (
-                RootNodeKind::ElifElseClause,
-                std::ptr::NonNull::from(node).cast(),
-            ),
-            AnyRootNodeRef::TypeParams(node) => (
-                RootNodeKind::TypeParams,
-                std::ptr::NonNull::from(node).cast(),
-            ),
-            AnyRootNodeRef::FString(node) => {
-                (RootNodeKind::FString, std::ptr::NonNull::from(node).cast())
-            }
-            AnyRootNodeRef::TString(node) => {
-                (RootNodeKind::TString, std::ptr::NonNull::from(node).cast())
-            }
-            AnyRootNodeRef::StringLiteral(node) => (
-                RootNodeKind::StringLiteral,
-                std::ptr::NonNull::from(node).cast(),
-            ),
-            AnyRootNodeRef::BytesLiteral(node) => (
-                RootNodeKind::BytesLiteral,
-                std::ptr::NonNull::from(node).cast(),
-            ),
-            AnyRootNodeRef::Identifier(node) => (
-                RootNodeKind::Identifier,
-                std::ptr::NonNull::from(node).cast(),
-            ),
-        }
-    }
-
-    /// Reconstructs an AST reference from its root node kind and type-erased pointer.
-    ///
-    /// # Safety
-    ///
-    /// - `pointer` must be properly aligned for and point to the exact root node type
-    ///   represented by `kind`.
-    /// - The pointer's provenance must permit reads of a complete, initialized, and valid
-    ///   value of that type.
-    /// - The pointed-to value must not be moved, dropped, or accessed mutably for `'a`.
-    #[inline]
-    #[expect(unsafe_code, reason = "reconstructs a type-erased AST reference")]
-    pub unsafe fn from_raw_parts(kind: RootNodeKind, pointer: std::ptr::NonNull<()>) -> Self {
-        let pointer = pointer.as_ptr();
-        // SAFETY: The caller guarantees that `pointer` is readable as the exact root node
-        // type selected by `kind` and remains valid and immutable for `'a`.
-        unsafe {
-            match kind {
-                RootNodeKind::Mod => AnyRootNodeRef::Mod(&*pointer.cast::<Mod>()),
-                RootNodeKind::Stmt => AnyRootNodeRef::Stmt(&*pointer.cast::<Stmt>()),
-                RootNodeKind::Expr => AnyRootNodeRef::Expr(&*pointer.cast::<Expr>()),
-                RootNodeKind::ExceptHandler => {
-                    AnyRootNodeRef::ExceptHandler(&*pointer.cast::<ExceptHandler>())
-                }
-                RootNodeKind::InterpolatedStringElement => {
-                    AnyRootNodeRef::InterpolatedStringElement(
-                        &*pointer.cast::<InterpolatedStringElement>(),
-                    )
-                }
-                RootNodeKind::Pattern => AnyRootNodeRef::Pattern(&*pointer.cast::<Pattern>()),
-                RootNodeKind::TypeParam => AnyRootNodeRef::TypeParam(&*pointer.cast::<TypeParam>()),
-                RootNodeKind::InterpolatedStringFormatSpec => {
-                    AnyRootNodeRef::InterpolatedStringFormatSpec(
-                        &*pointer.cast::<crate::InterpolatedStringFormatSpec>(),
-                    )
-                }
-                RootNodeKind::PatternArguments => {
-                    AnyRootNodeRef::PatternArguments(&*pointer.cast::<crate::PatternArguments>())
-                }
-                RootNodeKind::PatternKeyword => {
-                    AnyRootNodeRef::PatternKeyword(&*pointer.cast::<crate::PatternKeyword>())
-                }
-                RootNodeKind::Comprehension => {
-                    AnyRootNodeRef::Comprehension(&*pointer.cast::<crate::Comprehension>())
-                }
-                RootNodeKind::Arguments => {
-                    AnyRootNodeRef::Arguments(&*pointer.cast::<crate::Arguments>())
-                }
-                RootNodeKind::Parameters => {
-                    AnyRootNodeRef::Parameters(&*pointer.cast::<crate::Parameters>())
-                }
-                RootNodeKind::Parameter => {
-                    AnyRootNodeRef::Parameter(&*pointer.cast::<crate::Parameter>())
-                }
-                RootNodeKind::ParameterWithDefault => AnyRootNodeRef::ParameterWithDefault(
-                    &*pointer.cast::<crate::ParameterWithDefault>(),
-                ),
-                RootNodeKind::Keyword => {
-                    AnyRootNodeRef::Keyword(&*pointer.cast::<crate::Keyword>())
-                }
-                RootNodeKind::Alias => AnyRootNodeRef::Alias(&*pointer.cast::<crate::Alias>()),
-                RootNodeKind::WithItem => {
-                    AnyRootNodeRef::WithItem(&*pointer.cast::<crate::WithItem>())
-                }
-                RootNodeKind::MatchCase => {
-                    AnyRootNodeRef::MatchCase(&*pointer.cast::<crate::MatchCase>())
-                }
-                RootNodeKind::Decorator => {
-                    AnyRootNodeRef::Decorator(&*pointer.cast::<crate::Decorator>())
-                }
-                RootNodeKind::ElifElseClause => {
-                    AnyRootNodeRef::ElifElseClause(&*pointer.cast::<crate::ElifElseClause>())
-                }
-                RootNodeKind::TypeParams => {
-                    AnyRootNodeRef::TypeParams(&*pointer.cast::<crate::TypeParams>())
-                }
-                RootNodeKind::FString => {
-                    AnyRootNodeRef::FString(&*pointer.cast::<crate::FString>())
-                }
-                RootNodeKind::TString => {
-                    AnyRootNodeRef::TString(&*pointer.cast::<crate::TString>())
-                }
-                RootNodeKind::StringLiteral => {
-                    AnyRootNodeRef::StringLiteral(&*pointer.cast::<crate::StringLiteral>())
-                }
-                RootNodeKind::BytesLiteral => {
-                    AnyRootNodeRef::BytesLiteral(&*pointer.cast::<crate::BytesLiteral>())
-                }
-                RootNodeKind::Identifier => {
-                    AnyRootNodeRef::Identifier(&*pointer.cast::<crate::Identifier>())
-                }
-            }
-        }
-    }
-
-    pub fn visit_source_order<'b, V>(self, visitor: &mut V)
-    where
-        V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
-        'a: 'b,
-    {
-        match self {
-            AnyRootNodeRef::Mod(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Stmt(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Expr(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::ExceptHandler(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::InterpolatedStringElement(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Pattern(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::TypeParam(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::InterpolatedStringFormatSpec(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::PatternArguments(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::PatternKeyword(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Comprehension(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Arguments(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Parameters(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Parameter(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::ParameterWithDefault(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Keyword(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Alias(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::WithItem(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::MatchCase(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Decorator(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::ElifElseClause(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::TypeParams(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::FString(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::TString(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::StringLiteral(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::BytesLiteral(node) => node.visit_source_order(visitor),
-            AnyRootNodeRef::Identifier(node) => node.visit_source_order(visitor),
-        }
-    }
-}
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum NodeKind {
     ModModule,
@@ -9278,7 +6367,7 @@ impl AnyNodeRef<'_> {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ModModule {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub body: thin_vec::ThinVec<Stmt>,
 }
@@ -9287,7 +6376,7 @@ pub struct ModModule {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ModExpression {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub body: Box<Expr>,
 }
@@ -9299,7 +6388,7 @@ pub struct ModExpression {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtFunctionDef {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub is_async: bool,
     pub decorator_list: thin_vec::ThinVec<crate::Decorator>,
@@ -9314,7 +6403,7 @@ pub struct StmtFunctionDef {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtClassDef {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub decorator_list: thin_vec::ThinVec<crate::Decorator>,
     pub name: crate::Identifier,
@@ -9327,7 +6416,7 @@ pub struct StmtClassDef {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtReturn {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: Option<Box<Expr>>,
 }
@@ -9336,7 +6425,7 @@ pub struct StmtReturn {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtDelete {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub targets: Vec<Expr>,
 }
@@ -9345,7 +6434,7 @@ pub struct StmtDelete {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtTypeAlias {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub name: Box<Expr>,
     pub type_params: Option<Box<crate::TypeParams>>,
@@ -9356,7 +6445,7 @@ pub struct StmtTypeAlias {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtAssign {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub targets: Vec<Expr>,
     pub value: Box<Expr>,
@@ -9366,7 +6455,7 @@ pub struct StmtAssign {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtAugAssign {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub target: Box<Expr>,
     pub op: crate::Operator,
@@ -9377,7 +6466,7 @@ pub struct StmtAugAssign {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtAnnAssign {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub target: Box<Expr>,
     pub annotation: Box<Expr>,
@@ -9392,7 +6481,7 @@ pub struct StmtAnnAssign {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtFor {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub is_async: bool,
     pub target: Box<Expr>,
@@ -9406,7 +6495,7 @@ pub struct StmtFor {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtWhile {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub test: Box<Expr>,
     pub body: thin_vec::ThinVec<Stmt>,
@@ -9417,7 +6506,7 @@ pub struct StmtWhile {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtIf {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub test: Box<Expr>,
     pub body: thin_vec::ThinVec<Stmt>,
@@ -9431,7 +6520,7 @@ pub struct StmtIf {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtWith {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub is_async: bool,
     pub items: Vec<crate::WithItem>,
@@ -9442,7 +6531,7 @@ pub struct StmtWith {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtMatch {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub subject: Box<Expr>,
     pub cases: Vec<crate::MatchCase>,
@@ -9452,7 +6541,7 @@ pub struct StmtMatch {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtRaise {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub exc: Option<Box<Expr>>,
     pub cause: Option<Box<Expr>>,
@@ -9463,7 +6552,7 @@ pub struct StmtRaise {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtTry {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub body: thin_vec::ThinVec<Stmt>,
     pub handlers: Vec<ExceptHandler>,
@@ -9476,7 +6565,7 @@ pub struct StmtTry {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtAssert {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub test: Box<Expr>,
     pub msg: Option<Box<Expr>>,
@@ -9486,7 +6575,7 @@ pub struct StmtAssert {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtImport {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub names: Vec<crate::Alias>,
     pub is_lazy: bool,
@@ -9496,7 +6585,7 @@ pub struct StmtImport {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtImportFrom {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub module: Option<crate::Identifier>,
     pub names: Vec<crate::Alias>,
@@ -9508,7 +6597,7 @@ pub struct StmtImportFrom {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtGlobal {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub names: Vec<crate::Identifier>,
 }
@@ -9517,7 +6606,7 @@ pub struct StmtGlobal {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtNonlocal {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub names: Vec<crate::Identifier>,
 }
@@ -9526,7 +6615,7 @@ pub struct StmtNonlocal {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtExpr {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: Box<Expr>,
 }
@@ -9535,7 +6624,7 @@ pub struct StmtExpr {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtPass {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
 }
 
@@ -9543,7 +6632,7 @@ pub struct StmtPass {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtBreak {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
 }
 
@@ -9551,7 +6640,7 @@ pub struct StmtBreak {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtContinue {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
 }
 
@@ -9612,7 +6701,7 @@ pub struct StmtContinue {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtIpyEscapeCommand {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub kind: crate::IpyEscapeKind,
     pub value: Box<str>,
@@ -9622,7 +6711,7 @@ pub struct StmtIpyEscapeCommand {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprBoolOp {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub op: crate::BoolOp,
     pub values: Vec<Expr>,
@@ -9632,7 +6721,7 @@ pub struct ExprBoolOp {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprNamed {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub target: Box<Expr>,
     pub value: Box<Expr>,
@@ -9642,7 +6731,7 @@ pub struct ExprNamed {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprBinOp {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub left: Box<Expr>,
     pub op: crate::Operator,
@@ -9653,7 +6742,7 @@ pub struct ExprBinOp {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprUnaryOp {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub op: crate::UnaryOp,
     pub operand: Box<Expr>,
@@ -9663,7 +6752,7 @@ pub struct ExprUnaryOp {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprLambda {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub parameters: Option<Box<crate::Parameters>>,
     pub body: Box<Expr>,
@@ -9673,7 +6762,7 @@ pub struct ExprLambda {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprIf {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub test: Box<Expr>,
     pub body: Box<Expr>,
@@ -9684,7 +6773,7 @@ pub struct ExprIf {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprDict {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub items: Vec<crate::DictItem>,
 }
@@ -9693,7 +6782,7 @@ pub struct ExprDict {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprSet {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub elts: Vec<Expr>,
 }
@@ -9702,7 +6791,7 @@ pub struct ExprSet {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprListComp {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub elt: Box<Expr>,
     pub generators: Vec<crate::Comprehension>,
@@ -9712,7 +6801,7 @@ pub struct ExprListComp {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprSetComp {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub elt: Box<Expr>,
     pub generators: Vec<crate::Comprehension>,
@@ -9722,7 +6811,7 @@ pub struct ExprSetComp {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprDictComp {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub key: Option<Box<Expr>>,
     pub value: Box<Expr>,
@@ -9733,7 +6822,7 @@ pub struct ExprDictComp {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprGenerator {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub elt: Box<Expr>,
     pub generators: Vec<crate::Comprehension>,
@@ -9744,7 +6833,7 @@ pub struct ExprGenerator {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprAwait {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: Box<Expr>,
 }
@@ -9753,7 +6842,7 @@ pub struct ExprAwait {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprYield {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: Option<Box<Expr>>,
 }
@@ -9762,7 +6851,7 @@ pub struct ExprYield {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprYieldFrom {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: Box<Expr>,
 }
@@ -9777,7 +6866,7 @@ pub struct ExprYieldFrom {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprCompare {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub ops: Box<[crate::CmpOp]>,
     pub operands: Box<[Expr]>,
@@ -9792,7 +6881,7 @@ pub struct ExprCompare {
 #[derive(Clone, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprCall {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range_start: ruff_text_size::TextSize,
     pub func: Box<Expr>,
     pub arguments: crate::Arguments,
@@ -9809,7 +6898,7 @@ pub struct ExprCall {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprFString {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: crate::FStringValue,
 }
@@ -9825,7 +6914,7 @@ pub struct ExprFString {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprTString {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: crate::TStringValue,
 }
@@ -9835,7 +6924,7 @@ pub struct ExprTString {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprStringLiteral {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: crate::StringLiteralValue,
 }
@@ -9845,7 +6934,7 @@ pub struct ExprStringLiteral {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprBytesLiteral {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: crate::BytesLiteralValue,
 }
@@ -9853,7 +6942,7 @@ pub struct ExprBytesLiteral {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprNumberLiteral {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: crate::Number,
 }
@@ -9861,7 +6950,7 @@ pub struct ExprNumberLiteral {
 #[derive(Clone, Debug, PartialEq, Default)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprBooleanLiteral {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: bool,
 }
@@ -9869,14 +6958,14 @@ pub struct ExprBooleanLiteral {
 #[derive(Clone, Debug, PartialEq, Default)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprNoneLiteral {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprEllipsisLiteral {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
 }
 
@@ -9884,7 +6973,7 @@ pub struct ExprEllipsisLiteral {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprAttribute {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: Box<Expr>,
     pub attr: crate::Identifier,
@@ -9895,7 +6984,7 @@ pub struct ExprAttribute {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprSubscript {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: Box<Expr>,
     pub slice: Box<Expr>,
@@ -9906,7 +6995,7 @@ pub struct ExprSubscript {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprStarred {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: Box<Expr>,
     pub ctx: crate::ExprContext,
@@ -9916,7 +7005,7 @@ pub struct ExprStarred {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprName {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub id: Name,
     pub ctx: crate::ExprContext,
@@ -9926,7 +7015,7 @@ pub struct ExprName {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprList {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub elts: Vec<Expr>,
     pub ctx: crate::ExprContext,
@@ -9936,7 +7025,7 @@ pub struct ExprList {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprTuple {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub elts: Vec<Expr>,
     pub ctx: crate::ExprContext,
@@ -9947,7 +7036,7 @@ pub struct ExprTuple {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprSlice {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub lower: Option<Box<Expr>>,
     pub upper: Option<Box<Expr>>,
@@ -9968,7 +7057,7 @@ pub struct ExprSlice {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprIpyEscapeCommand {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub kind: crate::IpyEscapeKind,
     pub value: Box<str>,
@@ -9978,7 +7067,7 @@ pub struct ExprIpyEscapeCommand {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternMatchValue {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: Box<Expr>,
 }
@@ -9987,7 +7076,7 @@ pub struct PatternMatchValue {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternMatchSingleton {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub value: crate::Singleton,
 }
@@ -9996,7 +7085,7 @@ pub struct PatternMatchSingleton {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternMatchSequence {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub patterns: Vec<Pattern>,
 }
@@ -10005,7 +7094,7 @@ pub struct PatternMatchSequence {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternMatchMapping {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub keys: thin_vec::ThinVec<Expr>,
     pub patterns: thin_vec::ThinVec<Pattern>,
@@ -10016,7 +7105,7 @@ pub struct PatternMatchMapping {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternMatchClass {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub cls: Box<Expr>,
     pub arguments: crate::PatternArguments,
@@ -10026,7 +7115,7 @@ pub struct PatternMatchClass {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternMatchStar {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub name: Option<crate::Identifier>,
 }
@@ -10035,7 +7124,7 @@ pub struct PatternMatchStar {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternMatchAs {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub pattern: Option<Box<Pattern>>,
     pub name: Option<crate::Identifier>,
@@ -10045,7 +7134,7 @@ pub struct PatternMatchAs {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternMatchOr {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub patterns: Vec<Pattern>,
 }
@@ -10054,7 +7143,7 @@ pub struct PatternMatchOr {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct TypeParamTypeVar {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub name: crate::Identifier,
     pub bound: Option<Box<Expr>>,
@@ -10065,7 +7154,7 @@ pub struct TypeParamTypeVar {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct TypeParamTypeVarTuple {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub name: crate::Identifier,
     pub default: Option<Box<Expr>>,
@@ -10075,7 +7164,7 @@ pub struct TypeParamTypeVarTuple {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct TypeParamParamSpec {
-    pub node_index: crate::AtomicNodeIndex,
+    pub node_index: crate::NodeIndex,
     pub range: ruff_text_size::TextRange,
     pub name: crate::Identifier,
     pub default: Option<Box<Expr>>,

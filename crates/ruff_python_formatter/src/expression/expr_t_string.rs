@@ -1,4 +1,4 @@
-use ruff_python_ast::{AnyNodeRef, ExprTString, StringLike};
+use ruff_python_ast::{ExprTString, flat, flat::AnyNodeRef, flat::StringLike};
 
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, in_parentheses_only_group,
@@ -14,7 +14,11 @@ use crate::string::implicit::{
 pub struct FormatExprTString;
 
 impl FormatNodeRule<ExprTString> for FormatExprTString {
-    fn fmt_fields(&self, item: &ExprTString, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, ExprTString>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         if let Some(t_string) = item.as_single_part_tstring() {
             t_string.format().fmt(f)
         } else {
@@ -32,7 +36,7 @@ impl FormatNodeRule<ExprTString> for FormatExprTString {
     }
 }
 
-impl NeedsParentheses for ExprTString {
+impl NeedsParentheses for flat::View<'_, ExprTString> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
@@ -40,9 +44,9 @@ impl NeedsParentheses for ExprTString {
     ) -> OptionalParentheses {
         if let Some(tstring_part) = self.as_single_part_tstring() {
             // The t-string is not implicitly concatenated
-            if StringLike::TString(self).is_multiline(context)
+            if StringLike::from(*self).is_multiline(context)
                 || InterpolatedStringLayout::from_interpolated_string_elements(
-                    &tstring_part.elements,
+                    tstring_part.elements(),
                     context.source(),
                 )
                 .is_multiline()

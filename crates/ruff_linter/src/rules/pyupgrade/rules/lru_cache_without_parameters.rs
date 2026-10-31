@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Decorator, Expr};
+use ruff_python_ast::Decorator;
+use ruff_python_ast::flat;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -55,21 +56,20 @@ impl AlwaysFixableViolation for LRUCacheWithoutParameters {
 }
 
 /// UP011
-pub(crate) fn lru_cache_without_parameters(checker: &Checker, decorator_list: &[Decorator]) {
+pub(crate) fn lru_cache_without_parameters(
+    checker: &Checker,
+    decorator_list: flat::NodeList<'_, Decorator>,
+) {
     for decorator in decorator_list {
-        let Expr::Call(ast::ExprCall {
-            func,
-            arguments,
-            range_start: _,
-            node_index: _,
-        }) = &decorator.expression
-        else {
+        let flat::ExprKind::Call(call) = decorator.expression().classify() else {
             continue;
         };
+        let func = call.func();
+        let arguments = call.arguments();
 
         // Look for, e.g., `import functools; @functools.lru_cache()`.
-        if arguments.args.is_empty()
-            && arguments.keywords.is_empty()
+        if arguments.args().is_empty()
+            && arguments.keywords().is_empty()
             && checker
                 .semantic()
                 .resolve_qualified_name(func)

@@ -3,7 +3,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{self, generate_comparison};
-use ruff_python_ast::{self as ast, CmpOp, Expr};
+use ruff_python_ast::{self as ast, CmpOp, Expr, flat};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -168,8 +168,8 @@ impl AlwaysFixableViolation for TrueFalseComparison {
     }
 }
 
-fn is_redundant_boolean_comparison(op: CmpOp, comparator: &Expr) -> Option<bool> {
-    let value = comparator.as_boolean_literal_expr()?.value;
+fn is_redundant_boolean_comparison(op: CmpOp, comparator: flat::View<'_, Expr>) -> Option<bool> {
+    let value = comparator.as_boolean_literal_expr()?.value();
     match op {
         CmpOp::Is | CmpOp::Eq => Some(value),
         CmpOp::IsNot | CmpOp::NotEq => Some(!value),
@@ -178,15 +178,15 @@ fn is_redundant_boolean_comparison(op: CmpOp, comparator: &Expr) -> Option<bool>
 }
 
 fn generate_redundant_comparison(
-    compare: &ast::ExprCompare,
+    compare: flat::View<'_, ast::ExprCompare>,
     tokens: &Tokens,
     source: &str,
-    comparator: &Expr,
+    comparator: flat::View<'_, Expr>,
     kind: bool,
     needs_wrap: bool,
 ) -> String {
-    let comparator_range = parenthesized_range(comparator.into(), compare.into(), tokens)
-        .unwrap_or(comparator.range());
+    let comparator_range =
+        parenthesized_range(comparator, compare.into(), tokens).unwrap_or(comparator.range());
 
     let comparator_str = &source[comparator_range];
 
@@ -204,7 +204,7 @@ fn generate_redundant_comparison(
 }
 
 /// E711, E712
-pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare) {
+pub(crate) fn literal_comparisons(checker: &Checker, compare: flat::View<'_, ast::ExprCompare>) {
     // Mapping from (bad operator index) to (replacement operator). As we iterate
     // through the list of operators, we apply "dummy" fixes for each error,
     // then replace the entire expression at the end with one "real" fix, to
@@ -239,37 +239,30 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
             }
 
             if checker.is_rule_enabled(Rule::TrueFalseComparison) {
-                if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = comparator {
+                if let flat::ExprKind::BooleanLiteral(boolean_literal) = comparator.classify() {
+                    let value = boolean_literal.value();
                     match op {
                         EqCmpOp::Eq => {
-                            let cond = if compare.ops.len() == 1 {
+                            let cond = if compare.ops().len() == 1 {
                                 Some(SourceCodeSnippet::from_str(checker.locator().slice(next)))
                             } else {
                                 None
                             };
                             let diagnostic = checker.report_diagnostic(
-                                TrueFalseComparison {
-                                    value: *value,
-                                    op,
-                                    cond,
-                                },
+                                TrueFalseComparison { value, op, cond },
                                 compare.range(),
                             );
                             bad_ops.insert(0, CmpOp::Is);
                             diagnostics.push(diagnostic);
                         }
                         EqCmpOp::NotEq => {
-                            let cond = if compare.ops.len() == 1 {
+                            let cond = if compare.ops().len() == 1 {
                                 Some(SourceCodeSnippet::from_str(checker.locator().slice(next)))
                             } else {
                                 None
                             };
                             let diagnostic = checker.report_diagnostic(
-                                TrueFalseComparison {
-                                    value: *value,
-                                    op,
-                                    cond,
-                                },
+                                TrueFalseComparison { value, op, cond },
                                 compare.range(),
                             );
                             bad_ops.insert(0, CmpOp::IsNot);
@@ -282,13 +275,13 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
     }
 
     // Check each comparator in order.
-    for (index, (op, next)) in compare.ops.iter().zip(comparators).enumerate() {
+    for (index, (op, next)) in compare.ops().iter().zip(comparators).enumerate() {
         if helpers::is_constant_non_singleton(comparator) {
             comparator = next;
             continue;
         }
 
-        if let Some(op) = EqCmpOp::try_from(*op) {
+        if let Some(op) = EqCmpOp::try_from(op) {
             if checker.is_rule_enabled(Rule::NoneComparison) && next.is_none_literal_expr() {
                 match op {
                     EqCmpOp::Eq => {
@@ -307,20 +300,20 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
             }
 
             if checker.is_rule_enabled(Rule::TrueFalseComparison) {
-                if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = next {
+                if let flat::ExprKind::BooleanLiteral(boolean_literal) = next.classify() {
+                    let value = boolean_literal.value();
                     match op {
                         EqCmpOp::Eq => {
-                            if let Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-                                value: comparator_value,
-                                ..
-                            }) = comparator
+                            if let flat::ExprKind::BooleanLiteral(boolean_literal) =
+                                comparator.classify()
                             {
+                                let comparator_value = boolean_literal.value();
                                 if value == comparator_value {
                                     continue;
                                 }
                             }
 
-                            let cond = if compare.ops.len() == 1 {
+                            let cond = if compare.ops().len() == 1 {
                                 Some(SourceCodeSnippet::from_str(
                                     checker.locator().slice(comparator),
                                 ))
@@ -328,18 +321,14 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                                 None
                             };
                             let diagnostic = checker.report_diagnostic(
-                                TrueFalseComparison {
-                                    value: *value,
-                                    op,
-                                    cond,
-                                },
+                                TrueFalseComparison { value, op, cond },
                                 compare.range(),
                             );
                             bad_ops.insert(index, CmpOp::Is);
                             diagnostics.push(diagnostic);
                         }
                         EqCmpOp::NotEq => {
-                            let cond = if compare.ops.len() == 1 {
+                            let cond = if compare.ops().len() == 1 {
                                 Some(SourceCodeSnippet::from_str(
                                     checker.locator().slice(comparator),
                                 ))
@@ -347,11 +336,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                                 None
                             };
                             let diagnostic = checker.report_diagnostic(
-                                TrueFalseComparison {
-                                    value: *value,
-                                    op,
-                                    cond,
-                                },
+                                TrueFalseComparison { value, op, cond },
                                 compare.range(),
                             );
                             bad_ops.insert(index, CmpOp::IsNot);
@@ -369,24 +354,26 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
     // `noqa`, but another doesn't, both will be removed here.
     if !bad_ops.is_empty() {
         let ops = compare
-            .ops
+            .ops()
             .iter()
             .enumerate()
-            .map(|(idx, op)| bad_ops.get(&idx).unwrap_or(op))
-            .copied()
+            .map(|(idx, op)| bad_ops.get(&idx).copied().unwrap_or(op))
             .collect::<Vec<_>>();
 
         let tokens = checker.tokens();
         let source = checker.source();
 
-        let content = match (&*compare.ops, comparators) {
-            ([op], [comparator]) => {
-                if let Some(kind) = is_redundant_boolean_comparison(*op, left) {
+        let content = match (&compare.ops(), comparators) {
+            (items, args)
+                if let Some([op]) = items.as_array()
+                    && let Some([comparator]) = args.as_array() =>
+            {
+                if let Some(kind) = is_redundant_boolean_comparison(op, left) {
                     let needs_wrap = left.range().start() != compare.range().start();
                     generate_redundant_comparison(
                         compare, tokens, source, comparator, kind, needs_wrap,
                     )
-                } else if let Some(kind) = is_redundant_boolean_comparison(*op, comparator) {
+                } else if let Some(kind) = is_redundant_boolean_comparison(op, comparator) {
                     let needs_wrap = comparator.range().end() != compare.range().end();
                     generate_redundant_comparison(compare, tokens, source, left, kind, needs_wrap)
                 } else {

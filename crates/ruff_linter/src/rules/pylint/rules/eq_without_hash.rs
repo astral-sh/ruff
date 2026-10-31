@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{
-    Expr, ExprName, Identifier, StmtAnnAssign, StmtAssign, StmtClassDef, StmtFunctionDef,
-};
+use ruff_python_ast::StmtClassDef;
+use ruff_python_ast::flat;
 use ruff_python_semantic::analyze::class::{
     ClassMemberBoundness, ClassMemberKind, any_member_declaration,
 };
@@ -76,7 +75,7 @@ impl Violation for EqWithoutHash {
 }
 
 /// PLW1641
-pub(crate) fn object_without_hash_method(checker: &Checker, class: &StmtClassDef) {
+pub(crate) fn object_without_hash_method(checker: &Checker, class: flat::View<'_, StmtClassDef>) {
     if checker.source_type.is_stub() {
         return;
     }
@@ -88,7 +87,7 @@ pub(crate) fn object_without_hash_method(checker: &Checker, class: &StmtClassDef
             hash: HasMethod::No
         }
     ) {
-        checker.report_diagnostic(EqWithoutHash, class.name.range());
+        checker.report_diagnostic(EqWithoutHash, class.name().range());
     }
 }
 
@@ -99,32 +98,32 @@ struct EqHash {
 }
 
 impl EqHash {
-    fn from_class(class: &StmtClassDef) -> Self {
+    fn from_class(class: flat::View<'_, StmtClassDef>) -> Self {
         let (mut has_eq, mut has_hash) = (HasMethod::No, HasMethod::No);
 
         any_member_declaration(class, |declaration| {
             let id = match declaration.kind() {
-                ClassMemberKind::Assign(StmtAssign { targets, .. }) => {
-                    let [Expr::Name(ExprName { id, .. })] = &targets[..] else {
+                ClassMemberKind::Assign(stmt_assign) => {
+                    let Some([target]) = stmt_assign.targets().as_array() else {
+                        return false;
+                    };
+                    let Some(name) = target.as_name_expr() else {
+                        return false;
+                    };
+                    name.id()
+                }
+                ClassMemberKind::AnnAssign(stmt_ann_assign) => {
+                    let target = stmt_ann_assign.target();
+                    let flat::ExprKind::Name(name_node) = target.classify() else {
                         return false;
                     };
 
-                    id
+                    name_node.id()
                 }
-                ClassMemberKind::AnnAssign(StmtAnnAssign { target, .. }) => {
-                    let Expr::Name(ExprName { id, .. }) = target.as_ref() else {
-                        return false;
-                    };
-
-                    id
-                }
-                ClassMemberKind::FunctionDef(StmtFunctionDef {
-                    name: Identifier { id, .. },
-                    ..
-                }) => id.as_str(),
+                ClassMemberKind::FunctionDef(function) => function.name().id(),
             };
 
-            match id {
+            match id.as_str() {
                 "__eq__" => has_eq = has_eq | declaration.boundness().into(),
                 "__hash__" => has_hash = has_hash | declaration.boundness().into(),
                 _ => {}

@@ -3,7 +3,7 @@ use crate::completion;
 use ruff_db::parsed::parsed_module;
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::find_node::covering_node;
+use ruff_python_ast::flat::find_node::covering_node;
 use ruff_text_size::TextRange;
 use ty_project::Db;
 use ty_python_core::ProgramFile;
@@ -56,7 +56,7 @@ fn unresolved_fixes(
 ) -> Option<impl Iterator<Item = QuickFix>> {
     let parsed = parsed_module(db, file.python_file(db)).load(db);
     let node = covering_node(parsed.syntax().into(), diagnostic_range).node();
-    let symbol = &node.expr_name()?.id;
+    let symbol = &node.as_expr_name()?.id();
     Some(
         completion::unresolved_fixes(db, file, &parsed, symbol, node)
             .into_iter()

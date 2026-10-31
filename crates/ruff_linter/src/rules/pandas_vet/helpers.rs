@@ -1,4 +1,5 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 use ruff_python_semantic::{BindingKind, Imported, SemanticModel};
 
 #[derive(Debug)]
@@ -14,30 +15,30 @@ pub(super) enum Resolution {
 }
 
 /// Test an [`Expr`] for relevance to Pandas-related operations.
-pub(super) fn test_expression(expr: &Expr, semantic: &SemanticModel) -> Resolution {
-    match expr {
-        Expr::StringLiteral(_)
-        | Expr::BytesLiteral(_)
-        | Expr::NumberLiteral(_)
-        | Expr::BooleanLiteral(_)
-        | Expr::NoneLiteral(_)
-        | Expr::EllipsisLiteral(_)
-        | Expr::Tuple(_)
-        | Expr::List(_)
-        | Expr::Set(_)
-        | Expr::Dict(_)
-        | Expr::SetComp(_)
-        | Expr::ListComp(_)
-        | Expr::DictComp(_)
-        | Expr::Generator(_) => Resolution::IrrelevantExpression,
-        Expr::Name(name) => {
+pub(super) fn test_expression(expr: flat::View<'_, Expr>, semantic: &SemanticModel) -> Resolution {
+    match expr.classify() {
+        flat::ExprKind::StringLiteral(_)
+        | flat::ExprKind::BytesLiteral(_)
+        | flat::ExprKind::NumberLiteral(_)
+        | flat::ExprKind::BooleanLiteral(_)
+        | flat::ExprKind::NoneLiteral(_)
+        | flat::ExprKind::EllipsisLiteral(_)
+        | flat::ExprKind::Tuple(_)
+        | flat::ExprKind::List(_)
+        | flat::ExprKind::Set(_)
+        | flat::ExprKind::Dict(_)
+        | flat::ExprKind::SetComp(_)
+        | flat::ExprKind::ListComp(_)
+        | flat::ExprKind::DictComp(_)
+        | flat::ExprKind::Generator(_) => Resolution::IrrelevantExpression,
+        flat::ExprKind::Name(name) => {
             semantic
                 .resolve_name(name)
                 .map_or(Resolution::IrrelevantBinding, |id| {
                     match &semantic.binding(id).kind {
                         BindingKind::Argument => {
                             // Avoid, e.g., `self.values`.
-                            if matches!(name.id.as_str(), "self" | "cls") {
+                            if matches!(name.id().as_str(), "self" | "cls") {
                                 Resolution::IrrelevantBinding
                             } else {
                                 Resolution::RelevantLocal

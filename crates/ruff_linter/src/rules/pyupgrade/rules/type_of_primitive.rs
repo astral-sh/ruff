@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -55,8 +56,13 @@ impl Violation for TypeOfPrimitive {
 }
 
 /// UP003
-pub(crate) fn type_of_primitive(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
-    let [arg] = args else {
+pub(crate) fn type_of_primitive(
+    checker: &Checker,
+    &expr: &flat::View<'_, Expr>,
+    func: flat::View<'_, Expr>,
+    args: flat::NodeList<'_, Expr>,
+) {
+    let Some([arg]) = args.as_array() else {
         return;
     };
     let Some(primitive) = Primitive::from_expr(arg) else {

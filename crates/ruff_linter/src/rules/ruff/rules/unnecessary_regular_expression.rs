@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{
     Arguments, CmpOp, Expr, ExprAttribute, ExprBytesLiteral, ExprCall, ExprCompare, ExprContext,
     ExprStringLiteral, ExprUnaryOp, Identifier, UnaryOp,
@@ -79,7 +80,7 @@ const METACHARACTERS: [char; 12] = ['.', '^', '$', '*', '+', '?', '{', '[', '\\'
 const ESCAPABLE_SINGLE_CHARACTERS: &str = "abfnrtv";
 
 /// RUF055
-pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall) {
+pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: flat::View<'_, ExprCall>) {
     // adapted from unraw_re_pattern
     let semantic = checker.semantic();
 
@@ -87,7 +88,7 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
         return;
     }
 
-    let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) else {
+    let Some(qualified_name) = semantic.resolve_qualified_name(call.func()) else {
         return;
     };
 
@@ -109,11 +110,12 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
     // For now, reject any regex metacharacters. Compare to the complete list
     // from https://docs.python.org/3/howto/regex.html#matching-characters
     let has_metacharacters = match &literal {
-        Literal::Str(str_lit) => str_lit.value.to_str().contains(METACHARACTERS),
-        Literal::Bytes(bytes_lit) => bytes_lit
-            .value
-            .iter()
-            .any(|part| part.iter().any(|&b| METACHARACTERS.contains(&(b as char)))),
+        Literal::Str(str_lit) => str_lit.value().to_str().contains(METACHARACTERS),
+        Literal::Bytes(bytes_lit) => bytes_lit.value().iter().any(|part| {
+            part.value()
+                .iter()
+                .any(|&b| METACHARACTERS.contains(&(b as char)))
+        }),
     };
 
     if has_metacharacters {
@@ -154,7 +156,7 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
 #[derive(Debug)]
 enum ReFuncKind<'a> {
     // Only `Some` if it's a fixable `re.sub()` call
-    Sub { repl: Option<&'a Expr> },
+    Sub { repl: Option<flat::View<'a, Expr>> },
     Match,
     Search,
     Fullmatch,
@@ -164,8 +166,8 @@ enum ReFuncKind<'a> {
 #[derive(Debug)]
 struct ReFunc<'a> {
     kind: ReFuncKind<'a>,
-    pattern: &'a Expr,
-    string: &'a Expr,
+    pattern: flat::View<'a, Expr>,
+    string: flat::View<'a, Expr>,
     comparison_to_none: Option<ComparisonToNone>,
     range: TextRange,
 }
@@ -173,7 +175,7 @@ struct ReFunc<'a> {
 impl<'a> ReFunc<'a> {
     fn from_call_expr(
         semantic: &'a SemanticModel,
-        call: &'a ExprCall,
+        call: flat::View<'a, ExprCall>,
         func_name: &str,
     ) -> Option<Self> {
         // the proposed fixes for match, search, and fullmatch rely on the
@@ -186,13 +188,13 @@ impl<'a> ReFunc<'a> {
             None => (None, call.range()),
         };
 
-        match (func_name, call.arguments.len()) {
+        match (func_name, call.arguments().len()) {
             // `split` is the safest of these to fix, as long as metacharacters
             // have already been filtered out from the `pattern`
             ("split", 2) => Some(ReFunc {
                 kind: ReFuncKind::Split,
-                pattern: call.arguments.find_argument_value("pattern", 0)?,
-                string: call.arguments.find_argument_value("string", 1)?,
+                pattern: call.arguments().find_argument_value("pattern", 0)?,
+                string: call.arguments().find_argument_value("string", 1)?,
                 comparison_to_none,
                 range,
             }),
@@ -200,14 +202,14 @@ impl<'a> ReFunc<'a> {
             // allows it to be a function, which will *not* work in the str
             // version
             ("sub", 3) => {
-                let repl = call.arguments.find_argument_value("repl", 1)?;
+                let repl = call.arguments().find_argument_value("repl", 1)?;
                 let lit = resolve_literal(repl, semantic)?;
                 let mut fixable = true;
 
                 match lit {
                     Literal::Str(lit_str) => {
                         // Perform escape analysis for replacement literals.
-                        for (c, next) in lit_str.value.to_str().chars().tuple_windows() {
+                        for (c, next) in lit_str.value().to_str().chars().tuple_windows() {
                             // `\\0` (or any other ASCII digit) and `\\g` have special meaning in `repl` strings.
                             // Meanwhile, nearly all other escapes of ASCII letters in a `repl` string causes
                             // `re.PatternError` to be raised at runtime.
@@ -229,8 +231,8 @@ impl<'a> ReFunc<'a> {
                         }
                     }
                     Literal::Bytes(lit_bytes) => {
-                        for part in &lit_bytes.value {
-                            for (byte, next) in part.iter().copied().tuple_windows() {
+                        for part in lit_bytes.value() {
+                            for (byte, next) in part.value().iter().copied().tuple_windows() {
                                 if byte == b'\\' && (next as char).is_ascii_alphanumeric() {
                                     if ESCAPABLE_SINGLE_CHARACTERS.contains(next as char) {
                                         fixable = false;
@@ -247,30 +249,30 @@ impl<'a> ReFunc<'a> {
                     kind: ReFuncKind::Sub {
                         repl: fixable.then_some(repl),
                     },
-                    pattern: call.arguments.find_argument_value("pattern", 0)?,
-                    string: call.arguments.find_argument_value("string", 2)?,
+                    pattern: call.arguments().find_argument_value("pattern", 0)?,
+                    string: call.arguments().find_argument_value("string", 2)?,
                     comparison_to_none,
                     range,
                 })
             }
             ("match" | "prefixmatch", 2) if in_truthy_context => Some(ReFunc {
                 kind: ReFuncKind::Match,
-                pattern: call.arguments.find_argument_value("pattern", 0)?,
-                string: call.arguments.find_argument_value("string", 1)?,
+                pattern: call.arguments().find_argument_value("pattern", 0)?,
+                string: call.arguments().find_argument_value("string", 1)?,
                 comparison_to_none,
                 range,
             }),
             ("search", 2) if in_truthy_context => Some(ReFunc {
                 kind: ReFuncKind::Search,
-                pattern: call.arguments.find_argument_value("pattern", 0)?,
-                string: call.arguments.find_argument_value("string", 1)?,
+                pattern: call.arguments().find_argument_value("pattern", 0)?,
+                string: call.arguments().find_argument_value("string", 1)?,
                 comparison_to_none,
                 range,
             }),
             ("fullmatch", 2) if in_truthy_context => Some(ReFunc {
                 kind: ReFuncKind::Fullmatch,
-                pattern: call.arguments.find_argument_value("pattern", 0)?,
-                string: call.arguments.find_argument_value("string", 1)?,
+                pattern: call.arguments().find_argument_value("pattern", 0)?,
+                string: call.arguments().find_argument_value("string", 1)?,
                 comparison_to_none,
                 range,
             }),
@@ -287,10 +289,12 @@ impl<'a> ReFunc<'a> {
         match (&self.kind, &self.comparison_to_none) {
             // string.replace(pattern, repl)
             (ReFuncKind::Sub { repl }, _) => repl
-                .cloned()
-                .map(|repl| self.method_expr("replace", vec![self.pattern.clone(), repl])),
+                .map(flat::View::to_owned_node)
+                .map(|repl| self.method_expr("replace", vec![self.pattern.to_owned_node(), repl])),
             // string.split(pattern)
-            (ReFuncKind::Split, _) => Some(self.method_expr("split", vec![self.pattern.clone()])),
+            (ReFuncKind::Split, _) => {
+                Some(self.method_expr("split", vec![self.pattern.to_owned_node()]))
+            }
             // pattern in string
             (ReFuncKind::Search, None | Some(ComparisonToNone::IsNot)) => {
                 Some(ReFunc::compare_expr(self.pattern, CmpOp::In, self.string))
@@ -303,16 +307,16 @@ impl<'a> ReFunc<'a> {
             )),
             // string.startswith(pattern)
             (ReFuncKind::Match, None | Some(ComparisonToNone::IsNot)) => {
-                Some(self.method_expr("startswith", vec![self.pattern.clone()]))
+                Some(self.method_expr("startswith", vec![self.pattern.to_owned_node()]))
             }
             // not string.startswith(pattern)
             (ReFuncKind::Match, Some(ComparisonToNone::Is)) => {
-                let expr = self.method_expr("startswith", vec![self.pattern.clone()]);
+                let expr = self.method_expr("startswith", vec![self.pattern.to_owned_node()]);
                 let negated_expr = Expr::UnaryOp(ExprUnaryOp {
                     op: UnaryOp::Not,
                     operand: Box::new(expr),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                 });
                 Some(negated_expr)
             }
@@ -330,12 +334,12 @@ impl<'a> ReFunc<'a> {
     }
 
     /// Return a new compare expr of the form `left op right`
-    fn compare_expr(left: &Expr, op: CmpOp, right: &Expr) -> Expr {
+    fn compare_expr(left: flat::View<'_, Expr>, op: CmpOp, right: flat::View<'_, Expr>) -> Expr {
         Expr::Compare(ExprCompare {
             ops: [op].into(),
-            operands: Box::new([left.clone(), right.clone()]),
+            operands: Box::new([left.to_owned_node(), right.to_owned_node()]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         })
     }
 
@@ -343,11 +347,11 @@ impl<'a> ReFunc<'a> {
     /// `self.string.method(args...)`
     fn method_expr(&self, method: &str, args: Vec<Expr>) -> Expr {
         let method = Expr::Attribute(ExprAttribute {
-            value: Box::new(self.string.clone()),
+            value: Box::new(self.string.to_owned_node()),
             attr: Identifier::new(method, TextRange::default()),
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         });
         Expr::Call(ExprCall {
             func: Box::new(method),
@@ -355,31 +359,34 @@ impl<'a> ReFunc<'a> {
                 args: args.into(),
                 keywords: std::iter::empty().collect(),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
             },
             range_start: ruff_text_size::TextSize::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         })
     }
 }
 
 /// A literal that can be either a string or a bytes literal.
 enum Literal<'a> {
-    Str(&'a ExprStringLiteral),
-    Bytes(&'a ExprBytesLiteral),
+    Str(flat::View<'a, ExprStringLiteral>),
+    Bytes(flat::View<'a, ExprBytesLiteral>),
 }
 
 impl Literal<'_> {
     fn is_empty(&self) -> bool {
         match self {
-            Literal::Str(str_lit) => str_lit.value.is_empty(),
-            Literal::Bytes(bytes_lit) => bytes_lit.value.is_empty(),
+            Literal::Str(str_lit) => str_lit.value().is_empty(),
+            Literal::Bytes(bytes_lit) => bytes_lit.value().is_empty(),
         }
     }
 }
 
 /// Try to resolve `name` to either a string or bytes literal in `semantic`.
-fn resolve_literal<'a>(name: &'a Expr, semantic: &'a SemanticModel) -> Option<Literal<'a>> {
+fn resolve_literal<'a>(
+    name: flat::View<'a, Expr>,
+    semantic: &'a SemanticModel,
+) -> Option<Literal<'a>> {
     if let Some(str_lit) = resolve_string_literal(name, semantic) {
         return Some(Literal::Str(str_lit));
     }
@@ -391,9 +398,9 @@ fn resolve_literal<'a>(name: &'a Expr, semantic: &'a SemanticModel) -> Option<Li
 
 /// Try to resolve `name` to an [`ExprBytesLiteral`] in `semantic`.
 fn resolve_bytes_literal<'a>(
-    name: &'a Expr,
+    name: flat::View<'a, Expr>,
     semantic: &'a SemanticModel,
-) -> Option<&'a ExprBytesLiteral> {
+) -> Option<flat::View<'a, ExprBytesLiteral>> {
     if name.is_bytes_literal_expr() {
         return name.as_bytes_literal_expr();
     }
@@ -411,9 +418,9 @@ fn resolve_bytes_literal<'a>(
 
 /// Try to resolve `name` to an [`ExprStringLiteral`] in `semantic`.
 fn resolve_string_literal<'a>(
-    name: &'a Expr,
+    name: flat::View<'a, Expr>,
     semantic: &'a SemanticModel,
-) -> Option<&'a ExprStringLiteral> {
+) -> Option<flat::View<'a, ExprStringLiteral>> {
     if name.is_string_literal_expr() {
         return name.as_string_literal_expr();
     }
@@ -439,7 +446,8 @@ enum ComparisonToNone {
 ///    Example: `re.search("abc", s) is None`
 fn get_comparison_to_none(semantic: &SemanticModel) -> Option<(ComparisonToNone, TextRange)> {
     let compare = semantic.current_expression_parent()?.as_compare_expr()?;
-    let (_, op, Expr::NoneLiteral(_)) = compare.as_single()? else {
+    let (_, op, expr) = compare.as_single()?;
+    let flat::ExprKind::NoneLiteral(_) = expr.classify() else {
         return None;
     };
 

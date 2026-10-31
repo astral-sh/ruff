@@ -10,14 +10,17 @@ use crate::string::implicit::{
 };
 use crate::string::{StringLikeExtensions, implicit::FormatImplicitConcatenatedString};
 use ruff_formatter::FormatRuleWithOptions;
-use ruff_python_ast::{AnyNodeRef, ExprStringLiteral, StringLike};
+use ruff_python_ast::flat;
+use ruff_python_ast::{ExprStringLiteral, flat::AnyNodeRef, flat::StringLike};
 
 #[derive(Default)]
 pub struct FormatExprStringLiteral {
     kind: StringLiteralKind,
 }
 
-impl FormatRuleWithOptions<ExprStringLiteral, PyFormatContext<'_>> for FormatExprStringLiteral {
+impl FormatRuleWithOptions<flat::View<'_, ExprStringLiteral>, PyFormatContext<'_>>
+    for FormatExprStringLiteral
+{
     type Options = StringLiteralKind;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -27,7 +30,11 @@ impl FormatRuleWithOptions<ExprStringLiteral, PyFormatContext<'_>> for FormatExp
 }
 
 impl FormatNodeRule<ExprStringLiteral> for FormatExprStringLiteral {
-    fn fmt_fields(&self, item: &ExprStringLiteral, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, ExprStringLiteral>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         if let Some(string_literal) = item.as_single_part_string() {
             string_literal.format().with_options(self.kind).fmt(f)
         } else {
@@ -63,15 +70,15 @@ impl FormatNodeRule<ExprStringLiteral> for FormatExprStringLiteral {
     }
 }
 
-impl NeedsParentheses for ExprStringLiteral {
+impl NeedsParentheses for flat::View<'_, ExprStringLiteral> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if self.value.is_implicit_concatenated() {
+        if self.value().is_implicit_concatenated() {
             OptionalParentheses::Multiline
-        } else if StringLike::String(self).is_multiline(context) {
+        } else if StringLike::from(*self).is_multiline(context) {
             OptionalParentheses::Never
         } else {
             OptionalParentheses::BestFit

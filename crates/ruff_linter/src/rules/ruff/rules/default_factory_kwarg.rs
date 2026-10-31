@@ -1,4 +1,5 @@
 use anyhow::Result;
+use ruff_python_ast::flat;
 
 use ast::Keyword;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -76,11 +77,11 @@ impl Violation for DefaultFactoryKwarg {
 }
 
 /// RUF026
-pub(crate) fn default_factory_kwarg(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn default_factory_kwarg(checker: &Checker, call: flat::View<'_, ast::ExprCall>) {
     // If the call isn't a `defaultdict` constructor, return.
     if !checker
         .semantic()
-        .resolve_qualified_name(call.func.as_ref())
+        .resolve_qualified_name(call.func())
         .is_some_and(|qualified_name| {
             matches!(qualified_name.segments(), ["collections", "defaultdict"])
         })
@@ -89,17 +90,17 @@ pub(crate) fn default_factory_kwarg(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // If the user provided a positional argument for `default_factory`, return.
-    if !call.arguments.args.is_empty() {
+    if !call.arguments().args().is_empty() {
         return;
     }
 
     // If the user didn't provide a `default_factory` keyword argument, return.
-    let Some(keyword) = call.arguments.find_keyword("default_factory") else {
+    let Some(keyword) = call.arguments().find_keyword("default_factory") else {
         return;
     };
 
     // If the value is definitively not callable, return.
-    if is_non_callable_value(&keyword.value) {
+    if is_non_callable_value(keyword.value()) {
         return;
     }
 
@@ -114,18 +115,21 @@ pub(crate) fn default_factory_kwarg(checker: &Checker, call: &ast::ExprCall) {
 }
 
 /// Returns `true` if a value is definitively not callable (e.g., `1` or `[]`).
-fn is_non_callable_value(value: &Expr) -> bool {
+fn is_non_callable_value(value: flat::View<'_, Expr>) -> bool {
     is_constant(value)
-        || matches!(value, |Expr::List(_)| Expr::Dict(_)
-            | Expr::Set(_)
-            | Expr::Tuple(_)
-            | Expr::Slice(_)
-            | Expr::ListComp(_)
-            | Expr::SetComp(_)
-            | Expr::DictComp(_)
-            | Expr::Generator(_)
-            | Expr::FString(_)
-            | Expr::TString(_))
+        || matches!(
+            value.classify(),
+            |flat::ExprKind::List(_)| flat::ExprKind::Dict(_)
+                | flat::ExprKind::Set(_)
+                | flat::ExprKind::Tuple(_)
+                | flat::ExprKind::Slice(_)
+                | flat::ExprKind::ListComp(_)
+                | flat::ExprKind::SetComp(_)
+                | flat::ExprKind::DictComp(_)
+                | flat::ExprKind::Generator(_)
+                | flat::ExprKind::FString(_)
+                | flat::ExprKind::TString(_)
+        )
 }
 
 /// Generate an [`Expr`] to replace `defaultdict(default_factory=callable)` with
@@ -133,15 +137,15 @@ fn is_non_callable_value(value: &Expr) -> bool {
 ///
 /// For example, given `defaultdict(default_factory=list)`, generate `defaultdict(list)`.
 fn convert_to_positional(
-    call: &ast::ExprCall,
-    default_factory: &Keyword,
+    call: flat::View<'_, ast::ExprCall>,
+    default_factory: flat::View<'_, Keyword>,
     locator: &Locator,
     tokens: &Tokens,
 ) -> Result<Fix> {
-    if call.arguments.len() == 1 {
+    if call.arguments().len() == 1 {
         // Ex) `defaultdict(default_factory=list)`
         Ok(Fix::unsafe_edit(Edit::range_replacement(
-            locator.slice(&default_factory.value).to_string(),
+            locator.slice(default_factory.value()).to_string(),
             default_factory.range(),
         )))
     } else {
@@ -149,8 +153,8 @@ fn convert_to_positional(
 
         // First, remove the `default_factory` keyword argument.
         let removal_edit = remove_argument(
-            default_factory,
-            &call.arguments,
+            &default_factory,
+            call.arguments(),
             Parentheses::Preserve,
             locator.contents(),
             tokens,
@@ -158,8 +162,8 @@ fn convert_to_positional(
 
         // Second, insert the value as the first positional argument.
         let insertion_edit = Edit::insertion(
-            format!("{}, ", locator.slice(&default_factory.value)),
-            call.arguments
+            format!("{}, ", locator.slice(default_factory.value())),
+            call.arguments()
                 .iter_source_order()
                 .next()
                 .ok_or_else(|| anyhow::anyhow!("`default_factory` keyword argument not found"))?

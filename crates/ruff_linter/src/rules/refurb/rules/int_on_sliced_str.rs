@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprCall, Identifier};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -67,21 +68,30 @@ impl AlwaysFixableViolation for IntOnSlicedStr {
 }
 
 /// FURB166
-pub(crate) fn int_on_sliced_str(checker: &Checker, call: &ExprCall) {
+pub(crate) fn int_on_sliced_str(checker: &Checker, call: &ast::ExprCall<'_>) {
     // Verify that the function is `int`.
-    if !checker.semantic().match_builtin_expr(&call.func, "int") {
+    if !checker.semantic().match_builtin_expr(call.func, "int") {
         return;
     }
 
     // There must be exactly two arguments (e.g., `int(num[2:], 16)`).
-    let (expression, base) = match (
-        call.arguments.args.as_ref(),
-        call.arguments.keywords.as_ref(),
-    ) {
-        ([expression], [base]) if base.arg.as_ref().map(Identifier::as_str) == Some("base") => {
-            (expression, &base.value)
+    let (expression, base) = match (call.arguments.args(), call.arguments.keywords()) {
+        (args, keywords)
+            if let Some([expression]) = args.as_array()
+                && let Some([base]) = keywords.as_array()
+                && base
+                    .arg()
+                    .map(flat::View::<ruff_python_ast::Identifier>::as_str)
+                    == Some("base") =>
+        {
+            (expression, base.value())
         }
-        ([expression, base], []) => (expression, base),
+        (args, keywords)
+            if let Some([expression, base]) = args.as_array()
+                && keywords.is_empty() =>
+        {
+            (expression, base)
+        }
         _ => {
             return;
         }
@@ -90,7 +100,7 @@ pub(crate) fn int_on_sliced_str(checker: &Checker, call: &ExprCall) {
     // The base must be a number literal with a value of 2, 8, or 16.
     let Some(base_u8) = base
         .as_number_literal_expr()
-        .and_then(|base| base.value.as_int())
+        .and_then(|base| base.value().as_int())
         .and_then(ruff_python_ast::Int::as_u8)
     else {
         return;
@@ -100,29 +110,28 @@ pub(crate) fn int_on_sliced_str(checker: &Checker, call: &ExprCall) {
     }
 
     // Determine whether the expression is a slice of a string (e.g., `num[2:]`).
-    let Expr::Subscript(expr_subscript) = expression else {
+    let flat::ExprKind::Subscript(expr_subscript) = expression.classify() else {
         return;
     };
-    let Expr::Slice(expr_slice) = expr_subscript.slice.as_ref() else {
+    let flat::ExprKind::Slice(expr_slice) = expr_subscript.slice().classify() else {
         return;
     };
-    if expr_slice.upper.is_some() || expr_slice.step.is_some() {
+    if expr_slice.upper().is_some() || expr_slice.step().is_some() {
         return;
     }
     if expr_slice
-        .lower
-        .as_ref()
-        .and_then(|expr| expr.as_number_literal_expr())
-        .and_then(|expr| expr.value.as_int())
+        .lower()
+        .and_then(flat::View::as_number_literal_expr)
+        .and_then(|expr| expr.value().as_int())
         .is_none_or(|expr| expr.as_u8() != Some(2))
     {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(IntOnSlicedStr { base: base_u8 }, call.range());
+    let mut diagnostic = checker.report_diagnostic(IntOnSlicedStr { base: base_u8 }, call.range);
     diagnostic.set_fix(Fix::unsafe_edits(
         Edit::range_replacement(
-            checker.locator().slice(&*expr_subscript.value).to_string(),
+            checker.locator().slice(expr_subscript.value()).to_string(),
             expression.range(),
         ),
         [Edit::range_replacement("0".to_string(), base.range())],

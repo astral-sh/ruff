@@ -3,7 +3,11 @@ use std::borrow::Cow;
 use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, helpers::is_dunder, name::QualifiedName};
+use ruff_python_ast::{
+    flat::{self, fields as ast},
+    helpers::is_dunder,
+    name::QualifiedName,
+};
 use ruff_python_semantic::{AnyImport, FromImport, Import, Imported, ResolvedReference, Scope};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
@@ -144,10 +148,14 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
         } else {
             None
         };
-        let range = match binding.source.map(|id| checker.semantic().statement(id)) {
+        let range = match binding
+            .source
+            .map(|id| checker.semantic().statement(id))
+            .map(flat::View::<ruff_python_ast::Stmt>::fields)
+        {
             Some(ast::Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. })) => {
                 if index < import_info.module_name.len() {
-                    module.as_ref().map_or(binding.range(), |module| {
+                    module.map_or(binding.range(), |module| {
                         SimpleTokenizer::starts_at(module.start(), checker.locator().contents())
                             .skip_trivia()
                             .find(|token| {
@@ -159,8 +167,8 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
                 } else {
                     names
                         .iter()
-                        .find(|alias| alias.name.as_str() == import_info.member_name)
-                        .map_or(binding.range(), |alias| alias.name.range())
+                        .find(|alias| alias.name().as_str() == import_info.member_name)
+                        .map_or(binding.range(), |alias| alias.name().range())
                 }
             }
             _ => binding.range(),

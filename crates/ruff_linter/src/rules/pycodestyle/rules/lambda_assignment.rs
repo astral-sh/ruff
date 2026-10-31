@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{
     self as ast, DecoratorList, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
@@ -68,16 +69,17 @@ impl Violation for LambdaAssignment {
 /// E731
 pub(crate) fn lambda_assignment(
     checker: &Checker,
-    target: &Expr,
-    value: &Expr,
-    annotation: Option<&Expr>,
-    stmt: &Stmt,
+    target: flat::View<'_, Expr>,
+    value: flat::View<'_, Expr>,
+    annotation: Option<flat::View<'_, Expr>>,
+    stmt: flat::View<'_, Stmt>,
 ) {
-    let Expr::Name(ast::ExprName { id, .. }) = target else {
+    let flat::ExprKind::Name(name_node) = target.classify() else {
         return;
     };
+    let id = name_node.id();
 
-    let Expr::Lambda(lambda) = value else {
+    let flat::ExprKind::Lambda(lambda) = value.classify() else {
         return;
     };
 
@@ -137,20 +139,28 @@ pub(crate) fn lambda_assignment(
     }
 }
 
+struct CallableTypes<'a> {
+    arg_types: Option<flat::NodeList<'a, Expr>>,
+    return_type: flat::View<'a, Expr>,
+}
+
 /// Extract the argument types and return type from a `Callable` annotation.
 /// The `Callable` import can be from either `collections.abc` or `typing`.
-/// If an ellipsis is used for the argument types, an empty list is returned.
-/// The returned values are cloned, so they can be used as-is.
-fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Expr>, Expr)> {
-    let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = &annotation else {
+/// A literal parameter list supplies the individual argument annotations.
+fn extract_types<'a>(
+    annotation: flat::View<'a, Expr>,
+    semantic: &SemanticModel,
+) -> Option<CallableTypes<'a>> {
+    let flat::ExprKind::Subscript(subscript) = annotation.classify() else {
         return None;
     };
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() else {
+    let value = subscript.value();
+    let slice = subscript.slice();
+    let flat::ExprKind::Tuple(tuple) = slice.classify() else {
         return None;
     };
-    let [param_types, return_type] = elts.as_slice() else {
-        return None;
-    };
+    let elts = tuple.elts();
+    let [param_types, return_type] = elts.as_array()?;
 
     if !semantic
         .resolve_qualified_name(value)
@@ -168,27 +178,21 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
     // specification (e.g., a `ParamSpec`), or ellipsis.
     // For parameter specifications, we cannot assign per-parameter annotations,
     // but we can still preserve the return type annotation.
-    let params = match param_types {
-        Expr::List(ast::ExprList { elts, .. }) => elts.clone(),
-        Expr::EllipsisLiteral(_) => vec![],
-        // Treat any other form (e.g., `ParamSpec`, `Concatenate`, etc.) as a
-        // parameter specification: do not annotate individual parameters, but
-        // keep the return type.
-        _ => vec![],
-    };
-
-    // The second argument to `Callable` must be a type.
-    let return_type = return_type.clone();
-
-    Some((params, return_type))
+    let params = param_types
+        .as_list_expr()
+        .map(flat::View::<ast::ExprList>::elts);
+    Some(CallableTypes {
+        arg_types: params,
+        return_type,
+    })
 }
 
 /// Generate a function definition from a `lambda` expression.
 fn function(
     name: &str,
-    lambda: &ExprLambda,
-    annotation: Option<&Expr>,
-    stmt: &Stmt,
+    lambda: flat::View<'_, ExprLambda>,
+    annotation: Option<flat::View<'_, Expr>>,
+    stmt: flat::View<'_, Stmt>,
     checker: &Checker,
 ) -> String {
     // Use a dummy body. It gets replaced at the end with the actual body.
@@ -198,11 +202,18 @@ fn function(
             ExprEllipsisLiteral::default(),
         ))),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     });
-    let parameters = lambda.parameters.as_deref().cloned().unwrap_or_default();
+    let parameters = lambda
+        .parameters()
+        .map(flat::View::to_owned_node)
+        .unwrap_or_default();
     if let Some(annotation) = annotation {
-        if let Some((arg_types, return_type)) = extract_types(annotation, checker.semantic()) {
+        if let Some(CallableTypes {
+            arg_types,
+            return_type,
+        }) = extract_types(annotation, checker.semantic())
+        {
             // A `lambda` expression can only have positional-only and positional-or-keyword
             // arguments. The order is always positional-only first, then positional-or-keyword.
             let new_posonlyargs = parameters
@@ -212,8 +223,8 @@ fn function(
                 .map(|(idx, parameter)| ParameterWithDefault {
                     parameter: Parameter {
                         annotation: arg_types
-                            .get(idx)
-                            .map(|arg_type| Box::new(arg_type.clone())),
+                            .and_then(|types| types.get(idx))
+                            .map(|arg_type| Box::new(arg_type.to_owned_node())),
                         ..parameter.parameter.clone()
                     },
                     ..parameter.clone()
@@ -226,8 +237,8 @@ fn function(
                 .map(|(idx, parameter)| ParameterWithDefault {
                     parameter: Parameter {
                         annotation: arg_types
-                            .get(idx + new_posonlyargs.len())
-                            .map(|arg_type| Box::new(arg_type.clone())),
+                            .and_then(|types| types.get(idx + new_posonlyargs.len()))
+                            .map(|arg_type| Box::new(arg_type.to_owned_node())),
                         ..parameter.parameter.clone()
                     },
                     ..parameter.clone()
@@ -243,10 +254,10 @@ fn function(
                 }),
                 body: ast::Suite::from([body]),
                 decorator_list: ast::DecoratorList::new(),
-                returns: Some(Box::new(return_type)),
+                returns: Some(Box::new(return_type.to_owned_node())),
                 type_params: None,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
             });
             let generated = checker.generator().stmt(&func);
 
@@ -262,7 +273,7 @@ fn function(
         returns: None,
         type_params: None,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     });
     let generated = checker.generator().stmt(&function);
 
@@ -271,13 +282,12 @@ fn function(
 
 fn replace_trailing_ellipsis_with_original_expr(
     mut generated: String,
-    lambda: &ExprLambda,
-    stmt: &Stmt,
+    lambda: flat::View<'_, ExprLambda>,
+    stmt: flat::View<'_, Stmt>,
     checker: &Checker,
 ) -> String {
-    let original_expr_range =
-        parenthesized_range((&lambda.body).into(), lambda.into(), checker.tokens())
-            .unwrap_or(lambda.body.range());
+    let original_expr_range = parenthesized_range(lambda.body(), lambda.into(), checker.tokens())
+        .unwrap_or(lambda.body().range());
 
     // This prevents the autofix of introducing a syntax error if the lambda's body is an
     // expression spanned across multiple lines. To avoid the syntax error we preserve

@@ -184,8 +184,7 @@ mod tests {
     use insta::assert_debug_snapshot;
 
     use ruff_formatter::SourceCode;
-    use ruff_python_ast::{AnyNodeRef, AtomicNodeIndex};
-    use ruff_python_ast::{StmtBreak, StmtContinue};
+    use ruff_python_parser::parse_module;
     use ruff_python_trivia::CommentLinePosition;
     use ruff_text_size::{TextRange, TextSize};
 
@@ -194,28 +193,20 @@ mod tests {
 
     #[test]
     fn debug() {
-        let continue_statement = StmtContinue {
-            range: TextRange::new(TextSize::new(18), TextSize::new(26)),
-            node_index: AtomicNodeIndex::NONE,
-        };
-
-        let break_statement = StmtBreak {
-            range: TextRange::new(TextSize::new(55), TextSize::new(60)),
-            node_index: AtomicNodeIndex::NONE,
-        };
-
         let source = r"# leading comment
 continue; # trailing
 # break leading
 break;
 ";
 
+        let module = parse_module(source).unwrap();
+        let [continue_statement, break_statement] = module.suite().as_array().unwrap();
         let source_code = SourceCode::new(source);
 
         let mut comments_map: CommentsMap = MultiMap::new();
 
         comments_map.push_leading(
-            AnyNodeRef::from(&continue_statement).into(),
+            continue_statement.erase().into(),
             SourceComment::new(
                 source_code.slice(TextRange::at(TextSize::new(0), TextSize::new(17))),
                 CommentLinePosition::OwnLine,
@@ -223,7 +214,7 @@ break;
         );
 
         comments_map.push_trailing(
-            AnyNodeRef::from(&continue_statement).into(),
+            continue_statement.erase().into(),
             SourceComment::new(
                 source_code.slice(TextRange::at(TextSize::new(28), TextSize::new(10))),
                 CommentLinePosition::EndOfLine,
@@ -231,7 +222,7 @@ break;
         );
 
         comments_map.push_leading(
-            AnyNodeRef::from(&break_statement).into(),
+            break_statement.erase().into(),
             SourceComment::new(
                 source_code.slice(TextRange::at(TextSize::new(39), TextSize::new(15))),
                 CommentLinePosition::OwnLine,

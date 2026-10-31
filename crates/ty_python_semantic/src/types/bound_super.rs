@@ -3,7 +3,7 @@
 use crate::ProgramEnvironment;
 use itertools::{Either, Itertools};
 use ruff_db::diagnostic::Diagnostic;
-use ruff_python_ast::{AnyNodeRef, name::Name};
+use ruff_python_ast::{flat::AnyNodeRef, name::Name};
 
 use crate::{
     Db, DisplaySettings,

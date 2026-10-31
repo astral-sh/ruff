@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{ArgOrKeyword, ExprCall};
+use ruff_python_ast::flat;
+use ruff_python_ast::{ExprCall, flat::ArgOrKeyword};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -68,15 +69,15 @@ impl Violation for OsMakedirs {
 }
 
 /// PTH103
-pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_makedirs(checker: &Checker, call: flat::View<'_, ExprCall>, segments: &[&str]) {
     if segments != ["os", "makedirs"] {
         return;
     }
 
     let range = call.range();
-    let mut diagnostic = checker.report_diagnostic(OsMakedirs, call.func.range());
+    let mut diagnostic = checker.report_diagnostic(OsMakedirs, call.func().range());
 
-    let Some(name) = call.arguments.find_argument_value("name", 0) else {
+    let Some(name) = call.arguments().find_argument_value("name", 0) else {
         return;
     };
 
@@ -91,14 +92,14 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
     // ```
     // We should not offer autofixes if there are more arguments
     // than in the original signature
-    let parent_mode = call.arguments.find_keyword("parent_mode");
-    if call.arguments.len() > 3 + usize::from(parent_mode.is_some()) {
+    let parent_mode = call.arguments().find_keyword("parent_mode");
+    if call.arguments().len() > 3 + usize::from(parent_mode.is_some()) {
         return;
     }
     // We should not offer autofixes if there are keyword arguments
     // that don't match the original function signature
     if has_unknown_keywords_or_starred_expr(
-        &call.arguments,
+        call.arguments(),
         &["name", "mode", "exist_ok", "parent_mode"],
     ) {
         return;
@@ -121,8 +122,8 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
 
         let name_code = locator.slice(name.range());
 
-        let mode = call.arguments.find_argument("mode", 1);
-        let exist_ok = call.arguments.find_argument("exist_ok", 2);
+        let mode = call.arguments().find_argument("mode", 1);
+        let exist_ok = call.arguments().find_argument("exist_ok", 2);
 
         let mut mkdir_args = match (mode, exist_ok) {
             // Default to a keyword argument when alone.

@@ -3,7 +3,7 @@ use std::fmt;
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, LiteralExpressionRef};
+use ruff_python_ast::{self as ast, Expr, flat};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::Ranged;
@@ -66,16 +66,18 @@ impl Violation for RedundantLiteralUnion {
 }
 
 /// PYI051
-pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
+pub(crate) fn redundant_literal_union<'a>(checker: &Checker, &union: &flat::View<'a, Expr>) {
     let mut typing_literal_exprs = Vec::new();
     let mut builtin_types_in_union = FxHashSet::default();
 
     // Adds a member to `literal_exprs` for each value in a `Literal`, and any builtin types
     // to `builtin_types_in_union`.
-    let mut func = |expr: &'a Expr, _parent: &'a Expr| {
-        if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
+    let mut func = |expr: flat::View<'a, Expr>, _parent: flat::View<'a, Expr>| {
+        if let flat::ExprKind::Subscript(subscript) = expr.classify() {
+            let value = subscript.value();
+            let slice = subscript.slice();
             if checker.semantic().match_typing_expr(value, "Literal") {
-                if let Expr::Tuple(tuple) = &**slice {
+                if let flat::ExprKind::Tuple(tuple) = slice.classify() {
                     typing_literal_exprs.extend(tuple);
                 } else {
                     typing_literal_exprs.push(slice);
@@ -136,7 +138,7 @@ impl fmt::Display for ExprType {
 
 /// Return the [`ExprType`] of an [`Expr]` if it is a builtin type (e.g. `int`, `bool`, `float`,
 /// `str`, `bytes`, or `complex`).
-fn match_builtin_type(expr: &Expr, semantic: &SemanticModel) -> Option<ExprType> {
+fn match_builtin_type(expr: flat::View<'_, Expr>, semantic: &SemanticModel) -> Option<ExprType> {
     let result = match semantic.resolve_builtin_symbol(expr)? {
         "int" => ExprType::Int,
         "bool" => ExprType::Bool,
@@ -151,17 +153,17 @@ fn match_builtin_type(expr: &Expr, semantic: &SemanticModel) -> Option<ExprType>
 
 /// Return the [`ExprType`] of an [`Expr`] if it is a literal (e.g., an `int`, like `1`, or a
 /// `bool`, like `True`).
-fn match_literal_type(expr: &Expr) -> Option<ExprType> {
+fn match_literal_type(expr: flat::View<'_, Expr>) -> Option<ExprType> {
     Some(match expr.as_literal_expr()? {
-        LiteralExpressionRef::BooleanLiteral(_) => ExprType::Bool,
-        LiteralExpressionRef::StringLiteral(_) => ExprType::Str,
-        LiteralExpressionRef::BytesLiteral(_) => ExprType::Bytes,
-        LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
+        flat::LiteralExpression::BooleanLiteral(_) => ExprType::Bool,
+        flat::LiteralExpression::StringLiteral(_) => ExprType::Str,
+        flat::LiteralExpression::BytesLiteral(_) => ExprType::Bytes,
+        flat::LiteralExpression::NumberLiteral(number) => match number.value() {
             ast::Number::Int(_) => ExprType::Int,
             ast::Number::Float(_) => ExprType::Float,
             ast::Number::Complex { .. } => ExprType::Complex,
         },
-        LiteralExpressionRef::NoneLiteral(_) | LiteralExpressionRef::EllipsisLiteral(_) => {
+        flat::LiteralExpression::NoneLiteral(_) | flat::LiteralExpression::EllipsisLiteral(_) => {
             return None;
         }
     })

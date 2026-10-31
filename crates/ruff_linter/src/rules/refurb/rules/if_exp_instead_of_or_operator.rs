@@ -2,10 +2,10 @@ use std::borrow::Cow;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_python_ast::Expr;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::token::{Tokens, parenthesized_range};
+use ruff_python_ast::{Expr, flat};
 use ruff_text_size::Ranged;
 
 use crate::Locator;
@@ -60,22 +60,22 @@ impl Violation for IfExpInsteadOfOrOperator {
 }
 
 /// FURB110
-pub(crate) fn if_exp_instead_of_or_operator(checker: &Checker, if_expr: &ast::ExprIf) {
-    let ast::ExprIf {
-        test,
-        body,
-        orelse,
-        range,
-        node_index: _,
-    } = if_expr;
+pub(crate) fn if_exp_instead_of_or_operator(
+    checker: &Checker,
+    if_expr: flat::View<'_, ast::ExprIf>,
+) {
+    let test = if_expr.test();
+    let body = if_expr.body();
+    let orelse = if_expr.orelse();
+    let range = if_expr.range();
 
     if ComparableExpr::from(test) != ComparableExpr::from(body) {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(IfExpInsteadOfOrOperator, *range);
+    let mut diagnostic = checker.report_diagnostic(IfExpInsteadOfOrOperator, range);
 
-    let has_comments = checker.comment_ranges().intersects(*range);
+    let has_comments = checker.comment_ranges().intersects(range);
 
     // Replace with `{test} or {orelse}`.
     diagnostic.set_fix(Fix::applicable_edit(
@@ -103,14 +103,17 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &Checker, if_expr: &ast::Ex
 ///
 /// See: <https://docs.python.org/3/reference/expressions.html#operator-precedence>
 fn parenthesize_test<'a>(
-    expr: &Expr,
-    if_expr: &ast::ExprIf,
+    expr: flat::View<'_, Expr>,
+    if_expr: flat::View<'_, ast::ExprIf>,
     tokens: &Tokens,
     locator: &Locator<'a>,
 ) -> Cow<'a, str> {
-    if let Some(range) = parenthesized_range(expr.into(), if_expr.into(), tokens) {
+    if let Some(range) = parenthesized_range(expr, if_expr.into(), tokens) {
         Cow::Borrowed(locator.slice(range))
-    } else if matches!(expr, Expr::If(_) | Expr::Lambda(_) | Expr::Named(_)) {
+    } else if matches!(
+        expr.classify(),
+        flat::ExprKind::If(_) | flat::ExprKind::Lambda(_) | flat::ExprKind::Named(_)
+    ) {
         Cow::Owned(format!("({})", locator.slice(expr.range())))
     } else {
         Cow::Borrowed(locator.slice(expr.range()))

@@ -1,7 +1,8 @@
 use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_ast::{Expr, ExprCall, Keyword, Number};
 use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_text_size::Ranged;
 
@@ -90,7 +91,7 @@ impl Violation for NonOctalPermissions {
 }
 
 /// RUF064
-pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
+pub(crate) fn non_octal_permissions(checker: &Checker, call: flat::View<'_, ExprCall>) {
     if let Some(mode_arg) = find_func_mode_arg(call, checker.semantic())
         .or_else(|| find_method_mode_arg(call, checker.semantic()))
     {
@@ -104,11 +105,11 @@ pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
     }
 }
 
-fn check_mode(checker: &Checker, mode_arg: &Expr) {
-    let Expr::NumberLiteral(ast::ExprNumberLiteral {
-        value: ast::Number::Int(int),
+fn check_mode(checker: &Checker, mode_arg: flat::View<'_, Expr>) {
+    let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+        value: Number::Int(int),
         ..
-    }) = mode_arg
+    }) = mode_arg.fields()
     else {
         return;
     };
@@ -153,78 +154,89 @@ fn check_mode(checker: &Checker, mode_arg: &Expr) {
     diagnostic.set_fix(Fix::unsafe_edit(edit));
 }
 
-fn find_func_mode_arg<'a>(call: &'a ExprCall, semantic: &SemanticModel) -> Option<&'a Expr> {
-    let qualified_name = semantic.resolve_qualified_name(&call.func)?;
+fn find_func_mode_arg<'a>(
+    call: flat::View<'a, ExprCall>,
+    semantic: &SemanticModel,
+) -> Option<flat::View<'a, Expr>> {
+    let qualified_name = semantic.resolve_qualified_name(call.func())?;
 
     match qualified_name.segments() {
-        ["os", "umask"] => call.arguments.find_argument_value("mode", 0),
+        ["os", "umask"] => call.arguments().find_argument_value("mode", 0),
         [
             "os",
             "chmod" | "fchmod" | "lchmod" | "mkdir" | "makedirs" | "mkfifo" | "mknod",
-        ] => call.arguments.find_argument_value("mode", 1),
-        ["os", "open"] => call.arguments.find_argument_value("mode", 2),
+        ] => call.arguments().find_argument_value("mode", 1),
+        ["os", "open"] => call.arguments().find_argument_value("mode", 2),
         ["dbm", "open"] | ["dbm", "gnu" | "ndbm", "open"] => {
-            call.arguments.find_argument_value("mode", 2)
+            call.arguments().find_argument_value("mode", 2)
         }
         _ => None,
     }
 }
 
-fn find_method_mode_arg<'a>(call: &'a ExprCall, semantic: &SemanticModel) -> Option<&'a Expr> {
-    let (type_name, attr_name) = resolve_method_call(&call.func, semantic)?;
+fn find_method_mode_arg<'a>(
+    call: flat::View<'a, ExprCall>,
+    semantic: &SemanticModel,
+) -> Option<flat::View<'a, Expr>> {
+    let (type_name, attr_name) = resolve_method_call(call.func(), semantic)?;
 
     match (type_name.segments(), attr_name) {
         (
             ["pathlib", "Path" | "PosixPath" | "WindowsPath"],
             "chmod" | "lchmod" | "mkdir" | "touch",
-        ) => call.arguments.find_argument_value("mode", 0),
+        ) => call.arguments().find_argument_value("mode", 0),
         _ => None,
     }
 }
 
-fn find_func_parent_mode_arg<'a>(call: &'a ExprCall, semantic: &SemanticModel) -> Option<&'a Expr> {
-    let qualified_name = semantic.resolve_qualified_name(&call.func)?;
+fn find_func_parent_mode_arg<'a>(
+    call: flat::View<'a, ExprCall>,
+    semantic: &SemanticModel,
+) -> Option<flat::View<'a, Expr>> {
+    let qualified_name = semantic.resolve_qualified_name(call.func())?;
 
     match qualified_name.segments() {
         ["os", "makedirs"] => call
-            .arguments
+            .arguments()
             .find_keyword("parent_mode")
-            .map(|keyword| &keyword.value),
+            .map(flat::View::<Keyword>::value),
         _ => None,
     }
 }
 
 fn find_method_parent_mode_arg<'a>(
-    call: &'a ExprCall,
+    call: flat::View<'a, ExprCall>,
     semantic: &SemanticModel,
-) -> Option<&'a Expr> {
-    let (type_name, attr_name) = resolve_method_call(&call.func, semantic)?;
+) -> Option<flat::View<'a, Expr>> {
+    let (type_name, attr_name) = resolve_method_call(call.func(), semantic)?;
 
     match (type_name.segments(), attr_name) {
         (["pathlib", "Path" | "PosixPath" | "WindowsPath"], "mkdir") => call
-            .arguments
+            .arguments()
             .find_keyword("parent_mode")
-            .map(|keyword| &keyword.value),
+            .map(flat::View::<Keyword>::value),
         _ => None,
     }
 }
 
 fn resolve_method_call<'a>(
-    func: &'a Expr,
+    func: flat::View<'a, Expr>,
     semantic: &'a SemanticModel,
 ) -> Option<(QualifiedName<'a>, &'a str)> {
-    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func else {
+    let flat::ExprKind::Attribute(attribute) = func.classify() else {
         return None;
     };
+    let attr = attribute.attr();
+    let value = attribute.value();
 
     // First: is this an inlined call like `pathlib.Path.chmod`?
     // ```python
     // from pathlib import Path
     // Path("foo").chmod(0o644)
     // ```
-    if let Expr::Call(call) = value.as_ref() {
-        let qualified_name = semantic.resolve_qualified_name(&call.func)?;
-        return Some((qualified_name, attr));
+    if let flat::ExprKind::Call(call) = value.classify() {
+        let qualified_name = semantic.resolve_qualified_name(call.func())?;
+        return Some((qualified_name, attr.as_str()));
     }
 
     // Second, is this a call like `pathlib.Path.chmod` via a variable?
@@ -233,7 +245,7 @@ fn resolve_method_call<'a>(
     // path = Path("foo")
     // path.chmod()
     // ```
-    let Expr::Name(name) = value.as_ref() else {
+    let flat::ExprKind::Name(name) = value.classify() else {
         return None;
     };
 
@@ -241,13 +253,15 @@ fn resolve_method_call<'a>(
 
     let binding = semantic.binding(binding_id);
 
-    let Some(Expr::Call(call)) = analyze::typing::find_binding_value(binding, semantic) else {
+    let Some(flat::ExprKind::Call(call)) =
+        analyze::typing::find_binding_value(binding, semantic).map(flat::View::<Expr>::classify)
+    else {
         return None;
     };
 
-    let qualified_name = semantic.resolve_qualified_name(&call.func)?;
+    let qualified_name = semantic.resolve_qualified_name(call.func())?;
 
-    Some((qualified_name, attr))
+    Some((qualified_name, attr.as_str()))
 }
 
 /// Try to determine whether the integer literal

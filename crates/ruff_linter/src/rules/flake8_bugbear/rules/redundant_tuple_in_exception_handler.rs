@@ -1,6 +1,7 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, ExceptHandler, Expr};
+use ruff_python_ast::ExceptHandler;
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -59,19 +60,23 @@ impl AlwaysFixableViolation for RedundantTupleInExceptionHandler {
 }
 
 /// B013
-pub(crate) fn redundant_tuple_in_exception_handler(checker: &Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn redundant_tuple_in_exception_handler(
+    checker: &Checker,
+    handlers: flat::NodeList<'_, ExceptHandler>,
+) {
     for handler in handlers {
-        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
             type_: Some(type_),
             ..
-        }) = handler
+        }) = handler.fields()
         else {
             continue;
         };
-        let Expr::Tuple(ast::ExprTuple { elts, .. }) = type_.as_ref() else {
+        let flat::ExprKind::Tuple(tuple_node) = type_.classify() else {
             continue;
         };
-        let [elt] = elts.as_slice() else {
+        let elts = tuple_node.elts();
+        let Some([elt]) = elts.as_array() else {
             continue;
         };
         // It is not safe to replace a single-element
@@ -87,7 +92,7 @@ pub(crate) fn redundant_tuple_in_exception_handler(checker: &Checker, handlers: 
         }
         let mut diagnostic = checker.report_diagnostic(
             RedundantTupleInExceptionHandler {
-                name: checker.generator().expr(elt),
+                name: checker.generator().expr_view(elt),
             },
             type_.range(),
         );
@@ -108,7 +113,7 @@ pub(crate) fn redundant_tuple_in_exception_handler(checker: &Checker, handlers: 
         diagnostic.set_fix(Fix::applicable_edit(
             Edit::range_replacement(
                 pad(
-                    checker.generator().expr(elt),
+                    checker.generator().expr_view(elt),
                     type_.range(),
                     checker.locator(),
                 ),

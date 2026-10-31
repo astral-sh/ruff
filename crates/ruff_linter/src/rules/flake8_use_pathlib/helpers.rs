@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall};
+use ruff_python_ast::{Arguments, Expr, ExprCall, ExprName, Number, flat};
 use ruff_python_semantic::{SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
 
@@ -6,17 +6,20 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::{Applicability, Edit, Fix, Violation};
 
-pub(crate) fn is_keyword_only_argument_non_default(arguments: &Arguments, name: &str) -> bool {
+pub(crate) fn is_keyword_only_argument_non_default(
+    arguments: flat::View<'_, Arguments>,
+    name: &str,
+) -> bool {
     arguments
         .find_keyword(name)
-        .is_some_and(|keyword| !keyword.value.is_none_literal_expr())
+        .is_some_and(|keyword| !keyword.value().is_none_literal_expr())
 }
 
-pub(crate) fn is_pathlib_path_call(checker: &Checker, expr: &Expr) -> bool {
+pub(crate) fn is_pathlib_path_call(checker: &Checker, expr: flat::View<'_, Expr>) -> bool {
     expr.as_call_expr().is_some_and(|expr_call| {
         checker
             .semantic()
-            .resolve_qualified_name(&expr_call.func)
+            .resolve_qualified_name(expr_call.func())
             .is_some_and(|name| matches!(name.segments(), ["pathlib", "Path"]))
     })
 }
@@ -52,25 +55,25 @@ pub(crate) fn is_pure_path_subclass_with_preview(checker: &Checker, segments: &[
 /// so check if it's set to non-default values
 pub(crate) fn check_os_pathlib_single_arg_calls(
     checker: &Checker,
-    call: &ExprCall,
+    call: flat::View<'_, ExprCall>,
     attr: &str,
     fn_argument: &str,
     fix_enabled: bool,
     violation: impl Violation,
     applicability: Applicability,
 ) {
-    if call.arguments.len() != 1 {
+    if call.arguments().len() != 1 {
         return;
     }
 
-    let Some(arg) = call.arguments.find_argument_value(fn_argument, 0) else {
+    let Some(arg) = call.arguments().find_argument_value(fn_argument, 0) else {
         return;
     };
 
     let arg_code = checker.locator().slice(arg.range());
     let range = call.range();
 
-    let mut diagnostic = checker.report_diagnostic(violation, call.func.range());
+    let mut diagnostic = checker.report_diagnostic(violation, call.func().range());
 
     if !fix_enabled {
         return;
@@ -103,30 +106,30 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
     });
 }
 
-fn get_name_expr(expr: &Expr) -> Option<&ast::ExprName> {
-    match expr {
-        Expr::Name(name) => Some(name),
-        Expr::Call(ExprCall { func, .. }) => get_name_expr(func),
+fn get_name_expr(expr: flat::View<'_, Expr>) -> Option<flat::View<'_, ExprName>> {
+    match expr.classify() {
+        flat::ExprKind::Name(name) => Some(name),
+        flat::ExprKind::Call(expr_call) => {
+            let func = expr_call.func();
+            get_name_expr(func)
+        }
         _ => None,
     }
 }
 
 /// Returns `true` if the given expression looks like a file descriptor, i.e., if it is an integer.
-pub(crate) fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool {
-    if matches!(
-        expr,
-        Expr::NumberLiteral(ast::ExprNumberLiteral {
-            value: ast::Number::Int(_),
-            ..
-        })
-    ) {
+pub(crate) fn is_file_descriptor(expr: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
+    if expr
+        .as_number_literal_expr()
+        .is_some_and(|number| matches!(number.value(), Number::Int(_)))
+    {
         return true;
     }
 
     // Resolve attribute expressions (e.g., `obj.fd` where `fd` is annotated at
     // the class level) via the semantic model. Matches the existing behavior
     // for `Name` expressions below.
-    if let Expr::Attribute(_) = expr
+    if let flat::ExprKind::Attribute(_) = expr.classify()
         && let Some(binding_id) = semantic.lookup_attribute(expr)
     {
         return typing::is_int(semantic.binding(binding_id), semantic);
@@ -146,7 +149,7 @@ pub(crate) fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool 
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn check_os_pathlib_two_arg_calls(
     checker: &Checker,
-    call: &ExprCall,
+    call: flat::View<'_, ExprCall>,
     attr: &str,
     path_arg: &str,
     second_arg: &str,
@@ -155,11 +158,11 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
     applicability: Applicability,
 ) {
     let range = call.range();
-    let mut diagnostic = checker.report_diagnostic(violation, call.func.range());
+    let mut diagnostic = checker.report_diagnostic(violation, call.func().range());
 
     let (Some(path_expr), Some(second_expr)) = (
-        call.arguments.find_argument_value(path_arg, 0),
-        call.arguments.find_argument_value(second_arg, 1),
+        call.arguments().find_argument_value(path_arg, 0),
+        call.arguments().find_argument_value(second_arg, 1),
     ) else {
         return;
     };
@@ -197,21 +200,25 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
 }
 
 pub(crate) fn has_unknown_keywords_or_starred_expr(
-    arguments: &Arguments,
+    arguments: flat::View<'_, Arguments>,
     allowed: &[&str],
 ) -> bool {
-    if arguments.args.iter().any(Expr::is_starred_expr) {
+    if arguments.args().iter().any(flat::View::is_starred_expr) {
         return true;
     }
 
-    arguments.keywords.iter().any(|kw| match &kw.arg {
+    arguments.keywords().iter().any(|kw| match kw.arg() {
         Some(arg) => !allowed.contains(&arg.as_str()),
         None => true,
     })
 }
 
 /// Returns `true` if argument `name` is set to a non-default `None` value.
-pub(crate) fn is_argument_non_default(arguments: &Arguments, name: &str, position: usize) -> bool {
+pub(crate) fn is_argument_non_default(
+    arguments: flat::View<'_, Arguments>,
+    name: &str,
+    position: usize,
+) -> bool {
     arguments
         .find_argument_value(name, position)
         .is_some_and(|expr| !expr.is_none_literal_expr())

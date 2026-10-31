@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{Expr, Operator};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -64,7 +65,11 @@ impl Violation for PrintfInGetTextFuncCall {
 }
 
 /// INT003
-pub(crate) fn printf_in_gettext_func_call(checker: &Checker, func: &Expr, args: &[Expr]) {
+pub(crate) fn printf_in_gettext_func_call(
+    checker: &Checker,
+    func: flat::View<'_, Expr>,
+    args: flat::NodeList<'_, Expr>,
+) {
     // Check first argument (singular)
     if let Some(first) = args.first() {
         if is_printf_format(first) {
@@ -83,12 +88,12 @@ pub(crate) fn printf_in_gettext_func_call(checker: &Checker, func: &Expr, args: 
 
 /// Return `true` if `expr` is a printf-style formatting expression, such as
 /// `"%s" % 123`.
-fn is_printf_format(expr: &Expr) -> bool {
-    let Expr::BinOp(ast::ExprBinOp {
+fn is_printf_format(expr: flat::View<'_, Expr>) -> bool {
+    let ast::Expr::BinOp(ast::ExprBinOp {
         op: Operator::Mod,
         left,
         ..
-    }) = expr
+    }) = expr.fields()
     else {
         return false;
     };

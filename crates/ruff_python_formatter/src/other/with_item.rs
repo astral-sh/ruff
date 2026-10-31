@@ -1,5 +1,6 @@
 use ruff_formatter::{FormatRuleWithOptions, write};
 use ruff_python_ast::WithItem;
+use ruff_python_ast::flat;
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize, parenthesized};
@@ -80,7 +81,7 @@ impl Default for WithItemLayout {
     }
 }
 
-impl FormatRuleWithOptions<WithItem, PyFormatContext<'_>> for FormatWithItem {
+impl FormatRuleWithOptions<flat::View<'_, WithItem>, PyFormatContext<'_>> for FormatWithItem {
     type Options = WithItemLayout;
 
     fn with_options(self, options: Self::Options) -> Self {
@@ -89,13 +90,9 @@ impl FormatRuleWithOptions<WithItem, PyFormatContext<'_>> for FormatWithItem {
 }
 
 impl FormatNodeRule<WithItem> for FormatWithItem {
-    fn fmt_fields(&self, item: &WithItem, f: &mut PyFormatter) -> FormatResult<()> {
-        let WithItem {
-            range: _,
-            node_index: _,
-            context_expr,
-            optional_vars,
-        } = item;
+    fn fmt_fields(&self, item: flat::View<'_, WithItem>, f: &mut PyFormatter) -> FormatResult<()> {
+        let context_expr = item.context_expr();
+        let optional_vars = item.optional_vars();
 
         let comments = f.context().comments().clone();
         let trailing_as_comments = comments.dangling(item);
@@ -104,7 +101,7 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
         // if the `with` has a single item without a target.
         // E.g., it returns `true` for `with (a)` even though the parentheses
         // belong to the with statement and not the expression but it can't determine that.
-        let is_parenthesized = f.context().is_expression_parenthesized(context_expr.into());
+        let is_parenthesized = f.context().is_expression_parenthesized(context_expr);
 
         match self.layout {
             // Remove the parentheses of the `with_items` if the with statement adds parentheses

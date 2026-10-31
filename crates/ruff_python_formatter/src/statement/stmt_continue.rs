@@ -1,4 +1,5 @@
 use ruff_python_ast::StmtContinue;
+use ruff_python_ast::flat;
 
 use crate::prelude::*;
 
@@ -6,7 +7,11 @@ use crate::prelude::*;
 pub struct FormatStmtContinue;
 
 impl FormatNodeRule<StmtContinue> for FormatStmtContinue {
-    fn fmt_fields(&self, _item: &StmtContinue, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(
+        &self,
+        _item: flat::View<'_, StmtContinue>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         token("continue").fmt(f)
     }
 }

@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use ruff_formatter::{FormatError, FormatOptions, SourceCode, format_args, write};
-use ruff_python_ast::{AnyNodeRef, NodeKind, PySourceType};
+use ruff_python_ast::{NodeKind, PySourceType, flat::AnyNodeRef};
 use ruff_python_trivia::{
     CommentLinePosition, find_trailing_pragma_offset, lines_after, lines_after_ignoring_trivia,
     lines_before,

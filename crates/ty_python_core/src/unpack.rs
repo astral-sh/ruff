@@ -2,7 +2,8 @@ use crate::Program;
 use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast as ast;
+use ruff_python_ast::flat;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Db;
@@ -66,7 +67,11 @@ impl<'db> Unpack<'db> {
         self.program_file(db).python_file(db)
     }
 
-    pub fn target<'ast>(self, db: &'db dyn Db, parsed: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+    pub fn target<'ast>(
+        self,
+        db: &'db dyn Db,
+        parsed: &'ast ParsedModuleRef,
+    ) -> flat::View<'ast, ast::Expr> {
         self._target(db).node(parsed)
     }
 
@@ -105,12 +110,12 @@ impl<'db> UnpackValue<'db> {
         self.expression
     }
 
-    /// Returns the expression as an [`AnyNodeRef`].
+    /// Returns the expression as a [`flat::AnyNodeRef`].
     pub fn as_any_node_ref<'ast>(
         self,
         db: &'db dyn Db,
         module: &'ast ParsedModuleRef,
-    ) -> AnyNodeRef<'ast> {
+    ) -> flat::View<'ast, flat::Any> {
         self.expression().node_ref(db).node(module).into()
     }
 

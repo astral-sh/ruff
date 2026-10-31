@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::flat;
+use ruff_python_ast::{self as ast};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::find_assigned_value;
 use ruff_text_size::Ranged;
@@ -134,19 +135,16 @@ impl Violation for WaitForProcessInAsyncFunction {
 }
 
 /// ASYNC220, ASYNC221, ASYNC222
-pub(crate) fn blocking_process_invocation(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn blocking_process_invocation(checker: &Checker, call: flat::View<'_, ast::ExprCall>) {
     if !checker.semantic().in_async_context() {
         return;
     }
 
-    let Some(qualified_name) = checker
-        .semantic()
-        .resolve_qualified_name(call.func.as_ref())
-    else {
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func()) else {
         return;
     };
 
-    let range = call.func.range();
+    let range = call.func().range();
     match qualified_name.segments() {
         ["subprocess", "Popen"] | ["os", "popen"] => {
             checker.report_diagnostic_if_enabled(CreateSubprocessInAsyncFunction, range)
@@ -174,14 +172,15 @@ pub(crate) fn blocking_process_invocation(checker: &Checker, call: &ast::ExprCal
     };
 }
 
-fn is_p_wait(call: &ast::ExprCall, semantic: &SemanticModel) -> bool {
-    let Some(arg) = call.arguments.find_argument_value("mode", 0) else {
+fn is_p_wait(call: flat::View<'_, ast::ExprCall>, semantic: &SemanticModel) -> bool {
+    let Some(arg) = call.arguments().find_argument_value("mode", 0) else {
         return true;
     };
 
     if let Some(qualified_name) = semantic.resolve_qualified_name(arg) {
         return matches!(qualified_name.segments(), ["os", "P_WAIT"]);
-    } else if let Expr::Name(ast::ExprName { id, .. }) = arg {
+    } else if let flat::ExprKind::Name(name) = arg.classify() {
+        let id = name.id();
         let Some(value) = find_assigned_value(id, semantic) else {
             return false;
         };

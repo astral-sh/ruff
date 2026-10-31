@@ -1,4 +1,7 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+use ruff_python_ast::{
+    ExceptHandler, Stmt,
+    flat::{self, fields as ast},
+};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -52,20 +55,21 @@ impl Violation for ReturnInTryExceptFinally {
     }
 }
 
-fn find_return(stmts: &[Stmt]) -> Option<&Stmt> {
+fn find_return(stmts: flat::Suite<'_>) -> Option<flat::View<'_, Stmt>> {
     stmts.iter().find(|stmt| stmt.is_return_stmt())
 }
 
 /// SIM107
 pub(crate) fn return_in_try_except_finally(
     checker: &Checker,
-    body: &[Stmt],
-    handlers: &[ExceptHandler],
-    finalbody: &[Stmt],
+    body: flat::Suite<'_>,
+    handlers: flat::NodeList<'_, ExceptHandler>,
+    finalbody: flat::Suite<'_>,
 ) {
     let try_has_return = find_return(body).is_some();
     let except_has_return = handlers.iter().any(|handler| {
-        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) = handler;
+        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) =
+            handler.fields();
         find_return(body).is_some()
     });
 

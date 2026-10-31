@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCall;
+use ruff_python_ast::flat;
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
@@ -47,9 +48,11 @@ impl Violation for ExceptionWithoutExcInfo {
 }
 
 /// LOG007
-pub(crate) fn exception_without_exc_info(checker: &Checker, call: &ExprCall) {
-    match call.func.as_ref() {
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+pub(crate) fn exception_without_exc_info(checker: &Checker, call: flat::View<'_, ExprCall>) {
+    match call.func().classify() {
+        flat::ExprKind::Attribute(expr_attribute) => {
+            let attr = expr_attribute.attr();
+
             if !matches!(
                 LoggingLevel::from_attribute(attr.as_str()),
                 Some(LoggingLevel::Exception)
@@ -58,17 +61,17 @@ pub(crate) fn exception_without_exc_info(checker: &Checker, call: &ExprCall) {
             }
 
             if !logging::is_logger_candidate(
-                &call.func,
+                call.func(),
                 checker.semantic(),
                 &checker.settings().logger_objects,
             ) {
                 return;
             }
         }
-        Expr::Name(_) => {
+        flat::ExprKind::Name(_) => {
             if !checker
                 .semantic()
-                .resolve_qualified_name(call.func.as_ref())
+                .resolve_qualified_name(call.func())
                 .is_some_and(|qualified_name| {
                     matches!(qualified_name.segments(), ["logging", "exception"])
                 })
@@ -84,10 +87,10 @@ pub(crate) fn exception_without_exc_info(checker: &Checker, call: &ExprCall) {
     }
 }
 
-fn exc_info_arg_is_falsey(call: &ExprCall, checker: &Checker) -> bool {
-    call.arguments
+fn exc_info_arg_is_falsey(call: flat::View<'_, ExprCall>, checker: &Checker) -> bool {
+    call.arguments()
         .find_keyword("exc_info")
-        .map(|keyword| &keyword.value)
+        .map(flat::View::<ruff_python_ast::Keyword>::value)
         .is_some_and(|value| {
             let truthiness =
                 Truthiness::from_expr(value, |id| checker.semantic().has_builtin_binding(id));

@@ -1,9 +1,10 @@
 use anyhow::Context;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat::visitor;
+use ruff_python_ast::flat::visitor::Visitor;
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::visitor;
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, Identifier, Stmt};
+use ruff_python_ast::{Expr, Identifier, Stmt, StmtAssign};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -67,10 +68,17 @@ impl AlwaysFixableViolation for UnnecessaryAssignBeforeYield {
 }
 
 /// RUF070
-pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: &Stmt) {
-    let Stmt::FunctionDef(function_def) = function_stmt else {
+pub(crate) fn unnecessary_assign_before_yield(
+    checker: &Checker,
+    function_stmt: flat::View<'_, Stmt>,
+) {
+    let flat::StmtKind::FunctionDef(function_def) = function_stmt.classify() else {
         return;
     };
+
+    if !function_def.body_may_contain_yield() {
+        return;
+    }
 
     let Some(function_scope) = checker.semantic().function_scope(function_def) else {
         return;
@@ -78,27 +86,32 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
 
     let visitor = {
         let mut visitor = YieldVisitor::new(checker.semantic());
-        visitor.visit_body(&function_def.body);
+        visitor.visit_body(function_def.body());
         visitor
     };
 
-    for (assign, yield_expr, stmt) in &visitor.assignment_yield {
-        let (value, is_yield_from) = match yield_expr {
-            Expr::Yield(ast::ExprYield {
-                value: Some(value), ..
-            }) => (value.as_ref(), false),
-            Expr::YieldFrom(ast::ExprYieldFrom { value, .. }) => (value.as_ref(), true),
+    for (assign, yield_expr, stmt) in visitor.assignment_yield {
+        let (value, is_yield_from) = match yield_expr.classify() {
+            flat::ExprKind::Yield(expr_yield) if let Some(value) = expr_yield.value() => {
+                (value, false)
+            }
+            flat::ExprKind::YieldFrom(expr_yield_from) => {
+                let value = expr_yield_from.value();
+
+                (value, true)
+            }
             _ => continue,
         };
 
-        let Expr::Name(ast::ExprName { id: yielded_id, .. }) = value else {
+        let flat::ExprKind::Name(name_node) = value.classify() else {
             continue;
         };
+        let yielded_id = name_node.id();
 
-        if let [Expr::Name(ast::ExprName {
+        if let Some([ast::Expr::Name(ast::ExprName {
             id: assigned_id, ..
-        })] = assign.targets.as_slice()
-            && yielded_id == assigned_id
+        })]) = assign.targets().as_array().map(|items| items.map(flat::View::<Expr>::fields))
+            && *yielded_id == *assigned_id
             && !visitor.annotations.contains(assigned_id.as_str())
             && !visitor.non_locals.contains(assigned_id.as_str())
             && let Some(assigned_binding) = function_scope
@@ -127,17 +140,19 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
 
                     let eq_token = checker
                         .tokens()
-                        .before(assign.value.start())
+                        .before(assign.value().start())
                         .iter()
                         .rfind(|token| token.kind() == TokenKind::Equal)
                         .context("Expected an equals token")?;
 
                     let keyword = if is_yield_from { "yield from" } else { "yield" };
-                    let needs_parens =
-                        matches!(assign.value.as_ref(), Expr::Yield(_) | Expr::YieldFrom(_));
+                    let needs_parens = matches!(
+                        assign.value().classify(),
+                        flat::ExprKind::Yield(_) | flat::ExprKind::YieldFrom(_)
+                    );
 
                     let replace_assign = Edit::range_replacement(
-                        if eq_token.end() < assign.value.start() {
+                        if eq_token.end() < assign.value().start() {
                             keyword.to_string()
                         } else {
                             format!("{keyword} ")
@@ -147,8 +162,8 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
 
                     let mut edits = vec![replace_assign, delete_yield];
                     if needs_parens {
-                        edits.push(Edit::insertion("(".to_string(), assign.value.start()));
-                        edits.push(Edit::insertion(")".to_string(), assign.value.end()));
+                        edits.push(Edit::insertion("(".to_string(), assign.value().start()));
+                        edits.push(Edit::insertion(")".to_string(), assign.value().end()));
                     }
 
                     Ok(Fix::unsafe_edits(edits.remove(0), edits))
@@ -165,9 +180,13 @@ struct YieldVisitor<'semantic, 'a> {
     /// The annotated variables in the current function.
     annotations: FxHashSet<&'a str>,
     /// The `assignment`-to-`yield` statement pairs in the current function.
-    assignment_yield: Vec<(&'a ast::StmtAssign, &'a Expr, &'a Stmt)>,
+    assignment_yield: Vec<(
+        flat::View<'a, StmtAssign>,
+        flat::View<'a, Expr>,
+        flat::View<'a, Stmt>,
+    )>,
     /// The preceding sibling of the current node.
-    sibling: Option<&'a Stmt>,
+    sibling: Option<flat::View<'a, Stmt>>,
 }
 
 impl<'semantic, 'a> YieldVisitor<'semantic, 'a> {
@@ -183,39 +202,41 @@ impl<'semantic, 'a> YieldVisitor<'semantic, 'a> {
 }
 
 impl<'a> Visitor<'a> for YieldVisitor<'_, 'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::ClassDef(_) | Stmt::FunctionDef(_) => {
+    fn visit_stmt(&mut self, stmt: flat::View<'a, Stmt>) {
+        match stmt.fields() {
+            ast::Stmt::ClassDef(_) | ast::Stmt::FunctionDef(_) => {
                 // Do not recurse into nested class/function bodies.
                 self.sibling = Some(stmt);
                 return;
             }
-            Stmt::Global(ast::StmtGlobal { names, .. })
-            | Stmt::Nonlocal(ast::StmtNonlocal { names, .. }) => {
-                self.non_locals.extend(names.iter().map(Identifier::as_str));
+            ast::Stmt::Global(ast::StmtGlobal { names, .. })
+            | ast::Stmt::Nonlocal(ast::StmtNonlocal { names, .. }) => {
+                self.non_locals
+                    .extend(names.iter().map(flat::View::<Identifier>::as_str));
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
+            ast::Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
                 // Ex) `x: int`
                 if value.is_none()
-                    && let Expr::Name(name) = target.as_ref()
+                    && let flat::ExprKind::Name(name) = target.classify()
                 {
-                    self.annotations.insert(name.id.as_str());
+                    self.annotations.insert(name.id().as_str());
                 }
             }
-            Stmt::Expr(ast::StmtExpr { value, .. }) => {
-                if matches!(value.as_ref(), Expr::Yield(_) | Expr::YieldFrom(_)) {
-                    match self.sibling {
-                        Some(Stmt::Assign(stmt_assign)) => {
-                            self.assignment_yield
-                                .push((stmt_assign, value.as_ref(), stmt));
+            ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
+                if matches!(
+                    value.classify(),
+                    flat::ExprKind::Yield(_) | flat::ExprKind::YieldFrom(_)
+                ) {
+                    match self.sibling.map(flat::View::<Stmt>::classify) {
+                        Some(flat::StmtKind::Assign(stmt_assign)) => {
+                            self.assignment_yield.push((stmt_assign, value, stmt));
                         }
-                        Some(Stmt::With(with)) => {
+                        Some(flat::StmtKind::With(with)) => {
                             if let Some(stmt_assign) =
-                                with.body.last().and_then(Stmt::as_assign_stmt)
+                                with.body().last().and_then(flat::View::as_assign_stmt)
                                 && !has_conditional_body(with, self.semantic)
                             {
-                                self.assignment_yield
-                                    .push((stmt_assign, value.as_ref(), stmt));
+                                self.assignment_yield.push((stmt_assign, value, stmt));
                             }
                         }
                         _ => {}
@@ -229,7 +250,7 @@ impl<'a> Visitor<'a> for YieldVisitor<'_, 'a> {
         visitor::walk_stmt(self, stmt);
     }
 
-    fn visit_body(&mut self, body: &'a [Stmt]) {
+    fn visit_body(&mut self, body: flat::Suite<'a>) {
         let sibling = self.sibling;
         self.sibling = None;
         visitor::walk_body(self, body);

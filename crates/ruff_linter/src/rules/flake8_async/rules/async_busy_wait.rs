@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_text_size::Ranged;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -62,22 +62,25 @@ impl Violation for AsyncBusyWait {
 }
 
 /// ASYNC110
-pub(crate) fn async_busy_wait(checker: &Checker, while_stmt: &ast::StmtWhile) {
+pub(crate) fn async_busy_wait(checker: &Checker, while_stmt: &fields::StmtWhile<'_>) {
     // The body should be a single `await` call.
-    let [stmt] = while_stmt.body.as_slice() else {
+    let Some([stmt]) = while_stmt.body.as_array() else {
         return;
     };
-    let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
+    let flat::StmtKind::Expr(expr) = stmt.classify() else {
         return;
     };
-    let Expr::Await(ast::ExprAwait { value, .. }) = value.as_ref() else {
+    let value = expr.value();
+    let flat::ExprKind::Await(await_expr) = value.classify() else {
         return;
     };
-    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
+    let value = await_expr.value();
+    let flat::ExprKind::Call(call_node) = value.classify() else {
         return;
     };
+    let func = call_node.func();
 
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(func.as_ref()) else {
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) else {
         return;
     };
 
@@ -89,7 +92,7 @@ pub(crate) fn async_busy_wait(checker: &Checker, while_stmt: &ast::StmtWhile) {
             AsyncBusyWait {
                 module: AsyncModule::try_from(&qualified_name).unwrap(),
             },
-            while_stmt.range(),
+            while_stmt.range,
         );
     }
 }

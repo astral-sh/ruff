@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{Decorator, Expr, ExprCall, Keyword, StmtFunctionDef};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
@@ -80,11 +81,14 @@ impl AlwaysFixableViolation for FastApiRedundantResponseModel {
 }
 
 /// FAST001
-pub(crate) fn fastapi_redundant_response_model(checker: &Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn fastapi_redundant_response_model(
+    checker: &Checker,
+    function_def: flat::View<'_, StmtFunctionDef>,
+) {
     if !checker.semantic().seen_module(Modules::FASTAPI) {
         return;
     }
-    for decorator in &function_def.decorator_list {
+    for decorator in function_def.decorator_list() {
         let Some((call, response_model_arg)) =
             check_decorator(function_def, decorator, checker.semantic())
         else {
@@ -94,8 +98,8 @@ pub(crate) fn fastapi_redundant_response_model(checker: &Checker, function_def: 
             checker.report_diagnostic(FastApiRedundantResponseModel, response_model_arg.range());
         diagnostic.try_set_fix(|| {
             remove_argument(
-                response_model_arg,
-                &call.arguments,
+                &response_model_arg,
+                call.arguments(),
                 Parentheses::Preserve,
                 checker.source(),
                 checker.tokens(),
@@ -106,14 +110,14 @@ pub(crate) fn fastapi_redundant_response_model(checker: &Checker, function_def: 
 }
 
 fn check_decorator<'a>(
-    function_def: &StmtFunctionDef,
-    decorator: &'a Decorator,
+    function_def: flat::View<'_, StmtFunctionDef>,
+    decorator: flat::View<'a, Decorator>,
     semantic: &'a SemanticModel,
-) -> Option<(&'a ExprCall, &'a Keyword)> {
+) -> Option<(flat::View<'a, ExprCall>, flat::View<'a, Keyword>)> {
     let call = is_fastapi_route_decorator(decorator, semantic)?;
-    let response_model_arg = call.arguments.find_keyword("response_model")?;
-    let return_value = function_def.returns.as_ref()?;
-    if is_identical_types(&response_model_arg.value, return_value, semantic) {
+    let response_model_arg = call.arguments().find_keyword("response_model")?;
+    let return_value = function_def.returns()?;
+    if is_identical_types(response_model_arg.value(), return_value, semantic) {
         Some((call, response_model_arg))
     } else {
         None
@@ -121,12 +125,14 @@ fn check_decorator<'a>(
 }
 
 fn is_identical_types(
-    response_model_arg: &Expr,
-    return_value: &Expr,
+    response_model_arg: flat::View<'_, Expr>,
+    return_value: flat::View<'_, Expr>,
     semantic: &SemanticModel,
 ) -> bool {
-    if let (Expr::Name(response_mode_name_expr), Expr::Name(return_value_name_expr)) =
-        (response_model_arg, return_value)
+    if let (
+        flat::ExprKind::Name(response_mode_name_expr),
+        flat::ExprKind::Name(return_value_name_expr),
+    ) = (response_model_arg.classify(), return_value.classify())
     {
         return semantic
             .resolve_name(response_mode_name_expr)
@@ -136,23 +142,25 @@ fn is_identical_types(
                     .is_some_and(|right| left == right)
             });
     }
-    if let (Expr::Subscript(response_mode_subscript), Expr::Subscript(return_value_subscript)) =
-        (response_model_arg, return_value)
+    if let (
+        flat::ExprKind::Subscript(response_mode_subscript),
+        flat::ExprKind::Subscript(return_value_subscript),
+    ) = (response_model_arg.classify(), return_value.classify())
     {
         return is_identical_types(
-            &response_mode_subscript.value,
-            &return_value_subscript.value,
+            response_mode_subscript.value(),
+            return_value_subscript.value(),
             semantic,
         ) && is_identical_types(
-            &response_mode_subscript.slice,
-            &return_value_subscript.slice,
+            response_mode_subscript.slice(),
+            return_value_subscript.slice(),
             semantic,
         );
     }
-    if let (Expr::Tuple(response_mode_tuple), Expr::Tuple(return_value_tuple)) =
-        (response_model_arg, return_value)
+    if let (flat::ExprKind::Tuple(response_mode_tuple), flat::ExprKind::Tuple(return_value_tuple)) =
+        (response_model_arg.classify(), return_value.classify())
     {
-        return response_mode_tuple.len() == return_value_tuple.len()
+        return response_mode_tuple.elts().len() == return_value_tuple.elts().len()
             && response_mode_tuple
                 .iter()
                 .zip(return_value_tuple)

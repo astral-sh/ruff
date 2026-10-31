@@ -1,8 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::visitor;
+use ruff_python_ast::flat::visitor::Visitor;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::visitor;
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, Parameters};
+use ruff_python_ast::{Expr, Parameters};
 use ruff_python_semantic::analyze::typing::{
     is_immutable_annotation, is_immutable_func, is_immutable_newtype_call, is_mutable_func,
 };
@@ -101,9 +102,11 @@ impl<'a, 'b> ArgumentDefaultVisitor<'a, 'b> {
 }
 
 impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
-    fn visit_expr(&mut self, expr: &Expr) {
-        match expr {
-            Expr::Call(ast::ExprCall { func, .. }) => {
+    fn visit_expr(&mut self, expr: flat::View<'_, Expr>) {
+        match expr.classify() {
+            flat::ExprKind::Call(expr_call) => {
+                let func = expr_call.func();
+
                 if !is_mutable_func(func, self.checker.semantic())
                     && !is_immutable_func(
                         func,
@@ -127,7 +130,7 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
                 }
                 visitor::walk_expr(self, expr);
             }
-            Expr::Lambda(_) => {
+            flat::ExprKind::Lambda(_) => {
                 // Don't recurse.
             }
             _ => visitor::walk_expr(self, expr),
@@ -136,7 +139,10 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
 }
 
 /// B008
-pub(crate) fn function_call_in_argument_default(checker: &Checker, parameters: &Parameters) {
+pub(crate) fn function_call_in_argument_default(
+    checker: &Checker,
+    parameters: flat::View<'_, Parameters>,
+) {
     // Map immutable calls to (module, member) format.
     let extend_immutable_calls: Vec<QualifiedName> = checker
         .settings()

@@ -2,7 +2,8 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_ast::Expr;
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_semantic::analyze::typing::{TypeChecker, check_type, traverse_union_and_optional};
 use ruff_text_size::Ranged;
 
@@ -78,7 +79,7 @@ impl Violation for BlockingPathMethodInAsyncFunction {
 }
 
 /// ASYNC240
-pub(crate) fn blocking_os_path(checker: &Checker, call: &ExprCall) {
+pub(crate) fn blocking_os_path(checker: &Checker, call: &ast::ExprCall<'_>) {
     let semantic = checker.semantic();
     if !semantic.in_async_context() {
         return;
@@ -87,7 +88,7 @@ pub(crate) fn blocking_os_path(checker: &Checker, call: &ExprCall) {
     // Check if an expression is calling I/O related os.path method.
     // Just initializing pathlib.Path object is OK, we can return
     // early in that scenario.
-    if let Some(qualified_name) = semantic.resolve_qualified_name(call.func.as_ref()) {
+    if let Some(qualified_name) = semantic.resolve_qualified_name(call.func) {
         let segments = qualified_name.segments();
         if !matches!(segments, ["os", "path", _]) {
             return;
@@ -108,11 +109,15 @@ pub(crate) fn blocking_os_path(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let Some(ast::ExprAttribute { value, attr, .. }) = call.func.as_attribute_expr() else {
+    let Some(ast::ExprAttribute { value, attr, .. }) = call
+        .func
+        .as_attribute_expr()
+        .map(flat::View::<ruff_python_ast::ExprAttribute>::fields)
+    else {
         return;
     };
 
-    if !maybe_calling_io_operation(attr.id.as_str()) {
+    if !maybe_calling_io_operation(attr.id().as_str()) {
         return;
     }
 
@@ -152,7 +157,7 @@ struct PathlibPathChecker;
 impl PathlibPathChecker {
     fn is_pathlib_path_constructor(
         semantic: &ruff_python_semantic::SemanticModel,
-        expr: &Expr,
+        expr: flat::View<'_, Expr>,
     ) -> bool {
         let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
             return false;
@@ -174,7 +179,10 @@ impl PathlibPathChecker {
 }
 
 impl TypeChecker for PathlibPathChecker {
-    fn match_annotation(annotation: &Expr, semantic: &ruff_python_semantic::SemanticModel) -> bool {
+    fn match_annotation(
+        annotation: flat::View<'_, Expr>,
+        semantic: &ruff_python_semantic::SemanticModel,
+    ) -> bool {
         if Self::is_pathlib_path_constructor(semantic, annotation) {
             return true;
         }
@@ -193,12 +201,13 @@ impl TypeChecker for PathlibPathChecker {
     }
 
     fn match_initializer(
-        initializer: &Expr,
+        initializer: flat::View<'_, Expr>,
         semantic: &ruff_python_semantic::SemanticModel,
     ) -> bool {
-        let Expr::Call(ast::ExprCall { func, .. }) = initializer else {
+        let flat::ExprKind::Call(call_node) = initializer.classify() else {
             return false;
         };
+        let func = call_node.func();
 
         Self::is_pathlib_path_constructor(semantic, func)
     }

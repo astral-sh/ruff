@@ -1,6 +1,7 @@
 use itertools::Itertools;
-use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::{self as ast, Expr, LiteralExpressionRef, UnaryOp};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::helpers::map_subscript;
+use ruff_python_ast::{Expr, UnaryOp};
 use ruff_python_semantic::SemanticModel;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -68,13 +69,21 @@ impl Violation for MagicValueComparison {
     }
 }
 
-/// If an [`Expr`] is a literal (or unary operation on a literal), return the [`LiteralExpressionRef`]
+/// If an [`Expr`] is a literal (or unary operation on a literal), return the [`flat::LiteralExpression`]
 /// and its unary operator, if any.
-fn as_literal(expr: &Expr) -> Option<(LiteralExpressionRef<'_>, Option<&UnaryOp>)> {
-    match expr {
-        Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. })
-            if matches!(op, UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert) =>
+fn as_literal(
+    expr: flat::View<'_, Expr>,
+) -> Option<(flat::LiteralExpression<'_>, Option<UnaryOp>)> {
+    match expr.classify() {
+        flat::ExprKind::UnaryOp(expr_unary_op)
+            if matches!(
+                expr_unary_op.op(),
+                UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert
+            ) =>
         {
+            let op = expr_unary_op.op();
+            let operand = expr_unary_op.operand();
+
             operand.as_literal_expr().map(|literal| (literal, Some(op)))
         }
         _ => expr.as_literal_expr().map(|literal| (literal, None)),
@@ -82,8 +91,8 @@ fn as_literal(expr: &Expr) -> Option<(LiteralExpressionRef<'_>, Option<&UnaryOp>
 }
 
 fn is_magic_value(
-    literal_expr: LiteralExpressionRef,
-    unary_op: Option<&UnaryOp>,
+    literal_expr: flat::LiteralExpression<'_>,
+    unary_op: Option<UnaryOp>,
     settings: &Settings,
 ) -> bool {
     // Check if the literal type is in the allowed types list
@@ -105,9 +114,9 @@ fn is_magic_value(
     // Ignore `None`, `Bool`, and `Ellipsis` constants.
     !matches!(
         literal_expr,
-        LiteralExpressionRef::NoneLiteral(_)
-            | LiteralExpressionRef::BooleanLiteral(_)
-            | LiteralExpressionRef::EllipsisLiteral(_)
+        flat::LiteralExpression::NoneLiteral(_)
+            | flat::LiteralExpression::BooleanLiteral(_)
+            | flat::LiteralExpression::EllipsisLiteral(_)
     )
 }
 
@@ -116,7 +125,7 @@ fn is_magic_value(
 /// `sys.implementation.version`, or a subscript/attribute access on any of
 /// them (for example, `sys.version_info[0]` or
 /// `sys.implementation.version.major`).
-fn is_sys_version_comparand(expr: &Expr, semantic: &SemanticModel) -> bool {
+fn is_sys_version_comparand(expr: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
     let Some(qualified_name) = semantic.resolve_qualified_name(map_subscript(expr)) else {
         return false;
     };
@@ -127,7 +136,7 @@ fn is_sys_version_comparand(expr: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// PLR2004
-pub(crate) fn magic_value_comparison(checker: &Checker, operands: &[Expr]) {
+pub(crate) fn magic_value_comparison(checker: &Checker, operands: flat::NodeList<'_, Expr>) {
     for (left, right) in operands.iter().tuple_windows() {
         // If both of the comparators are literals, skip rule for the whole expression.
         // R0133: comparison-of-constants
@@ -144,7 +153,7 @@ pub(crate) fn magic_value_comparison(checker: &Checker, operands: &[Expr]) {
             && !previous.is_some_and(|expr| is_sys_version_comparand(expr, checker.semantic()))
             && !operands
                 .peek()
-                .is_some_and(|expr| is_sys_version_comparand(expr, checker.semantic()))
+                .is_some_and(|expr| is_sys_version_comparand(*expr, checker.semantic()))
         {
             checker.report_diagnostic(
                 MagicValueComparison {

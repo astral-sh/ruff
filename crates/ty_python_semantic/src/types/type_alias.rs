@@ -1,4 +1,5 @@
 use crate::ProgramEnvironment;
+use ruff_python_ast::flat;
 use std::fmt::Write;
 
 use crate::{
@@ -227,7 +228,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
 
-        definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
+        definition_expression_type(db, definition, type_alias_stmt_node.node(&module).value())
     }
 
     fn apply_specialization(
@@ -266,8 +267,7 @@ impl<'db> PEP695TypeAliasType<'db> {
 
         type_alias_stmt_node
             .node(&parsed)
-            .type_params
-            .as_ref()
+            .type_params()
             .and_then(|type_params| {
                 let index = semantic_index(db, program_file);
                 let definition = index.expect_single_definition(type_alias_stmt_node);
@@ -278,10 +278,16 @@ impl<'db> PEP695TypeAliasType<'db> {
 
 /// Find the `name` and `value` arguments to `TypeAliasType`. If either is supplied
 /// twice, use the positional argument for error recovery.
-pub(super) fn type_alias_arguments(arguments: &ast::Arguments) -> Option<(&ast::Expr, &ast::Expr)> {
-    let keyword = |name| arguments.find_keyword(name).map(|keyword| &keyword.value);
-    let name = arguments.args.first().or_else(|| keyword("name"))?;
-    let value = arguments.args.get(1).or_else(|| keyword("value"))?;
+pub(super) fn type_alias_arguments(
+    arguments: flat::View<'_, ast::Arguments>,
+) -> Option<(flat::View<'_, ast::Expr>, flat::View<'_, ast::Expr>)> {
+    let keyword = |name| {
+        arguments
+            .find_keyword(name)
+            .map(flat::View::<ast::Keyword>::value)
+    };
+    let name = arguments.args().first().or_else(|| keyword("name"))?;
+    let value = arguments.args().get(1).or_else(|| keyword("value"))?;
     Some((name, value))
 }
 
@@ -347,10 +353,10 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
             return Type::unknown();
         };
         let value_node = assignment.value(&module);
-        let ast::Expr::Call(call) = value_node else {
+        let flat::ExprKind::Call(call) = value_node.classify() else {
             return Type::unknown();
         };
-        let Some((_, value_arg)) = type_alias_arguments(&call.arguments) else {
+        let Some((_, value_arg)) = type_alias_arguments(call.arguments()) else {
             return Type::unknown();
         };
         definition_expression_type(db, definition, value_arg)
@@ -384,17 +390,17 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
             return None;
         };
-        let ast::Expr::Call(call) = assignment.value(&module) else {
+        let flat::ExprKind::Call(call) = assignment.value(&module).classify() else {
             return None;
         };
         let type_params = call
-            .arguments
+            .arguments()
             .find_argument_value("type_params", 2)?
             .as_tuple_expr()?;
         let index = semantic_index(db, file);
 
         let mut variables = FxOrderSet::default();
-        for element in &type_params.elts {
+        for element in type_params.elts() {
             let typevar = match definition_expression_type(db, definition, element) {
                 Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => bind_typevar(
                     db,

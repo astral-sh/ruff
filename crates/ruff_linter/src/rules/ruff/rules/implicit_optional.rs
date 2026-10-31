@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr, Operator, Parameters};
+use ruff_python_ast::{self as ast, Expr, Operator, Parameters, flat};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -137,15 +137,19 @@ impl From<PythonVersion> for ConversionType {
 }
 
 /// Generate a [`Fix`] for the given [`Expr`] as per the [`ConversionType`].
-fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr) -> Result<Fix> {
+fn generate_fix(
+    checker: &Checker,
+    conversion_type: ConversionType,
+    expr: flat::View<'_, Expr>,
+) -> Result<Fix> {
     match conversion_type {
         ConversionType::BinOpOr => {
             let new_expr = Expr::BinOp(ast::ExprBinOp {
-                left: Box::new(expr.clone()),
+                left: Box::new(expr.to_owned_node()),
                 op: Operator::BitOr,
                 right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
             });
             let content = checker.generator().expr(&new_expr);
             let edit = Edit::range_replacement(content, expr.range());
@@ -165,14 +169,14 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
             let (import_edit, binding) = importer.import(expr.start())?;
             let new_expr = Expr::Subscript(ast::ExprSubscript {
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
                 value: Box::new(Expr::Name(ast::ExprName {
                     id: Name::new(binding),
                     ctx: ast::ExprContext::Store,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    node_index: ruff_python_ast::NodeIndex::NONE,
                 })),
-                slice: Box::new(expr.clone()),
+                slice: Box::new(expr.to_owned_node()),
                 ctx: ast::ExprContext::Load,
             });
             let content = checker.generator().expr(&new_expr);
@@ -185,16 +189,18 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
 }
 
 /// RUF013
-pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
+pub(crate) fn implicit_optional(checker: &Checker, parameters: flat::View<'_, Parameters>) {
     for parameter in parameters.iter_non_variadic_params() {
-        let Some(Expr::NoneLiteral(_)) = parameter.default() else {
+        let Some(flat::ExprKind::NoneLiteral(_)) =
+            parameter.default().map(flat::View::<Expr>::classify)
+        else {
             continue;
         };
         let Some(annotation) = parameter.annotation() else {
             continue;
         };
 
-        if let Expr::StringLiteral(string_expr) = annotation {
+        if let flat::ExprKind::StringLiteral(string_expr) = annotation.classify() {
             // Quoted annotation.
             if let Ok(parsed_annotation) = checker.parse_type_annotation(string_expr) {
                 let Some(expr) = type_hint_explicitly_allows_none(

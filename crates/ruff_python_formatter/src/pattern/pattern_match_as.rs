@@ -1,6 +1,7 @@
 use ruff_formatter::write;
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::PatternMatchAs;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::AnyNodeRef;
 
 use crate::comments::dangling_comments;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
@@ -10,13 +11,13 @@ use crate::prelude::*;
 pub struct FormatPatternMatchAs;
 
 impl FormatNodeRule<PatternMatchAs> for FormatPatternMatchAs {
-    fn fmt_fields(&self, item: &PatternMatchAs, f: &mut PyFormatter) -> FormatResult<()> {
-        let PatternMatchAs {
-            range: _,
-            node_index: _,
-            pattern,
-            name,
-        } = item;
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, PatternMatchAs>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let pattern = item.pattern();
+        let name = item.name();
 
         let comments = f.context().comments().clone();
 
@@ -24,7 +25,7 @@ impl FormatNodeRule<PatternMatchAs> for FormatPatternMatchAs {
             if let Some(pattern) = pattern {
                 pattern.format().fmt(f)?;
 
-                if comments.has_trailing(pattern.as_ref()) {
+                if comments.has_trailing(pattern) {
                     write!(f, [hard_line_break()])?;
                 } else {
                     write!(f, [space()])?;
@@ -51,13 +52,13 @@ impl FormatNodeRule<PatternMatchAs> for FormatPatternMatchAs {
     }
 }
 
-impl NeedsParentheses for PatternMatchAs {
+impl NeedsParentheses for flat::View<'_, PatternMatchAs> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if self.name.is_some() {
+        if self.name().is_some() {
             OptionalParentheses::Multiline
         } else {
             OptionalParentheses::BestFit

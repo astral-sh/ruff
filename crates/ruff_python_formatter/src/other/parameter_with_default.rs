@@ -1,5 +1,6 @@
 use ruff_formatter::write;
 use ruff_python_ast::ParameterWithDefault;
+use ruff_python_ast::flat;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -9,18 +10,18 @@ use crate::prelude::*;
 pub struct FormatParameterWithDefault;
 
 impl FormatNodeRule<ParameterWithDefault> for FormatParameterWithDefault {
-    fn fmt_fields(&self, item: &ParameterWithDefault, f: &mut PyFormatter) -> FormatResult<()> {
-        let ParameterWithDefault {
-            range: _,
-            node_index: _,
-            parameter,
-            default,
-        } = item;
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, ParameterWithDefault>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let parameter = item.parameter();
+        let default = item.default();
 
         write!(f, [parameter.format()])?;
 
         if let Some(default) = default {
-            let space = parameter.annotation.is_some().then_some(space());
+            let space = parameter.annotation().is_some().then_some(space());
             // ```python
             // def f(
             //     a = # parameter trailing comment; needs line break
@@ -38,7 +39,7 @@ impl FormatNodeRule<ParameterWithDefault> for FormatParameterWithDefault {
             // )
             // ```
             let needs_line_break_trailing = f.context().comments().has_trailing(parameter);
-            let default_first_comment = f.context().comments().leading(default.as_ref()).first();
+            let default_first_comment = f.context().comments().leading(default).first();
             let needs_line_break_leading =
                 default_first_comment.is_some_and(|default_leading_comment| {
                     let mut tokenizer = SimpleTokenizer::new(

@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{self as ast, identifier::Identifier};
 use ruff_python_semantic::analyze::function_type::is_subject_to_liskov_substitution_principle;
 use ruff_python_semantic::analyze::{function_type, visibility};
@@ -73,7 +74,7 @@ impl Violation for TooManyPositionalArguments {
 /// PLR0917
 pub(crate) fn too_many_positional_arguments(
     checker: &Checker,
-    function_def: &ast::StmtFunctionDef,
+    function_def: flat::View<'_, ast::StmtFunctionDef>,
 ) {
     // https://github.com/astral-sh/ruff/issues/14535
     if checker.source_type.is_stub() {
@@ -83,11 +84,16 @@ pub(crate) fn too_many_positional_arguments(
 
     // Count the number of positional arguments.
     let num_positional_args = function_def
-        .parameters
-        .posonlyargs
+        .parameters()
+        .posonlyargs()
         .iter()
-        .chain(&function_def.parameters.args)
-        .filter(|param| !checker.settings().dummy_variable_rgx.is_match(param.name()))
+        .chain(function_def.parameters().args())
+        .filter(|param| {
+            !checker
+                .settings()
+                .dummy_variable_rgx
+                .is_match(param.name().as_str())
+        })
         .count();
 
     if num_positional_args <= checker.settings().pylint.max_positional_args {
@@ -96,8 +102,8 @@ pub(crate) fn too_many_positional_arguments(
 
     // Allow excessive arguments in `@override` or `@overload` methods, since they're required
     // to adhere to the parent signature.
-    if visibility::is_override(&function_def.decorator_list, semantic)
-        || visibility::is_overload(&function_def.decorator_list, semantic)
+    if visibility::is_override(function_def.decorator_list(), semantic)
+        || visibility::is_overload(function_def.decorator_list(), semantic)
     {
         return;
     }
@@ -105,8 +111,8 @@ pub(crate) fn too_many_positional_arguments(
     // Check if the function is a method or class method.
     let num_positional_args = if matches!(
         function_type::classify(
-            &function_def.name,
-            &function_def.decorator_list,
+            function_def.name().as_str(),
+            function_def.decorator_list(),
             semantic.current_scope(),
             semantic,
             &checker.settings().pep8_naming.classmethod_decorators,
@@ -135,8 +141,8 @@ pub(crate) fn too_many_positional_arguments(
         function_def.identifier(),
     );
     if is_subject_to_liskov_substitution_principle(
-        &function_def.name,
-        &function_def.decorator_list,
+        function_def.name().as_str(),
+        function_def.decorator_list(),
         semantic.current_scope(),
         semantic,
         &checker.settings().pep8_naming.classmethod_decorators,

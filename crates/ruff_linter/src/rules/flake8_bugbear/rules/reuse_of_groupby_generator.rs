@@ -1,7 +1,10 @@
-use ruff_python_ast::{self as ast, Comprehension, Expr, Stmt};
+use ruff_python_ast::{
+    Comprehension, Expr, Stmt,
+    flat::{self, fields as ast},
+};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::visitor::{self, Visitor};
+use ruff_python_ast::flat::visitor::{self, Visitor};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -70,7 +73,7 @@ struct GroupNameFinder<'a> {
     /// branch order.
     counter_stack: Vec<Vec<u32>>,
     /// A list of reused expressions.
-    exprs: Vec<&'a Expr>,
+    exprs: Vec<flat::View<'a, Expr>>,
 }
 
 impl<'a> GroupNameFinder<'a> {
@@ -85,8 +88,9 @@ impl<'a> GroupNameFinder<'a> {
         }
     }
 
-    fn name_matches(&self, expr: &Expr) -> bool {
-        if let Expr::Name(ast::ExprName { id, .. }) = expr {
+    fn name_matches(&self, expr: flat::View<'_, Expr>) -> bool {
+        if let flat::ExprKind::Name(name_node_view) = expr.classify() {
+            let id = name_node_view.id();
             id == self.group_name
         } else {
             false
@@ -117,14 +121,16 @@ impl<'a> GroupNameFinder<'a> {
 }
 
 impl<'a> Visitor<'a> for GroupNameFinder<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+    fn visit_stmt(&mut self, stmt: flat::View<'a, Stmt>) {
         if self.overridden {
             return;
         }
-        match stmt {
-            Stmt::For(ast::StmtFor {
-                target, iter, body, ..
-            }) => {
+        match stmt.classify() {
+            flat::StmtKind::For(stmt_for) => {
+                let target = stmt_for.target();
+                let iter = stmt_for.iter();
+                let body = stmt_for.body();
+
                 if self.name_matches(target) {
                     self.overridden = true;
                 } else {
@@ -147,18 +153,18 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                     self.nested = false;
                 }
             }
-            Stmt::While(ast::StmtWhile { body, .. }) => {
+            flat::StmtKind::While(stmt_while) => {
+                let body = stmt_while.body();
+
                 self.nested = true;
                 visitor::walk_body(self, body);
                 self.nested = false;
             }
-            Stmt::If(ast::StmtIf {
-                test,
-                body,
-                elif_else_clauses,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::StmtKind::If(stmt_if) => {
+                let test = stmt_if.test();
+                let body = stmt_if.body();
+                let elif_else_clauses = stmt_if.elif_else_clauses();
+
                 // Visit the test before pushing the branch counters as it
                 // is evaluated unconditionally.
                 self.visit_expr(test);
@@ -183,12 +189,10 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                     self.increment_usage_count(max_count);
                 }
             }
-            Stmt::Match(ast::StmtMatch {
-                subject,
-                cases,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::StmtKind::Match(stmt_match) => {
+                let subject = stmt_match.subject();
+                let cases = stmt_match.cases();
+
                 // Visit the subject before pushing the branch counters as it
                 // is evaluated unconditionally.
                 self.visit_expr(subject);
@@ -204,28 +208,32 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                     self.increment_usage_count(max_count);
                 }
             }
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+            flat::StmtKind::Assign(stmt_assign) => {
+                let targets = stmt_assign.targets();
+                let value = stmt_assign.value();
+
                 if targets.iter().any(|target| self.name_matches(target)) {
                     self.overridden = true;
                 } else {
                     self.visit_expr(value);
                 }
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
+            flat::StmtKind::AnnAssign(stmt_ann_assign) => {
+                let target = stmt_ann_assign.target();
+                let value = stmt_ann_assign.value();
+
                 if self.name_matches(target) {
                     self.overridden = true;
                 } else if let Some(expr) = value {
                     self.visit_expr(expr);
                 }
             }
-            Stmt::Continue(_) | Stmt::Break(_) => {
+            flat::StmtKind::Continue(_) | flat::StmtKind::Break(_) => {
                 self.reset_usage_count();
             }
-            Stmt::Return(ast::StmtReturn {
-                value,
-                range: _,
-                node_index: _,
-            }) => {
+            flat::StmtKind::Return(stmt_return) => {
+                let value = stmt_return.value();
+
                 if let Some(expr) = value {
                     self.visit_expr(expr);
                 }
@@ -235,23 +243,24 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
         }
     }
 
-    fn visit_comprehension(&mut self, comprehension: &'a Comprehension) {
-        if self.name_matches(&comprehension.target) {
+    fn visit_comprehension(&mut self, comprehension: flat::View<'a, Comprehension>) {
+        if self.name_matches(comprehension.target()) {
             self.overridden = true;
         }
         if self.overridden {
             return;
         }
-        if self.name_matches(&comprehension.iter) {
+        if self.name_matches(comprehension.iter()) {
             self.increment_usage_count(1);
             if self.usage_count > 1 {
-                self.exprs.push(&comprehension.iter);
+                self.exprs.push(comprehension.iter());
             }
         }
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        if let Expr::Named(ast::ExprNamed { target, .. }) = expr {
+    fn visit_expr(&mut self, expr: flat::View<'a, Expr>) {
+        if let flat::ExprKind::Named(named) = expr.classify() {
+            let target = named.target();
             if self.name_matches(target) {
                 self.overridden = true;
             }
@@ -260,18 +269,18 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
             return;
         }
 
-        match expr {
-            Expr::ListComp(ast::ExprListComp {
+        match expr.fields() {
+            ast::Expr::ListComp(ast::ExprListComp {
                 elt,
                 generators,
                 range: _,
-                node_index: _,
+                node: _,
             })
-            | Expr::SetComp(ast::ExprSetComp {
+            | ast::Expr::SetComp(ast::ExprSetComp {
                 elt,
                 generators,
                 range: _,
-                node_index: _,
+                node: _,
             }) => {
                 for comprehension in generators {
                     self.visit_comprehension(comprehension);
@@ -282,12 +291,12 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                     self.nested = false;
                 }
             }
-            Expr::DictComp(ast::ExprDictComp {
+            ast::Expr::DictComp(ast::ExprDictComp {
                 key,
                 value,
                 generators,
                 range: _,
-                node_index: _,
+                node: _,
             }) => {
                 for comprehension in generators {
                     self.visit_comprehension(comprehension);
@@ -328,24 +337,26 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
 /// B031
 pub(crate) fn reuse_of_groupby_generator(
     checker: &Checker,
-    target: &Expr,
-    body: &[Stmt],
-    iter: &Expr,
+    target: flat::View<'_, Expr>,
+    body: flat::Suite<'_>,
+    iter: flat::View<'_, Expr>,
 ) {
-    let Expr::Call(ast::ExprCall { func, .. }) = &iter else {
+    let flat::ExprKind::Call(call_node) = iter.classify() else {
         return;
     };
-    let Expr::Tuple(tuple) = target else {
+    let func = call_node.func();
+    let flat::ExprKind::Tuple(tuple) = target.classify() else {
         // Ignore any `groupby()` invocation that isn't unpacked
         return;
     };
-    if tuple.len() != 2 {
+    if tuple.elts().len() != 2 {
         return;
     }
     // We have an invocation of groupby which is a simple unpacking
-    let Expr::Name(ast::ExprName { id: group_name, .. }) = &tuple.elts[1] else {
+    let flat::ExprKind::Name(name_node) = tuple.elts().at(1).classify() else {
         return;
     };
+    let group_name = name_node.id();
     // Check if the function call is `itertools.groupby`
     if !checker
         .semantic()

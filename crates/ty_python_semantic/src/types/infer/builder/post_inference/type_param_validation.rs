@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast::{self as ast, flat, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::diagnostic::format_enumeration;
@@ -20,17 +20,17 @@ pub(crate) enum TypeParameterOwner<'a> {
 /// specialized and intentionally do not use this validation.
 pub(crate) fn check_single_typevar_tuple_pep695(
     context: &InferContext<'_, '_>,
-    type_params: &ast::TypeParams,
+    type_params: flat::View<'_, ast::TypeParams>,
     owner: TypeParameterOwner<'_>,
 ) {
     let (owner_kind, owner_name) = match owner {
         TypeParameterOwner::GenericClass(name) => ("Generic class", name),
         TypeParameterOwner::TypeAlias(name) => ("Type alias", name),
     };
-    let mut first_typevar_tuple: Option<&ast::TypeParamTypeVarTuple> = None;
+    let mut first_typevar_tuple: Option<flat::View<'_, ast::TypeParamTypeVarTuple>> = None;
 
     for type_param in type_params {
-        let ast::TypeParam::TypeVarTuple(typevar_tuple) = type_param else {
+        let flat::TypeParamKind::TypeVarTuple(typevar_tuple) = type_param.classify() else {
             continue;
         };
 
@@ -49,12 +49,12 @@ pub(crate) fn check_single_typevar_tuple_pep695(
 
         diagnostic.set_primary_annotation_message(format_args!(
             "`{}` is an additional TypeVarTuple",
-            typevar_tuple.name
+            typevar_tuple.name()
         ));
 
         diagnostic.annotate(context.secondary(first_typevar_tuple).message(format_args!(
             "`{}` is the first TypeVarTuple",
-            first_typevar_tuple.name
+            first_typevar_tuple.name()
         )));
 
         diagnostic.info(
@@ -67,7 +67,7 @@ pub(crate) fn check_single_typevar_tuple_pep695(
 
 pub(crate) fn check_no_default_after_typevar_tuple_pep695(
     context: &InferContext<'_, '_>,
-    type_params: &ast::TypeParams,
+    type_params: flat::View<'_, ast::TypeParams>,
 ) {
     check_no_default_after_typevar_tuple(
         context,
@@ -75,12 +75,12 @@ pub(crate) fn check_no_default_after_typevar_tuple_pep695(
         |param| {
             param
                 .as_type_var_tuple()
-                .map(|pack| (&pack.name.id, pack.range()))
+                .map(|pack| (pack.name().id(), pack.range()))
         },
         |param| {
             let typevar = param.as_type_var()?;
-            typevar.default.as_ref()?;
-            Some((&typevar.name.id, typevar.range()))
+            typevar.default()?;
+            Some((typevar.name().id(), typevar.range()))
         },
     );
 }

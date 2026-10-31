@@ -1,7 +1,8 @@
 use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, AtomicNodeIndex, Expr, Stmt, StmtExpr, StmtWith, WithItem};
+use ruff_python_ast::flat;
+use ruff_python_ast::{self as ast, Expr, NodeIndex, Stmt, StmtExpr, StmtWith, WithItem};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
 use ruff_source_file::UniversalNewlines;
@@ -90,7 +91,7 @@ impl fmt::Display for PytestContextType {
 }
 
 impl PytestContextType {
-    fn from_expr_name(func: &Expr, semantic: &SemanticModel) -> Option<Self> {
+    fn from_expr_name(func: flat::View<'_, Expr>, semantic: &SemanticModel) -> Option<Self> {
         semantic
             .resolve_qualified_name(func)
             .and_then(|qualified_name| match qualified_name.segments() {
@@ -118,25 +119,29 @@ impl PytestContextType {
 }
 
 /// RUF061
-pub(crate) fn legacy_raises_warns_deprecated_call(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn legacy_raises_warns_deprecated_call(
+    checker: &Checker,
+    call: flat::View<'_, ast::ExprCall>,
+) {
     let semantic = checker.semantic();
-    let Some(context_type) = PytestContextType::from_expr_name(&call.func, semantic) else {
+    let Some(context_type) = PytestContextType::from_expr_name(call.func(), semantic) else {
         return;
     };
 
     let (func_arg_name, func_arg_position) = context_type.func_arg();
     if call
-        .arguments
+        .arguments()
         .find_argument(func_arg_name, func_arg_position)
         .is_none()
     {
         return;
     }
 
-    if let Stmt::With(ast::StmtWith { items, .. }) = semantic.current_statement() {
+    if let flat::StmtKind::With(with_node) = semantic.current_statement().classify() {
+        let items = with_node.items();
         if items
             .iter()
-            .any(|item| item.context_expr.as_call_expr() == Some(call))
+            .any(|item| item.context_expr().as_call_expr() == Some(call))
         {
             return;
         }
@@ -174,11 +179,13 @@ pub(crate) fn legacy_raises_warns_deprecated_call(checker: &Checker, call: &ast:
 
 fn try_fix_legacy_call(
     context_type: PytestContextType,
-    stmt: &Stmt,
+    stmt: flat::View<'_, Stmt>,
     semantic: &SemanticModel,
 ) -> Option<StmtWith> {
-    match stmt {
-        Stmt::Expr(StmtExpr { value, .. }) => {
+    match stmt.classify() {
+        flat::StmtKind::Expr(stmt_expr) => {
+            let value = stmt_expr.value();
+
             let call = value.as_call_expr()?;
 
             // Handle two patterns for legacy calls:
@@ -189,37 +196,38 @@ fn try_fix_legacy_call(
             // `raises` (not `warns`/`deprecated_call`) since only `raises` returns an ExceptionInfo
             // object with a .match() method. We need to preserve this match condition when converting
             // to context manager form.
-            if PytestContextType::from_expr_name(&call.func, semantic) == Some(context_type) {
+            if PytestContextType::from_expr_name(call.func(), semantic) == Some(context_type) {
                 generate_with_statement(context_type, call, None, None, None)
             } else if let PytestContextType::Raises = context_type {
                 let inner_raises_call = call
-                    .func
+                    .func()
                     .as_attribute_expr()
-                    .filter(|expr_attribute| &expr_attribute.attr == "match")
-                    .and_then(|expr_attribute| expr_attribute.value.as_call_expr())
+                    .filter(|expr_attribute| expr_attribute.attr() == "match")
+                    .and_then(|expr_attribute| expr_attribute.value().as_call_expr())
                     .filter(|inner_call| {
-                        PytestContextType::from_expr_name(&inner_call.func, semantic)
+                        PytestContextType::from_expr_name(inner_call.func(), semantic)
                             == Some(PytestContextType::Raises)
                     })?;
-                let match_arg = call.arguments.args.first();
+                let match_arg = call.arguments().args().first();
                 generate_with_statement(context_type, inner_raises_call, match_arg, None, None)
             } else {
                 None
             }
         }
-        Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+        flat::StmtKind::Assign(stmt_assign) => {
+            let targets = stmt_assign.targets();
+            let value = stmt_assign.value();
+
             let call = value.as_call_expr().filter(|call| {
-                PytestContextType::from_expr_name(&call.func, semantic) == Some(context_type)
+                PytestContextType::from_expr_name(call.func(), semantic) == Some(context_type)
             })?;
             let (optional_vars, assign_targets) = match context_type {
                 PytestContextType::Raises => {
-                    let [target] = targets.as_slice() else {
-                        return None;
-                    };
+                    let [target] = targets.as_array()?;
                     (Some(target), None)
                 }
                 PytestContextType::Warns | PytestContextType::DeprecatedCall => {
-                    (None, Some(targets.as_slice()))
+                    (None, Some(targets))
                 }
             };
 
@@ -231,59 +239,66 @@ fn try_fix_legacy_call(
 
 fn generate_with_statement(
     context_type: PytestContextType,
-    legacy_call: &ast::ExprCall,
-    match_arg: Option<&Expr>,
-    optional_vars: Option<&Expr>,
-    assign_targets: Option<&[Expr]>,
+    legacy_call: flat::View<'_, ast::ExprCall>,
+    match_arg: Option<flat::View<'_, Expr>>,
+    optional_vars: Option<flat::View<'_, Expr>>,
+    assign_targets: Option<flat::NodeList<'_, Expr>>,
 ) -> Option<StmtWith> {
     let expected = if let Some((name, position)) = context_type.expected_arg() {
-        Some(legacy_call.arguments.find_argument_value(name, position)?)
+        Some(
+            legacy_call
+                .arguments()
+                .find_argument_value(name, position)?,
+        )
     } else {
         None
     };
 
     let (func_arg_name, func_arg_position) = context_type.func_arg();
     let func = legacy_call
-        .arguments
+        .arguments()
         .find_argument_value(func_arg_name, func_arg_position)?;
 
     let (func_args, func_keywords): (Vec<_>, Vec<_>) = legacy_call
-        .arguments
+        .arguments()
         .iter_source_order()
         .skip(if expected.is_some() { 2 } else { 1 })
         .partition_map(|arg_or_keyword| match arg_or_keyword {
-            ast::ArgOrKeyword::Arg(expr) => Either::Left(expr.clone()),
-            ast::ArgOrKeyword::Keyword(keyword) => Either::Right(keyword.clone()),
+            flat::ArgOrKeyword::Arg(expr) => Either::Left(expr.to_owned_node()),
+            flat::ArgOrKeyword::Keyword(keyword) => Either::Right(keyword.to_owned_node()),
         });
 
     let context_call = ast::ExprCall {
-        node_index: AtomicNodeIndex::NONE,
+        node_index: NodeIndex::NONE,
         range_start: ruff_text_size::TextSize::default(),
-        func: legacy_call.func.clone(),
+        func: Box::new(legacy_call.func().to_owned_node()),
         arguments: ast::Arguments {
-            node_index: AtomicNodeIndex::NONE,
+            node_index: NodeIndex::NONE,
             range: TextRange::default(),
-            args: expected.cloned().as_slice().into(),
+            args: expected
+                .map(flat::View::to_owned_node)
+                .into_iter()
+                .collect(),
             keywords: match_arg
                 .map(|expr| ast::Keyword {
-                    node_index: AtomicNodeIndex::NONE,
+                    node_index: NodeIndex::NONE,
                     // Take range from the original expression so that the keyword
                     // argument is generated after positional arguments
                     range: expr.range(),
                     arg: Some(ast::Identifier::new("match", TextRange::default())),
-                    value: expr.clone(),
+                    value: expr.to_owned_node(),
                 })
-                .as_slice()
-                .into(),
+                .into_iter()
+                .collect(),
         },
     };
 
     let func_call = ast::ExprCall {
-        node_index: AtomicNodeIndex::NONE,
+        node_index: NodeIndex::NONE,
         range_start: ruff_text_size::TextSize::default(),
-        func: Box::new(func.clone()),
+        func: Box::new(func.to_owned_node()),
         arguments: ast::Arguments {
-            node_index: AtomicNodeIndex::NONE,
+            node_index: NodeIndex::NONE,
             range: TextRange::default(),
             args: func_args.into(),
             keywords: func_keywords.into(),
@@ -292,28 +307,31 @@ fn generate_with_statement(
 
     let body = if let Some(assign_targets) = assign_targets {
         Stmt::Assign(ast::StmtAssign {
-            node_index: AtomicNodeIndex::NONE,
+            node_index: NodeIndex::NONE,
             range: TextRange::default(),
-            targets: assign_targets.to_vec(),
+            targets: assign_targets
+                .iter()
+                .map(flat::View::to_owned_node)
+                .collect(),
             value: Box::new(func_call.into()),
         })
     } else {
         Stmt::Expr(StmtExpr {
-            node_index: AtomicNodeIndex::NONE,
+            node_index: NodeIndex::NONE,
             range: TextRange::default(),
             value: Box::new(func_call.into()),
         })
     };
 
     Some(StmtWith {
-        node_index: AtomicNodeIndex::NONE,
+        node_index: NodeIndex::NONE,
         range: TextRange::default(),
         is_async: false,
         items: vec![WithItem {
-            node_index: AtomicNodeIndex::NONE,
+            node_index: NodeIndex::NONE,
             range: TextRange::default(),
             context_expr: context_call.into(),
-            optional_vars: optional_vars.map(|var| Box::new(var.clone())),
+            optional_vars: optional_vars.map(|var| Box::new(var.to_owned_node())),
         }],
         body: ast::Suite::from([body]),
     })

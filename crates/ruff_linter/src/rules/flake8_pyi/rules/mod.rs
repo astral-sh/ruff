@@ -2,7 +2,7 @@ use std::fmt;
 
 use anyhow::Result;
 
-use ruff_python_ast::{Expr, ExprContext, ExprName, ExprSubscript, ExprTuple, name::Name};
+use ruff_python_ast::{Expr, ExprContext, ExprName, ExprSubscript, ExprTuple, flat, name::Name};
 use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -122,8 +122,8 @@ impl fmt::Display for TypingModule {
 fn generate_union_fix(
     generator: Generator,
     importer: &TypingImporter,
-    nodes: Vec<&Expr>,
-    annotation: &Expr,
+    nodes: Vec<Expr>,
+    annotation: flat::View<'_, Expr>,
     applicability: Applicability,
 ) -> Result<Fix> {
     debug_assert!(nodes.len() >= 2, "At least two nodes required");
@@ -133,17 +133,17 @@ fn generate_union_fix(
     // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
     let new_expr = Expr::Subscript(ExprSubscript {
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
         value: Box::new(Expr::Name(ExprName {
             id: Name::new(binding),
             ctx: ExprContext::Store,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         })),
         slice: Box::new(Expr::Tuple(ExprTuple {
-            elts: nodes.into_iter().cloned().collect(),
+            elts: nodes,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
             ctx: ExprContext::Load,
             parenthesized: false,
         })),
@@ -153,6 +153,28 @@ fn generate_union_fix(
     Ok(Fix::applicable_edits(
         Edit::range_replacement(generator.expr(&new_expr), annotation.range()),
         [import_edit],
+        applicability,
+    ))
+}
+
+/// Generate a union expression from the remaining members of a PEP 604 union.
+fn generate_pep604_fix(
+    generator: Generator,
+    nodes: impl IntoIterator<Item = Expr>,
+    annotation: flat::View<'_, Expr>,
+    applicability: Applicability,
+) -> Option<Fix> {
+    let union = nodes.into_iter().reduce(|left, right| {
+        Expr::BinOp(ruff_python_ast::ExprBinOp {
+            left: Box::new(left),
+            op: ruff_python_ast::Operator::BitOr,
+            right: Box::new(right),
+            range: TextRange::default(),
+            node_index: ruff_python_ast::NodeIndex::NONE,
+        })
+    })?;
+    Some(Fix::applicable_edit(
+        Edit::range_replacement(generator.expr(&union), annotation.range()),
         applicability,
     ))
 }

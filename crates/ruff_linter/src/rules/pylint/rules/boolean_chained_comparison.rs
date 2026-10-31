@@ -1,7 +1,8 @@
 use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{
-    BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare,
+    BoolOp, CmpOp, ExprBoolOp, ExprCompare,
     token::{parentheses_iterator, parenthesized_range},
 };
 use ruff_text_size::{Ranged, TextRange};
@@ -51,14 +52,21 @@ impl AlwaysFixableViolation for BooleanChainedComparison {
 }
 
 /// PLR1716
-pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprBoolOp) {
+pub(crate) fn boolean_chained_comparison(
+    checker: &Checker,
+    expr_bool_op: flat::View<'_, ExprBoolOp>,
+) {
     // early exit for non `and` boolean operations
-    if expr_bool_op.op != BoolOp::And {
+    if expr_bool_op.op() != BoolOp::And {
         return;
     }
 
     // early exit when not all expressions are compare expressions
-    if !expr_bool_op.values.iter().all(Expr::is_compare_expr) {
+    if !expr_bool_op
+        .values()
+        .iter()
+        .all(flat::View::is_compare_expr)
+    {
         return;
     }
 
@@ -67,7 +75,7 @@ pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprB
 
     // retrieve all compare expressions from boolean expression
     let compare_expressions = expr_bool_op
-        .values
+        .values()
         .iter()
         .map(|expr| expr.as_compare_expr().unwrap());
 
@@ -75,14 +83,19 @@ pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprB
         compare_expressions
             .tuple_windows()
             .filter(|(left_compare, right_compare)| {
-                are_compare_expr_simplifiable(left_compare, right_compare)
+                are_compare_expr_simplifiable(*left_compare, *right_compare)
             })
     {
-        let Some(Expr::Name(left_compare_right)) = left_compare.operands.last() else {
+        let Some(flat::ExprKind::Name(left_compare_right)) = left_compare
+            .operands()
+            .last()
+            .map(flat::View::<ruff_python_ast::Expr>::classify)
+        else {
             continue;
         };
 
-        let Expr::Name(right_compare_left) = right_compare.first_operand() else {
+        let flat::ExprKind::Name(right_compare_left) = right_compare.first_operand().classify()
+        else {
             continue;
         };
 
@@ -143,10 +156,13 @@ pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprB
 }
 
 /// Checks whether two compare expressions are simplifiable
-fn are_compare_expr_simplifiable(left: &ExprCompare, right: &ExprCompare) -> bool {
-    left.ops
+fn are_compare_expr_simplifiable(
+    left: flat::View<'_, ExprCompare>,
+    right: flat::View<'_, ExprCompare>,
+) -> bool {
+    left.ops()
         .iter()
-        .chain(right.ops.iter())
+        .chain(right.ops().iter())
         .tuple_windows::<(_, _)>()
         .all(|(left_operator, right_operator)| {
             matches!(

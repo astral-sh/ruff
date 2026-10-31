@@ -1,7 +1,7 @@
 //! Lint rules based on import analysis.
 
 use ruff_notebook::CellOffsets;
-use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_ast::flat::statement_visitor::StatementVisitor;
 use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;

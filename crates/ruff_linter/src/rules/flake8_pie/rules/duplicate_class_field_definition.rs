@@ -1,8 +1,8 @@
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::helpers::any_over_expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -55,21 +55,30 @@ impl AlwaysFixableViolation for DuplicateClassFieldDefinition {
 }
 
 /// PIE794
-pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: &[Stmt]) {
+pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: flat::Suite<'_>) {
     let mut seen_targets: FxHashSet<&str> = FxHashSet::default();
     for stmt in body {
         // Extract the property name from the assignment statement.
-        let (target, value) = match stmt {
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                let [Expr::Name(target)] = targets.as_slice() else {
+        let (target, value) = match stmt.classify() {
+            flat::StmtKind::Assign(stmt_assign) => {
+                let targets = stmt_assign.targets();
+                let value = stmt_assign.value();
+
+                let Some([flat::ExprKind::Name(target)]) = targets
+                    .as_array()
+                    .map(|items| items.map(flat::View::<ruff_python_ast::Expr>::classify))
+                else {
                     continue;
                 };
 
-                (target, Some(&**value))
+                (target, Some(value))
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
-                if let Expr::Name(id) = target.as_ref() {
-                    (id, value.as_deref())
+            flat::StmtKind::AnnAssign(stmt_ann_assign) => {
+                let target = stmt_ann_assign.target();
+                let value = stmt_ann_assign.value();
+
+                if let flat::ExprKind::Name(id) = target.classify() {
+                    (id, value)
                 } else {
                     continue;
                 }
@@ -80,16 +89,17 @@ pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: &[Stmt])
         // If this is an unrolled augmented assignment (e.g., `x = x + 1`), skip it.
         if let Some(value) = value
             && any_over_expr(value, |expr| {
-                expr.as_name_expr().is_some_and(|name| name.id == target.id)
+                expr.as_name_expr()
+                    .is_some_and(|name| name.id() == target.id())
             })
         {
             continue;
         }
 
-        if !seen_targets.insert(target.id.as_str()) {
+        if !seen_targets.insert(target.id().as_str()) {
             let mut diagnostic = checker.report_diagnostic(
                 DuplicateClassFieldDefinition {
-                    name: target.id.to_string(),
+                    name: target.id().to_string(),
                 },
                 stmt.range(),
             );

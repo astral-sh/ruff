@@ -1,5 +1,8 @@
-use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+use ruff_python_ast::flat::helpers::map_callable;
+use ruff_python_ast::{
+    ElifElseClause, MatchCase, Pattern, StmtFunctionDef,
+    flat::{self, fields as ast},
+};
 
 use crate::model::SemanticModel;
 
@@ -23,8 +26,11 @@ pub enum Terminal {
 
 impl Terminal {
     /// Returns the [`Terminal`] behavior of the function, if it can be determined.
-    pub fn from_function(function: &ast::StmtFunctionDef, semantic: &SemanticModel) -> Terminal {
-        Self::from_body(&function.body, semantic)
+    pub fn from_function(
+        function: flat::View<'_, StmtFunctionDef>,
+        semantic: &SemanticModel,
+    ) -> Terminal {
+        Self::from_body(function.body(), semantic)
     }
 
     /// Returns `true` if the [`Terminal`] behavior includes at least one `return` path.
@@ -46,13 +52,13 @@ impl Terminal {
     }
 
     /// Returns the [`Terminal`] behavior of the body, if it can be determined.
-    fn from_body(stmts: &[Stmt], semantic: &SemanticModel) -> Terminal {
+    fn from_body(stmts: flat::Suite<'_>, semantic: &SemanticModel) -> Terminal {
         let mut terminal = Terminal::None;
 
         for stmt in stmts {
-            match stmt {
-                Stmt::For(ast::StmtFor { body, orelse, .. })
-                | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+            match stmt.fields() {
+                ast::Stmt::For(ast::StmtFor { body, orelse, .. })
+                | ast::Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
                     if always_breaks(body) {
                         continue;
                     }
@@ -63,7 +69,7 @@ impl Terminal {
                         terminal = terminal.and_then(Self::from_body(orelse, semantic));
                     }
                 }
-                Stmt::If(ast::StmtIf {
+                ast::Stmt::If(ast::StmtIf {
                     body,
                     elif_else_clauses,
                     ..
@@ -72,13 +78,16 @@ impl Terminal {
                         std::iter::once(Self::from_body(body, semantic)).chain(
                             elif_else_clauses
                                 .iter()
-                                .map(|clause| Self::from_body(&clause.body, semantic)),
+                                .map(|clause| Self::from_body(clause.body(), semantic)),
                         ),
                     );
 
                     // If the `if` statement is known to be exhaustive (by way of including an
                     // `else`)...
-                    if elif_else_clauses.iter().any(|clause| clause.test.is_none()) {
+                    if elif_else_clauses
+                        .iter()
+                        .any(|clause| clause.test().is_none())
+                    {
                         // And all branches return, then the `if` statement returns.
                         terminal = terminal.and_then(branch_terminal);
                     } else if branch_terminal.has_any_return() {
@@ -87,11 +96,11 @@ impl Terminal {
                         terminal = terminal.and_then(Terminal::ConditionalReturn);
                     }
                 }
-                Stmt::Match(ast::StmtMatch { cases, .. }) => {
+                ast::Stmt::Match(ast::StmtMatch { cases, .. }) => {
                     let branch_terminal = terminal.and_then(Terminal::branches(
                         cases
                             .iter()
-                            .map(|case| Self::from_body(&case.body, semantic)),
+                            .map(|case| Self::from_body(case.body(), semantic)),
                     ));
 
                     // If the `match` is known to be exhaustive (by way of including a wildcard
@@ -107,7 +116,7 @@ impl Terminal {
                         }
                     }
                 }
-                Stmt::Try(ast::StmtTry {
+                ast::Stmt::Try(ast::StmtTry {
                     body,
                     handlers,
                     orelse,
@@ -128,10 +137,10 @@ impl Terminal {
                     terminal = terminal.and_then(Self::from_body(finalbody, semantic));
 
                     let branch_terminal = Terminal::branches(handlers.iter().map(|handler| {
-                        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                             body,
                             ..
-                        }) = handler;
+                        }) = handler.fields();
                         Self::from_body(body, semantic)
                     }));
 
@@ -149,15 +158,15 @@ impl Terminal {
                         );
                     }
                 }
-                Stmt::With(ast::StmtWith { body, .. }) => {
+                ast::Stmt::With(ast::StmtWith { body, .. }) => {
                     terminal = terminal.and_then(Self::from_body(body, semantic));
                 }
-                Stmt::Return(_) => {
+                ast::Stmt::Return(_) => {
                     terminal = terminal.and_then(Terminal::RaiseOrReturn);
                 }
-                Stmt::Raise(raise) => {
+                ast::Stmt::Raise(ast::StmtRaise { node: raise, .. }) => {
                     // Check if this raise is NotImplementedError
-                    let is_not_implemented = raise.exc.as_ref().is_some_and(|exc| {
+                    let is_not_implemented = raise.exc().is_some_and(|exc| {
                         let exc = map_callable(exc);
                         semantic.match_builtin_expr(exc, "NotImplementedError")
                     });
@@ -287,10 +296,13 @@ impl Terminal {
 }
 
 /// Returns `true` if the body may break via a `break` statement.
-fn sometimes_breaks(stmts: &[Stmt], semantic: &SemanticModel) -> bool {
+fn sometimes_breaks(stmts: flat::Suite<'_>, semantic: &SemanticModel) -> bool {
     for stmt in stmts {
-        match stmt {
-            Stmt::For(ast::StmtFor { body, orelse, .. }) => {
+        match stmt.classify() {
+            flat::StmtKind::For(stmt_for) => {
+                let body = stmt_for.body();
+                let orelse = stmt_for.orelse();
+
                 if Terminal::from_body(body, semantic).has_any_return() {
                     return false;
                 }
@@ -298,7 +310,10 @@ fn sometimes_breaks(stmts: &[Stmt], semantic: &SemanticModel) -> bool {
                     return true;
                 }
             }
-            Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+            flat::StmtKind::While(stmt_while) => {
+                let body = stmt_while.body();
+                let orelse = stmt_while.orelse();
+
                 if Terminal::from_body(body, semantic).has_any_return() {
                     return false;
                 }
@@ -306,47 +321,46 @@ fn sometimes_breaks(stmts: &[Stmt], semantic: &SemanticModel) -> bool {
                     return true;
                 }
             }
-            Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                ..
-            }) if std::iter::once(body)
-                .chain(elif_else_clauses.iter().map(|clause| &clause.body))
-                .any(|body| sometimes_breaks(body, semantic)) =>
+            flat::StmtKind::If(stmt_if)
+                if std::iter::once(stmt_if.body())
+                    .chain(
+                        stmt_if
+                            .elif_else_clauses()
+                            .iter()
+                            .map(flat::View::<ElifElseClause>::body),
+                    )
+                    .any(|body| sometimes_breaks(body, semantic)) =>
             {
                 return true;
             }
-            Stmt::Match(ast::StmtMatch { cases, .. })
-                if cases
+            flat::StmtKind::Match(stmt_match)
+                if stmt_match
+                    .cases()
                     .iter()
-                    .any(|case| sometimes_breaks(&case.body, semantic)) =>
+                    .any(|case| sometimes_breaks(case.body(), semantic)) =>
             {
                 return true;
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) if (sometimes_breaks(body, semantic)
-                || handlers.iter().any(|handler| {
-                    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                        body, ..
-                    }) = handler;
-                    sometimes_breaks(body, semantic)
-                })
-                || sometimes_breaks(orelse, semantic)
-                || sometimes_breaks(finalbody, semantic)) =>
+            flat::StmtKind::Try(stmt_try)
+                if (sometimes_breaks(stmt_try.body(), semantic)
+                    || stmt_try.handlers().iter().any(|handler| {
+                        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                            body,
+                            ..
+                        }) = handler.fields();
+                        sometimes_breaks(body, semantic)
+                    })
+                    || sometimes_breaks(stmt_try.orelse(), semantic)
+                    || sometimes_breaks(stmt_try.finalbody(), semantic)) =>
             {
                 return true;
             }
-            Stmt::With(ast::StmtWith { body, .. }) if sometimes_breaks(body, semantic) => {
+            flat::StmtKind::With(stmt_with) if sometimes_breaks(stmt_with.body(), semantic) => {
                 return true;
             }
-            Stmt::Break(_) => return true,
-            Stmt::Return(_) => return false,
-            Stmt::Raise(_) => return false,
+            flat::StmtKind::Break(_) => return true,
+            flat::StmtKind::Return(_) => return false,
+            flat::StmtKind::Raise(_) => return false,
             _ => {}
         }
     }
@@ -354,12 +368,12 @@ fn sometimes_breaks(stmts: &[Stmt], semantic: &SemanticModel) -> bool {
 }
 
 /// Returns `true` if the body may break via a `break` statement.
-fn always_breaks(stmts: &[Stmt]) -> bool {
+fn always_breaks(stmts: flat::Suite<'_>) -> bool {
     for stmt in stmts {
-        match stmt {
-            Stmt::Break(_) => return true,
-            Stmt::Return(_) => return false,
-            Stmt::Raise(_) => return false,
+        match stmt.classify() {
+            flat::StmtKind::Break(_) => return true,
+            flat::StmtKind::Return(_) => return false,
+            flat::StmtKind::Raise(_) => return false,
             _ => {}
         }
     }
@@ -367,23 +381,28 @@ fn always_breaks(stmts: &[Stmt]) -> bool {
 }
 
 /// Returns true if the [`MatchCase`] is a wildcard pattern.
-fn is_wildcard(pattern: &ast::MatchCase) -> bool {
+fn is_wildcard(pattern: flat::View<'_, MatchCase>) -> bool {
     /// Returns true if the [`Pattern`] is a wildcard pattern.
-    fn is_wildcard_pattern(pattern: &ast::Pattern) -> bool {
-        match pattern {
-            ast::Pattern::MatchValue(_)
-            | ast::Pattern::MatchSingleton(_)
-            | ast::Pattern::MatchSequence(_)
-            | ast::Pattern::MatchMapping(_)
-            | ast::Pattern::MatchClass(_)
-            | ast::Pattern::MatchStar(_) => false,
+    fn is_wildcard_pattern(pattern: flat::View<'_, Pattern>) -> bool {
+        match pattern.classify() {
+            flat::PatternKind::MatchValue(_)
+            | flat::PatternKind::MatchSingleton(_)
+            | flat::PatternKind::MatchSequence(_)
+            | flat::PatternKind::MatchMapping(_)
+            | flat::PatternKind::MatchClass(_)
+            | flat::PatternKind::MatchStar(_) => false,
 
-            ast::Pattern::MatchAs(ast::PatternMatchAs { pattern, .. }) => pattern.is_none(),
-            ast::Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
+            flat::PatternKind::MatchAs(pattern_match_as) => {
+                let pattern = pattern_match_as.pattern();
+                pattern.is_none()
+            }
+            flat::PatternKind::MatchOr(pattern_match_or) => {
+                let patterns = pattern_match_or.patterns();
+
                 patterns.iter().all(is_wildcard_pattern)
             }
         }
     }
 
-    pattern.guard.is_none() && is_wildcard_pattern(&pattern.pattern)
+    pattern.guard().is_none() && is_wildcard_pattern(pattern.pattern())
 }

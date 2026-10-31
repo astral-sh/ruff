@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, CmpOp, Expr};
+use ruff_python_ast::flat;
+use ruff_python_ast::{self as ast, CmpOp};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
@@ -50,14 +51,14 @@ impl AlwaysFixableViolation for LiteralMembership {
 }
 
 /// PLR6201
-pub(crate) fn literal_membership(checker: &Checker, compare: &ast::ExprCompare) {
+pub(crate) fn literal_membership(checker: &Checker, compare: flat::View<'_, ast::ExprCompare>) {
     let Some((left, CmpOp::In | CmpOp::NotIn, right)) = compare.as_single() else {
         return;
     };
 
-    let elts = match right {
-        Expr::List(ast::ExprList { elts, .. }) => elts,
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts,
+    let elts = match right.classify() {
+        flat::ExprKind::List(expr_list) => expr_list.elts(),
+        flat::ExprKind::Tuple(expr_tuple) => expr_tuple.elts(),
         _ => return,
     };
 
@@ -67,30 +68,33 @@ pub(crate) fn literal_membership(checker: &Checker, compare: &ast::ExprCompare) 
     }
 
     // If `left`, or any of the elements in `right`, are known to _not_ be hashable, return.
-    if std::iter::once(left).chain(elts).any(|expr| match expr {
-        // Expressions that are known _not_ to be hashable.
-        Expr::List(_)
-        | Expr::Set(_)
-        | Expr::Dict(_)
-        | Expr::ListComp(_)
-        | Expr::SetComp(_)
-        | Expr::DictComp(_)
-        | Expr::Generator(_)
-        | Expr::Await(_)
-        | Expr::Yield(_)
-        | Expr::YieldFrom(_) => true,
-        // Expressions that can be _inferred_ not to be hashable.
-        Expr::Name(name) => {
-            let Some(id) = checker.semantic().resolve_name(name) else {
-                return false;
-            };
-            let binding = checker.semantic().binding(id);
-            typing::is_list(binding, checker.semantic())
-                || typing::is_dict(binding, checker.semantic())
-                || typing::is_set(binding, checker.semantic())
-        }
-        _ => false,
-    }) {
+    if std::iter::once(left)
+        .chain(elts)
+        .any(|expr| match expr.classify() {
+            // Expressions that are known _not_ to be hashable.
+            flat::ExprKind::List(_)
+            | flat::ExprKind::Set(_)
+            | flat::ExprKind::Dict(_)
+            | flat::ExprKind::ListComp(_)
+            | flat::ExprKind::SetComp(_)
+            | flat::ExprKind::DictComp(_)
+            | flat::ExprKind::Generator(_)
+            | flat::ExprKind::Await(_)
+            | flat::ExprKind::Yield(_)
+            | flat::ExprKind::YieldFrom(_) => true,
+            // Expressions that can be _inferred_ not to be hashable.
+            flat::ExprKind::Name(name) => {
+                let Some(id) = checker.semantic().resolve_name(name) else {
+                    return false;
+                };
+                let binding = checker.semantic().binding(id);
+                typing::is_list(binding, checker.semantic())
+                    || typing::is_dict(binding, checker.semantic())
+                    || typing::is_set(binding, checker.semantic())
+            }
+            _ => false,
+        })
+    {
         return;
     }
 

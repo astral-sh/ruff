@@ -2,8 +2,8 @@
 
 use anyhow::{Result, anyhow};
 use itertools::Itertools;
+use ruff_python_ast::flat::fields as ast;
 
-use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::{Binding, BindingKind, Scope, ScopeId, SemanticModel};
 use ruff_python_stdlib::{builtins::is_python_builtin, keyword::is_keyword};
@@ -284,14 +284,14 @@ impl Renamer {
         let (ast::Stmt::Assign(ast::StmtAssign { value, .. })
         | ast::Stmt::AnnAssign(ast::StmtAnnAssign {
             value: Some(value), ..
-        })) = statement
+        })) = statement.fields()
         else {
             return None;
         };
 
-        let ast::ExprCall {
-            func, arguments, ..
-        } = value.as_call_expr()?;
+        let expr_call = value.as_call_expr()?;
+        let func = expr_call.func();
+        let arguments = expr_call.arguments();
 
         let qualified_name = semantic.resolve_qualified_name(func)?;
 
@@ -318,7 +318,7 @@ impl Renamer {
 
         let name_argument = name_argument.as_string_literal_expr()?;
 
-        if name_argument.value.to_str() != name {
+        if name_argument.value().to_str() != name {
             return None;
         }
 

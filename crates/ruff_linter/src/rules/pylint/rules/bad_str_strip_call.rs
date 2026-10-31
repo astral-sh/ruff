@@ -1,6 +1,7 @@
 use std::fmt;
 
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::flat::fields;
+use ruff_python_ast::{Expr, flat};
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -76,11 +77,11 @@ pub(crate) enum ValueKind {
 }
 
 impl ValueKind {
-    fn from(expr: &Expr, semantic: &SemanticModel) -> Option<Self> {
-        match expr {
-            Expr::StringLiteral(_) => Some(Self::String),
-            Expr::BytesLiteral(_) => Some(Self::Bytes),
-            Expr::Name(name) => {
+    fn from(expr: flat::View<'_, Expr>, semantic: &SemanticModel) -> Option<Self> {
+        match expr.classify() {
+            flat::ExprKind::StringLiteral(_) => Some(Self::String),
+            flat::ExprKind::BytesLiteral(_) => Some(Self::Bytes),
+            flat::ExprKind::Name(name) => {
                 let binding_id = semantic.only_binding(name)?;
                 let binding = semantic.binding(binding_id);
 
@@ -152,11 +153,11 @@ impl fmt::Display for RemovalKind {
     }
 }
 
-fn string_has_duplicate_char(string: &ast::StringLiteralValue) -> bool {
+fn string_has_duplicate_char(string: flat::StringValue<'_>) -> bool {
     has_duplicate(string.chars())
 }
 
-fn bytes_has_duplicate_char(bytes: &ast::BytesLiteralValue) -> bool {
+fn bytes_has_duplicate_char(bytes: flat::BytesValue<'_>) -> bool {
     has_duplicate(bytes.bytes().map(char::from))
 }
 
@@ -168,37 +169,37 @@ fn has_duplicate(mut chars: impl Iterator<Item = char>) -> bool {
 }
 
 /// PLE1310
-pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ast::ExprCall) {
-    let (func, arguments) = (&call.func, &call.arguments);
+pub(crate) fn bad_str_strip_call(checker: &Checker, call: &fields::ExprCall<'_>) {
+    let (func, arguments) = (call.func, call.arguments);
 
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+    let flat::ExprKind::Attribute(attribute) = func.classify() else {
         return;
     };
+    let value = attribute.value();
+    let attr = attribute.attr();
 
     let Some(strip) = StripKind::from_str(attr.as_str()) else {
         return;
     };
 
-    if !arguments.keywords.is_empty() {
+    if !arguments.keywords().is_empty() {
         return;
     }
 
-    let [arg] = arguments.args.as_ref() else {
+    let Some([arg]) = arguments.args().as_array() else {
         return;
     };
-
-    let value = &**value;
 
     let Some(value_kind) = ValueKind::from(value, checker.semantic()) else {
         return;
     };
 
-    let duplicated = match arg {
-        Expr::StringLiteral(string) if value_kind == ValueKind::String => {
-            string_has_duplicate_char(&string.value)
+    let duplicated = match arg.classify() {
+        flat::ExprKind::StringLiteral(string) if value_kind == ValueKind::String => {
+            string_has_duplicate_char(string.value())
         }
-        Expr::BytesLiteral(bytes) if value_kind == ValueKind::Bytes => {
-            bytes_has_duplicate_char(&bytes.value)
+        flat::ExprKind::BytesLiteral(bytes) if value_kind == ValueKind::Bytes => {
+            bytes_has_duplicate_char(bytes.value())
         }
         _ => return,
     };

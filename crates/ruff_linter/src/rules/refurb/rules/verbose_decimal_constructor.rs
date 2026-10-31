@@ -3,7 +3,8 @@ use std::borrow::Cow;
 use itertools::Itertools;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields;
 use ruff_python_trivia::PythonWhitespace;
 use ruff_text_size::Ranged;
 
@@ -72,10 +73,10 @@ impl Violation for VerboseDecimalConstructor {
 }
 
 /// FURB157
-pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &fields::ExprCall<'_>) {
     if !checker
         .semantic()
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["decimal", "Decimal"]))
     {
         return;
@@ -86,10 +87,10 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
         return;
     };
 
-    match value {
-        Expr::StringLiteral(ast::ExprStringLiteral {
-            value: str_literal, ..
-        }) => {
+    match value.classify() {
+        flat::ExprKind::StringLiteral(expr_string_literal) => {
+            let str_literal = expr_string_literal.value();
+
             // Parse the inner string as an integer.
             //
             // For reference, a string argument to `Decimal` is parsed in CPython
@@ -168,19 +169,20 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                 applicability,
             ));
         }
-        Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) => {
+        flat::ExprKind::Call(expr_call) => {
+            let func = expr_call.func();
+            let arguments = expr_call.arguments();
+
             // Must be a call to the `float` builtin.
             if !checker.semantic().match_builtin_expr(func, "float") {
                 return;
             }
 
             // Must have exactly one argument, which is a string literal.
-            if !arguments.keywords.is_empty() {
+            if !arguments.keywords().is_empty() {
                 return;
             }
-            let [float] = arguments.args.as_ref() else {
+            let Some([float]) = arguments.args().as_array() else {
                 return;
             };
             let Some(float_str) = as_non_finite_float_string_literal(float) else {

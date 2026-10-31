@@ -1,4 +1,5 @@
-use ruff_python_ast::{Expr, ExprLambda};
+use ruff_python_ast::ExprLambda;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -60,21 +61,17 @@ impl Violation for ReimplementedContainerBuiltin {
 }
 
 /// PIE807
-pub(crate) fn reimplemented_container_builtin(checker: &Checker, expr: &ExprLambda) {
-    let ExprLambda {
-        parameters,
-        body,
-        range: _,
-        node_index: _,
-    } = expr;
+pub(crate) fn reimplemented_container_builtin(checker: &Checker, expr: flat::View<'_, ExprLambda>) {
+    let parameters = expr.parameters();
+    let body = expr.body();
 
     if parameters.is_some() {
         return;
     }
 
-    let container = match &**body {
-        Expr::List(list) if list.is_empty() => Container::List,
-        Expr::Dict(dict) if dict.is_empty() => Container::Dict,
+    let container = match body.classify() {
+        flat::ExprKind::List(list) if list.elts().is_empty() => Container::List,
+        flat::ExprKind::Dict(dict) if dict.items().is_empty() => Container::Dict,
         _ => return,
     };
     let mut diagnostic =

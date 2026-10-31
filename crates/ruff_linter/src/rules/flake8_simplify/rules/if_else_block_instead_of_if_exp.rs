@@ -1,7 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::flat::{self, fields};
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::{self as ast, BoolOp, ElifElseClause, Expr, Stmt};
+use ruff_python_ast::{self as ast, BoolOp, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -98,55 +99,65 @@ impl Violation for IfElseBlockInsteadOfIfExp {
 }
 
 /// SIM108
-pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::StmtIf) {
-    let ast::StmtIf {
-        test,
-        body,
-        elif_else_clauses,
-        range: _,
-        node_index: _,
-    } = stmt_if;
+pub(crate) fn if_else_block_instead_of_if_exp(
+    checker: &Checker,
+    stmt_if: flat::View<'_, ast::StmtIf>,
+) {
+    let test = stmt_if.test();
+    let body = stmt_if.body();
+    let elif_else_clauses = stmt_if.elif_else_clauses();
 
     // `test: None` to only match an `else` clause
-    let [
-        ElifElseClause {
-            body: else_body,
-            test: None,
-            ..
-        },
-    ] = elif_else_clauses.as_slice()
+    let Some([elif_else_clause]) = elif_else_clauses.as_array() else {
+        return;
+    };
+    let fields::ElifElseClause {
+        body: else_body,
+        test: None,
+        ..
+    } = elif_else_clause.fields()
     else {
         return;
     };
-    let [
-        Stmt::Assign(ast::StmtAssign {
-            targets: body_targets,
-            value: body_value,
-            ..
-        }),
-    ] = body.as_slice()
+    let Some(
+        [
+            fields::Stmt::Assign(fields::StmtAssign {
+                targets: body_targets,
+                value: body_value,
+                ..
+            }),
+        ],
+    ) = body
+        .as_array()
+        .map(|items| items.map(flat::View::<Stmt>::fields))
     else {
         return;
     };
-    let [
-        Stmt::Assign(ast::StmtAssign {
-            targets: else_targets,
-            value: else_value,
-            ..
-        }),
-    ] = else_body.as_slice()
+    let Some(
+        [
+            fields::Stmt::Assign(fields::StmtAssign {
+                targets: else_targets,
+                value: else_value,
+                ..
+            }),
+        ],
+    ) = else_body.as_array().map(|[stmt]| [stmt.fields()])
     else {
         return;
     };
-    let ([body_target], [else_target]) = (body_targets.as_slice(), else_targets.as_slice()) else {
+    let (Some([body_target]), Some([else_target])) =
+        (body_targets.as_array(), else_targets.as_array())
+    else {
         return;
     };
-    let Expr::Name(ast::ExprName { id: body_id, .. }) = body_target else {
+    let flat::ExprKind::Name(name) = body_target.classify() else {
         return;
     };
-    let Expr::Name(ast::ExprName { id: else_id, .. }) = else_target else {
+    let body_id = name.id();
+    let flat::ExprKind::Name(name) = else_target.classify() else {
         return;
     };
+    let else_id = name.id();
     if body_id != else_id {
         return;
     }
@@ -154,14 +165,14 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
     // Avoid suggesting ternary for `if (yield ...)`-style checks.
     // TODO(charlie): Fix precedence handling for yields in generator.
     if matches!(
-        body_value.as_ref(),
-        Expr::Yield(_) | Expr::YieldFrom(_) | Expr::Await(_)
+        body_value.classify(),
+        flat::ExprKind::Yield(_) | flat::ExprKind::YieldFrom(_) | flat::ExprKind::Await(_)
     ) {
         return;
     }
     if matches!(
-        else_value.as_ref(),
-        Expr::Yield(_) | Expr::YieldFrom(_) | Expr::Await(_)
+        else_value.classify(),
+        flat::ExprKind::Yield(_) | flat::ExprKind::YieldFrom(_) | flat::ExprKind::Await(_)
     ) {
         return;
     }
@@ -201,27 +212,27 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
             if ComparableExpr::from(test_node) == ComparableExpr::from(body_node)
                 && !contains_effect(test_node, |id| checker.semantic().has_builtin_binding(id)) =>
         {
-            let target_var = &body_target;
+            let target_var = body_target;
             let binary = assignment_binary_or(target_var, body_value, else_value);
             (checker.generator().stmt(&binary), AssignmentKind::Binary)
         }
         (test_node, body_node)
             if (test_node.as_unary_op_expr().is_some_and(|op_expr| {
-                op_expr.op.is_not()
-                    && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(body_node)
+                op_expr.op().is_not()
+                    && ComparableExpr::from(op_expr.operand()) == ComparableExpr::from(body_node)
             }) || body_node.as_unary_op_expr().is_some_and(|op_expr| {
-                op_expr.op.is_not()
-                    && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(test_node)
+                op_expr.op().is_not()
+                    && ComparableExpr::from(op_expr.operand()) == ComparableExpr::from(test_node)
             })) && !contains_effect(test_node, |id| {
                 checker.semantic().has_builtin_binding(id)
             }) =>
         {
-            let target_var = &body_target;
+            let target_var = body_target;
             let binary = assignment_binary_and(target_var, body_value, else_value);
             (checker.generator().stmt(&binary), AssignmentKind::Binary)
         }
         _ => {
-            let target_var = &body_target;
+            let target_var = body_target;
             let ternary = assignment_ternary(target_var, body_value, test, else_value);
             (checker.generator().stmt(&ternary), AssignmentKind::Ternary)
         }
@@ -247,7 +258,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
     );
     if !checker
         .comment_ranges()
-        .has_comments(stmt_if, checker.source())
+        .has_comments(&stmt_if, checker.source())
     {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             contents,
@@ -263,54 +274,62 @@ enum AssignmentKind {
 }
 
 fn assignment_ternary(
-    target_var: &Expr,
-    body_value: &Expr,
-    test: &Expr,
-    orelse_value: &Expr,
+    target_var: flat::View<'_, Expr>,
+    body_value: flat::View<'_, Expr>,
+    test: flat::View<'_, Expr>,
+    orelse_value: flat::View<'_, Expr>,
 ) -> Stmt {
     let node = ast::ExprIf {
-        test: Box::new(test.clone()),
-        body: Box::new(body_value.clone()),
-        orelse: Box::new(orelse_value.clone()),
+        test: Box::new(test.to_owned_node()),
+        body: Box::new(body_value.to_owned_node()),
+        orelse: Box::new(orelse_value.to_owned_node()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     let node1 = ast::StmtAssign {
-        targets: vec![target_var.clone()],
+        targets: vec![target_var.to_owned_node()],
         value: Box::new(node.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     node1.into()
 }
 
-fn assignment_binary_and(target_var: &Expr, left_value: &Expr, right_value: &Expr) -> Stmt {
+fn assignment_binary_and(
+    target_var: flat::View<'_, Expr>,
+    left_value: flat::View<'_, Expr>,
+    right_value: flat::View<'_, Expr>,
+) -> Stmt {
     let node = ast::ExprBoolOp {
         op: BoolOp::And,
-        values: vec![left_value.clone(), right_value.clone()],
+        values: vec![left_value.to_owned_node(), right_value.to_owned_node()],
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     let node1 = ast::StmtAssign {
-        targets: vec![target_var.clone()],
+        targets: vec![target_var.to_owned_node()],
         value: Box::new(node.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     };
     node1.into()
 }
 
-fn assignment_binary_or(target_var: &Expr, left_value: &Expr, right_value: &Expr) -> Stmt {
+fn assignment_binary_or(
+    target_var: flat::View<'_, Expr>,
+    left_value: flat::View<'_, Expr>,
+    right_value: flat::View<'_, Expr>,
+) -> Stmt {
     (ast::StmtAssign {
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        targets: vec![target_var.clone()],
+        node_index: ruff_python_ast::NodeIndex::NONE,
+        targets: vec![target_var.to_owned_node()],
         value: Box::new(
             (ast::ExprBoolOp {
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                node_index: ruff_python_ast::NodeIndex::NONE,
                 op: BoolOp::Or,
-                values: vec![left_value.clone(), right_value.clone()],
+                values: vec![left_value.to_owned_node(), right_value.to_owned_node()],
             })
             .into(),
         ),

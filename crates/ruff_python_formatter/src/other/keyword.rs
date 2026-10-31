@@ -1,5 +1,6 @@
 use ruff_formatter::write;
 use ruff_python_ast::Keyword;
+use ruff_python_ast::flat;
 
 use crate::prelude::*;
 
@@ -7,13 +8,9 @@ use crate::prelude::*;
 pub struct FormatKeyword;
 
 impl FormatNodeRule<Keyword> for FormatKeyword {
-    fn fmt_fields(&self, item: &Keyword, f: &mut PyFormatter) -> FormatResult<()> {
-        let Keyword {
-            range: _,
-            node_index: _,
-            arg,
-            value,
-        } = item;
+    fn fmt_fields(&self, item: flat::View<'_, Keyword>, f: &mut PyFormatter) -> FormatResult<()> {
+        let arg = item.arg();
+        let value = item.value();
         // Comments after the `=` or `**` are reassigned as leading comments on the value.
         if let Some(arg) = arg {
             write!(f, [arg.format(), token("="), value.format()])

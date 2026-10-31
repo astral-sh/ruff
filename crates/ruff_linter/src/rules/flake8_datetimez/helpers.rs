@@ -1,4 +1,5 @@
-use ruff_python_ast::{AnyNodeRef, Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::AnyNodeRef;
 
 use crate::checkers::ast::Checker;
 
@@ -74,9 +75,10 @@ pub(super) fn followed_by_astimezone(checker: &Checker) -> bool {
         if index % 2 == 1 {
             // datetime.now(...).replace(...).astimezone
             //                   ^^^^^^^      ^^^^^^^^^^
-            let Expr::Attribute(ExprAttribute { attr, .. }) = expr else {
+            let flat::ExprKind::Attribute(attribute) = expr.classify() else {
                 return false;
             };
+            let attr = attribute.attr();
 
             match attr.as_str() {
                 "replace" => last = Some(AnyNodeRef::from(expr)),
@@ -86,9 +88,10 @@ pub(super) fn followed_by_astimezone(checker: &Checker) -> bool {
         } else {
             // datetime.now(...).replace(...).astimezone
             //                          ^^^^^
-            let Expr::Call(ExprCall { func, .. }) = expr else {
+            let flat::ExprKind::Call(call_node) = expr.classify() else {
                 return false;
             };
+            let func = call_node.func();
 
             // Without this branch, we would fail to emit a diagnostic on code like this:
             //
@@ -98,7 +101,7 @@ pub(super) fn followed_by_astimezone(checker: &Checker) -> bool {
             //           #                 since the `datetime.now()` call is not followed
             //           #                 by `.astimezone()`
             // ```
-            if !last.is_some_and(|it| it.ptr_eq(AnyNodeRef::from(&**func))) {
+            if !last.is_some_and(|it| it.ptr_eq(AnyNodeRef::from(func))) {
                 return false;
             }
         }

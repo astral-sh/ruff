@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::Stmt;
+use ruff_python_ast::flat::{self, fields as ast};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -55,15 +56,15 @@ impl Violation for JumpStatementInFinally {
     }
 }
 
-fn walk_stmt(checker: &Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
+fn walk_stmt<'a>(checker: &Checker, body: flat::Suite<'a>, f: fn(flat::View<'a, Stmt>) -> bool) {
     for stmt in body {
         if f(stmt) {
             checker.report_diagnostic(
                 JumpStatementInFinally {
-                    name: match stmt {
-                        Stmt::Break(_) => "break",
-                        Stmt::Continue(_) => "continue",
-                        Stmt::Return(_) => "return",
+                    name: match stmt.classify() {
+                        flat::StmtKind::Break(_) => "break",
+                        flat::StmtKind::Continue(_) => "continue",
+                        flat::StmtKind::Return(_) => "return",
                         _ => unreachable!("Expected Stmt::Break | Stmt::Continue | Stmt::Return"),
                     }
                     .to_owned(),
@@ -71,18 +72,19 @@ fn walk_stmt(checker: &Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
                 stmt.range(),
             );
         }
-        match stmt {
-            Stmt::While(ast::StmtWhile { body, .. }) | Stmt::For(ast::StmtFor { body, .. }) => {
-                walk_stmt(checker, body, Stmt::is_return_stmt);
+        match stmt.fields() {
+            ast::Stmt::While(ast::StmtWhile { body, .. })
+            | ast::Stmt::For(ast::StmtFor { body, .. }) => {
+                walk_stmt(checker, body, flat::View::is_return_stmt);
             }
-            Stmt::If(ast::StmtIf { body, .. })
-            | Stmt::Try(ast::StmtTry { body, .. })
-            | Stmt::With(ast::StmtWith { body, .. }) => {
+            ast::Stmt::If(ast::StmtIf { body, .. })
+            | ast::Stmt::Try(ast::StmtTry { body, .. })
+            | ast::Stmt::With(ast::StmtWith { body, .. }) => {
                 walk_stmt(checker, body, f);
             }
-            Stmt::Match(ast::StmtMatch { cases, .. }) => {
+            ast::Stmt::Match(ast::StmtMatch { cases, .. }) => {
                 for case in cases {
-                    walk_stmt(checker, &case.body, f);
+                    walk_stmt(checker, case.body(), f);
                 }
             }
             _ => {}
@@ -91,8 +93,11 @@ fn walk_stmt(checker: &Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
 }
 
 /// B012
-pub(crate) fn jump_statement_in_finally(checker: &Checker, finalbody: &[Stmt]) {
+pub(crate) fn jump_statement_in_finally(checker: &Checker, finalbody: flat::Suite<'_>) {
     walk_stmt(checker, finalbody, |stmt| {
-        matches!(stmt, Stmt::Break(_) | Stmt::Continue(_) | Stmt::Return(_))
+        matches!(
+            stmt.classify(),
+            flat::StmtKind::Break(_) | flat::StmtKind::Continue(_) | flat::StmtKind::Return(_)
+        )
     });
 }

@@ -1,4 +1,5 @@
 use ruff_python_ast::Keyword;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -53,15 +54,18 @@ impl Violation for HardcodedPasswordFuncArg {
 }
 
 /// S106
-pub(crate) fn hardcoded_password_func_arg(checker: &Checker, keywords: &[Keyword]) {
+pub(crate) fn hardcoded_password_func_arg(
+    checker: &Checker,
+    keywords: flat::NodeList<'_, Keyword>,
+) {
     for keyword in keywords {
-        if string_literal(&keyword.value).is_none_or(str::is_empty) {
+        if string_literal(keyword.value()).is_none_or(str::is_empty) {
             continue;
         }
-        let Some(arg) = &keyword.arg else {
+        let Some(arg) = keyword.arg() else {
             continue;
         };
-        if !matches_password_name(arg) {
+        if !matches_password_name(arg.as_str()) {
             continue;
         }
         checker.report_diagnostic(

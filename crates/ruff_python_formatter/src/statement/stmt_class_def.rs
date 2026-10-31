@@ -1,4 +1,5 @@
 use ruff_formatter::write;
+use ruff_python_ast::flat::{self, fields as ast};
 use ruff_python_ast::{Decorator, NodeKind, StmtClassDef};
 use ruff_python_trivia::lines_after_ignoring_end_of_line_trivia;
 use ruff_text_size::Ranged;
@@ -15,16 +16,20 @@ use crate::statement::suite::SuiteKind;
 pub struct FormatStmtClassDef;
 
 impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
-    fn fmt_fields(&self, item: &StmtClassDef, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtClassDef {
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, StmtClassDef>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let ast::StmtClassDef {
             range: _,
-            node_index: _,
+            node: _,
             name,
             arguments,
             body,
             type_params,
             decorator_list,
-        } = item;
+        } = item.fields();
 
         let comments = f.context().comments().clone();
 
@@ -70,11 +75,11 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
                     &format_with(|f| {
                         write!(f, [token("class"), space(), name.format()])?;
 
-                        if let Some(type_params) = type_params.as_deref() {
+                        if let Some(type_params) = type_params {
                             write!(f, [type_params.format()])?;
                         }
 
-                        if let Some(arguments) = arguments.as_deref() {
+                        if let Some(arguments) = arguments {
                             // Drop empty the arguments node entirely (i.e., remove the parentheses) if it is empty,
                             // e.g., given:
                             // ```python
@@ -162,7 +167,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
 }
 
 pub(super) struct FormatDecorators<'a> {
-    pub(super) decorators: &'a [Decorator],
+    pub(super) decorators: flat::NodeList<'a, Decorator>,
     pub(super) leading_definition_comments: &'a [SourceComment],
 }
 

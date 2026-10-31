@@ -1,6 +1,7 @@
 use ruff_formatter::write;
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprStarred;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::AnyNodeRef;
 
 use crate::comments::dangling_comments;
 
@@ -11,13 +12,12 @@ use crate::prelude::*;
 pub struct FormatExprStarred;
 
 impl FormatNodeRule<ExprStarred> for FormatExprStarred {
-    fn fmt_fields(&self, item: &ExprStarred, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprStarred {
-            range: _,
-            node_index: _,
-            value,
-            ctx: _,
-        } = item;
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, ExprStarred>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let value = item.value();
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
@@ -26,7 +26,7 @@ impl FormatNodeRule<ExprStarred> for FormatExprStarred {
     }
 }
 
-impl NeedsParentheses for ExprStarred {
+impl NeedsParentheses for flat::View<'_, ExprStarred> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,

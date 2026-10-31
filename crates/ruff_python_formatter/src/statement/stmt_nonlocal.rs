@@ -1,5 +1,6 @@
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::StmtNonlocal;
+use ruff_python_ast::flat;
 
 use crate::prelude::*;
 
@@ -7,14 +8,18 @@ use crate::prelude::*;
 pub struct FormatStmtNonlocal;
 
 impl FormatNodeRule<StmtNonlocal> for FormatStmtNonlocal {
-    fn fmt_fields(&self, item: &StmtNonlocal, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, StmtNonlocal>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Join the `nonlocal` names, breaking across continuation lines if necessary, unless the
         // `nonlocal` statement has a trailing comment, in which case, breaking the names would
         // move the comment "off" of the `nonlocal` statement.
         if f.context().comments().has_trailing(item) {
             let joined = format_with(|f| {
                 f.join_with(format_args![token(","), space()])
-                    .entries(item.names.iter().formatted())
+                    .entries(item.names().iter().formatted())
                     .finish()
             });
 
@@ -27,7 +32,7 @@ impl FormatNodeRule<StmtNonlocal> for FormatStmtNonlocal {
                     if_group_breaks(&token("\\")),
                     soft_line_break(),
                 ])
-                .entries(item.names.iter().formatted())
+                .entries(item.names().iter().formatted())
                 .finish()
             });
 

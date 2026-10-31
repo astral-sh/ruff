@@ -1,5 +1,5 @@
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{PatternMatchSingleton, Singleton};
+use ruff_python_ast::flat::AnyNodeRef;
+use ruff_python_ast::{PatternMatchSingleton, Singleton, flat};
 
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
@@ -8,8 +8,12 @@ use crate::prelude::*;
 pub struct FormatPatternMatchSingleton;
 
 impl FormatNodeRule<PatternMatchSingleton> for FormatPatternMatchSingleton {
-    fn fmt_fields(&self, item: &PatternMatchSingleton, f: &mut PyFormatter) -> FormatResult<()> {
-        match item.value {
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, PatternMatchSingleton>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        match item.value() {
             Singleton::None => token("None").fmt(f),
             Singleton::True => token("True").fmt(f),
             Singleton::False => token("False").fmt(f),
@@ -17,7 +21,7 @@ impl FormatNodeRule<PatternMatchSingleton> for FormatPatternMatchSingleton {
     }
 }
 
-impl NeedsParentheses for PatternMatchSingleton {
+impl NeedsParentheses for flat::View<'_, PatternMatchSingleton> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,

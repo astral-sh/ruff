@@ -1,5 +1,6 @@
-use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
+use ruff_formatter::FormatOwnedWithRule;
 use ruff_python_ast::TypeParam;
+use ruff_python_ast::flat;
 
 use crate::prelude::*;
 
@@ -11,26 +12,19 @@ pub(crate) mod type_params;
 #[derive(Default)]
 pub struct FormatTypeParam;
 
-impl FormatRule<TypeParam, PyFormatContext<'_>> for FormatTypeParam {
-    fn fmt(&self, item: &TypeParam, f: &mut PyFormatter) -> FormatResult<()> {
-        match item {
-            TypeParam::TypeVar(x) => x.format().fmt(f),
-            TypeParam::TypeVarTuple(x) => x.format().fmt(f),
-            TypeParam::ParamSpec(x) => x.format().fmt(f),
+impl FormatRule<flat::View<'_, TypeParam>, PyFormatContext<'_>> for FormatTypeParam {
+    fn fmt(&self, item: &flat::View<'_, TypeParam>, f: &mut PyFormatter) -> FormatResult<()> {
+        let item = *item;
+        match item.classify() {
+            flat::TypeParamKind::TypeVar(x) => x.format().fmt(f),
+            flat::TypeParamKind::TypeVarTuple(x) => x.format().fmt(f),
+            flat::TypeParamKind::ParamSpec(x) => x.format().fmt(f),
         }
     }
 }
 
-impl<'ast> AsFormat<PyFormatContext<'ast>> for TypeParam {
-    type Format<'a> = FormatRefWithRule<'a, TypeParam, FormatTypeParam, PyFormatContext<'ast>>;
-
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, FormatTypeParam)
-    }
-}
-
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for TypeParam {
-    type Format = FormatOwnedWithRule<TypeParam, FormatTypeParam, PyFormatContext<'ast>>;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for flat::View<'_, TypeParam> {
+    type Format = FormatOwnedWithRule<Self, FormatTypeParam, PyFormatContext<'ast>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatTypeParam)

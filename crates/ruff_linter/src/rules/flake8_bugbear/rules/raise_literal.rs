@@ -1,4 +1,5 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -39,7 +40,7 @@ impl Violation for RaiseLiteral {
 }
 
 /// B016
-pub(crate) fn raise_literal(checker: &Checker, expr: &Expr) {
+pub(crate) fn raise_literal(checker: &Checker, expr: flat::View<'_, Expr>) {
     if expr.is_literal_expr() {
         checker.report_diagnostic(RaiseLiteral, expr.range());
     }

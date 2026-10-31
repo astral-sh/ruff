@@ -1,13 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, Keyword};
+use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::{AlwaysFixableViolation, Fix};
-
-use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for unnecessary list or tuple literals.
@@ -54,26 +53,25 @@ impl AlwaysFixableViolation for UnnecessaryLiteralDict {
 /// C406 (`dict([(1, 2)])`)
 pub(crate) fn unnecessary_literal_dict(
     checker: &Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
+    expr: flat::View<'_, Expr>,
+    argument: flat::View<'_, Expr>,
 ) {
-    let Some(argument) =
-        helpers::exactly_one_argument_with_matching_function("dict", func, args, keywords)
-    else {
-        return;
-    };
-    let (kind, elts) = match argument {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => (LiteralKind::Tuple, elts),
-        Expr::List(ast::ExprList { elts, .. }) => (LiteralKind::List, elts),
+    let (kind, elts) = match argument.classify() {
+        flat::ExprKind::Tuple(expr_tuple) => {
+            let elts = expr_tuple.elts();
+
+            (LiteralKind::Tuple, elts)
+        }
+        flat::ExprKind::List(expr_list) => {
+            let elts = expr_list.elts();
+            (LiteralKind::List, elts)
+        }
         _ => return,
     };
     // Accept `dict((1, 2), ...))` `dict([(1, 2), ...])`.
-    if !elts
-        .iter()
-        .all(|elt| matches!(&elt, Expr::Tuple(tuple) if tuple.len() == 2))
-    {
+    if !elts.iter().all(
+        |elt| matches!(elt.classify(), flat::ExprKind::Tuple(tuple) if tuple.elts().len() == 2),
+    ) {
         return;
     }
     if !checker.semantic().has_builtin_binding("dict") {

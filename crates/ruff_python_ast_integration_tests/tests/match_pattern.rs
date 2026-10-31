@@ -9,8 +9,8 @@ match subject:
     case _: ...
 ";
     let parsed = parse_module(source_code).unwrap();
-    let cases = &parsed.syntax().body[0].as_match_stmt().unwrap().cases;
+    let cases = parsed.suite().at(0).as_match_stmt().unwrap().cases();
     for case in cases {
-        assert!(case.pattern.is_wildcard());
+        assert!(case.pattern().is_wildcard());
     }
 }

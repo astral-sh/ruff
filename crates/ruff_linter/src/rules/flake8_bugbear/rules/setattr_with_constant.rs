@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, ExprContext, Identifier, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprContext, Identifier, Stmt, flat};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -75,33 +75,44 @@ impl AlwaysFixableViolation for SetAttrWithConstant {
     }
 }
 
-fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> String {
+fn assignment(
+    obj: flat::View<'_, Expr>,
+    name: &str,
+    value: flat::View<'_, Expr>,
+    generator: Generator,
+) -> String {
     let stmt = Stmt::Assign(ast::StmtAssign {
         targets: vec![Expr::Attribute(ast::ExprAttribute {
-            value: Box::new(obj.clone()),
+            value: Box::new(obj.to_owned_node()),
             attr: Identifier::new(name.to_string(), TextRange::default()),
             ctx: ExprContext::Store,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            node_index: ruff_python_ast::NodeIndex::NONE,
         })],
-        value: Box::new(value.clone()),
+        value: Box::new(value.to_owned_node()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        node_index: ruff_python_ast::NodeIndex::NONE,
     });
     generator.stmt(&stmt)
 }
 
 /// B010
-pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
-    let [obj, name, value] = args else {
+pub(crate) fn setattr_with_constant(
+    checker: &Checker,
+    &expr: &flat::View<'_, Expr>,
+    func: flat::View<'_, Expr>,
+    args: flat::NodeList<'_, Expr>,
+) {
+    let Some([obj, name, value]) = args.as_array() else {
         return;
     };
     if obj.is_starred_expr() {
         return;
     }
-    let Expr::StringLiteral(ast::ExprStringLiteral { value: name, .. }) = name else {
+    let flat::ExprKind::StringLiteral(string_literal) = name.classify() else {
         return;
     };
+    let name = string_literal.value();
     if !is_identifier(name.to_str()) {
         return;
     }
@@ -127,13 +138,9 @@ pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment
     // (which is a `Stmt`) if the `Expr` is already being used as a `Stmt`
     // (i.e., it's directly within an `Stmt::Expr`).
-    if let Stmt::Expr(ast::StmtExpr {
-        value: child,
-        range: _,
-        node_index: _,
-    }) = checker.semantic().current_statement()
-    {
-        if expr == child.as_ref() {
+    if let flat::StmtKind::Expr(expr_node) = checker.semantic().current_statement().classify() {
+        let child = expr_node.value();
+        if expr == child {
             let mut diagnostic = checker.report_diagnostic(SetAttrWithConstant, expr.range());
             let edit = Edit::range_replacement(
                 assignment(obj, name.to_str(), value, checker.generator()),

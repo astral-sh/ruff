@@ -1,12 +1,12 @@
-use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::flat::AnyNodeRef;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 
 /// Used as key into the [`MultiMap`](super::MultiMap) storing the comments per node by
 /// [`Comments`](super::Comments).
 ///
-/// Implements equality and hashing based on the address of the [`AnyNodeRef`] to get fast and cheap
-/// hashing/equality comparison.
+/// Keys identify rows in the tree being formatted. Different occurrences of equal syntax can
+/// have different comments.
 #[derive(Copy, Clone)]
 pub(super) struct NodeRefEqualityKey<'a> {
     node: AnyNodeRef<'a>,
@@ -32,7 +32,7 @@ impl Debug for NodeRefEqualityKey<'_> {
 
 impl PartialEq for NodeRefEqualityKey<'_> {
     fn eq(&self, other: &Self) -> bool {
-        self.node.ptr_eq(other.node)
+        self.node.is_same_node(other.node)
     }
 }
 
@@ -40,7 +40,7 @@ impl Eq for NodeRefEqualityKey<'_> {}
 
 impl Hash for NodeRefEqualityKey<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.node.as_ptr().hash(state);
+        self.node.handle().hash(state);
     }
 }
 
@@ -52,47 +52,33 @@ impl<'a> From<AnyNodeRef<'a>> for NodeRefEqualityKey<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::comments::node_key::NodeRefEqualityKey;
-    use ruff_python_ast::AnyNodeRef;
-    use ruff_python_ast::AtomicNodeIndex;
-    use ruff_python_ast::StmtContinue;
-    use ruff_text_size::TextRange;
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+    use super::NodeRefEqualityKey;
+    use ruff_python_parser::parse_module;
+    use std::hash::{DefaultHasher, Hash, Hasher};
 
-    fn hash(key: NodeRefEqualityKey) -> u64 {
-        let mut h = DefaultHasher::default();
-        key.hash(&mut h);
-        h.finish()
+    fn hash(key: NodeRefEqualityKey<'_>) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        key.hash(&mut hasher);
+        hasher.finish()
     }
 
     #[test]
     fn equality() {
-        let continue_statement = StmtContinue {
-            range: TextRange::default(),
-            node_index: AtomicNodeIndex::NONE,
-        };
-
-        let ref_a = NodeRefEqualityKey::from_ref(AnyNodeRef::from(&continue_statement));
-        let ref_b = NodeRefEqualityKey::from_ref(AnyNodeRef::from(&continue_statement));
-
-        assert_eq!(ref_a, ref_b);
-        assert_eq!(hash(ref_a), hash(ref_b));
+        let parsed = parse_module("pass").unwrap();
+        let a = NodeRefEqualityKey::from_ref(parsed.suite().at(0).erase());
+        let b = NodeRefEqualityKey::from_ref(parsed.suite().at(0).erase());
+        assert_eq!(a, b);
+        assert_eq!(hash(a), hash(b));
     }
 
     #[test]
     fn inequality() {
-        let continue_statement = StmtContinue {
-            range: TextRange::default(),
-            node_index: AtomicNodeIndex::NONE,
-        };
-
-        let boxed = Box::new(continue_statement.clone());
-
-        let ref_a = NodeRefEqualityKey::from_ref(AnyNodeRef::from(&continue_statement));
-        let ref_b = NodeRefEqualityKey::from_ref(AnyNodeRef::from(boxed.as_ref()));
-
-        assert_ne!(ref_a, ref_b);
-        assert_ne!(hash(ref_a), hash(ref_b));
+        let parsed = parse_module("pass\npass").unwrap();
+        let other = parse_module("pass").unwrap();
+        let a = NodeRefEqualityKey::from_ref(parsed.suite().at(0).erase());
+        let b = NodeRefEqualityKey::from_ref(parsed.suite().at(1).erase());
+        let c = NodeRefEqualityKey::from_ref(other.suite().at(0).erase());
+        assert_ne!(a, b);
+        assert_ne!(a, c);
     }
 }

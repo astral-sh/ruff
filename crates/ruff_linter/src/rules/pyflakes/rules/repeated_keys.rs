@@ -1,10 +1,11 @@
+use ruff_python_ast::flat::fields;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use std::collections::hash_map::Entry;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::{ComparableExpr, HashableExpr};
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, flat};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -150,15 +151,15 @@ impl Violation for MultiValueRepeatedKeyVariable {
 }
 
 /// F601, F602
-pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
-    if dict.len() < 2 {
+pub(crate) fn repeated_keys(checker: &Checker, dict: flat::View<'_, ast::ExprDict>) {
+    if dict.items().len() < 2 {
         return;
     }
 
-    let mut seen_keys = FxHashMap::with_capacity_and_hasher(dict.len(), FxBuildHasher);
+    let mut seen_keys = FxHashMap::with_capacity_and_hasher(dict.items().len(), FxBuildHasher);
     let mut seen_values = FxHashMap::default();
 
-    for (i, ast::DictItem { key, value }) in dict.iter().enumerate() {
+    for (i, flat::DictItemView { key, value }) in dict.items().iter().enumerate() {
         let Some(key) = key else {
             continue;
         };
@@ -171,8 +172,8 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
             Entry::Occupied(entry) => *entry.get(),
         };
 
-        let mut diagnostic = match key {
-            key if is_literal_key(key)
+        let mut diagnostic = match key.classify() {
+            key if is_literal_key(key.view())
                 && checker.is_rule_enabled(Rule::MultiValueRepeatedKeyLiteral) =>
             {
                 checker.report_diagnostic(
@@ -183,7 +184,9 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                     key.range(),
                 )
             }
-            Expr::Name(_) if checker.is_rule_enabled(Rule::MultiValueRepeatedKeyVariable) => {
+            flat::ExprKind::Name(_)
+                if checker.is_rule_enabled(Rule::MultiValueRepeatedKeyVariable) =>
+            {
                 checker.report_diagnostic(
                     MultiValueRepeatedKeyVariable {
                         name: SourceCodeSnippet::from_str(checker.locator().slice(key)),
@@ -201,10 +204,10 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
         if !values.insert(ComparableExpr::from(value)) {
             let previous = dict.value(i - 1);
             diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
-                parenthesized_range(previous.into(), dict.into(), checker.tokens())
+                parenthesized_range(previous, dict.into(), checker.tokens())
                     .unwrap_or_else(|| previous.range())
                     .end(),
-                parenthesized_range(value.into(), dict.into(), checker.tokens())
+                parenthesized_range(value, dict.into(), checker.tokens())
                     .unwrap_or_else(|| value.range())
                     .end(),
             )));
@@ -212,32 +215,32 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
     }
 }
 
-fn is_literal_key(expr: &Expr) -> bool {
-    match expr {
-        Expr::StringLiteral(_)
-        | Expr::BytesLiteral(_)
-        | Expr::NumberLiteral(_)
-        | Expr::BooleanLiteral(_)
-        | Expr::NoneLiteral(_)
-        | Expr::EllipsisLiteral(_)
-        | Expr::Tuple(_)
-        | Expr::FString(_) => true,
-        Expr::UnaryOp(ast::ExprUnaryOp {
+fn is_literal_key(expr: flat::View<'_, Expr>) -> bool {
+    match expr.fields() {
+        fields::Expr::StringLiteral(_)
+        | fields::Expr::BytesLiteral(_)
+        | fields::Expr::NumberLiteral(_)
+        | fields::Expr::BooleanLiteral(_)
+        | fields::Expr::NoneLiteral(_)
+        | fields::Expr::EllipsisLiteral(_)
+        | fields::Expr::Tuple(_)
+        | fields::Expr::FString(_) => true,
+        fields::Expr::UnaryOp(fields::ExprUnaryOp {
             op: ast::UnaryOp::UAdd | ast::UnaryOp::USub,
             operand,
             ..
         }) => signed_number_literal(operand).is_some(),
-        Expr::BinOp(ast::ExprBinOp {
+        fields::Expr::BinOp(fields::ExprBinOp {
             left,
             op: ast::Operator::Add | ast::Operator::Sub,
             right,
             ..
         }) => {
             signed_number_literal(left).is_some_and(|number| {
-                matches!(number.value, ast::Number::Int(_) | ast::Number::Float(_))
+                matches!(number.value(), ast::Number::Int(_) | ast::Number::Float(_))
             }) && matches!(
-                right.as_ref(),
-                Expr::NumberLiteral(ast::ExprNumberLiteral {
+                right.fields(),
+                fields::Expr::NumberLiteral(fields::ExprNumberLiteral {
                     value: ast::Number::Complex { .. },
                     ..
                 })
@@ -247,10 +250,12 @@ fn is_literal_key(expr: &Expr) -> bool {
     }
 }
 
-fn signed_number_literal(expr: &Expr) -> Option<&ast::ExprNumberLiteral> {
-    match expr {
-        Expr::NumberLiteral(number) => Some(number),
-        Expr::UnaryOp(ast::ExprUnaryOp {
+fn signed_number_literal(
+    expr: flat::View<'_, Expr>,
+) -> Option<flat::View<'_, ast::ExprNumberLiteral>> {
+    match expr.fields() {
+        fields::Expr::NumberLiteral(fields::ExprNumberLiteral { node: number, .. }) => Some(number),
+        fields::Expr::UnaryOp(fields::ExprUnaryOp {
             op: ast::UnaryOp::UAdd | ast::UnaryOp::USub,
             operand,
             ..

@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::Expr;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -58,13 +59,16 @@ impl Violation for UnsupportedMethodCallOnAll {
 }
 
 /// PYI056
-pub(crate) fn unsupported_method_call_on_all(checker: &Checker, func: &Expr) {
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func else {
+pub(crate) fn unsupported_method_call_on_all(checker: &Checker, func: flat::View<'_, Expr>) {
+    let flat::ExprKind::Attribute(attribute) = func.classify() else {
         return;
     };
-    let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+    let value = attribute.value();
+    let attr = attribute.attr();
+    let flat::ExprKind::Name(name_node) = value.classify() else {
         return;
     };
+    let id = name_node.id();
     if id.as_str() != "__all__" {
         return;
     }

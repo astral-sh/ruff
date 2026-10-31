@@ -1,3 +1,4 @@
+use ruff_python_ast::comparable::{ComparableExpr, ComparableStmt};
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::{Formatter, Write};
@@ -5,10 +6,12 @@ use std::fmt::{Formatter, Write};
 use annotate_snippets::{AnnotationKind, Group, Level, Renderer, Snippet};
 use datatest_stable::Utf8Path;
 use itertools::Itertools;
+use ruff_python_ast::flat::{self, fields as ast, visitor::Visitor};
 use ruff_python_ast::token::{Token, Tokens};
-use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_module};
-use ruff_python_ast::{self as ast, AnyNodeRef, Mod, PythonVersion};
+use ruff_python_ast::{
+    AnyNodeRef, Comprehension, Expr, HasNodeIndex, Mod, NodeIndex, NodeKind, PythonVersion, Stmt,
+};
 use ruff_python_parser::semantic_errors::{
     LazyImportContext, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
 };
@@ -112,10 +115,10 @@ fn test_valid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
 
     let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
 
-    let mut visitor =
-        SemanticSyntaxCheckerVisitor::new(source).with_python_version(options.target_version());
+    let mut visitor = SemanticSyntaxCheckerVisitor::new(source, parsed.ast())
+        .with_python_version(options.target_version());
 
-    for stmt in parsed.suite() {
+    for stmt in parsed.root().body() {
         visitor.visit_stmt(stmt);
     }
 
@@ -210,10 +213,10 @@ fn test_invalid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
 
     let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
 
-    let mut visitor =
-        SemanticSyntaxCheckerVisitor::new(source).with_python_version(options.target_version());
+    let mut visitor = SemanticSyntaxCheckerVisitor::new(source, parsed.ast())
+        .with_python_version(options.target_version());
 
-    for stmt in parsed.suite() {
+    for stmt in parsed.root().body() {
         visitor.visit_stmt(stmt);
     }
 
@@ -428,17 +431,40 @@ Tokens: {tokens:#?}
 /// * the range of the parent node fully encloses all its child nodes
 /// * the ranges are strictly increasing when traversing the nodes in pre-order.
 /// * all ranges are within the length of the source code.
+/// * reconstructing owned syntax preserves every node's index.
 fn validate_ast(parsed: &Parsed<Mod>, source_len: TextSize) {
-    walk_module(
-        &mut ValidateAstVisitor::new(parsed.tokens(), source_len),
-        parsed.syntax(),
-    );
+    let nodes: Vec<_> = parsed
+        .root()
+        .descendants()
+        .map(|node| (node.node_kind(), node.range(), node.node_index()))
+        .collect();
+    let mut visitor = ValidateAstVisitor::new(parsed.tokens(), source_len);
+    let owned = parsed.root().to_owned_node();
+    walk_module(&mut visitor, &owned);
+    assert_eq!(visitor.visited, nodes);
+
+    match (parsed.root().classify(), &owned) {
+        (flat::ModKind::Module(flat), Mod::Module(owned)) => {
+            assert_eq!(flat.body().len(), owned.body.len());
+            for (view, stmt) in flat.body().iter().zip(&owned.body) {
+                assert_eq!(ComparableStmt::from(view), ComparableStmt::from(stmt));
+            }
+        }
+        (flat::ModKind::Expression(flat), Mod::Expression(owned)) => {
+            assert_eq!(
+                ComparableExpr::from(flat.body()),
+                ComparableExpr::from(&*owned.body)
+            );
+        }
+        _ => panic!("projected module kind differs from its root"),
+    }
 }
 
 #[derive(Debug)]
 struct ValidateAstVisitor<'a> {
     tokens: std::iter::Peekable<std::slice::Iter<'a, Token>>,
     parents: Vec<AnyNodeRef<'a>>,
+    visited: Vec<(NodeKind, TextRange, NodeIndex)>,
     previous: Option<AnyNodeRef<'a>>,
     source_length: TextSize,
 }
@@ -447,6 +473,7 @@ impl<'a> ValidateAstVisitor<'a> {
     fn new(tokens: &'a Tokens, source_length: TextSize) -> Self {
         Self {
             tokens: tokens.iter().peekable(),
+            visited: Vec::new(),
             parents: Vec::new(),
             previous: None,
             source_length,
@@ -507,6 +534,8 @@ Root: {root:#?}",
 
 impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
     fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
+        self.visited
+            .push((node.kind(), node.range(), node.node_index()));
         if let AnyNodeRef::ExprCompare(compare) = node {
             assert!(
                 !compare.ops.is_empty(),
@@ -586,9 +615,9 @@ struct SemanticSyntaxCheckerVisitor<'a> {
 }
 
 impl<'a> SemanticSyntaxCheckerVisitor<'a> {
-    fn new(source: &'a str) -> Self {
+    fn new(source: &'a str, ast: &flat::Ast) -> Self {
         Self {
-            checker: SemanticSyntaxChecker::new(),
+            checker: SemanticSyntaxChecker::new(ast),
             diagnostics: RefCell::default(),
             python_version: PythonVersion::default(),
             source,
@@ -608,7 +637,7 @@ impl<'a> SemanticSyntaxCheckerVisitor<'a> {
     }
 
     fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Self)) {
-        let mut checker = std::mem::take(&mut self.checker);
+        let mut checker = self.checker;
         f(&mut checker, self);
         self.checker = checker;
     }
@@ -719,9 +748,11 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
 }
 
 impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
-        self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
-        match stmt {
+    fn visit_stmt(&mut self, stmt: flat::View<'_, Stmt>) {
+        self.with_semantic_checker(|semantic, context| {
+            semantic.visit_stmt(stmt, context);
+        });
+        match stmt.fields() {
             ast::Stmt::ClassDef(ast::StmtClassDef {
                 arguments,
                 body,
@@ -743,29 +774,27 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                 self.scopes.pop().unwrap();
             }
             ast::Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
-                self.scopes.push(Scope::Function {
-                    is_async: *is_async,
-                });
-                ast::visitor::walk_stmt(self, stmt);
+                self.scopes.push(Scope::Function { is_async });
+                flat::visitor::walk_stmt(self, stmt);
                 self.scopes.pop().unwrap();
             }
             ast::Stmt::Try(_) => {
                 let was_in_try = std::mem::replace(&mut self.in_try, true);
-                ast::visitor::walk_stmt(self, stmt);
+                flat::visitor::walk_stmt(self, stmt);
                 self.in_try = was_in_try;
             }
             _ => {
-                ast::visitor::walk_stmt(self, stmt);
+                flat::visitor::walk_stmt(self, stmt);
             }
         }
     }
 
-    fn visit_expr(&mut self, expr: &ast::Expr) {
-        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
-        match expr {
+    fn visit_expr(&mut self, expr: flat::View<'_, Expr>) {
+        SemanticSyntaxChecker::check_expr(expr, self);
+        match expr.fields() {
             ast::Expr::Lambda(_) => {
                 self.scopes.push(Scope::Function { is_async: false });
-                ast::visitor::walk_expr(self, expr);
+                flat::visitor::walk_expr(self, expr);
                 self.scopes.pop().unwrap();
             }
             ast::Expr::ListComp(ast::ExprListComp {
@@ -781,7 +810,7 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                     self.visit_comprehension(comprehension);
                 }
                 self.scopes.push(Scope::Comprehension {
-                    is_async: generators.iter().any(|generator| generator.is_async),
+                    is_async: generators.iter().any(flat::View::<Comprehension>::is_async),
                 });
                 self.visit_expr(elt);
                 self.scopes.pop().unwrap();
@@ -796,7 +825,7 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                     self.visit_comprehension(comprehension);
                 }
                 self.scopes.push(Scope::Comprehension {
-                    is_async: generators.iter().any(|generator| generator.is_async),
+                    is_async: generators.iter().any(flat::View::<Comprehension>::is_async),
                 });
                 if let Some(key) = key {
                     self.visit_expr(key);
@@ -805,7 +834,7 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                 self.scopes.pop().unwrap();
             }
             _ => {
-                ast::visitor::walk_expr(self, expr);
+                flat::visitor::walk_expr(self, expr);
             }
         }
     }

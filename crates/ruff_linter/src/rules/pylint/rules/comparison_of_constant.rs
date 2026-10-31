@@ -1,4 +1,4 @@
-use ruff_python_ast::{CmpOp, ExprCompare};
+use ruff_python_ast::{CmpOp, ExprCompare, flat};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -51,14 +51,14 @@ impl Violation for ComparisonOfConstant {
 }
 
 /// PLR0133
-pub(crate) fn comparison_of_constant(checker: &Checker, compare: &ExprCompare) {
+pub(crate) fn comparison_of_constant(checker: &Checker, compare: flat::View<'_, ExprCompare>) {
     for (left, op, right) in compare.iter() {
         if left.is_literal_expr() && right.is_literal_expr() {
             checker.report_diagnostic(
                 ComparisonOfConstant {
-                    left_constant: checker.generator().expr(left),
-                    op: *op,
-                    right_constant: checker.generator().expr(right),
+                    left_constant: checker.generator().expr_view(left),
+                    op,
+                    right_constant: checker.generator().expr_view(right),
                 },
                 left.range(),
             );

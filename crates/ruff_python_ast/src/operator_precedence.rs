@@ -1,4 +1,6 @@
-use crate::{BoolOp, Expr, ExprRef, Operator, UnaryOp};
+use crate::flat;
+use crate::flat::ExprKind;
+use crate::{BoolOp, Expr, Operator, UnaryOp};
 
 /// Represents the precedence levels for Python expressions.
 /// Variants at the top have lower precedence and variants at the bottom have
@@ -53,84 +55,88 @@ pub enum OperatorPrecedence {
     Atomic,
 }
 
-impl OperatorPrecedence {
-    fn from_expr_ref(expr: ExprRef) -> Self {
-        match expr {
+// Owned syntax stores the operator in a field. Parsed syntax reads the same
+// operator from its payload. Both forms follow the same precedence table.
+macro_rules! expression_precedence {
+    ($expr:expr, $kind:ident, $($op:tt)+) => {
+        match $expr {
             // Binding or parenthesized expression, list display, dictionary display, set display
-            ExprRef::Tuple(_)
-            | ExprRef::Dict(_)
-            | ExprRef::Set(_)
-            | ExprRef::ListComp(_)
-            | ExprRef::List(_)
-            | ExprRef::SetComp(_)
-            | ExprRef::DictComp(_)
-            | ExprRef::Generator(_)
-            | ExprRef::Name(_)
-            | ExprRef::StringLiteral(_)
-            | ExprRef::BytesLiteral(_)
-            | ExprRef::NumberLiteral(_)
-            | ExprRef::BooleanLiteral(_)
-            | ExprRef::NoneLiteral(_)
-            | ExprRef::EllipsisLiteral(_)
-            | ExprRef::FString(_)
-            | ExprRef::TString(_) => Self::Atomic,
+            $kind::Tuple(_)
+            | $kind::Dict(_)
+            | $kind::Set(_)
+            | $kind::ListComp(_)
+            | $kind::List(_)
+            | $kind::SetComp(_)
+            | $kind::DictComp(_)
+            | $kind::Generator(_)
+            | $kind::Name(_)
+            | $kind::StringLiteral(_)
+            | $kind::BytesLiteral(_)
+            | $kind::NumberLiteral(_)
+            | $kind::BooleanLiteral(_)
+            | $kind::NoneLiteral(_)
+            | $kind::EllipsisLiteral(_)
+            | $kind::FString(_)
+            | $kind::TString(_) => Self::Atomic,
             // Subscription, slicing, call, attribute reference
-            ExprRef::Attribute(_)
-            | ExprRef::Subscript(_)
-            | ExprRef::Call(_)
-            | ExprRef::Slice(_) => Self::CallAttribute,
+            $kind::Attribute(_)
+            | $kind::Subscript(_)
+            | $kind::Call(_)
+            | $kind::Slice(_) => Self::CallAttribute,
 
             // Await expression
-            ExprRef::Await(_) => Self::Await,
+            $kind::Await(_) => Self::Await,
 
             // Exponentiation **
             // Handled below along with other binary operators
 
             // Unary operators: +x, -x, ~x (except boolean not)
-            ExprRef::UnaryOp(operator) => match operator.op {
+            $kind::UnaryOp(operator) => match operator.$($op)+ {
                 UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert => Self::PosNegBitNot,
                 UnaryOp::Not => Self::Not,
             },
 
             // Math binary ops
-            ExprRef::BinOp(binary_operation) => Self::from(binary_operation.op),
+            $kind::BinOp(binary_operation) => Self::from(binary_operation.$($op)+),
 
             // Comparisons: <, <=, >, >=, ==, !=, in, not in, is, is not
-            ExprRef::Compare(_) => Self::ComparisonsMembershipIdentity,
+            $kind::Compare(_) => Self::ComparisonsMembershipIdentity,
 
             // Boolean not
             // Handled above in unary operators
 
             // Boolean operations: and, or
-            ExprRef::BoolOp(bool_op) => Self::from(bool_op.op),
+            $kind::BoolOp(bool_op) => Self::from(bool_op.$($op)+),
 
             // Conditional expressions: x if y else z
-            ExprRef::If(_) => Self::IfElse,
+            $kind::If(_) => Self::IfElse,
 
             // Lambda expressions
-            ExprRef::Lambda(_) => Self::Lambda,
+            $kind::Lambda(_) => Self::Lambda,
 
             // Unpacking also omitted in the docs, but has almost the lowest precedence,
             // except for assignment & yield expressions. E.g. `[*(v := [1,2])]` is valid
             // but `[*v := [1,2]] would fail on incorrect syntax because * will associate
             // `v` before the assignment.
-            ExprRef::Starred(_) => Self::Starred,
+            $kind::Starred(_) => Self::Starred,
 
             // Assignment expressions (aka named)
-            ExprRef::Named(_) => Self::Assign,
+            $kind::Named(_) => Self::Assign,
 
             // Although omitted in docs, yield expressions may be used inside an expression
             // but must be parenthesized. So for our purposes we assume they just have
             // the lowest "real" precedence.
-            ExprRef::Yield(_) | ExprRef::YieldFrom(_) => Self::Yield,
+            $kind::Yield(_) | $kind::YieldFrom(_) => Self::Yield,
 
             // Not a real python expression, so treat as lowest as well
-            ExprRef::IpyEscapeCommand(_) => Self::None,
+            $kind::IpyEscapeCommand(_) => Self::None,
         }
-    }
+    };
+}
 
-    pub fn from_expr(expr: &Expr) -> Self {
-        Self::from(ExprRef::from(expr))
+impl OperatorPrecedence {
+    pub fn from_expr(expr: flat::View<'_, Expr>) -> Self {
+        expression_precedence!(expr.classify(), ExprKind, op())
     }
 
     /// Returns `true` if the precedence is right-associative i.e., the operations are evaluated
@@ -140,15 +146,15 @@ impl OperatorPrecedence {
     }
 }
 
-impl From<&Expr> for OperatorPrecedence {
-    fn from(expr: &Expr) -> Self {
+impl From<flat::View<'_, Expr>> for OperatorPrecedence {
+    fn from(expr: flat::View<'_, Expr>) -> Self {
         Self::from_expr(expr)
     }
 }
 
-impl<'a> From<ExprRef<'a>> for OperatorPrecedence {
-    fn from(expr_ref: ExprRef<'a>) -> Self {
-        Self::from_expr_ref(expr_ref)
+impl From<&Expr> for OperatorPrecedence {
+    fn from(expr: &Expr) -> Self {
+        expression_precedence!(expr, Expr, op)
     }
 }
 

@@ -1,4 +1,5 @@
 use ruff_python_ast::Stmt;
+use ruff_python_ast::flat;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -39,7 +40,12 @@ fn is_pytest_or_subpackage(imported_name: &str) -> bool {
 }
 
 /// PT013
-pub(crate) fn import(checker: &Checker, import_from: &Stmt, name: &str, asname: Option<&str>) {
+pub(crate) fn import(
+    checker: &Checker,
+    import_from: flat::View<'_, Stmt>,
+    name: &str,
+    asname: Option<&str>,
+) {
     if is_pytest_or_subpackage(name) {
         if let Some(alias) = asname {
             if alias != name {
@@ -50,7 +56,12 @@ pub(crate) fn import(checker: &Checker, import_from: &Stmt, name: &str, asname: 
 }
 
 /// PT013
-pub(crate) fn import_from(checker: &Checker, import_from: &Stmt, module: Option<&str>, level: u32) {
+pub(crate) fn import_from(
+    checker: &Checker,
+    import_from: flat::View<'_, Stmt>,
+    module: Option<&str>,
+    level: u32,
+) {
     // If level is not zero or module is none, return
     if level != 0 {
         return;

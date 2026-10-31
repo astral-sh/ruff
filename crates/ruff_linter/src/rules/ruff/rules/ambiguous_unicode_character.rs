@@ -3,7 +3,7 @@ use std::fmt;
 use bitflags::bitflags;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, FString, StringLike, TString};
+use ruff_python_ast::{self as ast, flat::StringLike};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
@@ -201,24 +201,19 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &Checker, string_like:
     };
 
     for part in string_like.parts() {
-        match part {
-            ast::StringLikePart::String(string_literal) => {
-                let text = checker.locator().slice(string_literal);
-                ambiguous_unicode_character(
-                    text,
-                    string_literal.range(),
-                    context,
-                    checker.context(),
-                );
+        let elements = match part.classify() {
+            ast::flat::StringLikePartKind::String(literal) => {
+                let text = checker.locator().slice(literal);
+                ambiguous_unicode_character(text, literal.range(), context, checker.context());
+                continue;
             }
-            ast::StringLikePart::Bytes(_) => {}
-            ast::StringLikePart::FString(FString { elements, .. })
-            | ast::StringLikePart::TString(TString { elements, .. }) => {
-                for literal in elements.literals() {
-                    let text = checker.locator().slice(literal);
-                    ambiguous_unicode_character(text, literal.range(), context, checker.context());
-                }
-            }
+            ast::flat::StringLikePartKind::Bytes(_) => continue,
+            ast::flat::StringLikePartKind::FString(f_string) => f_string.elements(),
+            ast::flat::StringLikePartKind::TString(t_string) => t_string.elements(),
+        };
+        for literal in elements.literals() {
+            let text = checker.locator().slice(literal);
+            ambiguous_unicode_character(text, literal.range(), context, checker.context());
         }
     }
 }

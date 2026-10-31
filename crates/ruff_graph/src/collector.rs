@@ -1,8 +1,9 @@
 use crate::StringImports;
-use ruff_python_ast::visitor::source_order::{
+use ruff_python_ast::flat::visitor::source_order::{
     SourceOrderVisitor, walk_expr, walk_module, walk_stmt,
 };
-use ruff_python_ast::{self as ast, Expr, Mod, Stmt};
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{Expr, Mod, Stmt};
 use ty_module_resolver::ModuleName;
 
 /// Collect all imports for a given Python file.
@@ -33,25 +34,23 @@ impl<'a> Collector<'a> {
     }
 
     #[must_use]
-    pub(crate) fn collect(mut self, module: &Mod) -> Vec<CollectedImport> {
+    pub(crate) fn collect(mut self, module: flat::View<'_, Mod>) -> Vec<CollectedImport> {
         walk_module(&mut self, module);
         self.imports
     }
 }
 
 impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
-    fn visit_stmt(&mut self, stmt: &'ast Stmt) {
-        match stmt {
-            Stmt::ImportFrom(ast::StmtImportFrom {
+    fn visit_stmt(&mut self, stmt: flat::View<'ast, Stmt>) {
+        match stmt.fields() {
+            ast::Stmt::ImportFrom(ast::StmtImportFrom {
                 names,
                 module,
                 level,
                 is_lazy: _,
                 range: _,
-                node_index: _,
+                node: _,
             }) => {
-                let module = module.as_deref();
-                let level = *level;
                 for alias in names {
                     let mut components = vec![];
 
@@ -75,12 +74,12 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
 
                     // Add the module path.
                     if let Some(module) = module {
-                        components.extend(module.split('.'));
+                        components.extend(module.as_str().split('.'));
                     }
 
                     // Add the alias name, unless it's a wildcard import.
-                    if alias.name.as_str() != "*" {
-                        components.push(alias.name.as_str());
+                    if alias.name().as_str() != "*" {
+                        components.push(alias.name().as_str());
                     }
 
                     if let Some(module_name) = ModuleName::from_components(components) {
@@ -88,24 +87,24 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                     }
                 }
             }
-            Stmt::Import(ast::StmtImport {
+            ast::Stmt::Import(ast::StmtImport {
                 names,
                 is_lazy: _,
                 range: _,
-                node_index: _,
+                node: _,
             }) => {
                 for alias in names {
-                    if let Some(module_name) = ModuleName::new(alias.name.as_str()) {
+                    if let Some(module_name) = ModuleName::new(alias.name().as_str()) {
                         self.imports.push(CollectedImport::Import(module_name));
                     }
                 }
             }
-            Stmt::If(ast::StmtIf {
+            ast::Stmt::If(ast::StmtIf {
                 test,
                 body,
                 elif_else_clauses,
                 range: _,
-                node_index: _,
+                node: _,
             }) => {
                 // Skip TYPE_CHECKING blocks if not requested
                 if self.type_checking_imports || !is_type_checking_condition(test) {
@@ -116,32 +115,32 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                     self.visit_elif_else_clause(clause);
                 }
             }
-            Stmt::FunctionDef(_)
-            | Stmt::ClassDef(_)
-            | Stmt::While(_)
-            | Stmt::With(_)
-            | Stmt::Match(_)
-            | Stmt::Try(_)
-            | Stmt::For(_) => {
+            ast::Stmt::FunctionDef(_)
+            | ast::Stmt::ClassDef(_)
+            | ast::Stmt::While(_)
+            | ast::Stmt::With(_)
+            | ast::Stmt::Match(_)
+            | ast::Stmt::Try(_)
+            | ast::Stmt::For(_) => {
                 // Always traverse into compound statements.
                 walk_stmt(self, stmt);
             }
 
-            Stmt::Return(_)
-            | Stmt::Delete(_)
-            | Stmt::Assign(_)
-            | Stmt::AugAssign(_)
-            | Stmt::AnnAssign(_)
-            | Stmt::TypeAlias(_)
-            | Stmt::Raise(_)
-            | Stmt::Assert(_)
-            | Stmt::Global(_)
-            | Stmt::Nonlocal(_)
-            | Stmt::Expr(_)
-            | Stmt::Pass(_)
-            | Stmt::Break(_)
-            | Stmt::Continue(_)
-            | Stmt::IpyEscapeCommand(_) => {
+            ast::Stmt::Return(_)
+            | ast::Stmt::Delete(_)
+            | ast::Stmt::Assign(_)
+            | ast::Stmt::AugAssign(_)
+            | ast::Stmt::AnnAssign(_)
+            | ast::Stmt::TypeAlias(_)
+            | ast::Stmt::Raise(_)
+            | ast::Stmt::Assert(_)
+            | ast::Stmt::Global(_)
+            | ast::Stmt::Nonlocal(_)
+            | ast::Stmt::Expr(_)
+            | ast::Stmt::Pass(_)
+            | ast::Stmt::Break(_)
+            | ast::Stmt::Continue(_)
+            | ast::Stmt::IpyEscapeCommand(_) => {
                 // Only traverse simple statements when string imports is enabled.
                 if self.string_imports.enabled {
                     walk_stmt(self, stmt);
@@ -150,13 +149,13 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'ast Expr) {
+    fn visit_expr(&mut self, expr: flat::View<'ast, Expr>) {
         if self.string_imports.enabled {
-            if let Expr::StringLiteral(ast::ExprStringLiteral {
+            if let ast::Expr::StringLiteral(ast::ExprStringLiteral {
                 value,
                 range: _,
-                node_index: _,
-            }) = expr
+                node: _,
+            }) = expr.fields()
             {
                 let value = value.to_str();
                 // Determine whether the string literal "looks like" an import statement: contains
@@ -187,16 +186,16 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
 ///
 /// NOTE: Aliased `TYPE_CHECKING`, i.e. `import typing.TYPE_CHECKING as TC; if TC: ...`
 /// will not be detected!
-fn is_type_checking_condition(expr: &Expr) -> bool {
-    match expr {
+fn is_type_checking_condition(expr: flat::View<'_, Expr>) -> bool {
+    match expr.fields() {
         // `if TYPE_CHECKING:`
-        Expr::Name(ast::ExprName { id, .. }) => id.as_str() == "TYPE_CHECKING",
+        ast::Expr::Name(ast::ExprName { id, .. }) => id.as_str() == "TYPE_CHECKING",
         // `if typing.TYPE_CHECKING:`
-        Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+        ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
             attr.as_str() == "TYPE_CHECKING"
                 && matches!(
-                    value.as_ref(),
-                    Expr::Name(ast::ExprName { id, .. }) if id.as_str() == "typing"
+                    value.fields(),
+                    ast::Expr::Name(ast::ExprName { id, .. }) if id.as_str() == "typing"
                 )
         }
         _ => false,

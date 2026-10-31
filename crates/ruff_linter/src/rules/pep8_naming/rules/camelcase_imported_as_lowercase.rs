@@ -1,4 +1,4 @@
-use ruff_python_ast::{Alias, Stmt};
+use ruff_python_ast::{Alias, Stmt, flat};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -56,8 +56,8 @@ pub(crate) fn camelcase_imported_as_lowercase(
     checker: &Checker,
     name: &str,
     asname: &str,
-    alias: &Alias,
-    stmt: &Stmt,
+    alias: flat::View<'_, Alias>,
+    stmt: flat::View<'_, Stmt>,
     ignore_names: &IgnoreNames,
 ) {
     if helpers::is_camelcase(name) && ruff_python_stdlib::str::is_cased_lowercase(asname) {

@@ -1,5 +1,6 @@
 use anyhow::{Result, bail};
 use libcst_native::{CompoundStatement, Statement, Suite, With};
+use ruff_python_ast::flat;
 
 use ruff_python_ast as ast;
 use ruff_python_ast::whitespace;
@@ -16,10 +17,10 @@ use crate::fix::codemods::CodegenStylist;
 pub(crate) fn fix_multiple_with_statements(
     locator: &Locator,
     stylist: &Stylist,
-    with_stmt: &ast::StmtWith,
+    with_stmt: flat::View<'_, ast::StmtWith>,
 ) -> Result<Edit> {
     // Infer the indentation of the outer block.
-    let Some(outer_indent) = whitespace::indentation(locator.contents(), with_stmt) else {
+    let Some(outer_indent) = whitespace::indentation(locator.contents(), &with_stmt) else {
         bail!("Unable to fix multiline statement");
     };
 

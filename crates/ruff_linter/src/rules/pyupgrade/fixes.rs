@@ -1,13 +1,95 @@
-use ruff_python_ast::StmtImportFrom;
+use ruff_python_ast::flat;
 use ruff_python_ast::token::{TokenKind, Tokens};
+use ruff_python_ast::{self as ast, Expr, Keyword, Stmt, StmtImportFrom};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::Locator;
+use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, Locator};
+
+pub(super) struct ClassField<'a> {
+    pub(super) name: &'a str,
+    pub(super) annotation: flat::View<'a, Expr>,
+}
+
+impl<'a> ClassField<'a> {
+    pub(super) fn from_keywords(keywords: flat::NodeList<'a, Keyword>) -> Option<Vec<Self>> {
+        keywords
+            .iter()
+            .map(|keyword| {
+                Some(Self {
+                    name: keyword.arg()?.as_str(),
+                    annotation: keyword.value(),
+                })
+            })
+            .collect()
+    }
+
+    fn into_statement(self) -> Stmt {
+        ast::StmtAnnAssign {
+            target: Box::new(
+                ast::ExprName {
+                    id: self.name.into(),
+                    ctx: ast::ExprContext::Load,
+                    range: TextRange::default(),
+                    node_index: ast::NodeIndex::NONE,
+                }
+                .into(),
+            ),
+            annotation: Box::new(self.annotation.to_owned_node()),
+            value: None,
+            simple: true,
+            range: TextRange::default(),
+            node_index: ast::NodeIndex::NONE,
+        }
+        .into()
+    }
+}
+
+/// Convert a functional `NamedTuple` or `TypedDict` declaration to a class definition.
+pub(super) fn functional_to_class_fix(
+    checker: &Checker,
+    stmt: flat::View<'_, Stmt>,
+    name: &str,
+    base: flat::View<'_, Expr>,
+    fields: Vec<ClassField<'_>>,
+    keywords: flat::NodeList<'_, Keyword>,
+) -> Fix {
+    let body = if fields.is_empty() {
+        ast::Suite::from([Stmt::Pass(ast::StmtPass {
+            range: TextRange::default(),
+            node_index: ast::NodeIndex::NONE,
+        })])
+    } else {
+        fields.into_iter().map(ClassField::into_statement).collect()
+    };
+    let class = ast::StmtClassDef {
+        name: ast::Identifier::new(name, TextRange::default()),
+        arguments: Some(Box::new(ast::Arguments {
+            args: [base.to_owned_node()].into(),
+            keywords: keywords.iter().map(flat::View::to_owned_node).collect(),
+            range: TextRange::default(),
+            node_index: ast::NodeIndex::NONE,
+        })),
+        body,
+        type_params: None,
+        decorator_list: ast::DecoratorList::new(),
+        range: TextRange::default(),
+        node_index: ast::NodeIndex::NONE,
+    };
+    Fix::applicable_edit(
+        Edit::range_replacement(checker.generator().stmt(&class.into()), stmt.range()),
+        if checker.comment_ranges().intersects(stmt.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        },
+    )
+}
 
 /// Remove any imports matching `members` from an import-from statement.
 pub(crate) fn remove_import_members(
     locator: &Locator<'_>,
-    import_from_stmt: &StmtImportFrom,
+    import_from_stmt: flat::View<'_, StmtImportFrom>,
     tokens: &Tokens,
     members_to_remove: &[&str],
 ) -> String {
@@ -29,21 +111,21 @@ pub(crate) fn remove_import_members(
     let mut last_pos = import_from_stmt.start();
     let mut is_first = true;
 
-    for (index, member) in import_from_stmt.names.iter().enumerate() {
-        if !members_to_remove.contains(&member.name.as_str()) {
+    for (index, member) in import_from_stmt.names().iter().enumerate() {
+        if !members_to_remove.contains(&member.name().as_str()) {
             is_first = false;
             continue;
         }
 
         let range = if is_first {
             TextRange::new(
-                import_from_stmt.names[index].start(),
-                import_from_stmt.names[index + 1].start(),
+                import_from_stmt.names().at(index).start(),
+                import_from_stmt.names().at(index + 1).start(),
             )
         } else {
             TextRange::new(
                 commas[index - 1].start(),
-                import_from_stmt.names[index].end(),
+                import_from_stmt.names().at(index).end(),
             )
         };
 

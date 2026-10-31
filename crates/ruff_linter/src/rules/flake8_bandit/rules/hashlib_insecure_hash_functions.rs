@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::is_const_false;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::helpers::is_const_false;
 use ruff_python_ast::{self as ast, Arguments};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
@@ -90,7 +91,10 @@ impl Violation for HashlibInsecureHashFunction {
 }
 
 /// S324
-pub(crate) fn hashlib_insecure_hash_functions(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn hashlib_insecure_hash_functions(
+    checker: &Checker,
+    call: flat::View<'_, ast::ExprCall>,
+) {
     if !checker
         .semantic()
         .seen_module(Modules::HASHLIB | Modules::CRYPT)
@@ -100,7 +104,7 @@ pub(crate) fn hashlib_insecure_hash_functions(checker: &Checker, call: &ast::Exp
 
     if let Some(weak_hash_call) = checker
         .semantic()
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func())
         .and_then(|qualified_name| match qualified_name.segments() {
             ["hashlib", "new"] => Some(WeakHashCall::Hashlib {
                 call: HashlibCall::New,
@@ -132,16 +136,16 @@ pub(crate) fn hashlib_insecure_hash_functions(checker: &Checker, call: &ast::Exp
 
 fn detect_insecure_hashlib_calls(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call: flat::View<'_, ast::ExprCall>,
     hashlib_call: HashlibCall,
 ) {
-    if !is_used_for_security(&call.arguments) {
+    if !is_used_for_security(call.arguments()) {
         return;
     }
 
     match hashlib_call {
         HashlibCall::New => {
-            let Some(name_arg) = call.arguments.find_argument_value("name", 0) else {
+            let Some(name_arg) = call.arguments().find_argument_value("name", 0) else {
                 return;
             };
             let Some(hash_func_name) = string_literal(name_arg) else {
@@ -169,23 +173,24 @@ fn detect_insecure_hashlib_calls(
                     library: "hashlib".to_string(),
                     string: (*func_name).to_string(),
                 },
-                call.func.range(),
+                call.func().range(),
             );
         }
     }
 }
 
-fn detect_insecure_crypt_calls(checker: &Checker, call: &ast::ExprCall) {
+fn detect_insecure_crypt_calls(checker: &Checker, call: flat::View<'_, ast::ExprCall>) {
     let Some(method) = checker
         .semantic()
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func())
         .and_then(|qualified_name| match qualified_name.segments() {
             ["crypt", "crypt"] => Some(("salt", 1)),
             ["crypt", "mksalt"] => Some(("method", 0)),
             _ => None,
         })
         .and_then(|(argument_name, position)| {
-            call.arguments.find_argument_value(argument_name, position)
+            call.arguments()
+                .find_argument_value(argument_name, position)
         })
     else {
         return;
@@ -209,10 +214,10 @@ fn detect_insecure_crypt_calls(checker: &Checker, call: &ast::ExprCall) {
     }
 }
 
-fn is_used_for_security(arguments: &Arguments) -> bool {
+fn is_used_for_security(arguments: flat::View<'_, Arguments>) -> bool {
     arguments
         .find_keyword("usedforsecurity")
-        .is_none_or(|keyword| !is_const_false(&keyword.value))
+        .is_none_or(|keyword| !is_const_false(keyword.value()))
 }
 
 #[derive(Debug, Copy, Clone)]

@@ -1,6 +1,7 @@
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::PatternMatchMapping;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::AnyNodeRef;
 use ruff_python_ast::{Expr, Identifier, Pattern};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
@@ -15,14 +16,14 @@ use crate::prelude::*;
 pub struct FormatPatternMatchMapping;
 
 impl FormatNodeRule<PatternMatchMapping> for FormatPatternMatchMapping {
-    fn fmt_fields(&self, item: &PatternMatchMapping, f: &mut PyFormatter) -> FormatResult<()> {
-        let PatternMatchMapping {
-            keys,
-            patterns,
-            rest,
-            range: _,
-            node_index: _,
-        } = item;
+    fn fmt_fields(
+        &self,
+        item: flat::View<'_, PatternMatchMapping>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        let keys = item.keys();
+        let patterns = item.patterns();
+        let rest = item.rest();
 
         debug_assert_eq!(keys.len(), patterns.len());
 
@@ -93,7 +94,7 @@ impl FormatNodeRule<PatternMatchMapping> for FormatPatternMatchMapping {
     }
 }
 
-impl NeedsParentheses for PatternMatchMapping {
+impl NeedsParentheses for flat::View<'_, PatternMatchMapping> {
     fn needs_parentheses(
         &self,
         _parent: AnyNodeRef,
@@ -106,7 +107,7 @@ impl NeedsParentheses for PatternMatchMapping {
 /// A struct to format the `rest` element of a [`PatternMatchMapping`] (e.g., `{**rest}`).
 #[derive(Debug)]
 struct RestPattern<'a> {
-    identifier: &'a Identifier,
+    identifier: flat::View<'a, Identifier>,
     comments: &'a [SourceComment],
 }
 
@@ -132,8 +133,8 @@ impl Format<PyFormatContext<'_>> for RestPattern<'_> {
 /// A struct to format a key-pattern pair of a [`PatternMatchMapping`] (e.g., `{key: pattern}`).
 #[derive(Debug)]
 struct KeyPatternPair<'a> {
-    key: &'a Expr,
-    pattern: &'a Pattern,
+    key: flat::View<'a, Expr>,
+    pattern: flat::View<'a, Pattern>,
 }
 
 impl Ranged for KeyPatternPair<'_> {
@@ -158,20 +159,20 @@ impl Format<PyFormatContext<'_>> for KeyPatternPair<'_> {
 
 /// Given a [`PatternMatchMapping`], finds the range of the `**` element in the `rest` pattern,
 /// if it exists.
-fn find_double_star(pattern: &PatternMatchMapping, source: &str) -> Option<(TextRange, TextRange)> {
-    let PatternMatchMapping {
-        keys: _,
-        patterns,
-        rest,
-        range: _,
-        node_index: _,
-    } = pattern;
+fn find_double_star(
+    pattern: flat::View<'_, PatternMatchMapping>,
+    source: &str,
+) -> Option<(TextRange, TextRange)> {
+    let patterns = pattern.patterns();
+    let rest = pattern.rest();
 
     // If there's no `rest` element, there's no `**`.
-    let rest = rest.as_ref()?;
+    let rest = rest?;
 
-    let mut tokenizer =
-        SimpleTokenizer::starts_at(patterns.last().map_or(pattern.start(), Ranged::end), source);
+    let mut tokenizer = SimpleTokenizer::starts_at(
+        patterns.last().map_or(pattern.start(), |node| node.end()),
+        source,
+    );
     let double_star = tokenizer.find(|token| token.kind() == SimpleTokenKind::DoubleStar)?;
 
     Some((double_star.range(), rest.range()))

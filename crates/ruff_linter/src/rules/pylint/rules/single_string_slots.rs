@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, Expr, Stmt, StmtClassDef};
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::fields as ast;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
@@ -60,28 +61,39 @@ impl Violation for SingleStringSlots {
 }
 
 /// PLC0205
-pub(crate) fn single_string_slots(checker: &Checker, class: &StmtClassDef) {
-    for stmt in &class.body {
-        match stmt {
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+pub(crate) fn single_string_slots(checker: &Checker, class: &ast::StmtClassDef<'_>) {
+    for stmt in class.body {
+        match stmt.classify() {
+            flat::StmtKind::Assign(stmt_assign) => {
+                let targets = stmt_assign.targets();
+                let value = stmt_assign.value();
+
                 for target in targets {
-                    if let Expr::Name(ast::ExprName { id, .. }) = target {
+                    if let flat::ExprKind::Name(name_node) = target.classify() {
+                        let id = name_node.id();
                         if id.as_str() == "__slots__" {
-                            if matches!(value.as_ref(), Expr::StringLiteral(_) | Expr::FString(_)) {
+                            if matches!(
+                                value.classify(),
+                                flat::ExprKind::StringLiteral(_) | flat::ExprKind::FString(_)
+                            ) {
                                 checker.report_diagnostic(SingleStringSlots, stmt.identifier());
                             }
                         }
                     }
                 }
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                target,
-                value: Some(value),
-                ..
-            }) => {
-                if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
+            flat::StmtKind::AnnAssign(stmt_ann_assign)
+                if let Some(value) = stmt_ann_assign.value() =>
+            {
+                let target = stmt_ann_assign.target();
+
+                if let flat::ExprKind::Name(name_node) = target.classify() {
+                    let id = name_node.id();
                     if id.as_str() == "__slots__" {
-                        if matches!(value.as_ref(), Expr::StringLiteral(_) | Expr::FString(_)) {
+                        if matches!(
+                            value.classify(),
+                            flat::ExprKind::StringLiteral(_) | flat::ExprKind::FString(_)
+                        ) {
                             checker.report_diagnostic(SingleStringSlots, stmt.identifier());
                         }
                     }

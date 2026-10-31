@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{PySourceType, Stmt};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
@@ -76,7 +77,7 @@ impl Violation for ModuleImportNotAtTopOfFile {
 }
 
 /// E402
-pub(crate) fn module_import_not_at_top_of_file(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn module_import_not_at_top_of_file(checker: &Checker, stmt: flat::View<'_, Stmt>) {
     if checker.semantic().seen_import_boundary() && checker.semantic().at_top_level() {
         let mut diagnostic = checker.report_diagnostic(
             ModuleImportNotAtTopOfFile {

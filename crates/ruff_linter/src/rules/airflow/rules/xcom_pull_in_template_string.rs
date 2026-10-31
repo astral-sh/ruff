@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::flat::fields;
 use ruff_python_semantic::Modules;
 use ruff_python_trivia::Cursor;
 use ruff_text_size::Ranged;
@@ -73,7 +73,7 @@ impl Violation for AirflowXcomPullInTemplateString {
 }
 
 /// AIR201
-pub(crate) fn xcom_pull_in_template_string(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn xcom_pull_in_template_string(checker: &Checker, call: &fields::ExprCall<'_>) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
@@ -81,7 +81,7 @@ pub(crate) fn xcom_pull_in_template_string(checker: &Checker, call: &ast::ExprCa
     // Check if this is a call to an Airflow operator or sensor.
     if !checker
         .semantic()
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func)
         .is_some_and(|qualified_name| {
             is_airflow_builtin_or_provider(qualified_name.segments(), "operators", "Operator")
                 || is_airflow_builtin_or_provider(qualified_name.segments(), "sensors", "Sensor")
@@ -97,13 +97,13 @@ pub(crate) fn xcom_pull_in_template_string(checker: &Checker, call: &ast::ExprCa
     for arg_value in call
         .arguments
         .iter_source_order()
-        .map(ruff_python_ast::ArgOrKeyword::value)
+        .map(ruff_python_ast::flat::ArgOrKeyword::value)
     {
         let Some(string_literal) = arg_value.as_string_literal_expr() else {
             continue;
         };
 
-        let string_value = string_literal.value.to_str();
+        let string_value = string_literal.value().to_str();
 
         if let Some(task_id) = parse_xcom_pull_template(string_value) {
             let mut diagnostic = checker.report_diagnostic(

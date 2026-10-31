@@ -11,6 +11,7 @@ use crate::Program;
 use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_index::{FrozenIndexVec, Idx, IndexVec};
+use ruff_python_ast::flat;
 use ruff_python_ast::{self as ast, Singleton, name::Name};
 
 use crate::ProgramFile;
@@ -123,7 +124,7 @@ impl get_size2::GetSize for CallableAndCallExpr<'_> {}
 /// A call whose completion determines whether an expression statement can continue.
 #[derive(Debug)]
 pub struct StatementCall<'ast> {
-    pub call: &'ast ast::ExprCall,
+    pub call: flat::View<'ast, ast::ExprCall>,
     pub is_await: bool,
 }
 
@@ -141,13 +142,15 @@ impl<'ast> StatementCall<'ast> {
     /// Calls inside larger expressions, such as `1 + sys.exit()`, are deliberately excluded.
     /// Tracking their termination would require many more reachability constraints and degrade
     /// analysis performance.
-    pub fn from_expression(expression: &'ast ast::Expr) -> Option<Self> {
-        match expression {
-            ast::Expr::Call(call) => Some(Self {
+    pub fn from_expression(expression: flat::View<'ast, ast::Expr>) -> Option<Self> {
+        match expression.classify() {
+            flat::ExprKind::Call(call) => Some(Self {
                 call,
                 is_await: false,
             }),
-            ast::Expr::Await(ast::ExprAwait { value, .. }) => {
+            flat::ExprKind::Await(expr_await) => {
+                let value = expr_await.value();
+
                 value.as_call_expr().map(|call| Self {
                     call,
                     is_await: true,

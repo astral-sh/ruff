@@ -1,8 +1,8 @@
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Expr;
 use ruff_python_ast::comparable::HashableExpr;
+use ruff_python_ast::{Expr, flat};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -46,17 +46,17 @@ impl AlwaysFixableViolation for IterationOverSet {
 }
 
 /// PLC0208
-pub(crate) fn iteration_over_set(checker: &Checker, expr: &Expr) {
-    let Expr::Set(set) = expr else {
+pub(crate) fn iteration_over_set(checker: &Checker, expr: flat::View<'_, Expr>) {
+    let flat::ExprKind::Set(set) = expr.classify() else {
         return;
     };
 
-    if set.iter().any(|value| !value.is_literal_expr()) {
+    if set.elts().iter().any(|value| !value.is_literal_expr()) {
         return;
     }
 
-    let mut seen_values = FxHashSet::with_capacity_and_hasher(set.len(), FxBuildHasher);
-    for value in set {
+    let mut seen_values = FxHashSet::with_capacity_and_hasher(set.elts().len(), FxBuildHasher);
+    for value in set.elts() {
         if !seen_values.insert(HashableExpr::from(value)) {
             // if the set contains a duplicate literal value, early exit.
             // rule `B033` can catch that.
@@ -66,7 +66,7 @@ pub(crate) fn iteration_over_set(checker: &Checker, expr: &Expr) {
 
     let mut diagnostic = checker.report_diagnostic(IterationOverSet, expr.range());
 
-    let tuple = if let [elt] = set.elts.as_slice() {
+    let tuple = if let Some([elt]) = set.elts().as_array() {
         let elt = checker.locator().slice(elt);
         format!("({elt},)")
     } else {

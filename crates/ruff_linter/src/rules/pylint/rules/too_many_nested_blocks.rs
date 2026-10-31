@@ -1,6 +1,6 @@
-use ast::ExceptHandler;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::Stmt;
+use ruff_python_ast::flat;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -38,7 +38,7 @@ impl Violation for TooManyNestedBlocks {
 }
 
 /// PLR1702
-pub(crate) fn too_many_nested_blocks(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn too_many_nested_blocks(checker: &Checker, stmt: flat::View<'_, Stmt>) {
     // Only enforce nesting within functions or methods.
     if !checker.semantic().current_scope().kind.is_function() {
         return;
@@ -86,49 +86,62 @@ pub(crate) fn too_many_nested_blocks(checker: &Checker, stmt: &Stmt) {
 }
 
 /// Returns `true` if the given statement is a nested block.
-fn is_nested_block(stmt: &Stmt) -> bool {
+fn is_nested_block(stmt: flat::View<'_, Stmt>) -> bool {
     matches!(
-        stmt,
-        Stmt::If(_) | Stmt::While(_) | Stmt::For(_) | Stmt::Try(_) | Stmt::With(_)
+        stmt.classify(),
+        flat::StmtKind::If(_)
+            | flat::StmtKind::While(_)
+            | flat::StmtKind::For(_)
+            | flat::StmtKind::Try(_)
+            | flat::StmtKind::With(_)
     )
 }
 
 /// Returns `true` if the given statement is a leaf node.
-fn has_nested_block(stmt: &Stmt) -> bool {
-    match stmt {
-        Stmt::If(ast::StmtIf {
-            body,
-            elif_else_clauses,
-            ..
-        }) => {
+fn has_nested_block(stmt: flat::View<'_, Stmt>) -> bool {
+    match stmt.classify() {
+        flat::StmtKind::If(stmt_if) => {
+            let body = stmt_if.body();
+            let elif_else_clauses = stmt_if.elif_else_clauses();
+
             body.iter().any(is_nested_block)
                 || elif_else_clauses
                     .iter()
-                    .any(|elif_else| elif_else.body.iter().any(is_nested_block))
+                    .any(|elif_else| elif_else.body().iter().any(is_nested_block))
         }
-        Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+        flat::StmtKind::While(stmt_while) => {
+            let body = stmt_while.body();
+            let orelse = stmt_while.orelse();
+
             body.iter().any(is_nested_block) || orelse.iter().any(is_nested_block)
         }
-        Stmt::For(ast::StmtFor { body, orelse, .. }) => {
+        flat::StmtKind::For(stmt_for) => {
+            let body = stmt_for.body();
+            let orelse = stmt_for.orelse();
+
             body.iter().any(is_nested_block) || orelse.iter().any(is_nested_block)
         }
-        Stmt::Try(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        }) => {
+        flat::StmtKind::Try(stmt_try) => {
+            let body = stmt_try.body();
+            let handlers = stmt_try.handlers();
+            let orelse = stmt_try.orelse();
+            let finalbody = stmt_try.finalbody();
+
             body.iter().any(is_nested_block)
-                || handlers.iter().any(|handler| match handler {
-                    ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                        body, ..
-                    }) => body.iter().any(is_nested_block),
+                || handlers.iter().any(|handler| match handler.classify() {
+                    flat::ExceptHandlerKind::ExceptHandler(except_handler_except_handler) => {
+                        let body = except_handler_except_handler.body();
+                        body.iter().any(is_nested_block)
+                    }
                 })
                 || orelse.iter().any(is_nested_block)
                 || finalbody.iter().any(is_nested_block)
         }
-        Stmt::With(ast::StmtWith { body, .. }) => body.iter().any(is_nested_block),
+        flat::StmtKind::With(stmt_with) => {
+            let body = stmt_with.body();
+
+            body.iter().any(is_nested_block)
+        }
         _ => false,
     }
 }

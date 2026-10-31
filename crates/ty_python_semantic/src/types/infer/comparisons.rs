@@ -1,6 +1,7 @@
 use crate::Db;
 use crate::types::typevar::TypeVarSet;
 use ruff_python_ast as ast;
+use ruff_python_ast::flat;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
@@ -748,8 +749,8 @@ pub(super) fn infer_literal_membership_comparison<'db>(
     context: &InferContext<'db, '_>,
     left: Type<'db>,
     op: ast::CmpOp,
-    right: &ast::Expr,
-    expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+    right: flat::View<'_, ast::Expr>,
+    expression_type: impl FnMut(flat::View<'_, ast::Expr>) -> Type<'db>,
 ) -> Option<Type<'db>> {
     let negate = match op {
         ast::CmpOp::In => false,

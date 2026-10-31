@@ -1,13 +1,15 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{CmpOp, Expr, ExprName, ExprSubscript, Stmt, StmtIf};
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{CmpOp, Expr, ExprName, StmtIf};
 use ruff_python_semantic::analyze::typing;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
-type Key = Expr;
-type Dict = ExprName;
+type Key<'a> = flat::View<'a, Expr>;
+type Dict<'a> = flat::View<'a, ExprName>;
 
 /// ## What it does
 /// Checks for `if key in dictionary: del dictionary[key]`.
@@ -48,19 +50,22 @@ impl AlwaysFixableViolation for IfKeyInDictDel {
 }
 
 /// RUF051
-pub(crate) fn if_key_in_dict_del(checker: &Checker, stmt: &StmtIf) {
-    if !stmt.elif_else_clauses.is_empty() {
+pub(crate) fn if_key_in_dict_del(checker: &Checker, stmt: flat::View<'_, StmtIf>) {
+    if !stmt.elif_else_clauses().is_empty() {
         return;
     }
 
-    let [Stmt::Delete(delete)] = &stmt.body[..] else {
+    let Some([body_stmt]) = stmt.body().as_array() else {
+        return;
+    };
+    let flat::StmtKind::Delete(delete) = body_stmt.classify() else {
         return;
     };
 
-    let Some((test_dict, test_key)) = extract_dict_and_key_from_test(&stmt.test) else {
+    let Some((test_dict, test_key)) = extract_dict_and_key_from_test(stmt.test()) else {
         return;
     };
-    let Some((del_dict, del_key)) = extract_dict_and_key_from_del(&delete.targets) else {
+    let Some((del_dict, del_key)) = extract_dict_and_key_from_del(delete.targets()) else {
         return;
     };
 
@@ -75,76 +80,97 @@ pub(crate) fn if_key_in_dict_del(checker: &Checker, stmt: &StmtIf) {
     let fix = replace_with_dict_pop_fix(checker, stmt, test_dict, test_key);
 
     checker
-        .report_diagnostic(IfKeyInDictDel, delete.range)
+        .report_diagnostic(IfKeyInDictDel, delete.range())
         .set_fix(fix);
 }
 
-fn extract_dict_and_key_from_test(test: &Expr) -> Option<(&Dict, &Key)> {
-    let Expr::Compare(comp) = test else {
+fn extract_dict_and_key_from_test(test: flat::View<'_, Expr>) -> Option<(Dict<'_>, Key<'_>)> {
+    let flat::ExprKind::Compare(comp) = test.classify() else {
         return None;
     };
 
-    let [key, Expr::Name(dict)] = comp.operands.as_ref() else {
+    let Some([key, flat::ExprKind::Name(dict)]) = comp
+        .operands()
+        .as_array()
+        .map(|items| items.map(flat::View::<Expr>::classify))
+    else {
         return None;
     };
 
-    if !matches!(comp.ops.as_ref(), [CmpOp::In]) {
+    if !matches!(comp.ops().as_array(), Some([CmpOp::In])) {
         return None;
     }
 
-    Some((dict, key))
+    Some((dict, key.view()))
 }
 
-fn extract_dict_and_key_from_del(targets: &[Expr]) -> Option<(&Dict, &Key)> {
-    let [Expr::Subscript(ExprSubscript { value, slice, .. })] = targets else {
+fn extract_dict_and_key_from_del(targets: flat::NodeList<'_, Expr>) -> Option<(Dict<'_>, Key<'_>)> {
+    let Some([ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. })]) = targets
+        .as_array()
+        .map(|items| items.map(flat::View::<Expr>::fields))
+    else {
         return None;
     };
 
-    let Expr::Name(dict) = value.as_ref() else {
+    let flat::ExprKind::Name(dict) = value.classify() else {
         return None;
     };
 
     Some((dict, slice))
 }
 
-fn is_same_key(test: &Key, del: &Key) -> bool {
-    match (test, del) {
-        (Expr::Name(ExprName { id: test, .. }), Expr::Name(ExprName { id: del, .. })) => {
-            test.as_str() == del.as_str()
-        }
+fn is_same_key(test: Key<'_>, del: Key<'_>) -> bool {
+    match (test.fields(), del.fields()) {
+        (
+            ast::Expr::Name(ast::ExprName { id: test, .. }),
+            ast::Expr::Name(ast::ExprName { id: del, .. }),
+        ) => test.as_str() == del.as_str(),
 
-        (Expr::NoneLiteral(..), Expr::NoneLiteral(..)) => true,
-        (Expr::EllipsisLiteral(..), Expr::EllipsisLiteral(..)) => true,
+        (ast::Expr::NoneLiteral(..), ast::Expr::NoneLiteral(..)) => true,
+        (ast::Expr::EllipsisLiteral(..), ast::Expr::EllipsisLiteral(..)) => true,
 
-        (Expr::BooleanLiteral(test), Expr::BooleanLiteral(del)) => test.value == del.value,
-        (Expr::NumberLiteral(test), Expr::NumberLiteral(del)) => test.value == del.value,
+        (
+            ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { node: test, .. }),
+            ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { node: del, .. }),
+        ) => test.value() == del.value(),
+        (
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral { node: test, .. }),
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral { node: del, .. }),
+        ) => test.value() == del.value(),
 
-        (Expr::BytesLiteral(test), Expr::BytesLiteral(del)) => {
-            Iterator::eq(test.value.bytes(), del.value.bytes())
-        }
+        (
+            ast::Expr::BytesLiteral(ast::ExprBytesLiteral { node: test, .. }),
+            ast::Expr::BytesLiteral(ast::ExprBytesLiteral { node: del, .. }),
+        ) => Iterator::eq(test.value().bytes(), del.value().bytes()),
 
-        (Expr::StringLiteral(test), Expr::StringLiteral(del)) => {
-            Iterator::eq(test.value.chars(), del.value.chars())
-        }
+        (
+            ast::Expr::StringLiteral(ast::ExprStringLiteral { node: test, .. }),
+            ast::Expr::StringLiteral(ast::ExprStringLiteral { node: del, .. }),
+        ) => Iterator::eq(test.value().chars(), del.value().chars()),
 
         _ => false,
     }
 }
 
-fn is_same_dict(test: &Dict, del: &Dict) -> bool {
-    test.id.as_str() == del.id.as_str()
+fn is_same_dict(test: Dict<'_>, del: Dict<'_>) -> bool {
+    test.id().as_str() == del.id().as_str()
 }
 
-fn replace_with_dict_pop_fix(checker: &Checker, stmt: &StmtIf, dict: &Dict, key: &Key) -> Fix {
+fn replace_with_dict_pop_fix(
+    checker: &Checker,
+    stmt: flat::View<'_, StmtIf>,
+    dict: Dict<'_>,
+    key: Key<'_>,
+) -> Fix {
     let locator = checker.locator();
     let dict_expr = locator.slice(dict);
     let key_expr = locator.slice(key);
 
     let replacement = format!("{dict_expr}.pop({key_expr}, None)");
-    let edit = Edit::range_replacement(replacement, stmt.range);
+    let edit = Edit::range_replacement(replacement, stmt.range());
 
     let comment_ranges = checker.comment_ranges();
-    let applicability = if comment_ranges.intersects(stmt.range) {
+    let applicability = if comment_ranges.intersects(stmt.range()) {
         Applicability::Unsafe
     } else {
         Applicability::Safe

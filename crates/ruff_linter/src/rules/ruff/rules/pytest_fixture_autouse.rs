@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::is_const_true;
-use ruff_python_ast::{Decorator, Expr};
+use ruff_python_ast::Decorator;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::helpers::is_const_true;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -72,19 +73,19 @@ impl Violation for PytestFixtureAutouse {
 }
 
 /// `pytest-fixture-autouse`
-pub(crate) fn pytest_fixture_autouse(checker: &Checker, decorators: &[Decorator]) {
+pub(crate) fn pytest_fixture_autouse(checker: &Checker, decorators: flat::NodeList<'_, Decorator>) {
     for decorator in decorators {
         if !is_pytest_fixture(decorator, checker) {
             continue;
         }
 
         // Check if decorator has argument autouse=True
-        let Expr::Call(call) = &decorator.expression else {
+        let flat::ExprKind::Call(call) = decorator.expression().classify() else {
             continue;
         };
 
-        if let Some(keyword) = call.arguments.find_keyword("autouse") {
-            if is_const_true(&keyword.value) {
+        if let Some(keyword) = call.arguments().find_keyword("autouse") {
+            if is_const_true(keyword.value()) {
                 checker.report_diagnostic(PytestFixtureAutouse, keyword.range());
             }
         }

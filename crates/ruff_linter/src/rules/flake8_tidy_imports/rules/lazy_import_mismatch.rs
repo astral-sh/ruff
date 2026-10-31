@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::flat;
 use ruff_python_ast::{PythonVersion, Stmt};
 use ruff_python_semantic::ImportLaziness;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -102,7 +103,7 @@ impl Violation for LazyImportMismatch {
 }
 
 /// TID254
-pub(crate) fn lazy_import_mismatch(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn lazy_import_mismatch(checker: &Checker, stmt: flat::View<'_, Stmt>) {
     if checker.source_type.is_stub()
         || checker.lazy_import_context().is_some()
         || (checker.target_version() < PythonVersion::PY315
@@ -110,18 +111,24 @@ pub(crate) fn lazy_import_mismatch(checker: &Checker, stmt: &Stmt) {
     {
         return;
     }
-    let names = match stmt {
-        Stmt::Import(import) => &import.names,
-        Stmt::ImportFrom(import)
-            if import.module.as_deref() != Some("__future__")
-                && !import.names.iter().any(|alias| alias.name.as_str() == "*") =>
+    let names = match stmt.classify() {
+        flat::StmtKind::Import(import) => import.names(),
+        flat::StmtKind::ImportFrom(import)
+            if import
+                .module()
+                .map(flat::View::<ruff_python_ast::Identifier>::as_str)
+                != Some("__future__")
+                && !import
+                    .names()
+                    .iter()
+                    .any(|alias| alias.name().as_str() == "*") =>
         {
-            &import.names
+            import.names()
         }
         _ => return,
     };
     for (import_policy, node) in &BannedModuleImportPolicies::new(stmt, checker) {
-        let Some(alias) = node.as_alias().copied().or_else(|| names.first()) else {
+        let Some(alias) = node.as_alias().or_else(|| names.first()) else {
             continue;
         };
         let policy = match checker.semantic().import_laziness(stmt, alias) {
@@ -144,15 +151,15 @@ pub(crate) fn lazy_import_mismatch(checker: &Checker, stmt: &Stmt) {
 
 fn report_lazy_import_policy(
     checker: &Checker,
-    stmt: &Stmt,
+    stmt: flat::View<'_, Stmt>,
     range: ruff_text_size::TextRange,
     name: Option<String>,
     policy: LazyImportPolicy,
 ) {
     let mut diagnostic = checker.report_diagnostic(LazyImportMismatch { policy, name }, range);
-    let names = match stmt {
-        Stmt::Import(import) => &import.names,
-        Stmt::ImportFrom(import) => &import.names,
+    let names = match stmt.classify() {
+        flat::StmtKind::Import(import) => import.names(),
+        flat::StmtKind::ImportFrom(import) => import.names(),
         _ => return,
     };
     // Changing the entire statement could violate another imported name's policy.

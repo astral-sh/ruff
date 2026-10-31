@@ -1,8 +1,9 @@
 use ruff_formatter::{Argument, Arguments, FormatError, write};
-use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::flat;
+use ruff_python_ast::flat::AnyNodeRef;
 use ruff_python_ast::{
     ElifElseClause, ExceptHandlerExceptHandler, MatchCase, StmtClassDef, StmtFor, StmtFunctionDef,
-    StmtIf, StmtMatch, StmtTry, StmtWhile, StmtWith, Suite,
+    StmtIf, StmtMatch, StmtTry, StmtWhile, StmtWith,
 };
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::LineRanges;
@@ -22,18 +23,18 @@ use crate::{has_skip_comment, prelude::*};
 /// [source](https://docs.python.org/3/reference/compound_stmts.html#compound-statements)
 #[derive(Copy, Clone)]
 pub(crate) enum ClauseHeader<'a> {
-    Class(&'a StmtClassDef),
-    Function(&'a StmtFunctionDef),
-    If(&'a StmtIf),
-    ElifElse(&'a ElifElseClause),
-    Try(&'a StmtTry),
-    ExceptHandler(&'a ExceptHandlerExceptHandler),
-    TryFinally(&'a StmtTry),
-    Match(&'a StmtMatch),
-    MatchCase(&'a MatchCase),
-    For(&'a StmtFor),
-    While(&'a StmtWhile),
-    With(&'a StmtWith),
+    Class(flat::View<'a, StmtClassDef>),
+    Function(flat::View<'a, StmtFunctionDef>),
+    If(flat::View<'a, StmtIf>),
+    ElifElse(flat::View<'a, ElifElseClause>),
+    Try(flat::View<'a, StmtTry>),
+    ExceptHandler(flat::View<'a, ExceptHandlerExceptHandler>),
+    TryFinally(flat::View<'a, StmtTry>),
+    Match(flat::View<'a, StmtMatch>),
+    MatchCase(flat::View<'a, MatchCase>),
+    For(flat::View<'a, StmtFor>),
+    While(flat::View<'a, StmtWhile>),
+    With(flat::View<'a, StmtWith>),
     OrElse(ElseClause<'a>),
 }
 
@@ -44,32 +45,27 @@ impl<'a> ClauseHeader<'a> {
     /// the primary body. For clauses like `try`, it specifically returns the last child
     /// in the `try` body, not the `except`/`else`/`finally` clauses.
     ///
-    /// This is similar to [`ruff_python_ast::AnyNodeRef::last_child_in_body`]
+    /// This is similar to [`ruff_python_ast::flat::AnyNodeRef::last_child_in_body`]
     /// but restricted to the clause.
     fn last_child_in_clause(self) -> Option<AnyNodeRef<'a>> {
-        match self {
-            ClauseHeader::Class(StmtClassDef { body, .. })
-            | ClauseHeader::Function(StmtFunctionDef { body, .. })
-            | ClauseHeader::If(StmtIf { body, .. })
-            | ClauseHeader::ElifElse(ElifElseClause { body, .. })
-            | ClauseHeader::Try(StmtTry { body, .. })
-            | ClauseHeader::MatchCase(MatchCase { body, .. })
-            | ClauseHeader::For(StmtFor { body, .. })
-            | ClauseHeader::While(StmtWhile { body, .. })
-            | ClauseHeader::With(StmtWith { body, .. })
-            | ClauseHeader::ExceptHandler(ExceptHandlerExceptHandler { body, .. })
-            | ClauseHeader::OrElse(
-                ElseClause::Try(StmtTry { orelse: body, .. })
-                | ElseClause::For(StmtFor { orelse: body, .. })
-                | ElseClause::While(StmtWhile { orelse: body, .. }),
-            )
-            | ClauseHeader::TryFinally(StmtTry {
-                finalbody: body, ..
-            }) => body.last().map(AnyNodeRef::from),
-            ClauseHeader::Match(StmtMatch { cases, .. }) => cases
-                .last()
-                .and_then(|case| case.body.last().map(AnyNodeRef::from)),
-        }
+        let body = match self {
+            Self::Class(node) => node.body(),
+            Self::Function(node) => node.body(),
+            Self::If(node) => node.body(),
+            Self::ElifElse(node) => node.body(),
+            Self::Try(node) => node.body(),
+            Self::MatchCase(node) => node.body(),
+            Self::For(node) => node.body(),
+            Self::While(node) => node.body(),
+            Self::With(node) => node.body(),
+            Self::ExceptHandler(node) => node.body(),
+            Self::OrElse(ElseClause::Try(node)) => node.orelse(),
+            Self::OrElse(ElseClause::For(node)) => node.orelse(),
+            Self::OrElse(ElseClause::While(node)) => node.orelse(),
+            Self::TryFinally(node) => node.finalbody(),
+            Self::Match(node) => node.cases().last()?.body(),
+        };
+        body.last().map(flat::View::erase)
     }
 
     /// The range from the clause keyword up to and including the final colon.
@@ -81,8 +77,10 @@ impl<'a> ClauseHeader<'a> {
         self.visit(&mut |child| last_child_end = Some(child.end()));
 
         let end = match self {
-            ClauseHeader::Class(class) => Some(last_child_end.unwrap_or(class.name.end())),
-            ClauseHeader::Function(function) => Some(last_child_end.unwrap_or(function.name.end())),
+            ClauseHeader::Class(class) => Some(last_child_end.unwrap_or(class.name().end())),
+            ClauseHeader::Function(function) => {
+                Some(last_child_end.unwrap_or(function.name().end()))
+            }
             ClauseHeader::ElifElse(_)
             | ClauseHeader::Try(_)
             | ClauseHeader::If(_)
@@ -95,7 +93,7 @@ impl<'a> ClauseHeader<'a> {
             | ClauseHeader::OrElse(_) => last_child_end,
 
             ClauseHeader::ExceptHandler(handler) => {
-                handler.name.as_ref().map(Ranged::end).or(last_child_end)
+                handler.name().map(|node| node.end()).or(last_child_end)
             }
         };
 
@@ -118,123 +116,72 @@ impl<'a> ClauseHeader<'a> {
         }
 
         match self {
-            ClauseHeader::Class(StmtClassDef {
-                type_params,
-                arguments,
-                range: _,
-                node_index: _,
-                decorator_list: _,
-                name: _,
-                body: _,
-            }) => {
-                if let Some(type_params) = type_params.as_deref() {
+            ClauseHeader::Class(stmt_class_def) => {
+                let type_params = stmt_class_def.type_params();
+                let arguments = stmt_class_def.arguments();
+                if let Some(type_params) = type_params {
                     visit(type_params, visitor);
                 }
 
                 if let Some(arguments) = arguments {
-                    visit(arguments.as_ref(), visitor);
+                    visit(arguments, visitor);
                 }
             }
-            ClauseHeader::Function(StmtFunctionDef {
-                type_params,
-                parameters,
-                range: _,
-                node_index: _,
-                is_async: _,
-                decorator_list: _,
-                name: _,
-                returns,
-                body: _,
-            }) => {
-                if let Some(type_params) = type_params.as_deref() {
+            ClauseHeader::Function(stmt_function_def) => {
+                let type_params = stmt_function_def.type_params();
+                let parameters = stmt_function_def.parameters();
+                let returns = stmt_function_def.returns();
+                if let Some(type_params) = type_params {
                     visit(type_params, visitor);
                 }
-                visit(parameters.as_ref(), visitor);
+                visit(parameters, visitor);
 
-                if let Some(returns) = returns.as_deref() {
+                if let Some(returns) = returns {
                     visit(returns, visitor);
                 }
             }
-            ClauseHeader::If(StmtIf {
-                test,
-                range: _,
-                node_index: _,
-                body: _,
-                elif_else_clauses: _,
-            }) => {
-                visit(test.as_ref(), visitor);
+            ClauseHeader::If(stmt_if) => {
+                let test = stmt_if.test();
+                visit(test, visitor);
             }
-            ClauseHeader::ElifElse(ElifElseClause {
-                test,
-                range: _,
-                node_index: _,
-                body: _,
-            }) => {
-                if let Some(test) = test.as_ref() {
+            ClauseHeader::ElifElse(elif_else_clause) => {
+                let test = elif_else_clause.test();
+                if let Some(test) = test {
                     visit(test, visitor);
                 }
             }
 
-            ClauseHeader::ExceptHandler(ExceptHandlerExceptHandler {
-                type_: type_expr,
-                range: _,
-                node_index: _,
-                name: _,
-                body: _,
-            }) => {
-                if let Some(type_expr) = type_expr.as_deref() {
+            ClauseHeader::ExceptHandler(except_handler_except_handler) => {
+                let type_expr = except_handler_except_handler.type_();
+                if let Some(type_expr) = type_expr {
                     visit(type_expr, visitor);
                 }
             }
-            ClauseHeader::Match(StmtMatch {
-                subject,
-                range: _,
-                node_index: _,
-                cases: _,
-            }) => {
-                visit(subject.as_ref(), visitor);
+            ClauseHeader::Match(stmt_match) => {
+                let subject = stmt_match.subject();
+                visit(subject, visitor);
             }
-            ClauseHeader::MatchCase(MatchCase {
-                guard,
-                pattern,
-                range: _,
-                node_index: _,
-                body: _,
-            }) => {
+            ClauseHeader::MatchCase(match_case) => {
+                let guard = match_case.guard();
+                let pattern = match_case.pattern();
                 visit(pattern, visitor);
 
-                if let Some(guard) = guard.as_deref() {
+                if let Some(guard) = guard {
                     visit(guard, visitor);
                 }
             }
-            ClauseHeader::For(StmtFor {
-                target,
-                iter,
-                range: _,
-                node_index: _,
-                is_async: _,
-                body: _,
-                orelse: _,
-            }) => {
-                visit(target.as_ref(), visitor);
-                visit(iter.as_ref(), visitor);
+            ClauseHeader::For(stmt_for) => {
+                let target = stmt_for.target();
+                let iter = stmt_for.iter();
+                visit(target, visitor);
+                visit(iter, visitor);
             }
-            ClauseHeader::While(StmtWhile {
-                test,
-                range: _,
-                node_index: _,
-                body: _,
-                orelse: _,
-            }) => {
-                visit(test.as_ref(), visitor);
+            ClauseHeader::While(stmt_while) => {
+                let test = stmt_while.test();
+                visit(test, visitor);
             }
-            ClauseHeader::With(StmtWith {
-                items,
-                range: _,
-                node_index: _,
-                is_async: _,
-                body: _,
-            }) => {
+            ClauseHeader::With(stmt_with) => {
+                let items = stmt_with.items();
                 for item in items {
                     visit(item, visitor);
                 }
@@ -248,9 +195,9 @@ impl<'a> ClauseHeader<'a> {
         match self {
             ClauseHeader::Class(header) => {
                 let start_position = header
-                    .decorator_list
+                    .decorator_list()
                     .last()
-                    .map_or_else(|| header.start(), Ranged::end);
+                    .map_or_else(|| header.start(), |node| node.end());
                 find_keyword(
                     StartPosition::ClauseStart(start_position),
                     SimpleTokenKind::Class,
@@ -259,10 +206,10 @@ impl<'a> ClauseHeader<'a> {
             }
             ClauseHeader::Function(header) => {
                 let start_position = header
-                    .decorator_list
+                    .decorator_list()
                     .last()
-                    .map_or_else(|| header.start(), Ranged::end);
-                let keyword = if header.is_async {
+                    .map_or_else(|| header.start(), |node| node.end());
+                let keyword = if header.is_async() {
                     SimpleTokenKind::Async
                 } else {
                     SimpleTokenKind::Def
@@ -274,20 +221,13 @@ impl<'a> ClauseHeader<'a> {
                 SimpleTokenKind::If,
                 source,
             ),
-            ClauseHeader::ElifElse(ElifElseClause {
-                test: None, range, ..
-            }) => find_keyword(
-                StartPosition::clause_start(range),
-                SimpleTokenKind::Else,
-                source,
-            ),
-            ClauseHeader::ElifElse(ElifElseClause {
-                test: Some(_),
-                range,
-                ..
-            }) => find_keyword(
-                StartPosition::clause_start(range),
-                SimpleTokenKind::Elif,
+            ClauseHeader::ElifElse(clause) => find_keyword(
+                StartPosition::clause_start(clause),
+                if clause.test().is_some() {
+                    SimpleTokenKind::Elif
+                } else {
+                    SimpleTokenKind::Else
+                },
                 source,
             ),
             ClauseHeader::Try(header) => find_keyword(
@@ -302,11 +242,11 @@ impl<'a> ClauseHeader<'a> {
             ),
             ClauseHeader::TryFinally(header) => {
                 let last_statement = header
-                    .orelse
+                    .orelse()
                     .last()
                     .map(AnyNodeRef::from)
-                    .or_else(|| header.handlers.last().map(AnyNodeRef::from))
-                    .or_else(|| header.body.last().map(AnyNodeRef::from))
+                    .or_else(|| header.handlers().last().map(AnyNodeRef::from))
+                    .or_else(|| header.body().last().map(AnyNodeRef::from))
                     .unwrap();
 
                 find_keyword(
@@ -326,7 +266,7 @@ impl<'a> ClauseHeader<'a> {
                 source,
             ),
             ClauseHeader::For(header) => {
-                let keyword = if header.is_async {
+                let keyword = if header.is_async() {
                     SimpleTokenKind::Async
                 } else {
                     SimpleTokenKind::For
@@ -339,7 +279,7 @@ impl<'a> ClauseHeader<'a> {
                 source,
             ),
             ClauseHeader::With(header) => {
-                let keyword = if header.is_async {
+                let keyword = if header.is_async() {
                     SimpleTokenKind::Async
                 } else {
                     SimpleTokenKind::With
@@ -350,10 +290,10 @@ impl<'a> ClauseHeader<'a> {
             ClauseHeader::OrElse(header) => match header {
                 ElseClause::Try(try_stmt) => {
                     let last_statement = try_stmt
-                        .handlers
+                        .handlers()
                         .last()
                         .map(AnyNodeRef::from)
-                        .or_else(|| try_stmt.body.last().map(AnyNodeRef::from))
+                        .or_else(|| try_stmt.body().last().map(AnyNodeRef::from))
                         .unwrap();
 
                     find_keyword(
@@ -362,9 +302,13 @@ impl<'a> ClauseHeader<'a> {
                         source,
                     )
                 }
-                ElseClause::For(StmtFor { body, .. })
-                | ElseClause::While(StmtWhile { body, .. }) => find_keyword(
-                    StartPosition::LastStatement(body.last().unwrap().end()),
+                ElseClause::For(node) => find_keyword(
+                    StartPosition::LastStatement(node.body().last().unwrap().end()),
+                    SimpleTokenKind::Else,
+                    source,
+                ),
+                ElseClause::While(node) => find_keyword(
+                    StartPosition::LastStatement(node.body().last().unwrap().end()),
                     SimpleTokenKind::Else,
                     source,
                 ),
@@ -397,9 +341,9 @@ impl<'a> From<ClauseHeader<'a>> for AnyNodeRef<'a> {
 
 #[derive(Copy, Clone)]
 pub(crate) enum ElseClause<'a> {
-    Try(&'a StmtTry),
-    For(&'a StmtFor),
-    While(&'a StmtWhile),
+    Try(flat::View<'a, StmtTry>),
+    For(flat::View<'a, StmtFor>),
+    While(flat::View<'a, StmtWhile>),
 }
 
 impl<'a> From<ElseClause<'a>> for AnyNodeRef<'a> {
@@ -475,13 +419,13 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatClauseHeader<'_, 'ast> {
 }
 
 struct FormatClauseBody<'a> {
-    body: &'a Suite,
+    body: flat::Suite<'a>,
     kind: SuiteKind,
     trailing_comments: &'a [SourceComment],
 }
 
 fn clause_body<'a>(
-    body: &'a Suite,
+    body: flat::Suite<'a>,
     kind: SuiteKind,
     trailing_comments: &'a [SourceComment],
 ) -> FormatClauseBody<'a> {
@@ -525,7 +469,7 @@ pub(crate) struct FormatClause<'a, 'ast> {
     leading_comments: Option<(&'a [SourceComment], Option<AnyNodeRef<'a>>)>,
     /// The trailing comments coming after the colon.
     trailing_colon_comment: &'a [SourceComment],
-    body: &'a Suite,
+    body: flat::Suite<'a>,
     kind: SuiteKind,
 }
 
@@ -565,7 +509,7 @@ pub(crate) fn clause<'a, 'ast, Content>(
     header: ClauseHeader<'a>,
     header_formatter: &'a Content,
     trailing_colon_comment: &'a [SourceComment],
-    body: &'a Suite,
+    body: flat::Suite<'a>,
     kind: SuiteKind,
 ) -> FormatClause<'a, 'ast>
 where

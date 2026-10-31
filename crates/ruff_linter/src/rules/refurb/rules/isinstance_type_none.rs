@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_python_ast::flat::{self, fields as ast};
+use ruff_python_ast::{Expr, Operator};
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -51,15 +51,15 @@ impl Violation for IsinstanceTypeNone {
 }
 
 /// FURB168
-pub(crate) fn isinstance_type_none(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn isinstance_type_none(checker: &Checker, call: &ast::ExprCall<'_>) {
     let semantic = checker.semantic();
-    let (func, arguments) = (&call.func, &call.arguments);
+    let (func, arguments) = (call.func, call.arguments);
 
-    if !arguments.keywords.is_empty() {
+    if !arguments.keywords().is_empty() {
         return;
     }
 
-    let [expr, types] = arguments.args.as_ref() else {
+    let Some([expr, types]) = arguments.args().as_array() else {
         return;
     };
 
@@ -71,49 +71,55 @@ pub(crate) fn isinstance_type_none(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let fix = replace_with_identity_check(expr, call.range(), false, checker);
+    let fix = replace_with_identity_check(expr, call.range, false, checker);
     checker
-        .report_diagnostic(IsinstanceTypeNone, call.range())
+        .report_diagnostic(IsinstanceTypeNone, call.range)
         .set_fix(fix);
 }
 
 /// Returns `true` if the given expression is equivalent to checking if the
 /// object type is `None` when used with the `isinstance` builtin.
-fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
-    fn inner(expr: &Expr, in_union_context: bool, semantic: &SemanticModel) -> bool {
-        match expr {
+fn is_none(expr: flat::View<'_, Expr>, semantic: &SemanticModel) -> bool {
+    fn inner(expr: flat::View<'_, Expr>, in_union_context: bool, semantic: &SemanticModel) -> bool {
+        match expr.classify() {
             // Ex) `None`
             // Note: `isinstance` only accepts `None` as a type when used with
             // the union operator, so we need to check if we're in a union.
-            Expr::NoneLiteral(_) if in_union_context => true,
+            flat::ExprKind::NoneLiteral(_) if in_union_context => true,
 
             // Ex) `type(None)`
-            Expr::Call(ast::ExprCall {
-                func, arguments, ..
-            }) => {
+            flat::ExprKind::Call(expr_call) => {
+                let func = expr_call.func();
+                let arguments = expr_call.arguments();
+
                 if !semantic.match_builtin_expr(func, "type") {
                     return false;
                 }
 
-                if !arguments.keywords.is_empty() {
+                if !arguments.keywords().is_empty() {
                     return false;
                 }
 
-                matches!(arguments.args.as_ref(), [Expr::NoneLiteral(_)])
+                matches!(
+                    arguments
+                        .args()
+                        .as_array()
+                        .map(|items| items.map(flat::View::<Expr>::classify)),
+                    Some([flat::ExprKind::NoneLiteral(_)])
+                )
             }
 
             // Ex) `(type(None),)`
-            Expr::Tuple(tuple) => {
-                !tuple.is_empty() && tuple.iter().all(|element| inner(element, false, semantic))
+            flat::ExprKind::Tuple(tuple) => {
+                !tuple.elts().is_empty()
+                    && tuple.iter().all(|element| inner(element, false, semantic))
             }
 
             // Ex) `type(None) | type(None)`
-            Expr::BinOp(ast::ExprBinOp {
-                left,
-                op: Operator::BitOr,
-                right,
-                ..
-            }) => {
+            flat::ExprKind::BinOp(expr_bin_op) if expr_bin_op.op() == Operator::BitOr => {
+                let left = expr_bin_op.left();
+                let right = expr_bin_op.right();
+
                 // `None | None` is a `TypeError` at runtime
                 if left.is_none_literal_expr() && right.is_none_literal_expr() {
                     return false;
@@ -123,17 +129,20 @@ fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
             }
 
             // Ex) `Union[None, ...]`
-            Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            flat::ExprKind::Subscript(expr_subscript) => {
+                let value = expr_subscript.value();
+                let slice = expr_subscript.slice();
+
                 if !semantic.match_typing_expr(value, "Union") {
                     return false;
                 }
 
-                match slice.as_ref() {
-                    Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                match slice.fields() {
+                    ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                         !elts.is_empty()
                             && elts.iter().all(|element| inner(element, true, semantic))
                     }
-                    slice => inner(slice, true, semantic),
+                    slice => inner(slice.view(), true, semantic),
                 }
             }
 
