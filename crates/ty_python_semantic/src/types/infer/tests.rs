@@ -574,6 +574,7 @@ fn comparison_truthiness_widens_across_sparse_cycle_results() -> anyhow::Result<
     let inference = |ty, truthiness: Option<Truthiness>| {
         (
             ExpressionInference {
+                predicate_truthiness: None,
                 expressions: [(expression, ty)].into_iter().collect(),
                 extra: truthiness.map(|truthiness| {
                     Box::new(ExpressionInferenceExtra {
@@ -1066,6 +1067,35 @@ fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definit
         .end_of_scope_symbol_bindings(place_table(db, scope).symbol_id(name).unwrap())
         .find_map(|b| b.binding.definition())
         .expect("no binding found")
+}
+
+#[test]
+fn predicate_truthiness_updates_when_bool_method_changes() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from dependency import Flag
+
+        if Flag():
+            value = 1
+        else:
+            value = 2
+        "#,
+    )?;
+
+    let file = system_path_to_file(&db, "/src/main.py")?;
+    for (truthiness, expected) in [("True", 1), ("False", 2)] {
+        db.write_file(
+            "/src/dependency.pyi",
+            format!("from typing import Literal\nclass Flag:\n    def __bool__(self) -> Literal[{truthiness}]: ...\n"),
+        )?;
+        assert_eq!(
+            global_symbol(&db, file, "value").place.expect_type(),
+            Type::int_literal(expected)
+        );
+    }
+    Ok(())
 }
 
 #[test]
