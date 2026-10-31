@@ -26,7 +26,9 @@ use crate::{
         MemberLookupPolicy, Parameter, Parameters, Signature, StaticClassLiteral, Type,
         TypeContext, TypeQualifiers, UnionType,
         call::CallArguments,
-        class::{CodeGeneratorKind, FieldKind, MethodDecorator},
+        class::{
+            CodeGeneratorKind, FieldKind, MethodDecorator, implicit_attribute_definition_names,
+        },
         constraints::ConstraintSetBuilder,
         context::InferContext,
         diagnostic::{
@@ -147,6 +149,7 @@ pub(super) fn check_class<'db>(
         scope,
         kind: CodeGeneratorKind::from_class(db, class.into()),
         enum_info: enum_metadata(db, class.into()),
+        receiver_written_names: implicit_attribute_definition_names(db, scope),
         bases,
         named_tuple_bases,
     };
@@ -611,6 +614,7 @@ struct OverrideClass<'db> {
     scope: ScopeId<'db>,
     kind: Option<CodeGeneratorKind<'db>>,
     enum_info: Option<&'db EnumMetadata<'db>>,
+    receiver_written_names: &'db [Name],
     bases: Vec<ClassBase<'db>>,
     named_tuple_bases: Vec<ClassType<'db>>,
 }
@@ -637,6 +641,17 @@ fn check_class_declaration<'db>(
     // when an override or one of the class-specific rules below can use it.
     let subclass_instance_member =
         LazyCell::new(|| lookup_override_member(db, env, class, &member.name));
+
+    // A write such as `self.values += (item,)` also reads the member. Start inference from
+    // the member lookup, as before, so the write sees the same type during cycle recovery.
+    if override_class
+        .receiver_written_names
+        .binary_search(&member.name)
+        .is_ok()
+        && subclass_instance_member.place.is_undefined()
+    {
+        return;
+    }
 
     // Hashability may change in either direction across subclasses. Only the hash protocol's
     // signature constrains each definition; finality and override decorators are checked below.
