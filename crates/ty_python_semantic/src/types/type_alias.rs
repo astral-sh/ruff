@@ -142,13 +142,12 @@ impl<'db> AliasCycleRecovery<'_, 'db> {
         }
         match ty {
             Type::TypeAlias(alias) => self.visitor.visit(db, ty, || {
-                let value = apply_type_alias_specialization(
-                    db,
-                    alias.raw_value_type(db),
-                    alias.generic_context(db),
-                    alias.specialization(db),
-                    self.context,
-                );
+                let value = alias.raw_value_type(db);
+                let value = alias
+                    .specialization_or_default(db)
+                    .map_or(value, |specialization| {
+                        apply_type_alias_specialization(db, value, specialization, self.context)
+                    });
                 self.recover(db, value)
             }),
             Type::Recursive(recursive) => self.visitor.visit(db, ty, || {
@@ -418,17 +417,10 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
 fn apply_type_alias_specialization<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
-    generic_context: Option<GenericContext<'db>>,
-    specialization: Option<Specialization<'db>>,
+    specialization: Specialization<'db>,
     recursion_context: Option<&TypeRecursionContext<'db>>,
 ) -> Type<'db> {
-    let Some(generic_context) = generic_context else {
-        return ty;
-    };
-
-    let env = ProgramEnvironment::from_program(generic_context.program(db));
-    let specialization =
-        specialization.unwrap_or_else(|| generic_context.default_specialization(db, None));
+    let env = ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
     let type_mapping = match specialization.materialization_kind(db) {
         None => TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(specialization)),
         Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
@@ -443,6 +435,25 @@ fn apply_type_alias_specialization<'db>(
         TypeContext::default(),
         &ApplyTypeMappingVisitor::new(&env).with_recursion_context(recursion_context),
     )
+}
+
+/// Reuse the substitution for repeated references to the same specialized alias. Keeping the
+/// inferred body in the key leaves its inference and unguarded cycle recovery in the caller.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, id, _, _| Type::divergent(id),
+    cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, specialization: Specialization<'db>, _| {
+        let env = ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
+        value.cycle_normalized_impl(db, &env, *previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn specialize_alias_body<'db>(
+    db: &'db dyn Db,
+    specialization: Specialization<'db>,
+    value: Type<'db>,
+) -> Type<'db> {
+    apply_type_alias_specialization(db, value, specialization, None)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
@@ -556,13 +567,16 @@ impl<'db> TypeAliasType<'db> {
             .recover(db, Type::TypeAlias(self))
             .unwrap_or(cycle);
         }
-        apply_type_alias_specialization(
-            db,
-            self.raw_value_type(db),
-            self.generic_context(db),
-            self.specialization(db),
-            context,
-        )
+        let value = self.raw_value_type(db);
+        let Some(specialization) = self.specialization_or_default(db) else {
+            return value;
+        };
+        match context {
+            Some(context) => {
+                apply_type_alias_specialization(db, value, specialization, Some(context))
+            }
+            None => specialize_alias_body(db, specialization, value),
+        }
     }
 
     /// Resolve this alias while preserving active recursion guards.
@@ -709,6 +723,14 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::PEP695(type_alias) => type_alias.specialization(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.specialization(db),
         }
+    }
+
+    fn specialization_or_default(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+        let context = self.generic_context(db)?;
+        Some(
+            self.specialization(db)
+                .unwrap_or_else(|| context.default_specialization(db, None)),
+        )
     }
 
     /// Apply a mapping, retaining the alias's identity when its mapped body is unchanged.
