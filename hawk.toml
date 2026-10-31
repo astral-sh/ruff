@@ -32,6 +32,56 @@ package = "ty_completion_eval"
 bin = "ty_completion_eval"
 reason = "workspace completion evaluation binary"
 
+# Keep this list in sync with workspace packages that define doctests.
+
+[[doctest]]
+package = "ruff_annotate_snippets"
+
+[[doctest]]
+package = "ruff_cache"
+
+[[doctest]]
+package = "ruff_db"
+
+[[doctest]]
+package = "ruff_formatter"
+
+[[doctest]]
+package = "ruff_linter"
+
+[[doctest]]
+package = "ruff_notebook"
+
+[[doctest]]
+package = "ruff_options_metadata"
+
+[[doctest]]
+package = "ruff_python_ast"
+
+[[doctest]]
+package = "ruff_python_parser"
+
+[[doctest]]
+package = "ruff_python_stdlib"
+
+[[doctest]]
+package = "ruff_python_trivia"
+
+[[doctest]]
+package = "ruff_source_file"
+
+[[doctest]]
+package = "ruff_text_size"
+
+[[doctest]]
+package = "ruff_workspace"
+
+[[doctest]]
+package = "ty_module_resolver"
+
+[[doctest]]
+package = "ty_python_semantic"
+
 # Keep APIs used by targets outside Hawk's workspace analysis.
 
 [[override]]
