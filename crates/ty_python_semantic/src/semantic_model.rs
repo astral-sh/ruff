@@ -21,7 +21,7 @@ use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::place::{
     builtins_module_scope, implicit_builtins_symbol_scope, loop_header_reachability,
 };
-use crate::place_load::{ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolver, PlaceLoadSourceKind};
+use crate::place_load::{PlaceLoadMode, PlaceLoadResolver};
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
@@ -35,7 +35,7 @@ use ty_python_core::place_table;
 use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
 use ty_python_core::symbol::Symbol;
-use ty_python_core::{BindingWithConstraintsIterator, Program, ProgramFile};
+use ty_python_core::{Program, ProgramFile};
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
@@ -466,7 +466,6 @@ impl<'db> SemanticModel<'db> {
     ///
     /// Returns `None` if the scope is unavailable, the name is a plain assignment or deletion
     /// target, or inference skipped the name inside a string annotation.
-    #[allow(dead_code, reason = "awaiting IDE integration")]
     pub fn reaching_definitions(&self, name: &ast::ExprName) -> Option<DefinitionResolution<'db>> {
         if name.ctx.is_del() {
             return None;
@@ -831,12 +830,20 @@ impl<'db> SemanticModel<'db> {
 
     /// Returns definitions that may supply `receiver`'s value for dictionary key completion.
     ///
-    /// Names follow Python's scope lookup rules, stopping at a definitely bound source.
+    /// Names use [`Self::reaching_definitions()`], including any definitions it finds when
+    /// resolution is incomplete.
     /// Other tracked places use the bindings recorded at their use site.
     fn definitions_for_dictionary_key_completion(
         &self,
         receiver: &ast::Expr,
     ) -> Vec<Definition<'db>> {
+        if let ast::Expr::Name(name) = receiver {
+            return self
+                .reaching_definitions(name)
+                .map(|resolution| resolution.definitions().to_vec())
+                .unwrap_or_default();
+        }
+
         let index = semantic_index(self.db, self.file);
         let Some(scope) = index.try_expression_scope_id(receiver) else {
             return Vec::new();
@@ -844,54 +851,12 @@ impl<'db> SemanticModel<'db> {
         let Some(use_id) = index.try_expression_use_id(receiver.into()) else {
             return Vec::new();
         };
-        let mut definitions = Vec::new();
-        let mut add_bindings = |bindings: BindingWithConstraintsIterator<'db, 'db>| {
-            let resolution = DefinitionResolution::from_bindings(self.db, bindings);
-            definitions.extend_from_slice(resolution.definitions());
-        };
-        if let ast::Expr::Name(name) = receiver {
-            let place_expr = PlaceExpr::from_expr_name(name);
-            let env = self.program_environment();
-            let resolver = PlaceLoadResolver::new(
-                self.db,
-                &env,
-                index,
-                scope.to_scope_id(self.db, self.file),
-                &place_expr,
-                PlaceLoadMode::AtExpression(name.into()),
-                None,
-            );
-            resolver.resolve(|source| match source.kind() {
-                PlaceLoadSourceKind::Bindings(bindings) => {
-                    add_bindings(bindings.clone());
-                }
-                PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => {
-                    let index = semantic_index(self.db, scope.program_file(self.db));
-                    add_bindings(
-                        index
-                            .use_def_map(scope.file_scope_id(self.db))
-                            .reachable_bindings(*id),
-                    );
-                }
-                PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ExplicitGlobalSymbol {
-                    file,
-                    name,
-                }) => {
-                    let index = semantic_index(self.db, *file);
-                    if let Some(id) = index.place_table(FileScopeId::global()).symbol_id(name) {
-                        add_bindings(
-                            index
-                                .use_def_map(FileScopeId::global())
-                                .reachable_symbol_bindings(id),
-                        );
-                    }
-                }
-                PlaceLoadSourceKind::Implicit(_) => {}
-            });
-        } else {
-            add_bindings(index.use_def_map(scope).bindings_at_use(use_id));
-        }
-        definitions
+        DefinitionResolution::from_bindings(
+            self.db,
+            index.use_def_map(scope).bindings_at_use(use_id),
+        )
+        .definitions()
+        .to_vec()
     }
 
     /// Appends the reachable bindings of a `from` import's symbol in its target module.
