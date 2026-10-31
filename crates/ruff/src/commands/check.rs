@@ -17,13 +17,13 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_db::panic::catch_unwind;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
+use ruff_linter::settings::flags;
 use ruff_linter::settings::types::UnsafeFixes;
-use ruff_linter::settings::{LinterSettings, flags};
 use ruff_linter::{IOError, Violation, fs, warn_user_once};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::TextRange;
 use ruff_workspace::resolver::{
-    PyprojectConfig, ResolvedFile, match_exclusion, project_files_in_path,
+    PyprojectDiscovery, ResolvedFile, SettingsForSource, match_exclusion, project_files_in_path,
 };
 
 use crate::args::ConfigArguments;
@@ -33,7 +33,7 @@ use crate::diagnostics::Diagnostics;
 /// Run the linter over a collection of files.
 pub(crate) fn check(
     files: &[PathBuf],
-    pyproject_config: &PyprojectConfig,
+    project_config: &PyprojectDiscovery,
     config_arguments: &ConfigArguments,
     cache: flags::Cache,
     noqa: flags::Noqa,
@@ -42,7 +42,7 @@ pub(crate) fn check(
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
-    let (mut paths, resolver) = project_files_in_path(files, pyproject_config, config_arguments)?;
+    let (mut paths, resolver) = project_files_in_path(files, project_config, config_arguments)?;
     debug!("Identified files to lint in: {:?}", start.elapsed());
 
     // Filter out paths for file types not supported for linting
@@ -89,13 +89,13 @@ pub(crate) fn check(
                     .and_then(|parent| package_roots.get(parent))
                     .and_then(|package| *package);
 
-                let settings = resolver.resolve(path);
+                let project = resolver.resolve_with_path(path);
 
-                if (settings.file_resolver.force_exclude || !resolved_file.is_root())
+                if (project.settings.file_resolver.force_exclude || !resolved_file.is_root())
                     && match_exclusion(
                         resolved_file.path(),
                         resolved_file.file_name(),
-                        &settings.linter.exclude,
+                        &project.settings.linter.exclude,
                     )
                 {
                     return None;
@@ -109,7 +109,7 @@ pub(crate) fn check(
                 lint_path(
                     path,
                     package,
-                    &settings.linter,
+                    &project.with_overrides(config_arguments),
                     cache,
                     noqa,
                     fix_mode,
@@ -195,7 +195,7 @@ pub(crate) fn check(
 fn lint_path(
     path: &Path,
     package: Option<PackageRoot<'_>>,
-    settings: &LinterSettings,
+    settings: &SettingsForSource<'_, ConfigArguments>,
     cache: Option<&Cache>,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
@@ -231,7 +231,9 @@ mod test {
     use ruff_linter::settings::types::UnsafeFixes;
     use ruff_linter::settings::{LinterSettings, flags};
     use ruff_workspace::Settings;
-    use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
+    use ruff_workspace::resolver::{
+        ConfigurationAndSettings, PyprojectDiscovery, PyprojectDiscoveryStrategy,
+    };
 
     use crate::args::ConfigArguments;
 
@@ -265,13 +267,18 @@ mod test {
             linter: LinterSettings::for_rules(vec![rule_code, Rule::InvalidPyprojectToml]),
             ..Settings::default()
         };
-        let pyproject_config =
-            PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, settings, None);
+        let project_config = PyprojectDiscovery {
+            strategy: PyprojectDiscoveryStrategy::Fixed,
+            root: ConfigurationAndSettings {
+                settings,
+                ..ConfigurationAndSettings::default()
+            },
+        };
 
         // Run
         let diagnostics = check(
             &[tempdir.path().to_path_buf()],
-            &pyproject_config,
+            &project_config,
             &ConfigArguments::default(),
             flags::Cache::Disabled,
             flags::Noqa::Disabled,

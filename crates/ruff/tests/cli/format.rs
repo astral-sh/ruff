@@ -2460,6 +2460,103 @@ fn range_formatting_notebook() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn inline_script_formatter() -> Result<()> {
+    let test = CliTest::with_file("ruff.toml", "preview = true\nformat.quote-style = 'single'")?;
+    test.write_file("shared.toml", "format.quote-style = 'single'")?;
+    for (name, metadata) in [
+        ("inherited.py", "dependencies = []"),
+        ("defaults.py", "[tool.ruff]"),
+        ("extended.py", "tool.ruff.extend = '../shared.toml'"),
+    ] {
+        test.write_file(
+            format!("scripts/{name}"),
+            &format!("# /// script\n# {metadata}\n# ///\nx = 'hello'\n"),
+        )?;
+    }
+    assert!(
+        test.command()
+            .args(["format", "--no-preview", "--check", "scripts"])
+            .output()?
+            .status
+            .success()
+    );
+    assert!(
+        test.command()
+            .args(["format", "scripts"])
+            .output()?
+            .status
+            .success()
+    );
+    assert!(
+        test.read_file("scripts/inherited.py")?
+            .ends_with("x = 'hello'\n")
+    );
+    assert!(
+        test.read_file("scripts/defaults.py")?
+            .ends_with("x = \"hello\"\n")
+    );
+    assert!(
+        test.read_file("scripts/extended.py")?
+            .ends_with("x = 'hello'\n")
+    );
+    test.write_file("shared.toml", "format.quote-style = 'double'")?;
+    assert_eq!(
+        test.command()
+            .args(["format", "--check", "scripts/extended.py"])
+            .output()?
+            .status
+            .code(),
+        Some(1)
+    );
+
+    assert_cmd_snapshot!(test.format_command().args(["--stdin-filename=scripts/extended.py", "-"]).pass_stdin(
+        "# /// script\n# tool.ruff.extend = '../ruff.toml'\n# ///\nx = \"hello\"\n"
+    ), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    # /// script
+    # tool.ruff.extend = '../ruff.toml'
+    # ///
+    x = 'hello'
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn script_requires_python_formatter() -> Result<()> {
+    let test = CliTest::with_file(
+        "ruff.toml",
+        "preview = true\nper-file-target-version = { 'script.py' = 'py39' }",
+    )?;
+    let script = "# /// script\n# requires-python = '>=3.10'\n# ///\nwith open('a_really_long_foo') as foo, open('a_really_long_bar') as bar, open('a_really_long_baz') as baz:\n    pass\n";
+    test.write_file("script.py", script)?;
+    let output = test.format_command().arg("script.py").output()?;
+    assert!(output.status.success());
+    let formatted = test.read_file("script.py")?;
+    assert!(formatted.contains("with (\n"));
+    assert_cmd_snapshot!(test.format_command().args(["--stdin-filename=script.py", "-"]).pass_stdin(script), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    # /// script
+    # requires-python = '>=3.10'
+    # ///
+    with (
+        open("a_really_long_foo") as foo,
+        open("a_really_long_bar") as bar,
+        open("a_really_long_baz") as baz,
+    ):
+        pass
+
+    ----- stderr -----
+    "#);
+    Ok(())
+}
+
 /// Test that the formatter respects `per-file-target-version`. Context managers can't be
 /// parenthesized like this before Python 3.10.
 ///
