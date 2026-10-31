@@ -2254,6 +2254,47 @@ mod tests {
     }
 
     #[test]
+    fn hover_dataclass_keyword_parameter_documentation() {
+        let test = hover_test(
+            r#"
+            from dataclasses import dataclass
+
+            @dataclass
+            class Foo:
+                """This is an example dataclass."""
+
+                bar: bool
+                """This is the dataclass's argument."""
+
+            foo = Foo(ba<CURSOR>r=True)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (parameter) bar: bool
+        ---------------------------------------------
+        This is the dataclass's argument.
+
+        ---------------------------------------------
+        ```python
+        (parameter) bar: bool
+        ```
+        ---
+        This is the dataclass's argument.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:11:11
+           |
+        11 | foo = Foo(bar=True)
+           |           ^^-
+           |           | |
+           |           | Cursor offset
+           |           source
+           |
+        ");
+    }
+
+    #[test]
     fn hover_keyword_parameter_without_documentation() {
         let test = hover_test(
             r#"
