@@ -1129,7 +1129,7 @@ struct ScopeInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
-    /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
+    /// Type qualifiers for annotations and assignment targets.
     qualifiers: FrozenMap<ExpressionNodeKey, TypeQualifiers>,
 
     /// Expected types for expression nodes tracked for IDE completion.
@@ -1237,7 +1237,7 @@ impl<'db> ScopeInference<'db> {
             .or_else(|| self.fallback_type())
     }
 
-    /// Get qualifiers for an annotation expression.
+    /// Get qualifiers for an annotation or assignment target.
     pub(crate) fn qualifiers(&self, expression: impl Into<ExpressionNodeKey>) -> TypeQualifiers {
         self.extra
             .as_deref()
@@ -1599,7 +1599,7 @@ struct OtherDefinitionInferenceExtra<'db> {
     /// discarded.
     discards_dict_key_assignments: bool,
 
-    /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
+    /// Type qualifiers for annotations and assignment targets.
     /// Only populated for expressions that have non-empty qualifiers.
     qualifiers: FrozenMap<ExpressionNodeKey, TypeQualifiers>,
 }
@@ -1880,7 +1880,7 @@ impl<'db> DefinitionInference<'db> {
             .get(&collection_def)
     }
 
-    /// Get qualifiers for an annotation expression
+    /// Get qualifiers for an annotation or assignment target.
     pub(crate) fn qualifiers(&self, expression: impl Into<ExpressionNodeKey>) -> TypeQualifiers {
         let expression = expression.into();
         match self.extra.as_deref() {
@@ -2342,7 +2342,7 @@ struct StatementInferenceInnerExtra<'db> {
     /// Diagnostics and semantic validity for this region.
     context: InferContextResult,
 
-    /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
+    /// Type qualifiers for annotations and assignment targets.
     /// Only populated for expressions that have non-empty qualifiers.
     qualifiers: FrozenMap<ExpressionNodeKey, TypeQualifiers>,
 }

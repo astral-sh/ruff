@@ -4,6 +4,7 @@ use crate::goto::{
     Definitions, GotoTarget, docstring_for_call_definition, find_goto_target, find_goto_target_impl,
 };
 use crate::{Db, MarkupKind, RangedValue};
+use itertools::Itertools;
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -436,15 +437,11 @@ impl<'db> DisplayHoverContent<'_, 'db> {
 }
 
 fn create_qualifier_suffix(qualifiers: TypeQualifiers) -> String {
-    let mut standard = qualifiers
-        .iter()
-        .filter(|q| !q.is_non_standard())
-        .peekable();
+    let mut standard = qualifiers.annotation_qualifier_names().peekable();
     if standard.peek().is_none() {
         String::new()
     } else {
-        let names: Vec<&str> = standard.map(TypeQualifiers::name).collect();
-        format!(" ({})", names.join(", "))
+        format!(" ({})", standard.join(", "))
     }
 }
 

@@ -36,8 +36,8 @@ use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     KnownUnion, LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceClass,
     PropertyInstanceType, Protocol, SpecialFormType, SubclassOfInner, SubclassOfType, Type,
-    TypeAliasType, TypeGuardLike, TypedDictType, TypingModule, UnionType, WrapperDescriptorKind,
-    visitor,
+    TypeAliasType, TypeAndQualifiers, TypeGuardLike, TypeQualifiers, TypedDictType, TypingModule,
+    UnionType, WrapperDescriptorKind, visitor,
 };
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;
@@ -739,12 +739,11 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &'env ProgramEnvironment<'db>,
     ) -> DisplayType<'env, 'db> {
-        DisplayType {
-            ty: self,
-            settings: DisplaySettings::from_possibly_ambiguous_types(db, env, [self]),
+        self.display_with(
             db,
             env,
-        }
+            DisplaySettings::from_possibly_ambiguous_types(db, env, [self]),
+        )
     }
 
     pub(crate) fn display_with<'env>(
@@ -755,6 +754,7 @@ impl<'db> Type<'db> {
     ) -> DisplayType<'env, 'db> {
         DisplayType {
             ty: self,
+            qualifiers: TypeQualifiers::empty(),
             db,
             env,
             settings,
@@ -776,8 +776,23 @@ impl<'db> Type<'db> {
     }
 }
 
+impl<'db> TypeAndQualifiers<'db> {
+    /// Displays the type wrapped in its Python annotation qualifiers, such as `ClassVar[Final[int]]`.
+    pub fn display<'env>(
+        self,
+        db: &'db dyn Db,
+        env: &'env ProgramEnvironment<'db>,
+    ) -> DisplayType<'env, 'db> {
+        DisplayType {
+            qualifiers: self.qualifiers,
+            ..self.inner.display(db, env)
+        }
+    }
+}
+
 pub struct DisplayType<'env, 'db> {
     ty: Type<'db>,
+    qualifiers: TypeQualifiers,
     db: &'db dyn Db,
     env: &'env ProgramEnvironment<'db>,
     settings: DisplaySettings<'db>,
@@ -808,6 +823,11 @@ impl<'db> DisplayType<'_, 'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        for qualifier in self.qualifiers.annotation_qualifiers() {
+            f.with_type(Type::SpecialForm(SpecialFormType::from(qualifier)))
+                .write_str(qualifier.name())?;
+            f.write_char('[')?;
+        }
         let db = self.db;
         let representation = self.ty.representation(db, self.env, self.settings.clone());
         match self.ty.as_literal_value_kind() {
@@ -825,7 +845,11 @@ impl<'db> FmtDetailed<'db> for DisplayType<'_, 'db> {
                 f.write_str("]")
             }
             _ => representation.fmt_detailed(f),
+        }?;
+        for _ in self.qualifiers.annotation_qualifiers() {
+            f.write_char(']')?;
         }
+        Ok(())
     }
 }
 

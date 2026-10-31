@@ -11803,35 +11803,33 @@ bitflags! {
 impl get_size2::GetSize for TypeQualifiers {}
 
 impl TypeQualifiers {
-    /// Get the name of a type qualifier.
-    ///
-    /// Note that this function can only be called on sets with a single member.
-    /// Panics if more than a single bit is set.
-    pub fn name(self) -> &'static str {
+    /// Yields Python annotation qualifiers in the order they should wrap the type, outermost
+    /// first. Dataclasses recognize a final class variable only when `ClassVar` wraps `Final`.
+    fn annotation_qualifiers(self) -> impl Iterator<Item = TypeQualifier> {
+        self.iter().filter_map(Self::as_annotation_qualifier)
+    }
+
+    /// Returns whether every qualifier permits annotating a non-name target such as `C.x`.
+    pub fn is_valid_for_non_name_targets(self) -> bool {
+        self.annotation_qualifiers()
+            .all(TypeQualifier::is_valid_for_non_name_targets)
+    }
+
+    fn as_annotation_qualifier(self) -> Option<TypeQualifier> {
         match self {
-            Self::CLASS_VAR => "ClassVar",
-            Self::FINAL => "Final",
-            Self::INIT_VAR => "InitVar",
-            Self::REQUIRED => "Required",
-            Self::NOT_REQUIRED => "NotRequired",
-            Self::READ_ONLY => "ReadOnly",
-            _ => {
-                unreachable!(
-                    "Only a single bit should be set \
-                    when calling `TypeQualifiers::name` (got {self:?})"
-                )
-            }
+            Self::CLASS_VAR => Some(TypeQualifier::ClassVar),
+            Self::FINAL => Some(TypeQualifier::Final),
+            Self::INIT_VAR => Some(TypeQualifier::InitVar),
+            Self::REQUIRED => Some(TypeQualifier::Required),
+            Self::NOT_REQUIRED => Some(TypeQualifier::NotRequired),
+            Self::READ_ONLY => Some(TypeQualifier::ReadOnly),
+            _ => None,
         }
     }
 
-    /// Returns `true` if this is a non-standard qualifier.
-    ///
-    /// Non-standard qualifiers are internal implementation details like
-    /// `IMPLICIT_INSTANCE_ATTRIBUTE` and `FROM_MODULE_GETATTR`.
-    pub fn is_non_standard(self) -> bool {
-        const NON_STANDARD: TypeQualifiers =
-            TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE.union(TypeQualifiers::FROM_MODULE_GETATTR);
-        self.intersects(NON_STANDARD)
+    /// Yields the names of the Python annotation qualifiers, outermost first.
+    pub fn annotation_qualifier_names(self) -> impl Iterator<Item = &'static str> {
+        self.annotation_qualifiers().map(TypeQualifier::name)
     }
 }
 
@@ -11843,7 +11841,7 @@ impl TypeQualifiers {
 /// Example: `Annotated[ClassVar[tuple[int]], "metadata"]` would have type `tuple[int]` and the
 /// qualifier `ClassVar`.
 #[derive(Clone, Debug, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) struct TypeAndQualifiers<'db> {
+pub struct TypeAndQualifiers<'db> {
     inner: Type<'db>,
     origin: TypeOrigin,
     qualifiers: TypeQualifiers,
@@ -11894,7 +11892,7 @@ impl<'db> TypeAndQualifiers<'db> {
     }
 
     /// Return the set of type qualifiers.
-    pub(crate) fn qualifiers(&self) -> TypeQualifiers {
+    pub fn qualifiers(&self) -> TypeQualifiers {
         self.qualifiers
     }
 
