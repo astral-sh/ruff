@@ -633,19 +633,17 @@ fn check_class_declaration<'db>(
         first_reachable_definition,
     } = member;
 
-    let subclass_instance_member = lookup_override_member(db, env, class, &member.name);
-    let Place::Defined(DefinedPlace {
-        ty: type_on_subclass_instance,
-        ..
-    }) = subclass_instance_member.place
-    else {
-        return;
-    };
+    // Most declarations introduce a new member. Binding it to the subclass is only needed
+    // when an override or one of the class-specific rules below can use it.
+    let subclass_instance_member =
+        LazyCell::new(|| lookup_override_member(db, env, class, &member.name));
 
     // Hashability may change in either direction across subclasses. Only the hash protocol's
     // signature constrains each definition; finality and override decorators are checked below.
     if member.name == "__hash__"
         && configuration.check_method_liskov_violations()
+        && let Some(type_on_subclass_instance) =
+            subclass_instance_member.place.ignore_possibly_undefined()
         && let Some(object_hash) = Type::object()
             .member(db, env, "__hash__")
             .place
@@ -688,6 +686,7 @@ fn check_class_declaration<'db>(
         Some(CodeGeneratorKind::NamedTuple) => {
             if configuration.check_invalid_named_tuple_definitions()
                 && PROHIBITED_NAMEDTUPLE_ATTRS.contains(&member.name.as_str())
+                && !subclass_instance_member.place.is_undefined()
                 && let Some(symbol_id) = place_table(db, class_scope).symbol_id(&member.name)
                 && let Some(bad_definition) = use_def_map(db, class_scope)
                     .reachable_bindings(ScopedPlaceId::Symbol(symbol_id))
@@ -706,20 +705,23 @@ fn check_class_declaration<'db>(
             }
         }
         Some(policy @ CodeGeneratorKind::DataclassLike(_)) => {
-            check_post_init_signature(
-                context,
-                configuration,
-                class,
-                member,
-                *first_reachable_definition,
-                policy,
-            );
+            if member.name == "__post_init__" && !subclass_instance_member.place.is_undefined() {
+                check_post_init_signature(
+                    context,
+                    configuration,
+                    class,
+                    member,
+                    *first_reachable_definition,
+                    policy,
+                );
+            }
         }
         Some(CodeGeneratorKind::Pydantic(_) | CodeGeneratorKind::TypedDict) | None => {}
     }
 
     if let Some((superclass, overridden_field_declaration)) =
         conflicting_named_tuple_field(db, &override_class.named_tuple_bases, &member.name)
+        && !subclass_instance_member.place.is_undefined()
         && let Some(builder) = context.report_lint(
             &INVALID_NAMED_TUPLE_OVERRIDE,
             first_reachable_definition.focus_range(db, context.module()),
@@ -778,7 +780,7 @@ fn check_class_declaration<'db>(
                 || is_auto
                 || enum_info.value_construction.metaclass_may_transform_values;
 
-            if !skip_type_check {
+            if !skip_type_check && !subclass_instance_member.place.is_undefined() {
                 if let Some(new_function) = enum_info.value_construction.new.function() {
                     check_enum_member_against_constructor_method(
                         context,
@@ -923,6 +925,14 @@ fn check_class_declaration<'db>(
                     continue;
                 };
 
+            let Place::Defined(DefinedPlace {
+                ty: type_on_subclass_instance,
+                ..
+            }) = subclass_instance_member.place
+            else {
+                return;
+            };
+
             let superclass_instance_member =
                 lookup_override_member(db, env, superclass, &member.name);
             let Place::Defined(DefinedPlace {
@@ -1037,7 +1047,7 @@ fn check_class_declaration<'db>(
                             db,
                             env,
                             class.own_class_member(db, env, None, &member.name).inner,
-                            subclass_instance_member,
+                            *subclass_instance_member,
                         )
                     });
 
@@ -1189,28 +1199,6 @@ fn check_class_declaration<'db>(
         }
     }
 
-    if !subclass_overrides_superclass_declaration && !has_dynamic_superclass {
-        if has_typeddict_in_mro {
-            if !KnownClass::TypedDictFallback
-                .to_instance(db, env)
-                .member(db, env, &member.name)
-                .place
-                .is_undefined()
-            {
-                subclass_overrides_superclass_declaration = true;
-            }
-        } else if class_kind == Some(CodeGeneratorKind::NamedTuple) {
-            if !KnownClass::NamedTupleFallback
-                .to_instance(db, env)
-                .member(db, env, &member.name)
-                .place
-                .is_undefined()
-            {
-                subclass_overrides_superclass_declaration = true;
-            }
-        }
-    }
-
     if let Some(target) = missing_override_target
         && first_reachable_definition.kind(db).is_function_def()
     {
@@ -1219,13 +1207,28 @@ fn check_class_declaration<'db>(
 
     if !subclass_overrides_superclass_declaration
         && !has_dynamic_superclass
-        && (
-            // accessing `.kind()` here is fine as `definition`
-            // will always be a definition in the file currently being checked
-            first_reachable_definition.kind(db).is_function_def()
-        )
+        // This definition is in the file currently being checked.
+        && first_reachable_definition.kind(db).is_function_def()
+        && let Some(definition) = invalid_explicit_override_definition(context, member, class_scope)
+        && !subclass_instance_member.place.is_undefined()
     {
-        check_explicit_overrides(context, member, class_scope, class);
+        // These synthesized bases can satisfy an explicit override without a source declaration.
+        let fallback = if has_typeddict_in_mro {
+            Some(KnownClass::TypedDictFallback)
+        } else if class_kind == Some(CodeGeneratorKind::NamedTuple) {
+            Some(KnownClass::NamedTupleFallback)
+        } else {
+            None
+        };
+        if fallback.is_none_or(|fallback| {
+            fallback
+                .to_instance(db, env)
+                .member(db, env, &member.name)
+                .place
+                .is_undefined()
+        }) {
+            report_invalid_explicit_override(context, member, class, definition);
+        }
     }
 
     if let Some((superclass, superclass_method)) = overridden_final_method {
@@ -1856,18 +1859,13 @@ impl OverrideRulesConfig {
     }
 }
 
-fn check_explicit_overrides<'db>(
+fn report_invalid_explicit_override<'db>(
     context: &InferContext<'db, '_>,
     member: &Member<'db>,
-    subclass_scope: ScopeId<'db>,
     class: ClassType<'db>,
+    definition: LocalOverrideDefinition,
 ) {
     let db = context.db();
-    let Some(definition) = invalid_explicit_override_definition(context, member, subclass_scope)
-    else {
-        return;
-    };
-
     let Some(builder) = context.report_lint(&INVALID_EXPLICIT_OVERRIDE, definition.focus_range)
     else {
         return;
@@ -2053,9 +2051,6 @@ fn check_post_init_signature<'db>(
     let db = context.db();
 
     if !configuration.check_invalid_dataclasses() {
-        return;
-    }
-    if member.name != "__post_init__" {
         return;
     }
     let Some((static_class, spec)) = class.static_class_literal(db) else {
