@@ -461,10 +461,14 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertRegex`
    |
 help: Replace `assertRegex(...)` with `assert ...`
    |
-72 |     def test_assert_regex(self):
+1  | import unittest
+2  + import re
+3  |
+--------------------------------------------------------------------------------
+73 |     def test_assert_regex(self):
    -         self.assertRegex("abc", r"def")  # Error
-73 +         assert re.search(r"def", "abc")  # Error
-74 |
+74 +         assert re.search(r"def", "abc")  # Error
+75 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -479,10 +483,14 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertNotRegex`
    |
 help: Replace `assertNotRegex(...)` with `assert ...`
    |
-75 |     def test_assert_not_regex(self):
+1  | import unittest
+2  + import re
+3  |
+--------------------------------------------------------------------------------
+76 |     def test_assert_not_regex(self):
    -         self.assertNotRegex("abc", r"abc")  # Error
-76 +         assert not re.search(r"abc", "abc")  # Error
-77 |
+77 +         assert not re.search(r"abc", "abc")  # Error
+78 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -497,10 +505,14 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertRegexpMatches`
    |
 help: Replace `assertRegexpMatches(...)` with `assert ...`
    |
-78 |     def test_assert_regexp_matches(self):
+1  | import unittest
+2  + import re
+3  |
+--------------------------------------------------------------------------------
+79 |     def test_assert_regexp_matches(self):
    -         self.assertRegexpMatches("abc", r"def")  # Error
-79 +         assert re.search(r"def", "abc")  # Error
-80 |
+80 +         assert re.search(r"def", "abc")  # Error
+81 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -515,10 +527,14 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertNotRegex`
    |
 help: Replace `assertNotRegex(...)` with `assert ...`
    |
-81 |     def test_assert_not_regexp_matches(self):
+1  | import unittest
+2  + import re
+3  |
+--------------------------------------------------------------------------------
+82 |     def test_assert_not_regexp_matches(self):
    -         self.assertNotRegex("abc", r"abc")  # Error
-82 +         assert not re.search(r"abc", "abc")  # Error
-83 |
+83 +         assert not re.search(r"abc", "abc")  # Error
+84 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
