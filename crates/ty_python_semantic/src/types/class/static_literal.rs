@@ -223,7 +223,7 @@ impl<'db> StaticClassLiteral<'db> {
         self.header(db).has_explicit_bases
     }
 
-    pub(crate) fn has_explicit_metaclass(self, db: &'db dyn Db) -> bool {
+    fn has_explicit_metaclass(self, db: &'db dyn Db) -> bool {
         self.header(db).has_explicit_metaclass
     }
 
