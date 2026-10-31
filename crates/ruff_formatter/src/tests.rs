@@ -604,7 +604,7 @@ fn fill_entries_can_have_an_empty_separator() {
         token("<em>"),
         token("!"),
     ];
-    let content = format_with(|f| f.fill().entries(&soft_line_break(), &entries).finish());
+    let content = format_with(|f| f.fill().entries(&soft_line_break(), entries).finish());
     assert_eq!(print_at(4, &content), "<b>\nunbreakable text\n<em>\n!");
 }
 
