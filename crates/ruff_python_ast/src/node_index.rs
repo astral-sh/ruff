@@ -92,7 +92,7 @@ const SUB_SUB_NODES: u32 = 8;
 pub const MAX_REAL_INDEX: u32 = (1 << LEVEL_SHIFT) - 1;
 
 /// sub-AST level is stored in the top two bits
-pub fn sub_ast_level(index: u32) -> u32 {
+pub(crate) fn sub_ast_level(index: u32) -> u32 {
     (index & LEVEL_MASK) >> LEVEL_SHIFT
 }
 
