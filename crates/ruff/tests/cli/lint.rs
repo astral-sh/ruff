@@ -3008,6 +3008,173 @@ select = ["UP006"]
     Ok(())
 }
 
+/// A `requires-python` older than the oldest supported version is clamped to that version. UP006
+/// requires Python 3.9, so it doesn't apply when targeting Python 3.7. See astral-sh/ruff#29863.
+#[test]
+fn requires_python_older_than_supported() -> Result<()> {
+    let fixture = CliTest::with_file(
+        "pyproject.toml",
+        r#"[project]
+requires-python = ">= 3.4"
+
+[tool.ruff.lint]
+select = ["UP006"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .arg("--config")
+        .arg("pyproject.toml")
+        .args(["--stdin-filename", "test.py"])
+        .arg("-")
+        .pass_stdin(r#"from typing import List; foo: List[int]"#), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: The minimum Python version allowed by `requires-python` (3.4) is older than the oldest version supported by Ruff (3.7). Rules that depend on the target version will assume Python 3.7. To silence this warning, set `target-version = "py37"` in the project's Ruff configuration, such as `[tool.ruff]` in `pyproject.toml`.
+    "#);
+
+    // Python 2 is clamped the same way.
+    let fixture = CliTest::with_file(
+        "pyproject.toml",
+        r#"[project]
+requires-python = ">= 2.7"
+
+[tool.ruff.lint]
+select = ["UP006"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .arg("--config")
+        .arg("pyproject.toml")
+        .args(["--stdin-filename", "test.py"])
+        .arg("-")
+        .pass_stdin(r#"from typing import List; foo: List[int]"#), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: The minimum Python version allowed by `requires-python` (2.7) is older than the oldest version supported by Ruff (3.7). Rules that depend on the target version will assume Python 3.7. To silence this warning, set `target-version = "py37"` in the project's Ruff configuration, such as `[tool.ruff]` in `pyproject.toml`.
+    "#);
+
+    Ok(())
+}
+
+/// An explicit `--target-version` overrides a `requires-python` older than the oldest supported
+/// version, without a warning about clamping a version that isn't used.
+#[test]
+fn requires_python_older_than_supported_target_version_override() -> Result<()> {
+    let fixture = CliTest::with_file(
+        "pyproject.toml",
+        r#"[project]
+requires-python = ">= 3.4"
+
+[tool.ruff.lint]
+select = ["UP006"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .arg("--config")
+        .arg("pyproject.toml")
+        .args(["--target-version", "py312"])
+        .args(["--stdin-filename", "test.py"])
+        .arg("-")
+        .pass_stdin(r#"from typing import List; foo: List[int]"#), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
+    Found 1 error.
+    [*] 1 fixable with `--fix`.
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// A `requires-python` newer than the newest supported version is clamped to that version. UP040
+/// requires Python 3.12, so it applies when targeting Python 3.15. See astral-sh/ruff#29863.
+///
+/// ```
+/// tmp
+/// ├── pyproject.toml #<--- no `[tool.ruff]`
+/// └── test.py
+/// ```
+#[test]
+fn requires_python_newer_than_supported() -> Result<()> {
+    let fixture = CliTest::with_file(
+        "pyproject.toml",
+        r#"[project]
+requires-python = ">= 3.99"
+"#,
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--select", "UP040"])
+        .args(["--stdin-filename", "test.py"])
+        .arg("-")
+        .pass_stdin("from typing import TypeAlias\nX: TypeAlias = int\n"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:2:1: UP040 Type alias `X` uses `TypeAlias` annotation instead of the `type` keyword
+    Found 1 error.
+    1 unsafe fix available with `--fix --unsafe-fixes`.
+
+    ----- stderr -----
+    warning: The minimum Python version allowed by `requires-python` (3.99) is newer than the newest version supported by Ruff (3.15). Rules that depend on the target version will assume Python 3.15. To silence this warning, set `target-version = "py315"` in the project's Ruff configuration, such as `[tool.ruff]` in `pyproject.toml`.
+    "#);
+
+    Ok(())
+}
+
+/// A `requires-python` whose minimum version can't be a Python version is ignored, with a warning,
+/// so the default target version applies. UP006 requires Python 3.9, and the default is newer.
+#[test]
+fn requires_python_invalid_version() -> Result<()> {
+    let fixture = CliTest::with_file(
+        "pyproject.toml",
+        r#"[project]
+requires-python = ">= 4"
+
+[tool.ruff.lint]
+select = ["UP006"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .arg("--config")
+        .arg("pyproject.toml")
+        .args(["--stdin-filename", "test.py"])
+        .arg("-")
+        .pass_stdin(r#"from typing import List; foo: List[int]"#), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
+    Found 1 error.
+    [*] 1 fixable with `--fix`.
+
+    ----- stderr -----
+    warning: Ignoring `requires-python = ">=4"` in `[TMP]/pyproject.toml`: 4.0 is not a valid Python version.
+    "#);
+
+    Ok(())
+}
+
 /// ```
 /// tmp
 /// ├── pyproject.toml #<--- no `[tool.ruff]`
@@ -3140,6 +3307,48 @@ requires-python = ">= 3.11"
 
     ----- stderr -----
     ");
+    Ok(())
+}
+
+/// A `requires-python` older than the oldest supported version is clamped when it's the fallback
+/// for a `ruff.toml` without a `target-version`. UP006 requires Python 3.9, so it doesn't apply when
+/// targeting Python 3.7. See astral-sh/ruff#29863.
+///
+/// ```
+/// tmp
+/// ├── pyproject.toml #<-- no [tool.ruff]
+/// ├── ruff.toml #<-- no `target-version`
+/// └── test.py
+/// ```
+#[test]
+fn requires_python_older_than_supported_ruff_toml_fallback() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"[lint]
+select = ["UP006"]
+"#,
+    )?;
+
+    fixture.write_file(
+        "pyproject.toml",
+        r#"[project]
+requires-python = ">= 3.4"
+"#,
+    )?;
+
+    fixture.write_file("test.py", "from typing import List; foo: List[int]\n")?;
+
+    assert_cmd_snapshot!(fixture.check_command().arg("test.py"), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: The minimum Python version allowed by `requires-python` (3.4) is older than the oldest version supported by Ruff (3.7). Rules that depend on the target version will assume Python 3.7. To silence this warning, set `target-version = "py37"` in the project's Ruff configuration, such as `[tool.ruff]` in `pyproject.toml`.
+    "#);
+
     Ok(())
 }
 

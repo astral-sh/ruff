@@ -77,9 +77,9 @@ impl RuffSettings {
                 let fallback = find_fallback_target_version(self.inner.1);
                 if let Some(fallback) = fallback {
                     tracing::debug!(
-                        "Derived `target-version` from found `requires-python`: {fallback:?}"
+                        "Derived `target-version` from found `requires-python`: {fallback}"
                     );
-                    configuration.target_version = Some(fallback.into());
+                    configuration.target_version = Some(fallback);
                 }
 
                 self.inner.transform(configuration)
@@ -109,12 +109,12 @@ impl RuffSettings {
                 let fallback = find_fallback_target_version(root);
                 if let Some(fallback) = fallback {
                     tracing::debug!(
-                        "Derived `target-version` from found `requires-python` for fallback configuration: {fallback:?}"
+                        "Derived `target-version` from found `requires-python` for fallback configuration: {fallback}"
                     );
                 }
 
                 let configuration = Configuration {
-                    target_version: fallback.map(Into::into),
+                    target_version: fallback,
                     ..Configuration::default()
                 };
                 Self::with_editor_settings(editor_settings, root, configuration)
