@@ -605,8 +605,9 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                             // pass `x` twice.
                             let is_last_positional =
                                 positional_index + 1 == call.arguments.args.len();
-                            // The edit inserts the normalized parameter name. Python accepts
-                            // `def f(ｉｆ): ...`, but `f(if=1)` is a syntax error.
+                            // For `def f(ｉｆ): ...`, `name` is already normalized to the
+                            // reserved word `if`. Inserting `if=` would be a syntax error.
+                            // Repeating an existing keyword, as in `f(x=1, x=2)`, would be too.
                             let mode = if is_last_positional
                                 && !argument.is_starred_expr()
                                 && is_identifier(name)
@@ -887,6 +888,7 @@ mod tests {
     use insta::{assert_snapshot, internals::SettingsBindDropGuard};
     use itertools::Itertools;
     use ruff_db::{
+        Db as _,
         diagnostic::{
             Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, LintName, Severity,
             Span, SubDiagnostic, SubDiagnosticSeverity,
@@ -898,7 +900,9 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
 
-    use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
+    use ruff_db::system::{
+        DbWithTestSystem, DbWithWritableSystem, SystemPathBuf, SystemVirtualPath,
+    };
     use ty_project::metadata::options::{AnalysisOptions, Options};
     use ty_project::{ProjectMetadata, SemanticDb as _};
     use ty_python_core::semantic_index;
@@ -919,36 +923,6 @@ mod tests {
 
         test.assert_syntax_error_counts_do_not_increase(&source);
         source.strip_prefix(definition).unwrap().to_owned()
-    }
-
-    /// Assert that the only hint in the selected range has the given label and offers no edits.
-    #[track_caller]
-    fn assert_display_only_hint(source: &str, label: &str) {
-        let [hint] = inlay_hint_test(source)
-            .collect_hints(&InlayHintSettings::default())
-            .try_into()
-            .unwrap();
-        assert_eq!(hint.display().to_string(), label);
-        assert!(hint.text_edits.is_empty());
-    }
-
-    #[track_caller]
-    fn assert_error_count_did_not_increase<T: fmt::Display>(
-        kind: &str,
-        original: &[T],
-        edited: &[T],
-        source: &str,
-    ) {
-        assert!(
-            edited.len() <= original.len(),
-            "Inlay hint edits increased the number of {kind} from {} to {}.
-{}
-Source with applied edits:
-{source}",
-            original.len(),
-            edited.len(),
-            edited.iter().join("\n"),
-        );
     }
 
     fn inlay_hint_test(source: &str) -> InlayHintTest {
@@ -1388,15 +1362,32 @@ Source with applied edits:
         /// code may remain.
         #[track_caller]
         fn assert_syntax_error_counts_do_not_increase(&mut self, source: &str) {
-            self.db.write_file("edited.py", source).unwrap();
-            let edited = system_path_to_file(&self.db, "edited.py").unwrap();
-            // Open the copy so ty records semantic syntax errors for it even if the project
-            // discovered its files before `edited.py` existed.
-            self.db.project().open_file(&mut self.db, edited);
+            #[track_caller]
+            fn assert_error_count_did_not_increase<T: fmt::Display>(
+                kind: &str,
+                original: &[T],
+                edited: &[T],
+                source: &str,
+            ) {
+                assert!(
+                    edited.len() <= original.len(),
+                    "Inlay hint edits increased the number of {kind} from {} to {}.
+{}
+Source with applied edits:
+{source}",
+                    original.len(),
+                    edited.len(),
+                    edited.iter().join("\n"),
+                );
+            }
 
-            let db = &self.db;
+            let db = &mut self.db;
+            let path = SystemVirtualPath::new("assert-syntax://edited.py");
+            db.write_virtual_file(path, source);
+            let virtual_file = db.files().virtual_file(db, path);
+
             let original = db.program_file(self.file);
-            let edited = db.program_file(edited);
+            let edited = db.program_file(virtual_file.file());
             let parsed = |file: ProgramFile<'_>| parsed_module(db, file.python_file(db)).load(db);
             assert_error_count_did_not_increase(
                 "parse errors",
@@ -1410,6 +1401,9 @@ Source with applied edits:
                 semantic_index(db, edited).semantic_syntax_errors(),
                 source,
             );
+
+            virtual_file.close(db);
+            db.memory_file_system().remove_virtual_file(path).unwrap();
         }
 
         /// Returns the inlay hints for the given test case with custom settings.
@@ -4427,26 +4421,60 @@ Source with applied edits:
         // The unpacked `2` goes into `rest`, so only `1` gets a hint. Inserting `x=` would
         // produce `f(x=1, *[2])`. Python would raise a `TypeError` at runtime because the
         // unpacked `2` and the keyword argument `x=1` both supply `x`.
-        assert_display_only_hint(
+        let mut test = inlay_hint_test(
             "
             def f(x, *rest): ...
             f(1, *[2])
             ",
-            "x=",
         );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def f(x, *rest): ...
+        f([x=]1, *[2])
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:7
+          |
+        2 | def f(x, *rest): ...
+          |       ^
+        info: Source
+         --> main2.py:3:4
+          |
+        3 | f([x=]1, *[2])
+          |    ^
+        ");
     }
 
     #[test]
     fn argument_name_hint_for_parameter_that_normalizes_to_a_keyword() {
         // Python accepts the fullwidth spelling in the definition. Inserting the normalized
         // hint would produce `f(if=1)`, which is a syntax error.
-        assert_display_only_hint(
+        let mut test = inlay_hint_test(
             "
             def f(ｉｆ): ...
             f(1)
             ",
-            "if=",
         );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def f(ｉｆ): ...
+        f([if=]1)
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:7
+          |
+        2 | def f(ｉｆ): ...
+          |       ^^^^
+        info: Source
+         --> main2.py:3:4
+          |
+        3 | f([if=]1)
+          |    ^^
+        ");
 
         // The soft keyword `match` can be used directly as a keyword argument.
         assert_snapshot!(apply_inlay_hints("def f(match): ...\n", "f(1)"), @"f(match=1)");
@@ -4456,13 +4484,30 @@ Source with applied edits:
     fn argument_name_hint_for_keyword_already_in_call_has_no_edit() {
         // The original call would raise `TypeError` at runtime. Inserting `x=` would make
         // it a syntax error instead, because `f(x=1, x=2)` repeats an explicit keyword.
-        assert_display_only_hint(
+        let mut test = inlay_hint_test(
             "
             def f(x): ...
             f(1, x=2)
             ",
-            "x=",
         );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def f(x): ...
+        f([x=]1, x=2)
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:7
+          |
+        2 | def f(x): ...
+          |       ^
+        info: Source
+         --> main2.py:3:4
+          |
+        3 | f([x=]1, x=2)
+          |    ^
+        ");
     }
 
     #[test]
