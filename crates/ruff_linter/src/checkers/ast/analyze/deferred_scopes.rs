@@ -23,6 +23,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::MethodReceiverDefault,
         Rule::MutableClassDefault,
         Rule::MutableDataclassDefault,
+        Rule::NoMethodArgument,
         Rule::NoSelfUse,
         Rule::RedefinedArgumentFromLocal,
         Rule::RedefinedWhileUnused,
@@ -244,6 +245,10 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         }
 
         if scope.kind.is_function() {
+            if checker.is_rule_enabled(Rule::NoMethodArgument) {
+                pylint::rules::no_method_argument(checker, scope);
+            }
+
             if checker.is_rule_enabled(Rule::NoSelfUse) {
                 pylint::rules::no_self_use(checker, scope_id, scope);
             }
