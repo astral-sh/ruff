@@ -1190,6 +1190,27 @@ class AcceptsObject:
 class SynthesizedConflict(Ordered, AcceptsObject): ...
 ```
 
+### Generated NamedTuple methods
+
+The first base supplies a generated `_replace` method that accepts both argument types. Without
+that base, the selected method accepts only `int` and conflicts with the one that accepts `str`.
+
+```pyi
+from typing import NamedTuple
+
+class Point(NamedTuple):
+    x: int | str
+
+class AcceptsInt:
+    def _replace(self, *, x: int) -> object: ...
+
+class AcceptsStr:
+    def _replace(self, *, x: str) -> object: ...
+
+class FromTuple(Point, AcceptsInt, AcceptsStr): ...
+class FromBases(AcceptsInt, AcceptsStr): ...  # error: [invalid-method-override]
+```
+
 ### Enum mixins
 
 Ordinary mixin methods continue to contribute inherited contracts when the resulting class is an
