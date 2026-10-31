@@ -45,6 +45,9 @@ def project_setup(
     project = request.param
     assert isinstance(project, Project)
 
+    if project.edit is None:
+        pytest.skip(f"{project.name} does not have an incremental edit")
+
     with tempfile.TemporaryDirectory() as tempdir:
         cwd = Path(tempdir)
         project.clone(cwd)
