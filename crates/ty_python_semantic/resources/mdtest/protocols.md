@@ -488,7 +488,7 @@ class Base(Protocol): ...
 @runtime_checkable
 class Concrete(Base): ...
 
-@runtime_checkable  # no diagnostic
+@runtime_checkable  # ok
 class Subprotocol(Base, Protocol): ...
 ```
 
@@ -505,7 +505,7 @@ class P(Protocol): ...
 
 runtime_checkable(NotAProtocol)  # error: [invalid-argument-type] "`runtime_checkable` can only be applied to protocol classes"
 runtime_checkable_extensions(cls=NotAProtocol)  # error: [invalid-argument-type]
-runtime_checkable(P)  # no diagnostic
+runtime_checkable(P)  # ok
 ```
 
 ## `runtime_checkable` in stub files
@@ -515,7 +515,7 @@ In a stub file, a class can inherit from `Protocol` through an alias defined lat
 ```pyi
 from typing import runtime_checkable
 
-@runtime_checkable  # no diagnostic
+@runtime_checkable  # ok
 class P(ProtocolAlias): ...
 
 from typing import Protocol as ProtocolAlias
@@ -539,7 +539,7 @@ from typing import Protocol, runtime_checkable
 
 class P(Protocol): ...
 
-@runtime_checkable  # no diagnostic
+@runtime_checkable  # ok
 @lambda cls: P
 class Replaced: ...
 ```
@@ -3256,8 +3256,8 @@ class C: ...
 def takes_instance(value: JustObject) -> None: ...
 def takes_class(value: type[JustObject]) -> None: ...
 
-takes_instance(object())  # no diagnostic
-takes_class(object)  # no diagnostic
+takes_instance(object())  # ok
+takes_class(object)  # ok
 
 takes_instance(C())  # error: [invalid-argument-type]
 takes_class(C)  # error: [invalid-argument-type]
@@ -4032,7 +4032,7 @@ class HasGenericValue(Protocol):
     def value(self) -> object: ...
 
 def update(value: HasGenericValue, accepted: Swapped[str, int], rejected: Swapped[str, str]) -> None:
-    value.value = accepted  # no diagnostic
+    value.value = accepted  # ok
     value.value = rejected  # error: [invalid-assignment]
 ```
 
@@ -4068,7 +4068,7 @@ class HasValue(Protocol):
     def value(self) -> int: ...
 
 def _(x: HasValue, value: Recursive[int]) -> None:
-    x.value = value  # no diagnostic
+    x.value = value  # ok
     x.value = 1  # error: [invalid-assignment]
 ```
 
@@ -4122,7 +4122,7 @@ class HasPayload(Protocol):
     def value(self) -> int: ...
 
 def _(x: HasPayload, value: Payload[int]) -> None:
-    x.value = value  # no diagnostic
+    x.value = value  # ok
     x.value = 1  # error: [invalid-assignment]
 ```
 
@@ -4152,7 +4152,7 @@ class HasAlias(Protocol):
     def value(self) -> int: ...
 
 def _(x: HasAlias, value: RecursiveAlias[int]) -> None:
-    x.value = value  # no diagnostic
+    x.value = value  # ok
     x.value = 1  # error: [invalid-assignment]
 ```
 
@@ -4290,7 +4290,7 @@ class HasValue(Protocol):
     def value(self) -> int: ...
 
 def _(x: HasValue) -> None:
-    x.value = 1  # no diagnostic
+    x.value = 1  # ok
     x.value = "bad"  # error: [invalid-assignment]
 ```
 
@@ -4832,7 +4832,7 @@ class Implementation:
     def method(receiver: Receiver) -> None: ...
 
 def check(value: Implementation) -> Required:
-    return value  # no diagnostic
+    return value  # ok
 ```
 
 ## Recursive protocol receiver binding
@@ -7954,7 +7954,7 @@ class Readable(Protocol):
 static_assert(is_subtype_of(Node[str], Node[int]))
 
 def check(node: Node[str]) -> Readable:
-    return node  # no diagnostic
+    return node  # ok
 
 T = TypeVar("T", covariant=True)
 
@@ -7965,7 +7965,7 @@ class LegacyNode(Protocol[T]):
 static_assert(is_subtype_of(LegacyNode[str], LegacyNode[int]))
 
 def check_legacy(node: LegacyNode[str]) -> Readable:
-    return node  # no diagnostic
+    return node  # ok
 ```
 
 ### Explicit receivers on overloaded recursive protocol methods

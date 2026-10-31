@@ -1247,14 +1247,14 @@ class ItemDescriptor:
 class Holder:
     item = ItemDescriptor()
 
-compatible: HasItem = Holder()  # no diagnostic
+compatible: HasItem = Holder()  # ok
 ```
 
 Checking a class that only annotates its attribute with the descriptor type also terminates:
 
 ```py
 class AnnotationOnlyHolder:
-    item: ItemDescriptor  # no diagnostic
+    item: ItemDescriptor  # ok
 ```
 
 The recursive check does not make an incompatible setter acceptable:

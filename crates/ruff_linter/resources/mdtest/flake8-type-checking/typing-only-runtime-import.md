@@ -74,9 +74,9 @@ Explicit lazy imports and imports made lazy by `__lazy_modules__` already defer 
 not need to move into a type-checking block.
 
 ```py
-lazy from pathlib import Path  # no diagnostic
+lazy from pathlib import Path  # ok
 __lazy_modules__ = ["vendor"]
-from vendor import Model  # no diagnostic
+from vendor import Model  # ok
 
 def load(value: Path) -> Model: ...
 ```

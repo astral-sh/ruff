@@ -1022,7 +1022,7 @@ class ReturnsInt:
     def method(self) -> int:
         return 0
 
-class Combined(Callback, ReturnsStr, ReturnsInt): ...  # no diagnostic
+class Combined(Callback, ReturnsStr, ReturnsInt): ...  # ok
 ```
 
 A non-callable instance attribute still conflicts with the inherited methods. The error describes
@@ -2334,7 +2334,7 @@ by base classes.
 
 ```pyi
 class Hashable:
-    def __hash__(self) -> int: ...  # no diagnostic
+    def __hash__(self) -> int: ...  # ok
 
 class InvalidHash:
     def __hash__(self) -> str: ...  # snapshot: invalid-method-override
@@ -2359,7 +2359,7 @@ class NonCallable:
     __hash__ = 42  # error: [invalid-method-override]
 
 class Unhashable:
-    __hash__ = None  # no diagnostic
+    __hash__ = None  # ok
 ```
 
 ## Restoring hashability
@@ -2374,15 +2374,15 @@ class NarrowHash:
     __hash__: ClassVar[Callable[..., bool]]
 
 class Assigned(NarrowHash):
-    __hash__ = object.__hash__  # no diagnostic
+    __hash__ = object.__hash__  # ok
 
 reveal_type(Assigned.__hash__)  # revealed: def __hash__(self) -> int
 
 class Unhashable(Assigned):
-    __hash__ = None  # no diagnostic
+    __hash__ = None  # ok
 
 class Restored(Unhashable):
-    def __hash__(self) -> int: ...  # no diagnostic
+    def __hash__(self) -> int: ...  # ok
 ```
 
 The inherited `ClassVar` still prevents assignment through an instance:
@@ -2407,7 +2407,7 @@ class HashCallable:
         return 0
 
 class Restored(Unhashable):
-    __hash__ = HashCallable()  # no diagnostic
+    __hash__ = HashCallable()  # ok
 ```
 
 An incompatible return type makes the replacement invalid:
@@ -2430,7 +2430,7 @@ callable alternative must still return an `int`:
 from typing import Callable, ClassVar
 
 class OptionalHash:
-    __hash__: ClassVar[Callable[..., int] | None]  # no diagnostic
+    __hash__: ClassVar[Callable[..., int] | None]  # ok
 
 class InvalidOptionalHash:
     __hash__: ClassVar[Callable[..., str] | None]  # error: [invalid-method-override]
@@ -2549,7 +2549,7 @@ from typing import NamedTuple
 Base = NamedTuple("Base", [("value", int)])
 
 class Compatible(Base):
-    def _asdict(self) -> dict[str, int]: ...  # no diagnostic
+    def _asdict(self) -> dict[str, int]: ...  # ok
 
 class Incompatible(Base):
     def _asdict(self) -> int: ...  # error: [invalid-method-override]
@@ -2939,7 +2939,7 @@ class InitializedAttribute(AttributeBase):
     value = 1
 
 class NarrowedAttribute(AttributeBase):
-    value: bool  # no diagnostic
+    value: bool  # ok
 ```
 
 ```snapshot
@@ -2973,10 +2973,10 @@ class WithDefault(Declared):
     value: str = ""  # error: [invalid-attribute-override]
 
 class Compatible(Declared):
-    value: int = 2  # no diagnostic
+    value: int = 2  # ok
 
 class InheritsAnnotation(Declared):
-    value = 1  # no diagnostic
+    value = 1  # ok
 ```
 
 ## Inherited annotations and instance assignments
@@ -2999,14 +2999,14 @@ class Middle(Base):
         self.defaulted = "middle"
 
 class Child(Middle):
-    value = "child"  # no diagnostic
-    defaulted = "child"  # no diagnostic
+    value = "child"  # ok
+    defaulted = "child"  # ok
 
 def clear(obj: Middle):
     reveal_type(obj.value)  # revealed: str | None
     reveal_type(obj.defaulted)  # revealed: str | None
-    obj.value = None  # no diagnostic
-    obj.defaulted = None  # no diagnostic
+    obj.value = None  # ok
+    obj.defaulted = None  # ok
 
 class Incompatible(Middle):
     value: int = 1  # error: [invalid-attribute-override]
@@ -3028,7 +3028,7 @@ class Parent(Base):
     value: str  # error: [invalid-attribute-override]
 
 class Child(Parent):
-    value: str  # no diagnostic
+    value: str  # ok
 
 class Unrelated:
     value: bytes
@@ -3053,7 +3053,7 @@ class PropertyParent(PropertyBase):
 
 class PropertyChild(PropertyParent):
     @property
-    def value(self) -> bool:  # no diagnostic
+    def value(self) -> bool:  # ok
         return True
 ```
 
@@ -3075,11 +3075,11 @@ class Bridge(Bad):
         self.value = ""
 
 class ClassBody(Bridge):
-    value: str  # no diagnostic
+    value: str  # ok
 
 class Receiver(Bridge):
     def __init__(self) -> None:
-        self.value: str = ""  # no diagnostic
+        self.value: str = ""  # ok
 
 class NewClassBodyConflict(Bridge):
     value: bytes  # error: [invalid-attribute-override]
@@ -3162,7 +3162,7 @@ class Base:
 
 class Child(Base):
     @property
-    def value(self) -> int:  # no diagnostic
+    def value(self) -> int:  # ok
         return 1
 ```
 
@@ -3204,7 +3204,7 @@ class PropertyOverMethod(MethodBase):
         return 1
 
 class CallableAttributeOverMethod(MethodBase):
-    value: Callable[[], int]  # no diagnostic
+    value: Callable[[], int]  # ok
 
 class CallablePropertyBase:
     @property
@@ -3212,7 +3212,7 @@ class CallablePropertyBase:
         return lambda: 1
 
 class CompatibleMethod(CallablePropertyBase):
-    def value(self) -> int:  # no diagnostic
+    def value(self) -> int:  # ok
         return 1
 ```
 
@@ -3231,7 +3231,7 @@ class Base:
     def value(self) -> int: ...
 
 class Compatible(Base):
-    def value(self) -> int: ...  # no diagnostic
+    def value(self) -> int: ...  # ok
 
 class Incompatible(Base):
     def value(self) -> str: ...  # error: [invalid-method-override]
@@ -3260,7 +3260,7 @@ class AttributeBase:
     value: Callable[[int], int]
 
 class CompatibleMethod(AttributeBase):
-    def value(self, x: int, /) -> int: ...  # no diagnostic
+    def value(self, x: int, /) -> int: ...  # ok
 
 class IncompatibleMethod(AttributeBase):
     def value(self) -> int: ...  # error: [invalid-attribute-override]
@@ -3269,7 +3269,7 @@ class MethodBase:
     def value(self, x: int, /) -> int: ...
 
 class CompatibleAttribute(MethodBase):
-    value: Callable[[int], int]  # no diagnostic
+    value: Callable[[int], int]  # ok
 
 class IncompatibleAttribute(MethodBase):
     value: Callable[[], int]  # error: [invalid-attribute-override]
@@ -3289,7 +3289,7 @@ class FloatBaseType:
     cast_nocheck = Float
 
 class Compatible(FloatBaseType):
-    def cast_nocheck(self, num: int, dps: int) -> Float: ...  # no diagnostic
+    def cast_nocheck(self, num: int, dps: int) -> Float: ...  # ok
 
 class Incompatible(FloatBaseType):
     def cast_nocheck(self, num: int) -> Float: ...  # error: [invalid-method-override]
@@ -3310,8 +3310,8 @@ class Base:
     value = 0
 
 class Compatible(Base):
-    def callback(self, value: int) -> int: ...  # no diagnostic
-    value = "text"  # no diagnostic
+    def callback(self, value: int) -> int: ...  # ok
+    value = "text"  # ok
 
 class Incompatible(Base):
     def callback(self) -> int: ...  # error: [invalid-method-override]
@@ -3367,7 +3367,7 @@ class Base:
     value: Final[Callable[[int], int]]
 
 class Compatible(Base):
-    def value(self, x: int, /) -> int: ...  # no diagnostic
+    def value(self, x: int, /) -> int: ...  # ok
 
 class Incompatible(Base):
     def value(self) -> int: ...  # error: [invalid-method-override]
@@ -3406,7 +3406,7 @@ class Base:
     value = Descriptor()
 
 class Compatible(Base):
-    def value(self, x: int) -> int: ...  # no diagnostic
+    def value(self, x: int) -> int: ...  # ok
 
 class Incompatible(Base):
     def value(self) -> int: ...  # error: [invalid-attribute-override]
@@ -3487,14 +3487,14 @@ class Base:
     def method(self, x: int) -> int: ...
 
 class Child(Base):
-    def attribute(self) -> int: ...  # no diagnostic
-    def property(self) -> int: ...  # no diagnostic
+    def attribute(self) -> int: ...  # ok
+    def property(self) -> int: ...  # ok
     def method(self) -> int: ...  # error: [invalid-method-override]
 
 class Compatible(Base):
-    def attribute(self, x: int) -> int: ...  # no diagnostic
-    def property(self, x: int) -> int: ...  # no diagnostic
-    def method(self, x: int) -> int: ...  # no diagnostic
+    def attribute(self, x: int) -> int: ...  # ok
+    def property(self, x: int) -> int: ...  # ok
+    def method(self, x: int) -> int: ...  # ok
 ```
 
 Methods replacing inferred callable defaults still have their signatures checked.
@@ -3531,7 +3531,7 @@ class Base:
 class Child(Base):
     def attribute(self) -> int: ...  # error: [invalid-attribute-override]
     def property(self) -> int: ...  # error: [invalid-property-type-override]
-    def method(self) -> int: ...  # no diagnostic
+    def method(self) -> int: ...  # ok
 ```
 
 This also disables signature checking for methods that replace inferred callable defaults.
@@ -3544,7 +3544,7 @@ class CallableBase:
     make = Factory
 
 class Child(CallableBase):
-    def make(self) -> Factory: ...  # no diagnostic
+    def make(self) -> Factory: ...  # ok
 ```
 
 Finality checks remain enabled even when the overriding method has an incompatible signature.
@@ -3599,7 +3599,7 @@ class Incompatible(Base):
     value: ClassVar[str]  # error: [invalid-property-type-override]
 
 class Compatible(Base):
-    value: ClassVar[int]  # no diagnostic
+    value: ClassVar[int]  # ok
 
 class ClassBase:
     value: ClassVar[int]
@@ -3633,7 +3633,7 @@ class Child(Base):
     value: bytes  # error: [invalid-property-type-override]
 
 class Compatible(Base):
-    value: int  # no diagnostic
+    value: int  # ok
 ```
 
 ## Property setters
@@ -3760,7 +3760,7 @@ class Mixin: ...
 class Frozen(Base):
     value: int
 
-class Child(Mixin, Frozen): ...  # no diagnostic
+class Child(Mixin, Frozen): ...  # ok
 ```
 
 The inherited field is still read-only.
@@ -3913,9 +3913,9 @@ can assign this metadata in their class bodies without violating an inherited wr
 ```py
 class Slotted:
     __slots__ = ()
-    __module__ = "custom"  # no diagnostic
-    __doc__ = None  # no diagnostic
-    __annotations__ = {}  # no diagnostic
+    __module__ = "custom"  # ok
+    __doc__ = None  # ok
+    __annotations__ = {}  # ok
 ```
 
 Overrides must still preserve the declared read types.
@@ -4033,7 +4033,7 @@ class Base:
 
 class Same(Base):
     def __init__(self) -> None:
-        self.value: int = 1  # no diagnostic
+        self.value: int = 1  # ok
 ```
 
 An incompatible type is rejected. Narrowing to `bool` also violates the mutable-override rule: code
@@ -4054,7 +4054,7 @@ An assignment without an annotation does not change the inherited type.
 ```py
 class Initialized(Base):
     def __init__(self) -> None:
-        self.value = True  # no diagnostic
+        self.value = True  # ok
 ```
 
 An annotation in the subclass's body is also checked against the base's constructor annotation.
@@ -4069,7 +4069,7 @@ Repeating an incompatible annotation in a further subclass does not report the s
 ```py
 class Grandchild(Incompatible):
     def __init__(self) -> None:
-        self.value: str = ""  # no diagnostic
+        self.value: str = ""  # ok
 ```
 
 ## Method annotations overriding class-body declarations
@@ -4110,13 +4110,13 @@ class CompatibleSlot(Base):
     __slots__ = ("value",)
 
     def __init__(self) -> None:
-        self.value: int = 0  # no diagnostic
+        self.value: int = 0  # ok
 
 class CompatibleDefault(Base):
     value = 0
 
     def __init__(self) -> None:
-        self.value: int = 0  # no diagnostic
+        self.value: int = 0  # ok
 ```
 
 When the class body declares the attribute, we check that declaration once, even if a method repeats
@@ -4127,7 +4127,7 @@ class AnnotatedDefault(Base):
     value: str = ""  # error: [invalid-attribute-override]
 
     def __init__(self) -> None:
-        self.value: str = ""  # no diagnostic
+        self.value: str = ""  # ok
 ```
 
 Further subclasses can repeat the receiver declaration without reporting its existing conflict
@@ -4137,13 +4137,13 @@ is used as a base. Overrides with a different incompatible type still produce an
 ```py
 class RepeatedReceiver(WithDefault):
     def __init__(self) -> None:
-        self.value: str = ""  # no diagnostic
+        self.value: str = ""  # ok
 
 class RepeatedClassBody(WithDefault):
-    value: str  # no diagnostic
+    value: str  # ok
 
 class RepeatedDefault(WithDefault):
-    value = 0  # no diagnostic
+    value = 0  # ok
 
 class NewReceiverConflict(WithDefault):
     def __init__(self) -> None:
@@ -4236,9 +4236,9 @@ The error is not repeated in subclasses, including when the conflicting parent i
 class.
 
 ```py
-class Descendant(Conflict): ...  # no diagnostic
+class Descendant(Conflict): ...  # ok
 class Independent: ...
-class JoinedAgain(Independent, Conflict): ...  # no diagnostic
+class JoinedAgain(Independent, Conflict): ...  # ok
 ```
 
 ## Explicit overrides with multiple bases
@@ -4264,7 +4264,7 @@ conflicting parent is not the first base.
 class Independent: ...
 
 class JoinedAgain(Independent, Conflict):
-    value: str  # no diagnostic
+    value: str  # ok
 ```
 
 ## `Any` on an intermediate base
@@ -4304,7 +4304,7 @@ class Hashable(Base):
 
 class Unhashable(Hashable): ...
 class Mixin: ...
-class Child(Unhashable, Mixin): ...  # no diagnostic
+class Child(Unhashable, Mixin): ...  # ok
 ```
 
 ## Generated `__match_args__`
@@ -4323,7 +4323,7 @@ class Base:
 
 class Concrete(Base): ...
 class Mixin: ...
-class Child(Concrete, Mixin): ...  # no diagnostic
+class Child(Concrete, Mixin): ...  # ok
 ```
 
 ## Inherited `__match_args__`
@@ -4348,5 +4348,5 @@ class Base:
 class Generated(Base): ...
 
 class Mixin: ...
-class Child(Generated, Mixin): ...  # no diagnostic
+class Child(Generated, Mixin): ...  # ok
 ```

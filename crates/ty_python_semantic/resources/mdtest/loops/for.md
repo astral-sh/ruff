@@ -405,8 +405,8 @@ class C:
     key: Literal["a", "b"]
 
 c = C()
-[None for c.key in {"a": 1, "b": 2}]  # no diagnostic
-[None for _ in (0,) for c.key in {"a": 1, "b": 2}]  # no diagnostic
+[None for c.key in {"a": 1, "b": 2}]  # ok
+[None for _ in (0,) for c.key in {"a": 1, "b": 2}]  # ok
 
 for number, letter in {(1, "a"): 0, (2, "b"): 0}:
     reveal_type(number)  # revealed: Literal[1, 2]
@@ -418,7 +418,7 @@ Nested mutable containers still permit mutation:
 ```py
 for values in {"a": [1]}.values():
     reveal_type(values)  # revealed: list[int]
-    values.append(2)  # no diagnostic
+    values.append(2)  # ok
 ```
 
 ## With unpacked literal dictionary
@@ -444,7 +444,7 @@ included in the inferred union:
 for value in {**{1: "a"}, 1: "b"}.values():
     reveal_type(value)  # revealed: Literal["a", "b"]
 
-(key,) = {1: "a", 1: "b"}  # no diagnostic
+(key,) = {1: "a", 1: "b"}  # ok
 ```
 
 ## With non-callable iterator
