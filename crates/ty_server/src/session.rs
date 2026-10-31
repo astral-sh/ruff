@@ -533,14 +533,11 @@ impl Session {
     ) -> Option<(&SystemPath, &ProjectState)> {
         path.as_system()
             .and_then(|path| {
-                self.projects
-                    .range(..=path.to_path_buf())
-                    .rfind(|(root, _)| path.starts_with(root))
-                    .or_else(|| {
-                        self.projects
-                            .iter()
-                            .find(|(_, project)| project.db.program_for_dependency(path).is_some())
-                    })
+                closest_workspace_entry(&self.projects, path).or_else(|| {
+                    self.projects
+                        .iter()
+                        .find(|(_, project)| project.db.program_for_dependency(path).is_some())
+                })
             })
             .or_else(|| self.projects.first_key_value())
             .map(|(workspace_root, project)| (workspace_root.as_path(), project))
@@ -1272,9 +1269,8 @@ impl Session {
         SessionSnapshot {
             projects: self
                 .projects
-                .values()
-                .map(|project| &project.db)
-                .cloned()
+                .iter()
+                .map(|(workspace_root, project)| (workspace_root.clone(), project.db.clone()))
                 .collect(),
             index: self.index.clone().unwrap(),
             global_settings: self.global_settings.clone(),
@@ -1629,6 +1625,22 @@ impl DocumentRequestTarget {
     }
 }
 
+/// Returns the entry of a map keyed by workspace folder whose folder is the closest one that
+/// contains `path`, or `None` if no workspace folder contains `path`.
+///
+/// Workspace folders can be nested. For workspace folders `/repo` and `/repo/inner`, the path
+/// `/repo/inner/test.py` selects `/repo/inner`, and `/repo/test.py` selects `/repo`.
+fn closest_workspace_entry<'a, T>(
+    entries: &'a BTreeMap<SystemPathBuf, T>,
+    path: &SystemPath,
+) -> Option<(&'a SystemPathBuf, &'a T)> {
+    // Every folder that contains `path` sorts at or before it, and a nested folder sorts after
+    // the folders that contain it, so the last containing folder in this range is the closest.
+    entries
+        .range(..=path.to_path_buf())
+        .rfind(|(workspace_root, _)| path.starts_with(workspace_root))
+}
+
 /// An immutable snapshot of the current state of [`Session`].
 pub(crate) struct SessionSnapshot {
     index: Arc<Index>,
@@ -1648,12 +1660,36 @@ pub(crate) struct SessionSnapshot {
     /// dropped after all other fields, which ensures that
     /// Salsa's cancellation blocks until all fields are dropped (and not only
     /// waits for the db to be dropped while we still hold on to the `Index`).
-    projects: Vec<ProjectDatabase>,
+    ///
+    /// Like [`Session::projects`], this is keyed by workspace folder.
+    projects: BTreeMap<SystemPathBuf, ProjectDatabase>,
 }
 
 impl SessionSnapshot {
-    pub(crate) fn projects(&self) -> &[ProjectDatabase] {
-        &self.projects
+    pub(crate) fn projects(&self) -> impl Iterator<Item = &ProjectDatabase> {
+        self.projects.values()
+    }
+
+    /// Returns each workspace folder with the database of its project.
+    pub(crate) fn workspace_projects(
+        &self,
+    ) -> impl Iterator<Item = (&SystemPath, &ProjectDatabase)> {
+        self.projects
+            .iter()
+            .map(|(workspace_root, db)| (workspace_root.as_path(), db))
+    }
+
+    /// Returns the closest workspace folder that contains `path`, together with the database of
+    /// its project, or `None` if no workspace folder contains `path`.
+    ///
+    /// Unlike [`Session::project_db`], this doesn't fall back to another project for a path
+    /// outside every workspace folder.
+    pub(crate) fn project_db_for_path(
+        &self,
+        path: &SystemPath,
+    ) -> Option<(&SystemPath, &ProjectDatabase)> {
+        closest_workspace_entry(&self.projects, path)
+            .map(|(workspace_root, db)| (workspace_root.as_path(), db))
     }
 
     pub(crate) fn index(&self) -> &Index {
@@ -1769,11 +1805,7 @@ impl Workspaces {
     /// Returns a reference to the workspace for the given path, [`None`] if there's no workspace
     /// registered for the path.
     fn for_path(&self, path: impl AsRef<SystemPath>) -> Option<&Workspace> {
-        let path = path.as_ref();
-        self.workspaces
-            .range(..=path.to_path_buf())
-            .rfind(|(workspace_root, _)| path.starts_with(workspace_root))
-            .map(|(_, db)| db)
+        closest_workspace_entry(&self.workspaces, path.as_ref()).map(|(_, workspace)| workspace)
     }
 
     /// Returns the client settings for the workspace at the given path, [`None`] if there's no
@@ -2289,19 +2321,22 @@ pub(super) fn warn_about_unknown_options(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
     use std::io::ErrorKind;
     use std::sync::Arc;
 
     use anyhow::Context;
     use lsp_types::Uri;
     use ruff_db::files::vendored_path_to_file;
-    use ruff_db::system::{Command, CommandExecutor, OsSystem, System as _, SystemPath};
+    use ruff_db::system::{
+        Command, CommandExecutor, OsSystem, System as _, SystemPath, SystemPathBuf,
+    };
     use ruff_db::vendored::VendoredPath;
     use ty_project::metadata::Options;
     use ty_project::{ProjectDatabase, ProjectMetadata};
     use ty_python_core::program::UseDefaultStrategy;
 
-    use super::{DocumentRequestTarget, Index};
+    use super::{DocumentRequestTarget, Index, closest_workspace_entry};
     use crate::system::{AnySystemPath, LSPSystem, WorkspaceTrust};
 
     #[test]
@@ -2374,5 +2409,21 @@ mod tests {
             "external commands are disabled in an untrusted workspace",
         );
         Ok(())
+    }
+
+    #[test]
+    fn closest_workspace_entry_picks_the_innermost_containing_folder() {
+        let entries = BTreeMap::from([
+            (SystemPathBuf::from("/repo"), "outer"),
+            (SystemPathBuf::from("/repo/inner"), "inner"),
+        ]);
+        let closest = |path: &str| {
+            closest_workspace_entry(&entries, SystemPath::new(path)).map(|(_, name)| *name)
+        };
+
+        assert_eq!(closest("/repo/inner/test_a.py"), Some("inner"));
+        assert_eq!(closest("/repo/test_a.py"), Some("outer"));
+        assert_eq!(closest("/repo-other/test_a.py"), None);
+        assert_eq!(closest("/other/test_a.py"), None);
     }
 }
