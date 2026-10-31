@@ -117,9 +117,7 @@ impl<'db> MethodWrapper<'db> {
                     CallableTypeKind::FunctionLike => true,
                     CallableTypeKind::ClassMethodLike => kind == MethodWrapperKind::Classmethod,
                     CallableTypeKind::StaticMethodLike => kind == MethodWrapperKind::Staticmethod,
-                    CallableTypeKind::Regular
-                    | CallableTypeKind::DunderParamSpec
-                    | CallableTypeKind::ParamSpecValue => false,
+                    CallableTypeKind::Regular | CallableTypeKind::ParamSpecValue => false,
                 } =>
             {
                 Type::FunctionLiteral(function.with_descriptor_kind(

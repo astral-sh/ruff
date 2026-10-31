@@ -138,8 +138,8 @@ C()()
 _: Callable[..., None] = C()
 ```
 
-The dunder-name heuristic also does not apply to a callable parameterized by a `ParamSpec`, even
-after the `ParamSpec` is specialized:
+An explicitly annotated callable parameterized by a `ParamSpec` remains regular, even after the
+`ParamSpec` is specialized:
 
 ```py
 from collections.abc import Callable
@@ -168,7 +168,42 @@ def check_self(value: Child) -> None:
     result: Child = value[0]
 ```
 
-And of course the same is true if we have only an implicit assignment inside a method:
+### Callable annotations overriding inherited dunders
+
+Callable annotations can refine inherited dunder methods, including through a type alias:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any
+
+class Operand:
+    def __add__(self, value: Any, /) -> Any: ...
+    def __getitem__(self, value: Any, /) -> Any: ...
+
+type Add = Callable[[Index, Any], Index]
+
+class Index(Operand):
+    __add__: Add
+    __getitem__: Callable[[Index, Any], str]
+
+index = Index()
+# TODO: Direct access also includes an unbound callable from instance-attribute lookup,
+# even though no instance assignment is present.
+reveal_type(index.__add__)  # revealed: ((Any, /) -> Index) | ((Index, Any, /) -> Index)
+reveal_type(index + 1)  # revealed: Index
+reveal_type(index[1])  # revealed: str
+```
+
+### Dunder methods attached to instances
+
+Dunder methods assigned to an instance inside a method cannot be called implicitly:
 
 ```py
 from typing import Callable
@@ -186,9 +221,13 @@ _: Callable[..., None] = C()
 
 ## When the dunder is not a method
 
-A dunder can also be a non-method callable:
+A dunder can also be a non-method callable. Using the callable object's concrete type preserves the
+runtime fact that it is not a descriptor. Erasing that fact with a `Callable` annotation is
+necessarily unsound: the dunder heuristic assumes it is a method.
 
 ```py
+from collections.abc import Callable
+
 class SomeCallable:
     def __call__(self, key: int) -> str:
         return str(key)
@@ -196,9 +235,15 @@ class SomeCallable:
 class ClassWithNonMethodDunder:
     __getitem__: SomeCallable = SomeCallable()
 
+class ClassWithCallableAnnotatedDunder:
+    __getitem__: Callable[[int], str] = SomeCallable()
+
 class_with_callable_dunder = ClassWithNonMethodDunder()
 
 reveal_type(class_with_callable_dunder[0])  # revealed: str
+
+# error: [invalid-argument-type]
+ClassWithCallableAnnotatedDunder()[0]
 ```
 
 ## Dunders are looked up using the descriptor protocol
