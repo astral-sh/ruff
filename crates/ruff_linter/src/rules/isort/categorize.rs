@@ -1,9 +1,12 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use std::hash::Hasher;
 use std::iter;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use log::debug;
+use ruff_cache::{CacheKey as _, CacheKeyHasher};
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
@@ -80,6 +83,7 @@ enum Reason<'a> {
     Future,
     KnownStandardLibrary,
     SamePackage,
+    WorkspaceMetadata,
     #[expect(dead_code)]
     SourceMatch(&'a Path),
     NoMatch,
@@ -133,6 +137,12 @@ pub(crate) fn categorize<'a>(
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::SourceMatch(src),
             )
+        } else if let Some(classification) = known_modules
+            .workspace
+            .as_ref()
+            .and_then(|workspace| workspace.categorize(module_name))
+        {
+            classification
         } else if !is_relative && module_name == "__main__" {
             (
                 &ImportSection::Known(ImportType::FirstParty),
@@ -303,6 +313,7 @@ pub struct KnownModules {
     known: Vec<(IdentifierPattern, ImportSection)>,
     /// Whether any of the known modules are submodules (e.g., `foo.bar`, as opposed to `foo`).
     has_submodules: bool,
+    pub workspace: Option<WorkspaceImports>,
 }
 
 impl KnownModules {
@@ -361,6 +372,7 @@ impl KnownModules {
         Self {
             known,
             has_submodules,
+            workspace: None,
         }
     }
 
@@ -371,18 +383,9 @@ impl KnownModules {
             // Check all module prefixes from the longest to the shortest (e.g., given
             // `foo.bar.baz`, check `foo.bar.baz`, then `foo.bar`, then `foo`, taking the first,
             // most precise match).
-            for i in module_name
-                .match_indices('.')
-                .map(|(i, _)| i)
-                .chain(iter::once(module_name.len()))
-                .rev()
-            {
-                let submodule = &module_name[0..i];
-                if let Some(result) = self.categorize_submodule(submodule) {
-                    return Some(result);
-                }
-            }
-            None
+            iter::once(module_name)
+                .chain(module_parents(module_name))
+                .find_map(|submodule| self.categorize_submodule(submodule))
         } else {
             // Happy path: no submodules, so we can check the module base and be done.
             let module_base = module_name.split('.').next().unwrap();
@@ -412,6 +415,45 @@ impl KnownModules {
     }
 }
 
+/// Import sections inferred from the uv workspace and its installed distributions.
+#[derive(Debug, Clone, CacheKey)]
+pub struct WorkspaceImports {
+    /// A shared namespace may have both first- and third-party owners.
+    #[cache_key(ignore)]
+    sections: Arc<BTreeMap<String, Option<ImportSection>>>,
+    /// Hash the workspace once, since it can be shared by many package caches.
+    fingerprint: u64,
+}
+
+impl WorkspaceImports {
+    pub fn new(sections: BTreeMap<String, Option<ImportSection>>) -> Self {
+        let mut hasher = CacheKeyHasher::new();
+        sections.cache_key(&mut hasher);
+        Self {
+            sections: sections.into(),
+            fingerprint: hasher.finish(),
+        }
+    }
+
+    pub fn fingerprint(&self) -> u64 {
+        self.fingerprint
+    }
+
+    fn categorize(&self, name: &str) -> Option<(&ImportSection, Reason<'_>)> {
+        // A mixed namespace stops the search even if its parent has a single section.
+        iter::once(name)
+            .chain(module_parents(name))
+            .find_map(|name| self.sections.get(name))?
+            .as_ref()
+            .map(|section| (section, Reason::WorkspaceMetadata))
+    }
+}
+
+/// Yield the dotted parents of a module, starting with its immediate parent.
+fn module_parents(name: &str) -> impl Iterator<Item = &str> {
+    name.rmatch_indices('.').map(|(dot, _)| &name[..dot])
+}
+
 impl fmt::Display for KnownModules {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.known.is_empty() {
@@ -429,8 +471,9 @@ impl fmt::Display for KnownModules {
 
 #[cfg(test)]
 mod tests {
-    use crate::rules::isort::categorize::match_sources;
+    use super::{ImportSection, ImportType, WorkspaceImports, match_sources};
 
+    use std::collections::BTreeMap;
     use std::fs;
     use std::path::{Path, PathBuf};
     use tempfile::tempdir;
@@ -447,6 +490,29 @@ mod tests {
     /// Helper function to create a directory and all parent directories
     fn create_dir<P: AsRef<Path>>(path: P) {
         fs::create_dir_all(path).unwrap();
+    }
+
+    #[test]
+    fn workspace_namespace_ownership() {
+        let first = ImportSection::Known(ImportType::FirstParty);
+        let third = ImportSection::Known(ImportType::ThirdParty);
+        let imports = WorkspaceImports::new(BTreeMap::from([
+            ("ns".to_owned(), Some(third.clone())),
+            ("ns.mixed".to_owned(), None),
+            ("ns.mixed.local".to_owned(), Some(first.clone())),
+        ]));
+        for (name, section) in [
+            ("ns.external", Some(&third)),
+            ("ns.mixed", None),
+            ("ns.mixed.unknown", None),
+            ("ns.mixed.local.child", Some(&first)),
+        ] {
+            assert_eq!(
+                imports.categorize(name).map(|(section, _)| section),
+                section,
+                "{name}"
+            );
+        }
     }
 
     /// Tests a traditional Python package layout:

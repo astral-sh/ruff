@@ -14,6 +14,7 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_linter::codes::Rule;
 use ruff_linter::linter::{FixTable, FixerResult, LinterResult, ParseSource, lint_fix, lint_only};
 use ruff_linter::package::PackageRoot;
+use ruff_linter::rules::isort::categorize::WorkspaceImports;
 use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{LinterSettings, flags};
 use ruff_linter::source_kind::{SourceError, SourceKind, SourceKindDiff};
@@ -195,7 +196,14 @@ pub(crate) fn lint_path(
                 .relative_path(path)
                 .expect("wrong package cache for file");
 
-            let cache_key = FileCacheKey::from_path(path).context("Failed to create cache key")?;
+            let workspace_imports = settings
+                .isort
+                .known_modules
+                .workspace
+                .as_ref()
+                .map(WorkspaceImports::fingerprint);
+            let cache_key = FileCacheKey::from_path(path, workspace_imports)
+                .context("Failed to create cache key")?;
             let cached_diagnostics = cache
                 .get(relative_path, &cache_key)
                 .is_some_and(FileCache::linted);

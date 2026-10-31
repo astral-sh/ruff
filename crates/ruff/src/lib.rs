@@ -434,7 +434,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     let diagnostics = if is_stdin {
         commands::check_stdin::check_stdin(
             cli.stdin_filename.map(fs::normalize_path).as_deref(),
-            &pyproject_config,
+            pyproject_config,
             &config_arguments,
             noqa.into(),
             fix_mode,
