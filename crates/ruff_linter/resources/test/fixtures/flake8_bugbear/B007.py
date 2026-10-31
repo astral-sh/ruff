@@ -104,3 +104,21 @@ for key, value in current_crawler_tags.items():
         pass
     elif wanted_tag_value != value:
         pass
+
+
+# Regression test for #14113: a comprehension's target does not use the outer loop variable.
+for comprehension_value in ls:  # B007
+    print([comprehension_value for comprehension_value in otherls])
+
+
+# A conditional rebind must not make the outer loop variable appear unused.
+for branch_value in ls:
+    if cond:
+        branch_value = 2
+    print(branch_value)
+
+
+# Preserve the existing conservative behavior for conditional deletions.
+for deleted_value in ls:
+    if cond:
+        del deleted_value
