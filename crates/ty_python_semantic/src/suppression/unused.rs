@@ -1,8 +1,10 @@
+use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
+use ruff_python_ast::token::Tokens;
 use ruff_python_trivia::indentation_at_offset;
 use ruff_source_file::LineRanges;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::fmt::Write as _;
 
 use crate::lint::LintId;
@@ -69,7 +71,12 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
         })
         .peekable();
 
-    let source = source_text(context.db, context.file);
+    if unused_iter.peek().is_none() {
+        return;
+    }
+
+    let source = source_text(context.db, context.file());
+    let parsed = parsed_module(context.db, context.python_file).load(context.db);
 
     while let Some(suppression) = unused_iter.next() {
         let unused_lint = match suppression.kind {
@@ -201,12 +208,12 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
         diag.primary_annotation_mut()
             .unwrap()
             .push_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
-        diag.set_fix(remove_comment_fix(suppression, &source));
+        diag.set_fix(remove_comment_fix(suppression, &source, parsed.tokens()));
         diag.help("Remove the unused suppression comment");
     }
 }
 
-fn remove_comment_fix(suppression: &Suppression, source: &str) -> Fix {
+fn remove_comment_fix(suppression: &Suppression, source: &str, tokens: &Tokens) -> Fix {
     let comment_end = suppression.comment_range.end();
     let comment_start = suppression.comment_range.start();
     let after_comment = &source[comment_end.to_usize()..];
@@ -226,7 +233,25 @@ fn remove_comment_fix(suppression: &Suppression, source: &str) -> Fix {
     }
 
     if indentation_at_offset(comment_start, source).is_some() {
-        return Fix::safe_edit(Edit::range_deletion(source.full_line_range(comment_start)));
+        let line = source.full_line_range(comment_start);
+        let previous_end = tokens
+            .before(comment_start)
+            .last()
+            .map_or_else(|| source.bom_start_offset(), Ranged::end);
+
+        // Deleting the whole comment line here would change the value of `x` to 3.
+        //
+        //     x = 1 \
+        //         # ty: ignore[invalid-assignment]
+        //     +2
+        //
+        // The lexer skips the backslash and its newline, so the token before the
+        // comment is `1`. Delete from the end of `1` and keep the newline before `+2`.
+        if previous_end < line.start() {
+            return Fix::safe_edit(Edit::deletion(previous_end, comment_end));
+        }
+
+        return Fix::safe_edit(Edit::range_deletion(line));
     }
 
     // Remove any leading whitespace before the comment

@@ -132,6 +132,156 @@ def _(a_and_b: AAndB, not_a: NotA, quoted: Quoted, nested: Nested, generic: BoxG
     reveal_type(generic)  # revealed: Box[A & B]
 ```
 
+## Recursive aliases
+
+Intersections and negations do not guard recursive references. An alias that refers to itself
+through these operations has a circular definition.
+
+Regression test for <https://github.com/astral-sh/ty/issues/4601>.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeAlias
+
+A: TypeAlias = "~A & A"  # error: [cyclic-type-alias-definition]
+B: TypeAlias = "B & ~B"  # error: [cyclic-type-alias-definition]
+C: TypeAlias = "~C"  # error: [cyclic-type-alias-definition]
+D: TypeAlias = "D & int"  # error: [cyclic-type-alias-definition]
+```
+
+The same restriction applies to PEP 695 aliases:
+
+```py
+type E = ~E & E  # error: [cyclic-type-alias-definition]
+type F = F & ~F  # error: [cyclic-type-alias-definition]
+type G = ~G  # error: [cyclic-type-alias-definition]
+type H = H & int  # error: [cyclic-type-alias-definition]
+```
+
+## Mutually recursive aliases
+
+An unguarded cycle can also pass through another alias:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeAlias
+
+A: TypeAlias = "~B"  # error: [cyclic-type-alias-definition]
+B: TypeAlias = "A"  # error: [cyclic-type-alias-definition]
+
+type C = ~D  # error: [cyclic-type-alias-definition]
+type D = C  # error: [cyclic-type-alias-definition]
+```
+
+## Guarded recursive aliases
+
+Recursion through a container remains valid when the container appears in an intersection or
+negation.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeAlias
+
+A: TypeAlias = "list[A] & ~str"
+C: TypeAlias = "~list[C]"
+
+type B = list[B] & ~str
+type D = ~list[D]
+
+def _(a: A, b: B, c: C, d: D):
+    reveal_type(a)  # revealed: A
+    reveal_type(b)  # revealed: list[B]
+    reveal_type(c)  # revealed: C
+    reveal_type(d)  # revealed: ~list[D]
+```
+
+## Negated recursive aliases in gradual unions
+
+A recursive alias can combine a negated list with a list whose element type is unknown.
+
+Regression test for <https://github.com/astral-sh/ty/issues/4768>.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+type A = ~list[A] | list  # error: [missing-type-argument]
+type B = ~list[B] | list[Any]
+
+def _(a: A, b: B):
+    reveal_type(a)  # revealed: ~list[A] | list[Unknown]
+    reveal_type(b)  # revealed: ~list[B] | list[Any]
+```
+
+The same applies to stringified aliases declared with `TypeAlias`:
+
+```py
+from typing import TypeAlias
+
+C: TypeAlias = "~list[C] | list"  # error: [missing-type-argument]
+D: TypeAlias = "~list[D] | list[Any]"
+
+def _(c: C, d: D):
+    reveal_type(c)  # revealed: C
+    reveal_type(d)  # revealed: D
+```
+
+## Negated recursive aliases in unions of containers
+
+A recursive alias can appear positively and negatively in one container's element type and
+negatively in another union member.
+
+Regression test for <https://github.com/astral-sh/ty/issues/4799>.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeAlias
+
+type A = list[A | ~A] | list[~A]
+B: TypeAlias = "list[B | ~B] | list[~B]"
+
+def _(a: A, b: B):
+    reveal_type(a)  # revealed: list[A | ~A] | list[~A]
+    reveal_type(b)  # revealed: B
+```
+
+## Negated recursive aliases through an aliased container
+
+The recursion can pass through another alias for a container in the union.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Container = list[A | ~A]
+type A = Container | list[~A]
+
+def _(value: A):
+    reveal_type(value)  # revealed: list[Divergent]
+```
+
 ## Intersections inside `type[...]`
 
 ```toml

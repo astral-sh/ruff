@@ -15,6 +15,7 @@ use colored::Colorize;
 use itertools::Itertools;
 use path_absolutize::path_dedot;
 use regex::Regex;
+use ruff_command_line::TerminalColor;
 use ruff_graph::Direction;
 use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
@@ -89,20 +90,6 @@ impl GlobalConfigArgs {
     fn partition(self) -> (LogLevel, Vec<SingleConfigArgument>, bool) {
         (self.log_level(), self.config, self.isolated)
     }
-}
-
-/// Control when colored output is used.
-#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
-pub(crate) enum TerminalColor {
-    /// Display colors if the output goes to an interactive terminal.
-    #[default]
-    Auto,
-
-    /// Always display colors.
-    Always,
-
-    /// Never display colors.
-    Never,
 }
 
 // Configures Clap v3-style help menu colors
@@ -627,6 +614,10 @@ pub struct FormatCommand {
 
 #[derive(Copy, Clone, Debug, clap::Parser)]
 pub struct ServerCommand {
+    /// Treat all workspaces as untrusted, disabling the uv formatter backend.
+    #[arg(long)]
+    untrusted_workspace: bool,
+
     /// Enable preview mode. Use `--no-preview` to disable.
     ///
     /// This enables unstable server features and turns on the preview mode for the linter
@@ -638,6 +629,14 @@ pub struct ServerCommand {
 }
 
 impl ServerCommand {
+    pub(crate) fn resolve_workspace_trust(self) -> ruff_server::WorkspaceTrust {
+        if self.untrusted_workspace {
+            ruff_server::WorkspaceTrust::Untrusted
+        } else {
+            ruff_server::WorkspaceTrust::Trusted
+        }
+    }
+
     pub(crate) fn resolve_preview(self) -> Option<bool> {
         resolve_bool_arg(self.preview, self.no_preview)
     }

@@ -18,7 +18,7 @@ use crate::{
         ClassBase, ClassLiteral, ClassType, LintDiagnosticGuard, Parameters, Signature, Type,
         binding_type,
         diagnostic::{AbstractMethodAnnotationPolicy, abstract_method_span},
-        function::{AbstractMethodKind, FunctionDecorators},
+        function::AbstractMethodKind,
         infer::{function_known_decorators, infer_definition_types},
     },
 };
@@ -126,7 +126,7 @@ impl<'db> AbstractMethods<'db> {
                         db,
                         Signature::new(Parameters::gradual_form(), Type::none(db, env)),
                     )
-                    .is_assignable_to(db, env, callables.into_type(db, env))
+                    .is_assignable_to(db, env, callables.to_type(db, env))
                 {
                     diagnostic.help(format_args!(
                         "Change the body of `{first_method_name}` to `return` \
@@ -389,11 +389,7 @@ fn might_be_explicitly_abstract<'db>(db: &'db dyn Db, definition: Definition<'db
     if !function.has_decorators() {
         return false;
     }
-    let decorators = function_known_decorators(db, definition);
-    decorators
-        .known_decorators()
-        .contains(FunctionDecorators::ABSTRACT_METHOD)
-        || decorators.has_unknown_decorators()
+    function_known_decorators(db, definition).may_produce_abstract_method()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]

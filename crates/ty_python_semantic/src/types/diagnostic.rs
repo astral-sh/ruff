@@ -115,6 +115,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
     registry.register_lint(&INVALID_NEWTYPE);
     registry.register_lint(&MISMATCHED_TYPE_NAME);
+    registry.register_lint(&MISMATCHED_SENTINEL_NAME);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
     registry.register_lint(&USELESS_OVERLOAD_BODY);
@@ -185,6 +186,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPED_DICT_FIELD);
     registry.register_lint(&INVALID_TYPED_DICT_HEADER);
     registry.register_lint(&INVALID_ATTRIBUTE_OVERRIDE);
+    registry.register_lint(&INVALID_PROPERTY_TYPE_OVERRIDE);
+    registry.register_lint(&INVALID_MUTABLE_OVERRIDE);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&MISSING_OVERRIDE_DECORATOR);
@@ -193,8 +196,11 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
     registry.register_lint(&INVALID_TOTAL_ORDERING);
     registry.register_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER);
+    registry.register_lint(&TRUTHINESS_TEST_OF_NONE_UNION);
     registry.register_lint(&REDUNDANT_CONDITION);
     registry.register_lint(&REDUNDANT_CONDITION_STRICT);
+    registry.register_lint(&TRUTHINESS_TEST_OF_CALLABLE);
+    registry.register_lint(&TRUTHINESS_TEST_OF_ITERABLE);
 
     // String annotations
     registry.register_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION);
@@ -661,6 +667,15 @@ declare_lint! {
         summary: "detects functional typing definitions whose declared name does not match the assigned variable",
         status: LintStatus::stable("0.0.30"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/mismatched-sentinel-name.md")]
+    pub(crate) static MISMATCHED_SENTINEL_NAME = {
+        summary: "detects sentinel definitions whose declared name does not match the assigned variable",
+        status: LintStatus::stable("0.0.87"),
+        default_level: Level::Ignore,
     }
 }
 
@@ -1345,8 +1360,26 @@ declare_lint! {
 declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/invalid-attribute-override.md")]
     pub(crate) static INVALID_ATTRIBUTE_OVERRIDE = {
-        summary: "detects attribute overrides that change class-variable or instance-variable behavior",
+        summary: "detects attribute overrides that violate inherited type or access requirements",
         status: LintStatus::stable("0.0.33"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/invalid-property-type-override.md")]
+    pub(crate) static INVALID_PROPERTY_TYPE_OVERRIDE = {
+        summary: "detects incompatible overrides involving properties",
+        status: LintStatus::stable("0.0.81"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/invalid-mutable-override.md")]
+    pub(crate) static INVALID_MUTABLE_OVERRIDE = {
+        summary: "detects overrides that narrow writable attribute types",
+        status: LintStatus::stable("0.0.81"),
         default_level: Level::Error,
     }
 }
@@ -1383,7 +1416,16 @@ declare_lint! {
     pub(crate) static INVALID_LEGACY_POSITIONAL_PARAMETER = {
         summary: "detects incorrect usage of the legacy convention for specifying positional-only parameters",
         status: LintStatus::stable("0.0.15"),
-        default_level: Level::Warn,
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/truthiness-test-of-none-union.md")]
+    pub(crate) static TRUTHINESS_TEST_OF_NONE_UNION = {
+        summary: "detects truthiness checks that conflate `None` with other falsy values",
+        status: LintStatus::stable("0.0.84"),
+        default_level: Level::Ignore,
     }
 }
 
@@ -1402,6 +1444,24 @@ declare_lint! {
         summary: "detects conditions that are always truthy or always falsey (strict)",
         status: LintStatus::stable("0.0.79"),
         default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/truthiness-test-of-callable.md")]
+    pub(crate) static TRUTHINESS_TEST_OF_CALLABLE = {
+        summary: "detects truthiness tests of `Callable`-typed objects",
+        status: LintStatus::stable("0.0.83"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/truthiness-test-of-iterable.md")]
+    pub(crate) static TRUTHINESS_TEST_OF_ITERABLE = {
+        summary: "detects truthiness tests of `Iterable`-typed objects",
+        status: LintStatus::stable("0.0.83"),
+        default_level: Level::Warn,
     }
 }
 
@@ -3471,8 +3531,9 @@ impl<'db> IncompatibleBases<'db> {
     }
 
     /// Two disjoint bases are allowed to coexist in an MRO if one is a subclass of the other.
-    /// This method therefore removes any entry in `self` that is a subclass of one or more
-    /// other entries also contained in `self`.
+    /// This method therefore removes any entry in `self` that is a superclass of one or more
+    /// other entries also contained in `self`, keeping only the most-derived entries. If more
+    /// than one entry remains, no remaining entry is a subclass of another, so they conflict.
     pub(super) fn remove_redundant_entries(&mut self, db: &'db dyn Db) {
         self.0 = self
             .0
@@ -3485,10 +3546,10 @@ impl<'db> IncompatibleBases<'db> {
                         // CPython's layout check operates on runtime classes. Type arguments are
                         // irrelevant here: a generic disjoint base and any specialization of that
                         // base share the same layout.
-                        !disjoint_base
+                        !other_base
                             .class
                             .default_specialization(db)
-                            .is_subtype_of_class_literal(db, other_base.class)
+                            .is_subtype_of_class_literal(db, disjoint_base.class)
                     })
             })
             .map(|(base, info)| (*base, *info))
@@ -3552,6 +3613,27 @@ pub(crate) fn report_invalid_argument_number_to_special_form(
             special_form = special_form.into(),
         ));
     }
+}
+
+pub(super) fn report_invalid_runtime_checkable(
+    context: &InferContext,
+    node: impl Ranged,
+    class: ClassLiteral,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, node) else {
+        return;
+    };
+    let db = context.db();
+    let mut diagnostic =
+        builder.into_diagnostic("`runtime_checkable` can only be applied to protocol classes");
+    diagnostic.annotate(
+        Annotation::secondary(class.header_span(db))
+            .message(format_args!("`{}` is not a protocol class", class.name(db))),
+    );
+    diagnostic.info(
+        "A class is only a protocol if it directly inherits from \
+        `typing.Protocol` or `typing_extensions.Protocol`",
+    );
 }
 
 pub(crate) fn report_bad_argument_to_get_protocol_members(
@@ -4581,6 +4663,8 @@ pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
 pub(crate) enum TypedDictDeleteErrorKind {
     /// The key exists but is required (not `NotRequired`)
     RequiredKey,
+    /// The key exists but is marked `ReadOnly`.
+    ReadOnlyKey,
     /// The key refers to a read-only extra item.
     ReadOnlyExtraItem,
     /// The key does not exist in the `TypedDict`
@@ -4607,6 +4691,9 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
         TypedDictDeleteErrorKind::RequiredKey => builder.into_diagnostic(format_args!(
             "Cannot delete required key \"{field_name}\" from TypedDict `{typed_dict_name}`"
         )),
+        TypedDictDeleteErrorKind::ReadOnlyKey => builder.into_diagnostic(format_args!(
+            "Cannot delete read-only key \"{field_name}\" from TypedDict `{typed_dict_name}`"
+        )),
         TypedDictDeleteErrorKind::ReadOnlyExtraItem => builder.into_diagnostic(format_args!(
             "Cannot delete read-only extra item \"{field_name}\" \
             from TypedDict `{typed_dict_name}`"
@@ -4616,8 +4703,9 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
         )),
     };
 
-    // Add sub-diagnostic pointing to where the field is defined (if available)
-    if let Some(field) = field
+    // Only suggest making the field `NotRequired` when that would allow deletion.
+    if matches!(error_kind, TypedDictDeleteErrorKind::RequiredKey)
+        && let Some(field) = field
         && let Some(declaration) = field.first_declaration()
     {
         let file = declaration.file(db);
@@ -4940,7 +5028,7 @@ pub(crate) fn report_shadowed_type_variable<'db>(
     kind: &str,
     name: &ast::name::Name,
     range: TextRange,
-    type_var_kind: TypeVarKind,
+    type_var_kind: TypeVarKind<'db>,
     other_typevar: BoundTypeVarInstance<'db>,
 ) {
     let db = context.db();
@@ -4950,7 +5038,7 @@ pub(crate) fn report_shadowed_type_variable<'db>(
     let typevar_kind = match type_var_kind {
         TypeVarKind::LegacyTypeVar
         | TypeVarKind::Pep695TypeVar
-        | TypeVarKind::TypingSelf
+        | TypeVarKind::TypingSelf { .. }
         | TypeVarKind::Pep613Alias => "type variable",
         TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => "ParamSpec",
         TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => "TypeVarTuple",

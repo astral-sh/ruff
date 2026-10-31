@@ -2,7 +2,6 @@ fail_fast: false
 
 exclude: |
   (?x)^(
-    .github/workflows/release.yml|
     crates/ty_vendored/vendor/.*|
     crates/ty_project/resources/.*|
     crates/ty/docs/(configuration|rules|cli|environment).md|
@@ -33,13 +32,13 @@ repos:
         priority: 0
 
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: 4b2e70d08cb2ccd26d1fba73588de41c7a5d50b7 # frozen: v0.25
+    rev: 17e12779811926f000bdfa1795f9e3735dd71ac3 # frozen: 0.26
     hooks:
       - id: validate-pyproject
         priority: 0
 
   - repo: https://github.com/crate-ci/typos
-    rev: 8a48f81b6c64dcfea44b3633223084c4be58ac5f # frozen: v1.49.0
+    rev: 00f422f3b19c57bc6338715ebfe3316d38768461 # frozen: v1.50.3
     hooks:
       - id: typos
         priority: 0
@@ -54,7 +53,7 @@ repos:
         priority: 0
   # Prettier
   - repo: https://github.com/rbubley/mirrors-prettier
-    rev: 0ee178619d696787ca73d210cc191d720868c631 # frozen: v3.9.6
+    rev: ef4a397f916211b4a39ccf9d3d9cbb6562157251 # frozen: v3.9.9
     hooks:
       - id: prettier
         types: [yaml]
@@ -63,13 +62,13 @@ repos:
   # zizmor detects security vulnerabilities in GitHub Actions workflows.
   # Additional configuration for the tool is found in `.github/zizmor.yml`
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: 451b56af716f9f0d0c2b816503a3fd0cf8b036fa # frozen: v1.29.0
+    rev: fa412071e4f5d44d44f9e365f4676f9df92456a2 # frozen: v1.30.1
     hooks:
       - id: zizmor
         priority: 0
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 12e63946db2c5cfcc9030fac21c3883ba88c6ed8 # frozen: 0.38.0
+    rev: 0494aa7fa1314e98913a41227d8f0a515b2c1049 # frozen: 0.38.2
     hooks:
       - id: check-github-workflows
         # The bundled schema predates GitHub's cache-mode feature. Use a pinned
@@ -118,14 +117,14 @@ repos:
         priority: 0
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: eec2b3c4f52295313b08b04f928ab2479e468b5c # frozen: 0.12.15
+    rev: 46787482b9fb2003c56e0f7592e312ef381829d9 # frozen: 0.13.6
     hooks:
       - id: uv-lock
         priority: 0
         args: [--default-index=https://pypi.org/simple, --check, --refresh]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: e8f7d69b957a30acb2c875078d5fd012de24b64c # frozen: v0.16.7
+    rev: 25bcf95026b96e2dd3c0aec3090c3d6ef6ca2e6c # frozen: v0.17.3
     hooks:
       - id: ruff-format
         types_or: [python, pyi, jupyter]
@@ -134,7 +133,7 @@ repos:
 
   # Priority 1: Second-pass fixers (e.g., markdownlint-fix runs after mdformat).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: e8f7d69b957a30acb2c875078d5fd012de24b64c # frozen: v0.16.7
+    rev: 25bcf95026b96e2dd3c0aec3090c3d6ef6ca2e6c # frozen: v0.17.3
     hooks:
       - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]
@@ -157,7 +156,7 @@ repos:
 
   # Priority 2: ruffen-docs runs after markdownlint-fix (both modify markdown).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: e8f7d69b957a30acb2c875078d5fd012de24b64c # frozen: v0.16.7
+    rev: 25bcf95026b96e2dd3c0aec3090c3d6ef6ca2e6c # frozen: v0.17.3
     hooks:
       - id: ruff-format
         name: mdtest format

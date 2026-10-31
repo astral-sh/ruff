@@ -23,11 +23,13 @@ use crate::lexer::indentation::{Indentation, Indentations, IndentationsCheckpoin
 use crate::lexer::interpolated_string::{
     InterpolatedStringContext, InterpolatedStrings, InterpolatedStringsCheckpoint,
 };
+use crate::lexer::keywords::{KEYWORD_HASH_MULTIPLIER, KEYWORD_TABLE};
 use crate::string::InterpolatedStringKind;
 
 mod cursor;
 mod indentation;
 mod interpolated_string;
+mod keywords;
 
 const BOM: char = '\u{feff}';
 
@@ -208,7 +210,7 @@ impl<'src> Lexer<'src> {
             if c.is_ascii() {
                 self.consume_ascii_character(c)
             } else if is_unicode_identifier_start(c) {
-                let identifier = self.lex_identifier(c);
+                let identifier = self.lex_unicode_identifier();
                 self.state = State::Other;
 
                 identifier
@@ -635,108 +637,59 @@ impl<'src> Lexer<'src> {
         token
     }
 
-    /// Lex an identifier. Also used for keywords and string/bytes literals with a prefix.
+    /// Lex an identifier starting with an ASCII character, or a prefixed string.
     fn lex_identifier(&mut self, first: char) -> TokenKind {
-        // Detect potential string like rb'' b'' f'' t'' u'' r''
-        let quote = if let Some(prefix) = single_char_prefix(first) {
-            match self.cursor.first() {
-                quote @ ('\'' | '"') => {
-                    self.current_flags |= prefix;
-                    self.cursor.bump();
-                    Some(quote)
+        debug_assert!(first.is_ascii());
+
+        // Classify the ASCII prefix without decoding each character. Any Unicode suffix still
+        // needs the full identifier-continuation check below.
+        let bytes = self.cursor.rest().as_bytes();
+        let ascii_len = ascii_identifier_prefix_len(bytes);
+        self.cursor.skip_bytes(ascii_len);
+
+        match bytes.get(ascii_len) {
+            Some(quote @ (b'\'' | b'"')) if ascii_len <= 1 => {
+                let is_string_prefix = if ascii_len == 0 {
+                    if let Some(prefix) = single_char_prefix(first) {
+                        self.current_flags |= prefix;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    self.try_double_char_prefix([first, char::from(bytes[0])])
+                };
+                if is_string_prefix {
+                    self.cursor.skip_bytes(1);
+                    let quote = char::from(*quote);
+                    if self.current_flags.is_interpolated_string()
+                        && let Some(kind) = self.lex_interpolated_string_start(quote)
+                    {
+                        return kind;
+                    }
+                    return self.lex_string(quote);
                 }
-                second
-                    if let quote = self.cursor.second()
-                        && is_quote(quote) =>
-                {
-                    self.try_double_char_prefix([first, second]).then(|| {
-                        self.cursor.bump();
-                        self.cursor.bump();
-                        quote
-                    })
-                }
-                _ => None,
             }
-        } else {
-            None
-        };
-
-        if let Some(quote) = quote {
-            if self.current_flags.is_interpolated_string() {
-                if let Some(kind) = self.lex_interpolated_string_start(quote) {
-                    return kind;
-                }
+            Some(byte) if !byte.is_ascii() && self.cursor.eat_if(is_xid_continue).is_some() => {
+                // The ASCII prefix is already consumed; continue after the non-ASCII character.
+                return self.lex_unicode_identifier();
             }
-
-            return self.lex_string(quote);
+            _ => {}
         }
 
-        // Keep track of whether the identifier is ASCII-only or not.
-        //
-        // This is important because Python applies NFKC normalization to
-        // identifiers: https://docs.python.org/3/reference/lexical_analysis.html#identifiers.
-        // The parser needs to do the same when cooking the name, but applying
-        // NFKC normalization unconditionally is extremely expensive. If we know
-        // an identifier is ASCII-only (by far the most common case), the parser
-        // can skip NFKC normalization.
-        let mut is_ascii = first.is_ascii();
-        self.cursor
-            .eat_while(|c| is_identifier_continuation(c, &mut is_ascii));
+        KEYWORD_TABLE.lookup(first, bytes, ascii_len + 1)
+    }
 
-        if !is_ascii {
-            self.current_flags |= TokenFlags::NON_ASCII_IDENTIFIER;
-            return TokenKind::Identifier;
-        }
-
-        let text = self.token_text();
-
-        // No Python keyword is longer than eight bytes.
-        if text.len() > 8 {
-            return TokenKind::Identifier;
-        }
-
-        match text.as_bytes() {
-            b"False" => TokenKind::False,
-            b"None" => TokenKind::None,
-            b"True" => TokenKind::True,
-            b"and" => TokenKind::And,
-            b"as" => TokenKind::As,
-            b"assert" => TokenKind::Assert,
-            b"async" => TokenKind::Async,
-            b"await" => TokenKind::Await,
-            b"break" => TokenKind::Break,
-            b"case" => TokenKind::Case,
-            b"class" => TokenKind::Class,
-            b"continue" => TokenKind::Continue,
-            b"def" => TokenKind::Def,
-            b"del" => TokenKind::Del,
-            b"elif" => TokenKind::Elif,
-            b"else" => TokenKind::Else,
-            b"except" => TokenKind::Except,
-            b"finally" => TokenKind::Finally,
-            b"for" => TokenKind::For,
-            b"from" => TokenKind::From,
-            b"global" => TokenKind::Global,
-            b"if" => TokenKind::If,
-            b"import" => TokenKind::Import,
-            b"in" => TokenKind::In,
-            b"is" => TokenKind::Is,
-            b"lazy" => TokenKind::Lazy,
-            b"lambda" => TokenKind::Lambda,
-            b"match" => TokenKind::Match,
-            b"nonlocal" => TokenKind::Nonlocal,
-            b"not" => TokenKind::Not,
-            b"or" => TokenKind::Or,
-            b"pass" => TokenKind::Pass,
-            b"raise" => TokenKind::Raise,
-            b"return" => TokenKind::Return,
-            b"try" => TokenKind::Try,
-            b"type" => TokenKind::Type,
-            b"while" => TokenKind::While,
-            b"with" => TokenKind::With,
-            b"yield" => TokenKind::Yield,
-            _ => TokenKind::Identifier,
-        }
+    /// Continues from the cursor after the identifier's first non-ASCII character.
+    fn lex_unicode_identifier(&mut self) -> TokenKind {
+        // The remaining text can start with ASCII in both `α_suffix` and
+        // `prefix_α_suffix`. Scan that run in batches before decoding more characters.
+        let ascii_len = ascii_identifier_prefix_len(self.cursor.rest().as_bytes());
+        self.cursor.skip_bytes(ascii_len);
+        self.cursor.eat_while(is_identifier_continuation);
+        // The parser uses this flag to apply NFKC normalization only to non-ASCII names.
+        self.current_flags |= TokenFlags::NON_ASCII_IDENTIFIER;
+        TokenKind::Identifier
     }
 
     /// Try lexing the double character string prefix, updating the token flags accordingly.
@@ -1430,11 +1383,6 @@ impl<'src> Lexer<'src> {
         TextRange::at(end - len, len)
     }
 
-    #[inline]
-    fn token_text(&self) -> &'src str {
-        &self.source[self.token_range()]
-    }
-
     /// Retrieves the current offset of the cursor within the source code.
     // SAFETY: Lexer doesn't allow files larger than 4GB
     #[expect(clippy::cast_possible_truncation)]
@@ -1572,10 +1520,6 @@ struct RadixRun {
     has_nonzero_digit: bool,
 }
 
-const fn is_quote(c: char) -> bool {
-    matches!(c, '\'' | '"')
-}
-
 fn single_char_prefix(c: char) -> Option<TokenFlags> {
     Some(match c {
         'f' | 'F' => TokenFlags::F_STRING,
@@ -1600,21 +1544,13 @@ fn is_unicode_identifier_start(c: char) -> bool {
 
 /// Checks if the character c is a valid continuation character as described
 /// in <https://docs.python.org/3/reference/lexical_analysis.html#identifiers>.
-///
-/// Additionally, this function also keeps track of whether or not the total
-/// identifier is ASCII-only or not by mutably altering a reference to a
-/// boolean value passed in.
-fn is_identifier_continuation(c: char, identifier_is_ascii_only: &mut bool) -> bool {
+fn is_identifier_continuation(c: char) -> bool {
     // Arrange things such that ASCII codepoints never
     // result in the slower `is_xid_continue` getting called.
     if c.is_ascii() {
         matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9')
     } else {
-        let is_continuation = is_xid_continue(c);
-        if is_continuation {
-            *identifier_is_ascii_only = false;
-        }
-        is_continuation
+        is_xid_continue(c)
     }
 }
 
@@ -1622,6 +1558,127 @@ fn is_identifier_continuation(c: char, identifier_is_ascii_only: &mut bool) -> b
 #[doc(hidden)]
 pub fn lex(source: &str, mode: Mode) -> Lexer<'_> {
     Lexer::new(source, mode, TextSize::default())
+}
+
+/// Whether each byte can continue an ASCII identifier: letters, digits, or an underscore.
+/// Non-ASCII bytes are false, so scanning stops before a UTF-8 character that needs
+/// the Unicode identifier check.
+const ASCII_IDENTIFIER_CONTINUE: [bool; 256] = {
+    let mut table = [false; 256];
+    let mut byte = 0u8;
+    while byte < 128 {
+        table[byte as usize] = matches!(byte, b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'0'..=b'9');
+        byte += 1;
+    }
+    table
+};
+
+/// Returns the number of leading ASCII identifier-continuation bytes.
+///
+/// A table lookup classifies each byte without decoding UTF-8. Fixed-size batches
+/// give the compiler an opportunity to unroll the loop; correctness does not depend
+/// on unrolling. The lexer benchmarks in `ruff_benchmark` track performance across
+/// compiler updates.
+fn ascii_identifier_prefix_len(bytes: &[u8]) -> usize {
+    let (chunks, rest) = bytes.as_chunks::<16>();
+    let mut offset = 0;
+    for chunk in chunks {
+        if let Some(end) = chunk
+            .iter()
+            .position(|&byte| !ASCII_IDENTIFIER_CONTINUE[usize::from(byte)])
+        {
+            return offset + end;
+        }
+        offset += 16;
+    }
+    offset
+        + rest
+            .iter()
+            .position(|&byte| !ASCII_IDENTIFIER_CONTINUE[usize::from(byte)])
+            .unwrap_or(rest.len())
+}
+
+/// Packed keyword words and token kinds indexed by a six-bit perfect hash.
+///
+/// Multiplying a packed keyword by `KEYWORD_HASH_MULTIPLIER` and taking the high six
+/// bits gives each keyword a distinct slot in the 64-entry table. This is a perfect
+/// hash for the keywords. Other identifiers can collide and need a full-word comparison.
+///
+/// `phf::Map` uses `SipHash` and a displacement table to find each candidate's slot.
+/// With the same length and first-byte filters, `phf` 0.11.3 took 12–21% longer
+/// to lex the NumPy and Pydantic benchmark files on Apple Silicon.
+///
+/// Edit `KEYWORDS` in the `keywords` module to change the keyword set. Rust finds
+/// the multiplier and builds the table at compile time. Keywords must contain
+/// two to eight ASCII bytes to fit the word representation and length filter.
+#[repr(align(64))]
+struct KeywordTable {
+    words: [u64; 64],
+    kinds: [TokenKind; 64],
+    // Each entry records the possible first bytes for keywords of a given length,
+    // from two to eight bytes. `starts[len - 2]` sets bit `first_byte & 63` for
+    // each keyword of that length. An unset bit rules out a keyword before we
+    // pack or hash the identifier.
+    //
+    // Masking with 63 fits each entry in a u64, but bytes that differ by 64 share
+    // a bit. A set bit therefore only indicates a possible match; lookup still
+    // compares the full packed word to reject other identifiers.
+    starts: [u64; 7],
+}
+
+impl KeywordTable {
+    /// Builds the lookup arrays at compile time, rejecting unsupported lengths and hash collisions.
+    const fn new(mut keywords: &[(&[u8], TokenKind)]) -> Self {
+        let mut starts = [0u64; 7];
+        let mut words = [0; 64];
+        let mut kinds = [TokenKind::Identifier; 64];
+        while let Some((&(keyword, kind), rest)) = keywords.split_first() {
+            let word = keywords::pack(keyword);
+            starts[keyword.len() - 2] |= 1u64 << (keyword[0] & 63);
+            let slot = keywords::slot(word, KEYWORD_HASH_MULTIPLIER);
+            assert!(words[slot] == 0, "keyword hash collision");
+            words[slot] = word;
+            kinds[slot] = kind;
+            keywords = rest;
+        }
+        Self {
+            words,
+            kinds,
+            starts,
+        }
+    }
+
+    /// Classifies an ASCII identifier whose first character has already been consumed.
+    /// `rest` starts after `first` and may extend past the identifier; `len` includes `first`.
+    fn lookup(&self, first: char, rest: &[u8], len: usize) -> TokenKind {
+        // The shortest keywords have two bytes, and the packed word holds at most eight.
+        if len == 1 || len > 8 {
+            return TokenKind::Identifier;
+        }
+
+        if self.starts[len - 2] & (1u64 << (u32::from(first) & 63)) == 0 {
+            return TokenKind::Identifier;
+        }
+
+        let continuation = if let Some(chunk) = rest.first_chunk::<8>() {
+            u64::from_le_bytes(*chunk)
+        } else {
+            let mut padded = [0; 8];
+            padded[..len - 1].copy_from_slice(&rest[..len - 1]);
+            u64::from_le_bytes(padded)
+        };
+        // Pack bytes in little-endian order, aligned to the high end of the word.
+        // For example, "if" becomes 0x6669_0000_0000_0000. Shifting also discards
+        // any bytes loaded from the source after the identifier.
+        let word = ((continuation << 8) | u64::from(u32::from(first))) << ((8 - len) * 8);
+
+        let index = keywords::slot(word, KEYWORD_HASH_MULTIPLIER);
+        if word == self.words[index] {
+            self.kinds[index]
+        } else {
+            TokenKind::Identifier
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1633,6 +1690,42 @@ mod tests {
     use ruff_text_size::Ranged;
 
     use super::*;
+
+    #[test]
+    fn keyword_tokens() {
+        for kind in KEYWORD_TABLE.kinds {
+            if !kind.is_keyword() {
+                continue;
+            }
+            let display = kind.to_string();
+            let name = display.trim_matches('`');
+            // Cover both the padded EOF path and the full-word load across a token boundary.
+            for suffix in ["", " continue"] {
+                let source = format!("{name}{suffix}");
+                let mut lexer = Lexer::new(&source, Mode::Module, TextSize::default());
+                assert_eq!(lexer.next_token(), kind, "{source}");
+                assert_eq!(lexer.current_range().len().to_usize(), name.len());
+            }
+        }
+    }
+
+    #[test]
+    fn keyword_hash_collisions_remain_identifiers() {
+        for name in [
+            "iH", "aCd", "Fclse", "asqert", "edcept", "fknally", "glqbal", "m_tch", "noplocal",
+        ] {
+            // Cover both the padded EOF path and the full-word load across a token boundary.
+            for suffix in ["", " continue"] {
+                let source = format!("{name}{suffix}");
+                let mut lexer = Lexer::new(&source, Mode::Module, TextSize::default());
+                assert_eq!(lexer.next_token(), TokenKind::Identifier, "{source}");
+                assert_eq!(lexer.current_range().len().to_usize(), name.len());
+                if !suffix.is_empty() {
+                    assert_eq!(lexer.next_token(), TokenKind::Continue);
+                }
+            }
+        }
+    }
 
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";
@@ -2114,20 +2207,59 @@ if first:
 
     #[test]
     fn non_ascii_identifier_flag() {
-        let mut lexer = Lexer::new("a€\naβ = β\nascii", Mode::Module, TextSize::default());
-        let mut flags = Vec::new();
+        let source = "a€\naβ = β\nlong_ascii_prefixβ_012 = rβ_012\nβ_long_ascii_suffix_012\nascii";
+        let mut lexer = Lexer::new(source, Mode::Module, TextSize::default());
+        let mut identifiers = Vec::new();
         loop {
             let kind = lexer.next_token();
             if kind.is_eof() {
                 break;
             }
             if kind == TokenKind::Identifier {
-                flags.push(lexer.current_flags().is_non_ascii_identifier());
+                identifiers.push((
+                    &source[lexer.current_range()],
+                    lexer.current_flags().is_non_ascii_identifier(),
+                ));
             }
         }
 
         assert_eq!(lexer.finish().len(), 1);
-        assert_eq!(flags, [false, true, true, false]);
+        assert_eq!(
+            identifiers,
+            [
+                ("a", false),
+                ("aβ", true),
+                ("β", true),
+                ("long_ascii_prefixβ_012", true),
+                ("rβ_012", true),
+                ("β_long_ascii_suffix_012", true),
+                ("ascii", false),
+            ]
+        );
+    }
+
+    #[test]
+    fn identifier_boundaries() {
+        for len in [1, 7, 8, 9, 15, 16, 17, 31, 32, 33] {
+            for suffix in ["", "β", "\u{0301}", "β_tail0"] {
+                let name = format!("{}{suffix}", "a".repeat(len));
+                for ending in ["", " ", "\n", "=", "\0", "€", "😀"] {
+                    let source = format!("{name}{ending}");
+                    let mut lexer = Lexer::new(&source, Mode::Module, TextSize::default());
+                    assert_eq!(lexer.next_token(), TokenKind::Identifier, "{source:?}");
+                    assert_eq!(
+                        lexer.current_range(),
+                        TextRange::up_to(name.text_len()),
+                        "{source:?}"
+                    );
+                    assert_eq!(
+                        lexer.current_flags().is_non_ascii_identifier(),
+                        !suffix.is_empty(),
+                        "{source:?}"
+                    );
+                }
+            }
+        }
     }
 
     fn triple_quoted_eol(eol: &str) -> LexerOutput {

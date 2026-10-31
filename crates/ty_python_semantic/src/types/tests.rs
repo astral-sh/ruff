@@ -2,7 +2,9 @@ use super::*;
 use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
 use crate::types::call::bind::CallableDescription;
+use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::type_alias::PEP695TypeAliasType;
+use crate::types::typevar::TypeVarSet;
 use crate::{Db, ProgramEnvironment};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::DbWithWritableSystem as _;
@@ -615,7 +617,7 @@ fn divergent_type() {
     );
     for (source, target) in [(div, union), (div, Type::unknown()), (Type::unknown(), div)] {
         let when = source.when_constraint_set_assignable_to_owned(db, &env, target);
-        assert!(when.query(|_builder, when| when.is_always_satisfied(db, &env)));
+        assert!(when.query(|_builder, when| when.is_always_satisfied(db, &env, TypeVarSet::None)));
     }
     let normalized = union
         .recursive_type_normalized_impl(db, &env, div, false)
@@ -643,6 +645,178 @@ fn divergent_type() {
             .to_string(),
         "Never"
     );
+}
+
+#[test]
+fn pending_narrowing_intersections_are_order_independent() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let pending = Type::pending_narrowing();
+    let recursive = Type::divergent(salsa::plumbing::Id::from_bits(1));
+
+    for elements in [[pending, recursive], [recursive, pending]] {
+        assert_eq!(
+            IntersectionType::from_elements(&db, &env, elements),
+            pending
+        );
+    }
+    assert_eq!(
+        IntersectionBuilder::new(&db, &env)
+            .add_positive(recursive)
+            .add_negative(pending)
+            .build(),
+        pending
+    );
+    assert_eq!(
+        IntersectionBuilder::new(&db, &env)
+            .add_negative(pending)
+            .add_positive(recursive)
+            .build(),
+        pending
+    );
+}
+
+#[test]
+fn recursive_annotated_normalization() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_of = |ty| KnownClass::List.to_specialized_instance(&db, &env, &[ty]);
+    let annotated =
+        |ty| Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(&db, ty)));
+
+    let recursive = annotated(div);
+    assert_eq!(
+        annotated(list_of(div)).recursive_type_normalized_impl(&db, &env, div, false),
+        Some(recursive)
+    );
+    assert_eq!(
+        annotated(list_of(list_of(div))).recursive_type_normalized_impl(&db, &env, div, false),
+        Some(recursive)
+    );
+    assert_eq!(
+        annotated(recursive).recursive_type_normalized_impl(&db, &env, div, false),
+        Some(recursive)
+    );
+    assert_eq!(
+        annotated(list_of(div)).recursive_type_normalized_impl(&db, &env, div, true),
+        None
+    );
+}
+
+#[test]
+fn recursive_annotated_relations() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let annotated =
+        |ty| Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(&db, ty)));
+    let recursive = annotated(div);
+    let integer = annotated(KnownClass::Int.to_instance(&db, &env));
+    let object = annotated(Type::object());
+
+    for concrete in [integer, object, annotated(recursive)] {
+        assert!(concrete.is_assignable_to(&db, &env, recursive));
+        assert!(recursive.is_assignable_to(&db, &env, concrete));
+        assert!(!concrete.is_subtype_of(&db, &env, recursive));
+        assert!(!recursive.is_subtype_of(&db, &env, concrete));
+        assert!(!concrete.is_disjoint_from(&db, &env, recursive));
+        assert!(!recursive.is_disjoint_from(&db, &env, concrete));
+    }
+    assert!(!integer.is_assignable_to(&db, &env, object));
+    assert!(!object.is_assignable_to(&db, &env, integer));
+    assert!(integer.is_disjoint_from(&db, &env, object));
+    assert!(object.is_disjoint_from(&db, &env, integer));
+    assert!(!Type::int_literal(1).is_assignable_to(&db, &env, recursive));
+    assert!(!recursive.is_assignable_to(&db, &env, KnownClass::Int.to_instance(&db, &env)));
+}
+
+#[test]
+fn pending_narrowing_cycle_recovery_preserves_guarded_contributions() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let pending = Type::pending_narrowing();
+    let recursive = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let int = KnownClass::Int.to_instance(&db, &env);
+    let foreign = Type::divergent(salsa::plumbing::Id::from_bits(2));
+    let is_cycle_marker = |ty: Type<'_>| ty.same_divergent_marker(recursive);
+    let normalize =
+        |ty| Type::pending_narrowing_normalized(ty, &db, &env, recursive, &is_cycle_marker);
+    let list_of = |element| KnownClass::List.to_specialized_instance(&db, &env, &[element]);
+    let callable_returning =
+        |return_ty| Type::single_callable(&db, Signature::new(Parameters::empty(), return_ty));
+
+    // A constructor must retain a recursive reference even when a union also contains a
+    // resolved initializer. Otherwise, subsequent iterations can grow without a depth bound.
+    let approximation = UnionType::from_elements(
+        &db,
+        &env,
+        [
+            pending,
+            int,
+            recursive,
+            callable_returning(pending),
+            foreign,
+        ],
+    );
+    let normalized = normalize(approximation);
+    assert_eq!(
+        normalized,
+        UnionType::from_elements(&db, &env, [int, callable_returning(recursive), foreign])
+    );
+    assert!(
+        normalized
+            .as_union()
+            .is_some_and(|union| union.recursively_defined(&db) == RecursivelyDefined::No)
+    );
+
+    let unresolved = UnionType::from_elements(&db, &env, [pending, recursive]);
+    assert_eq!(normalize(unresolved), pending);
+
+    // Pending narrowing in an opaque bound invalidates the enclosing type argument.
+    let pending_typevar = BoundTypeVarInstance::synthetic_self(
+        &db,
+        SelfTypeVarOrigin::ReceiverPlaceholder,
+        pending,
+        BindingContext::Synthetic(env.program(&db)),
+    );
+    assert_eq!(
+        normalize(list_of(Type::TypeVar(pending_typevar))),
+        list_of(recursive)
+    );
+
+    // Metadata not rewritten by recursive normalization must not retain pending narrowing.
+    let typevar_object =
+        Type::KnownInstance(KnownInstanceType::TypeVar(pending_typevar.typevar(&db)));
+    assert_eq!(normalize(list_of(typevar_object)), recursive);
+}
+
+#[test]
+fn pending_narrowing_cycle_recovery_checks_alias_arguments() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented("/src/aliases.py", "type Constant[T] = int")?;
+    let env = db.program_environment();
+    let file = system_path_to_file(&db, "/src/aliases.py")?;
+    let file = ProgramFile::new(&db, file, env.program(&db));
+    let pending = Type::pending_narrowing();
+    let recursive = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let is_cycle_marker = |ty: Type<'_>| ty.same_divergent_marker(recursive);
+    let normalize =
+        |ty| Type::pending_narrowing_normalized(ty, &db, &env, recursive, &is_cycle_marker);
+    let list_of = |element| KnownClass::List.to_specialized_instance(&db, &env, &[element]);
+
+    // Stored arguments remain provisional even when the alias body does not use them.
+    // An alias does not itself establish recursive structure, but an enclosing constructor does.
+    let ty = global_symbol(&db, file, "Constant").place.expect_type();
+    let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) = ty else {
+        anyhow::bail!("expected `Constant` to be a type alias");
+    };
+    let alias = Type::TypeAlias(
+        alias.apply_specialization(&db, |context| context.repeat_specialization(&db, pending)),
+    );
+    assert_eq!(normalize(alias), pending);
+    assert_eq!(normalize(list_of(alias)), list_of(recursive));
+    Ok(())
 }
 
 #[test]

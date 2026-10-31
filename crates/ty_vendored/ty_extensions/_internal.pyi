@@ -165,6 +165,38 @@ class ConstraintSet:
         Universally abstracts the given type variables from this constraint set.
         """
 
+    def is_always_satisfied(self, *, inferable: TypeForm[tuple[object, ...]]) -> bool:
+        """
+        Returns whether this constraint set always holds with the given inferable
+        type variables, without checking their declared bounds or constraints.
+
+        If the computation budget is exceeded, the result has type `bool` rather
+        than a known literal value.
+        """
+
+    def is_never_satisfied(self, *, inferable: TypeForm[tuple[object, ...]]) -> bool:
+        """
+        Returns whether this constraint set never holds with the given inferable
+        type variables, without checking their declared bounds or constraints.
+
+        If the computation budget is exceeded, the result has type `bool` rather
+        than a known literal value.
+        """
+
+    def is_trivially_always_satisfied(self) -> bool:
+        """
+        Returns whether this constraint set is the true terminal BDD.
+
+        A nonterminal BDD returns `False` even if it is semantically always satisfied.
+        """
+
+    def is_trivially_never_satisfied(self) -> bool:
+        """
+        Returns whether this constraint set is the false terminal BDD.
+
+        A nonterminal BDD returns `False` even if it is semantically never satisfied.
+        """
+
     def solutions_for(
         self,
         typevar: TypeForm[object],
@@ -231,6 +263,20 @@ def is_equivalent_to(
 
 def is_subtype_of(ty: TypeForm[object], of: TypeForm[object]) -> ConstraintSet:
     """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`.
+
+    .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
+    """
+
+def is_constraint_set_subtype_of(
+    ty: TypeForm[object], of: TypeForm[object]
+) -> ConstraintSet:
+    """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`.
+
+    This differs from `is_subtype_of` in how it treats typevars.
+    `is_subtype_of` will assume that all typevars are non-inferable, and will
+    require all possible specializations of a typevar to satisfy the relation.
+    This method will instead return a constraint set describing which
+    specializations (possibly not all of them) satisfy the relation.
 
     .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     """

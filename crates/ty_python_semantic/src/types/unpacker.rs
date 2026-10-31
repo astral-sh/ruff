@@ -11,6 +11,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::Ranged;
 
 use crate::Db;
+use crate::types::dict::dict_literal_key_value_types;
 use crate::types::infer::{ExpressionInference, FrozenMap};
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{
@@ -18,15 +19,14 @@ use crate::types::tuple::{
     VariableLengthTuple,
 };
 use crate::types::{
-    KnownClass, Type, TypeCheckDiagnostics, TypeContext, UnionBuilder, UnionType,
-    infer_expression_types,
+    KnownClass, Type, TypeContext, UnionBuilder, UnionType, infer_expression_types,
 };
 use ty_python_core::ExpressionNodeKey;
 use ty_python_core::ProgramFile;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::unpack::{UnpackKind, UnpackValue};
 
-use super::context::InferContext;
+use super::context::{InferContext, InferContextResult};
 use super::diagnostic::INVALID_ASSIGNMENT;
 
 /// Unpacks the value expression type to their respective targets.
@@ -104,17 +104,26 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             }
             UnpackKind::Iterable { mode } => {
                 let env = self.context.program_environment();
-                value_type
-                    .try_iterate_with_mode(db, env, mode)
-                    .map(|tuple| tuple.homogeneous_element_type(db, env))
-                    .unwrap_or_else(|err| {
-                        err.report_diagnostic(
-                            &self.context,
-                            value_type,
-                            value.as_any_node_ref(self.db(), self.module()),
-                        );
-                        err.fallback_element_type(db, env)
+                if !mode.is_async()
+                    && let ast::Expr::Dict(dict) = value_expr
+                    && let Some((keys, _)) = dict_literal_key_value_types(db, env, dict, |expr| {
+                        value_inference.expression_type(expr)
                     })
+                {
+                    keys
+                } else {
+                    value_type
+                        .try_iterate_with_mode(db, env, mode)
+                        .map(|tuple| tuple.homogeneous_element_type(db, env))
+                        .unwrap_or_else(|err| {
+                            err.report_diagnostic(
+                                &self.context,
+                                value_type,
+                                value.as_any_node_ref(self.db(), self.module()),
+                            );
+                            err.fallback_element_type(db, env)
+                        })
+                }
             }
             UnpackKind::ContextManager { mode } => {
                 let env = self.context.program_environment();
@@ -348,7 +357,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
     pub(crate) fn finish(self) -> UnpackResult<'db> {
         UnpackResult {
-            diagnostics: self.context.finish(),
+            context: self.context.finish(),
             targets: FrozenMap::from(self.targets),
             cycle_recovery: None,
         }
@@ -358,7 +367,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 #[derive(Debug, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct UnpackResult<'db> {
     targets: FrozenMap<ExpressionNodeKey, Type<'db>>,
-    diagnostics: TypeCheckDiagnostics,
+    context: InferContextResult,
 
     /// The fallback type for missing expressions.
     ///
@@ -389,15 +398,15 @@ impl<'db> UnpackResult<'db> {
             .or(self.cycle_recovery)
     }
 
-    /// Returns the diagnostics in this unpacking assignment.
-    pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
-        &self.diagnostics
+    /// Returns the diagnostics and semantic validity of this unpacking assignment.
+    pub(crate) fn context_result(&self) -> &InferContextResult {
+        &self.context
     }
 
     pub(crate) fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
         Self {
             targets: FrozenMap::default(),
-            diagnostics: TypeCheckDiagnostics::default(),
+            context: InferContextResult::default(),
             cycle_recovery: Some(cycle_recovery),
         }
     }

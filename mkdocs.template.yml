@@ -104,8 +104,10 @@ plugins:
           - faq.md
 extra_css:
   - stylesheets/extra.css
+  - stylesheets/rule-filters.css
 extra_javascript:
   - js/extra.js
+  - js/rule-filters.js
 not_in_nav: |
   /rules/*
   /formatter/*

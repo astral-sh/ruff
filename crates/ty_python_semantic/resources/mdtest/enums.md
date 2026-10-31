@@ -1756,7 +1756,7 @@ from enum import Enum, auto
 from ty_extensions._internal import enum_members
 from typing import Any, Literal, cast
 
-def external_generate_next_value(*args: Any) -> Any: ...
+def external_generate_next_value(*args: Any, **kwargs: Any) -> Any: ...
 
 class ReassignedGenerator(Enum):
     @staticmethod
@@ -2161,6 +2161,21 @@ for color in Color:
     reveal_type(color)  # revealed: Color
 
 reveal_type(list(Color))  # revealed: list[Color]
+```
+
+## Combining flag members
+
+Flag operators accept other members of the same enum. A member's literal type does not restrict the
+other operand to that same member.
+
+```py
+from enum import Flag
+
+class Flags(Flag):
+    A = 1
+    B = 2
+
+Flags.A | Flags.B  # ok
 ```
 
 ## Methods / non-member attributes

@@ -1409,6 +1409,21 @@ def after_excluding_red_mixed(x: Color | int):
         reveal_type(x)  # revealed: Literal[Color.BLUE] | int
 ```
 
+Inline set literals also preserve the individual enum members for narrowing in either branch.
+
+```py
+def inline_enum_set(x: Color):
+    if x in {Color.RED, Color.GREEN}:
+        reveal_type(x)  # revealed: Literal[Color.RED, Color.GREEN]
+    else:
+        reveal_type(x)  # revealed: Literal[Color.BLUE]
+
+    if x not in {Color.RED}:
+        reveal_type(x)  # revealed: Literal[Color.GREEN, Color.BLUE]
+    else:
+        reveal_type(x)  # revealed: Literal[Color.RED]
+```
+
 When the container's element type is a union of enum literals, membership narrows to that union.
 Without the annotation, the tuple's elements are widened to `Color`, so the comprehension remains
 `list[Color]`:
@@ -1425,6 +1440,19 @@ def selected_colors(colors: list[Color]) -> list[SelectedColor]:
 def _(colors: list[Color]):
     inline = [color for color in colors if color in (Color.RED, Color.GREEN)]
     reveal_type(inline)  # revealed: list[Color]
+```
+
+Membership succeeds for the plain integer `1` as well as for the enum member `Code.OK`.
+
+```py
+from enum import IntEnum
+
+class Code(IntEnum):
+    OK = 1
+
+def check_membership(value: int):
+    if value in (Code.OK,):
+        reveal_type(value)  # revealed: int
 ```
 
 An enum that can have additional runtime members can still be narrowed by a membership test against

@@ -864,6 +864,29 @@ def loop_back():
             value = Integer.Y
 ```
 
+The comparison narrows a `str | int` to the matching builtin type. A plain string can equal
+`String.X` and reach the `.name` access.
+
+```py
+def compare_with_enum_member(value: str | int):
+    if value == String.X:
+        reveal_type(value)  # revealed: str
+        value.name  # error: [unresolved-attribute]
+
+    if Integer.X == value:
+        reveal_type(value)  # revealed: int
+```
+
+Members of other `IntEnum` classes can also compare equal to `Integer.X`.
+
+```py
+def compare_int_enums(value: IntEnum):
+    if value != Integer.X:
+        reveal_type(value)  # revealed: IntEnum & ~Literal[Integer.X]
+    else:
+        reveal_type(value)  # revealed: IntEnum
+```
+
 A custom `__new__` can replace the value declared in an `IntEnum` class body. We can still narrow
 the members of `Foo`, whose runtime values are known, but must preserve all of `Shifted` because its
 members' runtime values cannot be determined statically:
@@ -913,7 +936,7 @@ from enum import IntEnum
 from typing import Literal
 
 class AnnotatedShifted(IntEnum):
-    _value_: Literal[1]
+    _value_: Literal[1]  # error: [invalid-mutable-override]
 
     def __new__(cls, value: int) -> "AnnotatedShifted":
         member = int.__new__(cls, value + 1)
@@ -932,7 +955,7 @@ if AnnotatedShifted.MEMBER != Other.MEMBER:
     reveal_type(AnnotatedShifted.MEMBER)  # revealed: AnnotatedShifted
 
 class AnnotatedInitialized(IntEnum):
-    _value_: Literal[2]
+    _value_: Literal[2]  # error: [invalid-mutable-override]
 
     def __init__(self, value: int) -> None:
         self._value_ = 2
@@ -1501,6 +1524,27 @@ def correlated_materialized_pattern(left: Top[MaterializedT], right: Materialize
             return 1
 ```
 
+## `LiteralString` and string literals
+
+A comparison can narrow a `LiteralString` operand to a particular value or exclude that value. The
+concrete string keeps its type in either branch.
+
+```py
+from typing_extensions import LiteralString
+
+def compare(other: LiteralString):
+    value = "a"
+    if value != other:
+        reveal_type(value)  # revealed: Literal["a"]
+        reveal_type(other)  # revealed: LiteralString & ~Literal["a"]
+        value + 1  # error: [unsupported-operator]
+
+    if other == value:
+        reveal_type(other)  # revealed: Literal["a"]
+    else:
+        reveal_type(value)  # revealed: Literal["a"]
+```
+
 ## `LiteralString` and string-valued enums
 
 `LiteralString` can be narrowed by comparison with a string-valued enum member that inherits `str`'s
@@ -1517,6 +1561,7 @@ from typing_extensions import LiteralString
 
 class Color(StrEnum):
     RED = "red"
+    BLUE = "blue"
 
 def narrow_literal_string_with_enum(value: LiteralString | None):
     if value == Color.RED:
@@ -1528,6 +1573,15 @@ def narrow_literal_string_with_enum(value: LiteralString | None):
         reveal_type(value)  # revealed: (LiteralString & ~Literal["red"]) | None
     else:
         reveal_type(value)  # revealed: Literal["red"]
+```
+
+The enum member keeps its type when its value differs from the `LiteralString`.
+
+```py
+def compare_member(other: LiteralString):
+    color = Color.RED
+    if color != other:
+        reveal_type(color)  # revealed: Literal[Color.RED]
 ```
 
 ## Module literals

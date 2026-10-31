@@ -57,7 +57,7 @@ jobs:
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           sccache: false
-          maturin-version: v1.14.1
+          maturin-version: v1.15.0
           command: sdist
           args: --out dist
       - name: "Test sdist"
@@ -76,6 +76,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: wheels-sdist
+          compression-level: 0
           path: dist
 
   macos-x86_64:
@@ -97,7 +98,7 @@ jobs:
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           sccache: false
-          maturin-version: v1.14.1
+          maturin-version: v1.15.0
           target: x86_64
           args: --release --locked --out dist --compatibility pypi
         env:
@@ -108,6 +109,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: wheels-macos-x86_64
+          compression-level: 0
           path: dist
       - name: "Archive binary"
         run: |
@@ -123,6 +125,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: artifacts-macos-x86_64
+          compression-level: 0
           path: |
             *.tar.gz
             *.sha256
@@ -158,7 +161,7 @@ jobs:
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           sccache: false
-          maturin-version: v1.14.1
+          maturin-version: v1.15.0
           target: aarch64
           args: --release --locked --out dist --compatibility pypi
         env:
@@ -175,6 +178,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: wheels-aarch64-apple-darwin
+          compression-level: 0
           path: dist
       - name: "Archive binary"
         run: |
@@ -190,6 +194,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: artifacts-aarch64-apple-darwin
+          compression-level: 0
           path: |
             *.tar.gz
             *.sha256
@@ -237,7 +242,7 @@ jobs:
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           sccache: false
-          maturin-version: v1.14.1
+          maturin-version: v1.15.0
           target: ${{ matrix.platform.target }}
           args: --release --locked --out dist --compatibility pypi
         env:
@@ -266,6 +271,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: wheels-${{ matrix.platform.target }}
+          compression-level: 0
           path: dist
       - name: "Archive binary"
         shell: bash
@@ -277,6 +283,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: artifacts-${{ matrix.platform.target }}
+          compression-level: 0
           path: |
             *.zip
             *.sha256
@@ -317,7 +324,7 @@ jobs:
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           sccache: false
-          maturin-version: v1.14.1
+          maturin-version: v1.15.0
           target: ${{ matrix.target }}
           manylinux: 2_17
           args: --release --locked --out dist --compatibility pypi
@@ -335,6 +342,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: wheels-${{ matrix.target }}
+          compression-level: 0
           path: dist
       - name: "Archive binary"
         shell: bash
@@ -353,6 +361,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: artifacts-${{ matrix.target }}
+          compression-level: 0
           path: |
             *.tar.gz
             *.sha256
@@ -389,7 +398,7 @@ jobs:
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           sccache: false
-          maturin-version: v1.14.1
+          maturin-version: v1.15.0
           target: aarch64-unknown-linux-gnu
           manylinux: 2_17
           docker-options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
@@ -408,6 +417,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: wheels-aarch64-unknown-linux-gnu
+          compression-level: 0
           path: dist
       - name: "Archive binary"
         shell: bash
@@ -426,6 +436,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: artifacts-aarch64-unknown-linux-gnu
+          compression-level: 0
           path: |
             *.tar.gz
             *.sha256
@@ -475,7 +486,7 @@ jobs:
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           sccache: false
-          maturin-version: v1.14.1
+          maturin-version: v1.15.0
           target: ${{ matrix.platform.target }}
           manylinux: ${{ matrix.platform.manylinux }}
           docker-options: ${{ matrix.platform.maturin_docker_options }}
@@ -497,6 +508,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: wheels-${{ matrix.platform.target }}
+          compression-level: 0
           path: dist
       - name: "Archive binary"
         shell: bash
@@ -515,6 +527,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: artifacts-${{ matrix.platform.target }}
+          compression-level: 0
           path: |
             *.tar.gz
             *.sha256
@@ -543,7 +556,7 @@ jobs:
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           sccache: false
-          maturin-version: v1.14.1
+          maturin-version: v1.15.0
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
           args: --release --locked --out dist --compatibility pypi
@@ -562,6 +575,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: wheels-${{ matrix.target }}
+          compression-level: 0
           path: dist
       - name: "Archive binary"
         shell: bash
@@ -580,6 +594,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: artifacts-${{ matrix.target }}
+          compression-level: 0
           path: |
             *.tar.gz
             *.sha256
@@ -611,7 +626,7 @@ jobs:
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           sccache: false
-          maturin-version: v1.14.1
+          maturin-version: v1.15.0
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
           args: --release --locked --out dist --compatibility pypi
@@ -631,6 +646,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: wheels-${{ matrix.platform.target }}
+          compression-level: 0
           path: dist
       - name: "Archive binary"
         shell: bash
@@ -649,6 +665,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: artifacts-${{ matrix.platform.target }}
+          compression-level: 0
           path: |
             *.tar.gz
             *.sha256

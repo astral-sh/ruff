@@ -28,6 +28,27 @@ enum BinaryExpressionOperandTypes<'db> {
 type BinaryExpressionVisitor<'db> =
     CycleDetector<'db, ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>, 1>;
 
+fn is_union_type_operand(ty: Type<'_>) -> bool {
+    matches!(
+        ty,
+        Type::ClassLiteral(_)
+            | Type::SubclassOf(_)
+            | Type::GenericAlias(_)
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(
+                KnownInstanceType::UnionType(_)
+                    | KnownInstanceType::Literal(_)
+                    | KnownInstanceType::Annotated(_)
+                    | KnownInstanceType::TypeGenericAlias(_)
+                    | KnownInstanceType::Callable(_)
+                    | KnownInstanceType::TypeVar(_)
+                    | KnownInstanceType::TypeAliasType(_)
+                    | KnownInstanceType::NewType(_)
+                    | KnownInstanceType::Sentinel(_)
+            )
+    )
+}
+
 /// Repeated conditional concatenation can double the number of tuple alternatives at each step.
 const MAX_TUPLE_ADDITION_ALTERNATIVES: usize = 32;
 /// Repeated doubling (`x = x + x`) can grow a single tuple without introducing any union.
@@ -158,12 +179,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 BinaryExpressionOperandTypes::Inferred(left_ty, right_ty) => (left_ty, right_ty),
             };
 
+        self.infer_binary_expression_from_types(binary, left_ty, right_ty)
+    }
+
+    /// Evaluate a binary operator whose operands have already been inferred in their type contexts.
+    pub(super) fn infer_binary_expression_from_types(
+        &mut self,
+        binary: &ast::ExprBinOp,
+        left_ty: Type<'db>,
+        right_ty: Type<'db>,
+    ) -> Type<'db> {
+        let op = binary.op;
         let mut state = BinaryInferenceState::default();
         let return_type =
-            self.infer_binary_expression_type(binary.into(), left_ty, right_ty, *op, &mut state);
+            self.infer_binary_expression_type(binary.into(), left_ty, right_ty, op, &mut state);
         self.report_deprecated_functions(binary, state.deprecated_functions);
         return_type.unwrap_or_else(|| {
-            report_unsupported_binary_operation(&self.context, binary, left_ty, right_ty, *op);
+            report_unsupported_binary_operation(&self.context, binary, left_ty, right_ty, op);
             Type::unknown()
         })
     }
@@ -174,7 +206,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
-        let env = self.program_environment();
         let ast::ExprBinOp {
             left,
             op,
@@ -197,17 +228,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // `TypeAlias`, which uses `X | Y` syntax, where the returned type is not actually a union.
         // And attempting to enforce this more tightly showed a lot of potential false positives in
         // the ecosystem.
-        if left_ty.is_equivalent_to(db, env, right_ty) {
-            left_ty
-        } else {
-            UnionTypeInstance::from_value_expression_types(
-                db,
-                [left_ty, right_ty],
-                self.scope(),
-                self.typevar_binding_context,
-                self.inference_flags(),
-            )
-        }
+        UnionTypeInstance::from_value_expression_types(
+            db,
+            [left_ty, right_ty],
+            self.scope(),
+            self.typevar_binding_context,
+            self.inference_flags(),
+        )
     }
 
     /// Returns a `TypedDict` result when a PEP 584 special case succeeds, otherwise the inferred
@@ -298,7 +325,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let update_ty = self.speculate_without_diagnostics().infer_expression(
             update,
-            TypeContext::new(Some(Type::TypedDict(update_context_typed_dict))),
+            TypeContext::declared(Some(Type::TypedDict(update_context_typed_dict))),
         );
         let env = self.program_environment();
 
@@ -345,7 +372,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .try_typed_dict_pep_584_dunder(value_expr, typed_dict, typed_dict, "__ior__")
             .is_some()
         {
-            infer_value_ty(self, TypeContext::new(Some(typed_dict_ty)));
+            infer_value_ty(self, TypeContext::declared(Some(typed_dict_ty)));
             return Some(typed_dict_ty);
         }
 
@@ -355,7 +382,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .try_typed_dict_pep_584_dunder(value_expr, update_patch, typed_dict, "__ior__")
             .is_some()
         {
-            infer_value_ty(self, TypeContext::new(Some(Type::TypedDict(update_patch))));
+            infer_value_ty(
+                self,
+                TypeContext::declared(Some(Type::TypedDict(update_patch))),
+            );
             return Some(typed_dict_ty);
         }
 
@@ -1064,67 +1094,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             // PEP 604-style union types using the `|` operator.
-            (
-                Type::ClassLiteral(..)
-                | Type::SubclassOf(..)
-                | Type::GenericAlias(..)
-                | Type::SpecialForm(_)
-                | Type::KnownInstance(
-                    KnownInstanceType::UnionType(_)
-                    | KnownInstanceType::Literal(_)
-                    | KnownInstanceType::Annotated(_)
-                    | KnownInstanceType::TypeGenericAlias(_)
-                    | KnownInstanceType::Callable(_)
-                    | KnownInstanceType::TypeVar(_)
-                    | KnownInstanceType::TypeAliasType(_)
-                    | KnownInstanceType::NewType(_),
-                ),
-                Type::ClassLiteral(..)
-                | Type::SubclassOf(..)
-                | Type::GenericAlias(..)
-                | Type::SpecialForm(_)
-                | Type::KnownInstance(
-                    KnownInstanceType::UnionType(_)
-                    | KnownInstanceType::Literal(_)
-                    | KnownInstanceType::Annotated(_)
-                    | KnownInstanceType::TypeGenericAlias(_)
-                    | KnownInstanceType::Callable(_)
-                    | KnownInstanceType::TypeVar(_)
-                    | KnownInstanceType::TypeAliasType(_)
-                    | KnownInstanceType::NewType(_),
-                ),
-                ast::Operator::BitOr,
-            ) => {
-                if left_ty.is_equivalent_to(db, env, right_ty) {
-                    Some(left_ty)
-                } else {
-                    Some(UnionTypeInstance::from_value_expression_types(
-                        db,
-                        [left_ty, right_ty],
-                        self.scope(),
-                        self.typevar_binding_context,
-                        self.inference_flags(),
-                    ))
-                }
-            }
-            (
-                Type::ClassLiteral(..)
-                | Type::SubclassOf(..)
-                | Type::GenericAlias(..)
-                | Type::KnownInstance(..)
-                | Type::SpecialForm(..),
-                Type::NominalInstance(instance),
-                ast::Operator::BitOr,
-            )
-            | (
-                Type::NominalInstance(instance),
-                Type::ClassLiteral(..)
-                | Type::SubclassOf(..)
-                | Type::GenericAlias(..)
-                | Type::KnownInstance(..)
-                | Type::SpecialForm(..),
-                ast::Operator::BitOr,
-            ) if instance.has_known_class(db, KnownClass::NoneType) => {
+            (left, right, ast::Operator::BitOr)
+                if (is_union_type_operand(left)
+                    && (is_union_type_operand(right) || right.is_none(db)))
+                    || (left.is_none(db) && is_union_type_operand(right)) =>
+            {
                 Some(UnionTypeInstance::from_value_expression_types(
                     db,
                     [left_ty, right_ty],

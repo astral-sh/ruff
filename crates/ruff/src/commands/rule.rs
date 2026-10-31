@@ -22,7 +22,7 @@ struct Explanation<'a> {
     fix: String,
     fix_availability: FixAvailability,
     #[expect(clippy::struct_field_names)]
-    explanation: Option<&'a str>,
+    explanation: &'a str,
     preview: bool,
     status: RuleStatus,
     category: Category,
@@ -94,15 +94,7 @@ fn format_rule_text(rule: Rule) -> String {
         output.push('\n');
     }
 
-    if let Some(explanation) = rule.explanation() {
-        output.push_str(explanation.trim());
-    } else {
-        output.push_str("Message formats:");
-        for format in rule.message_formats() {
-            output.push('\n');
-            let _ = write!(&mut output, "* {format}");
-        }
-    }
+    output.push_str(rule.explanation().trim());
     output
 }
 

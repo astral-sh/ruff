@@ -17,10 +17,9 @@ use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
+use ruff_command_line::TerminalColor;
 use ruff_db::cancellation::{Canceled, CancellationToken, CancellationTokenSource};
-use ruff_db::diagnostic::{
-    Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
-};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity};
 use ruff_db::files::File;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use ruff_db::{STACK_SIZE, max_parallelism};
@@ -31,13 +30,13 @@ use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{
     ChangeResult, CollectReporter, Db, Project, ScriptEnvironmentAvailability, UseUv,
-    UvSyncProgress, watch,
+    UvSyncProgress, UvWorkspace, watch,
 };
 use ty_project::{ProjectDatabase, ProjectMetadata, ProjectReloadResult};
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
 use ty_static::EnvVars;
 
-use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat, TerminalColor};
+use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat};
 use crate::logging::{VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 pub use args::Cli;
@@ -47,8 +46,8 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
 
     let args = wild::args_os();
-    let args = argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX)
-        .context("Failed to read CLI arguments from file")?;
+    let args =
+        ruff_command_line::expand_args(args).context("Failed to read CLI arguments from file")?;
     let args = Cli::parse_from(args);
 
     match args.command {
@@ -97,10 +96,13 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
-    set_colored_override(args.color);
+    let color = TerminalColor::resolve(args.color, || std::env::var_os(EnvVars::FORCE_COLOR));
+    if let Some(color_override) = color.as_override() {
+        colored::control::set_override(color_override);
+    }
 
     let verbosity = args.verbosity.level();
-    let _guard = setup_tracing(verbosity, args.color.unwrap_or_default())?;
+    let _guard = setup_tracing(verbosity, color)?;
 
     let printer = Printer::new(verbosity, args.no_progress);
 
@@ -134,6 +136,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         MainLoopMode::Fix(FixMode::ApplyFixes)
     } else if args.add_ignore {
         MainLoopMode::Fix(FixMode::AddIgnore)
+    } else if args.update_baseline {
+        MainLoopMode::UpdateBaseline
     } else {
         MainLoopMode::Check
     };
@@ -148,8 +152,17 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .map(|path| SystemPath::absolute(path, &cwd));
     let force_exclude = args.force_exclude();
 
-    let use_uv = UseUv::from_system(&system);
-    let use_uv = if use_uv == UseUv::On
+    let mut project_metadata = match &config_file {
+        Some(config_file) => {
+            ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
+        }
+        None => ProjectMetadata::discover(&project_path, &system)?,
+    };
+
+    project_metadata.apply_configuration_files(&system)?;
+
+    project_metadata.set_override_options(args.into_options());
+    if project_metadata.use_uv() == UseUv::On
         && let [path] = check_paths.as_slice()
         && system.is_file(path)
         && system
@@ -158,24 +171,22 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     {
         // A single PEP 723 script uses its own uv environment, even with an explicit ty
         // configuration file. The other explicit paths still discover workspace metadata.
-        UseUv::Scripts
-    } else {
-        use_uv
-    };
+        project_metadata = project_metadata.with_use_uv(UseUv::Scripts);
+    }
 
-    let mut project_metadata = match &config_file {
-        Some(config_file) => {
-            ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system, use_uv)?
-        }
-        None => ProjectMetadata::discover_with_uv(&project_path, &system, use_uv)?,
-    };
-
-    project_metadata.apply_configuration_files(&system)?;
-
-    project_metadata.set_override_options(args.into_options());
+    if project_metadata.use_uv().workspace_discovery_enabled() {
+        let workspace = UvWorkspace::discover(&project_path, &system);
+        project_metadata.apply_uv_workspace(&system, workspace)?;
+    }
 
     let mut db = ProjectDatabase::fallible(project_metadata, system)?;
     let project = db.project();
+
+    if matches!(mode, MainLoopMode::UpdateBaseline) && project.settings(&db).baseline().is_none() {
+        return Err(anyhow!(
+            "`--update-baseline` requires a baseline path from `--baseline` or configuration"
+        ));
+    }
 
     project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
     project.set_force_exclude(&mut db, force_exclude);
@@ -352,7 +363,7 @@ impl MainLoop {
         let (check_sender, check_receiver) = crossbeam_channel::bounded(1);
 
         // Initialize the uv environment for all scripts
-        let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+        let scripts = db.project().scripts_to_synchronize(db);
         self.synchronize_scripts(db, &scripts);
 
         request_check(&check_sender);
@@ -416,6 +427,11 @@ impl MainLoop {
                         tracing::warn!("No python files found under the given path(s)");
                     }
 
+                    let mut result = result;
+                    if !matches!(self.mode, MainLoopMode::UpdateBaseline) {
+                        retain_visible_diagnostics(&mut result);
+                    }
+
                     let result = match self.mode {
                         MainLoopMode::Check => {
                             // TODO: We should have an official flag to silence workspace diagnostics.
@@ -444,7 +460,8 @@ impl MainLoop {
                                 ),
                             };
 
-                            if let Ok(result) = result {
+                            if let Ok(mut result) = result {
+                                retain_visible_diagnostics(&mut result.diagnostics);
                                 let fixed_diagnostics = match mode {
                                     FixMode::AddIgnore => None,
                                     FixMode::ApplyFixes => Some(result.count),
@@ -473,6 +490,28 @@ impl MainLoop {
                             } else {
                                 Err(Canceled)
                             }
+                        }
+                        MainLoopMode::UpdateBaseline => {
+                            let settings = db.project().settings(db);
+                            let Some(baseline_path) = settings.baseline() else {
+                                return Err(anyhow!(
+                                    "`--update-baseline` requires a baseline path from `--baseline` or configuration"
+                                ));
+                            };
+                            let result = ty_project::baseline::write(db, baseline_path, result)?;
+                            if !result.diagnostics.is_empty() {
+                                self.write_diagnostics(db, &result.diagnostics, None)?;
+                            }
+
+                            if settings.terminal().output_format.is_human_readable() {
+                                let count = result.count;
+                                writeln!(
+                                    self.printer.stream_for_requested_summary(),
+                                    "Updated baseline `{baseline_path}` with {count} diagnostic{}.",
+                                    if count == 1 { "" } else { "s" }
+                                )?;
+                            }
+                            Ok(result.diagnostics)
                         }
                     };
 
@@ -513,7 +552,7 @@ impl MainLoop {
                                 files_changed: true,
                             }
                         ) {
-                            let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+                            let scripts = db.project().scripts_to_synchronize(db);
                             self.synchronize_scripts(db, &scripts);
                         }
                     }
@@ -631,7 +670,6 @@ impl MainLoop {
                 if stdout.is_enabled() {
                     let mut stdout = BufWriter::new(stdout);
                     let display_config = DisplayDiagnosticConfig::new("ty")
-                        .format(terminal_settings.output_format.into())
                         .color(colored::control::SHOULD_COLORIZE.should_colorize())
                         .with_cancellation_token(Some(self.cancellation_token.clone()))
                         .context(0);
@@ -639,7 +677,9 @@ impl MainLoop {
                     write!(
                         stdout,
                         "{}",
-                        DisplayDiagnostics::new(db, &display_config, diagnostics)
+                        terminal_settings
+                            .output_format
+                            .display(db, &display_config, diagnostics)
                     )?;
                     stdout.flush()?;
                 }
@@ -673,12 +713,19 @@ impl MainLoop {
 enum MainLoopMode {
     Check,
     Fix(FixMode),
+    UpdateBaseline,
 }
 
 #[derive(Copy, Clone, Debug)]
 enum FixMode {
     AddIgnore,
     ApplyFixes,
+}
+
+fn retain_visible_diagnostics(diagnostics: &mut Vec<Diagnostic>) {
+    diagnostics.retain(|diagnostic| {
+        !(diagnostic.severity() == Severity::Hint && diagnostic.id().is_lint())
+    });
 }
 
 fn exit_status_from_diagnostics(
@@ -702,7 +749,7 @@ fn exit_status_from_diagnostics(
     }
 
     match max_severity {
-        Severity::Info => ExitStatus::Success,
+        Severity::Hint | Severity::Info => ExitStatus::Success,
         Severity::Warning => {
             if terminal_settings.error_on_warning {
                 ExitStatus::Failure
@@ -909,24 +956,6 @@ fn current_directory() -> Result<SystemPathBuf> {
             path.display()
         )
     })
-}
-
-fn set_colored_override(color: Option<TerminalColor>) {
-    let Some(color) = color else {
-        return;
-    };
-
-    match color {
-        TerminalColor::Auto => {
-            colored::control::unset_override();
-        }
-        TerminalColor::Always => {
-            colored::control::set_override(true);
-        }
-        TerminalColor::Never => {
-            colored::control::set_override(false);
-        }
-    }
 }
 
 /// Initializes the global rayon thread pool to never use more than `TY_MAX_PARALLELISM` threads.

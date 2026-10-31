@@ -76,8 +76,8 @@ mod tests {
     use insta::assert_snapshot;
     use ruff_db::{
         diagnostic::{
-            Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
-            LintName, Span, SubDiagnostic,
+            Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, LintName, Span,
+            SubDiagnostic,
         },
         files::{File, system_path_to_file},
         system::{DbWithWritableSystem, SystemPathBuf},
@@ -890,6 +890,36 @@ mod tests {
         ");
     }
 
+    #[test]
+    fn unresolved_namespace_descendant() {
+        let mut test = CodeActionTest::with_source("<START>NamespaceReport<END>()");
+        test.db
+            .write_file("acme/reports.py", "class NamespaceReport: ...")
+            .expect("write unopened namespace descendant");
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        info[code-action]: import acme.reports.NamespaceReport
+         --> main.py:1:1
+          |
+        1 | NamespaceReport()
+          | ^^^^^^^^^^^^^^^
+        help: This is a preferred code action
+          |
+        1 + from acme.reports import NamespaceReport
+        2 | NamespaceReport()
+          |
+
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:1:1
+          |
+        1 | NamespaceReport()
+          | ^^^^^^^^^^^^^^^
+          |
+          - NamespaceReport()
+        1 + NamespaceReport()  # ty: ignore[unresolved-reference]
+          |
+        ");
+    }
+
     struct CodeActionTest {
         db: ty_project::TestDb,
         file: File,
@@ -936,10 +966,7 @@ mod tests {
 
             let mut buf = String::new();
 
-            let config = DisplayDiagnosticConfig::new("ty")
-                .color(false)
-                .context(0)
-                .format(DiagnosticFormat::Full);
+            let config = DisplayDiagnosticConfig::new("ty").color(false).context(0);
 
             for mut action in code_actions(
                 &self.db,

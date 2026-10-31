@@ -328,9 +328,11 @@ info: A `UnionType` instance can only be used as the second argument to `isinsta
 info: Element `<class 'list[int]'>` in the union is not a class object
 ```
 
+The repeated `list[int]` appears once in the diagnostic, before `Literal[42]`.
+
 ```py
     # snapshot: invalid-argument-type
-    elif isinstance(x, Literal[42] | list[int] | bytes):
+    elif isinstance(x, list[int] | (Literal[42] | list[int]) | bytes):
         reveal_type(x)  # revealed: int | list[int] | bytes
 ```
 
@@ -338,12 +340,12 @@ info: Element `<class 'list[int]'>` in the union is not a class object
 error[invalid-argument-type]: Invalid second argument to `isinstance`
  --> src/mdtest_snippet.py:8:10
   |
-8 |     elif isinstance(x, Literal[42] | list[int] | bytes):
-  |          ^^^^^^^^^^^^^^-------------------------------^
+8 |     elif isinstance(x, list[int] | (Literal[42] | list[int]) | bytes):
+  |          ^^^^^^^^^^^^^^---------------------------------------------^
   |                        |
   |                        This `UnionType` instance contains non-class elements
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
-info: Elements `<special-form 'Literal[42]'>` and `<class 'list[int]'>` in the union are not class objects
+info: Elements `<class 'list[int]'>` and `<special-form 'Literal[42]'>` in the union are not class objects
 ```
 
 ```py
@@ -1983,4 +1985,58 @@ def narrow_aliased_typed_dict_to_dict(value: PayloadAlias) -> None:
         reveal_type(value)  # revealed: Payload
         # error: [unresolved-attribute]
         value.clear()
+```
+
+## Iterable element types with permissive generic narrowing
+
+After narrowing `Iterable[T] | T` to a non-sized iterable, `T` might itself be an iterable whose
+items have a different type. Permissive narrowing represents that possibility with `Unknown`, so the
+constructor infers `list[T | Unknown]`. Its acceptance as `Collection[T] | T` is unsound; it does
+not establish that all elements have type `T`. The same inferred type appears with and without a
+return context.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = false
+```
+
+```py
+from collections.abc import Collection, Iterable, Sized
+
+def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
+    if isinstance(value, Iterable) and not isinstance(value, Sized):
+        # revealed: list[T@maybe_iterable_to_list | Unknown]
+        reveal_type(list(value))
+        # revealed: list[T@maybe_iterable_to_list | Unknown]
+        return reveal_type(list(value))
+    raise NotImplementedError
+```
+
+## Iterable element types with strict generic narrowing
+
+Strict narrowing represents the unknown iterable element type with `object`. The constructor
+therefore infers `list[object]`, and returning it as `Collection[T] | T` is correctly rejected.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from collections.abc import Collection, Iterable, Sized
+
+def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
+    if isinstance(value, Iterable) and not isinstance(value, Sized):
+        # revealed: list[object]
+        reveal_type(list(value))
+        # error: [invalid-return-type]
+        # revealed: list[object]
+        return reveal_type(list(value))
+    raise NotImplementedError
 ```

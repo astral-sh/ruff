@@ -5,8 +5,8 @@ use ty_combine::Combine;
 use ty_static::EnvVars;
 
 pub(crate) use command::{MetadataTarget, Uv, uv_executable_error};
-pub(crate) use environments::{ProjectEnvironment, ScriptEnvironmentCacheKey, script_environment};
-pub use environments::{ScriptEnvironmentAvailability, UvEnvironments, UvSyncChanges};
+pub use environments::{ScriptEnvironmentAvailability, UvEnvironments, UvSyncChanges, UvWorkspace};
+pub(crate) use environments::{ScriptEnvironmentCacheKey, script_environment};
 pub(crate) use metadata::{DependencyMetadataError, UvMetadata, UvMetadataError};
 pub(crate) use service::{
     ScriptSyncRequest, ScriptSyncTask, UvMetadataResult, UvMetadataService, UvSyncTask,
@@ -54,11 +54,12 @@ impl UseUv {
         }
     }
 
-    pub(super) const fn workspace_discovery_enabled(self) -> bool {
+    /// Whether uv should be used for workspace discovery.
+    pub const fn workspace_discovery_enabled(self) -> bool {
         matches!(self, Self::On)
     }
 
-    const fn script_environments_enabled(self) -> bool {
+    pub(super) const fn script_environments_enabled(self) -> bool {
         matches!(self, Self::Scripts | Self::On)
     }
 }
@@ -69,10 +70,12 @@ impl Combine for UseUv {
     }
 }
 
-/// Host variables needed by uv integration tests to find executables, Python installations, and caches.
+/// Environment variables for uv integration tests.
 ///
 /// Tests use this allowlist after clearing the inherited environment so host settings such as
-/// `UV_LOCKED` and `PYTHONPATH` cannot affect subprocesses.
+/// `UV_LOCKED` and `PYTHONPATH` cannot affect subprocesses, while retaining executable, Python,
+/// and cache discovery. A fixed resolution cutoff prevents tests from executing newly published
+/// packages, including build dependencies.
 #[allow(
     clippy::disallowed_methods,
     reason = "Test only code, intentionally inherit variables from the host's environment."
@@ -93,6 +96,7 @@ pub fn uv_test_env_vars() -> impl Iterator<Item = (&'static str, String)> {
     ]
     .into_iter()
     .filter_map(|name| std::env::var(name).ok().map(|value| (name, value)))
+    .chain([("UV_EXCLUDE_NEWER", "2026-09-22T00:00:00Z".to_owned())])
 }
 
 #[cfg(test)]

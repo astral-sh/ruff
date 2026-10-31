@@ -1,9 +1,8 @@
 # PEP 613 type aliases
 
-PEP 613 type aliases are simple assignment statements, annotated with `typing.TypeAlias` to mark
-them as a type alias. At runtime, they behave the same as implicit type aliases. Our support for
-them is currently the same as for implicit type aliases, but we don't reproduce the full
-implicit-type-alias test suite here, just some particularly interesting cases.
+PEP 613 type aliases are assignments annotated with `typing.TypeAlias`. Like implicit aliases, they
+bind the name to the value of the right-hand side at runtime. In a type expression, a PEP 613 alias
+applies the default specialization to an unsubscripted generic on its right-hand side.
 
 ## Basic
 
@@ -129,9 +128,7 @@ def _(x: MyAlias):
 
 ## Generic aliases
 
-A more comprehensive set of tests can be found in
-[`implicit_type_aliases.md`](./implicit_type_aliases.md). If the implementations ever diverge, we
-may need to duplicate more tests here.
+See also the generic aliases in [`implicit_type_aliases.md`](./implicit_type_aliases.md).
 
 ### Basic
 
@@ -149,6 +146,165 @@ reveal_type(ListOrSet)  # revealed: <types.UnionType special-form 'list[T] | set
 def _(list_of_int: MyList[int], list_or_set_of_str: ListOrSet[str]):
     reveal_type(list_of_int)  # revealed: list[int]
     reveal_type(list_or_set_of_str)  # revealed: list[str] | set[str]
+```
+
+### Default specialization on the right-hand side
+
+An unsubscripted generic alias on the right-hand side is specialized with its defaults. Passing a
+type variable explicitly instead creates another generic alias:
+
+```py
+from typing_extensions import TypeAlias, TypeVar
+
+T = TypeVar("T", default=str)
+Items: TypeAlias = list[T]
+DefaultItems: TypeAlias = Items
+GenericItems: TypeAlias = Items[T]
+QuotedItems: TypeAlias = "Items"
+
+def inspect(default: DefaultItems, generic: GenericItems[int], quoted: QuotedItems):
+    reveal_type(default)  # revealed: list[str]
+    reveal_type(generic)  # revealed: list[int]
+    reveal_type(quoted)  # revealed: list[str]
+
+def invalid(value: DefaultItems[int]): ...  # error: [not-subscriptable]
+```
+
+A bare generic class in a PEP 613 alias is also default-specialized. Assigning that alias to another
+name preserves the specialization:
+
+```py
+DeclaredList: TypeAlias = list  # error: [missing-type-argument]
+ForwardedDeclared = DeclaredList
+
+def inspect(declared: DeclaredList, forwarded: ForwardedDeclared):
+    reveal_type(declared)  # revealed: list[Unknown]
+    reveal_type(forwarded)  # revealed: list[Unknown]
+
+def invalid(
+    declared: DeclaredList[int],  # error: [not-subscriptable]
+    forwarded: ForwardedDeclared[int],  # error: [not-subscriptable]
+): ...
+```
+
+The alias still refers to the generic class object in value expressions:
+
+```py
+reveal_type(DeclaredList[int])  # revealed: <class 'list[int]'>
+reveal_type(DeclaredList([1]))  # revealed: list[int]
+```
+
+A PEP 613 alias also default-specializes bare `Callable`. An implicit alias preserves the special
+form and can still supply its parameter and return types:
+
+```py
+from typing import Callable
+
+DeclaredCallable: TypeAlias = Callable  # error: [missing-type-argument]
+ImplicitCallable = Callable
+
+def inspect(declared: DeclaredCallable, implicit: ImplicitCallable[[int], str]):
+    reveal_type(declared)  # revealed: (...) -> Unknown
+    reveal_type(implicit)  # revealed: (int, /) -> str
+
+def invalid(value: DeclaredCallable[[int], str]): ...  # error: [not-subscriptable]
+```
+
+### Forwarding PEP 695 aliases
+
+A PEP 613 alias applies the defaults of a PEP 695 alias on its right-hand side. Assigning the result
+to another name preserves that specialization:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import TypeAlias
+
+type Modern[V = str] = list[V]
+Default: TypeAlias = Modern
+Forwarded = Default
+
+def inspect(default: Default, forwarded: Forwarded):
+    reveal_type(default)  # revealed: list[str]
+    reveal_type(forwarded)  # revealed: list[str]
+
+def invalid(
+    default: Default[int],  # error: [not-subscriptable]
+    forwarded: Forwarded[int],  # error: [not-subscriptable]
+): ...
+```
+
+### Imported generic aliases
+
+A PEP 613 alias also applies the defaults of an imported generic legacy alias, whether the imported
+alias is implicit or declared with `TypeAlias`:
+
+`aliases.py`:
+
+```py
+from typing_extensions import TypeAlias, TypeVar
+
+T = TypeVar("T", default=str)
+Implicit = list[T]
+Pep613: TypeAlias = list[T]
+Default: TypeAlias = Implicit
+```
+
+`main.py`:
+
+```py
+from typing import TypeAlias
+from aliases import Default, Implicit
+import aliases
+
+FromImplicit: TypeAlias = Implicit
+FromPep613: TypeAlias = aliases.Pep613
+
+def inspect(implicit: FromImplicit, pep613: FromPep613, imported: Default):
+    reveal_type(implicit)  # revealed: list[str]
+    reveal_type(pep613)  # revealed: list[str]
+    reveal_type(imported)  # revealed: list[str]
+
+def invalid(
+    implicit: FromImplicit[int],  # error: [not-subscriptable]
+    pep613: FromPep613[int],  # error: [not-subscriptable]
+    imported: Default[int],  # error: [not-subscriptable]
+): ...
+```
+
+### Forward references in stubs
+
+A PEP 613 alias in a stub can refer to an alias or class defined later in the file. An unsubscripted
+generic reference applies the default specialization, using `Unknown` for a type variable with no
+default:
+
+`aliases.pyi`:
+
+```pyi
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+Forwarded: TypeAlias = Items
+Items = list[T]
+LaterAlias: TypeAlias = Later
+
+class Later: ...
+
+def items() -> Forwarded: ...
+def invalid() -> Forwarded[int]: ...  # error: [not-subscriptable]
+def later() -> LaterAlias: ...
+```
+
+`main.py`:
+
+```py
+from aliases import items, later
+
+reveal_type(items())  # revealed: list[Unknown]
+reveal_type(later())  # revealed: Later
 ```
 
 ### Stringified generic alias
@@ -314,7 +470,7 @@ def _(c: MyAlias4[int, str]):
     reveal_type(c)  # revealed: (dict[str, int], /, *args: Any, **kwargs: Any) -> list[str]
 ```
 
-## Explicit aliases using `TypeAliasType`
+## Using `TypeAliasType` in legacy aliases
 
 ```py
 from typing import TypeAlias, TypeVar
@@ -438,6 +594,36 @@ my_isinstance(1, 1)
 my_isinstance(1, (int, (str, 1)))
 ```
 
+## Copying recursive dictionaries
+
+Copying a dictionary with a recursive value type preserves compatibility with the original type.
+
+Regression test for <https://github.com/astral-sh/ty/issues/4598>.
+
+```py
+from typing import TypeAlias
+
+Nested: TypeAlias = dict[str, "Nested | int"]
+
+def consume(value: Nested): ...
+def copy(value: Nested):
+    consume(dict(value))
+    copied = dict(value)
+    consume(copied)
+```
+
+The same applies when the recursive values include both lists and dictionaries.
+
+```py
+JSON: TypeAlias = "str | int | float | bool | None | list[JSON] | dict[str, JSON]"
+
+def consume_json(value: dict[str, JSON]): ...
+def copy_json(value: dict[str, JSON]):
+    consume_json(dict(value))
+    copied = dict(value)
+    consume_json(copied)
+```
+
 ## Stringified recursive aliases
 
 Quoting an entire recursive alias preserves its string value at runtime and its recursive type when
@@ -451,6 +637,67 @@ reveal_type(Nested)  # revealed: str
 
 def inspect(value: Nested):
     reveal_type(value)  # revealed: Nested
+```
+
+## Recursive aliases and their complements
+
+A fully static alias and its complement cover every object, even when the alias refers to itself.
+
+```py
+from typing import TypeAlias
+from ty_extensions import Not
+
+A: TypeAlias = "list[Not[A] | A]"
+
+def f(x: A):
+    reveal_type(x[0])  # revealed: object
+```
+
+## Negated recursive aliases
+
+```py
+from typing import TypeAlias
+from ty_extensions import Not
+
+A: TypeAlias = "list[Not[A]]"
+
+def f(x: A):
+    reveal_type(x[0])  # revealed: ~A
+```
+
+## Gradual recursive aliases and their complements
+
+The `Any` in each union member can have a different materialization, so the union does not simplify
+to `object`.
+
+```py
+from typing import Any, TypeAlias
+from ty_extensions import Not
+
+B: TypeAlias = "list[tuple[Any, B]]"
+
+def f(x: B | Not[B]):
+    reveal_type(x)  # revealed: B | ~B
+```
+
+## Negated recursive unions
+
+Negating a recursive union is equivalent to intersecting the negations of its members, including
+when the alias contains gradual types.
+
+```py
+from typing import Any, TypeAlias, TypeVar, assert_type
+from ty_extensions import Intersection, Not
+
+A: TypeAlias = "int | list[tuple[Any, A]]"
+T = TypeVar("T")
+
+def identity(x: T) -> T:
+    return x
+
+def f(x: Not[A], y: Intersection[Not[int], Not[list[tuple[Any, A]]]]):
+    assert_type(identity(x), Intersection[Not[int], Not[list[tuple[Any, A]]]])
+    assert_type(identity(y), Not[A])
 ```
 
 ## Specializing non-generic recursive aliases
@@ -567,6 +814,14 @@ T = TypeVar("T")
 Alias: TypeAlias = Union[T, "Alias[T]"]  # error: [cyclic-type-alias-definition]
 Growing: TypeAlias = "T | Growing[list[T]]"  # error: [cyclic-type-alias-definition]
 reveal_type(Growing)  # revealed: str
+```
+
+Adding the alias's complement does not make an unguarded cycle valid.
+
+```py
+from ty_extensions import Not
+
+Complemented: TypeAlias = "T | Complemented[T] | Not[Complemented[T]]"  # error: [cyclic-type-alias-definition]
 ```
 
 Invalid generic aliases use a divergent type for recovery with or without type arguments.
@@ -842,7 +1097,7 @@ differently_bad: TypeAlias = Unpack[tuple[int, ...]]  # snapshot: invalid-type-f
 ```
 
 ```snapshot
-error[invalid-type-form]: `Unpack` is not allowed in type alias values
+error[invalid-type-form]: `Unpack` is not allowed in type alias definitions
   --> src/mdtest_snippet.py:14:30
    |
 14 | differently_bad: TypeAlias = Unpack[tuple[int, ...]]  # snapshot: invalid-type-form
@@ -853,9 +1108,9 @@ info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotat
 
 ## `Self`
 
-`Self` is not allowed in an explicit type alias value, even when the alias is defined in a class
-body. Runtime-expression positions, such as `Annotated` metadata, are not part of the alias value's
-type expression.
+`Self` is not allowed in a PEP 613 type alias value, even when the alias is defined in a class body.
+Runtime-expression positions, such as `Annotated` metadata, are not part of the alias value's type
+expression.
 
 TODO: Reject `Self` introduced indirectly through runtime-expression forms such as `TypeOf[value]`.
 
@@ -889,7 +1144,7 @@ def second(value: Node.Tree): ...
 
 ## Disabled `invalid-type-form` `Self` fallback
 
-Rejected aliases recover as `Unknown` even when the diagnostic is disabled:
+Invalid uses of `Self` recover as `Unknown` even when the diagnostic is disabled:
 
 ```toml
 [rules]
@@ -911,13 +1166,50 @@ class C:
         reveal_type(value)  # revealed: tuple[Unknown]
 
     def takes_stringified(self, value: Stringified) -> None:
-        reveal_type(value)  # revealed: Unknown
+        reveal_type(value)  # revealed: tuple[Unknown, int]
 
     def invalid_attribute(self) -> Self:
         self.attribute: TypeAlias = Self
         return self.attribute  # error: [invalid-return-type]
 
 C().takes(1)
+```
+
+## Forwarding generic recursive aliases
+
+A forwarded PEP 613 alias preserves type arguments throughout the recursive type when its right-hand
+side passes a type variable explicitly:
+
+```py
+from typing_extensions import TypeAlias, TypeVar
+
+T = TypeVar("T", default=str)
+Node: TypeAlias = tuple[T, "Forwarded[T] | None"]
+Forwarded: TypeAlias = Node[T]
+
+def inspect(value: Forwarded[int]):
+    reveal_type(value[0])  # revealed: int
+    tail = value[1]
+    if tail is not None:
+        reveal_type(tail[0])  # revealed: int
+
+def invalid() -> Forwarded[int]:
+    return (1, ("bad", None))  # error: [invalid-return-type]
+```
+
+An unsubscripted reference fixes the default throughout the recursive type:
+
+```py
+DefaultNode: TypeAlias = Node
+
+def inspect_default(value: DefaultNode):
+    reveal_type(value[0])  # revealed: str
+    tail = value[1]
+    if tail is not None:
+        reveal_type(tail[0])  # revealed: str
+
+def invalid_default() -> DefaultNode:
+    return ("root", (1, None))  # error: [invalid-return-type]
 ```
 
 ## Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow

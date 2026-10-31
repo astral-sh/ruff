@@ -85,7 +85,7 @@ def f6() -> None: ...
 @overload
 def f6(x: str, y: str) -> str: ...
 def f6(x: str | None = None, y: str | None = None) -> str | None:
-    return x + y if x and y else None
+    return x + y if x is not None and y is not None else None
 
 def _(n: int):
     class PossiblyNotCallable:

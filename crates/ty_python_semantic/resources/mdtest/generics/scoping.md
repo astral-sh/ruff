@@ -237,7 +237,7 @@ class G(Generic[T]):
 
 ## Functions on generic classes are descriptors
 
-This repeats the tests in the [Functions as descriptors](./call/methods.md) test suite, but on a
+This repeats the tests in the [Functions as descriptors](../call/methods.md) test suite, but on a
 generic class. This ensures that we are carrying any specializations through the entirety of the
 descriptor protocol, which is how `self` parameters are bound to instance methods.
 
@@ -698,6 +698,32 @@ class C[T]:
     type Alias[U = T] = list[U]
 
     type Ok[U = int] = list[U]  # OK
+```
+
+### Unbound type variable tuple in a default
+
+A type variable tuple declared at module scope cannot supply the default for a PEP 695 type
+parameter. A function can use a pack declared earlier in its own parameter list.
+
+```py
+from typing import TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+# error: [unbound-type-variable]
+type Alias[*Us = Unpack[Ts]] = tuple[*Us]
+
+# error: [unbound-type-variable]
+def invalid[*Us = *Ts](*args: *Us) -> tuple[*Us]:
+    return args
+
+# error: [unbound-type-variable]
+type Nested[*Us = Unpack[tuple[int, Unpack[Ts]]]] = tuple[*Us]
+
+type Valid[T, *Us = Unpack[tuple[T]]] = tuple[*Us]  # ok
+
+def valid[*Ts, *Us = Unpack[Ts]](x: tuple[*Ts], y: tuple[*Us]) -> tuple[*Us]:  # ok
+    return y
 ```
 
 ### Legacy TypeVar in method with outer-scope class TypeVar

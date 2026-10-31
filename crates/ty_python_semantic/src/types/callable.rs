@@ -11,6 +11,7 @@ use crate::{
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
+        cyclic::ActiveRecursionDetector,
         function::OverloadLiteral,
         known_instance::{FunctoolsPartialInstance, MethodWrapperKind},
         relation::{TypeRelation, TypeRelationChecker},
@@ -139,9 +140,11 @@ impl<'db> Type<'db> {
             db,
             env,
             UpcastPolicy::default(),
-            CallableUpcastContext {
+            &CallableUpcastContext {
                 recursive_definition,
+                ..CallableUpcastContext::default()
             },
+            None,
         )
     }
 
@@ -155,7 +158,8 @@ impl<'db> Type<'db> {
             db,
             env,
             policy,
-            CallableUpcastContext::default(),
+            &CallableUpcastContext::default(),
+            None,
         )
     }
 
@@ -164,11 +168,28 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         policy: UpcastPolicy,
-        context: CallableUpcastContext<'db>,
+        context: &CallableUpcastContext<'db>,
+        receiver: Option<Type<'db>>,
+    ) -> Option<CallableTypes<'db>> {
+        context.active.visit(
+            &self,
+            || None,
+            || self.try_upcast_to_callable_impl(db, env, policy, context, receiver),
+        )
+    }
+
+    fn try_upcast_to_callable_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        policy: UpcastPolicy,
+        context: &CallableUpcastContext<'db>,
+        receiver: Option<Type<'db>>,
     ) -> Option<CallableTypes<'db>> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback
-                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context);
+            return fallback.try_upcast_to_callable_with_policy_and_context(
+                db, env, policy, context, receiver,
+            );
         }
 
         match self {
@@ -189,7 +210,7 @@ impl<'db> Type<'db> {
             Type::Recursive(recursive) => recursive
                 .unfold(db, env)
                 .into_unfolded()?
-                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context),
+                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context, receiver),
 
             Type::FunctionLiteral(function_literal)
                 if context.is_recursive_reference(db, function_literal) =>
@@ -206,16 +227,32 @@ impl<'db> Type<'db> {
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
-            Type::BoundMethod(bound_method) => bound_method.callables(db, env),
+            Type::BoundMethod(bound_method) => bound_method.callables(db).cloned(),
+
+            Type::TypeVar(typevar) => match typevar.require_bound_or_constraints(db, env) {
+                TypeVarBoundOrConstraints::UpperBound(bound) => bound
+                    .try_upcast_to_callable_with_policy_and_context(
+                        db,
+                        env,
+                        policy,
+                        context,
+                        Some(receiver.unwrap_or(self)),
+                    ),
+                // TODO: Preserve `Self` while validating the receiver against each constraint.
+                TypeVarBoundOrConstraints::Constraints(_) => None,
+            },
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self
-                    .member_lookup_with_policy(
+                    .member_lookup_with_policy_and_receiver(
                         db,
                         env,
                         "__call__",
                         MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        receiver,
                     )
+                    .unwrap_or_else(|error| error.fallback_member(db))
+                    .member(db)
                     .place;
 
                 if let Place::Defined(place) = call_symbol
@@ -223,7 +260,9 @@ impl<'db> Type<'db> {
                 {
                     place
                         .ty
-                        .try_upcast_to_callable_with_policy_and_context(db, env, policy, context)
+                        .try_upcast_to_callable_with_policy_and_context(
+                            db, env, policy, context, None,
+                        )
                         // The callable instance itself doesn't inherit the descriptor behavior of
                         // its `__call__` method.
                         .map(|callables| callables.map(|callable| callable.into_regular(db)))
@@ -239,7 +278,7 @@ impl<'db> Type<'db> {
 
             Type::NewTypeInstance(newtype) => newtype
                 .concrete_base_type(db)
-                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context),
+                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context, receiver),
 
             Type::SubclassOf(subclass_of_ty) if policy == UpcastPolicy::Sound => {
                 Some(CallableTypes::one(CallableType::function_like(
@@ -267,7 +306,7 @@ impl<'db> Type<'db> {
                             let upcast_callables = bound
                                 .constructor_for_typevar_bound(db, env)
                                 .try_upcast_to_callable_with_policy_and_context(
-                                    db, env, policy, context,
+                                    db, env, policy, context, None,
                                 )?;
                             Some(upcast_callables.map(|callable| {
                                 let signatures = callable
@@ -286,7 +325,7 @@ impl<'db> Type<'db> {
                                 let element_upcast = constraint
                                     .to_meta_type(db, env)
                                     .try_upcast_to_callable_with_policy_and_context(
-                                        db, env, policy, context,
+                                        db, env, policy, context, None,
                                     )?;
                                 for callable in element_upcast.into_inner() {
                                     let signatures =
@@ -312,8 +351,9 @@ impl<'db> Type<'db> {
             Type::Union(union) => {
                 let mut callables = SmallVec::new();
                 for element in union.elements(db) {
-                    let element_callable = element
-                        .try_upcast_to_callable_with_policy_and_context(db, env, policy, context)?;
+                    let element_callable = element.try_upcast_to_callable_with_policy_and_context(
+                        db, env, policy, context, receiver,
+                    )?;
                     callables.extend(element_callable.into_inner());
                 }
                 Some(CallableTypes::new(callables))
@@ -322,17 +362,19 @@ impl<'db> Type<'db> {
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(enum_literal) => enum_literal
                     .enum_class_instance(db, env)
-                    .try_upcast_to_callable_with_policy_and_context(db, env, policy, context),
+                    .try_upcast_to_callable_with_policy_and_context(
+                        db, env, policy, context, receiver,
+                    ),
                 _ => None,
             },
 
             Type::TypeAlias(alias) => alias
                 .value_type(db)
-                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context),
+                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context, receiver),
 
             Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(callable)) => callable
                 .inner(db)
-                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context)
+                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context, None)
                 .map(|callables| callables.map(|callable| callable.into_regular(db))),
 
             Type::KnownBoundMethod(method) => method.callables(db, env),
@@ -377,12 +419,14 @@ impl<'db> Type<'db> {
             Type::Intersection(intersection) => intersection
                 .finite_alternative_union(db, env)
                 .and_then(|alternatives| {
-                    alternatives.try_upcast_to_callable_with_policy(db, env, policy)
+                    alternatives.try_upcast_to_callable_with_policy_and_context(
+                        db, env, policy, context, receiver,
+                    )
                 }),
 
             Type::EnumComplement(complement) => complement
                 .remaining_literal_union(db, env)
-                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context),
+                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context, receiver),
 
             // TODO
             Type::DataclassDecorator(_)
@@ -391,19 +435,19 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(_)
             | Type::PropertyInstance(_)
             | Type::SlotDescriptor(_)
-            | Type::TypeVar(_)
             | Type::BoundSuper(_) => None,
         }
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Debug, Default)]
 struct CallableUpcastContext<'db> {
     recursive_definition: Option<Definition<'db>>,
+    active: ActiveRecursionDetector<Type<'db>>,
 }
 
 impl<'db> CallableUpcastContext<'db> {
-    fn is_recursive_reference(self, db: &'db dyn Db, function: FunctionType<'db>) -> bool {
+    fn is_recursive_reference(&self, db: &'db dyn Db, function: FunctionType<'db>) -> bool {
         self.recursive_definition
             .is_some_and(|definition| function.contains_definition(db, definition))
     }
@@ -564,7 +608,6 @@ pub enum CallableTypeKind {
     /// descriptors. The separate kind prevents the dunder descriptor heuristic from turning
     /// it into [`Self::FunctionLike`] after `P` is specialized: the specialized parameters
     /// already describe the callable's arguments.
-    /// Calling [`CallableType::bind_self`] removes this marker without removing a parameter.
     ///
     /// In the example below, specializing `P` to `[str]` gives `callback.__call__` the signature
     /// `(str, /) -> int`. Binding a receiver would incorrectly remove its `str` parameter:
@@ -646,9 +689,7 @@ pub(crate) enum UpcastPolicy {
 impl From<TypeRelation> for UpcastPolicy {
     fn from(relation: TypeRelation) -> Self {
         match relation {
-            TypeRelation::Subtyping
-            | TypeRelation::Redundancy { .. }
-            | TypeRelation::SubtypingAssuming => UpcastPolicy::Sound,
+            TypeRelation::Subtyping | TypeRelation::Redundancy { .. } => UpcastPolicy::Sound,
             TypeRelation::Assignability => UpcastPolicy::Unsound,
         }
     }
@@ -795,7 +836,7 @@ impl<'db> CallableType<'db> {
         }
     }
 
-    fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
+    pub(super) fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::DunderParamSpec)
     }
 
@@ -864,31 +905,23 @@ impl<'db> CallableType<'db> {
         ))
     }
 
-    pub(crate) fn bind_self(
+    /// Binds a method receiver, specializing its signatures and removing incompatible overloads.
+    ///
+    /// `typing_self_type` is used to replace `typing.Self`, which differs from `receiver_type`
+    /// for class methods.
+    pub(super) fn bind_self(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        self_type: Option<Type<'db>>,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
     ) -> CallableType<'db> {
-        self.bind_self_with_receiver(db, env, self_type, self_type)
-    }
-
-    /// Binds the runtime receiver while using `typing_self_type` to replace `typing.Self`.
-    fn bind_self_with_receiver(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        receiver_type: Option<Type<'db>>,
-        typing_self_type: Option<Type<'db>>,
-    ) -> CallableType<'db> {
-        if self.is_dunder_paramspec(db) {
-            return self.into_regular(db);
-        }
-
-        self.with_signatures(
+        Self::new_internal(
             db,
             self.signatures(db)
-                .bind_self_with_receiver(db, env, receiver_type, typing_self_type),
+                .bind_method_receiver(db, env, receiver_type, typing_self_type),
+            CallableTypeKind::Regular,
+            self.deprecated(db),
         )
     }
 
@@ -898,15 +931,6 @@ impl<'db> CallableType<'db> {
 
     pub(crate) fn into_dunder_paramspec(self, db: &'db dyn Db) -> CallableType<'db> {
         self.with_kind(db, CallableTypeKind::DunderParamSpec)
-    }
-
-    pub(crate) fn apply_self(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        self_type: Type<'db>,
-    ) -> CallableType<'db> {
-        self.apply_self_with_receiver(db, env, self_type, self_type)
     }
 
     pub(crate) fn apply_self_with_receiver(
@@ -989,8 +1013,15 @@ impl<'db> CallableType<'db> {
 pub(crate) struct CallableTypes<'db>(SmallVec<[CallableType<'db>; 1]>);
 
 impl<'db> CallableTypes<'db> {
-    fn new(callables: SmallVec<[CallableType<'db>; 1]>) -> Self {
+    fn new(mut callables: SmallVec<[CallableType<'db>; 1]>) -> Self {
         assert!(!callables.is_empty(), "CallableTypes should not be empty");
+        // Repeated alternatives do not change a union. Removing them also lets recursive
+        // constructor queries converge when each iteration adds the same `__init__` callable.
+        if callables.len() > 1 {
+            let mut seen = FxHashSet::default();
+            callables.retain(|callable| seen.insert(*callable));
+            callables.shrink_to_fit();
+        }
         CallableTypes(callables)
     }
 
@@ -999,20 +1030,14 @@ impl<'db> CallableTypes<'db> {
     }
 
     pub(crate) fn from_elements(callables: impl IntoIterator<Item = CallableType<'db>>) -> Self {
-        let callables: SmallVec<_> = callables.into_iter().collect();
-        assert!(!callables.is_empty(), "CallableTypes should not be empty");
-        CallableTypes(callables)
+        Self::new(callables.into_iter().collect())
     }
 
-    pub(crate) fn exactly_one(self) -> Option<CallableType<'db>> {
+    pub(crate) fn exactly_one(&self) -> Option<CallableType<'db>> {
         match self.0.as_slice() {
             [single] => Some(*single),
             _ => None,
         }
-    }
-
-    pub(super) fn as_slice(&self) -> &[CallableType<'db>] {
-        &self.0
     }
 
     fn into_inner(self) -> SmallVec<[CallableType<'db>; 1]> {
@@ -1023,9 +1048,17 @@ impl<'db> CallableTypes<'db> {
         self.0.iter()
     }
 
-    pub(crate) fn into_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    /// Iterates over every signature of every callable alternative without merging the
+    /// alternatives into an overloaded callable.
+    pub(crate) fn signatures(&self, db: &'db dyn Db) -> impl Iterator<Item = &'db Signature<'db>> {
+        self.0
+            .iter()
+            .flat_map(move |callable| callable.signatures(db))
+    }
+
+    pub(crate) fn to_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         assert!(!self.0.is_empty(), "CallableTypes should not be empty");
-        UnionType::from_elements(db, env, self.0.into_iter().map(Type::Callable))
+        UnionType::from_elements(db, env, self.0.iter().copied().map(Type::Callable))
     }
 
     pub(crate) fn map(self, mut f: impl FnMut(CallableType<'db>) -> CallableType<'db>) -> Self {

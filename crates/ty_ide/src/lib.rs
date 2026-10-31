@@ -3,6 +3,7 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 mod all_symbols;
+mod annotation_expression;
 mod call_hierarchy;
 mod code_action;
 mod completion;
@@ -406,9 +407,7 @@ mod tests {
     use insta::internals::SettingsBindDropGuard;
 
     use ruff_db::Db;
-    use ruff_db::diagnostic::{
-        Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, UnifiedFile,
-    };
+    use ruff_db::diagnostic::{Annotation, Diagnostic, DisplayDiagnosticConfig, UnifiedFile};
     use ruff_db::files::{File, FileRootKind, system_path_to_file};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_db::source::{SourceText, source_text};
@@ -419,9 +418,7 @@ mod tests {
     use ty_module_resolver::SearchPathSettings;
     use ty_project::{Db as _, ProjectMetadata, SemanticDb as _};
     use ty_python_core::ProgramFile;
-    use ty_python_core::platform::PythonPlatform;
-    use ty_python_core::program::{FallibleStrategy, ProgramSettings};
-    use ty_python_semantic::PythonVersionWithSource;
+    use ty_python_core::program::FallibleStrategy;
 
     /// A way to create a simple single-file (named `main.py`) cursor test.
     ///
@@ -463,10 +460,7 @@ mod tests {
 
             let mut buf = String::new();
 
-            let config = DisplayDiagnosticConfig::new("ty")
-                .color(false)
-                .context(0)
-                .format(DiagnosticFormat::Full);
+            let config = DisplayDiagnosticConfig::new("ty").color(false).context(0);
             for diagnostic in diagnostics {
                 let diag = diagnostic.into_diagnostic();
                 let config = config
@@ -674,14 +668,10 @@ mod tests {
             .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
             .expect("valid search paths");
 
-            db.project().update_program(
-                &mut db,
-                ProgramSettings {
-                    python_version: PythonVersionWithSource::default(),
-                    python_platform: PythonPlatform::default(),
-                    search_paths,
-                },
-            );
+            let project = db.project();
+            let mut settings = project.program_settings(&db).clone();
+            settings.search_paths = search_paths;
+            project.update_program(&mut db, settings);
 
             db.files()
                 .try_add_root(&db, &project_root, FileRootKind::Project);

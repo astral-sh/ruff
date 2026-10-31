@@ -45,7 +45,7 @@
       ]
     },
     "dummy-variable-rgx": {
-      "description": "A regular expression used to identify \"dummy\" variables, or those which\nshould be ignored when enforcing (e.g.) unused-variable rules. The\ndefault expression matches `_`, `__`, and `_var`, but not `_var_`.",
+      "description": "A regular expression used to identify \"dummy\" variables, or those which\nshould be ignored when enforcing (e.g.) unused-variable rules. The\ndefault expression matches `_`, `__`, `_var`, and `_次`, but not `_var_`\nor `_次_`.",
       "type": [
         "string",
         "null"
@@ -719,7 +719,7 @@
       }
     },
     "target-version": {
-      "description": "The minimum Python version to target, e.g., when considering automatic\ncode upgrades, like rewriting type annotations. Ruff will not propose\nchanges using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.11 or ==3.11\nspecify `target-version = \"py311\"`.\n\nIf you're already using a `pyproject.toml` file, we recommend\n`project.requires-python` instead, as it's based on Python packaging\nstandards, and will be respected by other tools. For example, Ruff\ntreats the following as identical to `target-version = \"py38\"`:\n\n```toml\n[project]\nrequires-python = \">=3.8\"\n```\n\nIf both are specified, `target-version` takes precedence over\n`requires-python`. See [_Inferring the Python version_](https://docs.astral.sh/ruff/configuration/#inferring-the-python-version)\nfor a complete description of how the `target-version` is determined\nwhen left unspecified.\n\nNote that a stub file can [sometimes make use of a typing feature](https://typing.python.org/en/latest/spec/distributing.html#syntax)\nbefore it is available at runtime, as long as the stub does not make\nuse of new *syntax*. For example, a type checker will understand\n`int | str` in a stub as being a `Union` type annotation, even if the\ntype checker is run using Python 3.9, despite the fact that the `|`\noperator can only be used to create union types at runtime on Python\n3.10+. As such, Ruff will often recommend newer features in a stub\nfile than it would for an equivalent runtime file with the same target\nversion.",
+      "description": "The minimum Python version to target, e.g., when considering automatic\ncode upgrades, like rewriting type annotations. Ruff will not propose\nchanges using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.12 or ==3.12\nspecify `target-version = \"py312\"`.\n\nIf you're already using a `pyproject.toml` file, we recommend\n`project.requires-python` instead, as it's based on Python packaging\nstandards, and will be respected by other tools. For example, Ruff\ntreats the following as identical to `target-version = \"py38\"`:\n\n```toml\n[project]\nrequires-python = \">=3.8\"\n```\n\nIf both are specified, `target-version` takes precedence over\n`requires-python`. See [_Inferring the Python version_](https://docs.astral.sh/ruff/configuration/#inferring-the-python-version)\nfor a complete description of how the `target-version` is determined\nwhen left unspecified.\n\nNote that a stub file can [sometimes make use of a typing feature](https://typing.python.org/en/latest/spec/distributing.html#syntax)\nbefore it is available at runtime, as long as the stub does not make\nuse of new *syntax*. For example, a type checker will understand\n`int | str` in a stub as being a `Union` type annotation, even if the\ntype checker is run using Python 3.9, despite the fact that the `|`\noperator can only be used to create union types at runtime on Python\n3.10+. As such, Ruff will often recommend newer features in a stub\nfile than it would for an equivalent runtime file with the same target\nversion.",
       "anyOf": [
         {
           "$ref": "#/definitions/PythonVersion"
@@ -779,6 +779,24 @@
       "type": "string",
       "enum": [
         "all"
+      ]
+    },
+    "AllowedFloatValue": {
+      "type": "number",
+      "format": "double"
+    },
+    "AllowedValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer",
+          "format": "int64"
+        },
+        {
+          "$ref": "#/definitions/AllowedFloatValue"
+        }
       ]
     },
     "AnalyzeOptions": {
@@ -851,6 +869,22 @@
         }
       },
       "additionalProperties": false
+    },
+    "AnnotationSemanticsSelection": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/RuntimeSemantics"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "ApiBan": {
       "type": "object",
@@ -1533,24 +1567,26 @@
           ]
         },
         "runtime-evaluated-base-classes": {
-          "description": "Exempt classes that list any of the enumerated classes as a base class\nfrom needing to be moved into type-checking blocks.\n\nCommon examples include Pydantic's `pydantic.BaseModel` and SQLAlchemy's\n`sqlalchemy.orm.DeclarativeBase`, but can also support user-defined\nclasses that inherit from those base classes. For example, if you define\na common `DeclarativeBase` subclass that's used throughout your project\n(e.g., `class Base(DeclarativeBase) ...` in `base.py`), you can add it to\nthis list (`runtime-evaluated-base-classes = [\"base.Base\"]`) to exempt\nmodels from being moved into type-checking blocks.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
+          "description": "Exempt classes that list any of the enumerated classes as a base class\nfrom needing to be moved into type-checking blocks.\n\nThis can either be configured as a list, if all entries share the same\nruntime semantics of being runtime required. Or a table where each entry\nis assigned to its desired runtime semantics.\n\nA common example for `\"runtime\"` required semantics is Pydantic's `pydantic.BaseModel`\nbut can also support user-defined classes that inherit from those base classes.\nFor example, if you define a common `BaseModel` subclass that's used throughout\nyour project (e.g., `class Base(BaseModel) ...` in `base.py`), you can add it to\nthis list/table (`runtime-evaluated-base-classes = [\"base.Base\"]`) to exempt\nmodels from being moved into type-checking blocks.\n\n```toml\n[tool.ruff.lint.flake8-type-checking]\nruntime-evaluated-base-classes = [\"pydantic.BaseModel\"]\n```\n\nOr\n\n```toml\n[tool.ruff.lint.flake8-type-checking.runtime-evaluated-base-classes]\n\"pydantic.BaseModel\" = \"required\"\n```\n\nFor some use-cases like SQLAlchemy's `sqlalchemy.orm.DeclarativeBase` it makes more\nsense to mark the class as runtime `\"ambiguous\"`, since references to other models do\nnot need to resolve at runtime. With these semantics ruff will assume the annotations\nalready contain all of the correct forward references, and will not attempt to move\nrelated imports and/or quote annotations.\n\n```toml\n[tool.ruff.lint.flake8-type-checking.runtime-evaluated-base-classes]\n\"sqlalchemy.orm.DeclarativeBase\" = \"ambiguous\"\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnnotationSemanticsSelection"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "runtime-evaluated-decorators": {
-          "description": "Exempt classes and functions decorated with any of the enumerated\ndecorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator\n(for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nfrom fastapi import FastAPI\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
+          "description": "Exempt classes and functions decorated with any of the enumerated\ndecorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator\n(for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nfrom fastapi import FastAPI\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.\n\nJust like with `runtime-evaluated-base-classes` it's possible to mark\ndecorators as runtime `\"ambiguous\"`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnnotationSemanticsSelection"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "strict": {
           "description": "Enforce `TC001`, `TC002`, and `TC003` rules even when valid runtime imports\nare present for the same module.\n\nSee flake8-type-checking's [strict](https://github.com/snok/flake8-type-checking#strict) option.",
@@ -2148,7 +2184,7 @@
           }
         },
         "dummy-variable-rgx": {
-          "description": "A regular expression used to identify \"dummy\" variables, or those which\nshould be ignored when enforcing (e.g.) unused-variable rules. The\ndefault expression matches `_`, `__`, and `_var`, but not `_var_`.",
+          "description": "A regular expression used to identify \"dummy\" variables, or those which\nshould be ignored when enforcing (e.g.) unused-variable rules. The\ndefault expression matches `_`, `__`, `_var`, and `_次`, but not `_var_`\nor `_次_`.",
           "type": [
             "string",
             "null"
@@ -2945,6 +2981,26 @@
             "$ref": "#/definitions/ConstantType"
           }
         },
+        "allow-magic-values": {
+          "description": "Specific literal values to ignore when used as \"magic values\" (see `PLR2004`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/AllowedValue"
+          }
+        },
+        "extend-allow-magic-values": {
+          "description": "Literal values to ignore when used as \"magic values\" (see `PLR2004`),\nin addition to those included in [`allow-magic-values`](#lint_pylint_allow-magic-values).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/AllowedValue"
+          }
+        },
         "max-args": {
           "description": "Maximum number of arguments allowed for a function or method definition\n(see `PLR0913`).",
           "type": [
@@ -3125,7 +3181,7 @@
           ]
         },
         "strictly-empty-init-modules": {
-          "description": "Whether to require `__init__.py` files to contain no code at all, including imports and\ndocstrings (see `RUF067`).",
+          "description": "Whether to require `__init__.py` files to contain no code at all, including imports and\n`__all__` assignments (see `RUF067`). Module and attribute docstrings are still allowed.",
           "type": [
             "boolean",
             "null"
@@ -4552,6 +4608,7 @@
         "UP05",
         "UP050",
         "UP051",
+        "UP052",
         "W",
         "W1",
         "W19",
@@ -4712,6 +4769,7 @@
         "complex-structure",
         "complexity",
         "constant-imported-as-non-constant",
+        "context-manager-iterator",
         "continue-in-finally",
         "continue-outside-loop",
         "convert-named-tuple-functional-to-class",
@@ -5254,6 +5312,7 @@
         "self-or-cls-assignment",
         "set-attr-with-constant",
         "shallow-copy-environ",
+        "shared-clock-mock",
         "shebang-leading-whitespace",
         "shebang-missing-executable-file",
         "shebang-missing-python",
@@ -5476,6 +5535,7 @@
         "unnecessary-placeholder",
         "unnecessary-range-start",
         "unnecessary-regular-expression",
+        "unnecessary-regular-expression-compile",
         "unnecessary-return-none",
         "unnecessary-round",
         "unnecessary-spread",
@@ -5550,6 +5610,21 @@
         "zip-dict-keys-and-values",
         "zip-instead-of-pairwise",
         "zip-without-explicit-strict"
+      ]
+    },
+    "RuntimeSemantics": {
+      "description": "Represents the desired runtime semantics for a set of type definitions\n\nNote that the order of variants is important here. `Required` has the\nhighest precedence when calling `RuntimeSemantics::combine` on two\nseparate targeting sources. (E.g. classes can be targeted both via\ntheir decorators, but also via their base classes, so this determines\nwhat happens when two sources disagree)",
+      "oneOf": [
+        {
+          "description": "Assume that all targeted annotations are going to be evaluated at runtime\nat some point. So all referenced bindings need to be available at runtime.",
+          "type": "string",
+          "const": "required"
+        },
+        {
+          "description": "Do not make any assumptions about how the targeted annotations are going\nto be interacted with, assume the current execution context of any referenced\nbindings is already correct.",
+          "type": "string",
+          "const": "ambiguous"
+        }
       ]
     },
     "Strictness": {
