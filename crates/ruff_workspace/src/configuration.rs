@@ -3,6 +3,7 @@
 //! the various parameters.
 
 use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::env::VarError;
 use std::num::{NonZeroU8, NonZeroU16};
@@ -32,7 +33,7 @@ use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
     CompiledPerFileIgnoreList, CompiledPerFileTargetVersionList, ExtensionMapping, FilePattern,
     FilePatternSet, GlobPath, OutputFormat, PerFileIgnore, PerFileTargetVersion, PreviewMode,
-    RequiredVersion, UnsafeFixes,
+    PythonVersion, RequiredVersion, UnsafeFixes,
 };
 use ruff_linter::settings::{
     DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, LinterSettings, TASK_TAGS, TargetVersion,
@@ -198,6 +199,8 @@ pub struct Configuration {
     pub builtins: Option<Vec<String>>,
     pub namespace_packages: Option<Vec<PathBuf>>,
     pub src: Option<Vec<PathBuf>>,
+    /// The target version, which can be outside the range of versions that Ruff supports when
+    /// it's inferred from `requires-python`. [`Configuration::into_settings`] clamps it.
     pub target_version: Option<ast::PythonVersion>,
     pub per_file_target_version: Option<Vec<PerFileTargetVersion>>,
 
@@ -216,8 +219,9 @@ impl Configuration {
             validate_required_version(required_version)?;
         }
 
-        let linter_target_version = TargetVersion(self.target_version);
-        let target_version = self.target_version.unwrap_or_default();
+        let target_version = self.target_version.map(clamp_target_version);
+        let linter_target_version = TargetVersion(target_version);
+        let target_version = target_version.unwrap_or_default();
         let global_preview = self.preview.unwrap_or_default();
 
         let format = self.format;
@@ -705,8 +709,8 @@ impl Configuration {
             self.target_version = self.target_version.or_else(|| {
                 let dir = initial_config_path.parent()?;
                 let fallback = pyproject::find_fallback_target_version(dir)?;
-                debug!("Derived `target-version` from `requires-python`: {fallback:?}");
-                Some(fallback.into())
+                debug!("Derived `target-version` from `requires-python`: {fallback}");
+                Some(fallback)
             });
         }
         // If the origin is UserSettings, we need more information
@@ -1493,6 +1497,35 @@ fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> {
     Ok(paths)
 }
 
+/// Clamp the target version into the range of versions that `target-version` accepts, with a
+/// warning if it was outside that range.
+///
+/// The range comes from [`PythonVersion`] itself, so a version outside it can only be inferred from
+/// `requires-python`. This includes versions that are only supported in preview, which can be newer
+/// than [`ast::PythonVersion::latest`].
+fn clamp_target_version(version: ast::PythonVersion) -> ast::PythonVersion {
+    let supported = PythonVersion::iter().map(ast::PythonVersion::from);
+    // `PythonVersion` always has variants, so this `else` branch only exists to avoid an `unwrap`.
+    let (Some(oldest), Some(newest)) = (supported.clone().min(), supported.max()) else {
+        return version;
+    };
+    let clamped = version.clamp(oldest, newest);
+    let comparison = match version.cmp(&clamped) {
+        Ordering::Less => "older than the oldest",
+        Ordering::Equal => return clamped,
+        Ordering::Greater => "newer than the newest",
+    };
+    warn_user_once_by_message!(
+        "The minimum Python version allowed by `requires-python` ({version}) is {comparison} \
+        version supported by Ruff ({clamped}). Rules that depend on the target version will assume \
+        Python {clamped}. To silence this warning, set `target-version = \"py{major}{minor}\"` in \
+        the project's Ruff configuration, such as `[tool.ruff]` in `pyproject.toml`.",
+        major = clamped.major,
+        minor = clamped.minor,
+    );
+    clamped
+}
+
 fn warn_about_deprecated_top_level_lint_options(
     top_level_options: &LintCommonOptions,
     path: Option<&Path>,
@@ -1831,7 +1864,11 @@ mod tests {
     use ruff_linter::rule_selector::PreviewOptions;
     use ruff_linter::settings::types::PreviewMode;
 
-    use crate::configuration::{LintConfiguration, RuleSelection};
+    use ruff_linter::settings::types::PythonVersion;
+    use ruff_python_ast as ast;
+    use strum::IntoEnumIterator;
+
+    use crate::configuration::{LintConfiguration, RuleSelection, clamp_target_version};
     use crate::options::PydocstyleOptions;
 
     const PREVIEW_RULES: &[Rule] = &[
@@ -2323,5 +2360,41 @@ mod tests {
         )?;
 
         Ok(())
+    }
+
+    #[test]
+    fn clamp_target_version_to_supported_range() {
+        let newest = PythonVersion::iter().map(ast::PythonVersion::from).max();
+
+        // Lower than the oldest `target-version`.
+        assert_eq!(
+            clamp_target_version(ast::PythonVersion { major: 2, minor: 7 }),
+            ast::PythonVersion::PY37
+        );
+        assert_eq!(
+            clamp_target_version(ast::PythonVersion { major: 3, minor: 4 }),
+            ast::PythonVersion::PY37
+        );
+
+        // Higher than the newest `target-version`.
+        assert_eq!(
+            Some(clamp_target_version(ast::PythonVersion {
+                major: 3,
+                minor: 99
+            })),
+            newest
+        );
+
+        // Within the range of `target-version` values.
+        assert_eq!(
+            clamp_target_version(ast::PythonVersion::PY37),
+            ast::PythonVersion::PY37
+        );
+        assert_eq!(
+            clamp_target_version(ast::PythonVersion::PY310),
+            ast::PythonVersion::PY310
+        );
+        // The newest `target-version` is kept as-is.
+        assert_eq!(newest.map(clamp_target_version), newest);
     }
 }

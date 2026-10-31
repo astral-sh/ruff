@@ -10,9 +10,10 @@ use ruff_db::system::SystemPathBuf;
 use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use strum::IntoEnumIterator;
 
-use ruff_linter::settings::types::{PythonVersion, RequiredVersion};
+use ruff_linter::settings::types::RequiredVersion;
+use ruff_linter::warn_user_once_by_message;
+use ruff_python_ast::PythonVersion;
 
 use crate::options::{Options, validate_required_version};
 
@@ -142,8 +143,11 @@ fn check_required_version(value: &toml::de::DeTable, table_path: &[&str]) -> Res
     Ok(())
 }
 
-/// Derive target version from `required-version` in `pyproject.toml`, if
+/// Derive target version from `requires-python` in `pyproject.toml`, if
 /// such a file exists in an ancestor directory.
+///
+/// The returned version can be outside the range of versions that Ruff supports. See
+/// [`get_minimum_supported_version`].
 pub fn find_fallback_target_version<P: AsRef<Path>>(path: P) -> Option<PythonVersion> {
     for directory in path.as_ref().ancestors() {
         if let Some(fallback) = get_fallback_target_version(directory) {
@@ -179,32 +183,34 @@ pub fn find_user_settings_toml() -> Option<PathBuf> {
 }
 
 /// Load `Options` from a `pyproject.toml` or `ruff.toml` file.
-pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
+///
+/// For a `pyproject.toml` file without a `target-version`, this also returns the minimum Python
+/// version allowed by its `requires-python`. That version is returned separately because it can be
+/// outside the range of versions that Ruff supports, which [`Options::target_version`] can't
+/// represent. See [`get_minimum_supported_version`].
+pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<(Options, Option<PythonVersion>)> {
     let path = path.as_ref();
     if path.ends_with("pyproject.toml") {
         let pyproject = parse_pyproject_toml(path)?;
-        let mut ruff = pyproject
+        let ruff = pyproject
             .tool
             .and_then(|tool| tool.ruff)
             .unwrap_or_default();
-        if ruff.target_version.is_none() {
-            if let Some(project) = pyproject.project {
-                if let Some(requires_python) = project.requires_python {
-                    ruff.target_version = get_minimum_supported_version(&requires_python);
-                }
-            }
-        }
-        Ok(ruff)
-    } else {
-        let ruff = parse_ruff_toml(path);
-        if let Ok(ruff) = ruff {
-            if ruff.target_version.is_none() {
-                debug!("No `target-version` found in `{}`", path.display());
-            }
-            Ok(ruff)
+        let requires_python_version = if ruff.target_version.is_none()
+            && let Some(project) = pyproject.project
+            && let Some(requires_python) = project.requires_python
+        {
+            get_minimum_supported_version(&requires_python, path)
         } else {
-            ruff
+            None
+        };
+        Ok((ruff, requires_python_version))
+    } else {
+        let ruff = parse_ruff_toml(path)?;
+        if ruff.target_version.is_none() {
+            debug!("No `target-version` found in `{}`", path.display());
         }
+        Ok((ruff, None))
     }
 }
 
@@ -225,25 +231,37 @@ fn get_fallback_target_version(dir: &Path) -> Option<PythonVersion> {
         }
     };
 
-    if let Some(project) = pyproject.project {
-        if let Some(requires_python) = project.requires_python {
-            return get_minimum_supported_version(&requires_python);
-        }
+    if let Some(project) = pyproject.project
+        && let Some(requires_python) = project.requires_python
+    {
+        return get_minimum_supported_version(&requires_python, &pyproject_path);
     }
     None
 }
 
 /// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
-fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<PythonVersion> {
-    /// Truncate a version to its major and minor components.
-    fn major_minor(version: &Version) -> Option<Version> {
-        let major = version.release().first()?;
-        let minor = version.release().get(1)?;
-        Some(Version::new([major, minor]))
+///
+/// The returned version is not clamped to the range of versions that Ruff supports, so that
+/// [`Configuration::into_settings`](crate::configuration::Configuration::into_settings) can warn
+/// about it only when it ends up as the target version. For example, `>=3.4` returns Python 3.4,
+/// which is then treated as Python 3.7, unless a `--target-version` argument overrides it.
+///
+/// A minimum version that can't be a valid Python version, such as `>=4` or `>=3.300`, is ignored
+/// with a warning, and Ruff continues as if `requires-python` were not set..
+fn get_minimum_supported_version(
+    requires_version: &VersionSpecifiers,
+    path: &Path,
+) -> Option<PythonVersion> {
+    /// Truncate a version to its major and minor components. A missing minor component is treated
+    /// as `0`, so `>=3` is equivalent to `>=3.0`.
+    fn major_minor(version: &Version) -> Option<(u64, u64)> {
+        let major = *version.release().first()?;
+        let minor = version.release().get(1).copied().unwrap_or(0);
+        Some((major, minor))
     }
 
     // Extract the minimum supported version from the specifiers.
-    let minimum_version = requires_version
+    let (major, minor) = requires_version
         .iter()
         .filter(|specifier| {
             matches!(
@@ -259,19 +277,31 @@ fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option
         .filter_map(|specifier| major_minor(specifier.version()))
         .min()?;
 
-    debug!("Detected minimum supported `requires-python` version: {minimum_version}");
+    debug!("Detected minimum supported `requires-python` version: {major}.{minor}");
 
-    // Find the Python version that matches the minimum supported version.
-    PythonVersion::iter().find(|version| Version::from(*version) == minimum_version)
+    if let Ok(major @ ..=3) = u8::try_from(major)
+        && let Ok(minor) = u8::try_from(minor)
+    {
+        Some(PythonVersion { major, minor })
+    } else {
+        warn_user_once_by_message!(
+            "Ignoring `requires-python = \"{requires_version}\"` in `{path}`: {major}.{minor} is not \
+            a valid Python version.",
+            path = path.display(),
+        );
+        None
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::path::Path;
     use std::str::FromStr;
     use std::sync::Arc;
 
     use anyhow::{Context, Result};
+    use pep440_rs::VersionSpecifiers;
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
@@ -279,10 +309,13 @@ mod tests {
     use ruff_linter::UnresolvedRuleSelector;
     use ruff_linter::line_width::LineLength;
     use ruff_linter::settings::types::PatternPrefixPair;
+    use ruff_python_ast::PythonVersion;
     use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 
     use crate::options::{Flake8BuiltinsOptions, LintCommonOptions, LintOptions, Options};
-    use crate::pyproject::{Pyproject, Tools, find_settings_toml, parse_pyproject_toml};
+    use crate::pyproject::{
+        Pyproject, Tools, find_settings_toml, get_minimum_supported_version, parse_pyproject_toml,
+    };
 
     #[test]
     fn deserialize() -> Result<()> {
@@ -596,5 +629,46 @@ per-file-ignores = { "__init__.py" = ["F401"] }
         assert!(result.is_ok());
         let result = PatternPrefixPair::from_str("bar:E503");
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn minimum_supported_version() -> Result<()> {
+        let minimum = |specifiers: &str| -> Result<Option<PythonVersion>> {
+            Ok(get_minimum_supported_version(
+                &VersionSpecifiers::from_str(specifiers)?,
+                Path::new("pyproject.toml"),
+            ))
+        };
+
+        assert_eq!(minimum(">=3.8")?, Some(PythonVersion::PY38));
+        assert_eq!(minimum(">=3.8.2")?, Some(PythonVersion::PY38));
+        assert_eq!(minimum(">=3.8,<3.12")?, Some(PythonVersion::PY38));
+        assert_eq!(minimum("<3.12")?, None);
+
+        // A missing minor component is treated as `0`.
+        assert_eq!(minimum(">=3")?, Some(PythonVersion { major: 3, minor: 0 }));
+
+        // Versions outside the supported range are returned as-is, to be clamped later.
+        assert_eq!(
+            minimum(">=2.7")?,
+            Some(PythonVersion { major: 2, minor: 7 })
+        );
+        assert_eq!(
+            minimum(">=3.4")?,
+            Some(PythonVersion { major: 3, minor: 4 })
+        );
+        assert_eq!(
+            minimum(">=3.99")?,
+            Some(PythonVersion {
+                major: 3,
+                minor: 99
+            })
+        );
+
+        // Versions that can't be a Python version are ignored.
+        assert_eq!(minimum(">=4")?, None);
+        assert_eq!(minimum(">=3.300")?, None);
+
+        Ok(())
     }
 }

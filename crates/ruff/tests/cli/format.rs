@@ -2510,6 +2510,44 @@ with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a
     Ok(())
 }
 
+/// A `requires-python` older than the oldest supported version is clamped to Python 3.7 for
+/// formatting too. Context managers can't be parenthesized like this before Python 3.10, so the
+/// formatter splits the last call instead. See astral-sh/ruff#29863.
+///
+/// ```
+/// tmp
+/// ├── pyproject.toml #<-- no [tool.ruff]
+/// └── test.py
+/// ```
+#[test]
+fn requires_python_older_than_supported_formatter() -> Result<()> {
+    let test = CliTest::with_file(
+        "pyproject.toml",
+        r#"[project]
+requires-python = ">= 3.4"
+"#,
+    )?;
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "test.py"])
+        .arg("-")
+        .pass_stdin(r#"
+with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open("a_really_long_baz") as baz:
+    pass
+"#), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    with open("a_really_long_foo") as foo, open("a_really_long_bar") as bar, open(
+        "a_really_long_baz"
+    ) as baz:
+        pass
+
+    ----- stderr -----
+    warning: The minimum Python version allowed by `requires-python` (3.4) is older than the oldest version supported by Ruff (3.7). Rules that depend on the target version will assume Python 3.7. To silence this warning, set `target-version = "py37"` in the project's Ruff configuration, such as `[tool.ruff]` in `pyproject.toml`.
+    "#);
+    Ok(())
+}
+
 /// Regression test for <https://github.com/astral-sh/ruff/issues/9381> with very helpful
 /// reproduction repo here: <https://github.com/lucasfijen/example_ruff_glob_bug>
 #[test]
