@@ -547,6 +547,19 @@ pub(crate) fn server_capabilities(
                 supported: Some(true),
                 change_notifications: Some(true.into()),
             }),
+            file_operations: Some(types::FileOperationOptions {
+                will_rename: Some(types::FileOperationRegistrationOptions::new(vec![
+                    types::FileOperationFilter::new(
+                        Some("file".to_string()),
+                        types::FileOperationPattern::new(
+                            "**/*.{py,pyi}".to_string(),
+                            Some(types::FileOperationPatternKind::File),
+                            None,
+                        ),
+                    ),
+                ])),
+                ..types::FileOperationOptions::default()
+            }),
             ..Default::default()
         }),
         type_hierarchy_provider: Some(true.into()),

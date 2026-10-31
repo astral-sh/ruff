@@ -136,7 +136,7 @@ use ty_python_semantic::{DefinitionResolution, HasType, SemanticModel};
 ///
 /// In the import from `facade`, `old` may or may not refer to the renamed module, so it is left
 /// unchanged. The import becomes `from facade import another, old`.
-fn will_rename_files(db: &dyn Db, renames: &[FileRename]) -> Vec<FileRenameEdit> {
+pub fn will_rename_files(db: &dyn Db, renames: &[FileRename]) -> Vec<FileRenameEdit> {
     let files: Vec<_> = db.project().files(db).iter().collect();
     let module_name_changes = ModuleNameChanges::new(db, renames);
     if module_name_changes.is_empty() {
@@ -153,21 +153,22 @@ fn will_rename_files(db: &dyn Db, renames: &[FileRename]) -> Vec<FileRenameEdit>
 }
 
 /// One Python file rename in a batch.
-struct FileRename {
+pub struct FileRename {
     /// The source file before the rename.
-    file: File,
+    pub file: File,
     /// The destination path, which need not exist yet.
-    new_path: SystemPathBuf,
+    pub new_path: SystemPathBuf,
 }
 
 /// A replacement and the file range containing it.
-type FileRenameEdit = RangedValue<String>;
+pub type FileRenameEdit = RangedValue<String>;
 
 /// Maps old module names to new module names for supported file renames.
 struct ModuleNameChanges<'db> {
     // A map from old module name to new module name for supported rename operations.
     module_renames: FxHashMap<&'db ModuleName, ModuleName>,
     // The module basename for each key in `module_renames` (e.g., `old` in `pkg.old`).
+    // Used to filter out irrelevant files and identifiers before semantic analysis.
     old_module_basenames: FxHashSet<&'db str>,
     // Used to check whether a source file may contain an old module basename.
     old_module_basename_matchers: Vec<NameMatcher<'db>>,
