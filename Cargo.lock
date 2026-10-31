@@ -3223,6 +3223,7 @@ name = "ruff_command_line"
 version = "0.0.20"
 dependencies = [
  "argfile",
+ "clap",
 ]
 
 [[package]]

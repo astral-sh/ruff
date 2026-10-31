@@ -59,6 +59,12 @@ Used to determine the name of the active Conda environment.
 Used to detect the path of an active Conda environment.
 If both `VIRTUAL_ENV` and `CONDA_PREFIX` are present, `VIRTUAL_ENV` will be preferred.
 
+### `FORCE_COLOR`
+
+Controls color in `ty check` output, including when piped.
+Any non-empty value forces color, and an empty value disables it.
+`--color always` and `--color never` take precedence.
+
 ### `PYTHONPATH`
 
 Adds additional directories to ty's search paths.
