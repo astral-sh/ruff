@@ -1,0 +1,407 @@
+---
+source: crates/ruff_linter/src/rules/flake8_import_conventions/mod.rs
+---
+ICN003 [*] Members of `math` should not be imported explicitly
+ --> banned_from_fix.py:2:5
+  |
+1 | def simple():
+2 |     from math import sqrt
+  |     ^^^^^^^^^^^^^^^^^^^^^
+3 |     return sqrt(9)
+  |
+help: Import `math` instead
+  |
+1 | def simple():
+  -     from math import sqrt
+  -     return sqrt(9)
+2 +     import math
+3 +     return math.sqrt(9)
+4 |
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `math` should not be imported explicitly
+ --> banned_from_fix.py:7:5
+  |
+6 | def aliased_members():
+7 |     from math import sqrt as root, ceil, pi as PI
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+8 |     return root(9), ceil(PI)
+  |
+help: Import `math` instead
+  |
+6 | def aliased_members():
+  -     from math import sqrt as root, ceil, pi as PI
+  -     return root(9), ceil(PI)
+7 +     import math
+8 +     return math.sqrt(9), math.ceil(math.pi)
+9 |
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `math` should not be imported explicitly
+  --> banned_from_fix.py:12:5
+   |
+11 | def closure_and_shadowing():
+12 |     from math import sqrt
+   |     ^^^^^^^^^^^^^^^^^^^^^
+13 |
+14 |     def closure():
+   |
+help: Import `math` instead
+   |
+11 | def closure_and_shadowing():
+   -     from math import sqrt
+12 +     import math
+13 |
+14 |     def closure():
+   -         return sqrt(16)
+15 +         return math.sqrt(16)
+16 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `math` should not be imported explicitly
+  --> banned_from_fix.py:24:5
+   |
+23 | def comprehensions():
+24 |     from math import sqrt
+   |     ^^^^^^^^^^^^^^^^^^^^^
+25 |     return [sqrt(n) for n in (4, 9)], [sqrt for sqrt in (1, 2)]
+   |
+help: Import `math` instead
+   |
+23 | def comprehensions():
+   -     from math import sqrt
+   -     return [sqrt(n) for n in (4, 9)], [sqrt for sqrt in (1, 2)]
+24 +     import math
+25 +     return [math.sqrt(n) for n in (4, 9)], [sqrt for sqrt in (1, 2)]
+26 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `math` should not be imported explicitly
+  --> banned_from_fix.py:29:5
+   |
+28 | def default_argument():
+29 |     from math import sqrt
+   |     ^^^^^^^^^^^^^^^^^^^^^
+30 |
+31 |     def inner(value=sqrt(9)):
+   |
+help: Import `math` instead
+   |
+28 | def default_argument():
+   -     from math import sqrt
+29 +     import math
+30 |
+   -     def inner(value=sqrt(9)):
+31 +     def inner(value=math.sqrt(9)):
+32 |         return value
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `pandas` should not be imported explicitly
+  --> banned_from_fix.py:38:5
+   |
+37 | def configured_alias():
+38 |     from pandas import Series as S, DataFrame
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+39 |     return S(), DataFrame()
+   |
+help: Import `pandas` instead
+   |
+37 | def configured_alias():
+   -     from pandas import Series as S, DataFrame
+   -     return S(), DataFrame()
+38 +     import pandas as pd
+39 +     return pd.Series(), pd.DataFrame()
+40 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `logging.config` should not be imported explicitly
+  --> banned_from_fix.py:43:5
+   |
+42 | def dotted_module():
+43 |     from logging.config import dictConfig as configure
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+44 |     configure({})
+   |
+help: Import `logging.config` instead
+   |
+42 | def dotted_module():
+   -     from logging.config import dictConfig as configure
+   -     configure({})
+43 +     import logging.config
+44 +     logging.config.dictConfig({})
+45 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `math` should not be imported explicitly
+  --> banned_from_fix.py:49:5
+   |
+47 | def reuse_alias():
+48 |     import math as m
+49 |     from math import sqrt
+   |     ^^^^^^^^^^^^^^^^^^^^^
+50 |     return sqrt(9), m.pi
+   |
+help: Import `math` instead
+   |
+48 |     import math as m
+   -     from math import sqrt
+   -     return sqrt(9), m.pi
+49 +     return m.sqrt(9), m.pi
+50 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `logging.config` should not be imported explicitly
+  --> banned_from_fix.py:55:5
+   |
+53 | def reuse_dotted_module():
+54 |     import logging.config
+55 |     from logging.config import dictConfig
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+56 |     dictConfig({})
+   |
+help: Import `logging.config` instead
+   |
+54 |     import logging.config
+   -     from logging.config import dictConfig
+   -     dictConfig({})
+55 +     logging.config.dictConfig({})
+56 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `math` should not be imported explicitly
+  --> banned_from_fix.py:60:5
+   |
+59 | def repeated_imports():
+60 |     from math import sqrt
+   |     ^^^^^^^^^^^^^^^^^^^^^
+61 |     from math import ceil
+62 |     return sqrt(9), ceil(1.1)
+   |
+help: Import `math` instead
+   |
+59 | def repeated_imports():
+   -     from math import sqrt
+60 +     import math
+61 |     from math import ceil
+   -     return sqrt(9), ceil(1.1)
+62 +     return math.sqrt(9), ceil(1.1)
+63 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `math` should not be imported explicitly
+  --> banned_from_fix.py:61:5
+   |
+59 | def repeated_imports():
+60 |     from math import sqrt
+61 |     from math import ceil
+   |     ^^^^^^^^^^^^^^^^^^^^^
+62 |     return sqrt(9), ceil(1.1)
+   |
+help: Import `math` instead
+   |
+60 |     from math import sqrt
+   -     from math import ceil
+   -     return sqrt(9), ceil(1.1)
+61 +     import math
+62 +     return sqrt(9), math.ceil(1.1)
+63 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `math` should not be imported explicitly
+  --> banned_from_fix.py:66:5
+   |
+65 |   def parenthesized():
+66 | /     from math import (
+67 | |         sqrt,
+68 | |         ceil,
+69 | |     )
+   | |_____^
+70 |       return sqrt(9), ceil(1.1)
+   |
+help: Import `math` instead
+   |
+65 | def parenthesized():
+   -     from math import (
+   -         sqrt,
+   -         ceil,
+   -     )
+   -     return sqrt(9), ceil(1.1)
+66 +     import math
+67 +     return math.sqrt(9), math.ceil(1.1)
+68 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `math` should not be imported explicitly
+  --> banned_from_fix.py:74:5
+   |
+73 | def trailing_comment():
+74 |     from math import sqrt  # Keep this comment.
+   |     ^^^^^^^^^^^^^^^^^^^^^
+75 |     return sqrt(9)
+   |
+help: Import `math` instead
+   |
+73 | def trailing_comment():
+   -     from math import sqrt  # Keep this comment.
+   -     return sqrt(9)
+74 +     import math  # Keep this comment.
+75 +     return math.sqrt(9)
+76 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `math` should not be imported explicitly
+  --> banned_from_fix.py:79:5
+   |
+78 | def semicolon():
+79 |     from math import sqrt; result = sqrt(9)
+   |     ^^^^^^^^^^^^^^^^^^^^^
+80 |     return result
+   |
+help: Import `math` instead
+   |
+78 | def semicolon():
+   -     from math import sqrt; result = sqrt(9)
+79 +     import math; result = math.sqrt(9)
+80 |     return result
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `math` should not be imported explicitly
+  --> banned_from_fix.py:84:5
+   |
+83 | def unused():
+84 |     from math import sqrt
+   |     ^^^^^^^^^^^^^^^^^^^^^
+help: Import `math` instead
+   |
+83 | def unused():
+   -     from math import sqrt
+84 +     import math
+85 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `typing` should not be imported explicitly
+  --> banned_from_fix.py:88:5
+   |
+87 | def annotations():
+88 |     from typing import Optional, Union
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+89 |     value: Optional[Union[int, str]] = None
+90 |     return value
+   |
+help: Import `typing` instead
+   |
+87 | def annotations():
+   -     from typing import Optional, Union
+   -     value: Optional[Union[int, str]] = None
+88 +     import typing
+89 +     value: typing.Optional[typing.Union[int, str]] = None
+90 |     return value
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `pandas` should not be imported explicitly
+  --> banned_from_fix.py:96:9
+   |
+94 |     import typing
+95 |     if typing.TYPE_CHECKING:
+96 |         from pandas import Series
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+97 |         value: Series
+   |
+help: Import `pandas` instead
+   |
+95 |     if typing.TYPE_CHECKING:
+   -         from pandas import Series
+   -         value: Series
+96 +         import pandas as pd
+97 +         value: pd.Series
+98 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `math` should not be imported explicitly
+   --> banned_from_fix.py:101:5
+    |
+100 | def attribute_and_f_string():
+101 |     from math import sqrt
+    |     ^^^^^^^^^^^^^^^^^^^^^
+102 |     return sqrt.__name__, f"{sqrt(9)}"
+    |
+help: Import `math` instead
+    |
+100 | def attribute_and_f_string():
+    -     from math import sqrt
+    -     return sqrt.__name__, f"{sqrt(9)}"
+101 +     import math
+102 +     return math.sqrt.__name__, f"{math.sqrt(9)}"
+103 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `math` should not be imported explicitly
+   --> banned_from_fix.py:107:5
+    |
+105 | def suppressed_import():
+106 |     from math import sqrt  # noqa: ICN003
+107 |     from math import ceil
+    |     ^^^^^^^^^^^^^^^^^^^^^
+108 |     return sqrt(9), ceil(1.1)
+    |
+help: Import `math` instead
+    |
+106 |     from math import sqrt  # noqa: ICN003
+    -     from math import ceil
+    -     return sqrt(9), ceil(1.1)
+107 +     import math
+108 +     return sqrt(9), math.ceil(1.1)
+109 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `math` should not be imported explicitly
+   --> banned_from_fix.py:112:18
+    |
+111 | def reuse_semicolon():
+112 |     import math; from math import sqrt; print(sqrt(9))
+    |                  ^^^^^^^^^^^^^^^^^^^^^
+help: Import `math` instead
+    |
+111 | def reuse_semicolon():
+    -     import math; from math import sqrt; print(sqrt(9))
+112 +     import math; print(math.sqrt(9))
+113 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+ICN003 [*] Members of `math` should not be imported explicitly
+   --> banned_from_fix.py:118:9
+    |
+116 |     if condition:
+117 |         import math
+118 |         from math import sqrt
+    |         ^^^^^^^^^^^^^^^^^^^^^
+119 |         print(sqrt(9))
+    |
+help: Import `math` instead
+    |
+117 |         import math
+    -         from math import sqrt
+    -         print(sqrt(9))
+118 +         print(math.sqrt(9))
+    |
+note: This is an unsafe fix and may change runtime behavior

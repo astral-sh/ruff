@@ -3622,6 +3622,7 @@ pub(crate) fn check_ast(
     analyze::deferred_comprehensions(&mut checker);
     analyze::definitions(&mut checker);
     analyze::bindings(&checker);
+    analyze::deferred_imports(&mut checker);
     analyze::unresolved_references(&checker);
     analyze::deferred_with_statements(&mut checker);
 
