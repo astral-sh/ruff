@@ -181,11 +181,19 @@ fn keyword_argument_hover_contents<'db>(
         &parameter.label,
         parameter.is_keyword_variadic,
     ))];
-    if let Some(documentation) = signature
+    let documentation = signature
         .definition
         .and_then(|definition| docstring_for_call_definition(db, definition))
         .and_then(|docstring| documentation_for_parameter(&docstring, &parameter.name))
-    {
+        .or_else(|| {
+            // Synthesized parameters, such as dataclass fields, have no callable
+            // docstring. Fall back to the parameter's own definition, which can
+            // carry an attribute docstring.
+            let definition = parameter.definition?;
+            let docstring = docstring_for_call_definition(db, definition)?;
+            Some(DocstringFragment::new(&docstring.render_plaintext()))
+        });
+    if let Some(documentation) = documentation {
         contents.push(HoverContent::DocstringFragment(documentation));
     }
 

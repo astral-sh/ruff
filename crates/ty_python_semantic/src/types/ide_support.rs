@@ -593,6 +593,12 @@ pub struct CallSignatureParameter<'db> {
 
     /// True if the parameter can absorb arbitrarily many keyword arguments.
     pub is_keyword_variadic: bool,
+
+    /// The source definition this parameter was derived from, if any.
+    ///
+    /// Synthesized parameters, such as dataclass fields, retain their field
+    /// definition so IDE features can look up attribute docstrings.
+    pub definition: Option<Definition<'db>>,
 }
 
 impl<'db> CallSignatureDetails<'db> {
@@ -683,6 +689,7 @@ fn displayed_parameters_for_signature<'db>(
                     is_positional_only: parameter.is_positional_only(),
                     is_variadic: parameter.is_variadic(),
                     is_keyword_variadic: parameter.is_keyword_variadic(),
+                    definition: parameter.definition(),
                 });
             }
 
@@ -717,6 +724,7 @@ fn displayed_parameters_for_signature<'db>(
                     is_positional_only: false,
                     is_variadic: true,
                     is_keyword_variadic: true,
+                    definition: None,
                 }],
                 vec![Some(0); parameters.len()],
             )
