@@ -910,6 +910,18 @@ mod tests {
     };
 
     #[test]
+    fn from_dotted_name() {
+        assert_eq!(
+            QualifiedName::from_dotted_name("typing.List").segments(),
+            ["typing", "List"]
+        );
+        assert_eq!(
+            QualifiedName::from_dotted_name("list").segments(),
+            ["", "list"]
+        );
+    }
+
+    #[test]
     fn qualify() {
         let name = QualifiedName::user_defined("numpy.linalg");
         let expr = Expr::Name(ExprName {

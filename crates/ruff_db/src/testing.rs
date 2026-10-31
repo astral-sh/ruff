@@ -227,6 +227,20 @@ pub struct LoggingGuard {
 }
 
 #[test]
+fn default_logging_enables_ty_and_ruff_events() {
+    let _guard = setup_logging();
+    assert!(tracing::enabled!(target: "ty", tracing::Level::INFO));
+    assert!(tracing::enabled!(target: "ruff", tracing::Level::INFO));
+}
+
+#[test]
+fn logging_with_target_filter() {
+    let _guard = setup_logging_with_filter("ty_module_resolver::resolver").unwrap();
+    assert!(tracing::enabled!(target: "ty_module_resolver::resolver", tracing::Level::INFO));
+    assert!(!tracing::enabled!(target: "ruff", tracing::Level::INFO));
+}
+
+#[test]
 fn query_was_not_run() {
     use crate::tests::TestDb;
     use salsa::prelude::*;

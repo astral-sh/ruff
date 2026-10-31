@@ -17,4 +17,5 @@ serde = { workspace = true, optional = true }
 workspace = true
 
 [lib]
+doctest = false
 test = false

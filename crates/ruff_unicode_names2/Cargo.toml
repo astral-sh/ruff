@@ -20,6 +20,7 @@ ruff_unicode_names2_generator = { workspace = true }
 rand = { workspace = true }
 
 [lib]
+doctest = false
 name = "unicode_names2"
 # Upstream unit tests, benchmarks, and macro doctests require nightly Rust.
 test = false

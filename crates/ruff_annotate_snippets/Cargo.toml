@@ -97,5 +97,6 @@ wildcard_imports = "warn"
 zero_sized_map_values = "warn"
 
 [lib]
+doctest = false
 name = "annotate_snippets"
 test = false

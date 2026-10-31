@@ -137,3 +137,40 @@ pub fn is_cased_uppercase(s: &str) -> bool {
     }
     cased
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{is_cased_lowercase, is_cased_uppercase, is_lowercase, is_uppercase};
+
+    #[test]
+    fn lowercase() {
+        for text in ["abc", "a_b_c", "a2c", "αbc"] {
+            assert!(is_lowercase(text), "{text:?}");
+            assert!(is_cased_lowercase(text), "{text:?}");
+        }
+        for text in ["aBc", "ABC", "αBC", "Ωbc"] {
+            assert!(!is_lowercase(text), "{text:?}");
+            assert!(!is_cased_lowercase(text), "{text:?}");
+        }
+        for text in ["", "_"] {
+            assert!(is_lowercase(text), "{text:?}");
+            assert!(!is_cased_lowercase(text), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn uppercase() {
+        for text in ["ABC", "A_B_C", "A2C", "ΩBC"] {
+            assert!(is_uppercase(text), "{text:?}");
+            assert!(is_cased_uppercase(text), "{text:?}");
+        }
+        for text in ["aBc", "abc", "Ωbc", "αBC"] {
+            assert!(!is_uppercase(text), "{text:?}");
+            assert!(!is_cased_uppercase(text), "{text:?}");
+        }
+        for text in ["", "_"] {
+            assert!(is_uppercase(text), "{text:?}");
+            assert!(!is_cased_uppercase(text), "{text:?}");
+        }
+    }
+}

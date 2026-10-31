@@ -449,8 +449,6 @@ jobs:
         run: cargo test -p ty_python_semantic --test mdtest || true
       - name: "Run tests"
         run: uv run --locked --only-dev cargo insta test --all-features --unreferenced reject --test-runner nextest --disable-nextest-doctest
-      - name: "Run doctests"
-        run: cargo test --doc --all-features
       # A workspace build enables stacker through the CLI crates' dependencies.
       - name: "Check parser without stacker"
         run: cargo check --locked -p ruff_python_parser --no-default-features --all-targets
@@ -523,8 +521,6 @@ jobs:
           cache-python: true
       - name: "Run tests"
         run: uv run --locked --only-dev cargo nextest run --cargo-profile profiling --all-features
-      - name: "Run doctests"
-        run: cargo test --doc --profile profiling --all-features
 
   cargo-test-other:
     strategy:
@@ -572,9 +568,7 @@ jobs:
           enable-cache: "true"
           cache-python: true
       - name: "Run tests"
-        run: |
-          uv run --locked --only-dev cargo nextest run --all-features --profile ci
-          cargo test --all-features --doc
+        run: uv run --locked --only-dev cargo nextest run --all-features --profile ci
 
   cargo-test-wasm:
     name: "cargo test (wasm)"
