@@ -398,7 +398,7 @@ struct ParsedDraft<R> {
     unsupported_syntax_errors: Vec<UnsupportedSyntaxError>,
 }
 
-impl<T> ParsedDraft<flat::Handle<T>> {
+impl<T> ParsedDraft<flat::BuildId<T>> {
     fn freeze(self) -> Parsed<T> {
         Parsed {
             tree: self.storage.finish_tree(self.syntax),
@@ -685,6 +685,23 @@ mod tests {
     use ruff_text_size::Ranged;
 
     use super::{ParseError, parse_expression, parse_module};
+
+    #[test]
+    fn first_node_has_allocation_index_zero() -> Result<(), ParseError> {
+        let mut parsed = parse_expression("x")?;
+        assert!(parsed.prepare_for_cache(0, 0));
+
+        let first = parsed.expr().erase();
+        let ast = parsed.ast();
+        assert_eq!(first.handle().index(), 0);
+        assert_eq!(first.node_index().as_u32(), Some(0));
+        assert_eq!(ast.row(0), Some(first));
+        assert_eq!(ast.view(first.handle()), Some(first));
+        assert!(ast.nodes().eq([first, parsed.root().erase()]));
+        assert_eq!(ast.row(2), None);
+        assert_eq!(ast.row(u32::MAX), None);
+        Ok(())
+    }
 
     #[test]
     fn single_and_chained_comparison_fields() -> Result<(), ParseError> {

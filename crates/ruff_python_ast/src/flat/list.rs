@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::ops::Bound;
 use std::ops::Range;
 
-use super::{Ast, Handle, Node, View, offset, split_words};
+use super::{Ast, BuildId, Handle, Node, View, offset, split_words};
 use crate::{CmpOp, Expr, FString, NodeKind, StringLiteral};
 
 #[derive(Clone, Copy, Debug)]
@@ -144,7 +144,15 @@ impl<T: Node + 'static> ListItem for Handle<T> {
     type Element = Self;
 
     fn word(self) -> u64 {
-        u64::from(self.row)
+        u64::from(self.slot.get())
+    }
+}
+
+impl<T: Node + 'static> ListItem for BuildId<T> {
+    type Element = Handle<T>;
+
+    fn word(self) -> u64 {
+        u64::from(self.slot)
     }
 }
 
@@ -160,13 +168,21 @@ impl ListItem for (Option<Handle<Expr>>, Handle<Expr>) {
     type Element = crate::DictItem;
 
     fn word(self) -> u64 {
-        u64::from(self.0.map_or(super::ABSENT, |key| key.row)) | (u64::from(self.1.row) << 32)
+        u64::from(self.0.map_or(0, |key| key.slot.get())) | (u64::from(self.1.slot.get()) << 32)
+    }
+}
+
+impl ListItem for (Option<BuildId<Expr>>, BuildId<Expr>) {
+    type Element = crate::DictItem;
+
+    fn word(self) -> u64 {
+        u64::from(self.0.map_or(0, |key| key.slot)) | (u64::from(self.1.slot) << 32)
     }
 }
 
 pub enum FStringPartId {
-    Literal(Handle<StringLiteral>),
-    FString(Handle<FString>),
+    Literal(BuildId<StringLiteral>),
+    FString(BuildId<FString>),
 }
 
 impl ListItem for FStringPartId {
@@ -174,8 +190,8 @@ impl ListItem for FStringPartId {
 
     fn word(self) -> u64 {
         match self {
-            Self::Literal(value) => u64::from(value.row),
-            Self::FString(value) => u64::from(value.row),
+            Self::Literal(value) => u64::from(value.slot),
+            Self::FString(value) => u64::from(value.slot),
         }
     }
 }
@@ -402,14 +418,14 @@ impl<T: Node> List<'_, Handle<T>> {
             return stack.pop();
         };
         if !rest.is_empty() {
-            stack.extend(rest.iter().rev().map(|&row| Handle::new(row)));
+            stack.extend(rest.iter().rev().map(|&row| Handle::from_word(row)));
         }
-        Some(Handle::new(first))
+        Some(Handle::from_word(first))
     }
 
     #[inline]
     pub(super) fn push_reversed(self, stack: &mut Vec<Handle<super::Any>>) {
-        stack.extend(self.words().iter().rev().map(|&row| Handle::new(row)));
+        stack.extend(self.words().iter().rev().map(|&row| Handle::from_word(row)));
     }
 }
 

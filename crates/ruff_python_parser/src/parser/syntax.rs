@@ -1,15 +1,15 @@
 use ruff_python_ast::{
     self as ast, NodeKind,
-    flat::{self, Builder, Emit, Handle, ListId, ListItem},
+    flat::{self, BuildId, Builder, Emit, ListId, ListItem},
 };
 use ruff_text_size::{Ranged, TextRange};
 use thin_vec::ThinVec;
 
 /// The Pratt parser uses the range and kind of its current result for lookahead and errors.
-/// Only the four-byte handle is written into its parent.
+/// Only its four-byte slot is written into its parent.
 #[derive(Debug)]
 pub(crate) struct Node<T> {
-    pub(crate) id: Handle<T>,
+    pub(crate) id: BuildId<T>,
     pub(crate) range: TextRange,
     pub(crate) kind: NodeKind,
 }
@@ -30,7 +30,7 @@ impl<T: flat::Node> Node<T> {
     }
     pub(crate) fn from_view(view: flat::View<'_, T>) -> Self {
         Self {
-            id: view.handle(),
+            id: view.build_id(),
             range: view.range(),
             kind: view.node_kind(),
         }
@@ -46,7 +46,7 @@ pub(crate) trait Construct: Emit + Sized {
 impl<T: Emit> Construct for T {}
 
 impl<T: flat::Node + 'static> ListItem for Node<T> {
-    type Element = Handle<T>;
+    type Element = flat::Handle<T>;
     fn word(self) -> u64 {
         self.id.word()
     }

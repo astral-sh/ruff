@@ -6,6 +6,7 @@
 use std::fmt;
 use std::hash::BuildHasher;
 use std::marker::PhantomData;
+use std::num::NonZeroU32;
 
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -56,10 +57,12 @@ const fn split_words(field: u64) -> [u32; 2] {
     [field as u32, (field >> 32) as u32]
 }
 
-/// The identity of a node of type `T` within its AST.
+/// The nonzero slot of a node of type `T` within its AST.
+///
+/// Slot zero represents an absent child. This also lets `Option<Handle<T>>` fit in four bytes.
 #[repr(transparent)]
 pub struct Handle<T> {
-    row: u32,
+    slot: NonZeroU32,
     ty: PhantomData<fn() -> T>,
 }
 
@@ -73,7 +76,7 @@ impl<T> Clone for Handle<T> {
 
 impl<T> PartialEq for Handle<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.row == other.row
+        self.slot == other.slot
     }
 }
 
@@ -81,7 +84,7 @@ impl<T> Eq for Handle<T> {}
 
 impl<T> std::hash::Hash for Handle<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.row.hash(state);
+        self.row_number().hash(state);
     }
 }
 
@@ -90,34 +93,94 @@ impl<T> get_size2::GetSize for Handle<T> {}
 
 impl<T> fmt::Debug for Handle<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.row.fmt(f)
+        self.row_number().fmt(f)
     }
 }
 
 impl<T> Handle<T> {
-    const fn new(row: u32) -> Self {
+    const fn from_word(word: u32) -> Self {
         Self {
-            row,
+            slot: NonZeroU32::new(word).expect("slot zero is reserved for absent children"),
             ty: PhantomData,
         }
     }
 
+    const fn row_number(self) -> u32 {
+        self.slot.get() - 1
+    }
+
+    const fn slot(self) -> usize {
+        self.slot.get() as usize
+    }
+
+    /// Zero-based allocation index for dense per-node tables, in the order of [`Ast::nodes`].
     pub const fn index(self) -> usize {
-        self.row as usize
+        self.row_number() as usize
     }
 
     /// The key of this row when its arena is a cached module.
     /// Use the view's node index for a quoted annotation, which has its own namespace.
     pub fn module_index(self) -> NodeIndex {
-        NodeIndex::from(self.row)
+        NodeIndex::from(self.row_number())
     }
 
     const fn cast<U>(self) -> Handle<U> {
-        Handle::new(self.row)
+        Handle {
+            slot: self.slot,
+            ty: PhantomData,
+        }
     }
 }
 
-const _: () = assert!(size_of::<Handle<crate::Expr>>() == 4);
+const _: () = {
+    assert!(size_of::<Handle<crate::Expr>>() == 4);
+    assert!(size_of::<Option<Handle<crate::Expr>>>() == 4);
+};
+
+/// A child slot used while constructing a tree.
+///
+/// The builder reserves slot zero before emitting any nodes. Keeping the slot as a plain
+/// `u32` avoids validating it on every parser reduction.
+#[repr(transparent)]
+pub struct BuildId<T> {
+    slot: u32,
+    ty: PhantomData<fn() -> T>,
+}
+
+impl<T> Copy for BuildId<T> {}
+
+impl<T> Clone for BuildId<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T> fmt::Debug for BuildId<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.slot.fmt(f)
+    }
+}
+
+impl<T> BuildId<T> {
+    const fn new(slot: u32) -> Self {
+        Self {
+            slot,
+            ty: PhantomData,
+        }
+    }
+
+    const fn slot(self) -> usize {
+        self.slot as usize
+    }
+
+    const fn index(self) -> usize {
+        (self.slot - 1) as usize
+    }
+
+    const fn cast<U>(self) -> BuildId<U> {
+        BuildId::new(self.slot)
+    }
+}
 
 /// A node and the AST that owns its fields.
 #[repr(C)]
@@ -139,10 +202,11 @@ impl<T> Clone for View<'_, T> {
 
 impl<'a, T> View<'a, T> {
     #[inline]
-    fn new(ast: &'a Ast, handle: Handle<T>) -> Self {
+    fn from_slot(ast: &'a Ast, slot: usize) -> Self {
+        debug_assert_ne!(slot, 0);
         Self {
             ast,
-            row: &ast.rows[handle.index()],
+            row: &ast.rows[slot],
             ty: PhantomData,
         }
     }
@@ -151,18 +215,23 @@ impl<'a, T> View<'a, T> {
         self.ast
     }
 
+    /// Recovers the slot for use in another field of the same builder.
     #[inline]
     #[expect(
         clippy::cast_possible_truncation,
         reason = "Builder::push checks that every row index fits in a u32."
     )]
-    pub fn handle(self) -> Handle<T> {
+    pub fn build_id(self) -> BuildId<T> {
         // SAFETY: Every view borrows an element of its own AST's row array. Its
         // index is the exact distance in rows from the start of that allocation.
         #[expect(unsafe_code)]
         let index =
             unsafe { std::ptr::from_ref(self.row).offset_from_unsigned(self.ast.rows.as_ptr()) };
-        Handle::new(index as u32)
+        BuildId::new(index as u32)
+    }
+
+    pub fn handle(self) -> Handle<T> {
+        Handle::from_word(self.build_id().slot)
     }
 
     pub fn is_same_node<U>(self, other: View<'_, U>) -> bool {
@@ -187,7 +256,7 @@ impl<'a, T> View<'a, T> {
         ) {
             return NodeIndex::NONE;
         }
-        self.ast.keys.key(self.handle().row)
+        self.ast.keys.key(self.handle().row_number())
     }
 
     pub fn node_kind(self) -> NodeKind
@@ -470,7 +539,7 @@ impl<'a> View<'a, crate::StmtFunctionDef> {
         if count == 0 {
             return None;
         }
-        let end = self.handle().index();
+        let end = self.handle().slot();
         Some(end - count..end)
     }
 }
@@ -503,7 +572,7 @@ impl Ast {
     }
 
     pub fn view<T: Node>(&self, handle: Handle<T>) -> Option<View<'_, T>> {
-        let row = self.rows.get(handle.index())?;
+        let row = self.rows.get(handle.slot())?;
         if !T::ANY && !T::matches(row.payload.kind) {
             return None;
         }
@@ -516,12 +585,16 @@ impl Ast {
 
     /// Borrows an untyped row by its allocation index.
     pub fn row(&self, index: u32) -> Option<AnyNodeRef<'_>> {
-        self.view(Handle::new(index))
+        Some(View {
+            ast: self,
+            row: self.rows.get((index as usize).checked_add(1)?)?,
+            ty: PhantomData,
+        })
     }
 
     /// Iterates the stored nodes in allocation order. Source-order traversal starts at the root.
     pub fn nodes(&self) -> impl ExactSizeIterator<Item = View<'_, Any>> {
-        self.rows.iter().map(|row| View {
+        self.rows.iter().skip(1).map(|row| View {
             ast: self,
             row,
             ty: PhantomData,
@@ -529,16 +602,15 @@ impl Ast {
     }
 
     fn at<T>(&self, handle: Handle<T>) -> View<'_, T> {
-        View::new(self, handle)
+        View::from_slot(self, handle.slot())
     }
 
     fn child<T: Node>(&self, field: u64) -> View<'_, T> {
-        let handle = Handle::new(split_words(field)[0]);
-        View::new(self, handle)
+        View::from_slot(self, split_words(field)[0] as usize)
     }
 
     fn optional_child<T: Node>(&self, field: u64) -> Option<View<'_, T>> {
-        (split_words(field)[0] != ABSENT).then(|| self.child(field))
+        (split_words(field)[0] != 0).then(|| self.child(field))
     }
 
     fn bytes(&self, field: u64) -> &[u8] {
@@ -552,7 +624,7 @@ impl Ast {
 
 /// Mutable construction state. Nested lists share scratch space, so building the
 /// children of a list never interleaves their extra data with its own elements.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Builder {
     ast: Ast,
     source: TextRange,
@@ -583,38 +655,51 @@ pub struct Checkpoint {
     yield_rows_end: u32,
 }
 
+impl Default for Builder {
+    fn default() -> Self {
+        Self::for_source(TextRange::default())
+    }
+}
+
 impl Builder {
     /// Start with a small sample of rows so a file with little syntax needs little storage.
     pub fn for_source(source: TextRange) -> Self {
         let bytes = source.len().to_usize();
         let estimated = (bytes / 18).min(4096);
-        let rows = if bytes <= 4096 {
+        let estimated_rows = if bytes <= 4096 {
             estimated
         } else {
             estimated.min(128)
         };
+        let mut rows = Vec::with_capacity(estimated_rows + 1);
+        // No view can refer to this row. Its presence makes every child slot a nonzero index.
+        rows.push(Row {
+            payload: Payload::new(NodeKind::ModModule),
+            span: TextRange::default(),
+        });
         Self {
             source,
             ast: Ast {
-                rows: Vec::with_capacity(rows),
+                rows,
                 extra: Vec::with_capacity(estimated + estimated / 8),
                 names: Vec::with_capacity(estimated / 8),
                 ..Ast::default()
             },
             name_ids: HashTable::with_capacity(estimated / 8),
-            ..Self::default()
+            scratch: Vec::new(),
+            recent_names: [0; 32],
         }
     }
 
     /// Turns a name expression into the identifier for a keyword argument. When the name is
     /// the last row, its expression handle expires and the identifier can reuse that row.
-    pub fn take_name(&mut self, name: Handle<crate::ExprName>) -> build::Identifier {
-        let expr = self.ast.at(name);
+    pub fn take_name(&mut self, name: BuildId<crate::ExprName>) -> build::Identifier {
+        let expr = self.get(name);
         let identifier = build::Identifier {
             id: expr.name_id(),
             range: expr.range(),
         };
-        if name.index() + 1 == self.ast.rows.len() {
+        if name.slot() + 1 == self.ast.rows.len() {
             self.ast.rows.pop();
         }
         identifier
@@ -658,27 +743,32 @@ impl Builder {
     }
 
     pub fn node_count(&self) -> usize {
-        self.ast.rows.len()
+        self.ast.rows.len() - 1
     }
 
     /// Records the interval of rows emitted between entering the function body and emitting its
     /// definition. The two remaining payload bytes can describe up to 65,535 rows.
-    pub fn record_function_body(&mut self, function: Handle<crate::StmtFunctionDef>, start: usize) {
+    pub fn record_function_body(
+        &mut self,
+        function: BuildId<crate::StmtFunctionDef>,
+        start: usize,
+    ) {
         let end = function.index();
         let count = u16::try_from(end.saturating_sub(start)).unwrap_or(0);
-        self.ast.rows[end].payload.bytes[13..15].copy_from_slice(&count.to_le_bytes());
+        self.ast.rows[function.slot()].payload.bytes[13..15].copy_from_slice(&count.to_le_bytes());
     }
 
-    pub fn finish_tree<T>(self, root: Handle<T>) -> Tree<T> {
+    pub fn finish_tree<T>(self, root: BuildId<T>) -> Tree<T> {
         Tree {
             ast: Box::new(self.ast),
-            root,
+            root: Handle::from_word(root.slot),
         }
     }
 
-    pub fn get<T: Node>(&self, handle: Handle<T>) -> View<'_, T> {
-        debug_assert!(T::matches(self.ast.rows[handle.index()].payload.kind));
-        self.ast.at(handle)
+    pub fn get<T: Node>(&self, id: BuildId<T>) -> View<'_, T> {
+        let view = View::from_slot(&self.ast, id.slot());
+        debug_assert!(T::matches(view.row.payload.kind));
+        view
     }
 
     #[inline]
@@ -694,18 +784,18 @@ impl Builder {
     }
 
     /// Sets the load, store or delete context of an assignment target and its elements.
-    pub fn set_expr_context(&mut self, expr: Handle<crate::Expr>, context: crate::ExprContext) {
+    pub fn set_expr_context(&mut self, expr: BuildId<crate::Expr>, context: crate::ExprContext) {
         let elements = match self.get(expr).classify() {
             ExprKind::Name(_) => return self.expr_name_context(expr, context),
             ExprKind::Attribute(_) => return self.expr_attribute_context(expr, context),
             ExprKind::Subscript(_) => return self.expr_subscript_context(expr, context),
             ExprKind::Starred(value) => {
-                let child = value.value().handle();
+                let child = value.value().build_id();
                 self.expr_starred_context(expr, context);
                 return self.set_expr_context(child, context);
             }
             ExprKind::UnaryOp(value) => {
-                return self.set_expr_context(value.operand().handle(), context);
+                return self.set_expr_context(value.operand().build_id(), context);
             }
             ExprKind::Tuple(value) => {
                 let elements = value.elts().id();
@@ -721,13 +811,13 @@ impl Builder {
         };
         for i in 0..elements.len() {
             if let Some(child) = self.get_list(elements).get(i) {
-                self.set_expr_context(child.handle(), context);
+                self.set_expr_context(child.build_id(), context);
             }
         }
     }
 
     #[inline]
-    fn push<T: Node>(&mut self, span: TextRange, payload: Payload) -> Handle<T> {
+    fn push<T: Node>(&mut self, span: TextRange, payload: Payload) -> BuildId<T> {
         let index = offset(self.ast.rows.len());
         let row = Row { payload, span };
         if self.ast.rows.len() < self.ast.rows.capacity() {
@@ -735,7 +825,7 @@ impl Builder {
         } else {
             self.grow_and_push(row);
         }
-        Handle::new(index)
+        BuildId::new(index)
     }
 
     #[cold]
@@ -749,7 +839,7 @@ impl Builder {
     fn reserve_rows(&mut self, end: TextSize) {
         // A module can start with a long docstring or a license header. Allow its remaining
         // source to be denser than the prefix, and leave some room for variation after it.
-        let rows = self.ast.rows.len();
+        let rows = self.node_count();
         let consumed = end.saturating_sub(self.source.start()).to_usize();
         let remaining = self.source.end().saturating_sub(end).to_usize();
         let estimate = rows.saturating_add(
@@ -905,7 +995,7 @@ impl<T> Tree<T> {
     }
 
     pub fn cast<U: Node>(self) -> Option<Tree<U>> {
-        U::matches(self.ast.rows[self.root.index()].payload.kind).then(|| Tree {
+        U::matches(self.ast.rows[self.root.slot()].payload.kind).then(|| Tree {
             root: self.root.cast(),
             ast: self.ast,
         })
@@ -919,7 +1009,7 @@ impl<T> Tree<T> {
         else {
             return false;
         };
-        let count = self.ast.rows.len();
+        let count = self.ast.rows.len() - 1;
         let required_keys = count - usize::from(self.root.index() + 1 == count);
         let keys = if required_keys <= capacity as usize {
             RowKeys::Direct(first)
@@ -933,7 +1023,7 @@ impl<T> Tree<T> {
                 .preorder_handles()
                 .skip(1)
                 .take(capacity as usize + 1)
-                .map(|handle| handle.row)
+                .map(Handle::row_number)
                 .collect();
             if rows.len() > capacity as usize {
                 return false;
@@ -979,11 +1069,11 @@ impl<T: Lower> From<&T> for Tree<T> {
 
 /// Builds the indexed representation of a Python syntax node.
 pub trait Lower: Node {
-    fn lower(&self, builder: &mut Builder) -> Handle<Self>;
+    fn lower(&self, builder: &mut Builder) -> BuildId<Self>;
 }
 
 /// The row, source range and kind returned to the parser after emitting a node.
-pub type EmittedNode<T> = (Handle<T>, TextRange, NodeKind);
+pub type EmittedNode<T> = (BuildId<T>, TextRange, NodeKind);
 
 /// Initial field values for a single row. All child IDs already belong to the builder.
 pub trait Emit {

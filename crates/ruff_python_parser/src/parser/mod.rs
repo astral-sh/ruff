@@ -77,22 +77,22 @@ pub(crate) struct Parser<'src> {
     recursion_depth: usize,
 
     /// Reusable, nesting-safe scratch storage for expression lists.
-    expr_scratch: ScratchBuffer<flat::Handle<ast::Expr>>,
+    expr_scratch: ScratchBuffer<flat::BuildId<ast::Expr>>,
 
     /// Reusable, nesting-safe scratch storage for call keywords.
-    keyword_scratch: ScratchBuffer<flat::Handle<ast::Keyword>>,
+    keyword_scratch: ScratchBuffer<flat::BuildId<ast::Keyword>>,
 
     /// Reusable, nesting-safe scratch storage for function and lambda parameters.
-    parameter_scratch: ScratchBuffer<flat::Handle<ast::ParameterWithDefault>>,
+    parameter_scratch: ScratchBuffer<flat::BuildId<ast::ParameterWithDefault>>,
 
     /// Reusable, nesting-safe scratch storage for statement lists.
-    stmt_scratch: ScratchBuffer<flat::Handle<ast::Stmt>>,
+    stmt_scratch: ScratchBuffer<flat::BuildId<ast::Stmt>>,
 
     /// Reusable scratch storage for import aliases.
-    alias_scratch: ScratchBuffer<flat::Handle<ast::Alias>>,
+    alias_scratch: ScratchBuffer<flat::BuildId<ast::Alias>>,
 
     /// Reusable, nesting-safe scratch storage for `elif` and `else` clauses.
-    elif_else_scratch: ScratchBuffer<flat::Handle<ast::ElifElseClause>>,
+    elif_else_scratch: ScratchBuffer<flat::BuildId<ast::ElifElseClause>>,
 }
 
 impl<'src> Parser<'src> {
@@ -153,7 +153,10 @@ impl<'src> Parser<'src> {
     }
 
     /// Appends top-level statements directly to the notebook's suite.
-    pub(crate) fn parse_cell(mut self, body: &mut Vec<flat::Handle<ast::Stmt>>) -> ParsedDraft<()> {
+    pub(crate) fn parse_cell(
+        mut self,
+        body: &mut Vec<flat::BuildId<ast::Stmt>>,
+    ) -> ParsedDraft<()> {
         self.maybe_grow_stack(|parser| {
             let snapshot = parser.parse_module_statements();
             parser

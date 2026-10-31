@@ -797,7 +797,7 @@ impl<'src> Parser<'src> {
                             // f((a) = 1)
                             // f( ( a ) = 1)
 
-                            let name = ident_expr.handle();
+                            let name = ident_expr.build_id();
                             if parsed_expr.is_parenthesized {
                                 parser.add_unsupported_syntax_error(
                                     UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,

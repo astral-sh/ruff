@@ -1,4 +1,4 @@
-use ruff_python_ast::flat::{Handle, ListId, PatternKind, View, build};
+use ruff_python_ast::flat::{BuildId, Handle, ListId, PatternKind, View, build};
 use ruff_python_ast::{self as ast, ExprContext, Operator, Singleton};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
@@ -15,11 +15,11 @@ impl Parser<'_> {
     /// Value patterns, mapping keys, and class heads already contain expressions. Reuse their
     /// handles, since a class head can itself contain an expression from an earlier recovery.
     /// Copying it into the same arena would retain its literal data once per recovery.
-    pub(super) fn pattern_to_expr(&mut self, pattern: Handle<ast::Pattern>) -> id::Expr {
+    pub(super) fn pattern_to_expr(&mut self, pattern: BuildId<ast::Pattern>) -> id::Expr {
         self.with_recursion(|parser| parser.pattern_to_expr_inner(pattern))
     }
 
-    fn pattern_to_expr_inner(&mut self, pattern: Handle<ast::Pattern>) -> id::Expr {
+    fn pattern_to_expr_inner(&mut self, pattern: BuildId<ast::Pattern>) -> id::Expr {
         let pattern = self.storage.get(pattern);
         let range = pattern.range();
         match pattern.classify() {
@@ -52,8 +52,8 @@ impl Parser<'_> {
                 let rest = node.rest().map(capture_name);
                 let mut items = Vec::with_capacity(patterns.len() + usize::from(rest.is_some()));
                 for index in 0..keys.len().min(patterns.len()) {
-                    let key = self.storage.get_list(keys).at(index).handle();
-                    let pattern = self.storage.get_list(patterns).at(index).handle();
+                    let key = self.storage.get_list(keys).at(index).build_id();
+                    let pattern = self.storage.get_list(patterns).at(index).build_id();
                     items.push((Some(key), self.pattern_to_expr(pattern).id));
                 }
                 if let Some(name) = rest {
@@ -67,7 +67,7 @@ impl Parser<'_> {
                 .into()
             }
             PatternKind::MatchClass(node) => {
-                let func = node.cls().handle();
+                let func = node.cls().build_id();
                 let arguments = node.arguments();
                 let arguments_range = arguments.range();
                 debug_assert_eq!(range.end(), arguments_range.end());
@@ -78,8 +78,8 @@ impl Parser<'_> {
                 for index in 0..keyword_patterns.len() {
                     let keyword = self.storage.get_list(keyword_patterns).at(index);
                     let range = keyword.range();
-                    let arg = keyword.attr().handle();
-                    let value = self.pattern_to_expr(keyword.pattern().handle());
+                    let arg = keyword.attr().build_id();
+                    let value = self.pattern_to_expr(keyword.pattern().build_id());
                     keywords.push(
                         build::Keyword {
                             range,
@@ -129,7 +129,7 @@ impl Parser<'_> {
                         id: self.storage.intern_name(""),
                         ctx: ExprContext::Invalid,
                     },
-                    (Some(pattern), None) => return self.pattern_to_expr(pattern.handle()),
+                    (Some(pattern), None) => return self.pattern_to_expr(pattern.build_id()),
                     (None, Some(name)) => capture_name(name),
                     (None, None) => build::ExprName {
                         range,
@@ -145,11 +145,11 @@ impl Parser<'_> {
                 let first = patterns.at(0);
                 let start = first.start();
                 let patterns = patterns.id();
-                let mut left = self.pattern_to_expr(first.handle());
+                let mut left = self.pattern_to_expr(first.build_id());
                 for index in 1..patterns.len() {
                     let pattern = self.storage.get_list(patterns).at(index);
                     let range = TextRange::new(start, pattern.end());
-                    let right = self.pattern_to_expr(pattern.handle());
+                    let right = self.pattern_to_expr(pattern.build_id());
                     left = build::ExprBinOp {
                         range,
                         left: left.id,
@@ -167,7 +167,7 @@ impl Parser<'_> {
     fn patterns_to_exprs(&mut self, patterns: ListId<Handle<ast::Pattern>>) -> Vec<id::Expr> {
         (0..patterns.len())
             .map(|index| {
-                let pattern = self.storage.get_list(patterns).at(index).handle();
+                let pattern = self.storage.get_list(patterns).at(index).build_id();
                 self.pattern_to_expr(pattern)
             })
             .collect()

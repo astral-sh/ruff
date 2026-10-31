@@ -10,8 +10,14 @@ tree representation.
 ## Handles and views
 
 A `Handle<Expr>` can refer to any expression. A `Handle<ExprBinOp>` refers to a binary expression.
-Both occupy four bytes. A handle is local to a particular parse, even if a later parse of the same
-file produces identical text and row numbers.
+Both store the node's physical slot as a `NonZeroU32`, so a handle indexes the row table directly.
+The builder reserves slot 0 for an absent child. This lets `Option<Handle<T>>` occupy the same
+four bytes as `Handle<T>`. Each parsed arena, including a separately parsed string annotation,
+pays for one unused 24-byte row.
+
+Allocation indices are zero-based. The first node occupies physical slot 1, has
+`handle.index() == 0`, and is returned by `ast.row(0)`. `Ast::nodes` skips the reserved slot.
+A handle is local to a particular parse, even if a later parse produces identical text and indices.
 
 `Parsed::root` returns a `View` that holds a reference to the node's row followed by a reference
 to its owning `Ast`. Copying a view copies those references. A field accessor resolves a child ID in
@@ -84,9 +90,10 @@ A `Parameters` row stores the positional-or-keyword list inline. For a signature
 `def f(x, y=0)`, this is the whole parameter list. The row allocates extra-data slots for
 the other four fields only when it has positional-only, variadic, or keyword-only parameters.
 
-Dictionary items use two words per entry, one for the optional key and one for the value. An
-optional child uses the reserved row ID `u32::MAX`. UTF-8 text and arbitrary byte strings have
-separate buffers, so a bytes literal can contain any byte without affecting text decoding. Number
+Dictionary items use two words per entry, one for the optional key and one for the value. In
+`{**mapping}` the key word is zero. Side-table offsets have their own encoding and can start at
+zero. UTF-8 text and arbitrary byte strings have separate buffers, so a bytes literal can contain
+any byte without affecting text decoding. Number
 values and interpolation debug text have their own side tables. Identifiers with the same spelling
 share a four-byte index into the parse's name table. Each distinct spelling is a `Name` backed
 by `CharStr`, which stores short names inline. The parser copies unescaped literal text directly
@@ -102,9 +109,12 @@ A formatter can iterate the parts in either direction and read each token's kind
 ## From source to rows
 
 The parser creates a row when it finishes a grammar production. In `left + right`, it emits the
-two names first and passes their handles to the binary expression's constructor. A parser result
-also carries its kind and range while the grammar still needs them. Only the handle goes into the
-parent payload. Nested lists of the same kind share a scratch buffer of four-byte handles. Each
+two names first and passes their slots to the binary expression's constructor. The parser's
+temporary `Node<T>` carries the kind, source range and a `BuildId<T>`. A build ID holds the same
+physical slot as a handle in a plain `u32`, so emitting a node and writing its slot into its
+parent need no nonzero check. The finished tree and consumers that retain a node use `Handle<T>`.
+
+Nested lists of the same kind share a scratch buffer of four-byte slots. Each
 list records the buffer length on entry. When the list closes, the parser copies that suffix
 into the extra-data column and truncates the buffer to the recorded length. The enclosing list
 keeps its handles.
@@ -173,7 +183,7 @@ then reads the row directly. Allocation order can differ from source order. In `
 for example, the parser emits the attribute and call before the enclosing subscript.
 
 A separately parsed string annotation has its own arena. Its containing string reserves a range
-of keys for that arena, and adding the row number to the start of the range identifies a node.
+of keys for that arena. A node’s key is the start of the range plus its zero-based allocation index.
 Nested strings reserve ranges in the same way. Ordinary module keys start at zero. If auxiliary
 rows would put an annotation over its 256-key limit (eight for a nested annotation), ty packs
 only the rows reached by source-order traversal into that range.
