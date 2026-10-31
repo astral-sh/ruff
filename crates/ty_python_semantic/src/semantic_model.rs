@@ -16,7 +16,7 @@ use ty_module_resolver::{
 };
 
 use crate::Db;
-use crate::place::definitions::DefinitionResolution;
+use crate::place::definitions::{DefinitionResolution, definitions_for_module_global};
 use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::place::{
     builtins_module_scope, implicit_builtins_symbol_scope, loop_header_reachability,
@@ -466,7 +466,6 @@ impl<'db> SemanticModel<'db> {
     ///
     /// Returns `None` if the scope is unavailable, the name is a plain assignment or deletion
     /// target, or inference skipped the name inside a string annotation.
-    #[allow(dead_code, reason = "awaiting IDE integration")]
     pub fn reaching_definitions(&self, name: &ast::ExprName) -> Option<DefinitionResolution<'db>> {
         if name.ctx.is_del() {
             return None;
@@ -498,6 +497,18 @@ impl<'db> SemanticModel<'db> {
         let resolver = PlaceLoadResolver::new(self.db, &env, index, scope, &place_expr, mode, None);
 
         Some(DefinitionResolution::from_resolver(self.db, resolver))
+    }
+
+    /// Returns the definitions that may supply a module global at the end of its scope.
+    ///
+    /// Returns `None` if the module has no file or the name has no symbol-table entry.
+    pub fn definitions_for_module_global(
+        &self,
+        module: Module<'db>,
+        name: &str,
+    ) -> Option<DefinitionResolution<'db>> {
+        let file = ProgramFile::new(self.db(), module.file(self.db())?, self.program());
+        definitions_for_module_global(self.db(), file, name)
     }
 
     /// Returns the first local definition created by `covering_node`, if any.
