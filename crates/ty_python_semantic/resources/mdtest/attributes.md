@@ -339,6 +339,18 @@ class Counter:
 reveal_type(Counter().value)  # revealed: int
 ```
 
+Reading a class attribute during an augmented assignment also accounts for earlier calls to the
+method. The receiver can hold a tuple of any length by the time the method runs.
+
+```py
+class Entries:
+    values = ()
+
+    def add(self, item: int) -> None:
+        reveal_type(self.values)  # revealed: tuple[int, ...]
+        self.values += (item,)  # error: [invalid-assignment]
+```
+
 #### Augmented assignments to narrowed optional attributes
 
 Once an optional attribute has been narrowed to its non-`None` value, augmented assignments must not
