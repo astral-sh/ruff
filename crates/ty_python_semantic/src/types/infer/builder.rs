@@ -139,7 +139,7 @@ use crate::types::{
     TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule,
     UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
     extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
-    is_discarded_dict_key_assignment, todo_type,
+    is_discarded_dict_key_assignment, self_typevar_origin_class_literal, todo_type,
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
 use ty_python_core::definition::{
@@ -1664,7 +1664,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let declared_ty = if resolved_place.is_undefined() && !place.is_symbol() {
-            self.fallback_member_declared_type(node, binding)
+            self.fallback_member_declared_type(node)
         } else {
             None
         }
@@ -1683,41 +1683,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// For a member binding without a live place declaration, obtain its declared type from
     /// normal attribute or subscript lookup on its receiver.
-    fn fallback_member_declared_type(
-        &mut self,
-        node: AnyNodeRef<'_>,
-        binding: Definition<'db>,
-    ) -> Option<Type<'db>> {
+    fn fallback_member_declared_type(&mut self, node: AnyNodeRef<'_>) -> Option<Type<'db>> {
         let db = self.db();
-        if let AnyNodeRef::ExprAttribute(attribute @ ast::ExprAttribute { value, attr, .. }) = node
-        {
+        if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
             let value_type = self.try_expression_type(value).unwrap_or_else(|| {
                 self.infer_maybe_standalone_expression(value, TypeContext::default())
             });
             if let Place::Defined(DefinedPlace {
                 ty,
                 definedness: Definedness::AlwaysDefined,
-                origin,
                 ..
             }) = value_type
                 .member(db, self.program_environment(), attr)
                 .place
             {
-                // When the receiver's writes are the only source of an attribute's type,
-                // its provisional tuple length cannot constrain the next write. Let cycle
-                // recovery see the longer tuple so it can widen the attribute across calls.
-                if !origin.is_declared()
-                    && matches!(binding.kind(db), DefinitionKind::AugmentedAssignment(_))
-                    && ty
-                        .exact_tuple_instance_spec(db)
-                        .is_some_and(|tuple| tuple.as_fixed_length().is_some())
-                    && self.is_instance_attribute_assignment(attribute)
-                    && value_type
-                        .class_member(db, self.program_environment(), attr)
-                        .is_undefined()
-                {
-                    return None;
-                }
                 // TODO: also consider qualifiers on the attribute
                 Some(ty)
             } else {
@@ -4689,7 +4668,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let node = target.into();
             let add = AddBinding {
-                declared_ty: self.fallback_member_declared_type(node, definition),
+                declared_ty: self.fallback_member_declared_type(node),
                 declaration: None,
                 binding: definition,
                 node,
@@ -11175,8 +11154,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let env = self.program_environment();
         let ast::ExprAttribute { value, attr, .. } = attribute;
-
         let db = self.db();
+        if let Type::TypeVar(typevar) = value_type
+            && let Some(ClassLiteral::Static(class)) =
+                self_typevar_origin_class_literal(db, typevar)
+            && class.only_augments_instance_attribute(db, attr)
+            && let Some(bound) = typevar.typevar(db).upper_bound(db, env)
+        {
+            // An augmented assignment reads the attribute it defines. Resolve the instance
+            // attribute before looking it up through `Self`, so the inherited initializer and
+            // the result of the update contribute to the same inference cycle.
+            let _ = bound.member(db, env, attr);
+        }
+
         let mut constraint_keys = vec![];
 
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type

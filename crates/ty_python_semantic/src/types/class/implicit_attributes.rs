@@ -67,6 +67,32 @@ impl<'db> StaticClassLiteral<'db> {
             )
     }
 
+    /// Are augmented assignments the only writes to `self.<name>` in this class?
+    pub(in crate::types) fn only_augments_instance_attribute(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> bool {
+        self.implicit_attribute_name(db, name, MethodDecorator::None)
+            .is_some_and(|attribute| Self::only_augments_attribute_inner(db, attribute))
+    }
+
+    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+    fn only_augments_attribute_inner(
+        db: &'db dyn Db,
+        attribute: ImplicitAttributeName<'db>,
+    ) -> bool {
+        let assignments =
+            attribute_assignments(db, attribute.class_body_scope(db), attribute.name(db));
+        let mut writes = assignments
+            .flat_map(|(bindings, _)| bindings.filter_map(|binding| binding.binding.definition()))
+            .peekable();
+        writes.peek().is_some()
+            && writes.all(|definition| {
+                matches!(definition.kind(db), DefinitionKind::AugmentedAssignment(_))
+            })
+    }
+
     /// Does a method establish instance storage for an attribute already typed by the class?
     pub(super) fn has_implicit_instance_attribute(self, db: &'db dyn Db, name: &str) -> bool {
         self.implicit_attribute_name(db, name, MethodDecorator::None)

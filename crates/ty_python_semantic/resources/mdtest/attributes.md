@@ -537,15 +537,20 @@ class Entries(Base):
         before = self.values
         self.values += (item,)  # ok
         return before  # error: [invalid-return-type]
+
+class Nested(Base):
+    def nest(self) -> None:
+        self.values += (self.values,)  # ok
 ```
 
 An explicit empty-tuple annotation still constrains the write.
 
 ```py
-class Annotated:
+class AnnotatedBase:
     def __init__(self) -> None:
         self.values: tuple[()] = ()
 
+class Limited(AnnotatedBase):
     def add(self, item: int) -> None:
         self.values += (item,)  # error: [invalid-assignment]
         reveal_type(self.values)  # revealed: tuple[()]
