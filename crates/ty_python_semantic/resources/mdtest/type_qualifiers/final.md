@@ -861,7 +861,7 @@ def assign(fixed: Fixed, either: Fixed | Mutable, both: Fixed | AlsoFixed, mutab
     if has_marker(either):
         either.value = 2  # error: [invalid-assignment]
     if has_marker(mutable):
-        mutable.value = 2  # no diagnostic
+        mutable.value = 2  # ok
 ```
 
 The same restriction applies to deletion, even when a protocol component permits it:
@@ -876,7 +876,7 @@ def delete(fixed: Fixed, either: Fixed | Mutable, both: Fixed | AlsoFixed, mutab
     if has_marker(both):
         del both.value  # error: [invalid-assignment]
     if has_marker(mutable):
-        del mutable.value  # no diagnostic
+        del mutable.value  # ok
 ```
 
 Narrowing `self` still allows initialization. That exemption does not apply to another parameter:
@@ -886,7 +886,7 @@ class Initialized:
     def __init__(self, other: "Initialized | Mutable") -> None:
         self.value: Final[int] = 1
         if has_marker(self):
-            self.value = 2  # no diagnostic
+            self.value = 2  # ok
         if has_marker(other):
             other.value = 2  # error: [invalid-assignment]
 ```

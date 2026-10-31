@@ -294,7 +294,7 @@ type Layer[T] = Fan[Fan[Fan[Fan[T]]]]
 type Payload = Layer[Layer[Layer[int]]]
 
 def clear(values: set[Payload]) -> None:
-    values.clear()  # no diagnostic
+    values.clear()  # ok
 ```
 
 ## Unpacking tuple aliases
@@ -896,7 +896,7 @@ python-version = "3.15"
 ```py
 from typing import TypeAliasType
 
-Qualified = TypeAliasType("Qualified", int, qualname="Qualified")  # no diagnostic
+Qualified = TypeAliasType("Qualified", int, qualname="Qualified")  # ok
 Invalid = TypeAliasType("Invalid", int, qualname=1)  # error: [invalid-argument-type]
 ```
 
@@ -1771,7 +1771,7 @@ from typing import Callable
 type Callback = Callable[..., Callback]
 
 def copy_callbacks(value: dict[str, Callback]):
-    copied: dict[str, Callback] = dict(value)  # no diagnostic
+    copied: dict[str, Callback] = dict(value)  # ok
 ```
 
 This also applies when the callable is one alternative of a recursive union.
@@ -1780,7 +1780,7 @@ This also applies when the callable is one alternative of a recursive union.
 type Value = float | None | Callable[..., Value]
 
 def copy_values(value: dict[str, Value]):
-    copied: dict[str, Value] = dict(value)  # no diagnostic
+    copied: dict[str, Value] = dict(value)  # ok
 ```
 
 ### Cyclic defaults

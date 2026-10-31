@@ -3196,7 +3196,7 @@ def check(child: Child) -> None:
     # error: [invalid-attribute-access] "Cannot assign to ClassVar `class_only` from an instance of type `Child`"
     child.class_only = 1
 
-# no diagnostic: attribute writes are still allowed on the class itself
+# ok: attribute writes are still allowed on the class itself
 Child.class_only = 1
 ```
 

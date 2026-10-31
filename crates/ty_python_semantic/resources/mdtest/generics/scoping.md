@@ -720,9 +720,9 @@ def invalid[*Us = *Ts](*args: *Us) -> tuple[*Us]:
 # error: [unbound-type-variable]
 type Nested[*Us = Unpack[tuple[int, Unpack[Ts]]]] = tuple[*Us]
 
-type Valid[T, *Us = Unpack[tuple[T]]] = tuple[*Us]  # no diagnostic
+type Valid[T, *Us = Unpack[tuple[T]]] = tuple[*Us]  # ok
 
-def valid[*Ts, *Us = Unpack[Ts]](x: tuple[*Ts], y: tuple[*Us]) -> tuple[*Us]:  # no diagnostic
+def valid[*Ts, *Us = Unpack[Ts]](x: tuple[*Ts], y: tuple[*Us]) -> tuple[*Us]:  # ok
     return y
 ```
 

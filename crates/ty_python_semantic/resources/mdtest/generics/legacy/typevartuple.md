@@ -708,7 +708,7 @@ class or function when it is declared.
 
 ```py
 OtherTs = TypeVarTuple("OtherTs")
-CopiedTs = TypeVarTuple("CopiedTs", default=Unpack[OtherTs])  # no diagnostic
+CopiedTs = TypeVarTuple("CopiedTs", default=Unpack[OtherTs])  # ok
 ```
 
 ### Backported default type arguments

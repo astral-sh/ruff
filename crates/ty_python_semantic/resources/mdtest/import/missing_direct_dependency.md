@@ -46,7 +46,7 @@ does not declare reports a missing direct dependency.
 `main.py`:
 
 ```py
-import direct  # no diagnostic
+import direct  # ok
 
 # snapshot: missing-direct-dependency
 import indirect
@@ -130,7 +130,7 @@ still requires a direct dependency.
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import indirect  # no diagnostic
+    import indirect  # ok
 
 import indirect  # error: [missing-direct-dependency]
 ```
@@ -149,8 +149,8 @@ class Value: ...
 `main.pyi`:
 
 ```pyi
-import indirect  # no diagnostic
-from indirect import Value  # no diagnostic
+import indirect  # ok
+from indirect import Value  # ok
 ```
 
 ## Dependency groups
@@ -200,15 +200,15 @@ indirect = ["indirect"]
 `app/__init__.py`:
 
 ```py
-import direct  # no diagnostic
+import direct  # ok
 import devtool  # error: [missing-direct-dependency] "direct dependency on `development-tool`"
 ```
 
 `tests/test_app.py`:
 
 ```py
-import direct  # no diagnostic
-import devtool  # no diagnostic
+import direct  # ok
+import devtool  # ok
 import indirect  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
 ```
 
@@ -253,10 +253,10 @@ python = "/.venv"
 
 from typing import TYPE_CHECKING
 
-import direct  # no diagnostic
+import direct  # ok
 
 if TYPE_CHECKING:
-    import indirect  # no diagnostic
+    import indirect  # ok
 
 # snapshot: missing-direct-dependency
 import indirect
@@ -349,13 +349,13 @@ Neither hides a later runtime import's diagnostic.
 from typing import TYPE_CHECKING
 
 if False:
-    import indirect  # no diagnostic
+    import indirect  # ok
 
 def use_dependency():
     if TYPE_CHECKING:
-        import indirect  # no diagnostic
+        import indirect  # ok
     if False:
-        import indirect  # no diagnostic
+        import indirect  # ok
 
 import indirect  # error: [missing-direct-dependency]
 ```
@@ -390,8 +390,8 @@ do not require project dependencies either.
 
 ```py
 import indirect  # error: [unresolved-import]
-import unowned  # no diagnostic
-import sys  # no diagnostic
+import unowned  # ok
+import sys  # ok
 ```
 
 #### Local modules and self-imports
@@ -417,8 +417,8 @@ module, or of the project itself, do not require another dependency declaration.
 `main.py`:
 
 ```py
-import indirect  # no diagnostic
-import app  # no diagnostic
+import indirect  # ok
+import app  # ok
 ```
 
 #### Re-exported values
@@ -441,7 +441,7 @@ from indirect import Value
 `main.py`:
 
 ```py
-from facade import Value  # no diagnostic
+from facade import Value  # ok
 ```
 
 ### Module ownership
@@ -506,8 +506,8 @@ value = 1
 `main.py`:
 
 ```py
-import ns  # no diagnostic
-import ns.core  # no diagnostic
+import ns  # ok
+import ns.core  # ok
 
 # error: [missing-direct-dependency] "direct dependency on `storage-distribution`"
 # error: [missing-direct-dependency] "direct dependency on `other-distribution`"
@@ -517,7 +517,7 @@ import ns.storage  # error: [missing-direct-dependency] "direct dependency on `s
 from ns.storage import value  # error: [missing-direct-dependency] "direct dependency on `storage-distribution`"
 
 # `ns.storage` is not a module-name prefix of `ns.storage_extra`.
-import ns.storage_extra  # no diagnostic
+import ns.storage_extra  # ok
 ```
 
 #### Namespaces containing local and installed modules
@@ -539,9 +539,9 @@ the external child require that distribution as a dependency.
 `main.py`:
 
 ```py
-import shared_namespace  # no diagnostic
-from shared_namespace import local  # no diagnostic
-import shared_namespace.local  # no diagnostic
+import shared_namespace  # ok
+from shared_namespace import local  # ok
+import shared_namespace.local  # ok
 
 from shared_namespace import external  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
 import shared_namespace.external  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
@@ -571,9 +571,9 @@ dependency.
 `main.py`:
 
 ```py
-import shared_namespace  # no diagnostic
-from shared_namespace import local  # no diagnostic
-import shared_namespace.local  # no diagnostic
+import shared_namespace  # ok
+from shared_namespace import local  # ok
+import shared_namespace.local  # ok
 
 from shared_namespace import external  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
 import shared_namespace.external  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
@@ -594,7 +594,7 @@ candidate distributions in the diagnostic.
 `main.py`:
 
 ```py
-import shared  # no diagnostic
+import shared  # ok
 ```
 
 #### Runtime distributions with separate stubs
@@ -637,8 +637,8 @@ value: int
 `main.py`:
 
 ```py
-import typed  # no diagnostic
-from typed import value  # no diagnostic
+import typed  # ok
+from typed import value  # ok
 
 reveal_type(typed.value)  # revealed: int
 reveal_type(value)  # revealed: int
@@ -713,14 +713,14 @@ other's direct dependencies.
 `main.py`:
 
 ```py
-import direct  # no diagnostic
+import direct  # ok
 import indirect  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
 ```
 
 `nested/main.py`:
 
 ```py
-import indirect  # no diagnostic
+import indirect  # ok
 import direct  # error: [missing-direct-dependency] "direct dependency on `direct-dependency`"
 ```
 
@@ -797,9 +797,9 @@ value = 2
 `main.py`:
 
 ```py
-import ns.child  # no diagnostic
-from ns.child import value  # no diagnostic
-from ns import child  # no diagnostic
+import ns.child  # ok
+from ns.child import value  # ok
+from ns import child  # ok
 ```
 
 Importing an attribute of the parent still requires its distribution, even when the same statement
@@ -863,7 +863,7 @@ import devtool  # error: [missing-direct-dependency] "direct dependency on `deve
 `tests/test_app.py`:
 
 ```py
-import devtool  # no diagnostic
+import devtool  # ok
 ```
 
 #### Flat editable roots
@@ -912,19 +912,19 @@ indirect = ["indirect"]
 `member/app/__init__.py`:
 
 ```py
-import devtool  # no diagnostic
+import devtool  # ok
 ```
 
 `member/tests/test_app.py`:
 
 ```py
-import devtool  # no diagnostic
+import devtool  # ok
 ```
 
 `member/scripts/develop.py`:
 
 ```py
-import devtool  # no diagnostic
+import devtool  # ok
 import indirect  # error: [missing-direct-dependency] "direct dependency on `indirect-distribution`"
 ```
 
@@ -965,7 +965,7 @@ script_dep = ["script"]
 `main.py`:
 
 ```py
-import project_dep  # no diagnostic
+import project_dep  # ok
 import script_dep  # error: [missing-direct-dependency] "direct dependency on `script-dependency`"
 ```
 
@@ -989,7 +989,7 @@ The first script declares only `script-dependency`. The project's declaration of
 # script_dep = ["script"]
 # ///
 
-import script_dep  # no diagnostic
+import script_dep  # ok
 import project_dep  # error: [missing-direct-dependency] "direct dependency on `project-dependency`"
 ```
 
@@ -1013,7 +1013,7 @@ of `script-dependency`.
 # script_dep = ["script"]
 # ///
 
-import project_dep  # no diagnostic
+import project_dep  # ok
 import script_dep  # error: [missing-direct-dependency] "direct dependency on `script-dependency`"
 ```
 
@@ -1049,7 +1049,7 @@ attrs = ["attrs"]
 `b.py`:
 
 ```py
-import attrs  # no diagnostic
+import attrs  # ok
 ```
 
 Importing `b` does not report its dependency on `attrs` as missing from the script. Importing
@@ -1070,7 +1070,7 @@ Importing `b` does not report its dependency on `attrs` as missing from the scri
 # attrs = ["attrs"]
 # ///
 
-import b  # no diagnostic
+import b  # ok
 import attrs  # error: [missing-direct-dependency] "Import of `attrs` requires a direct dependency on `attrs`"
 ```
 
@@ -1094,7 +1094,7 @@ missing-direct-dependency = "warn"
 `main.py`:
 
 ```py
-import indirect  # no diagnostic
+import indirect  # ok
 ```
 
 ### Unavailable script metadata
@@ -1139,7 +1139,7 @@ import indirect  # error: [missing-direct-dependency]
 # missing-direct-dependency = "warn"
 # ///
 
-import indirect  # no diagnostic
+import indirect  # ok
 ```
 
 ### Disabled rule
@@ -1171,5 +1171,5 @@ indirect = ["indirect"]
 `main.py`:
 
 ```py
-import indirect  # no diagnostic
+import indirect  # ok
 ```

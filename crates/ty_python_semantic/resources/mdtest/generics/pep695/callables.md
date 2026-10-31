@@ -904,7 +904,7 @@ Regression test for <https://github.com/astral-sh/ty/issues/4664>.
 ```py
 @final
 class Closed:
-    @decorate  # no diagnostic
+    @decorate  # ok
     @classmethod
     def method(cls, value: int) -> None: ...
 ```
@@ -1247,7 +1247,7 @@ def f(value: A) -> A:
 
 wrapped = wrap(f)
 reveal_type(wrapped)  # revealed: (A, /) -> A
-wrapped(A())  # no diagnostic
+wrapped(A())  # ok
 ```
 
 The generic overload of `sum` accepts iterables of arbitrary integers, even though its first
@@ -1258,7 +1258,7 @@ behavior:
 def wrap_sum[T](fn: Callable[[T], int]) -> Callable[[T], int]:
     return fn
 
-stage: Callable[[list[int]], int] = wrap_sum(sum)  # no diagnostic
+stage: Callable[[list[int]], int] = wrap_sum(sum)  # ok
 ```
 
 ## Inference from a bounded callable type variable

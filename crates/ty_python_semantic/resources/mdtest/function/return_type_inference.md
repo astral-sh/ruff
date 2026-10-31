@@ -832,7 +832,7 @@ class Box[T]:
         return value
 
 reveal_type(Box[int].identity(1))  # revealed: int | Unknown
-value: int = Box[int].identity(1)  # no diagnostic
+value: int = Box[int].identity(1)  # ok
 ```
 
 ## Overloaded functions

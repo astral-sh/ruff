@@ -82,5 +82,5 @@ select = ["UP035"]
 ```
 
 ```py
-from typing_extensions import TypeForm  # no diagnostic
+from typing_extensions import TypeForm  # ok
 ```

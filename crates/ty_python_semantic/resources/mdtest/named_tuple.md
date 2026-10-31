@@ -1394,7 +1394,7 @@ def reversed_order(flag: bool) -> Callable[..., A]:
     return B._replace if flag else A._replace
 
 def either_class(flag: bool) -> Callable[..., A | B]:
-    return A._replace if flag else B._replace  # no diagnostic
+    return A._replace if flag else B._replace  # ok
 ```
 
 The same distinction applies to named tuples created with the functional syntax:

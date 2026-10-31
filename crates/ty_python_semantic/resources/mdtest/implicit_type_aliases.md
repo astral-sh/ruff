@@ -3339,7 +3339,7 @@ from typing import Callable
 Callback = Callable[..., "Callback"]
 
 def copy_callbacks(value: dict[str, Callback]):
-    copied: dict[str, Callback] = dict(value)  # no diagnostic
+    copied: dict[str, Callback] = dict(value)  # ok
 ```
 
 This also applies when the callable is one alternative of a recursive union.
@@ -3348,7 +3348,7 @@ This also applies when the callable is one alternative of a recursive union.
 Value = float | None | Callable[..., "Value"]
 
 def copy_values(value: dict[str, Value]):
-    copied: dict[str, Value] = dict(value)  # no diagnostic
+    copied: dict[str, Value] = dict(value)  # ok
 ```
 
 ### Recursion through generic alias arguments

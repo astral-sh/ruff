@@ -114,7 +114,7 @@ from typing_extensions import cast as extension_cast
 
 def f(x: list[Literal["foo"]]) -> None: ...
 
-f(["foo"])  # no diagnostic
+f(["foo"])  # ok
 f(cast(list[Literal["foo"]], ["foo"]))  # error: [redundant-cast]
 f(cast(val=["foo"], typ=list[Literal["foo"]]))  # error: [redundant-cast]
 f(extension_cast(list[Literal["foo"]], ["foo"]))  # error: [redundant-cast]
@@ -191,7 +191,7 @@ inference attempt that does not use the type context, and emit neither `redundan
 from typing import Callable
 
 def callback() -> Callable[[int], str]:
-    return cast(Callable[[int], str], lambda value: value())  # no diagnostic
+    return cast(Callable[[int], str], lambda value: value())  # ok
 ```
 
 Diagnostics that occur without the outer context are still reported, once:
@@ -201,7 +201,7 @@ Diagnostics that occur without the outer context are still reported, once:
 item: Item = cast(Item, {"name": undefined, "count": 1})
 
 def make_item_with_error(name: str) -> Item:
-    return cast(  # no diagnostic
+    return cast(  # ok
         Item,
         {
             "name": cast(str, name),  # error: [redundant-cast]
@@ -359,21 +359,21 @@ def cast_generic_invalid(
     list_of_any: list[Any],
     just_any: Any,
 ):
-    cast(Any, list_of_integers)  # no diagnostic
-    cast(list[str], list_of_any)  # no diagnostic
-    cast(str, just_any)  # no diagnostic
-    cast(list[Intersection[int, Any]], list_of_integers)  # no diagnostic
-    cast(list[int], dynamic_list_of_integers)  # no diagnostic
-    cast(list[int], list_of_dynamic_integers)  # no diagnostic
-    cast(list[int], list_of_integers_or_any)  # no diagnostic
-    cast(list[int], any_or_list_of_integers)  # no diagnostic
+    cast(Any, list_of_integers)  # ok
+    cast(list[str], list_of_any)  # ok
+    cast(str, just_any)  # ok
+    cast(list[Intersection[int, Any]], list_of_integers)  # ok
+    cast(list[int], dynamic_list_of_integers)  # ok
+    cast(list[int], list_of_dynamic_integers)  # ok
+    cast(list[int], list_of_integers_or_any)  # ok
+    cast(list[int], any_or_list_of_integers)  # ok
 
     # `Any | list[int]` could materialize to `list[str] | list[int]`,
     # which is not disjoint from `list[str]`
-    cast(list[str], any_or_list_of_integers)  # no diagnostic
+    cast(list[str], any_or_list_of_integers)  # ok
 
     # similarly `Any | list[int | Any]` could also materialize to `list[str] | list[int]`
-    cast(list[str], any_or_list_of_integers_or_any)  # no diagnostic
+    cast(list[str], any_or_list_of_integers_or_any)  # ok
 ```
 
 ### Disjoint casts between identically named types
@@ -834,7 +834,7 @@ knows what they're doing if they cast to `Never` explicitly:
 ```py
 from typing_extensions import Never, cast
 
-x = cast(Never, 0)  # no diagnostic
+x = cast(Never, 0)  # ok
 ```
 
 Upcasts from a `Never`-inferred type to a supertype are also permitted without the rule being
@@ -844,7 +844,7 @@ triggered:
 from typing_extensions import Never, cast
 
 def test(x: Never):
-    y = cast(str, x)  # no diagnostic
+    y = cast(str, x)  # ok
 ```
 
 The reason why casting to or from `Never` is allowed is that the normal rationale for this rule does
@@ -868,7 +868,7 @@ without using a `cast`.
 ```pyi
 from typing import cast
 
-x = cast(int, ...)  # no diagnostic
+x = cast(int, ...)  # ok
 ```
 
 This is partly to accommodate the fact that the typing spec
@@ -907,7 +907,7 @@ executed at runtime:
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    x = cast(int, ...)  # no diagnostic
+    x = cast(int, ...)  # ok
 ```
 
 ### Casts involving collection literals that are inferred as having a disjoint type due to no type context

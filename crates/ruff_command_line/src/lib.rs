@@ -1,4 +1,8 @@
-//! Response-file expansion shared by the Ruff and ty command-line interfaces.
+//! Utilities shared by the Ruff and ty command-line interfaces.
+
+mod color;
+
+pub use color::TerminalColor;
 
 use std::ffi::{OsStr, OsString};
 use std::io;

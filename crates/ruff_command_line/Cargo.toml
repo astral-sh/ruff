@@ -12,6 +12,7 @@ license = { workspace = true }
 
 [dependencies]
 argfile = { workspace = true }
+clap = { workspace = true }
 
 [lints]
 workspace = true

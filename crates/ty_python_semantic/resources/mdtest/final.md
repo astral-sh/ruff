@@ -320,7 +320,7 @@ class B:
     method = A.method
 
 class C(B):
-    def method(self) -> None: ...  # no diagnostic here (see prose discussion above)
+    def method(self) -> None: ...  # ok here (see prose discussion above)
 ```
 
 ## Overriding a `@final` method by assigning a function to a class variable

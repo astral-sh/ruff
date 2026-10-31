@@ -818,7 +818,7 @@ class Parent:
 
 class Child(Parent):
     def __init__(self, children: Mapping[str, Child] | None = None) -> None:
-        super().__init__(children)  # no diagnostic
+        super().__init__(children)  # ok
 ```
 
 The caller's `Self` type variable is also a valid argument for the parent's independently inferred
@@ -827,7 +827,7 @@ The caller's `Self` type variable is also a valid argument for the parent's inde
 ```py
 class ChildWithSelf(Parent):
     def __init__(self, children: Mapping[str, Self] | None = None) -> None:
-        super().__init__(children)  # no diagnostic
+        super().__init__(children)  # ok
 ```
 
 ## Super in Protocol Classes

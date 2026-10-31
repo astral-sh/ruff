@@ -5785,7 +5785,7 @@ from typing_extensions import TypedDict
 Movie2 = TypedDict("Movie2", name=str, year=int)
 
 # The invalid declaration does not cause another diagnostic when used as an annotation.
-def use(value: Movie2): ...  # no diagnostic
+def use(value: Movie2): ...  # ok
 ```
 
 ## Function syntax with invalid arguments

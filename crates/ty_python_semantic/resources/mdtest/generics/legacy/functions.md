@@ -471,10 +471,10 @@ def contextual(value: str, existing: S) -> list[S]:
     return box(value)  # error: [invalid-return-type]
 
 def compatible_context(value: BoundedS) -> list[BoundedS]:
-    return box(value)  # no diagnostic
+    return box(value)  # ok
 
 def gradual_context(value: Any) -> list[S]:
-    return box(value)  # no diagnostic
+    return box(value)  # ok
 
 def box_callable(value: Callable[[], T]) -> list[T]:
     return [value()]
@@ -613,7 +613,7 @@ def identity(value: V) -> V:
     return value
 
 def register(callbacks: list[Callable[[object], T]], callback: Callable[[object], T]) -> None:
-    callbacks.append(callback)  # no diagnostic
+    callbacks.append(callback)  # ok
     # TODO: should report invalid-argument-type (https://github.com/astral-sh/ty/issues/3114)
     callbacks.append(identity)
 ```
@@ -781,8 +781,8 @@ class Writer(Protocol[T_contra]):
 
 def constrained(writer: Writer[T]) -> None: ...
 def f(text: Writer[str], binary: Writer[bytes], either: Writer[str] | Writer[bytes]):
-    constrained(text)  # no diagnostic
-    constrained(binary)  # no diagnostic
+    constrained(text)  # ok
+    constrained(binary)  # ok
     # snapshot: invalid-argument-type
     constrained(either)
 ```
@@ -2314,7 +2314,7 @@ def first_value(mapping: V | Batch[V]) -> V:
 class MultiDict(Generic[V]):
     def add(self, value: V): ...
     def extend_values(self, mapping: V | Batch[V]):
-        self.add(first_value(mapping))  # no diagnostic
+        self.add(first_value(mapping))  # ok
 ```
 
 ## Unions nested in covariant type arguments
@@ -2609,9 +2609,9 @@ def infer(callback: Callable[[], T | Box[T]]) -> T:
 unknown = Box()
 any_ = Box[Any]()
 
-unknown_result = infer(lambda: unknown)  # no diagnostic
+unknown_result = infer(lambda: unknown)  # ok
 reveal_type(unknown_result)  # revealed: Unknown
-any_result = infer(lambda: any_)  # no diagnostic
+any_result = infer(lambda: any_)  # ok
 reveal_type(any_result)  # revealed: Any
 ```
 
@@ -3445,7 +3445,7 @@ def union_callee(value: UnionT) -> UnionT:
 def union_caller(value: UnionS) -> UnionS:
     result = union_callee(value)
     reveal_type(result)  # revealed: UnionS@union_caller
-    return result  # no diagnostic
+    return result  # ok
 ```
 
 A fixed constrained typevar and a gradual argument can provide separate bounds for another
@@ -4999,7 +4999,7 @@ def _(
 ) -> None:
     result = remember_first(identity)
     reveal_type(result)  # revealed: (A | B, /) -> A | B
-    result(A())  # no diagnostic
+    result(A())  # ok
     reveal_type(result(B()))  # revealed: A | B
 ```
 
@@ -5047,7 +5047,7 @@ def convert(prefix: int, value: str | int) -> str | int:
 
 result = remember_first(convert)
 reveal_type(result)  # revealed: (value: str) -> str | int
-result("first")  # no diagnostic
+result("first")  # ok
 # A cached `str` must not be returned as `int` on a later call.
 # error: [invalid-argument-type]
 reveal_type(result(1))  # revealed: str | int

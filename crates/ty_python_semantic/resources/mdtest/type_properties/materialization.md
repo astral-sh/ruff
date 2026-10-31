@@ -370,9 +370,9 @@ def check(
     restricted: Callable[[int], Never],
     returns_none: Bottom[Callable[..., None]],
 ) -> None:
-    positional: Callable[[str, bytes], int] = bottom  # no diagnostic
-    keyword_only: Required = bottom  # no diagnostic
-    declared: Required = never_returns  # no diagnostic
+    positional: Callable[[str, bytes], int] = bottom  # ok
+    keyword_only: Required = bottom  # ok
+    declared: Required = never_returns  # ok
 
     wrong_parameters: Callable[[str], int] = restricted  # error: [invalid-assignment]
     wrong_return: Callable[[int], str] = returns_none  # error: [invalid-assignment]
@@ -389,7 +389,7 @@ class Restricted:
 class Allowed(Restricted): ...
 
 def check_receiver(restricted: Restricted, allowed: Allowed) -> None:
-    valid: Callable[[int], str] = allowed.method  # no diagnostic
+    valid: Callable[[int], str] = allowed.method  # ok
     invalid: Callable[[int], str] = restricted.method  # error: [invalid-assignment]
 ```
 
@@ -412,11 +412,11 @@ def returns_str(*args: object, **kwargs: object) -> str:
 def returns_int(*args: object, **kwargs: object) -> int:
     return 0
 
-accepts_target(returns_str)  # no diagnostic
+accepts_target(returns_str)  # ok
 accepts_target(returns_int)  # error: [invalid-argument-type]
 
 def check_source_receiver(restricted: Restricted, allowed: Allowed) -> None:
-    accepts_target(allowed.method)  # no diagnostic
+    accepts_target(allowed.method)  # ok
     accepts_target(restricted.method)  # error: [invalid-argument-type]
 ```
 
@@ -438,8 +438,8 @@ class Required(Protocol):
     def __call__(self, *, enabled: bool) -> bytes: ...
 
 def check(positional: Callable[[int], str], keyword_only: Required) -> None:
-    first: Top[Callable[..., object]] = positional  # no diagnostic
-    second: Top[Callable[..., object]] = keyword_only  # no diagnostic
+    first: Top[Callable[..., object]] = positional  # ok
+    second: Top[Callable[..., object]] = keyword_only  # ok
     wrong_return: Top[Callable[..., int]] = positional  # error: [invalid-assignment]
     wrong_parameters: Top[Callable[[str], object]] = positional  # error: [invalid-assignment]
 ```
@@ -464,9 +464,9 @@ class Restricted:
 class Allowed(Restricted): ...
 
 def check_receiver(restricted: Restricted) -> None:
-    valid: Top[Callable[..., object]] = restricted.method  # no diagnostic
-    aliased: Top[Callable[..., object]] = restricted.aliased  # no diagnostic
-    generic: Top[Callable[..., object]] = restricted.generic  # no diagnostic
+    valid: Top[Callable[..., object]] = restricted.method  # ok
+    aliased: Top[Callable[..., object]] = restricted.aliased  # ok
+    generic: Top[Callable[..., object]] = restricted.generic  # ok
 
     invalid: Callable[[], str] = restricted.method  # error: [invalid-assignment]
     invalid_alias: Callable[[], str] = restricted.aliased  # error: [invalid-assignment]
@@ -3854,7 +3854,7 @@ static_assert(not is_equivalent_to(Tree, Bottom[Tree]))
 
 def write(top: Top[Tree], bottom: Bottom[Tree]) -> None:
     top.value = 1  # error: [invalid-assignment]
-    bottom.value = object()  # no diagnostic
+    bottom.value = object()  # ok
 ```
 
 The getter can be gradual even when the setter is fully static:

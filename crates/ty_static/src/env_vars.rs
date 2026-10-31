@@ -96,6 +96,11 @@ impl EnvVars {
 
     // Externally defined environment variables
 
+    /// Controls color in `ty check` output, including when piped.
+    /// Any non-empty value forces color, and an empty value disables it.
+    /// `--color always` and `--color never` take precedence.
+    pub const FORCE_COLOR: &'static str = "FORCE_COLOR";
+
     /// Specifies an upper limit for the number of threads ty uses when performing work in parallel.
     /// Equivalent to `TY_MAX_PARALLELISM`.
     ///

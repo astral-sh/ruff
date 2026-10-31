@@ -1403,11 +1403,11 @@ child = Child("a")
 reveal_type(child.value)  # revealed: str
 Child(1)  # error: [invalid-argument-type]
 
-child.value = "b"  # no diagnostic
+child.value = "b"  # ok
 child.value = 1  # error: [invalid-assignment]
 
 reveal_type(Child.__replace__)  # revealed: (self: Child, *, value: str = ...) -> Child
-child.__replace__(value="b")  # no diagnostic
+child.__replace__(value="b")  # ok
 child.__replace__(value=1)  # error: [invalid-argument-type]
 ```
 
@@ -1423,7 +1423,7 @@ class Indirect(Nested[str]): ...
 reveal_type(Indirect.__init__)  # revealed: (self: Indirect, value: list[str]) -> None
 indirect = Indirect(["a"])
 Indirect([1])  # error: [invalid-argument-type]
-indirect.value = ["b"]  # no diagnostic
+indirect.value = ["b"]  # ok
 indirect.value = [1]  # error: [invalid-assignment]
 ```
 
@@ -2545,9 +2545,9 @@ class Just[T](Protocol):
 
 class Custom: ...
 
-exact: Just[object] = object()  # no diagnostic
+exact: Just[object] = object()  # ok
 subclass: Just[object] = Custom()  # error: [invalid-assignment]
-exact_class: type[Just[object]] = object  # no diagnostic
+exact_class: type[Just[object]] = object  # ok
 subclass_class: type[Just[object]] = Custom  # error: [invalid-assignment]
 ```
 
@@ -2876,7 +2876,7 @@ class Chain[T](Protocol):
 class Concrete[T](Chain[T]): ...
 
 def check[T](value: Concrete[T]) -> None:
-    matching: Chain[T] = value  # no diagnostic
+    matching: Chain[T] = value  # ok
     incompatible: Chain[int] = value  # snapshot: invalid-assignment
 ```
 
@@ -2926,8 +2926,8 @@ class Invalid[T]:
 
 def accepts(value: Chain[int]) -> None: ...
 def check(inherited: Inherited[int], structural: Structural[int], wrong: Structural[str], invalid: Invalid[int]):
-    accepts(inherited)  # no diagnostic
-    accepts(structural)  # no diagnostic
+    accepts(inherited)  # ok
+    accepts(structural)  # ok
     accepts(wrong)  # error: [invalid-argument-type]
     accepts(invalid)  # error: [invalid-argument-type]
 ```
@@ -2940,14 +2940,14 @@ class StructuralProtocol[T](Protocol):
     def step[S](self: Chain[tuple[S]], callback: Callable[[S], T]) -> None: ...
 
 def check_protocol(valid: StructuralProtocol[int], invalid: StructuralProtocol[str]):
-    accepts(valid)  # no diagnostic
+    accepts(valid)  # ok
     accepts(invalid)  # error: [invalid-argument-type]
 ```
 
 The expected protocol also supplies the inherited constructor's type argument.
 
 ```py
-contextual: Chain[int] = Inherited(())  # no diagnostic
+contextual: Chain[int] = Inherited(())  # ok
 reveal_type(contextual)  # revealed: Inherited[int]
 ```
 
@@ -2973,7 +2973,7 @@ class Incompatible:
 
 def accepts(value: Required) -> None: ...
 def check(broad: Broad, incompatible: Incompatible):
-    accepts(broad)  # no diagnostic
+    accepts(broad)  # ok
     accepts(incompatible)  # error: [invalid-argument-type]
 ```
 
@@ -3062,7 +3062,7 @@ An expected return type also provides context for the call:
 ```py
 def contextual_argument[T](a: Box[str], b: Box[T], cond: bool) -> tuple[Box[str], str] | tuple[Box[T], T]:
     box = a if cond else b
-    return box.pair_with_values([])  # no diagnostic
+    return box.pair_with_values([])  # ok
 
 def inferred_result[T](a: Box[str], b: Box[T], cond: bool):
     box = a if cond else b
@@ -3111,7 +3111,7 @@ python-version = "3.12"
 ```py
 def compare[T](first: dict[str, T], second: dict[str, int]) -> None:
     for current in (first, second):
-        for key, data in current.items():  # no diagnostic
+        for key, data in current.items():  # ok
             reveal_type(data)  # revealed: T@compare | int
             reveal_type(current.get(key))  # revealed: T@compare | None | int
 ```
@@ -3155,7 +3155,7 @@ class WithDefault(Base[int]):
     value: str = ""  # error: [invalid-attribute-override]
 
 class Grandchild(WithDefault):
-    value: str = ""  # no diagnostic
+    value: str = ""  # ok
 ```
 
 A new concrete inheritance path can introduce a conflict absent from a parent's gradual
@@ -3185,7 +3185,7 @@ class Base[T]:
 
 class Same(Base[int]):
     def __init__(self) -> None:
-        self.value: int = 0  # no diagnostic
+        self.value: int = 0  # ok
 ```
 
 Narrowing to `bool` would prevent writes of other integers. An unrelated type such as `str` also
@@ -3298,7 +3298,7 @@ class Base[T]:
     def value(self) -> T:
         raise NotImplementedError
 
-class String(Base[Any]):  # no diagnostic
+class String(Base[Any]):  # ok
     @property
     def value(self) -> str:
         return ""

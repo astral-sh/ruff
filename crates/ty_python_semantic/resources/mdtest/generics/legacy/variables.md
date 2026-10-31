@@ -1061,7 +1061,7 @@ class WithProperty:
 StoredBound = TypeVar("StoredBound", bound=Stored)
 
 def stored(obj: StoredBound):
-    obj.cls = type(obj)  # no diagnostic
+    obj.cls = type(obj)  # ok
     obj.cls = Stored  # error: [invalid-assignment]
 ```
 
@@ -1071,7 +1071,7 @@ The same binding applies to every possible setter of a conditionally defined pro
 PropertyBound = TypeVar("PropertyBound", bound=WithProperty)
 
 def property_bound(obj: PropertyBound):
-    obj.cls = type(obj)  # no diagnostic
+    obj.cls = type(obj)  # ok
     obj.cls = WithProperty  # error: [invalid-assignment]
 ```
 
@@ -1081,8 +1081,8 @@ Every constraint must permit a write or deletion, with `Self` still bound to the
 Constrained = TypeVar("Constrained", Stored, WithProperty)
 
 def constrained(obj: Constrained):
-    obj.cls = type(obj)  # no diagnostic
-    del obj.cls  # no diagnostic
+    obj.cls = type(obj)  # ok
+    del obj.cls  # ok
 ```
 
 A union bound preserves the same `Self` binding and deletion support.
@@ -1091,8 +1091,8 @@ A union bound preserves the same `Self` binding and deletion support.
 Bounded = TypeVar("Bounded", bound=Stored | WithProperty)
 
 def bounded(obj: Bounded):
-    obj.cls = type(obj)  # no diagnostic
-    del obj.cls  # no diagnostic
+    obj.cls = type(obj)  # ok
+    del obj.cls  # ok
 ```
 
 A protocol annotation also binds `Self` to the original type variable. Its additional `marker`
@@ -1108,7 +1108,7 @@ class HasClass(Protocol):
 ProtocolBound = TypeVar("ProtocolBound", bound=Stored | HasClass)
 
 def protocol_bound(obj: ProtocolBound):
-    obj.cls = type(obj)  # no diagnostic
+    obj.cls = type(obj)  # ok
 ```
 
 ## Read-only attribute alternatives
@@ -1151,10 +1151,10 @@ class Custom:
 T = TypeVar("T", bound=Custom)
 
 def assign(obj: T):
-    obj.dynamic = 1  # no diagnostic
+    obj.dynamic = 1  # ok
     obj.dynamic = "wrong"  # error: [invalid-assignment]
     obj.other = 1  # error: [invalid-assignment]
-    obj.declared = "ok"  # no diagnostic
+    obj.declared = "ok"  # ok
     obj.declared = 1  # error: [invalid-assignment]
 ```
 
@@ -1184,7 +1184,7 @@ class Other:
 T = TypeVar("T", bound=Custom | Other)
 
 def assign(obj: T):
-    obj.other = obj  # no diagnostic
+    obj.other = obj  # ok
     obj.other = Custom()  # error: [invalid-assignment]
 ```
 
@@ -1194,7 +1194,7 @@ Conditionally defined setters also retain the original receiver's type.
 Conditional = TypeVar("Conditional", bound=Other)
 
 def conditional(obj: Conditional):
-    obj.other = obj  # no diagnostic
+    obj.other = obj  # ok
     # error: [invalid-assignment]
     # error: [invalid-assignment]
     obj.other = Other()
@@ -1211,7 +1211,7 @@ class ClassMethod:
 ClassMethodBound = TypeVar("ClassMethodBound", bound=ClassMethod)
 
 def class_method(obj: ClassMethodBound):
-    obj.other = obj  # no diagnostic
+    obj.other = obj  # ok
     obj.other = ClassMethod()  # error: [invalid-assignment]
 ```
 
@@ -1262,7 +1262,7 @@ ChildBound = TypeVar("ChildBound", bound=Child)
 
 def child(obj: ChildBound):
     obj.value = 1  # error: [invalid-assignment]
-    obj.extra = 1  # no diagnostic
+    obj.extra = 1  # ok
 ```
 
 A writable alternative does not make the frozen field writable.
