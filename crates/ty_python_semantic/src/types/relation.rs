@@ -916,6 +916,33 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         other: Type<'db>,
     ) -> bool {
+        if let (Type::Never, ty) | (ty, Type::Never) = (self, other) {
+            let differs_from_never = |ty| {
+                matches!(
+                    ty,
+                    Type::NominalInstance(_)
+                        | Type::LiteralValue(_)
+                        | Type::Dynamic(_)
+                        | Type::FunctionLiteral(_)
+                        | Type::BoundMethod(_)
+                        | Type::ClassLiteral(_)
+                )
+            };
+            return match ty {
+                Type::Never => true,
+                Type::Divergent(_) => ty
+                    .materialized_divergent_fallback()
+                    .is_some_and(|ty| ty.is_never()),
+                ty if differs_from_never(ty) => false,
+                Type::Union(union)
+                    if union.elements(db).iter().copied().any(differs_from_never) =>
+                {
+                    false
+                }
+                // Never is redundant in every union, so only the converse can fail.
+                _ => ty.is_pure_redundant_with(db, env, Type::Never),
+            };
+        }
         self.when_equivalent_to(db, env, other, &ConstraintSetBuilder::new())
             .is_always_satisfied(db, env, TypeVarSet::None)
     }
