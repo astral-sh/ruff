@@ -42,11 +42,11 @@ impl UvImportDiscovery {
             Self::project_root(&directory).and_then(|project| self.discover(project));
     }
 
-    fn project_root(directory: &Path) -> Option<&Path> {
+    pub fn project_root(directory: &Path) -> Option<&Path> {
         directory.ancestors().find(|dir| Self::is_project(dir))
     }
 
-    fn discover(&self, root: &Path) -> Option<WorkspaceImports> {
+    pub fn discover(&self, root: &Path) -> Option<WorkspaceImports> {
         let mut workspaces = self.workspaces.lock().unwrap();
         if !workspaces.contains_key(root) {
             let imports = match read_metadata(root) {
@@ -71,7 +71,7 @@ impl UvImportDiscovery {
         workspaces.get(root).cloned().flatten()
     }
 
-    pub(crate) fn uses_import_sections(settings: &Settings) -> bool {
+    pub fn uses_import_sections(settings: &Settings) -> bool {
         settings.linter.rules.any_enabled(&[
             Rule::UnsortedImports,
             Rule::UnusedImport,
@@ -206,11 +206,12 @@ impl Metadata {
                 Some(package.editable_roots(&member.path))
             })
             .flatten()
-            .unique();
-        for root in roots {
-            add_source_modules(&root, &mut sections);
+            .unique()
+            .collect::<Vec<_>>();
+        for root in &roots {
+            add_source_modules(root, &mut sections);
         }
-        WorkspaceImports::new(sections)
+        WorkspaceImports::new(sections, roots)
     }
 }
 

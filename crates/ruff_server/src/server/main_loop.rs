@@ -17,10 +17,11 @@ pub(crate) type MainLoopReceiver = crossbeam::channel::Receiver<Event>;
 
 impl Server {
     pub(super) fn main_loop(&mut self) -> crate::Result<()> {
-        self.initialize(&Client::new(
+        let client = Client::new(
             self.main_loop_sender.clone(),
             self.connection.sender.clone(),
-        ));
+        );
+        self.initialize(&client);
 
         let mut scheduler = schedule::Scheduler::new(self.worker_threads);
 
@@ -31,11 +32,6 @@ impl Server {
 
             match next_event {
                 Event::Message(msg) => {
-                    let client = Client::new(
-                        self.main_loop_sender.clone(),
-                        self.connection.sender.clone(),
-                    );
-
                     let task = match msg {
                         Message::Request(req) => {
                             self.session
@@ -95,7 +91,16 @@ impl Server {
                         }
                     };
 
-                    scheduler.dispatch(task, &mut self.session, client);
+                    scheduler.dispatch(task, &mut self.session, client.clone());
+                }
+                Event::UvImports(imports) => {
+                    if self.session.update_uv_imports(imports) {
+                        if let Err(err) = api::refresh_diagnostics(&self.session, &client) {
+                            tracing::error!(
+                                "Failed to refresh diagnostics after reading uv metadata: {err}"
+                            );
+                        }
+                    }
                 }
                 Event::SendResponse(response) => {
                     // Filter out responses for already canceled requests.
@@ -154,6 +159,17 @@ impl Server {
             let mut registrations = vec![];
 
             if supports_watched_files {
+                let use_uv = self.session.use_uv();
+                let uv_patterns: &[&str] = if use_uv {
+                    &[
+                        "**/uv.lock",
+                        "**/uv.toml",
+                        "**/*.dist-info/RECORD",
+                        "**/*.pth",
+                    ]
+                } else {
+                    &[]
+                };
                 // `workspace/didChangeWatchedFiles`
                 // (this registers the configuration file watcher)
                 registrations.push(lsp_types::Registration {
@@ -161,26 +177,23 @@ impl Server {
                     method: "workspace/didChangeWatchedFiles".into(),
                     register_options: Some(
                         serde_json::to_value(DidChangeWatchedFilesRegistrationOptions {
-                            watchers: vec![
-                                FileSystemWatcher {
-                                    glob_pattern: types::GlobPattern::Pattern(
-                                        "**/.ruff.toml".into(),
-                                    ),
+                            watchers: ["**/.ruff.toml", "**/ruff.toml", "**/pyproject.toml"]
+                                .into_iter()
+                                .chain(uv_patterns.iter().copied())
+                                .map(|pattern| FileSystemWatcher {
+                                    glob_pattern: types::GlobPattern::Pattern(pattern.into()),
                                     kind: None,
-                                },
-                                FileSystemWatcher {
+                                })
+                                .chain(use_uv.then(|| FileSystemWatcher {
                                     glob_pattern: types::GlobPattern::Pattern(
-                                        "**/ruff.toml".into(),
+                                        "**/*.{py,pyi}".into(),
                                     ),
-                                    kind: None,
-                                },
-                                FileSystemWatcher {
-                                    glob_pattern: types::GlobPattern::Pattern(
-                                        "**/pyproject.toml".into(),
-                                    ),
-                                    kind: None,
-                                },
-                            ],
+                                    kind: Some(types::WatchKind::from(
+                                        u32::from(types::WatchKind::Create)
+                                            | u32::from(types::WatchKind::Delete),
+                                    )),
+                                }))
+                                .collect(),
                         })
                         .unwrap(),
                     ),
@@ -275,4 +288,7 @@ pub(crate) enum Event {
 
     /// Send a response to the client
     SendResponse(lsp_server::Response),
+
+    /// Workspace metadata read by the uv worker.
+    UvImports(crate::session::UvImports),
 }
