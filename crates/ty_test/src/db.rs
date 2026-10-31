@@ -295,6 +295,9 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
 
     let AnalysisSettings {
         return_type_inference: return_type_inference_default,
+        strict_list_inference: strict_list_inference_default,
+        strict_dictionary_inference: strict_dictionary_inference_default,
+        strict_set_inference: strict_set_inference_default,
         strict_generic_narrowing: strict_generic_narrowing_default,
         strict_equality_semantics: strict_equality_semantics_default,
         respect_type_ignore_comments: respect_type_ignore_comments_default,
@@ -332,6 +335,15 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
         return_type_inference: options
             .return_type_inference
             .unwrap_or(return_type_inference_default),
+        strict_list_inference: options
+            .strict_list_inference
+            .unwrap_or(strict_list_inference_default),
+        strict_dictionary_inference: options
+            .strict_dictionary_inference
+            .unwrap_or(strict_dictionary_inference_default),
+        strict_set_inference: options
+            .strict_set_inference
+            .unwrap_or(strict_set_inference_default),
         strict_generic_narrowing: options
             .strict_generic_narrowing
             .unwrap_or(strict_generic_narrowing_default),
