@@ -388,8 +388,7 @@ impl Options {
                 .iter()
                 .map(|root| root.absolute(context.configuration_root(), system))
                 .collect()
-        } else {
-            let project_root = context.configuration_root();
+        } else if let Some(project_root) = context.project_root() {
             let mut roots = vec![];
             let is_package = |dir: &SystemPath| {
                 system.is_file(&dir.join("__init__.py"))
@@ -437,6 +436,9 @@ impl Options {
             roots.push(project_root.to_path_buf());
 
             roots
+        } else {
+            // A standalone script has no implicit first-party roots.
+            Vec::new()
         };
 
         // collect the existing site packages
@@ -612,7 +614,7 @@ impl Options {
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum OptionsContext<'a> {
     Project(&'a SystemPath),
-    /// The directory containing a standalone script, or the working directory for a virtual script.
+    /// The directory used to resolve relative settings for the script.
     Script(&'a SystemPath),
 }
 
@@ -859,8 +861,9 @@ pub struct EnvironmentOptions {
     /// * `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
     /// * `./python`
     ///
-    /// Scripts with inline metadata have no first-party roots by default because they are
-    /// single-file programs. Set `root = ["."]` to allow importing local modules.
+    /// Scripts with inline metadata default to `root = []`, even when the enclosing project
+    /// configures first-party roots. Set `root = ["."]` in the script's `[tool.ty.environment]`
+    /// table to import sibling modules.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
@@ -890,8 +893,10 @@ pub struct EnvironmentOptions {
     ///    and attempt to infer the Python version of that environment
     /// 3. Fall back to the default value (see below)
     ///
-    /// Scripts with inline metadata use their `requires-python` field instead of
-    /// `project.requires-python`. They do not inherit the Python version of the enclosing project.
+    /// A script with inline metadata uses its own `requires-python` in preference to the
+    /// enclosing project's Python version. An explicit `[tool.ty.environment]` Python version
+    /// in the script takes precedence over its `requires-python`. A script that specifies
+    /// neither `requires-python` nor a `[tool.ty]` table inherits the project's version setting.
     ///
     /// For some language features, ty can also understand conditionals based on comparisons
     /// with `sys.version_info`. These are commonly found in typeshed, for example,
