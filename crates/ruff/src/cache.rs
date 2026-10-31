@@ -4,7 +4,9 @@ use std::hash::Hasher;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(target_has_atomic = "64")]
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
@@ -22,6 +24,10 @@ use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
 use ruff_workspace::Settings;
 use ruff_workspace::resolver::Resolver;
+
+// `std` only provides `AtomicU64` on targets with 64-bit atomics.
+#[cfg(not(target_has_atomic = "64"))]
+use portable_atomic::AtomicU64;
 
 /// [`Path`] that is relative to the package root in [`PackageCache`].
 pub(crate) type RelativePath = Path;
@@ -341,10 +347,54 @@ pub(crate) struct FileCache {
     ///
     /// Represented as the number of milliseconds since Unix epoch. This will
     /// break in 1970 + ~584 years (~2554).
-    #[rkyv(with = rkyv::with::AtomicLoad<rkyv::with::Relaxed>)]
+    #[cfg_attr(
+        target_has_atomic = "64",
+        rkyv(with = rkyv::with::AtomicLoad<rkyv::with::Relaxed>)
+    )]
+    #[cfg_attr(not(target_has_atomic = "64"), rkyv(with = AtomicU64LoadRelaxed))]
     last_seen: AtomicU64,
 
     data: FileCacheData,
+}
+
+/// Archives a [`portable_atomic::AtomicU64`] as its value, like
+/// [`rkyv::with::AtomicLoad`] with [`rkyv::with::Relaxed`] does for the `std`
+/// one, so the on-disk format is the same on all targets.
+#[cfg(not(target_has_atomic = "64"))]
+struct AtomicU64LoadRelaxed;
+
+#[cfg(not(target_has_atomic = "64"))]
+impl rkyv::with::ArchiveWith<AtomicU64> for AtomicU64LoadRelaxed {
+    type Archived = rkyv::primitive::ArchivedU64;
+    type Resolver = ();
+
+    fn resolve_with(field: &AtomicU64, (): Self::Resolver, out: rkyv::Place<Self::Archived>) {
+        out.write(rkyv::primitive::ArchivedU64::from_native(
+            field.load(Ordering::Relaxed),
+        ));
+    }
+}
+
+#[cfg(not(target_has_atomic = "64"))]
+impl<S: rkyv::rancor::Fallible + ?Sized> rkyv::with::SerializeWith<AtomicU64, S>
+    for AtomicU64LoadRelaxed
+{
+    fn serialize_with(_: &AtomicU64, _: &mut S) -> std::result::Result<Self::Resolver, S::Error> {
+        Ok(())
+    }
+}
+
+#[cfg(not(target_has_atomic = "64"))]
+impl<D: rkyv::rancor::Fallible + ?Sized>
+    rkyv::with::DeserializeWith<rkyv::primitive::ArchivedU64, AtomicU64, D>
+    for AtomicU64LoadRelaxed
+{
+    fn deserialize_with(
+        field: &rkyv::primitive::ArchivedU64,
+        _: &mut D,
+    ) -> std::result::Result<AtomicU64, D::Error> {
+        Ok(AtomicU64::new(field.to_native()))
+    }
 }
 
 impl FileCache {
@@ -503,7 +553,6 @@ mod tests {
     use std::io;
     use std::io::Write;
     use std::path::{Path, PathBuf};
-    use std::sync::atomic::AtomicU64;
     use std::time::SystemTime;
 
     use anyhow::Result;
@@ -522,7 +571,7 @@ mod tests {
     use ruff_workspace::Settings;
 
     use crate::cache::{self, ChangeData, FileCache, FileCacheData, FileCacheKey};
-    use crate::cache::{Cache, RelativePathBuf};
+    use crate::cache::{AtomicU64, Cache, RelativePathBuf};
     use crate::commands::format::{FormatCommandError, FormatMode, FormatResult, format_path};
     use crate::diagnostics::{Diagnostics, lint_path};
 

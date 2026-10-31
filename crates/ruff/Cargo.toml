@@ -77,6 +77,9 @@ tikv-jemallocator = { workspace = true }
 [target.'cfg(target_os = "windows")'.dependencies]
 mimalloc = { workspace = true }
 
+[target.'cfg(not(target_has_atomic = "64"))'.dependencies]
+portable-atomic = { workspace = true }
+
 [dev-dependencies]
 # Enable test rules during development
 ruff_linter = { workspace = true, features = ["clap", "test-rules"] }
