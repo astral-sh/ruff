@@ -6,8 +6,7 @@ Both of them use the lower-level `ruff_python_importer::Insertion` primitive.
 The main differences here are:
 
 1. This works with ty's semantic model instead of ruff's.
-2. This owns the task of visiting AST to extract imports for
-   diagnostic fixes, completions, and inlay hints.
+2. It collects top-level imports for diagnostic fixes, completions, and inlay hints.
 3. It doesn't have as many facilities as `ruff_linter`'s importer.
 */
 
@@ -22,9 +21,6 @@ use crate::{Db, SemanticModel};
 use ruff_db::source::{SourceText, source_text};
 use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
-use ruff_python_ast::flat::visitor::source_order::{
-    SourceOrderVisitor, TraversalSignal, walk_stmt,
-};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::Tokens;
 use ruff_python_codegen::Stylist;
@@ -50,7 +46,7 @@ pub struct Importer<'a> {
     source: SourceText,
     /// The cached source style for formatting inserted code.
     stylist: &'a Stylist<'static>,
-    /// The list of visited, top-level runtime imports in the Python AST.
+    /// Top-level imports in source order.
     imports: &'a [AstNodeRef<ast::Stmt>],
 }
 
@@ -522,7 +518,13 @@ fn stylist(db: &dyn Db, file: PythonFile<'_>) -> Stylist<'static> {
 #[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size)]
 fn top_level_imports(db: &dyn Db, file: PythonFile<'_>) -> Box<[AstNodeRef<ast::Stmt>]> {
     let parsed = parsed_module(db, file).load(db);
-    TopLevelImports::find(&parsed)
+    // Imports inside an `if` or `try` suite may never execute.
+    parsed
+        .suite()
+        .iter()
+        .filter(|stmt| stmt.is_import_stmt() || stmt.is_import_from_stmt())
+        .map(|stmt| AstNodeRef::from_view(&parsed, stmt))
+        .collect()
 }
 
 /// A map of symbols in scope at a particular location in a module.
@@ -1021,72 +1023,4 @@ enum ImportStyle {
     /// Import the symbol using the `from` statement (e.g. `from foo
     /// import bar; bar`).
     ImportFrom,
-}
-
-/// An AST visitor for extracting top-level imports.
-struct TopLevelImports<'ast> {
-    parsed: &'ast ParsedModuleRef,
-    level: u64,
-    imports: Vec<AstNodeRef<ast::Stmt>>,
-}
-
-impl<'ast> TopLevelImports<'ast> {
-    /// Find all top-level imports from the given AST of a Python module.
-    fn find(parsed: &'ast ParsedModuleRef) -> Box<[AstNodeRef<ast::Stmt>]> {
-        let mut visitor = TopLevelImports {
-            parsed,
-            level: 0,
-            imports: Vec::new(),
-        };
-        visitor.visit_body(parsed.suite());
-        visitor.imports.into_boxed_slice()
-    }
-}
-
-impl<'ast> SourceOrderVisitor<'ast> for TopLevelImports<'ast> {
-    fn visit_stmt(&mut self, stmt: flat::View<'ast, ast::Stmt>) {
-        match stmt.classify() {
-            flat::StmtKind::Import(_) | flat::StmtKind::ImportFrom(_) => {
-                if self.level == 0 {
-                    self.imports.push(AstNodeRef::from_view(self.parsed, stmt));
-                }
-            }
-            _ => {
-                // OK because it's not practical for the source code
-                // depth of a Python to exceed a u64.
-                //
-                // Also, it is perhaps a bit too eager to increment
-                // this for every non-import statement, particularly
-                // compared to the more refined scope tracking in the
-                // semantic index builder. However, I don't think
-                // we need anything more refined here. We only care
-                // about top-level imports. So as soon as we get into
-                // something nested, we can bail out.
-                //
-                // Although, this does mean, e.g.,
-                //
-                //     if predicate:
-                //         import whatever
-                //
-                // at the module scope is not caught here. If we
-                // need those imports, I think we'll just want some
-                // more case analysis with more careful `level`
-                // incrementing.
-                self.level = self.level.checked_add(1).unwrap();
-                walk_stmt(self, stmt);
-                // Always OK because we can only be here after
-                // a successful +1 from above.
-                self.level = self.level.checked_sub(1).unwrap();
-            }
-        }
-    }
-
-    #[inline]
-    fn enter_node(&mut self, node: flat::AnyNodeRef<'ast>) -> TraversalSignal {
-        if node.is_statement() {
-            TraversalSignal::Traverse
-        } else {
-            TraversalSignal::Skip
-        }
-    }
 }
