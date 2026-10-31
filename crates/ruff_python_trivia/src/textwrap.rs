@@ -285,6 +285,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn indent_preserves_whitespace() {
+        assert_eq!(indent(" \t  Foo   ", "->"), "-> \t  Foo   ");
+        assert_eq!(indent_first_line(" \t  Foo   ", "->"), "-> \t  Foo   ");
+    }
+
+    #[test]
+    fn indent_with_blank_lines() {
+        assert_eq!(indent("first\n\n\nlast\n", "  "), "  first\n\n\n  last\n");
+        assert_eq!(indent_first_line("\n\n\nlast\n", "  "), "\n\n\nlast\n");
+    }
+
+    #[test]
     fn indent_empty() {
         assert_eq!(indent("\n", "  "), "\n");
     }

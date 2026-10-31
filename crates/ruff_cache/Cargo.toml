@@ -26,4 +26,5 @@ ruff_macros = { workspace = true }
 workspace = true
 
 [lib]
+doctest = false
 test = false

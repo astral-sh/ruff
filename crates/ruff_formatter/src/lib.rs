@@ -31,6 +31,8 @@ pub mod macros;
 pub mod prelude;
 pub mod printer;
 mod source_code;
+#[cfg(test)]
+mod tests;
 
 use crate::formatter::Formatter;
 use crate::group_id::UniqueGroupIdBuilder;

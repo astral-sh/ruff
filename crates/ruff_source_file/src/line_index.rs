@@ -702,7 +702,67 @@ mod tests {
     use ruff_text_size::TextSize;
 
     use crate::line_index::LineIndex;
-    use crate::{LineColumn, OneIndexed};
+    use crate::{LineColumn, OneIndexed, PositionEncoding, SourceLocation};
+
+    #[test]
+    fn columns_with_a_leading_bom() {
+        let source = "\u{feff}def a():\n    pass";
+        let index = LineIndex::from_source_text(source);
+        for (offset, line, display_column, character_offset) in
+            [(0, 0, 0, 0), (3, 0, 0, 1), (7, 0, 4, 5), (16, 1, 4, 4)]
+        {
+            let line = OneIndexed::from_zero_indexed(line);
+            assert_eq!(
+                index.line_column(offset.into(), source),
+                LineColumn {
+                    line,
+                    column: OneIndexed::from_zero_indexed(display_column),
+                }
+            );
+            assert_eq!(
+                index.source_location(offset.into(), source, PositionEncoding::Utf32),
+                SourceLocation {
+                    line,
+                    character_offset: OneIndexed::from_zero_indexed(character_offset),
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn byte_offsets_from_source_locations() {
+        let ascii = "a = 4\nc = \"some string\"\nx = b";
+        let unicode = "\u{feff}a = 4\nc = \"❤️\"\nx = b";
+        let cases = [
+            (ascii, &[(0, 0, 0), (1, 4, 10), (0, 10, 6), (3, 0, 29)][..]),
+            (
+                unicode,
+                &[(0, 0, 0), (0, 1, 3), (1, 7, 20), (1, 10, 22), (3, 0, 27)][..],
+            ),
+        ];
+        for (source, offsets) in cases {
+            let index = LineIndex::from_source_text(source);
+            for &(line, column, offset) in offsets {
+                let location = SourceLocation {
+                    line: OneIndexed::from_zero_indexed(line),
+                    character_offset: OneIndexed::from_zero_indexed(column),
+                };
+                for encoding in [PositionEncoding::Utf16, PositionEncoding::Utf32] {
+                    assert_eq!(
+                        index.offset(location, source, encoding),
+                        TextSize::new(offset)
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn decimal_digits() {
+        for (value, digits) in [(1, 1), (100, 3), (1000, 4)] {
+            assert_eq!(OneIndexed::new(value).unwrap().digits().get(), digits);
+        }
+    }
 
     #[test]
     fn ascii_index() {
@@ -731,6 +791,13 @@ mod tests {
     fn ascii_source_location() {
         let contents = "x = 1\ny = 2";
         let index = LineIndex::from_source_text(contents);
+
+        for (offset, line) in [(0, 0), (2, 0), (6, 1)] {
+            assert_eq!(
+                index.line_index(offset.into()),
+                OneIndexed::from_zero_indexed(line)
+            );
+        }
 
         // First row.
         let loc = index.line_column(TextSize::from(2), contents);

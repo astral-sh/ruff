@@ -130,9 +130,10 @@ impl OptionSet {
     ///
     /// The name can be separated by `.` to find a nested option.
     ///
-    /// ## Examples
+    /// For example, `options.has("format.hard-tabs")` looks for the `hard-tabs` field
+    /// in the `format` option group.
     ///
-    /// ### Test for the existence of a child option
+    /// # Example
     ///
     /// ```rust
     /// # use ruff_options_metadata::{OptionField, OptionsMetadata, Visit};
@@ -155,47 +156,6 @@ impl OptionSet {
     /// assert!(WithOptions::metadata().has("ignore-git-ignore"));
     /// assert!(!WithOptions::metadata().has("does-not-exist"));
     /// ```
-    /// ### Test for the existence of a nested option
-    ///
-    /// ```rust
-    /// # use ruff_options_metadata::{OptionField, OptionsMetadata, Visit};
-    ///
-    /// struct Root;
-    ///
-    /// impl OptionsMetadata for Root {
-    ///     fn record(visit: &mut dyn Visit) {
-    ///         visit.record_field("ignore-git-ignore", OptionField {
-    ///             doc: "Whether Ruff should respect the gitignore file",
-    ///             default: "false",
-    ///             value_type: "bool",
-    ///             example: "",
-    ///             scope: None,
-    ///             deprecated: None
-    ///         });
-    ///
-    ///         visit.record_set("format", Nested::metadata());
-    ///     }
-    /// }
-    ///
-    /// struct Nested;
-    ///
-    /// impl OptionsMetadata for Nested {
-    ///     fn record(visit: &mut dyn Visit) {
-    ///         visit.record_field("hard-tabs", OptionField {
-    ///             doc: "Use hard tabs for indentation and spaces for alignment.",
-    ///             default: "false",
-    ///             value_type: "bool",
-    ///             example: "",
-    ///             scope: None,
-    ///             deprecated: None
-    ///         });
-    ///     }
-    /// }
-    ///
-    /// assert!(Root::metadata().has("format.hard-tabs"));
-    /// assert!(!Root::metadata().has("format.spaces"));
-    /// assert!(!Root::metadata().has("lint.hard-tabs"));
-    /// ```
     pub fn has(&self, name: &str) -> bool {
         self.find(name).is_some()
     }
@@ -204,78 +164,8 @@ impl OptionSet {
     ///
     /// The name can be separated by `.` to find a nested option.
     ///
-    /// ## Examples
-    ///
-    /// ### Find a child option
-    ///
-    /// ```rust
-    /// # use ruff_options_metadata::{OptionEntry, OptionField, OptionsMetadata, Visit};
-    ///
-    /// struct WithOptions;
-    ///
-    /// static IGNORE_GIT_IGNORE: OptionField = OptionField {
-    ///     doc: "Whether Ruff should respect the gitignore file",
-    ///     default: "false",
-    ///     value_type: "bool",
-    ///     example: "",
-    ///     scope: None,
-    ///     deprecated: None
-    ///  };
-    ///
-    /// impl OptionsMetadata for WithOptions {
-    ///     fn record(visit: &mut dyn Visit) {
-    ///         visit.record_field("ignore-git-ignore", IGNORE_GIT_IGNORE.clone());
-    ///     }
-    /// }
-    ///
-    /// assert_eq!(WithOptions::metadata().find("ignore-git-ignore").and_then(OptionEntry::into_field), Some(IGNORE_GIT_IGNORE.clone()));
-    /// assert!(WithOptions::metadata().find("does-not-exist").is_none());
-    /// ```
-    /// ### Find a nested option
-    ///
-    /// ```rust
-    /// # use std::assert_matches;
-    /// # use ruff_options_metadata::{OptionEntry, OptionField, OptionsMetadata, Visit};
-    ///
-    /// static HARD_TABS: OptionField = OptionField {
-    ///     doc: "Use hard tabs for indentation and spaces for alignment.",
-    ///     default: "false",
-    ///     value_type: "bool",
-    ///     example: "",
-    ///     scope: None,
-    ///     deprecated: None
-    /// };
-    ///
-    /// struct Root;
-    ///
-    /// impl OptionsMetadata for Root {
-    ///     fn record(visit: &mut dyn Visit) {
-    ///         visit.record_field("ignore-git-ignore", OptionField {
-    ///             doc: "Whether Ruff should respect the gitignore file",
-    ///             default: "false",
-    ///             value_type: "bool",
-    ///             example: "",
-    ///             scope: None,
-    ///             deprecated: None
-    ///         });
-    ///
-    ///         visit.record_set("format", Nested::metadata());
-    ///     }
-    /// }
-    ///
-    /// struct Nested;
-    ///
-    /// impl OptionsMetadata for Nested {
-    ///     fn record(visit: &mut dyn Visit) {
-    ///         visit.record_field("hard-tabs", HARD_TABS.clone());
-    ///     }
-    /// }
-    ///
-    /// assert_eq!(Root::metadata().find("format.hard-tabs").and_then(OptionEntry::into_field), Some(HARD_TABS.clone()));
-    /// assert_matches!(Root::metadata().find("format"), Some(OptionEntry::Set(_)));
-    /// assert!(Root::metadata().find("format.spaces").is_none());
-    /// assert!(Root::metadata().find("lint.hard-tabs").is_none());
-    /// ```
+    /// For example, `options.find("format")` returns the group as an [`OptionEntry::Set`],
+    /// while `options.find("format.hard-tabs")` returns its field as an [`OptionEntry::Field`].
     pub fn find(&self, name: &str) -> Option<OptionEntry> {
         struct FindOptionVisitor<'a> {
             option: Option<OptionEntry>,
@@ -473,5 +363,73 @@ mod serde {
         fn record_field(&mut self, name: &str, field: OptionField) {
             self.entries.insert(name.to_string(), field);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::assert_matches;
+
+    use super::{OptionEntry, OptionField, OptionsMetadata, Visit};
+
+    const RESPECT_GITIGNORE: OptionField = OptionField {
+        doc: "Respect the gitignore file.",
+        default: "true",
+        value_type: "bool",
+        example: "",
+        scope: None,
+        deprecated: None,
+    };
+    const HARD_TABS: OptionField = OptionField {
+        doc: "Use hard tabs for indentation.",
+        default: "false",
+        ..RESPECT_GITIGNORE
+    };
+
+    struct Root;
+    struct Format;
+
+    impl OptionsMetadata for Root {
+        fn record(visit: &mut dyn Visit) {
+            visit.record_field("respect-gitignore", RESPECT_GITIGNORE);
+            visit.record_set("format", Format::metadata());
+        }
+    }
+
+    impl OptionsMetadata for Format {
+        fn record(visit: &mut dyn Visit) {
+            visit.record_field("hard-tabs", HARD_TABS);
+        }
+    }
+
+    #[test]
+    fn has_options() {
+        let options = Root::metadata();
+        assert!(options.has("respect-gitignore"));
+        assert!(options.has("format.hard-tabs"));
+        assert!(!options.has("does-not-exist"));
+        assert!(!options.has("format.spaces"));
+        assert!(!options.has("lint.hard-tabs"));
+    }
+
+    #[test]
+    fn find_options() {
+        let options = Root::metadata();
+        assert_eq!(
+            options
+                .find("respect-gitignore")
+                .and_then(OptionEntry::into_field),
+            Some(RESPECT_GITIGNORE),
+        );
+        assert_eq!(
+            options
+                .find("format.hard-tabs")
+                .and_then(OptionEntry::into_field),
+            Some(HARD_TABS),
+        );
+        assert_matches!(options.find("format"), Some(OptionEntry::Set(_)));
+        assert!(options.find("does-not-exist").is_none());
+        assert!(options.find("format.spaces").is_none());
+        assert!(options.find("lint.hard-tabs").is_none());
     }
 }

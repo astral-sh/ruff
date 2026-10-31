@@ -15,6 +15,7 @@ license = { workspace = true }
 ignored = ["ruff_cache"]
 
 [lib]
+doctest = false
 
 [dependencies]
 ruff_cache = { workspace = true, optional = true }

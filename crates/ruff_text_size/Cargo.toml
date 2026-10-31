@@ -32,4 +32,5 @@ path = "tests/serde.rs"
 required-features = ["serde"]
 
 [lib]
+doctest = false
 test = false

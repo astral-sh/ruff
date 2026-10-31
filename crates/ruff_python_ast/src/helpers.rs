@@ -1862,12 +1862,34 @@ mod tests {
 
     use ruff_text_size::TextRange;
 
-    use crate::helpers::{any_over_stmt, any_over_type_param, resolve_imported_module_path};
+    use crate::helpers::{
+        any_over_stmt, any_over_type_param, collect_import_from_member, format_import_from,
+        format_import_from_member, resolve_imported_module_path,
+    };
     use crate::{
         AtomicNodeIndex, Expr, ExprContext, ExprName, ExprNumberLiteral, Identifier, Int, Number,
         Stmt, StmtTypeAlias, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
         TypeParamTypeVarTuple, TypeParams,
     };
+
+    #[test]
+    fn import_from_names() {
+        assert_eq!(format_import_from(0, None), "");
+        assert_eq!(format_import_from(1, None), ".");
+        assert_eq!(format_import_from(1, Some("foo")), ".foo");
+
+        for (level, module, formatted, segments) in [
+            (0, None, "bar", &["bar"][..]),
+            (1, None, ".bar", &[".", "bar"]),
+            (1, Some("foo"), ".foo.bar", &[".", "foo", "bar"]),
+        ] {
+            assert_eq!(format_import_from_member(level, module, "bar"), formatted);
+            assert_eq!(
+                collect_import_from_member(level, module, "bar").segments(),
+                segments
+            );
+        }
+    }
 
     #[test]
     fn resolve_import() {

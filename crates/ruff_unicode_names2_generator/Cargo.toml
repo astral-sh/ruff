@@ -15,4 +15,5 @@ phf_codegen = { workspace = true }
 rand = { workspace = true }
 
 [lib]
+doctest = false
 name = "unicode_names2_generator"
