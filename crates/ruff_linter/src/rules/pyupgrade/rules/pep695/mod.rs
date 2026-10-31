@@ -51,6 +51,7 @@ pub(crate) struct TypeVar<'a> {
     pub(crate) restriction: Option<TypeVarRestriction<'a>>,
     pub(crate) kind: TypeParamKind,
     pub(crate) default: Option<&'a Expr>,
+    pub(crate) has_unpacked_keywords: bool,
 }
 
 /// Wrapper for formatting a sequence of [`TypeVar`]s for use as a generic type parameter (e.g. `[T,
@@ -153,6 +154,7 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
             restriction,
             kind,
             default,
+            ..
         }: &'a TypeVar<'a>,
     ) -> Self {
         let default = default.map(|expr| Box::new(expr.clone()));
@@ -238,6 +240,7 @@ impl<'a> From<&'a TypeParam> for TypeVar<'a> {
             kind,
             restriction,
             default: param.default(),
+            has_unpacked_keywords: false,
         }
     }
 }
@@ -275,6 +278,7 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
                 restriction: Some(TypeVarRestriction::AnyStr),
                 kind: TypeParamKind::TypeVar,
                 default: None,
+                has_unpacked_keywords: false,
             });
             return;
         }
@@ -313,6 +317,7 @@ pub(crate) fn expr_name_to_type_var<'a>(
                 restriction: None,
                 kind: TypeParamKind::TypeVar,
                 default: None,
+                has_unpacked_keywords: false,
             });
         }
         Expr::Call(ExprCall {
@@ -364,6 +369,10 @@ pub(crate) fn expr_name_to_type_var<'a>(
                     restriction,
                     kind,
                     default,
+                    has_unpacked_keywords: arguments
+                        .keywords
+                        .iter()
+                        .any(|keyword| keyword.arg.is_none()),
                 });
             }
         }

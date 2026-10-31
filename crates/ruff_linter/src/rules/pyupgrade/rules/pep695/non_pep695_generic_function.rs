@@ -88,7 +88,7 @@ pub(crate) struct NonPEP695GenericFunction {
 }
 
 impl Violation for NonPEP695GenericFunction {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -167,21 +167,28 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
         return;
     };
 
+    let mut diagnostic = checker.report_diagnostic(
+        NonPEP695GenericFunction {
+            name: name.to_string(),
+        },
+        TextRange::new(name.start(), parameters.end()),
+    );
+
+    if type_vars
+        .iter()
+        .any(|type_var| type_var.has_unpacked_keywords)
+    {
+        return;
+    }
+
     // build the fix as a String to avoid removing comments from the entire function body
     let type_params = DisplayTypeVars {
         type_vars: &type_vars,
         source: checker.source(),
     };
 
-    checker
-        .report_diagnostic(
-            NonPEP695GenericFunction {
-                name: name.to_string(),
-            },
-            TextRange::new(name.start(), parameters.end()),
-        )
-        .set_fix(Fix::unsafe_edit(Edit::insertion(
-            type_params.to_string(),
-            name.end(),
-        )));
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+        type_params.to_string(),
+        name.end(),
+    )));
 }

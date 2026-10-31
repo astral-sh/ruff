@@ -105,7 +105,7 @@ enum TypeAliasKind {
 }
 
 impl Violation for NonPEP695TypeAlias {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -182,6 +182,7 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
                     restriction: None,
                     kind: TypeParamKind::TypeVar,
                     default: None,
+                    has_unpacked_keywords: false,
                 })
             })
         })
@@ -289,6 +290,21 @@ fn create_diagnostic(
         return;
     }
 
+    let mut diagnostic = checker.report_diagnostic(
+        NonPEP695TypeAlias {
+            name: name.to_string(),
+            type_alias_kind,
+        },
+        stmt.range(),
+    );
+
+    if type_vars
+        .iter()
+        .any(|type_var| type_var.has_unpacked_keywords)
+    {
+        return;
+    }
+
     let source = checker.source();
 
     let content = format!(
@@ -297,13 +313,5 @@ fn create_diagnostic(
     );
     let edit = Edit::range_replacement(content, stmt.range());
 
-    checker
-        .report_diagnostic(
-            NonPEP695TypeAlias {
-                name: name.to_string(),
-                type_alias_kind,
-            },
-            stmt.range(),
-        )
-        .set_fix(Fix::unsafe_edit(edit));
+    diagnostic.set_fix(Fix::unsafe_edit(edit));
 }
