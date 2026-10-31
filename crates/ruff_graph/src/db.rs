@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
-use zip::CompressionMethod;
 
 use ruff_db::Db as SourceDb;
 use ruff_db::files::Files;
@@ -11,9 +10,9 @@ use ty_module_resolver::{FallibleStrategy, SearchPathSettings, SearchPaths};
 use ty_site_packages::{PythonEnvironment, SysPrefixPathOrigin};
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
-    let mut builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
+    let mut builder = VendoredFileSystemBuilder::new();
     builder.add_file("stdlib/VERSIONS", "\n").unwrap();
-    builder.finish().unwrap()
+    builder.finish()
 });
 
 #[salsa::db]

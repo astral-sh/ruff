@@ -3234,10 +3234,12 @@ dependencies = [
  "arc-swap",
  "camino",
  "compact_str",
+ "crc32fast",
  "dashmap",
  "dunce",
  "etcetera",
  "filetime",
+ "flate2",
  "get-size2",
  "ignore",
  "insta",
@@ -3271,7 +3273,7 @@ dependencies = [
  "url",
  "web-time",
  "which",
- "zip",
+ "zstd",
 ]
 
 [[package]]
@@ -3362,7 +3364,6 @@ dependencies = [
  "serde",
  "ty_module_resolver",
  "ty_site_packages",
- "zip",
 ]
 
 [[package]]
@@ -5084,11 +5085,13 @@ dependencies = [
 name = "ty_vendored"
 version = "0.0.20"
 dependencies = [
+ "crc32fast",
+ "flate2",
  "path-slash",
  "ruff_db",
  "static_assertions",
  "walkdir",
- "zip",
+ "zstd",
 ]
 
 [[package]]
@@ -5974,12 +5977,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e04976da629d3b04204ba8105b396a193af8ad2583b2c79bfb3ab8af580a11e"
 dependencies = [
  "crc32fast",
- "flate2",
  "indexmap",
  "memchr",
  "nix",
  "typed-path",
- "zstd",
 ]
 
 [[package]]
