@@ -125,6 +125,77 @@ mod tests {
     }
 
     #[test]
+    fn banned_from_fix() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_import_conventions/banned_from_fix.py"),
+            &banned_from_settings(),
+        )?;
+        assert!(!diagnostics.is_empty());
+        assert!(
+            diagnostics
+                .iter()
+                .all(|diagnostic| diagnostic.fix().is_some())
+        );
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn banned_from_no_fix() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_import_conventions/banned_from_no_fix.py"),
+            &banned_from_settings(),
+        )?;
+        assert!(!diagnostics.is_empty());
+        assert!(
+            diagnostics
+                .iter()
+                .all(|diagnostic| diagnostic.fix().is_none())
+        );
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn banned_from_invalid_alias() -> Result<()> {
+        for alias in ["", "class", "invalid.alias", "ｍａｔｈ"] {
+            let mut settings = banned_from_settings();
+            settings
+                .flake8_import_conventions
+                .aliases
+                .insert("math".to_string(), alias.to_string());
+            let diagnostics = test_path(
+                Path::new("flake8_import_conventions/banned_from_alias.py"),
+                &settings,
+            )?;
+            assert_eq!(diagnostics.len(), 1);
+            assert!(diagnostics[0].fix().is_none(), "{alias}");
+        }
+        Ok(())
+    }
+
+    fn banned_from_settings() -> LinterSettings {
+        LinterSettings {
+            flake8_import_conventions: super::settings::Settings {
+                aliases: default_aliases(PreviewMode::Disabled),
+                banned_aliases: FxHashMap::default(),
+                banned_from: [
+                    "math",
+                    ".math",
+                    "pandas",
+                    "typing",
+                    "logging.config",
+                    "__future__",
+                ]
+                .map(str::to_string)
+                .into_iter()
+                .collect(),
+            },
+            ..LinterSettings::for_rule(Rule::BannedImportFrom)
+        }
+    }
+
+    #[test]
     fn remove_defaults() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_import_conventions/remove_default.py"),

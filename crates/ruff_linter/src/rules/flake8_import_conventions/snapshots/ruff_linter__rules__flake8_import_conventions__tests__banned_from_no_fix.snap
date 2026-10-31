@@ -1,0 +1,202 @@
+---
+source: crates/ruff_linter/src/rules/flake8_import_conventions/mod.rs
+---
+ICN003 Members of `__future__` should not be imported explicitly
+ --> banned_from_no_fix.py:1:1
+  |
+1 | from __future__ import annotations
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Import `__future__` instead
+
+ICN003 Members of `math` should not be imported explicitly
+ --> banned_from_no_fix.py:5:5
+  |
+4 | def target_conflict(math):
+5 |     from math import sqrt
+  |     ^^^^^^^^^^^^^^^^^^^^^
+6 |     return sqrt(9)
+  |
+help: Import `math` instead
+
+ICN003 Members of `math` should not be imported explicitly
+  --> banned_from_no_fix.py:10:5
+   |
+ 9 | def nested_target_conflict():
+10 |     from math import sqrt
+   |     ^^^^^^^^^^^^^^^^^^^^^
+11 |
+12 |     def inner(math):
+   |
+help: Import `math` instead
+
+ICN003 Members of `math` should not be imported explicitly
+  --> banned_from_no_fix.py:19:5
+   |
+18 | def reassigned_member():
+19 |     from math import sqrt
+   |     ^^^^^^^^^^^^^^^^^^^^^
+20 |     result = sqrt(9)
+21 |     sqrt = lambda x: x
+   |
+help: Import `math` instead
+
+ICN003 Members of `math` should not be imported explicitly
+  --> banned_from_no_fix.py:26:5
+   |
+25 | def deleted_member():
+26 |     from math import sqrt
+   |     ^^^^^^^^^^^^^^^^^^^^^
+27 |     if condition:
+28 |         del sqrt
+   |
+help: Import `math` instead
+
+ICN003 Members of `typing` should not be imported explicitly
+  --> banned_from_no_fix.py:32:5
+   |
+31 | def quoted_annotation():
+32 |     from typing import Optional
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+33 |     value: "Optional[int]" = None
+34 |     return value
+   |
+help: Import `typing` instead
+
+ICN003 Members of `math` should not be imported explicitly
+  --> banned_from_no_fix.py:38:5
+   |
+37 | def explicit_export():
+38 |     from math import sqrt as sqrt
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+39 |     return sqrt(9)
+   |
+help: Import `math` instead
+
+ICN003 Members of `math` should not be imported explicitly
+  --> banned_from_no_fix.py:43:5
+   |
+42 |   def internal_comment():
+43 | /     from math import (
+44 | |         sqrt,  # Keep this explanation.
+45 | |         ceil,
+46 | |     )
+   | |_____^
+47 |       return sqrt(9), ceil(1.1)
+   |
+help: Import `math` instead
+
+ICN003 Members of `math` should not be imported explicitly
+  --> banned_from_no_fix.py:52:5
+   |
+50 | def existing_import_comment():
+51 |     import math
+52 |     from math import sqrt  # Keep this comment.
+   |     ^^^^^^^^^^^^^^^^^^^^^
+53 |     return sqrt(9)
+   |
+help: Import `math` instead
+
+ICN003 Members of `math` should not be imported explicitly
+  --> banned_from_no_fix.py:59:5
+   |
+57 |     if condition:
+58 |         import math
+59 |     from math import sqrt
+   |     ^^^^^^^^^^^^^^^^^^^^^
+60 |     return sqrt(9)
+   |
+help: Import `math` instead
+
+ICN003 Members of `math` should not be imported explicitly
+  --> banned_from_no_fix.py:64:5
+   |
+63 | def later_module_import():
+64 |     from math import sqrt
+   |     ^^^^^^^^^^^^^^^^^^^^^
+65 |     print(sqrt(9))
+66 |     import math
+   |
+help: Import `math` instead
+
+ICN003 Members of `math` should not be imported explicitly
+  --> banned_from_no_fix.py:71:5
+   |
+69 | def rebound_module():
+70 |     import math
+71 |     from math import sqrt
+   |     ^^^^^^^^^^^^^^^^^^^^^
+72 |     math = None
+73 |     return sqrt(9)
+   |
+help: Import `math` instead
+
+ICN003 Members of `math` should not be imported explicitly
+  --> banned_from_no_fix.py:78:5
+   |
+76 | def global_declaration():
+77 |     global sqrt
+78 |     from math import sqrt
+   |     ^^^^^^^^^^^^^^^^^^^^^
+79 |     return sqrt(9)
+   |
+help: Import `math` instead
+
+ICN003 Members of `math` should not be imported explicitly
+  --> banned_from_no_fix.py:83:5
+   |
+82 | def nonlocal_declaration():
+83 |     from math import sqrt
+   |     ^^^^^^^^^^^^^^^^^^^^^
+84 |
+85 |     def inner():
+   |
+help: Import `math` instead
+
+ICN003 Members of `.math` should not be imported explicitly
+  --> banned_from_no_fix.py:93:5
+   |
+92 | def relative():
+93 |     from .math import sqrt
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+94 |     return sqrt(9)
+   |
+help: Import `.math` instead
+
+ICN003 Members of `math` should not be imported explicitly
+  --> banned_from_no_fix.py:97:1
+   |
+97 | from math import sqrt as exported_sqrt
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+98 | __all__ = ["exported_sqrt"]
+   |
+help: Import `math` instead
+
+ICN003 Members of `math` should not be imported explicitly
+   --> banned_from_no_fix.py:101:1
+    |
+101 | from math import sqrt as global_root
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Import `math` instead
+
+ICN003 Members of `math` should not be imported explicitly
+   --> banned_from_no_fix.py:110:5
+    |
+109 | def annotated_member():
+110 |     from math import sqrt
+    |     ^^^^^^^^^^^^^^^^^^^^^
+111 |     sqrt: object
+112 |     return sqrt(9)
+    |
+help: Import `math` instead
+
+ICN003 Members of `math` should not be imported explicitly
+   --> banned_from_no_fix.py:117:5
+    |
+115 | def rebound_existing_module():
+116 |     import math
+117 |     from math import sqrt
+    |     ^^^^^^^^^^^^^^^^^^^^^
+118 |
+119 |     def inner():
+    |
+help: Import `math` instead
