@@ -11,12 +11,13 @@ use ty_python_core::{
 };
 
 use crate::{
-    Db, ProgramEnvironment,
+    Db, Program, ProgramEnvironment,
     lint::LintMetadata,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
-        ClassBase, ClassType, InstanceFallbackShadowsNonDataDescriptor, IntersectionType,
-        KnownInstanceType, MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers,
+        ClassBase, ClassLiteral, ClassType, InstanceFallbackShadowsNonDataDescriptor,
+        IntersectionType, KnownInstanceType, MemberLookupPolicy, StaticClassLiteral, Type,
+        TypeQualifiers,
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
         class::CodeGeneratorKind,
         context::InferContext,
@@ -81,7 +82,7 @@ struct UnboundAttribute<'db> {
 /// checks its explicit `str` annotation and reports the incompatible override.
 /// `Inherited` retains that `str` declaration when checking `Child`, so repeating
 /// the annotation does not report the parent's conflict again.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum AttributeContractKind {
     /// Prefer the class member, including inherited annotations on unannotated defaults.
     ClassBody,
@@ -799,23 +800,20 @@ fn already_inherited<'db>(
     env: &ProgramEnvironment<'db>,
     class: ClassType<'db>,
     target_owner: ClassType<'db>,
-    name: &str,
+    name: &Name,
     source: &AttributeContract<'db>,
     kind: AttributeContractKind,
 ) -> bool {
     let child_receiver = Type::instance(db, env, class);
+    let program = env.program(db);
+    let target = target_owner.class_literal(db);
     class
         .iter_mro(db)
         .skip(1)
         .filter_map(ClassBase::into_class)
         .any(|parent| {
-            let Some(owner) = parent
-                .iter_mro(db)
-                .filter_map(ClassBase::into_class)
-                .find(|owner| {
-                    !owner.own_class_member(db, env, None, name).is_undefined()
-                        || !owner.own_instance_member(db, env, name).is_undefined()
-                })
+            let Some(owner) =
+                conflicting_parent_member(db, program, parent, target, name.clone(), kind)
             else {
                 return false;
             };
@@ -824,43 +822,66 @@ fn already_inherited<'db>(
             else {
                 return false;
             };
-            if inherited.read != source.read
-                || inherited.write != source.write
-                || inherited.is_frozen_field != source.is_frozen_field
-                || inherited.qualifiers != source.qualifiers
-            {
-                return false;
-            }
-            let receiver = Type::instance(db, env, parent);
-            let Some(MemberContract::Attribute(inherited)) =
-                member_contract(db, env, owner, receiver, name, kind)
+            inherited.read == source.read
+                && inherited.write == source.write
+                && inherited.is_frozen_field == source.is_frozen_field
+                && inherited.qualifiers == source.qualifiers
+        })
+}
+
+/// Return the owner of the parent's selected attribute if that declaration already violates
+/// a specialization of `target`. These comparisons bind to the parent, so every child can
+/// reuse them. The caller still checks how the selected declaration binds to its receiver.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+fn conflicting_parent_member<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    parent: ClassType<'db>,
+    target: ClassLiteral<'db>,
+    name: Name,
+    kind: AttributeContractKind,
+) -> Option<ClassType<'db>> {
+    let env = ProgramEnvironment::from_program(program);
+    let mut ancestors = parent
+        .iter_mro(db)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .chain(parent.iter_explicit_ancestors(db, &env).skip(1))
+        .filter(|ancestor| ancestor.class_literal(db) == target)
+        .peekable();
+    ancestors.peek()?;
+    let owner = parent
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .find(|owner| {
+            !owner.own_class_member(db, &env, None, &name).is_undefined()
+                || !owner.own_instance_member(db, &env, &name).is_undefined()
+        })?;
+    let receiver = Type::instance(db, &env, parent);
+    let Some(MemberContract::Attribute(source)) =
+        member_contract(db, &env, owner, receiver, &name, kind)
+    else {
+        return None;
+    };
+    ancestors
+        .any(|ancestor| {
+            let Some(MemberContract::Attribute(target)) =
+                member_contract(db, &env, ancestor, receiver, &name, kind)
             else {
                 return false;
             };
-            parent
-                .iter_mro(db)
-                .skip(1)
-                .filter_map(ClassBase::into_class)
-                .chain(parent.iter_explicit_ancestors(db, env).skip(1))
-                .filter(|ancestor| ancestor.class_literal(db) == target_owner.class_literal(db))
-                .any(|ancestor| {
-                    let Some(MemberContract::Attribute(target)) =
-                        member_contract(db, env, ancestor, receiver, name, kind)
-                    else {
-                        return false;
-                    };
-                    attribute_violation(
-                        db,
-                        env,
-                        receiver,
-                        Type::instance(db, env, ancestor),
-                        name,
-                        &inherited,
-                        &target,
-                    )
-                    .is_some()
-                })
+            attribute_violation(
+                db,
+                &env,
+                receiver,
+                Type::instance(db, &env, ancestor),
+                &name,
+                &source,
+                &target,
+            )
+            .is_some()
         })
+        .then_some(owner)
 }
 
 /// Check the selected attribute against every inherited declaration of that name.
@@ -905,6 +926,20 @@ pub(super) fn check_inherited_conflict<'db>(
         // `attribute_violation` accepts two methods regardless of their read and write types,
         // so we can skip binding them to the subclass.
         if declaration.is_method && target.is_method {
+            continue;
+        }
+        // This owner is itself a parent of the child. If its own selected declaration already
+        // conflicts with the target, `already_inherited` would match this same declaration
+        // bound to the child. No comparison on this receiver can introduce a new error.
+        if conflicting_parent_member(
+            db,
+            env.program(db),
+            owner,
+            target_owner.class_literal(db),
+            name.clone(),
+            kind,
+        ) == Some(owner)
+        {
             continue;
         }
         let Some(target) = bind_attribute(db, env, target_owner, receiver, name, &target) else {
