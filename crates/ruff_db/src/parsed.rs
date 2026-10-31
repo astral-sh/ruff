@@ -4,8 +4,7 @@ use std::sync::Arc;
 use arc_swap::ArcSwapOption;
 use get_size2::GetSize;
 use ruff_python_ast::{
-    MAX_REAL_INDEX, ModExpression, ModModule, NodeIndex, NodeIndexError, PythonVersion,
-    StringLiteral, sub_ast_level, sub_indices,
+    ModExpression, ModModule, NodeIndex, NodeIndexError, PythonVersion, StringLiteral,
 };
 use ruff_python_parser::{
     ParseError, ParseErrorType, ParseOptions, Parsed, parse_cells_unchecked,
@@ -71,7 +70,7 @@ pub fn parsed_string_annotation(
 ) -> Result<Parsed<ModExpression>, ParseError> {
     let mut expr = parse_string_annotation(source, string)?;
 
-    prepare_annotation(&mut expr, string.node_index()).map_err(|err| {
+    expr.index_string_annotation(string.node_index()).map_err(|err| {
         let message = match err {
             NodeIndexError::NoParent => {
                 "Internal error: string annotation's parent had no NodeIndex"
@@ -262,26 +261,9 @@ where
 }
 
 fn cache_module(mut parsed: Parsed<ModModule>) -> Arc<Parsed<ModModule>> {
-    assert!(
-        parsed.prepare_for_cache(0, MAX_REAL_INDEX),
-        "module exceeds the supported number of rows"
-    );
+    parsed.index_module();
+    parsed.shrink_to_fit();
     Arc::new(parsed)
-}
-
-fn prepare_annotation(
-    parsed: &mut Parsed<ModExpression>,
-    parent: NodeIndex,
-) -> Result<(), NodeIndexError> {
-    let parent = parent.as_u32().ok_or(NodeIndexError::NoParent)?;
-    let (first, last) = sub_indices(parent)?;
-    if parsed.prepare_for_cache(first, last) {
-        Ok(())
-    } else if sub_ast_level(parent) == 0 {
-        Err(NodeIndexError::ExhaustedSubIndices)
-    } else {
-        Err(NodeIndexError::ExhaustedSubSubIndices)
-    }
 }
 
 #[cfg(test)]
@@ -289,7 +271,7 @@ mod tests {
     use crate::Db;
     use crate::PythonFile;
     use crate::files::{system_path_to_file, vendored_path_to_file};
-    use crate::parsed::{parsed_module, prepare_annotation};
+    use crate::parsed::parsed_module;
     use crate::system::{
         DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemVirtualPath,
     };
@@ -304,7 +286,9 @@ mod tests {
         let (parent, _) = sub_indices(0).unwrap();
         let (first, last) = sub_indices(parent).unwrap();
         let mut annotation = parse_expression(r#"f"{x:0}{y:0}""#).unwrap();
-        prepare_annotation(&mut annotation, NodeIndex::from(parent)).unwrap();
+        annotation
+            .index_string_annotation(NodeIndex::from(parent))
+            .unwrap();
         let mut keys: Vec<_> = annotation
             .root()
             .descendants()
@@ -316,7 +300,7 @@ mod tests {
 
         let mut over_limit = parse_expression(r#"not f"{x:0}{y:0}""#).unwrap();
         assert!(matches!(
-            prepare_annotation(&mut over_limit, NodeIndex::from(parent)),
+            over_limit.index_string_annotation(NodeIndex::from(parent)),
             Err(NodeIndexError::ExhaustedSubSubIndices)
         ));
     }

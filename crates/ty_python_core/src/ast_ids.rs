@@ -171,22 +171,29 @@ pub(crate) mod node_key {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::MAX_REAL_INDEX;
-    use ruff_python_parser::{ParseError, parse_expression};
+    use ruff_db::parsed::parsed_string_annotation;
+    use ruff_python_parser::{ParseError, parse_module};
 
     use super::AstIdsBuilder;
 
     #[test]
     fn uses_across_blocks_scopes_and_annotations() -> Result<(), ParseError> {
-        let mut module = parse_expression(&format!("({}a, b, c)", "x, ".repeat(63)))?;
-        assert!(module.prepare_for_cache(0, MAX_REAL_INDEX));
-        let tuple = module.expr().as_tuple_expr().unwrap();
-        let [a, b, c] = tuple.elts().slice(63..).as_array().unwrap();
+        let source = format!("({}a, b, c, 'T')", "x, ".repeat(63));
+        let mut module = parse_module(&source)?;
+        module.index_module();
+        let [stmt] = module.suite().as_array().unwrap();
+        let expr = stmt.as_expr_stmt().unwrap().value();
+        let tuple = expr.as_tuple_expr().unwrap();
+        let [a, b, c, string] = tuple.elts().slice(63..).as_array().unwrap();
         assert_eq!(a.node_index().as_u32(), Some(63));
         assert_eq!(b.node_index().as_u32(), Some(64));
 
-        let mut annotation = parse_expression("T")?;
-        assert!(annotation.prepare_for_cache(MAX_REAL_INDEX + 1, MAX_REAL_INDEX + 1));
+        let string = string
+            .as_string_literal_expr()
+            .unwrap()
+            .as_single_part_string()
+            .unwrap();
+        let annotation = parsed_string_annotation(&source, string)?;
         let t = annotation.expr();
 
         let mut builder = AstIdsBuilder::default();
@@ -200,7 +207,7 @@ mod tests {
         assert_eq!(builder.try_use_id(inner, t), Some(t_id));
 
         let ids = builder.finish();
-        assert_eq!(ids.try_use_id(module.expr()), None);
+        assert_eq!(ids.try_use_id(expr), None);
         assert_eq!(ids.try_use_id(a), Some(a_id));
         assert_eq!(ids.try_use_id(b), Some(b_id));
         assert_eq!(ids.try_use_id(c), Some(c_id));

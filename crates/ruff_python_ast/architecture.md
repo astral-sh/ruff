@@ -178,15 +178,19 @@ both trees in a shared offset table.
 
 ty keeps a typed arena handle in each `AstNodeRef<T>`. Parsing the same source with the same
 options emits the same rows, so a reference still resolves after ty evicts and reparses the
-module. Before caching the parse, ty shrinks its row and side-table buffers. Resolving a handle
-then reads the row directly. Allocation order can differ from source order. In `a.b()[i]`,
-for example, the parser emits the attribute and call before the enclosing subscript.
+module. Resolving a handle reads the row directly. Allocation order can differ from source order.
+In `a.b()[i]`, for example, the parser emits the attribute and call before the enclosing subscript.
 
-A separately parsed string annotation has its own arena. Its containing string reserves a range
-of keys for that arena. A node’s key is the start of the range plus its zero-based allocation index.
-Nested strings reserve ranges in the same way. Ordinary module keys start at zero. If auxiliary
-rows would put an annotation over its 256-key limit (eight for a nested annotation), ty packs
-only the rows reached by source-order traversal into that range.
+Before caching a module, ty calls `index_module()` to use each row's zero-based allocation index
+as its node key. This takes constant time because the rows share one base offset. ty then calls
+`shrink_to_fit()` to release spare capacity in the parse buffers.
+
+A separately parsed string annotation has its own short-lived arena. ty calls
+`index_string_annotation()` to give its nodes keys in the range reserved by the containing
+string literal. A node's key is the start of the range plus its zero-based allocation index.
+If auxiliary rows would put an annotation over its 256-key limit (eight for a nested annotation),
+ty keeps a sorted list of the rows reached by source-order traversal. Each row's position in the
+list gives its offset within the reserved range.
 
 The IDE finds the enclosing annotation by searching annotation roots sorted by source position.
 To identify an unassigned call such as `return type("C", (), {})`, ty records its row relative to

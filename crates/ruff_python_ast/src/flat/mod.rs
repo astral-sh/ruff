@@ -14,7 +14,10 @@ use crate::name::Name;
 use hashbrown::{HashTable, hash_table::Entry};
 use rustc_hash::FxBuildHasher;
 
-use crate::{DebugText, NodeIndex, NodeKind, Number};
+use crate::{
+    DebugText, MAX_REAL_INDEX, NodeIndex, NodeIndexError, NodeKind, Number, sub_ast_level,
+    sub_indices,
+};
 
 mod generated;
 mod list;
@@ -454,7 +457,7 @@ struct Row {
 
 const _: () = assert!(size_of::<Row>() == 24);
 
-/// A module and most quoted annotations use their physical row numbers directly.
+/// Translates a zero-based allocation index to a module or string-annotation key.
 #[derive(Clone, Default, Debug)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 enum RowKeys {
@@ -549,16 +552,6 @@ impl Ast {
     /// This scans the distinct names interned during parsing.
     pub fn contains_identifier(&self, spelling: &str) -> bool {
         self.names.iter().any(|name| name.as_str() == spelling)
-    }
-
-    fn shrink_to_fit(&mut self) {
-        self.rows.shrink_to_fit();
-        self.extra.shrink_to_fit();
-        self.text.shrink_to_fit();
-        self.names.shrink_to_fit();
-        self.bytes.shrink_to_fit();
-        self.numbers.shrink_to_fit();
-        self.debug_text.shrink_to_fit();
     }
 
     #[inline]
@@ -1001,48 +994,72 @@ impl<T> Tree<T> {
         })
     }
 
-    /// Shrinks the arena for caching and selects its module or string-annotation key range.
-    pub fn prepare_for_cache(&mut self, first: u32, last: u32) -> bool {
-        let Some(capacity) = last
-            .checked_sub(first)
-            .and_then(|width| width.checked_add(1))
-        else {
-            return false;
-        };
+    /// Releases spare capacity in the row and side-table buffers.
+    pub fn shrink_to_fit(&mut self) {
+        self.ast.rows.shrink_to_fit();
+        self.ast.extra.shrink_to_fit();
+        self.ast.text.shrink_to_fit();
+        self.ast.names.shrink_to_fit();
+        self.ast.bytes.shrink_to_fit();
+        self.ast.numbers.shrink_to_fit();
+        self.ast.debug_text.shrink_to_fit();
+    }
+
+    fn required_node_indices(&self) -> usize {
         let count = self.ast.rows.len() - 1;
-        let required_keys = count - usize::from(self.root.index() + 1 == count);
-        let keys = if required_keys <= capacity as usize {
-            RowKeys::Direct(first)
-        } else if first > crate::MAX_REAL_INDEX {
-            // For example, an f-string's format spec has an arena row, but source-order
-            // traversal visits its contents directly. Count only reachable syntax when
-            // the physical rows would exceed the annotation's 256 or 8 reserved keys.
-            let mut rows: Vec<u32> = self
-                .root()
-                .erase()
-                .preorder_handles()
-                .skip(1)
-                .take(capacity as usize + 1)
-                .map(Handle::row_number)
-                .collect();
-            if rows.len() > capacity as usize {
-                return false;
-            }
-            rows.sort_unstable();
-            RowKeys::Annotation {
-                first,
-                rows: rows.into_boxed_slice(),
-            }
-        } else {
-            return false;
-        };
-        self.ast.shrink_to_fit();
-        self.ast.keys = keys;
-        true
+        // The module or expression wrapper has no NodeIndex. Its row can be omitted
+        // from the index range when it comes after every indexed row.
+        count - usize::from(self.root.index() + 1 == count)
+    }
+}
+
+impl Tree<crate::ModModule> {
+    /// Uses each node's zero-based allocation index as its module-wide [`NodeIndex`].
+    pub fn index_module(&mut self) {
+        assert!(
+            self.required_node_indices() <= MAX_REAL_INDEX as usize + 1,
+            "module exceeds the supported number of rows"
+        );
+        self.ast.keys = RowKeys::Direct(0);
     }
 }
 
 impl Tree<crate::ModExpression> {
+    /// Uses the node indices reserved for the annotation's containing string literal.
+    pub fn index_string_annotation(&mut self, parent: NodeIndex) -> Result<(), NodeIndexError> {
+        let parent = parent.as_u32().ok_or(NodeIndexError::NoParent)?;
+        let (first, last) = sub_indices(parent)?;
+        let capacity = (last - first + 1) as usize;
+        if self.required_node_indices() <= capacity {
+            self.ast.keys = RowKeys::Direct(first);
+            return Ok(());
+        }
+
+        // An f-string's format spec has an arena row, but source-order traversal visits
+        // its contents directly. Only reachable syntax needs an index in the annotation.
+        let mut rows: Vec<u32> = self
+            .root()
+            .erase()
+            .preorder_handles()
+            .skip(1)
+            .take(capacity + 1)
+            .map(Handle::row_number)
+            .collect();
+        if rows.len() > capacity {
+            return Err(if sub_ast_level(parent) == 0 {
+                NodeIndexError::ExhaustedSubIndices
+            } else {
+                NodeIndexError::ExhaustedSubSubIndices
+            });
+        }
+        rows.sort_unstable();
+        self.ast.keys = RowKeys::Annotation {
+            first,
+            rows: rows.into_boxed_slice(),
+        };
+        Ok(())
+    }
+
     /// Recovered coordinates of expressions inside a decoded string annotation refer to
     /// the containing string. Identifier and literal-part spans still describe the decoded text.
     pub fn relocate_expression(&mut self, range: TextRange) {

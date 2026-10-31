@@ -74,7 +74,8 @@ use ruff_python_ast::flat::{self, Rebuild};
 
 use ruff_python_ast::token::{Token, TokenFlags, TokenKind, Tokens};
 use ruff_python_ast::{
-    Expr, Mod, ModExpression, ModModule, PySourceType, StringFlags, StringLiteral, Suite,
+    Expr, Mod, ModExpression, ModModule, NodeIndex, NodeIndexError, PySourceType, StringFlags,
+    StringLiteral, Suite,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -448,11 +449,11 @@ impl<T> Parsed<T> {
         self.tree.ast()
     }
 
-    /// Trims the parse buffers and uses arena rows as keys in the given namespace.
-    pub fn prepare_for_cache(&mut self, first: u32, last: u32) -> bool {
+    /// Releases spare capacity in the syntax tree and diagnostics.
+    pub fn shrink_to_fit(&mut self) {
+        self.tree.shrink_to_fit();
         self.errors.shrink_to_fit();
         self.unsupported_syntax_errors.shrink_to_fit();
-        self.tree.prepare_for_cache(first, last)
     }
 
     /// Borrows the syntax root and its module-local storage.
@@ -577,6 +578,11 @@ impl Parsed<Mod> {
 }
 
 impl Parsed<ModModule> {
+    /// Uses each node's zero-based allocation index as its module-wide [`NodeIndex`].
+    pub fn index_module(&mut self) {
+        self.tree.index_module();
+    }
+
     /// Borrows the module's top-level statements as a [`flat::Suite`].
     #[inline]
     pub fn suite(&self) -> flat::Suite<'_> {
@@ -590,6 +596,11 @@ impl Parsed<ModModule> {
 }
 
 impl Parsed<ModExpression> {
+    /// Uses the node indices reserved for the annotation's containing string literal.
+    pub fn index_string_annotation(&mut self, parent: NodeIndex) -> Result<(), NodeIndexError> {
+        self.tree.index_string_annotation(parent)
+    }
+
     /// Borrows the parsed expression.
     pub fn expr(&self) -> flat::View<'_, Expr> {
         self.root().body()
@@ -679,24 +690,30 @@ impl std::fmt::Display for ModeParseError {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::CmpOp;
     use ruff_python_ast::flat::{Builder, Emit, Lower, Tree, build};
     use ruff_python_ast::helpers::ReturnStatementVisitor;
+    use ruff_python_ast::{CmpOp, NodeIndex};
     use ruff_text_size::Ranged;
 
     use super::{ParseError, parse_expression, parse_module};
 
     #[test]
     fn first_node_has_allocation_index_zero() -> Result<(), ParseError> {
-        let mut parsed = parse_expression("x")?;
-        assert!(parsed.prepare_for_cache(0, 0));
-
-        let first = parsed.expr().erase();
+        let mut parsed = parse_module("pass")?;
+        let handle = parsed.suite().first().unwrap().erase().handle();
+        parsed.shrink_to_fit();
+        assert_eq!(
+            parsed.ast().view(handle).unwrap().node_index(),
+            NodeIndex::NONE
+        );
+        parsed.index_module();
+        parsed.shrink_to_fit();
+        let first = parsed.suite().first().unwrap().erase();
         let ast = parsed.ast();
         assert_eq!(first.handle().index(), 0);
         assert_eq!(first.node_index().as_u32(), Some(0));
         assert_eq!(ast.row(0), Some(first));
-        assert_eq!(ast.view(first.handle()), Some(first));
+        assert_eq!(ast.view(handle), Some(first));
         assert!(ast.nodes().eq([first, parsed.root().erase()]));
         assert_eq!(ast.row(2), None);
         assert_eq!(ast.row(u32::MAX), None);
