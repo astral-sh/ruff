@@ -1,0 +1,57 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D422 Section "Notes" appears more than once
+  --> D422.py:13:5
+   |
+11 |     First notes.
+12 |
+13 |     Notes
+   |     ^^^^^
+14 |     -----
+15 |     Second notes.
+   |
+
+D422 Section "RETURNS" appears more than once
+  --> D422.py:26:5
+   |
+24 |     int
+25 |
+26 |     RETURNS
+   |     ^^^^^^^
+27 |     -------
+28 |     int
+   |
+
+D422 Section "Examples" appears more than once
+  --> D422.py:39:5
+   |
+37 |     >>> 1
+38 |
+39 |     Examples
+   |     ^^^^^^^^
+40 |     --------
+41 |     >>> 2
+   |
+
+D422 Section "Examples" appears more than once
+  --> D422.py:43:5
+   |
+41 |     >>> 2
+42 |
+43 |     Examples
+   |     ^^^^^^^^
+44 |     --------
+45 |     >>> 3
+   |
+
+D422 Section "Args" appears more than once
+  --> D422.py:58:5
+   |
+56 |         int
+57 |
+58 |     Args:
+   |     ^^^^
+59 |         y: The y.
+60 |     """
+   |

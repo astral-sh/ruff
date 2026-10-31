@@ -1007,6 +1007,7 @@ mod tests {
         	pandas-use-of-dot-read-table (PD012),
         	pandas-use-of-pd-merge (PD015),
         	escape-sequence-in-docstring (D301),
+        	duplicate-docstring-section (D422),
         	missing-maxsplit-arg (PLC0207),
         	unnecessary-dunder-call (PLC2801),
         	duplicate-bases (PLE0241),
