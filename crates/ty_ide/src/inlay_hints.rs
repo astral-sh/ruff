@@ -4316,19 +4316,55 @@ Source with applied edits:
 
     #[test]
     fn argument_name_hint_before_variadic_arguments_has_no_edit() {
-        const DEFINITION: &str = "def f(x, *rest): ...\n";
-        assert_snapshot!(apply_inlay_hints(DEFINITION, "f(1)"), @"f(x=1)");
-
         // The second argument binds to `*rest` and has no hint. Keep the hint for `x` visible,
         // but inserting it would turn `f(1, 2)` into the invalid call `f(x=1, 2)`.
-        let test = inlay_hint_test(&format!("{DEFINITION}f(1, 2)"));
-        let [hint] = test
-            .collect_hints(&InlayHintSettings::default())
-            .try_into()
-            .unwrap();
+        let mut test = inlay_hint_test(
+            "
+            def f(x, *rest): ...
+            f(1)
+            f(1, 2)
+            ",
+        );
 
-        assert_eq!(hint.display().to_string(), "x=");
-        assert!(hint.text_edits.is_empty());
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def f(x, *rest): ...
+        f([x=]1)
+        f([x=]1, 2)
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:7
+          |
+        2 | def f(x, *rest): ...
+          |       ^
+        info: Source
+         --> main2.py:3:4
+          |
+        3 | f([x=]1)
+          |    ^
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:7
+          |
+        2 | def f(x, *rest): ...
+          |       ^
+        info: Source
+         --> main2.py:4:4
+          |
+        4 | f([x=]1, 2)
+          |    ^
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+          |
+        2 | def f(x, *rest): ...
+          - f(1)
+        3 + f(x=1)
+        4 | f(1, 2)
+          |
+        ");
     }
 
     #[test]
