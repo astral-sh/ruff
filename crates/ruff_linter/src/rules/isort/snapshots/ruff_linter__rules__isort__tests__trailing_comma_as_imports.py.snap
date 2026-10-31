@@ -1,0 +1,48 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+I001 [*] Import block is un-sorted or un-formatted
+  --> trailing_comma_as_imports.py:2:1
+   |
+ 1 |   # A single aliased member is not split, so the trailing comma is respected.
+ 2 | / from glob import (
+ 3 | |     glob as g,
+ 4 | | )
+ 5 | |
+ 6 | | # A statement without aliases is not split, so the trailing comma is respected.
+ 7 | | from sys import (
+ 8 | |     argv,
+ 9 | |     stderr,
+10 | | )
+11 | |
+12 | | # Split into one statement per aliased member, so the trailing comma is ignored.
+13 | | from aws_cdk import (
+14 | |     NestedStack,
+15 | |     aws_ecr as ecr,
+16 | |     aws_ecs as ecs,
+17 | |     aws_events as events,
+18 | |     aws_events_targets as targets,
+19 | |     aws_iam as iam,
+20 | |     aws_logs as logs,
+21 | | )
+   | |_^
+help: Organize imports
+   |
+12 | # Split into one statement per aliased member, so the trailing comma is ignored.
+   - from aws_cdk import (
+   -     NestedStack,
+   -     aws_ecr as ecr,
+   -     aws_ecs as ecs,
+   -     aws_events as events,
+   -     aws_events_targets as targets,
+   -     aws_iam as iam,
+   -     aws_logs as logs,
+   - )
+13 + from aws_cdk import NestedStack
+14 + from aws_cdk import aws_ecr as ecr
+15 + from aws_cdk import aws_ecs as ecs
+16 + from aws_cdk import aws_events as events
+17 + from aws_cdk import aws_events_targets as targets
+18 + from aws_cdk import aws_iam as iam
+19 + from aws_cdk import aws_logs as logs
+   |
