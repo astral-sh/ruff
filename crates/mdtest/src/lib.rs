@@ -10,7 +10,9 @@ use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
 use ruff_db::files::File;
 use ruff_db::panic::{PanicError, catch_unwind};
 use ruff_db::source::line_index;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_diagnostics::Applicability;
+use ruff_python_ast::PythonVersion;
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -306,12 +308,57 @@ pub struct TestFile<'a> {
 }
 
 impl TestFile<'_> {
+    /// Check the file's diagnostic assertions and collect any inline snapshot updates.
+    pub fn check_diagnostics(
+        &self,
+        db: &dyn Db,
+        tool_name: &'static str,
+        python_version: PythonVersion,
+        diagnostics: &[Diagnostic],
+        options: RunOptions,
+        snapshot_filter: impl Fn(&str) -> String,
+    ) -> Result<Vec<MarkdownEdit>, FileFailures> {
+        let mut edits = Vec::new();
+        matcher::match_file(db, self.file, python_version, diagnostics, options)
+            .and_then(|inline| {
+                validate_inline_snapshot(db, tool_name, self, &inline, &mut edits, snapshot_filter)
+            })
+            .map_err(|by_line| FileFailures {
+                backtick_offsets: self.to_code_block_backtick_offsets(),
+                by_line,
+            })?;
+        Ok(edits)
+    }
+
     pub fn to_code_block_backtick_offsets(&self) -> Vec<BacktickOffsets> {
         self.code_blocks
             .iter()
             .map(parser::CodeBlock::backtick_offsets)
             .collect()
     }
+}
+
+/// Replace `<path-to-site-packages>` with the platform-specific path in a Python environment.
+pub fn expand_site_packages_placeholder(
+    path: &SystemPath,
+    python_version: PythonVersion,
+) -> Option<SystemPathBuf> {
+    let component_index = path
+        .components()
+        .position(|component| component.as_str() == "<path-to-site-packages>")?;
+
+    let mut components = path.components();
+    let mut expanded: SystemPathBuf = components.by_ref().take(component_index).collect();
+    if cfg!(target_os = "windows") {
+        expanded.extend(["Lib", "site-packages"]);
+    } else {
+        expanded.push("lib");
+        expanded.push(format!("python{python_version}"));
+        expanded.push("site-packages");
+    }
+    expanded.extend(components.skip(1));
+
+    Some(expanded)
 }
 
 fn diagnostic_display_config(tool_name: &'static str) -> DisplayDiagnosticConfig {
@@ -354,7 +401,7 @@ fn apply_snapshot_filters(rendered: &str) -> std::borrow::Cow<'_, str> {
     INLINE_SNAPSHOT_PATH_FILTER.replace_all(rendered, "/$1")
 }
 
-pub fn validate_inline_snapshot(
+fn validate_inline_snapshot(
     db: &dyn Db,
     tool_name: &'static str,
     test_file: &TestFile<'_>,

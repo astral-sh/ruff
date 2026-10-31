@@ -123,7 +123,7 @@ impl LintMetadata {
         self.documentation_lines().join("\n")
     }
 
-    pub(crate) fn documentation_url(&self) -> String {
+    pub fn documentation_url(&self) -> String {
         lint_documentation_url(self.name())
     }
 
@@ -625,7 +625,7 @@ impl RuleSelection {
     }
 
     /// Returns the configured severity for the lint with the given id or `None` if the lint is disabled.
-    pub(crate) fn severity(&self, lint: LintId) -> Option<Severity> {
+    pub fn severity(&self, lint: LintId) -> Option<Severity> {
         self.lints.get(&lint).map(|(severity, _)| *severity)
     }
 
