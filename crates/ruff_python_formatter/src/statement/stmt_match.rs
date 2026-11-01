@@ -11,14 +11,10 @@ use crate::statement::clause::{ClauseHeader, clause_header};
 #[derive(Default)]
 pub struct FormatStmtMatch;
 
-impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
-    fn fmt_fields(&self, item: &StmtMatch, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtMatch {
-            range: _,
-            node_index: _,
-            subject,
-            cases,
-        } = item;
+impl FormatNodeRule<ruff_python_ast::kind::StmtMatch> for FormatStmtMatch {
+    fn fmt_fields(&self, item: StmtMatch<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let subject = item.subject();
+        let cases = item.cases();
 
         let comments = f.context().comments().clone();
         let dangling_item_comments = comments.dangling(item);
@@ -55,7 +51,7 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
                 [block_indent(&format_args!(
                     leading_alternate_branch_comments(
                         comments.leading(case),
-                        last_case.body.last(),
+                        last_case.body().last(),
                     ),
                     case.format().with_options(last_suite_in_statement)
                 ))]

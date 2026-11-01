@@ -1,6 +1,6 @@
 use ruff_formatter::write;
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::ExprName;
+use ruff_python_ast::{ExprName, SyntaxNode};
+use ruff_text_size::Ranged;
 
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
@@ -8,22 +8,17 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprName;
 
-impl FormatNodeRule<ExprName> for FormatExprName {
-    fn fmt_fields(&self, item: &ExprName, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprName {
-            id: _,
-            range,
-            ctx: _,
-            node_index: _,
-        } = item;
-        write!(f, [source_text_slice(*range)])
+impl FormatNodeRule<ruff_python_ast::kind::ExprName> for FormatExprName {
+    fn fmt_fields(&self, item: ExprName<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let range = item.range();
+        write!(f, [source_text_slice(range)])
     }
 }
 
-impl NeedsParentheses for ExprName {
+impl NeedsParentheses for ExprName<'_> {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        _parent: SyntaxNode,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
         OptionalParentheses::BestFit
@@ -46,7 +41,7 @@ mod tests {
             .as_expr_stmt()
             .unwrap();
         let name = expression_statement
-            .value
+            .value()
             .as_name_expr()
             .expect("Expected name expression");
 

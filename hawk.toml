@@ -377,14 +377,6 @@ reason = "the public owned-format adapter retains its builder API"
 [[override]]
 lint = "hawk::dead_public"
 crate = "ruff_formatter"
-item = "FormatOwnedWithRule::<T, R, C>::with_options"
-kind = "inherent_method"
-level = "expect"
-reason = "the public owned-format adapter retains its builder API"
-
-[[override]]
-lint = "hawk::dead_public"
-crate = "ruff_formatter"
 item = "printer::printer_options::PrintWidth::new"
 kind = "inherent_method"
 level = "expect"

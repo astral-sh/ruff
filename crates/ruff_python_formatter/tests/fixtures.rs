@@ -1,4 +1,4 @@
-use crate::normalizer::Normalizer;
+use crate::normalizer::normalize_module;
 use anyhow::anyhow;
 use datatest_stable::Utf8Path;
 use insta::assert_snapshot;
@@ -8,7 +8,6 @@ use ruff_db::diagnostic::{
     Span, SubDiagnostic, SubDiagnosticSeverity,
 };
 use ruff_formatter::FormatOptions;
-use ruff_python_ast::Mod;
 use ruff_python_ast::comparable::ComparableMod;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_formatter::{PreviewMode, PyFormatOptions, format_module_source, format_range};
@@ -456,10 +455,8 @@ fn ensure_unchanged_ast(
 
     let unformatted_unsupported_syntax_errors =
         collect_unsupported_syntax_errors(&unformatted_parsed);
-    let mut unformatted_ast = unformatted_parsed.into_syntax();
-
-    Normalizer.visit_module(&mut unformatted_ast);
-    let unformatted_ast = ComparableMod::from(&unformatted_ast);
+    let unformatted_ast = normalize_module(unformatted_parsed.root());
+    let unformatted_ast = ComparableMod::from(unformatted_ast.root());
 
     // Parse the formatted code.
     let formatted_parsed = parse(
@@ -499,9 +496,8 @@ fn ensure_unchanged_ast(
         })
         .collect::<Vec<_>>();
 
-    let mut formatted_ast = formatted_parsed.into_syntax();
-    Normalizer.visit_module(&mut formatted_ast);
-    let formatted_ast = ComparableMod::from(&formatted_ast);
+    let formatted_ast = normalize_module(formatted_parsed.root());
+    let formatted_ast = ComparableMod::from(formatted_ast.root());
 
     if formatted_ast != unformatted_ast {
         let diff = TextDiff::from_lines(
@@ -603,7 +599,7 @@ struct StmtVisitor {
 }
 
 impl StmtVisitor {
-    fn new(parsed: &Parsed<Mod>) -> Self {
+    fn new(parsed: &Parsed<ruff_python_ast::kind::Mod>) -> Self {
         let mut visitor = Self { nodes: Vec::new() };
         visitor.visit_mod(parsed.syntax());
         visitor
@@ -622,7 +618,7 @@ impl StmtVisitor {
 }
 
 impl<'a> SourceOrderVisitor<'a> for StmtVisitor {
-    fn visit_stmt(&mut self, stmt: &'a ruff_python_ast::Stmt) {
+    fn visit_stmt(&mut self, stmt: ruff_python_ast::Stmt<'a>) {
         self.nodes.push(stmt.range());
         ruff_python_ast::visitor::source_order::walk_stmt(self, stmt);
     }
@@ -630,7 +626,7 @@ impl<'a> SourceOrderVisitor<'a> for StmtVisitor {
 
 /// Collects the unsupported syntax errors and assigns a unique hash to each error.
 fn collect_unsupported_syntax_errors(
-    parsed: &Parsed<Mod>,
+    parsed: &Parsed<ruff_python_ast::kind::Mod>,
 ) -> FxHashMap<u64, UnsupportedSyntaxError> {
     let mut collected = FxHashMap::default();
 

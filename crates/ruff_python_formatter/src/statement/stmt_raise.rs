@@ -8,14 +8,10 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatStmtRaise;
 
-impl FormatNodeRule<StmtRaise> for FormatStmtRaise {
-    fn fmt_fields(&self, item: &StmtRaise, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtRaise {
-            range: _,
-            node_index: _,
-            exc,
-            cause,
-        } = item;
+impl FormatNodeRule<ruff_python_ast::kind::StmtRaise> for FormatStmtRaise {
+    fn fmt_fields(&self, item: StmtRaise<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let exc = item.exc();
+        let cause = item.cause();
 
         token("raise").fmt(f)?;
 

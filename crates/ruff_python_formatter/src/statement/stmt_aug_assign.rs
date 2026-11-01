@@ -12,22 +12,18 @@ use crate::{AsFormat, FormatNodeRule};
 #[derive(Default)]
 pub struct FormatStmtAugAssign;
 
-impl FormatNodeRule<StmtAugAssign> for FormatStmtAugAssign {
-    fn fmt_fields(&self, item: &StmtAugAssign, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtAugAssign {
-            target,
-            op,
-            value,
-            range: _,
-            node_index: _,
-        } = item;
+impl FormatNodeRule<ruff_python_ast::kind::StmtAugAssign> for FormatStmtAugAssign {
+    fn fmt_fields(&self, item: StmtAugAssign<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let target = item.target();
+        let op = item.op();
+        let value = item.value();
 
         if has_target_own_parentheses(target, f.context())
-            && !f.context().is_expression_parenthesized(target.into())
+            && !f.context().is_expression_parenthesized(target)
         {
             FormatStatementsLastExpression::RightToLeft {
                 before_operator: AnyBeforeOperator::Expression(target),
-                operator: AnyAssignmentOperator::AugAssign(*op),
+                operator: AnyAssignmentOperator::AugAssign(op),
                 value,
                 statement: item.into(),
             }

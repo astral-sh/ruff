@@ -5,8 +5,8 @@ use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix, TStringPrefix,
 };
 use ruff_python_ast::{
-    AnyStringFlags, FString, InterpolatedStringElement, StringFlags, StringLike, StringLikePart,
-    TString,
+    AnyStringFlags, InterpolatedStringElementKind, StringFlags, StringLike, StringLikeKind,
+    StringLikePartKind,
 };
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
@@ -98,11 +98,11 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
         let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
 
         for part in self.string.parts() {
-            let format_part = format_with(|f: &mut PyFormatter| match part {
-                StringLikePart::String(part) => part.format().fmt(f),
-                StringLikePart::Bytes(bytes_literal) => bytes_literal.format().fmt(f),
-                StringLikePart::FString(part) => part.format().fmt(f),
-                StringLikePart::TString(part) => part.format().fmt(f),
+            let format_part = format_with(|f: &mut PyFormatter| match part.classify() {
+                StringLikePartKind::String(part) => part.format().fmt(f),
+                StringLikePartKind::Bytes(bytes_literal) => bytes_literal.format().fmt(f),
+                StringLikePartKind::FString(part) => part.format().fmt(f),
+                StringLikePartKind::TString(part) => part.format().fmt(f),
             });
 
             let part_comments = comments.leading_dangling_trailing(part);
@@ -169,16 +169,16 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                     return None;
                 }
 
-                match part {
-                    StringLikePart::FString(fstring) => {
-                        if matches!(string, StringLike::TString(_)) {
+                match part.classify() {
+                    StringLikePartKind::FString(fstring) => {
+                        if matches!(string.classify(), StringLikeKind::TString(_)) {
                             // Don't concatenate t-strings and f-strings
                             return None;
                         }
                         if context.options().target_version().supports_pep_701() {
                             if is_interpolated_string_with_quoted_format_spec_and_debug(
-                                &fstring.elements,
-                                fstring.flags.into(),
+                                fstring.elements(),
+                                fstring.flags().into(),
                                 context,
                             ) {
                                 if preserve_quotes_requirement
@@ -205,10 +205,10 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                             preserve_quotes_requirement = Some(part.flags().quote_style());
                         }
                     }
-                    StringLikePart::TString(tstring) => {
+                    StringLikePartKind::TString(tstring) => {
                         if is_interpolated_string_with_quoted_format_spec_and_debug(
-                            &tstring.elements,
-                            tstring.flags.into(),
+                            tstring.elements(),
+                            tstring.flags().into(),
                             context,
                         ) {
                             if preserve_quotes_requirement
@@ -219,7 +219,7 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                             preserve_quotes_requirement = Some(part.flags().quote_style());
                         }
                     }
-                    StringLikePart::Bytes(_) | StringLikePart::String(_) => {}
+                    StringLikePartKind::Bytes(_) | StringLikePartKind::String(_) => {}
                 }
             }
 
@@ -229,11 +229,11 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
             // Only preserve the string type but disregard the `u` and `r` prefixes.
             // * It's not necessary to preserve the `r` prefix because Ruff doesn't support joining raw strings (we shouldn't get here).
             // * It's not necessary to preserve the `u` prefix because Ruff discards the `u` prefix (it's meaningless in Python 3+)
-            let prefix = match string {
-                StringLike::String(_) => AnyStringPrefix::Regular(StringLiteralPrefix::Empty),
-                StringLike::Bytes(_) => AnyStringPrefix::Bytes(ByteStringPrefix::Regular),
-                StringLike::FString(_) => AnyStringPrefix::Format(FStringPrefix::Regular),
-                StringLike::TString(_) => AnyStringPrefix::Template(TStringPrefix::Regular),
+            let prefix = match string.classify() {
+                StringLikeKind::String(_) => AnyStringPrefix::Regular(StringLiteralPrefix::Empty),
+                StringLikeKind::Bytes(_) => AnyStringPrefix::Bytes(ByteStringPrefix::Regular),
+                StringLikeKind::FString(_) => AnyStringPrefix::Format(FStringPrefix::Regular),
+                StringLikeKind::TString(_) => AnyStringPrefix::Template(TStringPrefix::Regular),
             };
 
             let quote = if let Some(quote) = preserve_quotes_requirement {
@@ -313,8 +313,8 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
         let mut first_non_empty = self.docstring;
 
         while let Some(part) = parts.next() {
-            match part {
-                StringLikePart::String(_) | StringLikePart::Bytes(_) => {
+            let elements = match part.classify() {
+                StringLikePartKind::String(_) | StringLikePartKind::Bytes(_) => {
                     FormatLiteralContent {
                         range: part.content_range(),
                         flags: self.flags,
@@ -329,40 +329,39 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                             .trim_start()
                             .is_empty();
                     }
+                    continue;
                 }
-
-                StringLikePart::FString(FString { elements, .. })
-                | StringLikePart::TString(TString { elements, .. }) => {
-                    let context = InterpolatedStringContext::new(
-                        self.flags,
-                        InterpolatedStringLayout::from_interpolated_string_elements(
-                            elements,
-                            f.context().source(),
-                        ),
-                    );
-                    let state = f
-                        .context()
-                        .interpolated_string_state()
-                        .enter_string(context);
-                    let f = &mut WithInterpolatedStringState::new(state, &mut *f);
-                    for element in elements {
-                        match element {
-                            InterpolatedStringElement::Literal(literal) => {
-                                FormatLiteralContent {
-                                    range: literal.range(),
-                                    flags: self.flags,
-                                    is_interpolated_string: true,
-                                    trim_end: false,
-                                    trim_start: false,
-                                }
-                                .fmt(f)?;
-                            }
-                            // Formatting the expression here and in the expanded version is safe **only**
-                            // because we assert that the f/t-string never contains any comments.
-                            InterpolatedStringElement::Interpolation(expression) => {
-                                FormatInterpolatedElement::new(expression, context).fmt(f)?;
-                            }
+                StringLikePartKind::FString(string) => string.elements(),
+                StringLikePartKind::TString(string) => string.elements(),
+            };
+            let context = InterpolatedStringContext::new(
+                self.flags,
+                InterpolatedStringLayout::from_interpolated_string_elements(
+                    elements,
+                    f.context().source(),
+                ),
+            );
+            let state = f
+                .context()
+                .interpolated_string_state()
+                .enter_string(context);
+            let f = &mut WithInterpolatedStringState::new(state, &mut *f);
+            for element in elements {
+                match element.classify() {
+                    InterpolatedStringElementKind::Literal(literal) => {
+                        FormatLiteralContent {
+                            range: literal.range(),
+                            flags: self.flags,
+                            is_interpolated_string: true,
+                            trim_end: false,
+                            trim_start: false,
                         }
+                        .fmt(f)?;
+                    }
+                    // Formatting the expression here and in the expanded version is safe **only**
+                    // because we assert that the f/t-string never contains any comments.
+                    InterpolatedStringElementKind::Interpolation(expression) => {
+                        FormatInterpolatedElement::new(expression, context).fmt(f)?;
                     }
                 }
             }

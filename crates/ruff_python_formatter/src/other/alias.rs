@@ -8,14 +8,10 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatAlias;
 
-impl FormatNodeRule<Alias> for FormatAlias {
-    fn fmt_fields(&self, item: &Alias, f: &mut PyFormatter) -> FormatResult<()> {
-        let Alias {
-            range: _,
-            node_index: _,
-            name,
-            asname,
-        } = item;
+impl FormatNodeRule<ruff_python_ast::kind::Alias> for FormatAlias {
+    fn fmt_fields(&self, item: Alias<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let name = item.name();
+        let asname = item.asname();
         write!(f, [DotDelimitedIdentifier::new(name)])?;
 
         let comments = f.context().comments().clone();

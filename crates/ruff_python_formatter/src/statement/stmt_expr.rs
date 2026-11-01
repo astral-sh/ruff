@@ -1,5 +1,4 @@
-use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, Operator, StmtExpr};
+use ruff_python_ast::{self as ast, Expr, Operator, StmtExpr};
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
@@ -9,9 +8,9 @@ use crate::statement::trailing_semicolon;
 #[derive(Default)]
 pub struct FormatStmtExpr;
 
-impl FormatNodeRule<StmtExpr> for FormatStmtExpr {
-    fn fmt_fields(&self, item: &StmtExpr, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtExpr { value, .. } = item;
+impl FormatNodeRule<ruff_python_ast::kind::StmtExpr> for FormatStmtExpr {
+    fn fmt_fields(&self, item: StmtExpr<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let value = item.value();
 
         if is_arithmetic_like(value) {
             maybe_parenthesize_expression(value, item, Parenthesize::Optional).fmt(f)?;
@@ -30,10 +29,10 @@ impl FormatNodeRule<StmtExpr> for FormatStmtExpr {
     }
 }
 
-const fn is_arithmetic_like(expression: &Expr) -> bool {
+fn is_arithmetic_like(expression: Expr<'_>) -> bool {
     matches!(
-        expression,
-        Expr::BinOp(ast::ExprBinOp {
+        expression.fields(),
+        ast::ExprFields::BinOp(ast::ExprBinOpFields {
             op: Operator::BitOr
                 | Operator::BitXor
                 | Operator::LShift

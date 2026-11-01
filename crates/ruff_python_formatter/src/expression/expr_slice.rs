@@ -1,6 +1,5 @@
 use ruff_formatter::{FormatError, write};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{Expr, ExprSlice, ExprUnaryOp, UnaryOp};
+use ruff_python_ast::{self as ast, Expr, ExprSlice, SyntaxNode, UnaryOp};
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -11,25 +10,17 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprSlice;
 
-impl FormatNodeRule<ExprSlice> for FormatExprSlice {
+impl FormatNodeRule<ruff_python_ast::kind::ExprSlice> for FormatExprSlice {
     /// This implementation deviates from black in that comments are attached to the section of the
     /// slice they originate in
-    fn fmt_fields(&self, item: &ExprSlice, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, item: ExprSlice<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         // `[lower:upper:step]`
-        let ExprSlice {
-            lower,
-            upper,
-            step,
-            range,
-            node_index: _,
-        } = item;
+        let lower = item.lower();
+        let upper = item.upper();
+        let step = item.step();
+        let range = item.range();
 
-        let (first_colon, second_colon) = find_colons(
-            f.context().source(),
-            *range,
-            lower.as_deref(),
-            upper.as_deref(),
-        )?;
+        let (first_colon, second_colon) = find_colons(f.context().source(), range, lower, upper)?;
 
         // Handle comment placement
         // In placements.rs, we marked comment for None nodes a dangling and associated all others
@@ -61,9 +52,9 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
 
         // Handle spacing around the colon(s)
         // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#slices
-        let lower_simple = lower.as_ref().is_none_or(|expr| is_simple_expr(expr));
-        let upper_simple = upper.as_ref().is_none_or(|expr| is_simple_expr(expr));
-        let step_simple = step.as_ref().is_none_or(|expr| is_simple_expr(expr));
+        let lower_simple = lower.is_none_or(|expr| is_simple_expr(expr));
+        let upper_simple = upper.is_none_or(|expr| is_simple_expr(expr));
+        let step_simple = step.is_none_or(|expr| is_simple_expr(expr));
         let all_simple = lower_simple && upper_simple && step_simple;
 
         // lower
@@ -100,7 +91,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
 
         // Upper
         if let Some(upper) = upper {
-            let upper_leading_comments = comments.leading(upper.as_ref());
+            let upper_leading_comments = comments.leading(upper);
             leading_comments_spacing(f, upper_leading_comments)?;
             write!(f, [upper.format(), line_suffix_boundary()])?;
         } else {
@@ -132,7 +123,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
                 space().fmt(f)?;
             }
             if let Some(step) = step {
-                let step_leading_comments = comments.leading(step.as_ref());
+                let step_leading_comments = comments.leading(step);
                 leading_comments_spacing(f, step_leading_comments)?;
                 step.format().fmt(f)?;
             } else if !dangling_step_comments.is_empty() {
@@ -156,10 +147,10 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
 fn find_colons(
     contents: &str,
     range: TextRange,
-    lower: Option<&Expr>,
-    upper: Option<&Expr>,
+    lower: Option<Expr<'_>>,
+    upper: Option<Expr<'_>>,
 ) -> FormatResult<(SimpleToken, Option<SimpleToken>)> {
-    let after_lower = lower.as_ref().map_or(range.start(), Ranged::end);
+    let after_lower = lower.map_or(range.start(), |node| node.end());
     let mut tokens = SimpleTokenizer::new(contents, TextRange::new(after_lower, range.end()))
         .skip_trivia()
         .skip_while(|token| token.kind == SimpleTokenKind::RParen);
@@ -172,7 +163,7 @@ fn find_colons(
         ));
     }
 
-    let after_upper = upper.as_ref().map_or(first_colon.end(), Ranged::end);
+    let after_upper = upper.map_or(first_colon.end(), |node| node.end());
     let mut tokens = SimpleTokenizer::new(contents, TextRange::new(after_upper, range.end()))
         .skip_trivia()
         .skip_while(|token| token.kind == SimpleTokenKind::RParen);
@@ -191,13 +182,15 @@ fn find_colons(
 
 /// Determines whether this expression needs a space around the colon
 /// <https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#slices>
-fn is_simple_expr(expr: &Expr) -> bool {
+fn is_simple_expr(expr: Expr<'_>) -> bool {
     // Unary op expressions except `not` can be simple.
-    if let Some(ExprUnaryOp {
+    if let Some(ast::ExprUnaryOpFields {
         op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
         operand,
         ..
-    }) = expr.as_unary_op_expr()
+    }) = expr
+        .as_unary_op_expr()
+        .map(ruff_python_ast::ExprUnaryOp::fields)
     {
         is_simple_expr(operand)
     } else {
@@ -226,19 +219,14 @@ pub(crate) enum ExprSliceCommentSection {
 pub(crate) fn assign_comment_in_slice(
     comment: TextRange,
     contents: &str,
-    expr_slice: &ExprSlice,
+    expr_slice: ExprSlice<'_>,
 ) -> ExprSliceCommentSection {
-    let ExprSlice {
-        lower,
-        upper,
-        step: _,
-        range,
-        node_index: _,
-    } = expr_slice;
+    let lower = expr_slice.lower();
+    let upper = expr_slice.upper();
+    let range = expr_slice.range();
 
     let (first_colon, second_colon) =
-        find_colons(contents, *range, lower.as_deref(), upper.as_deref())
-            .expect("SyntaxError when trying to parse slice");
+        find_colons(contents, range, lower, upper).expect("SyntaxError when trying to parse slice");
 
     if comment.start() < first_colon.start() {
         ExprSliceCommentSection::Lower
@@ -274,10 +262,10 @@ fn leading_comments_spacing(
     Ok(())
 }
 
-impl NeedsParentheses for ExprSlice {
+impl NeedsParentheses for ExprSlice<'_> {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        _parent: SyntaxNode,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
         OptionalParentheses::Multiline
