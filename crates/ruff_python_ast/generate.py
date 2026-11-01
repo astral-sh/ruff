@@ -946,7 +946,7 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
         out.append('_ => unreachable!("typed node belongs to this group"), } } }')
     for n in ast.all_nodes:
         fields = [field_codec(f, nodes) for f in n.fields]
-        paired_lists = n.name in {"Arguments", "PatternArguments"}
+        paired_lists = n.name in {"ExprCompare", "Arguments", "PatternArguments"}
         if paired_lists:
             first, second = fields
             fields = [replace(first, width=4), second]

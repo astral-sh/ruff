@@ -2602,11 +2602,10 @@ impl Builder {
         [ops, operands]: [u64; 2],
     ) -> BuildId<crate::kind::ExprCompare> {
         let mut row = Row::new(NodeKind::ExprCompare, range);
-        row.set_expr_compare_ops(ops);
-        row.set_expr_compare_extra_offset(offset(self.ast.extra.len()));
-        self.ast
-            .extra
-            .extend([split_words(operands)[0], split_words(operands)[1]]);
+        let [ops, operands] =
+            super::list::Interval::pack_pair(&mut self.ast.extra, [ops, operands]);
+        row.set_expr_compare_ops(split_words(ops)[0]);
+        row.set_expr_compare_operands(operands);
         self.push(row)
     }
 }
@@ -2621,15 +2620,15 @@ impl<'a> crate::ExprCompare<'a> {
 
     #[inline]
     pub fn ops(self) -> List<'a, crate::CmpOp> {
-        let word = self.syntax.row.expr_compare_ops();
+        let word = super::list::Interval::preceding(
+            self.syntax.row.expr_compare_operands(),
+            u64::from(self.syntax.row.expr_compare_ops()),
+        );
         List::new(self.syntax.ast, word)
     }
     #[inline]
     pub fn operands(self) -> NodeList<'a, crate::kind::Expr> {
-        let word = {
-            let base = self.syntax.row.expr_compare_extra_offset() as usize;
-            self.syntax.ast.extra_word::<true>(base)
-        };
+        let word = self.syntax.row.expr_compare_operands();
         List::new(self.syntax.ast, word)
     }
 }

@@ -162,8 +162,8 @@ u32 at 0 => expr_yield_value, set_expr_yield_value;
 u32 at 0 => expr_yield_from_value, set_expr_yield_from_value;
 }
     ExprCompare {
-u64 at 0 => expr_compare_ops, set_expr_compare_ops;
-u32 at 8 => expr_compare_extra_offset, set_expr_compare_extra_offset;
+u64 at 0 => expr_compare_operands, set_expr_compare_operands;
+u32 at 8 => expr_compare_ops, set_expr_compare_ops;
 }
     ExprCall {
 u32 at 0 => expr_call_func, set_expr_call_func;
@@ -376,6 +376,7 @@ impl super::Ast {
             | NodeKind::ExprBoolOp
             | NodeKind::ExprDict
             | NodeKind::ExprSet
+            | NodeKind::ExprCompare
             | NodeKind::ExprFString
             | NodeKind::ExprTString
             | NodeKind::ExprStringLiteral
@@ -528,14 +529,6 @@ impl super::Ast {
                 Some(AstNodeId::from_word(
                     split_words(record.inline_word::<4, 4>())[0],
                 )),
-            ),
-            NodeKind::ExprCompare => Children::rows(
-                self,
-                List::<AstNodeId<crate::kind::Any>>::new(self, {
-                    let base = split_words(record.inline_word::<8, 4>())[0] as usize;
-                    self.extra_word::<true>(base)
-                })
-                .words(),
             ),
             NodeKind::InterpolatedElement => Children::sequence(
                 self,
@@ -880,6 +873,7 @@ impl super::Ast {
             | NodeKind::ExprBoolOp
             | NodeKind::ExprDict
             | NodeKind::ExprSet
+            | NodeKind::ExprCompare
             | NodeKind::ExprFString
             | NodeKind::ExprTString
             | NodeKind::ExprStringLiteral
@@ -1158,13 +1152,6 @@ impl super::Ast {
                 let word = split_words(record.inline_word::<4, 4>())[0];
                 if word == 0 { stack.resume() } else { word }
             }
-            NodeKind::ExprCompare => stack.descend_list(
-                List::<AstNodeId<crate::kind::Any>>::new(self, {
-                    let base = split_words(record.inline_word::<8, 4>())[0] as usize;
-                    self.extra_word::<true>(base)
-                })
-                .words(),
-            ),
             NodeKind::ExprSlice => {
                 let word = split_words(record.inline_word::<8, 4>())[0];
                 if word != 0 {
