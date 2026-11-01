@@ -10,8 +10,8 @@ use crate::prelude::*;
 pub struct FormatTypeParams;
 
 /// Formats a sequence of [`TypeParam`](ruff_python_ast::TypeParam) nodes.
-impl FormatNodeRule<TypeParams> for FormatTypeParams {
-    fn fmt_fields(&self, item: &TypeParams, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<ruff_python_ast::kind::TypeParams> for FormatTypeParams {
+    fn fmt_fields(&self, item: TypeParams<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         // A dangling comment indicates a comment on the same line as the opening bracket, e.g.:
         // ```python
         // type foo[  # This type parameter clause has a dangling comment.
@@ -24,7 +24,7 @@ impl FormatNodeRule<TypeParams> for FormatTypeParams {
 
         let items = format_with(|f| {
             f.join_comma_separated(item.end())
-                .nodes(item.type_params.iter())
+                .nodes(item.type_params().iter())
                 .finish()
         });
 

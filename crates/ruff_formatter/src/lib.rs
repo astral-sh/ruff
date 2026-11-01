@@ -714,21 +714,6 @@ where
             context: PhantomData,
         }
     }
-
-    pub fn rule(&self) -> &R {
-        &self.rule
-    }
-}
-
-impl<T, R, O, C> FormatRefWithRule<'_, T, R, C>
-where
-    R: FormatRuleWithOptions<T, C, Options = O>,
-{
-    #[must_use]
-    pub fn with_options(mut self, options: O) -> Self {
-        self.rule = self.rule.with_options(options);
-        self
-    }
 }
 
 impl<T, R, C> FormatWithRule<C> for FormatRefWithRule<'_, T, R, C>
@@ -773,6 +758,10 @@ where
             rule,
             context: PhantomData,
         }
+    }
+
+    pub fn rule(&self) -> &R {
+        &self.rule
     }
 
     #[must_use]

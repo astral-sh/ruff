@@ -1,6 +1,5 @@
-use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions};
-use ruff_python_ast::{AnyNodeRef, Expr, PatternMatchAs};
-use ruff_python_ast::{MatchCase, Pattern};
+use ruff_formatter::{FormatOwnedWithRule, FormatRule, FormatRuleWithOptions};
+use ruff_python_ast::{ExprKind, MatchCase, Pattern, PatternKind, SyntaxNode};
 use ruff_python_trivia::{
     BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind, first_non_trivia_token,
 };
@@ -30,7 +29,7 @@ pub struct FormatPattern {
     parentheses: Parentheses,
 }
 
-impl FormatRuleWithOptions<Pattern, PyFormatContext<'_>> for FormatPattern {
+impl FormatRuleWithOptions<Pattern<'_>, PyFormatContext<'_>> for FormatPattern {
     type Options = Parentheses;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -39,17 +38,18 @@ impl FormatRuleWithOptions<Pattern, PyFormatContext<'_>> for FormatPattern {
     }
 }
 
-impl FormatRule<Pattern, PyFormatContext<'_>> for FormatPattern {
-    fn fmt(&self, pattern: &Pattern, f: &mut PyFormatter) -> FormatResult<()> {
-        let format_pattern = format_with(|f| match pattern {
-            Pattern::MatchValue(pattern) => pattern.format().fmt(f),
-            Pattern::MatchSingleton(pattern) => pattern.format().fmt(f),
-            Pattern::MatchSequence(pattern) => pattern.format().fmt(f),
-            Pattern::MatchMapping(pattern) => pattern.format().fmt(f),
-            Pattern::MatchClass(pattern) => pattern.format().fmt(f),
-            Pattern::MatchStar(pattern) => pattern.format().fmt(f),
-            Pattern::MatchAs(pattern) => pattern.format().fmt(f),
-            Pattern::MatchOr(pattern) => pattern.format().fmt(f),
+impl FormatRule<Pattern<'_>, PyFormatContext<'_>> for FormatPattern {
+    fn fmt(&self, pattern: &Pattern<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let pattern = *pattern;
+        let format_pattern = format_with(|f| match pattern.classify() {
+            PatternKind::MatchValue(pattern) => pattern.format().fmt(f),
+            PatternKind::MatchSingleton(pattern) => pattern.format().fmt(f),
+            PatternKind::MatchSequence(pattern) => pattern.format().fmt(f),
+            PatternKind::MatchMapping(pattern) => pattern.format().fmt(f),
+            PatternKind::MatchClass(pattern) => pattern.format().fmt(f),
+            PatternKind::MatchStar(pattern) => pattern.format().fmt(f),
+            PatternKind::MatchAs(pattern) => pattern.format().fmt(f),
+            PatternKind::MatchOr(pattern) => pattern.format().fmt(f),
         });
 
         let parenthesize = match self.parentheses {
@@ -91,16 +91,8 @@ impl FormatRule<Pattern, PyFormatContext<'_>> for FormatPattern {
     }
 }
 
-impl<'ast> AsFormat<PyFormatContext<'ast>> for Pattern {
-    type Format<'a> = FormatRefWithRule<'a, Pattern, FormatPattern, PyFormatContext<'ast>>;
-
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, FormatPattern::default())
-    }
-}
-
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for Pattern {
-    type Format = FormatOwnedWithRule<Pattern, FormatPattern, PyFormatContext<'ast>>;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for Pattern<'_> {
+    type Format = FormatOwnedWithRule<Self, FormatPattern, PyFormatContext<'ast>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatPattern::default())
@@ -108,7 +100,7 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Pattern {
 }
 
 fn is_pattern_parenthesized(
-    pattern: &Pattern,
+    pattern: Pattern<'_>,
     comment_ranges: &CommentRanges,
     contents: &str,
 ) -> bool {
@@ -134,36 +126,36 @@ fn is_pattern_parenthesized(
     }
 }
 
-impl NeedsParentheses for Pattern {
+impl NeedsParentheses for Pattern<'_> {
     fn needs_parentheses(
         &self,
-        parent: AnyNodeRef,
+        parent: SyntaxNode,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        match self {
-            Pattern::MatchValue(pattern) => pattern.needs_parentheses(parent, context),
-            Pattern::MatchSingleton(pattern) => pattern.needs_parentheses(parent, context),
-            Pattern::MatchSequence(pattern) => pattern.needs_parentheses(parent, context),
-            Pattern::MatchMapping(pattern) => pattern.needs_parentheses(parent, context),
-            Pattern::MatchClass(pattern) => pattern.needs_parentheses(parent, context),
-            Pattern::MatchStar(pattern) => pattern.needs_parentheses(parent, context),
-            Pattern::MatchAs(pattern) => pattern.needs_parentheses(parent, context),
-            Pattern::MatchOr(pattern) => pattern.needs_parentheses(parent, context),
+        match self.classify() {
+            PatternKind::MatchValue(pattern) => pattern.needs_parentheses(parent, context),
+            PatternKind::MatchSingleton(pattern) => pattern.needs_parentheses(parent, context),
+            PatternKind::MatchSequence(pattern) => pattern.needs_parentheses(parent, context),
+            PatternKind::MatchMapping(pattern) => pattern.needs_parentheses(parent, context),
+            PatternKind::MatchClass(pattern) => pattern.needs_parentheses(parent, context),
+            PatternKind::MatchStar(pattern) => pattern.needs_parentheses(parent, context),
+            PatternKind::MatchAs(pattern) => pattern.needs_parentheses(parent, context),
+            PatternKind::MatchOr(pattern) => pattern.needs_parentheses(parent, context),
         }
     }
 }
 
 pub(crate) fn maybe_parenthesize_pattern<'a>(
-    pattern: &'a Pattern,
-    case: &'a MatchCase,
+    pattern: Pattern<'a>,
+    case: MatchCase<'a>,
 ) -> MaybeParenthesizePattern<'a> {
     MaybeParenthesizePattern { pattern, case }
 }
 
 #[derive(Debug)]
 pub(crate) struct MaybeParenthesizePattern<'a> {
-    pattern: &'a Pattern,
-    case: &'a MatchCase,
+    pattern: Pattern<'a>,
+    case: MatchCase<'a>,
 }
 
 impl Format<PyFormatContext<'_>> for MaybeParenthesizePattern<'_> {
@@ -180,7 +172,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizePattern<'_> {
             return pattern.format().with_options(Parentheses::Always).fmt(f);
         }
 
-        let needs_parentheses = pattern.needs_parentheses(AnyNodeRef::from(*case), f.context());
+        let needs_parentheses = pattern.needs_parentheses(SyntaxNode::from(case), f.context());
 
         match needs_parentheses {
             OptionalParentheses::Always => {
@@ -188,7 +180,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizePattern<'_> {
             }
             OptionalParentheses::Never => pattern.format().with_options(Parentheses::Never).fmt(f),
             OptionalParentheses::Multiline => {
-                if can_pattern_omit_optional_parentheses(pattern, f.context()) {
+                if can_pattern_omit_optional_parentheses(*pattern, f.context()) {
                     optional_parentheses(&pattern.format().with_options(Parentheses::Never)).fmt(f)
                 } else {
                     parenthesize_if_expands(&pattern.format().with_options(Parentheses::Never))
@@ -222,7 +214,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizePattern<'_> {
 ///
 /// The layout is only applied when the parenthesized pattern is the first or last item in the pattern.
 /// For example, the layout isn't used for `a | [b, c] | d` because that would look weird.
-fn can_pattern_omit_optional_parentheses(pattern: &Pattern, context: &PyFormatContext) -> bool {
+fn can_pattern_omit_optional_parentheses(pattern: Pattern<'_>, context: &PyFormatContext) -> bool {
     let mut visitor = CanOmitOptionalParenthesesVisitor::default();
     visitor.visit_pattern(pattern, context);
 
@@ -234,23 +226,30 @@ fn can_pattern_omit_optional_parentheses(pattern: &Pattern, context: &PyFormatCo
         false
     } else {
         // It's complicated
-        fn has_parentheses_and_is_non_empty(pattern: &Pattern, context: &PyFormatContext) -> bool {
-            let has_own_non_empty = match pattern {
-                Pattern::MatchValue(_)
-                | Pattern::MatchSingleton(_)
-                | Pattern::MatchStar(_)
-                | Pattern::MatchOr(_) => false,
-                Pattern::MatchAs(PatternMatchAs { pattern, .. }) => match pattern {
-                    Some(pattern) => has_parentheses_and_is_non_empty(pattern, context),
-                    None => false,
-                },
-                Pattern::MatchSequence(sequence) => {
-                    !sequence.patterns.is_empty() || context.comments().has_dangling(pattern)
+        fn has_parentheses_and_is_non_empty(
+            pattern: Pattern<'_>,
+            context: &PyFormatContext,
+        ) -> bool {
+            let has_own_non_empty = match pattern.classify() {
+                PatternKind::MatchValue(_)
+                | PatternKind::MatchSingleton(_)
+                | PatternKind::MatchStar(_)
+                | PatternKind::MatchOr(_) => false,
+                PatternKind::MatchAs(pattern_match_as) => {
+                    let pattern = pattern_match_as.pattern();
+                    match pattern {
+                        Some(pattern) => has_parentheses_and_is_non_empty(pattern, context),
+                        None => false,
+                    }
                 }
-                Pattern::MatchMapping(mapping) => {
-                    mapping.entries().next().is_some() || context.comments().has_dangling(pattern)
+                PatternKind::MatchSequence(sequence) => {
+                    !sequence.patterns().is_empty() || context.comments().has_dangling(pattern)
                 }
-                Pattern::MatchClass(class) => !class.arguments.patterns.is_empty(),
+                PatternKind::MatchMapping(mapping) => {
+                    mapping.items().entries().next().is_some()
+                        || context.comments().has_dangling(pattern)
+                }
+                PatternKind::MatchClass(class) => !class.arguments().patterns().is_empty(),
             };
 
             if has_own_non_empty {
@@ -276,35 +275,35 @@ struct CanOmitOptionalParenthesesVisitor<'input> {
     max_precedence: OperatorPrecedence,
     max_precedence_count: usize,
     any_parenthesized_expressions: bool,
-    last: Option<&'input Pattern>,
+    last: Option<Pattern<'input>>,
     first: First<'input>,
 }
 
 impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
-    fn visit_pattern(&mut self, pattern: &'a Pattern, context: &PyFormatContext) {
-        match pattern {
-            Pattern::MatchSequence(_) | Pattern::MatchMapping(_) => {
+    fn visit_pattern(&mut self, pattern: Pattern<'a>, context: &PyFormatContext) {
+        match pattern.classify() {
+            PatternKind::MatchSequence(_) | PatternKind::MatchMapping(_) => {
                 self.any_parenthesized_expressions = true;
             }
 
-            Pattern::MatchValue(value) => match &*value.value {
-                Expr::StringLiteral(_)
-                | Expr::BytesLiteral(_)
-                | Expr::TString(_)
-                | Expr::NumberLiteral(_)
-                | Expr::Attribute(_)
-                | Expr::UnaryOp(_) => {
+            PatternKind::MatchValue(value) => match value.value().classify() {
+                ExprKind::StringLiteral(_)
+                | ExprKind::BytesLiteral(_)
+                | ExprKind::TString(_)
+                | ExprKind::NumberLiteral(_)
+                | ExprKind::Attribute(_)
+                | ExprKind::UnaryOp(_) => {
                     // require no state update other than visit_pattern does.
                 }
 
-                Expr::FString(_) => {
+                ExprKind::FString(_) => {
                     // F-strings are allowed according to python's grammar but fail with a syntax error at runtime.
                     // That's why we need to support them for formatting.
                 }
 
                 // `case 4+3j:` or `case 4-3j:
                 // Cannot contain arbitrary expressions. Limited to complex numbers.
-                Expr::BinOp(_) => {
+                ExprKind::BinOp(_) => {
                     self.update_max_precedence(OperatorPrecedence::Additive, 1);
                 }
 
@@ -312,36 +311,38 @@ impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
                     debug_assert!(
                         false,
                         "Unsupported expression in pattern match value: {:?}",
-                        value.value
+                        value.value()
                     );
                 }
             },
-            Pattern::MatchClass(_) => {
+            PatternKind::MatchClass(_) => {
                 self.any_parenthesized_expressions = true;
 
                 // The pattern doesn't start with a parentheses pattern, but with the class's identifier.
                 self.first.set_if_none(First::Token);
             }
-            Pattern::MatchAs(PatternMatchAs { pattern, .. }) => {
+            PatternKind::MatchAs(pattern_match_as) => {
+                let pattern = pattern_match_as.pattern();
+
                 if let Some(pattern) = pattern {
                     self.visit_sub_pattern(pattern, context);
                 }
             }
-            Pattern::MatchStar(_) | Pattern::MatchSingleton(_) => {}
-            Pattern::MatchOr(or_pattern) => {
+            PatternKind::MatchStar(_) | PatternKind::MatchSingleton(_) => {}
+            PatternKind::MatchOr(or_pattern) => {
                 self.update_max_precedence(
                     OperatorPrecedence::Or,
-                    or_pattern.patterns.len().saturating_sub(1),
+                    or_pattern.patterns().len().saturating_sub(1),
                 );
 
-                for pattern in &or_pattern.patterns {
+                for pattern in or_pattern.patterns() {
                     self.visit_sub_pattern(pattern, context);
                 }
             }
         }
     }
 
-    fn visit_sub_pattern(&mut self, pattern: &'a Pattern, context: &PyFormatContext) {
+    fn visit_sub_pattern(&mut self, pattern: Pattern<'a>, context: &PyFormatContext) {
         self.last = Some(pattern);
 
         // Rule only applies for non-parenthesized patterns.
@@ -384,7 +385,7 @@ enum First<'a> {
     /// Pattern starts with a non-parentheses token. E.g. `*x`
     Token,
 
-    Pattern(&'a Pattern),
+    Pattern(Pattern<'a>),
 }
 
 impl<'a> First<'a> {
@@ -395,7 +396,7 @@ impl<'a> First<'a> {
         }
     }
 
-    fn pattern(self) -> Option<&'a Pattern> {
+    fn pattern(self) -> Option<Pattern<'a>> {
         match self {
             First::None | First::Token => None,
             First::Pattern(pattern) => Some(pattern),

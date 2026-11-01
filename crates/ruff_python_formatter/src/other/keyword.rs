@@ -6,14 +6,10 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatKeyword;
 
-impl FormatNodeRule<Keyword> for FormatKeyword {
-    fn fmt_fields(&self, item: &Keyword, f: &mut PyFormatter) -> FormatResult<()> {
-        let Keyword {
-            range: _,
-            node_index: _,
-            arg,
-            value,
-        } = item;
+impl FormatNodeRule<ruff_python_ast::kind::Keyword> for FormatKeyword {
+    fn fmt_fields(&self, item: Keyword<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let arg = item.arg();
+        let value = item.value();
         // Comments after the `=` or `**` are reassigned as leading comments on the value.
         if let Some(arg) = arg {
             write!(f, [arg.format(), token("="), value.format()])

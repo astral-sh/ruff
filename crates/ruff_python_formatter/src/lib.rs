@@ -3,13 +3,14 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
+use ruff_python_ast::{AstNode, NodeType};
 use thiserror::Error;
 use tracing::Level;
 
 pub use range::format_range;
 use ruff_formatter::prelude::*;
 use ruff_formatter::{FormatError, Formatted, PrintError, Printed, SourceCode, format, write};
-use ruff_python_ast::{AnyNodeRef, Mod};
+use ruff_python_ast::Mod;
 use ruff_python_parser::{ParseError, ParseOptions, Parsed, parse};
 use ruff_python_trivia::TriviaRanges;
 use ruff_text_size::{Ranged, TextRange};
@@ -52,11 +53,10 @@ pub(crate) type PyFormatter<'ast, 'buf, 'state> = Formatter<'buf, 'state, PyForm
 /// Rule for formatting a Python AST node.
 pub(crate) trait FormatNodeRule<N>
 where
-    N: Ranged,
-    for<'a> AnyNodeRef<'a>: From<&'a N>,
+    N: NodeType,
 {
-    fn fmt(&self, node: &N, f: &mut PyFormatter) -> FormatResult<()> {
-        let node_ref = AnyNodeRef::from(node);
+    fn fmt(&self, node: N::Borrowed<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let node_ref = node.syntax_node();
         let comments = f.context().comments();
         if !f.options().source_map_generation().is_enabled() && !comments.may_have_comment(node_ref)
         {
@@ -98,7 +98,7 @@ where
     }
 
     /// Formats the node's fields.
-    fn fmt_fields(&self, item: &N, f: &mut PyFormatter) -> FormatResult<()>;
+    fn fmt_fields(&self, item: N::Borrowed<'_>, f: &mut PyFormatter) -> FormatResult<()>;
 }
 
 #[derive(Error, Debug, PartialEq, Eq)]
@@ -151,7 +151,7 @@ pub fn format_module_source(
 }
 
 pub fn format_module_ast<'a>(
-    parsed: &'a Parsed<Mod>,
+    parsed: &'a Parsed<ruff_python_ast::kind::Mod>,
     trivia: &'a TriviaRanges,
     source: &'a str,
     options: PyFormatOptions,
@@ -159,18 +159,17 @@ pub fn format_module_ast<'a>(
     format_node(parsed, trivia, source, options)
 }
 
-fn format_node<'a, N>(
+fn format_node<'a, N: NodeType>(
     parsed: &'a Parsed<N>,
     trivia: &'a TriviaRanges,
     source: &'a str,
     options: PyFormatOptions,
 ) -> FormatResult<Formatted<PyFormatContext<'a>>>
 where
-    N: AsFormat<PyFormatContext<'a>>,
-    &'a N: Into<AnyNodeRef<'a>>,
+    N::Borrowed<'a>: AsFormat<PyFormatContext<'a>>,
 {
     let source_code = SourceCode::new(source);
-    let comments = Comments::from_ast(parsed.syntax(), source_code, trivia);
+    let comments = Comments::from_ast(parsed.syntax().syntax_node(), source_code, trivia);
 
     let formatted = format!(
         PyFormatContext::new(options, source, comments, trivia, parsed.tokens()),
@@ -206,7 +205,7 @@ pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatM
 }
 
 /// Public function for generating a printable string of the debug comments.
-pub fn pretty_comments(module: &Mod, trivia: &TriviaRanges, source: &str) -> String {
+pub fn pretty_comments(module: Mod<'_>, trivia: &TriviaRanges, source: &str) -> String {
     let source_code = SourceCode::new(source);
     let comments = Comments::from_ast(module, source_code, trivia);
 
