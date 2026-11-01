@@ -13,12 +13,12 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::file_to_module;
 use ty_python_core::ProgramFile;
+use ty_python_semantic::SemanticModel;
 use ty_python_semantic::importer::{ImportAction, ImportRequest, Importer, MembersInScope};
 use ty_python_semantic::types::ide_support::{
     inlay_hint_call_argument_details, inlay_hint_return_type,
 };
-use ty_python_semantic::types::{Type, TypeDetail, TypeDisplayDetails};
-use ty_python_semantic::{HasType, SemanticModel};
+use ty_python_semantic::types::{Type, TypeAndQualifiers, TypeDetail, TypeDisplayDetails};
 
 #[derive(Debug, Clone)]
 pub struct InlayHint {
@@ -33,7 +33,7 @@ impl InlayHint {
         context: InlayHintImportContext<'_, 'db>,
         expr: &Expr,
         assignment: &StmtAssign,
-        ty: Type<'db>,
+        ty: TypeAndQualifiers<'db>,
         tokens: &Tokens,
     ) -> Option<Self> {
         let InlayHintImportContext { db, file, .. } = context;
@@ -55,7 +55,8 @@ impl InlayHint {
             range.end(),
             &details,
             ": ",
-            annotations_are_valid_syntax(assignment),
+            annotations_are_valid_syntax(assignment)
+                && (expr.is_name_expr() || ty.qualifiers().is_valid_for_non_name_targets()),
         ))
     }
 
@@ -448,7 +449,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         if !self.settings.variable_types || is_ignored_variable_assignment_target(expr) {
             return;
         }
-        let Some(ty) = expr.inferred_type(&self.model) else {
+        let Some(ty) = self.model.assignment_target_type(expr) else {
             return;
         };
 
@@ -1610,6 +1611,202 @@ Source with applied edits:
         11 + bb: Literal[b"foo"] = aa
            |
         "#);
+    }
+
+    #[test]
+    fn inherited_classvar_in_variable_hint() {
+        // Child.x inherits ClassVar from Base.x. A local class has that name, so both the hint
+        // and its edit use typing.ClassVar.
+        let mut test = inlay_hint_test(
+            "
+            from base import Base
+
+            class ClassVar: ...
+
+            class Child(Base):
+                <START>x<END> = abs(-2)
+            ",
+        );
+        test.with_extra_file(
+            "base.py",
+            &dedent(
+                "
+                from typing import ClassVar
+
+                class Base:
+                    x: ClassVar[int] = 0
+                ",
+            ),
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        from base import Base
+
+        class ClassVar: ...
+
+        class Child(Base):
+            x[: typing.ClassVar[int]] = abs(-2)
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/typing.pyi:LL:1
+           |
+        LL | ClassVar: _SpecialForm
+           | ^^^^^^^^
+        info: Source
+          --> main2.py:LL:9
+           |
+        LL |     x[: typing.ClassVar[int]] = abs(-2)
+           |         ^^^^^^^^^^^^^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class int:
+           |       ^^^
+        info: Source
+          --> main2.py:LL:25
+           |
+        LL |     x[: typing.ClassVar[int]] = abs(-2)
+           |                         ^^^
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+          |
+        1 + import typing
+        2 |
+        --------------------------------------------------------------------------------
+        7 | class Child(Base):
+          -     x = abs(-2)
+        8 +     x: typing.ClassVar[int] = abs(-2)
+          |
+        ");
+    }
+
+    #[test]
+    fn nested_qualifiers_in_variable_hint() {
+        // The hint takes ClassVar and Final from the declaration of x and bool from flag().
+        // ClassVar goes on the outside so dataclasses recognize x as a class variable.
+        let mut test = inlay_hint_test(
+            "
+            from dataclasses import dataclass
+            from typing import ClassVar, Final
+
+            def flag() -> bool: ...
+
+            @dataclass
+            class C:
+                x: ClassVar[Final[int]]
+                <START>x<END> = flag()
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        from dataclasses import dataclass
+        from typing import ClassVar, Final
+
+        def flag() -> bool: ...
+
+        @dataclass
+        class C:
+            x: ClassVar[Final[int]]
+            x[: ClassVar[Final[bool]]] = flag()
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/typing.pyi:LL:1
+           |
+        LL | ClassVar: _SpecialForm
+           | ^^^^^^^^
+        info: Source
+          --> main2.py:LL:9
+           |
+        LL |     x[: ClassVar[Final[bool]]] = flag()
+           |         ^^^^^^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/typing.pyi:LL:1
+           |
+        LL | Final: _SpecialForm
+           | ^^^^^
+        info: Source
+          --> main2.py:LL:18
+           |
+        LL |     x[: ClassVar[Final[bool]]] = flag()
+           |                  ^^^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class bool(int):
+           |       ^^^^
+        info: Source
+          --> main2.py:LL:24
+           |
+        LL |     x[: ClassVar[Final[bool]]] = flag()
+           |                        ^^^^
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+           |
+        9  |     x: ClassVar[Final[int]]
+           -     x = flag()
+        10 +     x: ClassVar[Final[bool]] = flag()
+           |
+        ");
+    }
+
+    #[test]
+    fn classvar_hint_on_attribute_assignment() {
+        // Show the ClassVar qualifier on C.x. Only a name in the class body can be annotated
+        // with ClassVar, so the hint offers no edit here.
+        let mut test = inlay_hint_test(
+            "
+            from typing import ClassVar
+
+            class C:
+                x: ClassVar[int] = 0
+
+            <START>C.x<END> = abs(-2)
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        from typing import ClassVar
+
+        class C:
+            x: ClassVar[int] = 0
+
+        C.x[: ClassVar[int]] = abs(-2)
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/typing.pyi:LL:1
+           |
+        LL | ClassVar: _SpecialForm
+           | ^^^^^^^^
+        info: Source
+          --> main2.py:LL:7
+           |
+        LL | C.x[: ClassVar[int]] = abs(-2)
+           |       ^^^^^^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class int:
+           |       ^^^
+        info: Source
+          --> main2.py:LL:16
+           |
+        LL | C.x[: ClassVar[int]] = abs(-2)
+           |                ^^^
+        ");
     }
 
     #[test]
