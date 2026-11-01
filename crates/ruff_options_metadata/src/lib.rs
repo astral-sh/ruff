@@ -128,44 +128,58 @@ impl OptionSet {
 
     /// Returns `true` if this set has an option that resolves to `name`.
     ///
-    /// The name can be separated by `.` to find a nested option.
-    ///
-    /// For example, `options.has("format.hard-tabs")` looks for the `hard-tabs` field
-    /// in the `format` option group.
+    /// Use a dotted name to look up an option inside a group.
     ///
     /// # Example
     ///
+    /// Given a `format` group with an `indent-style` field, both the group and
+    /// the field have a name in the root option set.
+    ///
     /// ```rust
     /// # use ruff_options_metadata::{OptionField, OptionsMetadata, Visit};
-    ///
-    /// struct WithOptions;
-    ///
-    /// impl OptionsMetadata for WithOptions {
-    ///     fn record(visit: &mut dyn Visit) {
-    ///         visit.record_field("ignore-git-ignore", OptionField {
-    ///             doc: "Whether Ruff should respect the gitignore file",
-    ///             default: "false",
-    ///             value_type: "bool",
-    ///             example: "",
-    ///             scope: None,
-    ///             deprecated: None,
-    ///         });
-    ///     }
-    /// }
-    ///
-    /// assert!(WithOptions::metadata().has("ignore-git-ignore"));
-    /// assert!(!WithOptions::metadata().has("does-not-exist"));
+    /// # struct Root;
+    /// # struct Format;
+    /// # impl OptionsMetadata for Root {
+    /// #     fn record(visit: &mut dyn Visit) {
+    /// #         visit.record_set("format", Format::metadata());
+    /// #     }
+    /// # }
+    /// # impl OptionsMetadata for Format {
+    /// #     fn record(visit: &mut dyn Visit) {
+    /// #         visit.record_field("indent-style", OptionField {
+    /// #             doc: "The indentation style.",
+    /// #             default: r#""space""#,
+    /// #             value_type: r#""space" | "tab""#,
+    /// #             example: r#"indent-style = "tab""#,
+    /// #             scope: None,
+    /// #             deprecated: None,
+    /// #         });
+    /// #     }
+    /// # }
+    /// # let options = Root::metadata();
+    /// assert!(options.has("format"));
+    /// assert!(options.has("format.indent-style"));
+    /// assert!(!options.has("indent-style"));
     /// ```
     pub fn has(&self, name: &str) -> bool {
         self.find(name).is_some()
     }
 
-    /// Returns `Some` if this set has an option that resolves to `name` and `None` otherwise.
-    ///
-    /// The name can be separated by `.` to find a nested option.
+    /// Looks up a field or group by its dotted name. Returns `None` if the name is absent.
     ///
     /// For example, `options.find("format")` returns the group as an [`OptionEntry::Set`],
-    /// while `options.find("format.hard-tabs")` returns its field as an [`OptionEntry::Field`].
+    /// while `options.find("format.indent-style")` returns its field as an [`OptionEntry::Field`].
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ruff_options_metadata::OptionSet;
+    ///
+    /// fn indent_style_default(options: &OptionSet) -> Option<&'static str> {
+    ///     let field = options.find("format.indent-style")?.into_field()?;
+    ///     Some(field.default)
+    /// }
+    /// ```
     pub fn find(&self, name: &str) -> Option<OptionEntry> {
         struct FindOptionVisitor<'a> {
             option: Option<OptionEntry>,

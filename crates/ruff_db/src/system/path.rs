@@ -69,6 +69,14 @@ impl SystemPath {
     ///   root: `c:\windows` is absolute, while `c:temp` and `\temp` are not.
     ///
     /// [`has_root`]: Utf8Path::has_root
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// assert!(!SystemPath::new("foo.txt").is_absolute());
+    /// ```
     #[inline]
     #[must_use]
     pub fn is_absolute(&self) -> bool {
@@ -84,9 +92,16 @@ impl SystemPath {
     /// * [`None`], if the file name begins with `.` and has no other `.`s within;
     /// * Otherwise, the portion of the file name after the final `.`
     ///
-    /// For example, the extension of `foo.tar.gz` is `gz`.
-    ///
     /// See [`Path::extension`] for more details.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// assert_eq!(SystemPath::new("foo.tar.gz").extension(), Some("gz"));
+    /// assert_eq!(SystemPath::new(".gitignore").extension(), None);
+    /// ```
     #[inline]
     #[must_use]
     pub fn extension(&self) -> Option<&str> {
@@ -97,7 +112,15 @@ impl SystemPath {
     ///
     /// Only considers whole path components to match.
     ///
-    /// For example, `/etc/passwd` starts with `/etc/` and `/etc/passwd///`, but not `/e`.
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// let path = SystemPath::new("/etc/passwd");
+    /// assert!(path.starts_with("/etc/"));
+    /// assert!(!path.starts_with("/e"));
+    /// ```
     #[inline]
     #[must_use]
     pub fn starts_with(&self, base: impl AsRef<SystemPath>) -> bool {
@@ -108,7 +131,16 @@ impl SystemPath {
     ///
     /// Only considers whole path components to match.
     ///
-    /// For example, `/etc/resolv.conf` ends with `resolv.conf`, but not `/resolv.conf` or `conf`.
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// let path = SystemPath::new("/etc/resolv.conf");
+    /// assert!(path.ends_with("resolv.conf"));
+    /// assert!(!path.ends_with("/resolv.conf"));
+    /// assert!(!path.ends_with("conf"));
+    /// ```
     #[inline]
     #[must_use]
     pub fn ends_with(&self, child: impl AsRef<SystemPath>) -> bool {
@@ -119,7 +151,14 @@ impl SystemPath {
     ///
     /// Returns [`None`] if the path terminates in a root or prefix.
     ///
-    /// For example, the parent of `/foo/bar` is `/foo`, whose parent is `/`.
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// assert_eq!(SystemPath::new("/foo/bar").parent(), Some(SystemPath::new("/foo")));
+    /// assert_eq!(SystemPath::new("/").parent(), None);
+    /// ```
     #[inline]
     #[must_use]
     pub fn parent(&self) -> Option<&SystemPath> {
@@ -134,10 +173,17 @@ impl SystemPath {
     /// [`None`], the iterator will do likewise. The iterator will always yield at least one value,
     /// namely `&self`.
     ///
-    /// For example, the ancestors of `/foo/bar` end at `/`, while those of `../foo/bar`
-    /// include `..` and the empty path.
-    ///
     /// [`parent`]: SystemPath::parent
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// let path = SystemPath::new("../foo/bar");
+    /// let ancestors: Vec<_> = path.ancestors().map(SystemPath::as_str).collect();
+    /// assert_eq!(ancestors, ["../foo/bar", "../foo", "..", ""]);
+    /// ```
     #[inline]
     pub fn ancestors(&self) -> impl Iterator<Item = &SystemPath> {
         self.0.ancestors().map(SystemPath::new)
@@ -162,6 +208,18 @@ impl SystemPath {
     /// is a symbolic link (so its parent isn't `a`).
     ///
     /// [`CurDir`]: camino::Utf8Component::CurDir
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use camino::Utf8Component;
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// let mut components = SystemPath::new("/tmp/./foo.txt").components();
+    /// assert_eq!(components.next(), Some(Utf8Component::RootDir));
+    /// assert_eq!(components.next(), Some(Utf8Component::Normal("tmp")));
+    /// assert_eq!(components.next(), Some(Utf8Component::Normal("foo.txt")));
+    /// ```
     #[inline]
     pub fn components(&self) -> camino::Utf8Components<'_> {
         self.0.components()
@@ -174,7 +232,14 @@ impl SystemPath {
     ///
     /// Returns [`None`] if the path terminates in `..`.
     ///
-    /// For example, `tmp/foo.txt` and `foo.txt/.` both have the file name `foo.txt`.
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// assert_eq!(SystemPath::new("foo.txt/.").file_name(), Some("foo.txt"));
+    /// assert_eq!(SystemPath::new("foo.txt/..").file_name(), None);
+    /// ```
     #[inline]
     #[must_use]
     pub fn file_name(&self) -> Option<&str> {
@@ -192,7 +257,14 @@ impl SystemPath {
     /// * The entire file name if the file name begins with `.` and has no other `.`s within;
     /// * Otherwise, the portion of the file name before the final `.`
     ///
-    /// For example, the stem of `foo.tar.gz` is `foo.tar`.
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// assert_eq!(SystemPath::new("foo.tar.gz").file_stem(), Some("foo.tar"));
+    /// assert_eq!(SystemPath::new(".gitignore").file_stem(), Some(".gitignore"));
+    /// ```
     #[inline]
     #[must_use]
     pub fn file_stem(&self) -> Option<&str> {
@@ -208,8 +280,16 @@ impl SystemPath {
     ///
     /// [`starts_with`]: SystemPath::starts_with
     ///
-    /// For example, stripping `/test/` from `/test/haha/foo.txt` returns `haha/foo.txt`.
-    /// Stripping the entire path returns the empty path.
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPath;
+    ///
+    /// let path = SystemPath::new("/test/foo.txt");
+    /// assert_eq!(path.strip_prefix("/test/"), Ok(SystemPath::new("foo.txt")));
+    /// assert_eq!(path.strip_prefix(path), Ok(SystemPath::new("")));
+    /// assert!(path.strip_prefix("test").is_err());
+    /// ```
     #[inline]
     pub fn strip_prefix(
         &self,
@@ -222,7 +302,14 @@ impl SystemPath {
     ///
     /// See [`std::path::PathBuf::push`] for more details on what it means to adjoin a path.
     ///
-    /// For example, joining `/etc` and `passwd` produces `/etc/passwd`.
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::{SystemPath, SystemPathBuf};
+    ///
+    /// let path = SystemPath::new("/etc").join("passwd");
+    /// assert_eq!(path, SystemPathBuf::from("/etc/passwd"));
+    /// ```
     #[inline]
     #[must_use]
     pub fn join(&self, path: impl AsRef<SystemPath>) -> SystemPathBuf {
@@ -233,8 +320,15 @@ impl SystemPath {
     ///
     /// See [`std::path::PathBuf::set_extension`] for more details.
     ///
-    /// For example, replacing the extension of `foo.tar.gz` with `xz` produces `foo.tar.xz`.
-    /// An empty extension removes the last extension, leaving `foo.tar`.
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::{SystemPath, SystemPathBuf};
+    ///
+    /// let archive = SystemPath::new("foo.tar.gz");
+    /// assert_eq!(archive.with_extension("xz"), SystemPathBuf::from("foo.tar.xz"));
+    /// assert_eq!(archive.with_extension(""), SystemPathBuf::from("foo.tar"));
+    /// ```
     #[inline]
     pub fn with_extension(&self, extension: &str) -> SystemPathBuf {
         SystemPathBuf::from_utf8_path_buf(self.0.with_extension(extension))
@@ -271,9 +365,33 @@ impl SystemPath {
     ///
     /// Adapted from [cargo](https://github.com/rust-lang/cargo/blob/fede83ccf973457de319ba6fa0e36ead454d2e20/src/cargo/util/paths.rs#L61)
     ///
-    /// For example, resolving `foo/./bar` from `/tmp` produces `/tmp/foo/bar` on Unix.
-    /// Resolving `foo\.\bar` from `C:\tmp` produces `C:\tmp\foo\bar` on Windows.
-    /// Parent components that would traverse past the root resolve to the root.
+    /// # Examples
+    ///
+    /// On Unix, `..` stops at the filesystem root.
+    ///
+    /// ```
+    /// use ruff_db::system::{SystemPath, SystemPathBuf};
+    ///
+    /// # #[cfg(unix)] {
+    /// let path = SystemPath::absolute("foo/./bar", "/tmp");
+    /// assert_eq!(path, SystemPathBuf::from("/tmp/foo/bar"));
+    /// let root = SystemPath::absolute("../../../", "/tmp");
+    /// assert_eq!(root, SystemPathBuf::from("/"));
+    /// # }
+    /// ```
+    ///
+    /// On Windows, `..` stops at the root of the drive.
+    ///
+    /// ```
+    /// use ruff_db::system::{SystemPath, SystemPathBuf};
+    ///
+    /// # #[cfg(windows)] {
+    /// let path = SystemPath::absolute(r"foo\.\bar", r"C:\tmp");
+    /// assert_eq!(path, SystemPathBuf::from(r"C:\tmp\foo\bar"));
+    /// let root = SystemPath::absolute(r"..\..\..", r"C:\tmp");
+    /// assert_eq!(root, SystemPathBuf::from(r"C:\"));
+    /// # }
+    /// ```
     pub fn absolute(path: impl AsRef<SystemPath>, cwd: impl AsRef<SystemPath>) -> SystemPathBuf {
         fn absolute(path: &SystemPath, cwd: &SystemPath) -> SystemPathBuf {
             let path = &path.0;
@@ -371,8 +489,17 @@ impl SystemPathBuf {
     ///   replaces everything except for the prefix (if any) of `self`.
     /// * if `path` has a prefix but no root, it replaces `self`.
     ///
-    /// For example, pushing `file.bk` onto `/tmp` produces `/tmp/file.bk`.
-    /// Pushing `/etc` onto `/tmp` produces `/etc`.
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemPathBuf;
+    ///
+    /// let mut path = SystemPathBuf::from("/tmp");
+    /// path.push("file.bk");
+    /// assert_eq!(path, SystemPathBuf::from("/tmp/file.bk"));
+    /// path.push("/etc");
+    /// assert_eq!(path, SystemPathBuf::from("/etc"));
+    /// ```
     pub fn push(&mut self, path: impl AsRef<SystemPath>) {
         self.0.push(&path.as_ref().0);
     }
@@ -591,9 +718,17 @@ impl SystemVirtualPath {
 
     /// Extracts the file extension, if possible.
     ///
-    /// For example, the extension of `vscode-notebook-cell:Untitled-1.ipynb` is `ipynb`.
-    ///
     /// See [`Path::extension`] for more details.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ruff_db::system::SystemVirtualPath;
+    ///
+    /// let cell = SystemVirtualPath::new("vscode-notebook-cell:Untitled-1.ipynb");
+    /// assert_eq!(cell.extension(), Some("ipynb"));
+    /// assert_eq!(SystemVirtualPath::new("untitled:Untitled-1").extension(), None);
+    /// ```
     pub fn extension(&self) -> Option<&str> {
         Path::new(&self.0).extension().and_then(|ext| ext.to_str())
     }
@@ -731,8 +866,14 @@ impl Borrow<SystemVirtualPath> for SystemVirtualPathBuf {
 
 /// Deduplicates identical paths and removes nested paths.
 ///
-/// For example, given `/a/b/c`, `/a/b`, `/a/beta`, and another `/a/b/c`,
-/// the remaining paths are `/a/b` and `/a/beta`.
+/// # Examples
+///
+/// ```
+/// use ruff_db::system::deduplicate_nested_paths;
+///
+/// let paths = ["/a/b/c", "/a/b", "/a/beta", "/a/b"];
+/// assert_eq!(deduplicate_nested_paths(paths).collect::<Vec<_>>(), ["/a/b", "/a/beta"]);
+/// ```
 pub fn deduplicate_nested_paths<P, I>(paths: I) -> DeduplicatedNestedPathsIter<P>
 where
     I: IntoIterator<Item = P>,

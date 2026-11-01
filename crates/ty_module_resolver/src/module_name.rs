@@ -46,7 +46,15 @@ impl ModuleName {
     /// * The name contains a sequence of multiple dots
     /// * A component of a name (the part between two dots) isn't a valid python identifier.
     ///
-    /// For example, `foo.bar` is valid, while `.foo`, `foo..bar`, and `2000` are invalid.
+    /// # Examples
+    ///
+    /// ```
+    /// use ty_module_resolver::ModuleName;
+    ///
+    /// assert_eq!(ModuleName::new_static("foo.bar").as_deref(), Some("foo.bar"));
+    /// assert_eq!(ModuleName::new_static(".foo"), None);
+    /// assert_eq!(ModuleName::new_static("foo..bar"), None);
+    /// ```
     #[inline]
     #[must_use]
     pub fn new_static(name: &'static str) -> Option<Self> {
@@ -60,12 +68,21 @@ impl ModuleName {
 
     /// Returns an iterator over the components of the module name.
     ///
-    /// For example, `foo.bar.baz` yields `foo`, `bar`, then `baz`.
+    /// # Examples
+    ///
+    /// ```
+    /// use ty_module_resolver::ModuleName;
+    ///
+    /// let module = ModuleName::new_static("foo.bar.baz").unwrap();
+    /// assert_eq!(module.components().collect::<Vec<_>>(), ["foo", "bar", "baz"]);
+    /// ```
     pub fn components(&self) -> impl DoubleEndedIterator<Item = &str> {
         self.0.split('.')
     }
 
     /// Returns the first component in this module name.
+    ///
+    /// For `foo.bar.baz`, this returns `foo`.
     #[must_use]
     pub fn first_component(&self) -> &str {
         // OK because `Self::is_valid_name` guarantees that there is at least
@@ -76,6 +93,8 @@ impl ModuleName {
     }
 
     /// Returns the last component in this module name.
+    ///
+    /// For `foo.bar.baz`, this returns `baz`.
     #[must_use]
     pub fn last_component(&self) -> &str {
         // OK because `Self::is_valid_name` guarantees that there is at least
@@ -87,7 +106,16 @@ impl ModuleName {
 
     /// The name of this module's immediate parent, if it has a parent.
     ///
-    /// For example, the parent of `foo.bar` is `foo`. A top-level module has no parent.
+    /// # Examples
+    ///
+    /// ```
+    /// use ty_module_resolver::ModuleName;
+    ///
+    /// let module = ModuleName::new_static("foo.bar").unwrap();
+    /// let parent = module.parent().unwrap();
+    /// assert_eq!(parent.as_str(), "foo");
+    /// assert_eq!(parent.parent(), None);
+    /// ```
     #[must_use]
     pub fn parent(&self) -> Option<ModuleName> {
         let (parent, _) = self.0.rsplit_once('.')?;
@@ -96,9 +124,17 @@ impl ModuleName {
 
     /// Returns `true` if the name starts with `other`.
     ///
-    /// This is equivalent to checking if `self` is a sub-module of `other`.
+    /// Matches whole components. A module starts with itself.
     ///
-    /// For example, `foo.bar` starts with `foo`, while `foo_bar` does not.
+    /// # Examples
+    ///
+    /// ```
+    /// use ty_module_resolver::ModuleName;
+    ///
+    /// let foo = ModuleName::new_static("foo").unwrap();
+    /// assert!(ModuleName::new_static("foo.bar").unwrap().starts_with(&foo));
+    /// assert!(!ModuleName::new_static("foo_bar").unwrap().starts_with(&foo));
+    /// ```
     #[must_use]
     pub fn starts_with(&self, other: &ModuleName) -> bool {
         let mut self_components = self.components();
@@ -113,17 +149,22 @@ impl ModuleName {
         true
     }
 
-    /// Given a parent module name of this module name, return the relative
-    /// portion of this module name.
+    /// Returns the part of the module name that follows `parent`.
     ///
-    /// For example, a parent module name of `importlib` with this module name
-    /// as `importlib.resources`, this returns `resources`.
+    /// Returns `None` unless `parent` is a proper ancestor of this module.
     ///
-    /// If `parent` isn't a parent name of this module name, then this returns
-    /// `None`.
+    /// # Examples
     ///
-    /// Parent names must match whole components. For example, `importlib` is not a parent
-    /// of `importliblib.resources`.
+    /// ```
+    /// use ty_module_resolver::ModuleName;
+    ///
+    /// let parent = ModuleName::new_static("importlib").unwrap();
+    /// let module = ModuleName::new_static("importlib.resources").unwrap();
+    /// assert_eq!(module.relative_to(&parent).as_deref(), Some("resources"));
+    ///
+    /// let other = ModuleName::new_static("importliblib.resources").unwrap();
+    /// assert_eq!(other.relative_to(&parent), None);
+    /// ```
     #[must_use]
     pub fn relative_to(&self, parent: &ModuleName) -> Option<ModuleName> {
         let relative_name = self.0.strip_prefix(&*parent.0)?.strip_prefix('.')?;
@@ -150,8 +191,16 @@ impl ModuleName {
 
     /// Construct a [`ModuleName`] from a sequence of parts.
     ///
-    /// For example, `["a", "b"]` produces `a.b`. Returns `None` for an empty sequence or
-    /// if any component is an invalid identifier.
+    /// Returns `None` for an empty sequence or if any component is an invalid identifier.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ty_module_resolver::ModuleName;
+    ///
+    /// assert_eq!(ModuleName::from_components(["a", "b"]).as_deref(), Some("a.b"));
+    /// assert_eq!(ModuleName::from_components(["a", "b-c"]), None);
+    /// ```
     #[must_use]
     pub fn from_components<'a>(components: impl IntoIterator<Item = &'a str>) -> Option<Self> {
         let mut components = components.into_iter();
@@ -172,7 +221,15 @@ impl ModuleName {
 
     /// Extends `self` with the components of `other`.
     ///
-    /// For example, extending `foo.bar` with `baz.eggs` produces `foo.bar.baz.eggs`.
+    /// # Examples
+    ///
+    /// ```
+    /// use ty_module_resolver::ModuleName;
+    ///
+    /// let mut module = ModuleName::new_static("foo.bar").unwrap();
+    /// module.extend(&ModuleName::new_static("baz.eggs").unwrap());
+    /// assert_eq!(module.as_str(), "foo.bar.baz.eggs");
+    /// ```
     pub fn extend(&mut self, other: &ModuleName) {
         self.0.push('.');
         self.0.push_str(other);
@@ -180,7 +237,18 @@ impl ModuleName {
 
     /// Returns an iterator of this module name and all of its parent modules.
     ///
-    /// For example, `foo.bar.baz` yields `foo.bar.baz`, `foo.bar`, then `foo`.
+    /// # Examples
+    ///
+    /// ```
+    /// use ty_module_resolver::ModuleName;
+    ///
+    /// let module = ModuleName::new_static("foo.bar.baz").unwrap();
+    /// let mut ancestors = module.ancestors();
+    /// assert_eq!(ancestors.next().as_deref(), Some("foo.bar.baz"));
+    /// assert_eq!(ancestors.next().as_deref(), Some("foo.bar"));
+    /// assert_eq!(ancestors.next().as_deref(), Some("foo"));
+    /// assert_eq!(ancestors.next(), None);
+    /// ```
     pub fn ancestors(&self) -> impl Iterator<Item = Self> {
         std::iter::successors(Some(self.clone()), Self::parent)
     }
@@ -254,6 +322,16 @@ impl ModuleName {
     /// user's first party code. That is, end users still expect to see
     /// suggestions from their own test modules, but not for test modules in
     /// their dependencies.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ty_module_resolver::ModuleName;
+    ///
+    /// assert!(ModuleName::new_static("numpy.tests").unwrap().is_test_module());
+    /// assert!(ModuleName::new_static("conftest").unwrap().is_test_module());
+    /// assert!(!ModuleName::new_static("tests").unwrap().is_test_module());
+    /// ```
     pub fn is_test_module(&self) -> bool {
         if self.last_component() == "conftest" {
             return true;
@@ -277,6 +355,15 @@ impl ModuleName {
     /// first party code. That is, end users still expect to see suggestions
     /// from their private modules, but not for private modules in their
     /// dependencies.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ty_module_resolver::ModuleName;
+    ///
+    /// assert!(ModuleName::new_static("foo._bar.quux").unwrap().is_private());
+    /// assert!(!ModuleName::new_static("foo.bar.quux").unwrap().is_private());
+    /// ```
     pub fn is_private(&self) -> bool {
         self.components().any(|c| c.starts_with('_'))
     }
