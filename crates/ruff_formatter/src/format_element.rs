@@ -155,6 +155,10 @@ impl From<GroupMode> for PrintMode {
 pub struct Interned(Rc<[FormatElement]>);
 
 impl Interned {
+    pub(super) fn from_tail(items: std::vec::Drain<'_, FormatElement>) -> Self {
+        Self(items.collect())
+    }
+
     pub(super) fn new(content: Vec<FormatElement>) -> Self {
         Self(content.into())
     }
