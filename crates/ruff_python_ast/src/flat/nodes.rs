@@ -702,7 +702,11 @@ impl<'a> Iterator for ArgumentsSourceOrder<'a> {
     type Item = ArgOrKeyword<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|node| {
+        self.nth(0)
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.0.nth(n).map(|node| {
             if let Some(keyword) = node.cast::<crate::Keyword>() {
                 ArgOrKeyword::Keyword(keyword)
             } else {
