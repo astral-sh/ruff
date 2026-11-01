@@ -262,3 +262,14 @@ def add_numbers(b):
         int: The sum of the two numbers.
     """
     return a + b
+
+# OK - https://github.com/astral-sh/ruff/issues/20984
+def documented_return_after_unpunctuated_parameter(bar: int) -> bool:
+    """Do something.
+
+    Args:
+        bar: some argument
+    Returns:
+        bool: some return value
+    """
+    return bar > 0

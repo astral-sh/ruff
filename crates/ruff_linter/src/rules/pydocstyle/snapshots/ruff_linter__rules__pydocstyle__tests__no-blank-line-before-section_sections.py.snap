@@ -48,3 +48,52 @@ help: Add blank line before "Raises"
 227 +
 228 |     Raises:
     |
+
+D411 [*] Missing blank line before section ("Returns")
+   --> sections.py:649:5
+    |
+647 |     Keyword Args:
+648 |         option: some argument
+649 |     Returns:
+    |     ^^^^^^^
+650 |         bool: some return value
+    |
+help: Add blank line before "Returns"
+    |
+648 |         option: some argument
+649 +
+650 |     Returns:
+    |
+
+D411 [*] Missing blank line before section ("Return")
+   --> sections.py:660:5
+    |
+658 |     Args:
+659 |         value: some argument.
+660 |     Return:
+    |     ^^^^^^
+661 |         bool: some return value
+662 |     Raises:
+    |
+help: Add blank line before "Return"
+    |
+659 |         value: some argument.
+660 +
+661 |     Return:
+    |
+
+D411 [*] Missing blank line before section ("Raises")
+   --> sections.py:662:5
+    |
+660 |     Return:
+661 |         bool: some return value
+662 |     Raises:
+    |     ^^^^^^
+663 |         ValueError: bad value
+    |
+help: Add blank line before "Raises"
+    |
+661 |         bool: some return value
+662 +
+663 |     Raises:
+    |

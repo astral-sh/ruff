@@ -474,6 +474,39 @@ fn is_docstring_section(
         return true;
     }
 
+    let verbatim = &line[TextRange::at(indent_size, section_name_size)];
+
+    // Structured peer sections are unambiguous even when the preceding item description
+    // doesn't end in punctuation. Keep the paragraph heuristic for free-form sections
+    // like `Examples`, where section-looking content may be literal example output.
+    let is_structured_peer_transition = previous_section.is_some_and(|previous_section| {
+        previous_section.indent_size == indent_size
+            && section_kind.as_str() == verbatim
+            && matches!(
+                (previous_section.kind, section_kind),
+                (
+                    SectionKind::Args
+                        | SectionKind::Arguments
+                        | SectionKind::KeywordArgs
+                        | SectionKind::KeywordArguments
+                        | SectionKind::OtherArgs
+                        | SectionKind::OtherArguments
+                        | SectionKind::Parameters,
+                    SectionKind::Return
+                        | SectionKind::Returns
+                        | SectionKind::Yield
+                        | SectionKind::Yields
+                        | SectionKind::Raises
+                ) | (
+                    SectionKind::Return
+                        | SectionKind::Returns
+                        | SectionKind::Yield
+                        | SectionKind::Yields,
+                    SectionKind::Raises
+                )
+            )
+    });
+
     // Determine whether the previous line looks like the end of a paragraph.
     let previous_line_looks_like_end_of_paragraph = previous_line.is_none_or(|previous_line| {
         let previous_line = previous_line.trim();
@@ -482,7 +515,7 @@ fn is_docstring_section(
             .any(|char| previous_line.ends_with(char));
         previous_line_ends_with_punctuation || previous_line.is_empty()
     });
-    if !previous_line_looks_like_end_of_paragraph {
+    if !is_structured_peer_transition && !previous_line_looks_like_end_of_paragraph {
         return false;
     }
 
@@ -509,8 +542,6 @@ fn is_docstring_section(
     // However, if the header is an _exact_ match (like `Returns:`, as opposed to `returns:`), then
     // continue to treat it as a section header.
     if let Some(previous_section) = previous_section {
-        let verbatim = &line[TextRange::at(indent_size, section_name_size)];
-
         // If the section is more deeply indented, assume it's a subsection, as in:
         // ```python
         // def func(args: tuple[int]):
