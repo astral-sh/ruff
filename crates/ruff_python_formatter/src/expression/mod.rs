@@ -4,7 +4,7 @@ use std::slice;
 use ruff_formatter::{FormatOwnedWithRule, FormatRule, FormatRuleWithOptions, write};
 use ruff_python_ast::token::parentheses_iterator;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, walk_expr};
-use ruff_python_ast::{self as ast, Expr, ExprKind, Operator, SyntaxNode};
+use ruff_python_ast::{self as ast, AstNode, Expr, ExprKind, Operator, SyntaxNode};
 use ruff_python_trivia::TriviaRanges;
 use ruff_text_size::Ranged;
 
@@ -1416,54 +1416,21 @@ pub(crate) fn is_invalid_type_expression(expr: Expr<'_>) -> bool {
 pub(crate) fn left_most<'expr>(expression: Expr<'expr>, trivia: &TriviaRanges) -> Expr<'expr> {
     let mut current = expression;
     loop {
-        let left = match current.fields() {
-            ast::ExprFields::BinOp(ast::ExprBinOpFields { left, .. })
-            | ast::ExprFields::If(ast::ExprIfFields { body: left, .. })
-            | ast::ExprFields::Call(ast::ExprCallFields { func: left, .. })
-            | ast::ExprFields::Attribute(ast::ExprAttributeFields { value: left, .. })
-            | ast::ExprFields::Subscript(ast::ExprSubscriptFields { value: left, .. }) => Some(left),
-
-            ast::ExprFields::BoolOp(ast::ExprBoolOpFields {
-                node: expr_bool_op, ..
-            }) => expr_bool_op.values().first(),
-            ast::ExprFields::Compare(ast::ExprCompareFields { node: compare, .. }) => {
-                Some(compare.first_operand())
-            }
-
-            ast::ExprFields::Generator(ast::ExprGeneratorFields {
-                node: generator, ..
-            }) if !generator.parenthesized() => Some(generator.elt()),
-
-            ast::ExprFields::Tuple(ast::ExprTupleFields { node: tuple, .. }) if !tuple.parenthesized() => {
-                tuple.elts().first()
-            }
-            ast::ExprFields::Slice(ast::ExprSliceFields { node: slice, .. }) => slice.lower(),
-
-            ast::ExprFields::List(_)
-            | ast::ExprFields::Tuple(_)
-            | ast::ExprFields::Name(_)
-            | ast::ExprFields::Starred(_)
-            | ast::ExprFields::FString(_)
-            | ast::ExprFields::TString(_)
-            | ast::ExprFields::StringLiteral(_)
-            | ast::ExprFields::BytesLiteral(_)
-            | ast::ExprFields::NumberLiteral(_)
-            | ast::ExprFields::BooleanLiteral(_)
-            | ast::ExprFields::NoneLiteral(_)
-            | ast::ExprFields::EllipsisLiteral(_)
-            | ast::ExprFields::Yield(_)
-            | ast::ExprFields::YieldFrom(_)
-            | ast::ExprFields::Await(_)
-            | ast::ExprFields::DictComp(_)
-            | ast::ExprFields::SetComp(_)
-            | ast::ExprFields::ListComp(_)
-            | ast::ExprFields::Set(_)
-            | ast::ExprFields::Dict(_)
-            | ast::ExprFields::UnaryOp(_)
-            | ast::ExprFields::Lambda(_)
-            | ast::ExprFields::Named(_)
-            | ast::ExprFields::IpyEscapeCommand(_)
-            | ast::ExprFields::Generator(_) => None,
+        let left = match current.classify() {
+            ExprKind::BinOp(_)
+            | ExprKind::If(_)
+            | ExprKind::Call(_)
+            | ExprKind::Attribute(_)
+            | ExprKind::Subscript(_)
+            | ExprKind::BoolOp(_)
+            | ExprKind::Compare(_) => current
+                .syntax_node()
+                .first_child()
+                .and_then(SyntaxNode::cast),
+            ExprKind::Generator(generator) if !generator.parenthesized() => Some(generator.elt()),
+            ExprKind::Tuple(tuple) if !tuple.parenthesized() => tuple.elts().first(),
+            ExprKind::Slice(slice) => slice.lower(),
+            _ => None,
         };
 
         let Some(left) = left else {
