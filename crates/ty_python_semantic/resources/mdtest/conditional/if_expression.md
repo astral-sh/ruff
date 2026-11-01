@@ -74,23 +74,76 @@ def _(flag: bool):
     incompatible_mapping: dict[str, int] = {"x": "y"} if flag else {}  # error: [invalid-assignment]
 ```
 
-## Other collection branches
+## Joint collection branches
 
-When both branches are empty, their element types remain unknown. A list in the other branch can
-also supply `Unknown` or `Any` as the element type. Lists with different element types combine those
-types. A list in one branch and a dictionary in the other produce a union of the two types.
+If both branches contain literals for the same collection type, the type inferred for the
+conditional expression combines both literals:
+
+```py
+def _(flag: bool):
+    a = ["x"] if flag else [1]
+    reveal_type(a)  # revealed: list[str | int]
+
+    b = [1] if flag else ["x"]
+    reveal_type(b)  # revealed: list[int | str]
+
+    items = {"x"} if flag else {1}
+    reveal_type(items)  # revealed: set[str | int]
+
+    mapping = {"key": 1} if flag else {2: "value"}
+    reveal_type(mapping)  # revealed: dict[str | int, int | str]
+
+    _ = ["x"] if flag else [int(missing)]  # error: [unresolved-reference]
+```
+
+Dynamic types are retained from both branches:
 
 ```py
 from typing import Any
-from ty_extensions._internal import Unknown
 
-def _(flag: bool, unknown: list[Unknown], gradual: list[Any]):
+def _(flag: bool, dynamic: Any):
+    a = [dynamic] if flag else [1]
+    reveal_type(a)  # revealed: list[Any | int]
+
+    b = [1] if flag else [dynamic]
+    reveal_type(b)  # revealed: list[int | Any]
+
+    nested = [[]] if flag else [[1]]
+    reveal_type(nested)  # revealed: list[list[Unknown] | list[int]]
+```
+
+When both branches are empty, their element types remain unknown:
+
+```py
+def _(flag: bool):
     reveal_type([] if flag else [])  # revealed: list[Unknown]
     reveal_type({} if flag else {})  # revealed: dict[Unknown, Unknown]
-    reveal_type(["x"] if flag else unknown)  # revealed: list[Unknown]
-    reveal_type(["x"] if flag else gradual)  # revealed: list[Any]
-    reveal_type(["x"] if flag else [1])  # revealed: list[int | str]
+```
+
+A list in one branch and a dictionary in the other produce a union of the two types:
+
+```py
+def _(flag: bool):
     reveal_type(["x"] if flag else {})  # revealed: list[str] | dict[Unknown, Unknown]
+```
+
+If one branch contains an existing collection, the literal in the other branch is inferred against
+the existing collection's declared type:
+
+```py
+def _(flag: bool, existing: list[int], gradual: list[Any]):
+    reveal_type(["x"] if flag else gradual)  # revealed: list[Any]
+
+    aliased = ["x"] if flag else existing
+    reveal_type(aliased)  # revealed: list[int | str] | list[int]
+```
+
+An explicit union annotation can supply a different element type to each branch:
+
+```py
+def _(flag: bool):
+    x: list[int] | list[str] = [1] if flag else ["x"]
+    reveal_type(x)  # revealed: list[int] | list[str]
 ```
 
 ## Collection branches and evaluation order
@@ -112,6 +165,9 @@ def _(flag: bool):
     result = [(skipped := "after")] if False else []
     reveal_type(result)  # revealed: list[str]
     reveal_type(skipped)  # revealed: Literal["before"]
+
+    reachable = ["x"] if False else [1]
+    reveal_type(reachable)  # revealed: list[int]
 ```
 
 ## Statically known compound conditions
