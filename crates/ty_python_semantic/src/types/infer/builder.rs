@@ -35,16 +35,14 @@ use super::{
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
-    ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
-    RequiresExplicitReExport, TypeOrigin, builtins_module_scope, class_body_implicit_symbol,
-    explicit_global_symbol, implicit_builtins_symbol, loop_header_reachability,
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
-    place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
-    typing_extensions_symbol,
+    DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers, TypeOrigin,
+    loop_header_reachability, module_type_implicit_global_declaration,
+    module_type_implicit_global_symbol, place_from_bindings_with_reachability_cache,
+    place_from_declarations_with_reachability_cache,
 };
 use crate::place_load::{
-    ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceExprPrefixLoads, PlaceLoadFailure, PlaceLoadMode,
-    PlaceLoadResolutionProcedure, PlaceLoadResolutionStep, PlaceLoadSource, PlaceLoadSourceKind,
+    ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolver, PlaceLoadSourceKind,
+    ResolvedPlaceLoadSource,
 };
 use crate::reachability::{
     ReachabilityEvaluationCache, evaluate_reachability_with_cache, is_end_of_scope_reachable,
@@ -10750,7 +10748,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         (ty.inner_type(), definition)
     }
 
-    /// Infer the type of a place expression from its ordered load sources.
+    /// Infer the type of the value read from a place expression.
     ///
     /// This also returns the [`ConstraintKey`]s used by expression-level narrowing.
     fn infer_place_load(
@@ -10758,7 +10756,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         place_expr: &PlaceExpr,
         expr_ref: ast::ExprRef,
     ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
-        let env = self.program_environment();
         let mode = if self.is_deferred() && self.in_string_annotation() {
             PlaceLoadMode::StringAnnotation
         } else if self.is_deferred() {
@@ -10766,200 +10763,52 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             PlaceLoadMode::AtExpression(expr_ref)
         };
-        let mut procedure = PlaceLoadResolutionProcedure::new(
+        let resolver = PlaceLoadResolver::new(
             self.db(),
+            self.program_environment(),
             self.index,
             self.scope(),
             place_expr,
             mode,
+            Some(self.reachability_cache()),
         );
-        let mut place = PlaceAndQualifiers::from(Place::Undefined);
-        let mut failure = None;
-        let mut checked_deprecated = false;
 
-        while let Some(step) = procedure.next() {
-            match step {
-                PlaceLoadResolutionStep::Source(source) => {
-                    if !checked_deprecated && source.is_post_lexical() {
-                        // Deprecation diagnostics apply to the result of lexical name resolution,
-                        // before it is combined with implicit module globals or builtins. Hence, we
-                        // check for deprecation here when the first post-lexical source is yielded.
-                        // If resolution stops before this, then the check after the resolution loop
-                        // handles the final lexical result instead.
-                        if let Some(ty) = place.place.ignore_possibly_undefined() {
-                            self.check_deprecated(expr_ref, ty);
-                        }
-                        checked_deprecated = true;
-                    }
-                    let narrowing_constraints = procedure.narrowing_constraints_for(&source);
-                    place = place.or_fall_back_to(self.db(), env, || {
-                        self.infer_place_load_source(
-                            procedure.place_expr(),
-                            source,
-                            narrowing_constraints,
-                        )
-                    });
-                    if place.place.is_definitely_bound() {
-                        break;
-                    }
-                }
-                PlaceLoadResolutionStep::MemberResolutionCondition(prefix_loads) => {
-                    if self.has_bound_place_expr_prefix(&prefix_loads) {
-                        failure = Some(PlaceLoadFailure::NotFound);
-                        break;
-                    }
-                }
-                PlaceLoadResolutionStep::Exhausted(exhaustion_failure) => {
-                    failure = Some(exhaustion_failure);
-                    break;
-                }
+        let resolved_load = resolver.resolve(|source| {
+            if matches!(
+                source.kind(),
+                PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::UnimportedRevealType)
+            ) && let Some(name) = expr_ref.as_name_expr()
+                && !self.in_stub()
+                && !self.is_in_type_checking_block(self.scope(), name)
+            {
+                report_undefined_reveal(&self.context, name);
             }
-        }
 
-        if !checked_deprecated && let Some(ty) = place.place.ignore_possibly_undefined() {
+            self.narrow_place_load_source(PlaceExprRef::from(place_expr), source);
+        });
+
+        if let Some(ty) = resolved_load.deprecation_target.ignore_possibly_undefined() {
             self.check_deprecated(expr_ref, ty);
         }
 
-        let place = if failure == Some(PlaceLoadFailure::NotFound) {
-            place.or_fall_back_to(self.db(), env, || {
-                self.infer_unimported_reveal_type_fallback(expr_ref)
-            })
-        } else {
-            place
-        };
-
-        let constraint_keys = procedure.into_constraints();
-
-        (place, constraint_keys)
+        (resolved_load.place, resolved_load.constraint_keys)
     }
 
-    fn infer_place_load_source(
+    fn narrow_place_load_source(
         &self,
         place_expr: PlaceExprRef,
-        source: PlaceLoadSource<'db>,
-        narrowing_constraints: &[(FileScopeId, ConstraintKey)],
-    ) -> PlaceAndQualifiers<'db> {
-        let db = self.db();
-        let env = self.program_environment();
-        let is_class_body_global_fallback = source.is_class_body_global_fallback();
-
-        let place = match source.kind {
-            PlaceLoadSourceKind::Bindings(bindings) => {
-                let mut place = place_from_bindings_with_reachability_cache(
-                    db,
-                    env,
-                    bindings,
-                    self.reachability_cache(),
-                )
-                .place;
-
-                // Compatibility policy: ty historically treats a possibly-bound module snapshot
-                // reached through a class-body global fallback as definitely bound. At runtime,
-                // an unbound snapshot would continue to builtins or produce a name error.
-                if is_class_body_global_fallback && let Place::Defined(defined) = place {
-                    place = Place::Defined(defined.with_definedness(Definedness::AlwaysDefined));
-                }
-
-                place.into()
-            }
-            PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => place_by_id(
-                db,
-                scope,
-                id,
-                RequiresExplicitReExport::No,
-                ConsideredDefinitions::AllReachable,
-            ),
-            PlaceLoadSourceKind::Implicit(implicit) => match implicit {
-                ImplicitPlaceLoad::DunderClass(definition) => original_class_type(db, definition)
-                    .map_or_else(
-                        || Place::Undefined.into(),
-                        |class| Place::bound(class).into(),
-                    ),
-                ImplicitPlaceLoad::ClassBodySymbol(name) => {
-                    let implicit = class_body_implicit_symbol(db, env, &name);
-                    if implicit.place.is_definitely_bound() {
-                        implicit
-                    } else {
-                        Place::Undefined.into()
-                    }
-                }
-                ImplicitPlaceLoad::ExplicitGlobalSymbol { file, name } => {
-                    explicit_global_symbol(db, file, &name)
-                }
-                ImplicitPlaceLoad::ModuleImplicitGlobal { file, name } => {
-                    module_type_implicit_global_symbol(db, file, &name)
-                }
-                ImplicitPlaceLoad::Builtin(name) => {
-                    if Some(self.scope()) == builtins_module_scope(db, env) {
-                        Place::Undefined.into()
-                    } else {
-                        implicit_builtins_symbol(db, env, &name)
-                    }
-                }
-            },
-        };
-
-        if narrowing_constraints.is_empty() {
-            place
-        } else {
-            place.map_type(|ty| {
-                self.narrow_place_with_applicable_constraints(place_expr, ty, narrowing_constraints)
-            })
+        source: &mut ResolvedPlaceLoadSource<'_, 'db>,
+    ) {
+        if !source.constraint_keys().is_empty()
+            && let Some(ty) = source.place().ignore_possibly_undefined()
+        {
+            let narrowed = self.narrow_place_with_applicable_constraints(
+                place_expr,
+                ty,
+                source.constraint_keys(),
+            );
+            source.set_narrowed_type(narrowed);
         }
-    }
-
-    /// Applies ty's convenience fallback for an unimported `reveal_type`.
-    fn infer_unimported_reveal_type_fallback(
-        &self,
-        expr_ref: ast::ExprRef,
-    ) -> PlaceAndQualifiers<'db> {
-        let Some(name) = expr_ref
-            .as_name_expr()
-            .filter(|name| name.id == "reveal_type")
-        else {
-            return Place::Undefined.into();
-        };
-
-        if !self.in_stub() && !self.is_in_type_checking_block(self.scope(), name) {
-            report_undefined_reveal(&self.context, name);
-        }
-
-        typing_extensions_symbol(self.db(), self.program_environment(), "reveal_type")
-    }
-
-    /// Returns whether any tracked place-expression prefix has a definite or possible binding in
-    /// this scope.
-    fn has_bound_place_expr_prefix(&self, prefix_loads: &PlaceExprPrefixLoads<'db>) -> bool {
-        let db = self.db();
-        let env = self.program_environment();
-        let file_scope_id = prefix_loads.scope().file_scope_id(db);
-        let use_def = self.index.use_def_map(file_scope_id);
-
-        prefix_loads.iter().any(|prefix| {
-            let place = match prefix {
-                PlaceExprPrefixLoad::AtUse(use_id) => {
-                    place_from_bindings_with_reachability_cache(
-                        db,
-                        env,
-                        use_def.bindings_at_use(use_id),
-                        self.reachability_cache(),
-                    )
-                    .place
-                }
-                PlaceExprPrefixLoad::AllReachable(place_id) => {
-                    place_from_bindings_with_reachability_cache(
-                        db,
-                        env,
-                        use_def.reachable_bindings(place_id),
-                        self.reachability_cache(),
-                    )
-                    .place
-                }
-                PlaceExprPrefixLoad::DefinitelyBound => return true,
-            };
-
-            !place.is_undefined()
-        })
     }
 
     fn report_unresolved_reference(&self, expr_name_node: &ast::ExprName) {

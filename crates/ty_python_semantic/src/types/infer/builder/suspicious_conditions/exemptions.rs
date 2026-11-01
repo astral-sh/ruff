@@ -24,14 +24,8 @@ use ty_python_core::{
 
 use crate::{
     Db, Program, ProgramEnvironment,
-    place::{
-        ConsideredDefinitions, Provenance, RequiresExplicitReExport, place_by_id,
-        place_from_bindings,
-    },
-    place_load::{
-        ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceLoadMode, PlaceLoadResolutionProcedure,
-        PlaceLoadResolutionStep, PlaceLoadSourceKind,
-    },
+    place::Provenance,
+    place_load::{ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolver, PlaceLoadSourceKind},
     types::{
         Type, TypeContext,
         definition_resolution::{
@@ -404,62 +398,34 @@ fn place_condition_definition_info<'db>(
     {
         let scope = scope.to_scope_id(db, file);
         let env = ProgramEnvironment::from_scope(scope);
-        let procedure = PlaceLoadResolutionProcedure::new(
+        let resolver = PlaceLoadResolver::new(
             db,
+            &env,
             index,
             scope,
             &place_expr,
             PlaceLoadMode::AtExpression(expression.into()),
+            None,
         );
-        for step in procedure {
-            let source = match step {
-                PlaceLoadResolutionStep::Source(source) => source,
-                PlaceLoadResolutionStep::MemberResolutionCondition(prefixes) => {
-                    let use_def = use_def_map(db, prefixes.scope());
-                    if prefixes.iter().any(|prefix| {
-                        let bindings = match prefix {
-                            PlaceExprPrefixLoad::AtUse(id) => use_def.bindings_at_use(id),
-                            PlaceExprPrefixLoad::AllReachable(id) => use_def.reachable_bindings(id),
-                            PlaceExprPrefixLoad::DefinitelyBound => return true,
-                        };
-                        !place_from_bindings(db, &env, bindings).place.is_undefined()
-                    }) {
-                        break;
-                    }
-                    continue;
-                }
-                PlaceLoadResolutionStep::Exhausted(_) => break,
-            };
-            let (source_info, definitely_bound) = match source.kind {
+        let resolved = resolver.resolve(|source| {
+            let source_info = match source.kind() {
                 PlaceLoadSourceKind::Bindings(bindings) => {
-                    let definitely_bound = place_from_bindings(db, &env, bindings.clone())
-                        .place
-                        .is_definitely_bound();
-                    (
-                        ConditionDefinitionInfo::from_bindings(db, bindings),
-                        definitely_bound,
-                    )
+                    ConditionDefinitionInfo::from_bindings(db, bindings.clone())
                 }
                 PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => {
-                    owning_scope_condition_definition_info(db, scope, id)
+                    owning_scope_condition_definition_info(db, *scope, *id)
                 }
                 PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ExplicitGlobalSymbol {
                     file,
                     name,
-                }) => {
-                    info.merge(name_condition_definition_info(
-                        db,
-                        global_scope(db, file),
-                        name,
-                    ));
-                    break;
-                }
-                PlaceLoadSourceKind::Implicit(_) => continue,
+                }) => name_condition_definition_info(db, global_scope(db, *file), name.clone()),
+                PlaceLoadSourceKind::Implicit(_) => ConditionDefinitionInfo::default(),
             };
             info.merge(source_info);
-            if definitely_bound {
-                return info;
-            }
+        });
+
+        if resolved.place.place.is_definitely_bound() {
+            return info;
         }
     }
 
@@ -594,18 +560,18 @@ fn resolved_condition_definition_info<'db>(
     )
 }
 
-/// Lazy closure reads share all reachable definitions in the owning scope. Cache both the provenance
-/// traversal and boundness analysis so repeated conditions do not rescan all those bindings.
+/// Lazy closure reads share all reachable definitions in the owning scope. Cache the provenance
+/// traversal so repeated conditions do not rescan all those bindings.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| (ConditionDefinitionInfo::default(), false),
+    cycle_initial = |_, _, _, _| ConditionDefinitionInfo::default(),
     heap_size = ruff_memory_usage::heap_size
 )]
 fn owning_scope_condition_definition_info<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     place: ScopedPlaceId,
-) -> (ConditionDefinitionInfo<'db>, bool) {
+) -> ConditionDefinitionInfo<'db> {
     let use_def = use_def_map(db, scope);
     let mut info = ConditionDefinitionInfo::from_bindings(db, use_def.reachable_bindings(place));
     for declaration in use_def.reachable_declarations(place) {
@@ -613,16 +579,8 @@ fn owning_scope_condition_definition_info<'db>(
             info.merge(resolved_condition_definition_info(db, definition));
         }
     }
-    let definitely_bound = place_by_id(
-        db,
-        scope,
-        place,
-        RequiresExplicitReExport::No,
-        ConsideredDefinitions::AllReachable,
-    )
-    .place
-    .is_definitely_bound();
-    (info, definitely_bound)
+
+    info
 }
 
 /// Caches definition information for global reads in lazy scopes.

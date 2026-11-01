@@ -22,7 +22,7 @@ use ty_python_core::{
     Truthiness,
     ast_ids::HasScopedUseId,
     definition::{Definition, DefinitionKind},
-    place::PlaceExpr,
+    place::{PlaceExpr, PlaceExprRef},
     predicate::{Predicate, PredicateNode},
     scope::FileScopeId,
     semantic_index,
@@ -31,8 +31,7 @@ use ty_python_core::{
 use crate::{
     SemanticModel,
     importer::ImportRequest,
-    place::{Place, PlaceAndQualifiers},
-    place_load::{PlaceLoadMode, PlaceLoadResolutionProcedure, PlaceLoadResolutionStep},
+    place_load::{PlaceLoadMode, PlaceLoadResolver},
     reachability::is_range_reachable,
     types::{
         KnownClass, KnownUnion, LintDiagnosticGuard, LintDiagnosticGuardBuilder,
@@ -1538,29 +1537,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// This preserves earlier narrowing, including constraints on captured variables.
     fn type_before_if_chain(&self, name: &ast::ExprName) -> Option<Type<'db>> {
         let db = self.db();
-        let env = self.program_environment();
         let use_def = self.index.use_def_map(self.scope().file_scope_id(db));
         let snapshot =
             use_def.if_chain_start_for_use(name.scoped_use_id(db, self.program_file()))?;
         let place_expr = PlaceExpr::from_expr_name(name);
-        let mut procedure = PlaceLoadResolutionProcedure::new(
+        let resolver = PlaceLoadResolver::new(
             db,
+            self.program_environment(),
             self.index,
             self.scope(),
             &place_expr,
             PlaceLoadMode::AtNameSnapshot(snapshot),
+            Some(self.reachability_cache()),
         );
-        let mut place = PlaceAndQualifiers::from(Place::Undefined);
-        while let Some(PlaceLoadResolutionStep::Source(source)) = procedure.next() {
-            let constraints = procedure.narrowing_constraints_for(&source);
-            place = place.or_fall_back_to(db, env, || {
-                self.infer_place_load_source(procedure.place_expr(), source, constraints)
-            });
-            if place.place.is_definitely_bound() {
-                break;
-            }
-        }
-        place.place.ignore_possibly_undefined()
+
+        let resolved = resolver.resolve(|source| {
+            self.narrow_place_load_source(PlaceExprRef::from(&place_expr), source);
+        });
+
+        resolved.place.ignore_possibly_undefined()
     }
 
     /// Replaces an always-true final `elif` with an `else` branch and a defensive assertion.
