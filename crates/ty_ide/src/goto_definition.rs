@@ -2280,10 +2280,10 @@ p = Point<CURSOR>(1, 2)
         LL | Foo.__dictoffset__
            |     ^^^^^^^^^^^^^^ Clicking here
         info: Found 1 definition
-          --> stdlib/builtins.pyi:LL:5
+          --> stdlib/builtins.pyi:LL:9
            |
-        LL |     __dictoffset__: Final[int]
-           |     --------------
+        LL |     def __dictoffset__(self) -> int: ...
+           |         --------------
         ");
     }
 
@@ -2364,10 +2364,10 @@ p = Point<CURSOR>(1, 2)
         LL | type.__dictoffset__
            |      ^^^^^^^^^^^^^^ Clicking here
         info: Found 1 definition
-          --> stdlib/builtins.pyi:LL:5
+          --> stdlib/builtins.pyi:LL:9
            |
-        LL |     __dictoffset__: Final[int]
-           |     --------------
+        LL |     def __dictoffset__(self) -> int: ...
+           |         --------------
         ");
     }
 
