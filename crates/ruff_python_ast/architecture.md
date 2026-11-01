@@ -146,7 +146,11 @@ position. Rewinding discards the abandoned rows and their variable-length data. 
 also spans all cells of a notebook. Each cell appends its top-level statement handles, and the
 parser emits a single module for the concatenated source.
 
-The builder estimates its initial row and side-table capacities from the source length.
+For modules up to 4 KiB, the builder reserves row space from the source length. Larger modules
+start with at most 128 rows. When the rows fill, the builder estimates how many more it needs
+from the number of rows and source bytes consumed so far. It also reserves extra-data words in
+proportion to their use. The estimate allows the remaining source to be denser than the prefix,
+as happens when a module starts with a long docstring.
 
 After parsing, the tree owns the rows and side tables. The builder releases its scratch buffers
 and name lookup table. Returning a child view borrows the same tree. Freeing the tree releases
