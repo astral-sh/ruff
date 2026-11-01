@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprKind, Stmt, StmtKind};
 use ruff_python_semantic::{Scope, SemanticModel};
 use ruff_text_size::Ranged;
 
@@ -197,17 +197,21 @@ pub(crate) fn unused_private_type_var(checker: &Checker, scope: &Scope) {
         let Some(source) = binding.source else {
             continue;
         };
-        let stmt @ Stmt::Assign(ast::StmtAssign { targets, value, .. }) =
-            checker.semantic().statement(source)
+        let stmt = checker.semantic().statement(source);
+        let StmtKind::Assign(assign) = stmt.classify() else {
+            continue;
+        };
+        let targets = assign.targets();
+        let value = assign.value();
+        let Some([ast::ExprFields::Name(ast::ExprNameFields { id, .. })]) =
+            targets.as_array().map(|[target]| [target.fields()])
         else {
             continue;
         };
-        let [Expr::Name(ast::ExprName { id, .. })] = &targets[..] else {
+        let ExprKind::Call(call) = value.classify() else {
             continue;
         };
-        let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
-            continue;
-        };
+        let func = call.func();
 
         let semantic = checker.semantic();
         let Some(type_var_like_kind) =
@@ -263,7 +267,7 @@ pub(crate) fn unused_private_protocol(checker: &Checker, scope: &Scope) {
             continue;
         };
 
-        let Stmt::ClassDef(class_def) = checker.semantic().statement(source) else {
+        let StmtKind::ClassDef(class_def) = checker.semantic().statement(source).classify() else {
             continue;
         };
 
@@ -277,7 +281,7 @@ pub(crate) fn unused_private_protocol(checker: &Checker, scope: &Scope) {
 
         checker.report_diagnostic(
             UnusedPrivateProtocol {
-                name: class_def.name.to_string(),
+                name: class_def.name().to_string(),
             },
             binding.range(),
         );
@@ -316,20 +320,25 @@ pub(crate) fn unused_private_type_alias(checker: &Checker, scope: &Scope) {
     }
 }
 
-fn extract_type_alias_name<'a>(stmt: &'a ast::Stmt, semantic: &SemanticModel) -> Option<&'a str> {
-    match stmt {
-        ast::Stmt::AnnAssign(ast::StmtAnnAssign {
-            target, annotation, ..
-        }) => {
-            let ast::ExprName { id, .. } = target.as_name_expr()?;
+fn extract_type_alias_name<'a>(stmt: Stmt<'a>, semantic: &SemanticModel) -> Option<&'a str> {
+    match stmt.classify() {
+        StmtKind::AnnAssign(stmt_ann_assign) => {
+            let target = stmt_ann_assign.target();
+            let annotation = stmt_ann_assign.annotation();
+
+            let expr_name = target.as_name_expr()?;
+            let id = expr_name.id();
             if semantic.match_typing_expr(annotation, "TypeAlias") {
                 Some(id)
             } else {
                 None
             }
         }
-        ast::Stmt::TypeAlias(ast::StmtTypeAlias { name, .. }) => {
-            let ast::ExprName { id, .. } = name.as_name_expr()?;
+        StmtKind::TypeAlias(stmt_type_alias) => {
+            let name = stmt_type_alias.name();
+
+            let expr_name = name.as_name_expr()?;
+            let id = expr_name.id();
             Some(id)
         }
         _ => None,
@@ -371,9 +380,9 @@ pub(crate) fn unused_private_typed_dict(checker: &Checker, scope: &Scope) {
     }
 }
 
-fn extract_typeddict_name<'a>(stmt: &'a Stmt, semantic: &SemanticModel) -> Option<&'a str> {
-    let is_typeddict = |expr: &ast::Expr| semantic.match_typing_expr(expr, "TypedDict");
-    match stmt {
+fn extract_typeddict_name<'a>(stmt: Stmt<'a>, semantic: &SemanticModel) -> Option<&'a str> {
+    let is_typeddict = |expr: Expr<'_>| semantic.match_typing_expr(expr, "TypedDict");
+    match stmt.classify() {
         // E.g. return `Some("Foo")` for the first one of these classes,
         // and `Some("Bar")` for the second:
         //
@@ -389,9 +398,11 @@ fn extract_typeddict_name<'a>(stmt: &'a Stmt, semantic: &SemanticModel) -> Optio
         // class Bar(typing.TypedDict, typing.Generic[T]):
         //     y: T
         // ```
-        Stmt::ClassDef(class_def @ ast::StmtClassDef { name, .. }) => {
+        StmtKind::ClassDef(class_def) => {
+            let name = class_def.name();
+
             if class_def.bases().iter().any(is_typeddict) {
-                Some(name)
+                Some(name.as_str())
             } else {
                 None
             }
@@ -403,12 +414,15 @@ fn extract_typeddict_name<'a>(stmt: &'a Stmt, semantic: &SemanticModel) -> Optio
         // import typing
         // Baz = typing.TypedDict("Baz", {"z": bytes})
         // ```
-        Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-            let [target] = targets.as_slice() else {
-                return None;
-            };
-            let ast::ExprName { id, .. } = target.as_name_expr()?;
-            let ast::ExprCall { func, .. } = value.as_call_expr()?;
+        StmtKind::Assign(stmt_assign) => {
+            let targets = stmt_assign.targets();
+            let value = stmt_assign.value();
+
+            let [target] = targets.as_array()?;
+            let expr_name = target.as_name_expr()?;
+            let id = expr_name.id();
+            let expr_call = value.as_call_expr()?;
+            let func = expr_call.func();
             if is_typeddict(func) { Some(id) } else { None }
         }
         _ => None,

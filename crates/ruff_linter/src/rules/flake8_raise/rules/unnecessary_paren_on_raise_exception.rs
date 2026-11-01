@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprKind};
 use ruff_python_semantic::BindingKind;
 use ruff_text_size::Ranged;
 
@@ -59,16 +59,12 @@ impl AlwaysFixableViolation for UnnecessaryParenOnRaiseException {
 }
 
 /// RSE102
-pub(crate) fn unnecessary_paren_on_raise_exception(checker: &Checker, expr: &Expr) {
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments,
-        range_start: _,
-        node_index: _,
-    }) = expr
-    else {
+pub(crate) fn unnecessary_paren_on_raise_exception(checker: &Checker, expr: Expr<'_>) {
+    let ExprKind::Call(call_node) = expr.classify() else {
         return;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
     if arguments.is_empty() {
         // `raise func()` still requires parentheses; only `raise Class()` does not.
@@ -86,9 +82,16 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &Checker, expr: &Exp
         if exception_type.is_none() {
             // If the method name doesn't _look_ like a class (i.e., it's lowercase), it's
             // probably a function call, not a class.
-            let identifier = match func.as_ref() {
-                Expr::Name(ast::ExprName { id, .. }) => Some(id.as_str()),
-                Expr::Attribute(ast::ExprAttribute { attr, .. }) => Some(attr.as_str()),
+            let identifier = match func.classify() {
+                ExprKind::Name(expr_name) => {
+                    let id = expr_name.id();
+                    Some(id.as_str())
+                }
+                ExprKind::Attribute(expr_attribute) => {
+                    let attr = expr_attribute.attr();
+
+                    Some(attr.as_str())
+                }
                 _ => None,
             };
             if identifier.is_some_and(|identifier| {

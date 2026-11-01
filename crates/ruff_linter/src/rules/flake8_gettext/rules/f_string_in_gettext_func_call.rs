@@ -1,4 +1,4 @@
-use ruff_python_ast::Expr;
+use ruff_python_ast::{Expr, NodeList};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -65,7 +65,11 @@ impl Violation for FStringInGetTextFuncCall {
 }
 
 /// INT001
-pub(crate) fn f_string_in_gettext_func_call(checker: &Checker, func: &Expr, args: &[Expr]) {
+pub(crate) fn f_string_in_gettext_func_call(
+    checker: &Checker,
+    func: Expr<'_>,
+    args: NodeList<'_, ruff_python_ast::kind::Expr>,
+) {
     // Check first argument (singular)
     if let Some(first) = args.first() {
         if first.is_f_string_expr() {

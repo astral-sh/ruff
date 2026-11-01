@@ -1,6 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_ast::{self as ast, Expr, ExprCall, ExprKind};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing::find_binding_value;
@@ -81,10 +81,9 @@ impl AlwaysFixableViolation for LenTest {
 }
 
 /// PLC1802
-pub(crate) fn len_test(checker: &Checker, call: &ExprCall) {
-    let ExprCall {
-        func, arguments, ..
-    } = call;
+pub(crate) fn len_test(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    let func = call.func;
+    let arguments = call.arguments;
     let semantic = checker.semantic();
 
     if !semantic.in_boolean_test() {
@@ -96,8 +95,10 @@ pub(crate) fn len_test(checker: &Checker, call: &ExprCall) {
     }
 
     // Single argument and no keyword arguments
-    let [argument] = &*arguments.args else { return };
-    if !arguments.keywords.is_empty() {
+    let Some([argument]) = arguments.args().as_array() else {
+        return;
+    };
+    if !arguments.keywords().is_empty() {
         return;
     }
 
@@ -113,14 +114,14 @@ pub(crate) fn len_test(checker: &Checker, call: &ExprCall) {
             LenTest {
                 expression: SourceCodeSnippet::new(replacement.clone()),
             },
-            call.range(),
+            call.range,
         )
         .set_fix(Fix::applicable_edit(
             Edit::range_replacement(
-                edits::pad(replacement, call.range(), checker.locator()),
-                call.range(),
+                edits::pad(replacement, call.range, checker.locator()),
+                call.range,
             ),
-            if checker.comment_ranges().intersects(call.range()) {
+            if checker.comment_ranges().intersects(call.range) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
@@ -128,10 +129,11 @@ pub(crate) fn len_test(checker: &Checker, call: &ExprCall) {
         ));
 }
 
-fn is_indirect_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Name(ast::ExprName { id: name, .. }) = expr else {
+fn is_indirect_sequence(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
+    let ExprKind::Name(name_node) = expr.classify() else {
         return false;
     };
+    let name = name_node.id();
 
     let scope = semantic.current_scope();
     let Some(binding_id) = scope.get(name) else {
@@ -150,20 +152,20 @@ fn is_indirect_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
         // Attempt to retrieve the function definition statement
         let Some(function) = binding
             .statement(semantic)
-            .and_then(|statement| statement.as_function_def_stmt())
+            .and_then(ruff_python_ast::Stmt::as_function_def_stmt)
         else {
             return false;
         };
 
         // If not find in non-default params, it must be varargs or kwargs
-        return function.parameters.find(name).is_none();
+        return function.parameters().find(name).is_none();
     };
 
     // If `binding_value` is found, check if it is a sequence
     is_sequence(binding_value, semantic)
 }
 
-fn is_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
+fn is_sequence(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
     // Check if the expression type is a direct sequence match (dict, list, set, tuple, string or bytes)
     if matches!(
         ResolvedPythonType::from(expr),
@@ -180,7 +182,7 @@ fn is_sequence(expr: &Expr, semantic: &SemanticModel) -> bool {
     }
 
     // Check if the expression is a function call to a built-in sequence constructor
-    let Some(ExprCall { func, .. }) = expr.as_call_expr() else {
+    let Some(ast::ExprCallFields { func, .. }) = expr.as_call_expr().map(ExprCall::fields) else {
         return false;
     };
 

@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+use ruff_python_ast::{self as ast, Stmt, StmtKind, Suite};
 
 use crate::Violation;
 use crate::codes::Category;
@@ -76,41 +76,50 @@ impl Violation for ComplexStructure {
     }
 }
 
-fn get_complexity_number(stmts: &[Stmt]) -> usize {
+fn get_complexity_number(stmts: Suite<'_>) -> usize {
     let mut complexity = 0;
     for stmt in stmts {
-        match stmt {
-            Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                ..
-            }) => {
+        match stmt.classify() {
+            StmtKind::If(stmt_if) => {
+                let body = stmt_if.body();
+                let elif_else_clauses = stmt_if.elif_else_clauses();
+
                 complexity += 1;
                 complexity += get_complexity_number(body);
                 for clause in elif_else_clauses {
-                    if clause.test.is_some() {
+                    if clause.test().is_some() {
                         complexity += 1;
                     }
-                    complexity += get_complexity_number(&clause.body);
+                    complexity += get_complexity_number(clause.body());
                 }
             }
-            Stmt::For(ast::StmtFor { body, orelse, .. }) => {
+            StmtKind::For(stmt_for) => {
+                let body = stmt_for.body();
+                let orelse = stmt_for.orelse();
+
                 complexity += 1;
                 complexity += get_complexity_number(body);
                 complexity += get_complexity_number(orelse);
             }
-            Stmt::With(ast::StmtWith { body, .. }) => {
+            StmtKind::With(stmt_with) => {
+                let body = stmt_with.body();
+
                 complexity += get_complexity_number(body);
             }
-            Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+            StmtKind::While(stmt_while) => {
+                let body = stmt_while.body();
+                let orelse = stmt_while.orelse();
+
                 complexity += 1;
                 complexity += get_complexity_number(body);
                 complexity += get_complexity_number(orelse);
             }
-            Stmt::Match(ast::StmtMatch { cases, .. }) => {
+            StmtKind::Match(stmt_match) => {
+                let cases = stmt_match.cases();
+
                 for case in cases {
                     complexity += 1;
-                    complexity += get_complexity_number(&case.body);
+                    complexity += get_complexity_number(case.body());
                 }
                 if let Some(last_case) = cases.last() {
                     // The complexity of an irrefutable pattern is similar to an `else` block of an `if` statement.
@@ -125,18 +134,17 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                     //     case 1: ...
                     //     case foo: ...
                     // ```
-                    if last_case.guard.is_none() && last_case.pattern.is_irrefutable() {
+                    if last_case.guard().is_none() && last_case.pattern().is_irrefutable() {
                         complexity -= 1;
                     }
                 }
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
+            StmtKind::Try(stmt_try) => {
+                let body = stmt_try.body();
+                let handlers = stmt_try.handlers();
+                let orelse = stmt_try.orelse();
+                let finalbody = stmt_try.finalbody();
+
                 complexity += get_complexity_number(body);
                 if !orelse.is_empty() {
                     complexity += 1;
@@ -145,17 +153,21 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                 complexity += get_complexity_number(finalbody);
                 for handler in handlers {
                     complexity += 1;
-                    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                        body, ..
-                    }) = handler;
+                    let ast::ExceptHandlerFields::ExceptHandler(
+                        ast::ExceptHandlerExceptHandlerFields { body, .. },
+                    ) = handler.fields();
                     complexity += get_complexity_number(body);
                 }
             }
-            Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
+            StmtKind::FunctionDef(stmt_function_def) => {
+                let body = stmt_function_def.body();
+
                 complexity += 1;
                 complexity += get_complexity_number(body);
             }
-            Stmt::ClassDef(ast::StmtClassDef { body, .. }) => {
+            StmtKind::ClassDef(stmt_class_def) => {
+                let body = stmt_class_def.body();
+
                 complexity += get_complexity_number(body);
             }
             _ => {}
@@ -167,9 +179,9 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
 /// C901
 pub(crate) fn function_is_too_complex(
     checker: &Checker,
-    stmt: &Stmt,
+    stmt: Stmt<'_>,
     name: &str,
-    body: &[Stmt],
+    body: Suite<'_>,
     max_complexity: usize,
 ) {
     let complexity = get_complexity_number(body) + 1;
@@ -189,14 +201,9 @@ pub(crate) fn function_is_too_complex(
 mod tests {
     use anyhow::Result;
 
-    use ruff_python_ast::Suite;
     use ruff_python_parser::parse_module;
 
     use super::get_complexity_number;
-
-    fn parse_suite(source: &str) -> Result<Suite> {
-        Ok(parse_module(source)?.into_suite())
-    }
 
     #[test]
     fn trivial() -> Result<()> {
@@ -204,8 +211,8 @@ mod tests {
 def trivial():
     pass
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 1);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 1);
         Ok(())
     }
 
@@ -215,8 +222,8 @@ def trivial():
 def expr_as_statement():
     0xF00D
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 1);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 1);
         Ok(())
     }
 
@@ -228,8 +235,8 @@ def sequential(n):
     s = k + n
     return s
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 1);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 1);
         Ok(())
     }
 
@@ -244,8 +251,8 @@ def if_elif_else_dead_path(n):
     else:
         return "smaller than or equal to three"
 "#;
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 3);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 3);
         Ok(())
     }
 
@@ -261,8 +268,8 @@ def nested_ifs():
     else:
         return "smaller than or equal to three"
 "#;
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 3);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 3);
         Ok(())
     }
 
@@ -273,8 +280,8 @@ def for_loop():
     for i in range(10):
         print(i)
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 2);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 2);
         Ok(())
     }
 
@@ -287,8 +294,8 @@ def for_else(mylist):
     else:
         print(None)
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 2);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 2);
         Ok(())
     }
 
@@ -301,8 +308,8 @@ def recursive(n):
     else:
         return n
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 2);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 2);
         Ok(())
     }
 
@@ -318,8 +325,8 @@ def nested_functions():
 
     a()
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 3);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 3);
         Ok(())
     }
 
@@ -336,8 +343,8 @@ def try_else():
     else:
         print(4)
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 4);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 4);
         Ok(())
     }
 
@@ -353,8 +360,8 @@ def nested_try_finally():
     finally:
         print(3)
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 1);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 1);
         Ok(())
     }
 
@@ -370,8 +377,8 @@ async def foobar(a, b, c):
     async for x in a:
         pass
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 3);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 3);
         Ok(())
     }
 
@@ -381,8 +388,8 @@ async def foobar(a, b, c):
 def annotated_assign():
     x: Any = None
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 1);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 1);
         Ok(())
     }
 
@@ -417,8 +424,8 @@ class Class:
 
         return ServiceProvider(Logger())
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 9);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 9);
         Ok(())
     }
 
@@ -431,8 +438,8 @@ def process_detect_lines():
     finally:
         pass
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 1);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 1);
         Ok(())
     }
 
@@ -446,8 +453,8 @@ def process_detect_lines():
         if res:
             errors.append(f"Non-zero exit code {res}")
 "#;
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 2);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 2);
         Ok(())
     }
 
@@ -459,8 +466,8 @@ def with_lock():
         if foo:
             print('bar')
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 2);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 2);
         Ok(())
     }
 
@@ -474,8 +481,8 @@ def f():
         case _:
             print('bar')
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 2);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 2);
         Ok(())
     }
 
@@ -491,8 +498,8 @@ def f():
         case _:
             print('baz')
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 3);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 3);
         Ok(())
     }
 
@@ -506,8 +513,8 @@ def f():
         case x:
             print(x)
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 2);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 2);
         Ok(())
     }
 
@@ -521,8 +528,8 @@ def f():
         case 5 | _:
             print(x)
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(get_complexity_number(&stmts), 2);
+        let parsed = parse_module(source)?;
+        assert_eq!(get_complexity_number(parsed.suite()), 2);
         Ok(())
     }
 }

@@ -1,5 +1,4 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::{
     Scope, ScopeId, ScopeKind,
@@ -84,16 +83,13 @@ pub(crate) fn no_self_use(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
         return;
     };
 
-    let ast::StmtFunctionDef {
-        name,
-        parameters,
-        decorator_list,
-        ..
-    } = func;
+    let name = func.name();
+    let parameters = func.parameters();
+    let decorator_list = func.decorator_list();
 
     if !matches!(
         function_type::classify(
-            name,
+            name.as_str(),
             decorator_list,
             parent,
             semantic,
@@ -108,7 +104,7 @@ pub(crate) fn no_self_use(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
     let extra_property_decorators = checker.settings().pydocstyle.property_decorators();
 
     if function_type::is_stub(func, semantic)
-        || visibility::is_magic(name)
+        || visibility::is_magic(name.as_str())
         || visibility::is_abstract(decorator_list, semantic)
         || visibility::is_override(decorator_list, semantic)
         || visibility::is_overload(decorator_list, semantic)
@@ -120,7 +116,12 @@ pub(crate) fn no_self_use(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
     }
 
     // Identify the `self` parameter.
-    let Some(parameter) = parameters.posonlyargs.iter().chain(&parameters.args).next() else {
+    let Some(parameter) = parameters
+        .posonlyargs()
+        .iter()
+        .chain(parameters.args())
+        .next()
+    else {
         return;
     };
 

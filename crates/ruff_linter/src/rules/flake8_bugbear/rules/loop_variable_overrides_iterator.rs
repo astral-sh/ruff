@@ -52,7 +52,11 @@ impl Violation for LoopVariableOverridesIterator {
 }
 
 /// B020
-pub(crate) fn loop_variable_overrides_iterator(checker: &Checker, target: &Expr, iter: &Expr) {
+pub(crate) fn loop_variable_overrides_iterator(
+    checker: &Checker,
+    target: Expr<'_>,
+    iter: Expr<'_>,
+) {
     let target_names = {
         let mut target_finder = NameFinder::default();
         target_finder.visit_expr(target);
@@ -82,32 +86,32 @@ pub(crate) fn loop_variable_overrides_iterator(checker: &Checker, target: &Expr,
 
 #[derive(Default)]
 struct NameFinder<'a> {
-    names: FxHashMap<&'a str, &'a Expr>,
+    names: FxHashMap<&'a str, Expr<'a>>,
 }
 
 impl<'a> Visitor<'a> for NameFinder<'a> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Name(ast::ExprName { id, .. }) => {
+    fn visit_expr(&mut self, expr: Expr<'a>) {
+        match expr.fields() {
+            ast::ExprFields::Name(ast::ExprNameFields { id, .. }) => {
                 self.names.insert(id, expr);
             }
-            Expr::ListComp(ast::ExprListComp { generators, .. })
-            | Expr::SetComp(ast::ExprSetComp { generators, .. })
-            | Expr::Generator(ast::ExprGenerator { generators, .. }) => {
+            ast::ExprFields::ListComp(ast::ExprListCompFields { generators, .. })
+            | ast::ExprFields::SetComp(ast::ExprSetCompFields { generators, .. })
+            | ast::ExprFields::Generator(ast::ExprGeneratorFields { generators, .. }) => {
                 for comp in generators {
-                    self.visit_expr(&comp.iter);
+                    self.visit_expr(comp.iter());
                 }
             }
-            Expr::DictComp(ast::ExprDictComp { generators, .. }) => {
-                for comp in generators.as_ref() {
-                    self.visit_expr(&comp.iter);
+            ast::ExprFields::DictComp(ast::ExprDictCompFields { generators, .. }) => {
+                for comp in generators {
+                    self.visit_expr(comp.iter());
                 }
             }
-            Expr::Lambda(ast::ExprLambda {
+            ast::ExprFields::Lambda(ast::ExprLambdaFields {
                 parameters,
                 body,
                 range: _,
-                node_index: _,
+                node: _,
             }) => {
                 visitor::walk_expr(self, body);
 

@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, Stmt, StmtFor};
+use ruff_python_ast::{ExprKind, StmtFor, StmtKind};
 use ruff_python_semantic::analyze::typing;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -63,24 +64,28 @@ impl AlwaysFixableViolation for ForLoopSetMutations {
 }
 
 /// FURB142
-pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
-    if !for_stmt.orelse.is_empty() {
+pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: StmtFor<'_>) {
+    if !for_stmt.orelse().is_empty() {
         return;
     }
-    let [Stmt::Expr(stmt_expr)] = for_stmt.body.as_slice() else {
+    let Some([StmtKind::Expr(stmt_expr)]) = for_stmt
+        .body()
+        .as_array()
+        .map(|items| items.map(ruff_python_ast::Stmt::classify))
+    else {
         return;
     };
-    let Expr::Call(expr_call) = stmt_expr.value.as_ref() else {
+    let ExprKind::Call(expr_call) = stmt_expr.value().classify() else {
         return;
     };
-    let Expr::Attribute(expr_attr) = expr_call.func.as_ref() else {
+    let ExprKind::Attribute(expr_attr) = expr_call.func().classify() else {
         return;
     };
-    if !expr_call.arguments.keywords.is_empty() {
+    if !expr_call.arguments().keywords().is_empty() {
         return;
     }
 
-    let (method_name, batch_method_name) = match expr_attr.attr.as_str() {
+    let (method_name, batch_method_name) = match expr_attr.attr().as_str() {
         "add" => ("add", "update"),
         "discard" => ("discard", "difference_update"),
         _ => {
@@ -88,7 +93,7 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
         }
     };
 
-    let Expr::Name(set) = expr_attr.value.as_ref() else {
+    let ExprKind::Name(set) = expr_attr.value().classify() else {
         return;
     };
 
@@ -99,29 +104,29 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
     {
         return;
     }
-    let [arg] = expr_call.arguments.args.as_ref() else {
+    let Some([arg]) = expr_call.arguments().args().as_array() else {
         return;
     };
 
     let locator = checker.locator();
-    let content = match (for_stmt.target.as_ref(), arg) {
-        (Expr::Name(for_target), Expr::Name(arg)) if for_target.id == arg.id => {
+    let content = match (for_stmt.target().classify(), arg.classify()) {
+        (ExprKind::Name(for_target), ExprKind::Name(arg)) if for_target.id() == arg.id() => {
             format!(
                 "{}.{batch_method_name}({})",
-                set.id,
+                set.id(),
                 parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Call).0,
             )
         }
         (for_target, arg) => {
             let arg_content = match arg {
-                Expr::Generator(generator) if !generator.parenthesized => {
+                ExprKind::Generator(generator) if !generator.parenthesized() => {
                     format!("({})", locator.slice(arg))
                 }
                 _ => locator.slice(arg).to_string(),
             };
             format!(
                 "{}.{batch_method_name}({} for {} in {})",
-                set.id,
+                set.id(),
                 arg_content,
                 locator.slice(for_target),
                 parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension)
@@ -130,13 +135,13 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
         }
     };
 
-    let applicability = if checker.comment_ranges().intersects(for_stmt.range) {
+    let applicability = if checker.comment_ranges().intersects(for_stmt.range()) {
         Applicability::Unsafe
     } else {
         Applicability::Safe
     };
     let fix = Fix::applicable_edit(
-        Edit::range_replacement(content, for_stmt.range),
+        Edit::range_replacement(content, for_stmt.range()),
         applicability,
     );
 
@@ -146,7 +151,7 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
                 method_name,
                 batch_method_name,
             },
-            for_stmt.range,
+            for_stmt.range(),
         )
         .set_fix(fix);
 }

@@ -84,7 +84,7 @@ pub(crate) fn property_docstring_starts_with_verb(
     };
 
     if !is_property(
-        &function.decorator_list,
+        function.decorator_list(),
         settings.property_decorators(),
         checker.semantic(),
     ) {

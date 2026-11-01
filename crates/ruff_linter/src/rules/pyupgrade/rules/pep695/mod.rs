@@ -2,17 +2,16 @@
 //! [`non_pep695_generic_class`] (UP046), and [`non_pep695_generic_function`]
 //! (UP047)
 
+use ruff_python_ast::{ExprKind, StmtKind};
 use std::fmt::Display;
 
 use itertools::Itertools;
 use ruff_python_ast::{
-    self as ast, Arguments, Expr, ExprCall, ExprName, ExprSubscript, Identifier, PythonVersion,
-    Stmt, StmtAssign, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
-    name::Name,
+    self as ast, Arguments, Expr, ExprName, ExprSubscript, PythonVersion, TypeParam,
     visitor::{self, Visitor},
 };
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::preview::is_type_var_default_enabled;
@@ -30,9 +29,9 @@ mod private_type_parameter;
 #[derive(Debug)]
 pub(crate) enum TypeVarRestriction<'a> {
     /// A type variable with a bound, e.g., `TypeVar("T", bound=int)`.
-    Bound(&'a Expr),
+    Bound(Expr<'a>),
     /// A type variable with constraints, e.g., `TypeVar("T", int, str)`.
-    Constraint(Vec<&'a Expr>),
+    Constraint(Vec<Expr<'a>>),
     /// `AnyStr` is a special case: the only public `TypeVar` defined in the standard library,
     /// and thus the only one that we recognise when imported from another module.
     AnyStr,
@@ -50,7 +49,7 @@ pub(crate) struct TypeVar<'a> {
     pub(crate) name: &'a str,
     pub(crate) restriction: Option<TypeVarRestriction<'a>>,
     pub(crate) kind: TypeParamKind,
-    pub(crate) default: Option<&'a Expr>,
+    pub(crate) default: Option<Expr<'a>>,
 }
 
 /// Wrapper for formatting a sequence of [`TypeVar`]s for use as a generic type parameter (e.g. `[T,
@@ -146,87 +145,19 @@ impl Display for DisplayTypeVar<'_> {
     }
 }
 
-impl<'a> From<&'a TypeVar<'a>> for TypeParam {
-    fn from(
-        TypeVar {
-            name,
-            restriction,
-            kind,
-            default,
-        }: &'a TypeVar<'a>,
-    ) -> Self {
-        let default = default.map(|expr| Box::new(expr.clone()));
-        match kind {
-            TypeParamKind::TypeVar => TypeParam::TypeVar(TypeParamTypeVar {
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                name: Identifier::new(*name, TextRange::default()),
-                bound: match restriction {
-                    Some(TypeVarRestriction::Bound(bound)) => Some(Box::new((*bound).clone())),
-                    Some(TypeVarRestriction::Constraint(constraints)) => {
-                        Some(Box::new(Expr::Tuple(ast::ExprTuple {
-                            range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                            elts: constraints.iter().map(|expr| (*expr).clone()).collect(),
-                            ctx: ast::ExprContext::Load,
-                            parenthesized: true,
-                        })))
-                    }
-                    Some(TypeVarRestriction::AnyStr) => {
-                        Some(Box::new(Expr::Tuple(ast::ExprTuple {
-                            range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                            elts: vec![
-                                Expr::Name(ExprName {
-                                    range: TextRange::default(),
-                                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                                    id: Name::from("str"),
-                                    ctx: ast::ExprContext::Load,
-                                }),
-                                Expr::Name(ExprName {
-                                    range: TextRange::default(),
-                                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                                    id: Name::from("bytes"),
-                                    ctx: ast::ExprContext::Load,
-                                }),
-                            ],
-                            ctx: ast::ExprContext::Load,
-                            parenthesized: true,
-                        })))
-                    }
-                    None => None,
-                },
-                default,
-            }),
-            TypeParamKind::TypeVarTuple => TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                name: Identifier::new(*name, TextRange::default()),
-                default,
-            }),
-            TypeParamKind::ParamSpec => TypeParam::ParamSpec(TypeParamParamSpec {
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                name: Identifier::new(*name, TextRange::default()),
-                default,
-            }),
-        }
-    }
-}
+impl<'a> From<TypeParam<'a>> for TypeVar<'a> {
+    fn from(param: TypeParam<'a>) -> Self {
+        let (kind, restriction) = match param.classify() {
+            ast::TypeParamKind::TypeVarTuple(_) => (TypeParamKind::TypeVarTuple, None),
+            ast::TypeParamKind::ParamSpec(_) => (TypeParamKind::ParamSpec, None),
 
-impl<'a> From<&'a TypeParam> for TypeVar<'a> {
-    fn from(param: &'a TypeParam) -> Self {
-        let (kind, restriction) = match param {
-            TypeParam::TypeVarTuple(_) => (TypeParamKind::TypeVarTuple, None),
-            TypeParam::ParamSpec(_) => (TypeParamKind::ParamSpec, None),
-
-            TypeParam::TypeVar(param) => {
-                let restriction = match param.bound.as_deref() {
+            ast::TypeParamKind::TypeVar(param) => {
+                let restriction = match param.bound().map(Expr::classify) {
                     None => None,
-                    Some(Expr::Tuple(constraints)) => Some(TypeVarRestriction::Constraint(
-                        constraints.elts.iter().collect::<Vec<_>>(),
+                    Some(ExprKind::Tuple(constraints)) => Some(TypeVarRestriction::Constraint(
+                        constraints.elts().iter().collect::<Vec<_>>(),
                     )),
-                    Some(bound) => Some(TypeVarRestriction::Bound(bound)),
+                    Some(bound) => Some(TypeVarRestriction::Bound(bound.view())),
                 };
 
                 (TypeParamKind::TypeVar, restriction)
@@ -234,7 +165,7 @@ impl<'a> From<&'a TypeParam> for TypeVar<'a> {
         };
 
         Self {
-            name: param.name(),
+            name: param.name().as_str(),
             kind,
             restriction,
             default: param.default(),
@@ -252,7 +183,7 @@ struct TypeVarReferenceVisitor<'a> {
 
 /// Recursively collects the names of type variable references present in an expression.
 impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: Expr<'a>) {
         // special case for typing.AnyStr, which is a commonly-imported type variable in the
         // standard library with the definition:
         //
@@ -279,8 +210,8 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
             return;
         }
 
-        match expr {
-            Expr::Name(name) if name.ctx.is_load() => {
+        match expr.classify() {
+            ExprKind::Name(name) if name.ctx().is_load() => {
                 if let Some(var) = expr_name_to_type_var(self.semantic, name) {
                     self.vars.push(var);
                 } else {
@@ -294,30 +225,31 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
 
 pub(crate) fn expr_name_to_type_var<'a>(
     semantic: &'a SemanticModel,
-    name: &'a ExprName,
+    name: ExprName<'a>,
 ) -> Option<TypeVar<'a>> {
-    let StmtAssign { value, .. } = semantic
-        .lookup_symbol(name.id.as_str())
+    let stmt_assign = semantic
+        .lookup_symbol(name.id().as_str())
         .binding_id()
         .and_then(|binding_id| semantic.binding(binding_id).source)
         .map(|node_id| semantic.statement(node_id))?
         .as_assign_stmt()?;
+    let value = stmt_assign.value();
 
-    match value.as_ref() {
-        Expr::Subscript(ExprSubscript {
-            value: subscript_value,
-            ..
-        }) if semantic.match_typing_expr(subscript_value, "TypeVar") => {
+    match value.classify() {
+        ExprKind::Subscript(expr_subscript)
+            if semantic.match_typing_expr(expr_subscript.value(), "TypeVar") =>
+        {
             return Some(TypeVar {
-                name: &name.id,
+                name: name.id(),
                 restriction: None,
                 kind: TypeParamKind::TypeVar,
                 default: None,
             });
         }
-        Expr::Call(ExprCall {
-            func, arguments, ..
-        }) => {
+        ExprKind::Call(expr_call) => {
+            let func = expr_call.func();
+            let arguments = expr_call.arguments();
+
             let kind = if semantic.match_typing_expr(func, "TypeVar") {
                 TypeParamKind::TypeVar
             } else if semantic.match_typing_expr(func, "TypeVarTuple") {
@@ -329,9 +261,9 @@ pub(crate) fn expr_name_to_type_var<'a>(
             };
 
             if arguments
-                .args
+                .args()
                 .first()
-                .is_some_and(Expr::is_string_literal_expr)
+                .is_some_and(ast::Expr::is_string_literal_expr)
             {
                 // `default` was added in PEP 696 and Python 3.13. We now support converting
                 // TypeVars with defaults to PEP 695 type parameters.
@@ -346,21 +278,19 @@ pub(crate) fn expr_name_to_type_var<'a>(
                 // ```python
                 // class slice[T: str = Any]: ...
                 // ```
-                let default = arguments
-                    .find_keyword("default")
-                    .map(|default| &default.value);
+                let default = arguments.find_keyword("default").map(ast::Keyword::value);
                 let restriction = if let Some(bound) = arguments.find_keyword("bound") {
-                    Some(TypeVarRestriction::Bound(&bound.value))
-                } else if arguments.args.len() > 1 {
+                    Some(TypeVarRestriction::Bound(bound.value()))
+                } else if arguments.args().len() > 1 {
                     Some(TypeVarRestriction::Constraint(
-                        arguments.args.iter().skip(1).collect(),
+                        arguments.args().iter().skip(1).collect(),
                     ))
                 } else {
                     None
                 };
 
                 return Some(TypeVar {
-                    name: &name.id,
+                    name: name.id(),
                     restriction,
                     kind,
                     default,
@@ -378,7 +308,12 @@ fn in_nested_context(checker: &Checker) -> bool {
         .semantic()
         .current_statements()
         .skip(1) // skip the immediate parent, we only call this within a class or function
-        .any(|stmt| matches!(stmt, Stmt::ClassDef(_) | Stmt::FunctionDef(_)))
+        .any(|stmt| {
+            matches!(
+                stmt.classify(),
+                StmtKind::ClassDef(_) | StmtKind::FunctionDef(_)
+            )
+        })
 }
 
 /// Returns `true` if a type variable without a default follows a type variable with a default.
@@ -429,14 +364,18 @@ fn check_type_vars<'a>(vars: Vec<TypeVar<'a>>, checker: &Checker) -> Option<Vec<
 /// Search `class_bases` for a `typing.Generic` base class. Returns the `Generic` expression (if
 /// any), along with its index in the class's bases tuple.
 pub(crate) fn find_generic<'a>(
-    class_bases: &'a Arguments,
+    class_bases: Arguments<'a>,
     semantic: &SemanticModel,
-) -> Option<(usize, &'a ExprSubscript)> {
-    class_bases.args.iter().enumerate().find_map(|(idx, expr)| {
-        expr.as_subscript_expr().and_then(|sub_expr| {
-            semantic
-                .match_typing_expr(&sub_expr.value, "Generic")
-                .then_some((idx, sub_expr))
+) -> Option<(usize, ExprSubscript<'a>)> {
+    class_bases
+        .args()
+        .iter()
+        .enumerate()
+        .find_map(|(idx, expr)| {
+            expr.as_subscript_expr().and_then(|sub_expr| {
+                semantic
+                    .match_typing_expr(sub_expr.value(), "Generic")
+                    .then_some((idx, sub_expr))
+            })
         })
-    })
 }

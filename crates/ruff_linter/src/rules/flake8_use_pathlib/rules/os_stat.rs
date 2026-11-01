@@ -2,7 +2,7 @@ use std::fmt;
 
 use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, ArgOrKeyword, Arguments, Expr, ExprCall, PythonVersion};
+use ruff_python_ast::{ArgOrKeyword, Arguments, ExprCall, ExprKind, PythonVersion};
 use ruff_text_size::Ranged;
 
 use crate::codes::Category;
@@ -108,7 +108,7 @@ impl fmt::Display for StatMethod {
 }
 
 // PTH116
-pub(crate) fn os_stat(checker: &Checker, call: &ExprCall, segment: &[&str]) {
+pub(crate) fn os_stat(checker: &Checker, call: ExprCall<'_>, segment: &[&str]) {
     if segment != ["os", "stat"] {
         return;
     }
@@ -119,11 +119,11 @@ pub(crate) fn os_stat(checker: &Checker, call: &ExprCall, segment: &[&str]) {
     //           0         1           2
     // os.stat(path, *, dir_fd=None, follow_symlinks=True)
     // ```
-    if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
+    if is_keyword_only_argument_non_default(call.arguments(), "dir_fd") {
         return;
     }
 
-    let Some(path_args) = call.arguments.find_argument_value("path", 0) else {
+    let Some(path_args) = call.arguments().find_argument_value("path", 0) else {
         return;
     };
 
@@ -134,7 +134,7 @@ pub(crate) fn os_stat(checker: &Checker, call: &ExprCall, segment: &[&str]) {
     let method = if checker.target_version() >= PythonVersion::PY310 {
         Some(StatMethod::Stat)
     } else {
-        match is_boolean_literal_or_default(&call.arguments, "follow_symlinks") {
+        match is_boolean_literal_or_default(call.arguments(), "follow_symlinks") {
             Some(true) => Some(StatMethod::Stat),
             Some(false) => Some(StatMethod::LStat),
             None => None,
@@ -142,14 +142,16 @@ pub(crate) fn os_stat(checker: &Checker, call: &ExprCall, segment: &[&str]) {
     };
 
     let range = call.range();
-    let mut diagnostic = checker.report_diagnostic(OsStat { method }, call.func.range());
+    let mut diagnostic = checker.report_diagnostic(OsStat { method }, call.func().range());
 
     if !is_fix_os_stat_enabled(checker.settings()) {
         return;
     }
 
-    if has_unknown_keywords_or_starred_expr(&call.arguments, &["path", "dir_fd", "follow_symlinks"])
-    {
+    if has_unknown_keywords_or_starred_expr(
+        call.arguments(),
+        &["path", "dir_fd", "follow_symlinks"],
+    ) {
         return;
     }
 
@@ -172,15 +174,18 @@ pub(crate) fn os_stat(checker: &Checker, call: &ExprCall, segment: &[&str]) {
                 Some(locator.slice(expr.range()))
             }
             ArgOrKeyword::Keyword(kw)
-                if matches!(kw.arg.as_deref(), Some("follow_symlinks"))
-                    && checker.target_version() >= PythonVersion::PY310 =>
+                if matches!(
+                    kw.arg().map(ruff_python_ast::Identifier::as_str),
+                    Some("follow_symlinks")
+                ) && checker.target_version() >= PythonVersion::PY310 =>
             {
                 Some(locator.slice(kw.range()))
             }
             _ => None,
         };
 
-        let stat_args = itertools::join(call.arguments.iter_source_order().filter_map(args), ", ");
+        let stat_args =
+            itertools::join(call.arguments().iter_source_order().filter_map(args), ", ");
 
         let replacement = if is_pathlib_path_call(checker, path_args) {
             format!("{path_code}.{method}({stat_args})")
@@ -199,13 +204,17 @@ pub(crate) fn os_stat(checker: &Checker, call: &ExprCall, segment: &[&str]) {
 ///
 /// If the keyword is omitted, returns `Some(true)` (its default value).
 /// Returns `None` if the keyword argument is present but not a boolean literal.
-fn is_boolean_literal_or_default(argument: &Arguments, name: &str) -> Option<bool> {
+fn is_boolean_literal_or_default(argument: Arguments<'_>, name: &str) -> Option<bool> {
     let Some(kw) = argument.find_keyword(name) else {
         return Some(true);
     };
 
-    match &kw.value {
-        Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some(*value),
+    match kw.value().classify() {
+        ExprKind::BooleanLiteral(expr_boolean_literal) => {
+            let value = expr_boolean_literal.value();
+
+            Some(value)
+        }
         _ => None,
     }
 }

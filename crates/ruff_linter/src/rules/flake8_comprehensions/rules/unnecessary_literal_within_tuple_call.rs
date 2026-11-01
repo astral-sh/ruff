@@ -1,13 +1,13 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, ExprCall, ExprKind};
+
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::rules::flake8_comprehensions::helpers::exactly_one_argument_with_matching_function;
 use crate::{Edit, Fix, FixAvailability, Violation};
-
-use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for `tuple` calls that take unnecessary list or tuple literals as
@@ -69,21 +69,13 @@ impl Violation for UnnecessaryLiteralWithinTupleCall {
 }
 
 /// C409
-pub(crate) fn unnecessary_literal_within_tuple_call(checker: &Checker, call: &ast::ExprCall) {
-    if !call.arguments.keywords.is_empty() {
-        return;
-    }
-    let Some(argument) = helpers::exactly_one_argument_with_matching_function(
-        "tuple",
-        &call.func,
-        &call.arguments.args,
-        &call.arguments.keywords,
-    ) else {
+pub(crate) fn unnecessary_literal_within_tuple_call(checker: &Checker, call: ExprCall<'_>) {
+    let Some(argument) = exactly_one_argument_with_matching_function("tuple", call) else {
         return;
     };
-    let argument_kind = match argument {
-        Expr::Tuple(_) => TupleLiteralKind::Tuple,
-        Expr::List(_) => TupleLiteralKind::List,
+    let argument_kind = match argument.classify() {
+        ExprKind::Tuple(_) => TupleLiteralKind::Tuple,
+        ExprKind::List(_) => TupleLiteralKind::List,
         _ => return,
     };
     if !checker.semantic().has_builtin_binding("tuple") {
@@ -97,11 +89,12 @@ pub(crate) fn unnecessary_literal_within_tuple_call(checker: &Checker, call: &as
         call.range(),
     );
 
-    match argument {
-        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+    match argument.fields() {
+        ast::ExprFields::List(ast::ExprListFields { elts, .. })
+        | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => {
             // Convert `tuple([1, 2])` to `(1, 2)`
             diagnostic.set_fix({
-                let needs_trailing_comma = if let [item] = elts.as_slice() {
+                let needs_trailing_comma = if let Some([item]) = elts.as_array() {
                     SimpleTokenizer::new(
                         checker.locator().contents(),
                         TextRange::new(item.end(), argument.end()),

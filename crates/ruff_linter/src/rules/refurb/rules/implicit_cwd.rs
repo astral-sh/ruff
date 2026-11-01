@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::{ExprCall, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::codes::Category;
@@ -47,36 +47,38 @@ impl Violation for ImplicitCwd {
 }
 
 /// FURB177
-pub(crate) fn no_implicit_cwd(checker: &Checker, call: &ExprCall) {
-    if !call.arguments.is_empty() {
+pub(crate) fn no_implicit_cwd(checker: &Checker, call: ExprCall<'_>) {
+    if !call.arguments().is_empty() {
         return;
     }
 
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
+    let ExprKind::Attribute(attribute) = call.func().classify() else {
         return;
     };
+    let attr = attribute.attr();
+    let value = attribute.value();
 
     if attr != "resolve" {
         return;
     }
 
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = value.as_ref()
-    else {
+    let ExprKind::Call(call_node) = value.classify() else {
         return;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
     // Match on arguments, but ignore keyword arguments. `Path()` accepts keyword arguments, but
     // ignores them. See: https://github.com/python/cpython/issues/98094.
-    match &*arguments.args {
+    match arguments.args() {
         // Ex) `Path().resolve()`
-        [] => {}
+        args if args.is_empty() => {}
         // Ex) `Path(".").resolve()`
-        [arg] => {
-            let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = arg else {
+        args if let Some([arg]) = args.as_array() => {
+            let ExprKind::StringLiteral(string_literal) = arg.classify() else {
                 return;
             };
+            let value = string_literal.value();
             if !matches!(value.to_str(), "" | ".") {
                 return;
             }

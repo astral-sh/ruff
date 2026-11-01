@@ -1,6 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::resolve_imported_module_path;
-use ruff_python_ast::{Alias, AnyNodeRef, Stmt, StmtImport, StmtImportFrom};
+use ruff_python_ast::{
+    AstNodeId, ListIter, Stmt, StmtImport, StmtImportFrom, StmtKind, SyntaxNode,
+};
 use ruff_text_size::Ranged;
 use std::borrow::Cow;
 
@@ -58,7 +60,7 @@ impl Violation for BannedModuleLevelImports {
 }
 
 /// TID253
-pub(crate) fn banned_module_level_imports(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn banned_module_level_imports(checker: &Checker, stmt: Stmt<'_>) {
     if !checker.semantic().at_top_level() {
         return;
     }
@@ -81,22 +83,25 @@ pub(crate) fn banned_module_level_imports(checker: &Checker, stmt: &Stmt) {
 }
 
 pub(crate) enum BannedModuleImportPolicies<'a> {
-    Import(&'a StmtImport),
+    Import(StmtImport<'a>),
     ImportFrom {
         module: Option<Cow<'a, str>>,
-        node: &'a StmtImportFrom,
+        node: StmtImportFrom<'a>,
     },
     NonImport,
 }
 
 impl<'a> BannedModuleImportPolicies<'a> {
-    pub(crate) fn new(stmt: &'a Stmt, checker: &Checker) -> Self {
-        match stmt {
-            Stmt::Import(import) => Self::Import(import),
-            Stmt::ImportFrom(import @ StmtImportFrom { module, level, .. }) => {
+    pub(crate) fn new(stmt: Stmt<'a>, checker: &Checker) -> Self {
+        match stmt.classify() {
+            StmtKind::Import(import) => Self::Import(import),
+            StmtKind::ImportFrom(import) => {
+                let module = import.module();
+                let level = import.level();
+
                 let module = resolve_imported_module_path(
-                    *level,
-                    module.as_deref(),
+                    level,
+                    module.map(ruff_python_ast::Identifier::as_str),
                     checker.module.qualified_name(),
                 );
 
@@ -117,13 +122,13 @@ impl<'a> IntoIterator for &'a BannedModuleImportPolicies<'a> {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             BannedModuleImportPolicies::Import(import) => {
-                BannedModuleImportPoliciesIter::Import(import.names.iter())
+                BannedModuleImportPoliciesIter::Import(import.names().iter())
             }
             BannedModuleImportPolicies::ImportFrom { module, node } => {
                 BannedModuleImportPoliciesIter::ImportFrom {
                     module: module.as_deref(),
-                    names: node.names.iter(),
-                    import: Some(node),
+                    names: node.names().iter(),
+                    import: Some(*node),
                 }
             }
             BannedModuleImportPolicies::NonImport => BannedModuleImportPoliciesIter::NonImport,
@@ -132,24 +137,26 @@ impl<'a> IntoIterator for &'a BannedModuleImportPolicies<'a> {
 }
 
 pub(crate) enum BannedModuleImportPoliciesIter<'a> {
-    Import(std::slice::Iter<'a, Alias>),
+    Import(ListIter<'a, AstNodeId<ruff_python_ast::kind::Alias>>),
     ImportFrom {
         module: Option<&'a str>,
-        names: std::slice::Iter<'a, Alias>,
-        import: Option<&'a StmtImportFrom>,
+        names: ListIter<'a, AstNodeId<ruff_python_ast::kind::Alias>>,
+        import: Option<StmtImportFrom<'a>>,
     },
     NonImport,
 }
 
 impl<'a> Iterator for BannedModuleImportPoliciesIter<'a> {
-    type Item = (NameMatchPolicy<'a>, AnyNodeRef<'a>);
+    type Item = (NameMatchPolicy<'a>, SyntaxNode<'a>);
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Import(names) => {
                 let name = names.next()?;
                 Some((
-                    NameMatchPolicy::MatchNameOrParent(MatchNameOrParent { module: &name.name }),
+                    NameMatchPolicy::MatchNameOrParent(MatchNameOrParent {
+                        module: name.name().as_str(),
+                    }),
                     name.into(),
                 ))
             }
@@ -169,14 +176,14 @@ impl<'a> Iterator for BannedModuleImportPoliciesIter<'a> {
 
                 loop {
                     let alias = names.next()?;
-                    if &alias.name == "*" {
+                    if alias.name() == "*" {
                         continue;
                     }
 
                     break Some((
                         NameMatchPolicy::MatchName(MatchName {
                             module,
-                            member: &alias.name,
+                            member: alias.name().as_str(),
                         }),
                         alias.into(),
                     ));

@@ -1,14 +1,15 @@
-use ast::ExprName;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprCall, ExprContext};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{self as ast, Builder, Comprehension, Expr, ExprKind};
+use ruff_python_codegen::Generator;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits::pad_start;
+use crate::fix::syntax;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -76,9 +77,9 @@ impl Violation for UnnecessaryDictComprehensionForIterable {
 /// C420
 pub(crate) fn unnecessary_dict_comprehension_for_iterable(
     checker: &Checker,
-    dict_comp: &ast::ExprDictComp,
+    dict_comp: ast::ExprDictComp<'_>,
 ) {
-    let [generator] = dict_comp.generators.as_ref() else {
+    let Some([generator]) = dict_comp.generators().as_array() else {
         return;
     };
 
@@ -86,37 +87,37 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
     // - async generator expressions, because `dict.fromkeys` is not async.
     // - nested generator expressions, because `dict.fromkeys` might be error-prone option at least for fixing.
     // - generator expressions with `if` clauses, because `dict.fromkeys` might not be valid option.
-    if !generator.ifs.is_empty() {
+    if !generator.ifs().is_empty() {
         return;
     }
-    if generator.is_async {
+    if generator.is_async() {
         return;
     }
 
-    let Some(key) = dict_comp.key.as_deref() else {
+    let Some(key) = dict_comp.key() else {
         return;
     };
 
     // Don't suggest `dict.keys` if the target is not the same as the key.
-    if ComparableExpr::from(&generator.target) != ComparableExpr::from(key) {
+    if ComparableExpr::from(generator.target()) != ComparableExpr::from(key) {
         return;
     }
 
     // Don't suggest `dict.fromkeys` if the target contains side-effecting expressions
     // (attributes, subscripts, or slices).
-    if contains_side_effecting_sub_expression(&generator.target) {
+    if contains_side_effecting_sub_expression(generator.target()) {
         return;
     }
 
     // Don't suggest `dict.fromkeys` if the value is not a constant or constant-like.
-    if !is_constant_like(dict_comp.value.as_ref()) {
+    if !is_constant_like(dict_comp.value()) {
         return;
     }
 
     // Don't suggest `dict.fromkeys` if any of the expressions in the value are defined within
     // the comprehension (e.g., by the target).
-    let self_referential = any_over_expr(dict_comp.value.as_ref(), |expr| {
-        let Expr::Name(name) = expr else {
+    let self_referential = any_over_expr(dict_comp.value(), |expr| {
+        let ExprKind::Name(name) = expr.classify() else {
             return false;
         };
 
@@ -142,7 +143,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
 
     let mut diagnostic = checker.report_diagnostic(
         UnnecessaryDictComprehensionForIterable {
-            is_value_none_literal: dict_comp.value.is_none_literal_expr(),
+            is_value_none_literal: dict_comp.value().is_none_literal_expr(),
         },
         dict_comp.range(),
     );
@@ -150,12 +151,11 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
     if checker.semantic().has_builtin_binding("dict") {
         let edit = Edit::range_replacement(
             pad_start(
-                checker
-                    .generator()
-                    .expr(&fix_unnecessary_dict_comprehension(
-                        dict_comp.value.as_ref(),
-                        generator,
-                    )),
+                fix_unnecessary_dict_comprehension(
+                    checker.generator(),
+                    dict_comp.value(),
+                    generator,
+                ),
                 dict_comp.start(),
                 checker.locator(),
             ),
@@ -179,23 +179,23 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
 /// contains, e.g., a function call, it cannot be shared, as the function might have side effects.
 /// Similarly, if the value contains a list comprehension, it cannot be shared, as `dict.fromkeys`
 /// would leave each value with a reference to the same list.
-fn is_constant_like(expr: &Expr) -> bool {
+fn is_constant_like(expr: Expr<'_>) -> bool {
     !any_over_expr(expr, |expr| {
         matches!(
-            expr,
-            Expr::Lambda(_)
-                | Expr::List(_)
-                | Expr::Dict(_)
-                | Expr::Set(_)
-                | Expr::ListComp(_)
-                | Expr::SetComp(_)
-                | Expr::DictComp(_)
-                | Expr::Generator(_)
-                | Expr::Await(_)
-                | Expr::Yield(_)
-                | Expr::YieldFrom(_)
-                | Expr::Call(_)
-                | Expr::Named(_)
+            expr.classify(),
+            ExprKind::Lambda(_)
+                | ExprKind::List(_)
+                | ExprKind::Dict(_)
+                | ExprKind::Set(_)
+                | ExprKind::ListComp(_)
+                | ExprKind::SetComp(_)
+                | ExprKind::DictComp(_)
+                | ExprKind::Generator(_)
+                | ExprKind::Await(_)
+                | ExprKind::Yield(_)
+                | ExprKind::YieldFrom(_)
+                | ExprKind::Call(_)
+                | ExprKind::Named(_)
         )
     })
 }
@@ -205,36 +205,27 @@ fn is_constant_like(expr: &Expr) -> bool {
 /// For example:
 /// - Given `{n: None for n in [1,2,3]}`, generate `dict.fromkeys([1,2,3])`.
 /// - Given `{n: 1 for n in [1,2,3]}`, generate `dict.fromkeys([1,2,3], 1)`.
-fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -> Expr {
-    let iterable = generator.iter.clone();
-    let args = Arguments {
-        args: if value.is_none_literal_expr() {
-            [iterable].into()
-        } else {
-            [iterable, value.clone()].into()
-        },
-        keywords: std::iter::empty().collect(),
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+fn fix_unnecessary_dict_comprehension(
+    generator: Generator,
+    value: Expr<'_>,
+    comprehension: Comprehension<'_>,
+) -> String {
+    let mut builder = Builder::default();
+    let dict = syntax::name(&mut builder, "dict");
+    let iterable = comprehension.iter();
+    let args = if value.is_none_literal_expr() {
+        builder.copy_nodes([iterable])
+    } else {
+        builder.copy_nodes([iterable, value])
     };
-    Expr::Call(ExprCall {
-        func: Box::new(Expr::Name(ExprName {
-            id: "dict.fromkeys".into(),
-            ctx: ExprContext::Load,
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        })),
-        arguments: args,
-        range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    })
+    let call = syntax::call_method(&mut builder, dict, "fromkeys", args);
+    generator.expr(builder.get(call))
 }
-
-fn contains_side_effecting_sub_expression(target: &Expr) -> bool {
+fn contains_side_effecting_sub_expression(target: Expr<'_>) -> bool {
     any_over_expr(target, |expr| {
         matches!(
-            expr,
-            Expr::Attribute(_) | Expr::Subscript(_) | Expr::Slice(_)
+            expr.classify(),
+            ExprKind::Attribute(_) | ExprKind::Subscript(_) | ExprKind::Slice(_)
         )
     })
 }

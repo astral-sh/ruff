@@ -1,7 +1,7 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{Comprehension, Expr, StmtFor};
+use ruff_python_ast::{self as ast, Comprehension, Expr, ExprKind};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::analyze::typing::is_io_base_expr;
 use ruff_text_size::Ranged;
@@ -64,30 +64,30 @@ impl AlwaysFixableViolation for ReadlinesInFor {
 }
 
 /// FURB129
-pub(crate) fn readlines_in_for(checker: &Checker, for_stmt: &StmtFor) {
-    readlines_in_iter(checker, for_stmt.iter.as_ref());
+pub(crate) fn readlines_in_for(checker: &Checker, for_stmt: &ast::StmtForFields<'_>) {
+    readlines_in_iter(checker, for_stmt.iter);
 }
 
 /// FURB129
-pub(crate) fn readlines_in_comprehension(checker: &Checker, comprehension: &Comprehension) {
-    readlines_in_iter(checker, &comprehension.iter);
+pub(crate) fn readlines_in_comprehension(checker: &Checker, comprehension: Comprehension<'_>) {
+    readlines_in_iter(checker, comprehension.iter());
 }
 
-fn readlines_in_iter(checker: &Checker, iter_expr: &Expr) {
-    let Expr::Call(expr_call) = iter_expr else {
+fn readlines_in_iter(checker: &Checker, iter_expr: Expr<'_>) {
+    let ExprKind::Call(expr_call) = iter_expr.classify() else {
         return;
     };
 
-    let Expr::Attribute(expr_attr) = expr_call.func.as_ref() else {
+    let ExprKind::Attribute(expr_attr) = expr_call.func().classify() else {
         return;
     };
 
-    if expr_attr.attr.as_str() != "readlines" || !expr_call.arguments.is_empty() {
+    if expr_attr.attr().as_str() != "readlines" || !expr_call.arguments().is_empty() {
         return;
     }
 
     // Determine whether `fp` in `fp.readlines()` was bound to a file object.
-    if let Expr::Name(name) = expr_attr.value.as_ref() {
+    if let ExprKind::Name(name) = expr_attr.value().classify() {
         if !checker
             .semantic()
             .resolve_name(name)
@@ -97,19 +97,17 @@ fn readlines_in_iter(checker: &Checker, iter_expr: &Expr) {
             return;
         }
     } else {
-        if !is_io_base_expr(expr_attr.value.as_ref(), checker.semantic()) {
+        if !is_io_base_expr(expr_attr.value(), checker.semantic()) {
             return;
         }
     }
 
-    let deletion_range = if let Some(parenthesized_range) = parenthesized_range(
-        expr_attr.value.as_ref().into(),
-        expr_attr.into(),
-        checker.tokens(),
-    ) {
+    let deletion_range = if let Some(parenthesized_range) =
+        parenthesized_range(expr_attr.value(), expr_attr.into(), checker.tokens())
+    {
         expr_call.range().add_start(parenthesized_range.len())
     } else {
-        expr_call.range().add_start(expr_attr.value.range().len())
+        expr_call.range().add_start(expr_attr.value().range().len())
     };
 
     let padded = pad_end(String::new(), deletion_range.end(), checker.locator());

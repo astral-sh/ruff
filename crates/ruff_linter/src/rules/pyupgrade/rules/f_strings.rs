@@ -7,7 +7,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{self as ast, Expr, Keyword, StringFlags};
+use ruff_python_ast::{self as ast, Expr, ExprCall, ExprKind, Number, StringFlags};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
@@ -64,18 +64,18 @@ impl Violation for FString {
 /// respectively.
 #[derive(Debug)]
 struct FormatSummaryValues<'a> {
-    args: Vec<&'a Expr>,
-    kwargs: FxHashMap<&'a str, &'a Expr>,
+    args: Vec<Expr<'a>>,
+    kwargs: FxHashMap<&'a str, Expr<'a>>,
     auto_index: usize,
 }
 
 impl<'a> FormatSummaryValues<'a> {
-    fn try_from_call(call: &'a ast::ExprCall, locator: &'a Locator) -> Option<Self> {
-        let mut extracted_args: Vec<&Expr> = Vec::new();
-        let mut extracted_kwargs: FxHashMap<&str, &Expr> = FxHashMap::default();
+    fn try_from_call(call: ExprCall<'a>, locator: &'a Locator) -> Option<Self> {
+        let mut extracted_args: Vec<Expr<'_>> = Vec::new();
+        let mut extracted_kwargs: FxHashMap<&str, Expr<'_>> = FxHashMap::default();
 
-        for arg in &*call.arguments.args {
-            if matches!(arg, Expr::Starred(..))
+        for arg in call.arguments().args() {
+            if matches!(arg.classify(), ExprKind::Starred(..))
                 || contains_quotes(locator.slice(arg))
                 || locator.contains_line_break(arg.range())
             {
@@ -83,18 +83,14 @@ impl<'a> FormatSummaryValues<'a> {
             }
             extracted_args.push(arg);
         }
-        for keyword in &*call.arguments.keywords {
-            let Keyword {
-                arg,
-                value,
-                range: _,
-                node_index: _,
-            } = keyword;
-            let key = arg.as_ref()?;
+        for keyword in call.arguments().keywords() {
+            let arg = keyword.arg();
+            let value = keyword.value();
+            let key = arg?;
             if contains_quotes(locator.slice(value)) || locator.contains_line_break(value.range()) {
                 return None;
             }
-            extracted_kwargs.insert(key, value);
+            extracted_kwargs.insert(key.as_str(), value);
         }
 
         if extracted_args.is_empty() && extracted_kwargs.is_empty() {
@@ -116,12 +112,12 @@ impl<'a> FormatSummaryValues<'a> {
     }
 
     /// Return the positional argument at the given index.
-    fn arg_positional(&self, index: usize) -> Option<&Expr> {
+    fn arg_positional(&self, index: usize) -> Option<Expr<'_>> {
         self.args.get(index).copied()
     }
 
     /// Return the keyword argument with the given name.
-    fn arg_keyword(&self, key: &str) -> Option<&Expr> {
+    fn arg_keyword(&self, key: &str) -> Option<Expr<'_>> {
         self.kwargs.get(key).copied()
     }
 }
@@ -140,27 +136,27 @@ enum FormatContext {
 }
 
 /// Returns `true` if the expression should be parenthesized when used in an f-string.
-fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
-    match (context, expr) {
+fn parenthesize(expr: Expr<'_>, text: &str, context: FormatContext) -> bool {
+    match (context, expr.fields()) {
         // E.g., `x + y` should be parenthesized in `f"{(x + y)[0]}"`.
         (
             FormatContext::Accessed,
-            Expr::BinOp(_)
-            | Expr::UnaryOp(_)
-            | Expr::BoolOp(_)
-            | Expr::Compare(_)
-            | Expr::If(_)
-            | Expr::Lambda(_)
-            | Expr::Await(_)
-            | Expr::Yield(_)
-            | Expr::YieldFrom(_)
-            | Expr::Starred(_),
+            ast::ExprFields::BinOp(_)
+            | ast::ExprFields::UnaryOp(_)
+            | ast::ExprFields::BoolOp(_)
+            | ast::ExprFields::Compare(_)
+            | ast::ExprFields::If(_)
+            | ast::ExprFields::Lambda(_)
+            | ast::ExprFields::Await(_)
+            | ast::ExprFields::Yield(_)
+            | ast::ExprFields::YieldFrom(_)
+            | ast::ExprFields::Starred(_),
         ) => true,
         // E.g., `12` should be parenthesized in `f"{(12).real}"`.
         (
             FormatContext::Accessed,
-            Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: ast::Number::Int(..),
+            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+                value: Number::Int(..),
                 ..
             }),
         ) => text
@@ -171,41 +167,41 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
         // E.g., `{x, y}` should be parenthesized in `f"{(x, y)}"`.
         (
             _,
-            Expr::Generator(_)
-            | Expr::Dict(_)
-            | Expr::Named(_)
-            | Expr::Set(_)
-            | Expr::SetComp(_)
-            | Expr::DictComp(_),
+            ast::ExprFields::Generator(_)
+            | ast::ExprFields::Dict(_)
+            | ast::ExprFields::Named(_)
+            | ast::ExprFields::Set(_)
+            | ast::ExprFields::SetComp(_)
+            | ast::ExprFields::DictComp(_),
         ) => true,
-        (_, Expr::Subscript(ast::ExprSubscript { value, .. })) => {
+        (_, ast::ExprFields::Subscript(ast::ExprSubscriptFields { value, .. })) => {
             matches!(
-                value.as_ref(),
-                Expr::Generator(_)
-                    | Expr::Dict(_)
-                    | Expr::Set(_)
-                    | Expr::SetComp(_)
-                    | Expr::DictComp(_)
+                value.classify(),
+                ExprKind::Generator(_)
+                    | ExprKind::Dict(_)
+                    | ExprKind::Set(_)
+                    | ExprKind::SetComp(_)
+                    | ExprKind::DictComp(_)
             )
         }
-        (_, Expr::Attribute(ast::ExprAttribute { value, .. })) => {
+        (_, ast::ExprFields::Attribute(ast::ExprAttributeFields { value, .. })) => {
             matches!(
-                value.as_ref(),
-                Expr::Generator(_)
-                    | Expr::Dict(_)
-                    | Expr::Set(_)
-                    | Expr::SetComp(_)
-                    | Expr::DictComp(_)
+                value.classify(),
+                ExprKind::Generator(_)
+                    | ExprKind::Dict(_)
+                    | ExprKind::Set(_)
+                    | ExprKind::SetComp(_)
+                    | ExprKind::DictComp(_)
             )
         }
-        (_, Expr::Call(ast::ExprCall { func, .. })) => {
+        (_, ast::ExprFields::Call(ast::ExprCallFields { func, .. })) => {
             matches!(
-                func.as_ref(),
-                Expr::Generator(_)
-                    | Expr::Dict(_)
-                    | Expr::Set(_)
-                    | Expr::SetComp(_)
-                    | Expr::DictComp(_)
+                func.classify(),
+                ExprKind::Generator(_)
+                    | ExprKind::Dict(_)
+                    | ExprKind::Set(_)
+                    | ExprKind::SetComp(_)
+                    | ExprKind::DictComp(_)
             )
         }
         _ => false,
@@ -213,7 +209,11 @@ fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
 }
 
 /// Given an [`Expr`], format it for use in a formatted expression within an f-string.
-fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>) -> Cow<'a, str> {
+fn formatted_expr<'a>(
+    expr: Expr<'_>,
+    context: FormatContext,
+    locator: &Locator<'a>,
+) -> Cow<'a, str> {
     let text = locator.slice(expr);
     if parenthesize(expr, text, context) && !(text.starts_with('(') && text.ends_with(')')) {
         Cow::Owned(format!("({text})"))
@@ -422,7 +422,7 @@ impl FStringConversion {
 }
 
 /// UP032
-pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &FormatSummary) {
+pub(crate) fn f_strings(checker: &Checker, call: ExprCall<'_>, summary: &FormatSummary) {
     if summary.has_nested_parts {
         return;
     }
@@ -432,11 +432,12 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
         return;
     }
 
-    let Expr::Attribute(ast::ExprAttribute { value, .. }) = call.func.as_ref() else {
+    let ExprKind::Attribute(attribute_node) = call.func().classify() else {
         return;
     };
+    let value = attribute_node.value();
 
-    let Expr::StringLiteral(literal) = &**value else {
+    let ExprKind::StringLiteral(literal) = value.classify() else {
         return;
     };
 
@@ -445,7 +446,7 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
     };
 
     let mut patches: Vec<(TextRange, FStringConversion)> = vec![];
-    let mut tokens = checker.tokens().in_range(call.func.range()).iter();
+    let mut tokens = checker.tokens().in_range(call.func().range()).iter();
     let end = loop {
         let Some(token) = tokens.next() else {
             unreachable!("Should break from the `Tok::Dot` arm");
@@ -533,7 +534,7 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
         expr.as_call_expr().is_some_and(|call| {
             checker
                 .semantic()
-                .resolve_qualified_name(call.func.as_ref())
+                .resolve_qualified_name(call.func())
                 .is_some_and(|qualified_name| {
                     matches!(
                         qualified_name.segments(),
@@ -553,7 +554,9 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
     //     0,  # 0
     // )
     // ```
-    let has_comments = checker.comment_ranges().intersects(call.arguments.range());
+    let has_comments = checker
+        .comment_ranges()
+        .intersects(call.arguments().range());
 
     if !has_comments {
         if contents.is_empty() {

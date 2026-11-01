@@ -48,6 +48,6 @@ impl Violation for Assert {
 }
 
 /// S101
-pub(crate) fn assert_used(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn assert_used(checker: &Checker, stmt: Stmt<'_>) {
     checker.report_diagnostic(Assert, TextRange::at(stmt.start(), "assert".text_len()));
 }

@@ -1,14 +1,16 @@
 use ast::FStringFlags;
 use itertools::Itertools;
+use ruff_python_ast::{BuildId, Builder, ExprKind, InterpolatedStringElementKind, NodeList};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr, StringFlags, str::Quote};
+use ruff_python_ast::{self as ast, Expr, StringFlags, str::Quote};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::fix::syntax;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 use crate::rules::flynt::helpers;
@@ -66,19 +68,25 @@ impl AlwaysFixableViolation for StaticJoinToFString {
     }
 }
 
-fn is_static_length(elts: &[Expr]) -> bool {
+fn is_static_length(elts: NodeList<'_, ast::kind::Expr>) -> bool {
     elts.iter().all(|e| !e.is_starred_expr())
 }
 
 /// Build an f-string consisting of `joinees` joined by `joiner` with `flags`.
-fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<Expr> {
+fn build_fstring(
+    builder: &mut Builder,
+    joiner: &str,
+    joinees: NodeList<'_, ast::kind::Expr>,
+    flags: FStringFlags,
+) -> Option<BuildId<ast::kind::Expr>> {
     // If all elements are string constants, join them into a single string.
-    if joinees.iter().all(Expr::is_string_literal_expr) {
+    if joinees.iter().all(ast::Expr::is_string_literal_expr) {
         let mut flags: Option<ast::StringLiteralFlags> = None;
         let content = joinees
             .iter()
             .filter_map(|expr| {
-                if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
+                if let ExprKind::StringLiteral(string_literal) = expr.classify() {
+                    let value = string_literal.value();
                     if flags.is_none() {
                         // Take the flags from the first Expr
                         flags = Some(value.first_literal_flags());
@@ -107,13 +115,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
             }
         }
 
-        let node = ast::StringLiteral {
-            value: content.into_boxed_str(),
-            flags,
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        };
-        return Some(node.into());
+        return Some(syntax::string_literal(builder, &content, flags));
     }
 
     let mut f_string_elements = Vec::with_capacity(joinees.len() * 2);
@@ -128,14 +130,15 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
             return None;
         }
         if !std::mem::take(&mut first) {
-            f_string_elements.push(helpers::to_interpolated_string_literal_element(joiner));
+            f_string_elements.push(syntax::literal_element(
+                builder,
+                joiner,
+                TextRange::default(),
+            ));
         }
-        let element = helpers::to_interpolated_string_element(expr)?;
-        if let ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
-            value,
-            ..
-        }) = &element
-        {
+        let element = helpers::to_interpolated_string_element(builder, expr)?;
+        if let InterpolatedStringElementKind::Literal(literal) = builder.get(element).classify() {
+            let value = literal.value();
             has_single_quote |= value.contains('\'');
             has_double_quote |= value.contains('"');
         }
@@ -150,48 +153,52 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
         _ => quote,
     };
 
-    let node = ast::FString {
-        elements: f_string_elements.into(),
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        flags: flags.with_quote_style(adjusted_quote),
-    };
-    Some(node.into())
+    let elements = builder.list(f_string_elements);
+    Some(syntax::f_string(
+        builder,
+        elements,
+        flags.with_quote_style(adjusted_quote),
+    ))
 }
 
 /// FLY002
-pub(crate) fn static_join_to_fstring(checker: &Checker, expr: &Expr, joiner: &str) {
-    let Expr::Call(ast::ExprCall {
-        arguments: Arguments { args, keywords, .. },
-        ..
-    }) = expr
-    else {
+pub(crate) fn static_join_to_fstring(checker: &Checker, expr: Expr<'_>, joiner: &str) {
+    let ExprKind::Call(call_node) = expr.classify() else {
         return;
     };
+    let arguments = call_node.arguments();
+    let args = arguments.args();
+    let keywords = arguments.keywords();
 
     // If there are kwargs or more than one argument, this is some non-standard
     // string join call.
     if !keywords.is_empty() {
         return;
     }
-    let [arg] = &**args else {
+    let Some([arg]) = args.as_array() else {
         return;
     };
 
     // Get the elements to join; skip (e.g.) generators, sets, etc.
-    let joinees = match &arg {
-        Expr::List(ast::ExprList { elts, .. }) if is_static_length(elts) => elts,
-        Expr::Tuple(ast::ExprTuple { elts, .. }) if is_static_length(elts) => elts,
+    let joinees = match arg.classify() {
+        ExprKind::List(expr_list) if is_static_length(expr_list.elts()) => expr_list.elts(),
+        ExprKind::Tuple(expr_tuple) if is_static_length(expr_tuple.elts()) => expr_tuple.elts(),
         _ => return,
     };
 
     // Try to build the fstring (internally checks whether e.g. the elements are
     // convertible to f-string elements).
-    let Some(new_expr) = build_fstring(joiner, joinees, checker.default_fstring_flags()) else {
+    let mut builder = Builder::default();
+    let Some(new_expr) = build_fstring(
+        &mut builder,
+        joiner,
+        joinees,
+        checker.default_fstring_flags(),
+    ) else {
         return;
     };
 
-    let contents = checker.generator().expr(&new_expr);
+    let contents = checker.generator().expr(builder.get(new_expr));
 
     let mut diagnostic = checker.report_diagnostic(
         StaticJoinToFString {

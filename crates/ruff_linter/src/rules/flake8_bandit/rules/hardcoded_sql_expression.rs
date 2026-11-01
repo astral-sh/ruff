@@ -4,7 +4,7 @@ use regex::Regex;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::str::raw_contents;
-use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_python_ast::{self as ast, Expr, ExprKind, Operator};
 use ruff_text_size::Ranged;
 
 use crate::Locator;
@@ -57,17 +57,15 @@ impl Violation for HardcodedSQLExpression {
 }
 
 /// S608
-pub(crate) fn hardcoded_sql_expression(checker: &Checker, expr: &Expr) {
-    let content = match expr {
+pub(crate) fn hardcoded_sql_expression(checker: &Checker, &expr: &Expr<'_>) {
+    let content = match expr.classify() {
         // "select * from table where val = " + "str" + ...
-        Expr::BinOp(ast::ExprBinOp {
-            op: Operator::Add, ..
-        }) => {
+        ExprKind::BinOp(expr_bin_op) if expr_bin_op.op() == Operator::Add => {
             // Only evaluate the full BinOp, not the nested components.
             if checker
                 .semantic()
                 .current_expression_parent()
-                .is_some_and(ruff_python_ast::Expr::is_bin_op_expr)
+                .is_some_and(ast::Expr::is_bin_op_expr)
             {
                 return;
             }
@@ -77,20 +75,22 @@ pub(crate) fn hardcoded_sql_expression(checker: &Checker, expr: &Expr) {
             checker.generator().expr(expr)
         }
         // "select * from table where val = %s" % ...
-        Expr::BinOp(ast::ExprBinOp {
-            left,
-            op: Operator::Mod,
-            ..
-        }) => {
+        ExprKind::BinOp(expr_bin_op) if expr_bin_op.op() == Operator::Mod => {
+            let left = expr_bin_op.left();
+
             let Some(string) = left.as_string_literal_expr() else {
                 return;
             };
-            string.value.to_str().escape_default().to_string()
+            string.value().to_str().escape_default().to_string()
         }
-        Expr::Call(ast::ExprCall { func, .. }) => {
-            let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
+        ExprKind::Call(expr_call) => {
+            let func = expr_call.func();
+
+            let ExprKind::Attribute(attribute) = func.classify() else {
                 return;
             };
+            let attr = attribute.attr();
+            let value = attribute.value();
             // "select * from table where val = {}".format(...)
             if attr != "format" {
                 return;
@@ -98,13 +98,13 @@ pub(crate) fn hardcoded_sql_expression(checker: &Checker, expr: &Expr) {
             let Some(string) = value.as_string_literal_expr() else {
                 return;
             };
-            string.value.to_str().escape_default().to_string()
+            string.value().to_str().escape_default().to_string()
         }
 
         // f"select * from table where val = {val}"
-        Expr::FString(f_string)
-            if f_string.value.f_strings().any(|fs| {
-                fs.elements
+        ExprKind::FString(f_string)
+            if f_string.value().f_strings().any(|fs| {
+                fs.elements()
                     .iter()
                     .any(ast::InterpolatedStringElement::is_interpolation)
             }) =>
@@ -130,8 +130,8 @@ pub(crate) fn hardcoded_sql_expression(checker: &Checker, expr: &Expr) {
 /// ```
 ///
 /// becomes `foobar {x}baz`.
-fn concatenated_f_string(expr: &ast::ExprFString, locator: &Locator) -> String {
-    expr.value
+fn concatenated_f_string(expr: ast::ExprFString<'_>, locator: &Locator) -> String {
+    expr.value()
         .iter()
         .filter_map(|part| raw_contents(locator.slice(part)))
         .collect()
@@ -139,9 +139,12 @@ fn concatenated_f_string(expr: &ast::ExprFString, locator: &Locator) -> String {
 
 /// Returns `Some(true)` if an expression appears to be an explicit string concatenation,
 /// `Some(false)` if it's _not_ an explicit concatenation, and `None` if it's ambiguous.
-fn is_explicit_concatenation(expr: &Expr) -> Option<bool> {
-    match expr {
-        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
+fn is_explicit_concatenation(expr: Expr<'_>) -> Option<bool> {
+    match expr.classify() {
+        ExprKind::BinOp(expr_bin_op) => {
+            let left = expr_bin_op.left();
+            let right = expr_bin_op.right();
+
             let left = is_explicit_concatenation(left);
             let right = is_explicit_concatenation(right);
             match (left, right) {
@@ -153,41 +156,48 @@ fn is_explicit_concatenation(expr: &Expr) -> Option<bool> {
             }
         }
         // Ambiguous (e.g., `x + y`).
-        Expr::Call(_) => None,
-        Expr::Subscript(_) => None,
-        Expr::Attribute(_) => None,
-        Expr::Name(_) => None,
+        ExprKind::Call(_) => None,
+        ExprKind::Subscript(_) => None,
+        ExprKind::Attribute(_) => None,
+        ExprKind::Name(_) => None,
 
         // Non-strings.
-        Expr::Lambda(_) => Some(false),
-        Expr::List(_) => Some(false),
-        Expr::Tuple(_) => Some(false),
-        Expr::Dict(_) => Some(false),
-        Expr::Set(_) => Some(false),
-        Expr::Generator(_) => Some(false),
-        Expr::Yield(_) => Some(false),
-        Expr::YieldFrom(_) => Some(false),
-        Expr::Await(_) => Some(false),
-        Expr::Starred(_) => Some(false),
-        Expr::Slice(_) => Some(false),
-        Expr::BooleanLiteral(_) => Some(false),
-        Expr::EllipsisLiteral(_) => Some(false),
-        Expr::NumberLiteral(_) => Some(false),
-        Expr::ListComp(_) => Some(false),
-        Expr::SetComp(_) => Some(false),
-        Expr::DictComp(_) => Some(false),
-        Expr::Compare(_) => Some(false),
-        Expr::FString(_) => Some(true),
+        ExprKind::Lambda(_) => Some(false),
+        ExprKind::List(_) => Some(false),
+        ExprKind::Tuple(_) => Some(false),
+        ExprKind::Dict(_) => Some(false),
+        ExprKind::Set(_) => Some(false),
+        ExprKind::Generator(_) => Some(false),
+        ExprKind::Yield(_) => Some(false),
+        ExprKind::YieldFrom(_) => Some(false),
+        ExprKind::Await(_) => Some(false),
+        ExprKind::Starred(_) => Some(false),
+        ExprKind::Slice(_) => Some(false),
+        ExprKind::BooleanLiteral(_) => Some(false),
+        ExprKind::EllipsisLiteral(_) => Some(false),
+        ExprKind::NumberLiteral(_) => Some(false),
+        ExprKind::ListComp(_) => Some(false),
+        ExprKind::SetComp(_) => Some(false),
+        ExprKind::DictComp(_) => Some(false),
+        ExprKind::Compare(_) => Some(false),
+        ExprKind::FString(_) => Some(true),
         // TODO(dylan): decide whether to trigger here
-        Expr::TString(_) => Some(false),
-        Expr::StringLiteral(_) => Some(true),
-        Expr::BytesLiteral(_) => Some(false),
-        Expr::NoneLiteral(_) => Some(false),
-        Expr::IpyEscapeCommand(_) => Some(false),
+        ExprKind::TString(_) => Some(false),
+        ExprKind::StringLiteral(_) => Some(true),
+        ExprKind::BytesLiteral(_) => Some(false),
+        ExprKind::NoneLiteral(_) => Some(false),
+        ExprKind::IpyEscapeCommand(_) => Some(false),
 
         // Conditionally strings.
-        Expr::Named(ast::ExprNamed { value, .. }) => is_explicit_concatenation(value),
-        Expr::If(ast::ExprIf { body, orelse, .. }) => {
+        ExprKind::Named(expr_named) => {
+            let value = expr_named.value();
+
+            is_explicit_concatenation(value)
+        }
+        ExprKind::If(expr_if) => {
+            let body = expr_if.body();
+            let orelse = expr_if.orelse();
+
             let body = is_explicit_concatenation(body);
             let orelse = is_explicit_concatenation(orelse);
             match (body, orelse) {
@@ -198,7 +208,9 @@ fn is_explicit_concatenation(expr: &Expr) -> Option<bool> {
                 _ => None,
             }
         }
-        Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
+        ExprKind::BoolOp(expr_bool_op) => {
+            let values = expr_bool_op.values();
+
             let values = values
                 .iter()
                 .map(is_explicit_concatenation)
@@ -211,6 +223,10 @@ fn is_explicit_concatenation(expr: &Expr) -> Option<bool> {
                 None
             }
         }
-        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => is_explicit_concatenation(operand),
+        ExprKind::UnaryOp(expr_unary_op) => {
+            let operand = expr_unary_op.operand();
+
+            is_explicit_concatenation(operand)
+        }
     }
 }

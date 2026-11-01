@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_ast::{self as ast, Expr, ExprKind, Stmt, StmtFor, StmtKind};
 
 use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -96,33 +96,36 @@ impl Violation for ManualListComprehension {
 }
 
 /// PERF401
-pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtFor) {
-    let Expr::Name(ast::ExprName {
-        id: for_stmt_target_id,
-        ..
-    }) = &*for_stmt.target
-    else {
+pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: StmtFor<'_>) {
+    let ExprKind::Name(name_node) = for_stmt.target().classify() else {
         return;
     };
+    let for_stmt_target_id = name_node.id();
 
-    let (stmt, if_test) = match &*for_stmt.body {
+    let (stmt, if_test) = match for_stmt
+        .body()
+        .as_array()
+        .map(|items| items.map(Stmt::fields))
+    {
         // ```python
         // for x in y:
         //     if z:
         //         filtered.append(x)
         // ```
-        [
-            ast::Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                test,
-                ..
-            }),
-        ] => {
+        Some(
+            [
+                ast::StmtFields::If(ast::StmtIfFields {
+                    body,
+                    elif_else_clauses,
+                    test,
+                    ..
+                }),
+            ],
+        ) => {
             if !elif_else_clauses.is_empty() {
                 return;
             }
-            let [stmt] = body.as_slice() else {
+            let Some([stmt]) = body.as_array() else {
                 return;
             };
             (stmt, Some(test))
@@ -131,42 +134,37 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         // for x in y:
         //     filtered.append(f(x))
         // ```
-        [stmt] => (stmt, None),
+        Some([stmt]) => (stmt.view(), None),
         _ => return,
     };
 
-    let ast::Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
+    let StmtKind::Expr(expr_node) = stmt.classify() else {
         return;
     };
+    let value = expr_node.value();
 
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments:
-            Arguments {
-                args,
-                keywords,
-                range: _,
-                node_index: _,
-            },
-        range_start: _,
-        node_index: _,
-    }) = value.as_ref()
-    else {
+    let ExprKind::Call(call_node) = value.classify() else {
         return;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
+    let args = arguments.args();
+    let keywords = arguments.keywords();
     let call_range = value.range();
 
     if !keywords.is_empty() {
         return;
     }
 
-    let [arg] = &**args else {
+    let Some([arg]) = args.as_array() else {
         return;
     };
 
-    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = &**func else {
+    let ExprKind::Attribute(attribute) = func.classify() else {
         return;
     };
+    let attr = attribute.attr();
+    let value = attribute.value();
 
     if attr.as_str() != "append" {
         return;
@@ -179,11 +177,11 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
 
     // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`), unless it's async, which
     // `manual-list-copy` doesn't cover.
-    if !for_stmt.is_async {
+    if !for_stmt.is_async() {
         if if_test.is_none() {
             if arg
                 .as_name_expr()
-                .is_some_and(|arg| arg.id == *for_stmt_target_id)
+                .is_some_and(|arg| *arg.id() == *for_stmt_target_id)
             {
                 return;
             }
@@ -192,14 +190,14 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
 
     // An assignment expression is a syntax error anywhere in a comprehension's iterable, even
     // when parenthesized (e.g., `[x for x in (y := z)]`), so the loop can't be converted.
-    if any_over_expr(&for_stmt.iter, &Expr::is_named_expr) {
+    if any_over_expr(for_stmt.iter(), ruff_python_ast::Expr::is_named_expr) {
         return;
     }
 
     // Avoid, e.g., `for x in y: filtered.append(filtered[-1] * 2)`.
     if any_over_expr(arg, |expr| {
         expr.as_name_expr()
-            .is_some_and(|expr| expr.id == list_name.id)
+            .is_some_and(|expr| expr.id() == list_name.id())
     }) {
         return;
     }
@@ -233,7 +231,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     if if_test.is_some_and(|test| {
         any_over_expr(test, |expr| {
             expr.as_name_expr()
-                .is_some_and(|expr| expr.id == list_name.id)
+                .is_some_and(|expr| expr.id() == list_name.id())
         })
     }) {
         return;
@@ -257,7 +255,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         .semantic()
         .bindings
         .iter()
-        .find(|binding| for_stmt.target.range() == binding.range)
+        .find(|binding| for_stmt.target().range() == binding.range)
         .unwrap();
     // If the target variable is global (e.g., `global INDEX`) or nonlocal (e.g., `nonlocal INDEX`),
     // then it is intended to be used elsewhere outside the for loop.
@@ -275,26 +273,27 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     }
 
     let list_binding_stmt = list_binding.statement(checker.semantic());
-    let list_binding_value = list_binding_stmt.and_then(|binding_stmt| match binding_stmt {
-        ast::Stmt::AnnAssign(assign) => assign.value.as_deref(),
-        ast::Stmt::Assign(assign) => Some(&assign.value),
-        _ => None,
-    });
+    let list_binding_value =
+        list_binding_stmt.and_then(|binding_stmt| match binding_stmt.classify() {
+            StmtKind::AnnAssign(assign) => assign.value(),
+            StmtKind::Assign(assign) => Some(assign.value()),
+            _ => None,
+        });
 
     // If the variable is an empty list literal, then we might be able to replace it with a full list comprehension
     // otherwise, it has to be replaced with a `list.extend`.
     let binding_is_empty_list =
-        list_binding_value.is_some_and(|binding_value| match binding_value {
+        list_binding_value.is_some_and(|binding_value| match binding_value.classify() {
             // `value = []`
-            Expr::List(list_expr) => list_expr.is_empty(),
+            ExprKind::List(list_expr) => list_expr.elts().is_empty(),
             // `value = list()`
             // This might be linted against, but turning it into a list comprehension will also remove it
-            Expr::Call(call) => {
+            ExprKind::Call(call) => {
                 checker
                     .semantic()
-                    .resolve_builtin_symbol(&call.func)
+                    .resolve_builtin_symbol(call.func())
                     .is_some_and(|name| name == "list")
-                    && call.arguments.is_empty()
+                    && call.arguments().is_empty()
             }
             _ => false,
         });
@@ -311,11 +310,12 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
 
     // If the binding is not a single name expression, it could be replaced with a list comprehension,
     // but not necessarily, so this needs to be manually fixed. This does not apply when using an extend.
-    let binding_has_one_target = list_binding_stmt.is_some_and(|binding_stmt| match binding_stmt {
-        ast::Stmt::AnnAssign(_) => true,
-        ast::Stmt::Assign(assign) => assign.targets.len() == 1,
-        _ => false,
-    });
+    let binding_has_one_target =
+        list_binding_stmt.is_some_and(|binding_stmt| match binding_stmt.classify() {
+            StmtKind::AnnAssign(_) => true,
+            StmtKind::Assign(assign) => assign.targets().len() == 1,
+            _ => false,
+        });
 
     // If the binding gets used in between the assignment and the for loop, a list comprehension is no longer safe
 
@@ -345,7 +345,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
 
     let mut diagnostic = checker.report_diagnostic(
         ManualListComprehension {
-            is_async: for_stmt.is_async,
+            is_async: for_stmt.is_async(),
             comprehension_type: Some(comprehension_type),
         },
         call_range,
@@ -358,7 +358,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
                 comprehension_type,
                 list_binding,
                 for_stmt,
-                if_test.map(std::convert::AsRef::as_ref),
+                if_test,
                 arg,
                 checker,
             )
@@ -369,9 +369,9 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
 fn convert_to_list_extend(
     fix_type: ComprehensionType,
     binding: &Binding,
-    for_stmt: &ast::StmtFor,
-    if_test: Option<&Expr>,
-    to_append: &Expr,
+    for_stmt: StmtFor<'_>,
+    if_test: Option<Expr<'_>>,
+    to_append: Expr<'_>,
     checker: &Checker,
 ) -> Result<Fix> {
     let semantic = checker.semantic();
@@ -386,8 +386,8 @@ fn convert_to_list_extend(
             // since if the assignment expression appears
             // internally (e.g. as an operand in a boolean
             // operation) then it will already be parenthesized.
-            match test {
-                Expr::Named(_) | Expr::If(_) | Expr::Lambda(_) => {
+            match test.classify() {
+                ExprKind::Named(_) | ExprKind::If(_) | ExprKind::Lambda(_) => {
                     format!(" if ({})", locator.slice(test.range()))
                 }
                 _ => format!(" if {}", locator.slice(test.range())),
@@ -399,16 +399,16 @@ fn convert_to_list_extend(
     let (for_iter_str, for_iter_range) =
         parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension);
 
-    let for_type = if for_stmt.is_async {
+    let for_type = if for_stmt.is_async() {
         "async for"
     } else {
         "for"
     };
-    let target_str = locator.slice(for_stmt.target.range());
+    let target_str = locator.slice(for_stmt.target().range());
     let elt_str = locator.slice(to_append);
     let generator_str = if to_append
         .as_generator_expr()
-        .is_some_and(|generator| !generator.parenthesized)
+        .is_some_and(|generator| !generator.parenthesized())
     {
         format!("({elt_str}) {for_type} {target_str} in {for_iter_str}{if_str}")
     } else {
@@ -416,23 +416,23 @@ fn convert_to_list_extend(
     };
 
     let variable_name = locator.slice(binding);
-    let mut ranges_to_ignore = vec![to_append.range(), for_iter_range, for_stmt.target.range()];
+    let mut ranges_to_ignore = vec![to_append.range(), for_iter_range, for_stmt.target().range()];
     if let Some(test) = if_test {
         ranges_to_ignore.push(test.range());
     }
     let for_loop_inline_comments =
-        comment_strings_in_range(checker, for_stmt.range, &ranges_to_ignore);
+        comment_strings_in_range(checker, for_stmt.range(), &ranges_to_ignore);
 
     let newline = checker.stylist().line_ending().as_str();
 
     let indent = locator.slice(TextRange::new(
-        locator.line_start(for_stmt.range.start()),
-        for_stmt.range.start(),
+        locator.line_start(for_stmt.range().start()),
+        for_stmt.range().start(),
     ));
 
     match fix_type {
         ComprehensionType::Extend => {
-            let generator_str = if for_stmt.is_async {
+            let generator_str = if for_stmt.is_async() {
                 // generators do not implement __iter__, so `async for` requires the generator to be a list
                 format!("[{generator_str}]")
             } else {
@@ -452,15 +452,15 @@ fn convert_to_list_extend(
             );
             Ok(Fix::unsafe_edit(Edit::range_replacement(
                 text_to_replace,
-                for_stmt.range,
+                for_stmt.range(),
             )))
         }
         ComprehensionType::ListComprehension => {
             let binding_stmt = binding.statement(semantic);
             let binding_stmt_range = binding_stmt
-                .and_then(|stmt| match stmt {
-                    ast::Stmt::AnnAssign(assign) => Some(assign.range),
-                    ast::Stmt::Assign(assign) => Some(assign.range),
+                .and_then(|stmt| match stmt.classify() {
+                    StmtKind::AnnAssign(assign) => Some(assign.range()),
+                    StmtKind::Assign(assign) => Some(assign.range()),
                     _ => None,
                 })
                 .ok_or(anyhow!(
@@ -472,8 +472,9 @@ fn convert_to_list_extend(
             let (binding_stmt_deletion_range, binding_is_multiple_stmts) =
                 statement_deletion_range(checker, binding_stmt_range);
 
-            let annotations = match binding_stmt.and_then(|stmt| stmt.as_ann_assign_stmt()) {
-                Some(assign) => format!(": {}", locator.slice(assign.annotation.range())),
+            let annotations = match binding_stmt.and_then(ruff_python_ast::Stmt::as_ann_assign_stmt)
+            {
+                Some(assign) => format!(": {}", locator.slice(assign.annotation().range())),
                 None => String::new(),
             };
 
@@ -498,7 +499,10 @@ fn convert_to_list_extend(
 
             Ok(Fix::unsafe_edits(
                 Edit::range_deletion(binding_stmt_deletion_range),
-                [Edit::range_replacement(comprehension_body, for_stmt.range)],
+                [Edit::range_replacement(
+                    comprehension_body,
+                    for_stmt.range(),
+                )],
             ))
         }
     }

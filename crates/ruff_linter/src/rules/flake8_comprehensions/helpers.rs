@@ -1,19 +1,12 @@
-use ruff_python_ast::{Expr, Keyword};
+use ruff_python_ast::{Expr, ExprCall, NodeList};
 
 pub(super) fn exactly_one_argument_with_matching_function<'a>(
     name: &str,
-    func: &Expr,
-    args: &'a [Expr],
-    keywords: &[Keyword],
-) -> Option<&'a Expr> {
-    let [arg] = args else {
-        return None;
-    };
-    if !keywords.is_empty() {
-        return None;
-    }
-    let func = func.as_name_expr()?;
-    if func.id != name {
+    call: ExprCall<'a>,
+) -> Option<Expr<'a>> {
+    let arguments = call.arguments();
+    let [arg] = arguments.args().as_array()?;
+    if !arguments.keywords().is_empty() || call.func().as_name_expr()?.id() != name {
         return None;
     }
     Some(arg)
@@ -21,10 +14,10 @@ pub(super) fn exactly_one_argument_with_matching_function<'a>(
 
 pub(super) fn first_argument_with_matching_function<'a>(
     name: &str,
-    func: &Expr,
-    args: &'a [Expr],
-) -> Option<&'a Expr> {
-    if func.as_name_expr().is_some_and(|func| func.id == name) {
+    func: Expr<'_>,
+    args: NodeList<'a, ruff_python_ast::kind::Expr>,
+) -> Option<Expr<'a>> {
+    if func.as_name_expr().is_some_and(|func| func.id() == name) {
         args.first()
     } else {
         None

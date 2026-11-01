@@ -80,7 +80,7 @@ impl AnnotationContext {
 
     /// Determine the [`AnnotationContext`] to use for annotations in a function signature.
     pub(super) fn from_function(
-        function_def: &StmtFunctionDef,
+        function_def: StmtFunctionDef<'_>,
         semantic: &SemanticModel,
         settings: &LinterSettings,
         version: PythonVersion,

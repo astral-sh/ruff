@@ -62,7 +62,7 @@ impl Violation for OsPathExists {
 }
 
 /// PTH110
-pub(crate) fn os_path_exists(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_path_exists(checker: &Checker, call: ExprCall<'_>, segments: &[&str]) {
     if segments != ["os", "path", "exists"] {
         return;
     }

@@ -59,9 +59,9 @@ pub(crate) fn should_ignore_definition(
         return false;
     };
 
-    function.decorator_list.iter().any(|decorator| {
+    function.decorator_list().iter().any(|decorator| {
         semantic
-            .resolve_qualified_name(map_callable(&decorator.expression))
+            .resolve_qualified_name(map_callable(decorator.expression()))
             .is_some_and(|qualified_name| {
                 ignore_decorators
                     .clone()

@@ -97,11 +97,11 @@ pub(crate) fn iter_method_return_iterable(checker: &Checker, definition: &Defini
         return;
     };
 
-    let Some(returns) = function.returns.as_ref() else {
+    let Some(returns) = function.returns() else {
         return;
     };
 
-    let is_async = match function.name.as_str() {
+    let is_async = match function.name().as_str() {
         "__iter__" => false,
         "__aiter__" => true,
         _ => return,

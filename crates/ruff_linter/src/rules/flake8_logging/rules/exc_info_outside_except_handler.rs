@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::{ExprCall, ExprKind};
 use ruff_python_semantic::analyze::logging::is_logger_candidate;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
@@ -87,25 +87,33 @@ impl Violation for ExcInfoOutsideExceptHandler {
 }
 
 /// LOG014
-pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall) {
+pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: ExprCall<'_>) {
+    let Some(exc_info) = call.arguments().find_keyword("exc_info") else {
+        return;
+    };
+
+    if !exc_info.value().is_literal_expr() {
+        return;
+    }
+
     let semantic = checker.semantic();
 
     if !outside_handlers(call.start(), semantic) {
         return;
     }
 
-    match &*call.func {
-        func @ Expr::Attribute(ExprAttribute { attr, .. }) => {
-            if !is_logger_candidate(func, semantic, &checker.settings().logger_objects) {
+    let func = call.func();
+    match func.classify() {
+        ExprKind::Attribute(attribute) => {
+            if LoggingLevel::from_attribute(&attribute.attr()).is_none() {
                 return;
             }
-
-            if LoggingLevel::from_attribute(attr).is_none() {
+            if !is_logger_candidate(func, semantic, &checker.settings().logger_objects) {
                 return;
             }
         }
 
-        func @ Expr::Name(_) => {
+        ExprKind::Name(_) => {
             let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
                 return;
             };
@@ -122,27 +130,19 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall
         _ => return,
     }
 
-    let Some(exc_info) = call.arguments.find_keyword("exc_info") else {
-        return;
-    };
-
-    if !exc_info.value.is_literal_expr() {
-        return;
-    }
-
-    let truthiness = Truthiness::from_expr(&exc_info.value, |id| semantic.has_builtin_binding(id));
+    let truthiness = Truthiness::from_expr(exc_info.value(), |id| semantic.has_builtin_binding(id));
 
     if truthiness.into_bool() != Some(true) {
         return;
     }
 
-    let arguments = &call.arguments;
+    let arguments = call.arguments();
 
-    let mut diagnostic = checker.report_diagnostic(ExcInfoOutsideExceptHandler, exc_info.range);
+    let mut diagnostic = checker.report_diagnostic(ExcInfoOutsideExceptHandler, exc_info.range());
 
     diagnostic.try_set_fix(|| {
         let edit = remove_argument(
-            exc_info,
+            &exc_info,
             arguments,
             Parentheses::Preserve,
             checker.source(),

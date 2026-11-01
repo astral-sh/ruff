@@ -27,7 +27,7 @@ impl Violation for GlobalAtModuleLevel {
 }
 
 /// PLW0604
-pub(crate) fn global_at_module_level(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn global_at_module_level(checker: &Checker, stmt: Stmt<'_>) {
     if checker.semantic().current_scope().kind.is_module() {
         checker.report_diagnostic(GlobalAtModuleLevel, stmt.range());
     }

@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_body;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr, StmtFor};
+use ruff_python_ast::{self as ast, ExprKind};
 use ruff_python_semantic::analyze::typing::is_set;
 use ruff_text_size::Ranged;
 
@@ -66,7 +66,7 @@ impl AlwaysFixableViolation for ModifiedIteratingSet {
 }
 
 /// PLE4703
-pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
+pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &ast::StmtForFields<'_>) {
     let Some(name) = for_stmt.iter.as_name_expr() else {
         return;
     };
@@ -78,14 +78,16 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
         return;
     }
 
-    let is_modified = any_over_body(&for_stmt.body, |expr| {
-        let Some(func) = expr.as_call_expr().map(|call| &call.func) else {
+    let is_modified = any_over_body(for_stmt.body, |expr| {
+        let Some(func) = expr.as_call_expr().map(ruff_python_ast::ExprCall::func) else {
             return false;
         };
 
-        let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+        let ExprKind::Attribute(attribute) = func.classify() else {
             return false;
         };
+        let value = attribute.value();
+        let attr = attribute.attr();
 
         let Some(value) = value.as_name_expr() else {
             return false;
@@ -101,9 +103,9 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &StmtFor) {
     if is_modified {
         let mut diagnostic = checker.report_diagnostic(
             ModifiedIteratingSet {
-                name: name.id.clone(),
+                name: name.id().clone(),
             },
-            for_stmt.range(),
+            for_stmt.range,
         );
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             format!("{}.copy()", checker.locator().slice(name)),

@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprCall};
+use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -59,16 +59,13 @@ impl Violation for TrioSyncCall {
 }
 
 /// ASYNC105
-pub(crate) fn sync_call(checker: &Checker, call: &ExprCall) {
+pub(crate) fn sync_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     if !checker.semantic().seen_module(Modules::TRIO) {
         return;
     }
 
     let Some(method_name) = ({
-        let Some(qualified_name) = checker
-            .semantic()
-            .resolve_qualified_name(call.func.as_ref())
-        else {
+        let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func) else {
             return;
         };
         MethodName::try_from(&qualified_name)
@@ -83,12 +80,12 @@ pub(crate) fn sync_call(checker: &Checker, call: &ExprCall) {
     if checker
         .semantic()
         .current_expression_parent()
-        .is_some_and(Expr::is_await_expr)
+        .is_some_and(ruff_python_ast::Expr::is_await_expr)
     {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(TrioSyncCall { method_name }, call.range());
+    let mut diagnostic = checker.report_diagnostic(TrioSyncCall { method_name }, call.range);
     if checker.semantic().in_async_context() {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
             pad(

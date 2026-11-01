@@ -55,8 +55,8 @@ pub(crate) fn lowercase_imported_as_non_lowercase(
     checker: &Checker,
     name: &str,
     asname: &str,
-    alias: &Alias,
-    stmt: &Stmt,
+    alias: Alias<'_>,
+    stmt: Stmt<'_>,
     ignore_names: &IgnoreNames,
 ) {
     if !str::is_cased_uppercase(name) && str::is_cased_lowercase(name) && !str::is_lowercase(asname)

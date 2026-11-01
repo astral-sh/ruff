@@ -66,7 +66,7 @@ impl Violation for OsPathGetsize {
 }
 
 /// PTH202
-pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_path_getsize(checker: &Checker, call: ExprCall<'_>, segments: &[&str]) {
     if segments != ["os", "path", "getsize"] {
         return;
     }

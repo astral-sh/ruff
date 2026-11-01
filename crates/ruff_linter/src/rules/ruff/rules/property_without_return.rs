@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
-use ruff_python_ast::{Expr, Stmt, StmtFunctionDef};
+use ruff_python_ast::{Expr, ExprKind, Stmt, StmtFunctionDef, StmtKind};
 use ruff_python_semantic::analyze::{function_type, visibility};
 
 use crate::checkers::ast::Checker;
@@ -53,19 +53,16 @@ impl Violation for PropertyWithoutReturn {
 }
 
 /// RUF066
-pub(crate) fn property_without_return(checker: &Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn property_without_return(checker: &Checker, function_def: StmtFunctionDef<'_>) {
     let semantic = checker.semantic();
 
     if checker.source_type.is_stub() || semantic.in_protocol_or_abstract_method() {
         return;
     }
 
-    let StmtFunctionDef {
-        decorator_list,
-        body,
-        name,
-        ..
-    } = function_def;
+    let decorator_list = function_def.decorator_list();
+    let body = function_def.body();
+    let name = function_def.name();
 
     let extra_property_decorators = checker.settings().pydocstyle.property_decorators();
     if !visibility::is_property(decorator_list, extra_property_decorators, semantic)
@@ -98,25 +95,25 @@ struct PropertyVisitor {
 // `yield`/`yield from`/`raise`/`return` statement/expression,
 // as having one of those indicates that there's likely no implementation mistake
 impl Visitor<'_> for PropertyVisitor {
-    fn visit_expr(&mut self, expr: &Expr) {
+    fn visit_expr(&mut self, expr: Expr<'_>) {
         if self.found {
             return;
         }
 
-        match expr {
-            Expr::Yield(_) | Expr::YieldFrom(_) => self.found = true,
+        match expr.classify() {
+            ExprKind::Yield(_) | ExprKind::YieldFrom(_) => self.found = true,
             _ => walk_expr(self, expr),
         }
     }
 
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+    fn visit_stmt(&mut self, stmt: Stmt<'_>) {
         if self.found {
             return;
         }
 
-        match stmt {
-            Stmt::Return(_) | Stmt::Raise(_) => self.found = true,
-            Stmt::FunctionDef(_) => {
+        match stmt.classify() {
+            StmtKind::Return(_) | StmtKind::Raise(_) => self.found = true,
+            StmtKind::FunctionDef(_) => {
                 // Do not recurse into nested functions; they're evaluated separately.
             }
             _ => walk_stmt(self, stmt),

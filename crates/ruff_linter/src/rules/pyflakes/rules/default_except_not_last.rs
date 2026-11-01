@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::except;
-use ruff_python_ast::{self as ast, ExceptHandler};
+use ruff_python_ast::{self as ast, NodeList};
 
 use crate::Locator;
 use crate::Violation;
@@ -59,11 +59,14 @@ impl Violation for DefaultExceptNotLast {
 /// F707
 pub(crate) fn default_except_not_last(
     checker: &Checker,
-    handlers: &[ExceptHandler],
+    handlers: NodeList<'_, ruff_python_ast::kind::ExceptHandler>,
     locator: &Locator,
 ) {
     for (idx, handler) in handlers.iter().enumerate() {
-        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) = handler;
+        let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
+            type_,
+            ..
+        }) = handler.fields();
         if type_.is_none() && idx < handlers.len() - 1 {
             checker.report_diagnostic(DefaultExceptNotLast, except(handler, locator.contents()));
         }

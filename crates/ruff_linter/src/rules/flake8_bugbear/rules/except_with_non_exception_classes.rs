@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, Operator};
+use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprKind, Operator};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -55,72 +55,82 @@ impl Violation for ExceptWithNonExceptionClasses {
 }
 
 /// B030
-pub(crate) fn except_with_non_exception_classes(checker: &Checker, except_handler: &ExceptHandler) {
-    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) =
-        except_handler;
+pub(crate) fn except_with_non_exception_classes(
+    checker: &Checker,
+    except_handler: ExceptHandler<'_>,
+) {
+    let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
+        type_,
+        ..
+    }) = except_handler.fields();
     let Some(type_) = type_ else {
         return;
     };
     for expr in flatten_iterables(type_) {
         if !matches!(
-            expr,
-            Expr::Subscript(_) | Expr::Attribute(_) | Expr::Name(_) | Expr::Call(_),
+            expr.classify(),
+            ExprKind::Subscript(_) | ExprKind::Attribute(_) | ExprKind::Name(_) | ExprKind::Call(_),
         ) {
             let is_star = checker
                 .semantic()
                 .current_statement()
                 .as_try_stmt()
-                .is_some_and(|try_stmt| try_stmt.is_star);
+                .is_some_and(ruff_python_ast::StmtTry::is_star);
             checker.report_diagnostic(ExceptWithNonExceptionClasses { is_star }, expr.range());
         }
     }
 }
 
-/// Given an [`Expr`], flatten any [`Expr::Starred`] expressions and any
-/// [`Expr::BinOp`] expressions into a flat list of expressions.
+/// Flattens starred expressions and concatenations when collecting exception types.
 ///
 /// This should leave any unstarred iterables alone (subsequently raising a
 /// warning for B029).
-fn flatten_iterables(expr: &Expr) -> Vec<&Expr> {
+fn flatten_iterables(expr: Expr<'_>) -> Vec<Expr<'_>> {
     // Unpack the top-level Tuple into queue, otherwise add as-is.
-    let mut exprs_to_process: VecDeque<&Expr> = match expr {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().collect(),
+    let mut exprs_to_process: VecDeque<Expr<'_>> = match expr.classify() {
+        ExprKind::Tuple(expr_tuple) => {
+            let elts = expr_tuple.elts();
+            elts.iter().collect()
+        }
         _ => vec![expr].into(),
     };
-    let mut flattened_exprs: Vec<&Expr> = Vec::with_capacity(exprs_to_process.len());
+    let mut flattened_exprs: Vec<Expr<'_>> = Vec::with_capacity(exprs_to_process.len());
 
     while let Some(expr) = exprs_to_process.pop_front() {
-        match expr {
-            Expr::Starred(ast::ExprStarred { value, .. }) => match value.as_ref() {
-                Expr::Tuple(ast::ExprTuple { elts, .. })
-                | Expr::List(ast::ExprList { elts, .. }) => {
-                    exprs_to_process.append(&mut elts.iter().collect());
+        match expr.classify() {
+            ExprKind::Starred(expr_starred) => {
+                let value = expr_starred.value();
+                match value.fields() {
+                    ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
+                    | ast::ExprFields::List(ast::ExprListFields { elts, .. }) => {
+                        exprs_to_process.append(&mut elts.iter().collect());
+                    }
+                    ast::ExprFields::BinOp(ast::ExprBinOpFields {
+                        op: Operator::Add, ..
+                    }) => {
+                        exprs_to_process.push_back(value);
+                    }
+                    _ => flattened_exprs.push(value),
                 }
-                Expr::BinOp(ast::ExprBinOp {
-                    op: Operator::Add, ..
-                }) => {
-                    exprs_to_process.push_back(value);
-                }
-                _ => flattened_exprs.push(value),
-            },
-            Expr::BinOp(ast::ExprBinOp {
-                left,
-                right,
-                op: Operator::Add,
-                ..
-            }) => {
+            }
+            ExprKind::BinOp(expr_bin_op) if expr_bin_op.op() == Operator::Add => {
+                let left = expr_bin_op.left();
+                let right = expr_bin_op.right();
+
                 for expr in [left, right] {
                     // If left or right are tuples, starred, or binary operators, flatten them.
-                    match expr.as_ref() {
-                        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                    match expr.classify() {
+                        ExprKind::Tuple(expr_tuple) => {
+                            let elts = expr_tuple.elts();
+
                             exprs_to_process.append(&mut elts.iter().collect());
                         }
-                        Expr::Starred(ast::ExprStarred { value, .. }) => {
+                        ExprKind::Starred(expr_starred) => {
+                            let value = expr_starred.value();
+
                             exprs_to_process.push_back(value);
                         }
-                        Expr::BinOp(ast::ExprBinOp {
-                            op: Operator::Add, ..
-                        }) => {
+                        ExprKind::BinOp(expr_bin_op) if expr_bin_op.op() == Operator::Add => {
                             exprs_to_process.push_back(expr);
                         }
                         _ => flattened_exprs.push(expr),

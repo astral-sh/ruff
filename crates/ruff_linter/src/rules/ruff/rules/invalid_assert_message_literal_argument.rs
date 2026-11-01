@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, StmtAssert};
+use ruff_python_ast::{self as ast, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -38,18 +38,21 @@ impl Violation for InvalidAssertMessageLiteralArgument {
 }
 
 /// RUF040
-pub(crate) fn invalid_assert_message_literal_argument(checker: &Checker, stmt: &StmtAssert) {
-    let Some(message) = stmt.msg.as_deref() else {
+pub(crate) fn invalid_assert_message_literal_argument(
+    checker: &Checker,
+    stmt: &ast::StmtAssertFields<'_>,
+) {
+    let Some(message) = stmt.msg else {
         return;
     };
 
     if !matches!(
-        message,
-        Expr::NumberLiteral(_)
-            | Expr::BooleanLiteral(_)
-            | Expr::NoneLiteral(_)
-            | Expr::EllipsisLiteral(_)
-            | Expr::BytesLiteral(_)
+        message.classify(),
+        ExprKind::NumberLiteral(_)
+            | ExprKind::BooleanLiteral(_)
+            | ExprKind::NoneLiteral(_)
+            | ExprKind::EllipsisLiteral(_)
+            | ExprKind::BytesLiteral(_)
     ) {
         return;
     }

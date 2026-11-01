@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -51,8 +51,9 @@ impl Violation for InvalidMockAccess {
 }
 
 /// PGH005
-pub(crate) fn uncalled_mock_method(checker: &Checker, expr: &Expr) {
-    if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = expr {
+pub(crate) fn uncalled_mock_method(checker: &Checker, expr: Expr<'_>) {
+    if let ExprKind::Attribute(attribute_node) = expr.classify() {
+        let attr = attribute_node.attr();
         let is_uncalled_mock_method = matches!(
             attr.as_str(),
             "assert_any_call"
@@ -85,13 +86,16 @@ pub(crate) fn uncalled_mock_method(checker: &Checker, expr: &Expr) {
 }
 
 /// PGH005
-pub(crate) fn non_existent_mock_method(checker: &Checker, test: &Expr) {
-    let attr = match test {
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr,
-        Expr::Call(ast::ExprCall { func, .. }) => match func.as_ref() {
-            Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr,
-            _ => return,
-        },
+pub(crate) fn non_existent_mock_method(checker: &Checker, test: Expr<'_>) {
+    let attr = match test.classify() {
+        ExprKind::Attribute(expr_attribute) => expr_attribute.attr(),
+        ExprKind::Call(expr_call) => {
+            let func = expr_call.func();
+            match func.classify() {
+                ExprKind::Attribute(expr_attribute) => expr_attribute.attr(),
+                _ => return,
+            }
+        }
         _ => return,
     };
     let is_missing_mock_method = matches!(

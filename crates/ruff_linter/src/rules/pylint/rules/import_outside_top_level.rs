@@ -65,7 +65,7 @@ impl Violation for ImportOutsideTopLevel {
 }
 
 /// PLC0415
-pub(crate) fn import_outside_top_level(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn import_outside_top_level(checker: &Checker, stmt: Stmt<'_>) {
     if checker.semantic().current_scope().kind.is_module() {
         // "Top-level" imports are allowed
         return;

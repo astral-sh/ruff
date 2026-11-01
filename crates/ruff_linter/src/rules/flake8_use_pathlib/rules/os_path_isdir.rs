@@ -63,7 +63,7 @@ impl Violation for OsPathIsdir {
 }
 
 /// PTH112
-pub(crate) fn os_path_isdir(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_path_isdir(checker: &Checker, call: ExprCall<'_>, segments: &[&str]) {
     if segments != ["os", "path", "isdir"] {
         return;
     }

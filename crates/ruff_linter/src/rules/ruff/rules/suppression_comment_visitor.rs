@@ -1,7 +1,7 @@
 use std::iter::Peekable;
 
 use ruff_python_ast::{
-    AnyNodeRef, Suite,
+    Suite, SyntaxNode,
     helpers::comment_indentation_after,
     visitor::source_order::{self, SourceOrderVisitor, TraversalSignal},
 };
@@ -27,8 +27,8 @@ pub(super) struct SuppressionCommentVisitor<
 > {
     comments: Peekable<I>,
 
-    parents: Vec<AnyNodeRef<'src>>,
-    preceding_node: Option<AnyNodeRef<'src>>,
+    parents: Vec<SyntaxNode<'src>>,
+    preceding_node: Option<SyntaxNode<'src>>,
 
     builder: &'builder mut (dyn CaptureSuppressionComment<'src> + 'src),
     locator: &'src Locator<'src>,
@@ -52,8 +52,8 @@ where
         }
     }
 
-    pub(super) fn visit(mut self, suite: &'src Suite) {
-        self.visit_body(suite.as_slice());
+    pub(super) fn visit(mut self, suite: Suite<'src>) {
+        self.visit_body(suite);
     }
 
     fn can_skip(&mut self, node_end: TextSize) -> bool {
@@ -67,7 +67,7 @@ impl<'ast, I> SourceOrderVisitor<'ast> for SuppressionCommentVisitor<'ast, '_, I
 where
     I: Iterator<Item = SuppressionComment> + 'ast,
 {
-    fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
+    fn enter_node(&mut self, node: SyntaxNode<'ast>) -> TraversalSignal {
         let node_range = node.range();
 
         let enclosing_node = self.parents.last().copied();
@@ -107,7 +107,7 @@ where
         }
     }
 
-    fn leave_node(&mut self, node: AnyNodeRef<'ast>) {
+    fn leave_node(&mut self, node: SyntaxNode<'ast>) {
         self.parents.pop();
 
         let node_end = node.end();
@@ -174,29 +174,24 @@ where
 
         self.preceding_node = Some(node);
     }
-    fn visit_body(&mut self, body: &'ast [ruff_python_ast::Stmt]) {
-        match body {
-            [] => {
-                // no-op
+    fn visit_body(&mut self, body: Suite<'ast>) {
+        let Some((first, rest)) = body.split_first() else {
+            return;
+        };
+        if let Some(last) = rest.last() {
+            if self.can_skip(last.end()) {
+                // The first statement may have leading comments after the previous node.
+                self.visit_stmt(first);
+                self.preceding_node = Some(last.into());
+            } else {
+                source_order::walk_body(self, body);
             }
-            [only] => {
-                self.visit_stmt(only);
-            }
-            [first, .., last] => {
-                if self.can_skip(last.end()) {
-                    // Skip traversing the body when there's no comment between the first and last statement.
-                    // It is still necessary to visit the first statement to process all comments between
-                    // the previous node and the first statement.
-                    self.visit_stmt(first);
-                    self.preceding_node = Some(last.into());
-                } else {
-                    source_order::walk_body(self, body);
-                }
-            }
+        } else {
+            self.visit_stmt(first);
         }
     }
 
-    fn visit_identifier(&mut self, _identifier: &'ast ruff_python_ast::Identifier) {
+    fn visit_identifier(&mut self, _identifier: ruff_python_ast::Identifier<'ast>) {
         // Skip identifiers, matching the formatter comment extraction
     }
 }
@@ -204,11 +199,11 @@ where
 #[derive(Clone, Debug)]
 pub(super) struct SuppressionCommentData<'src> {
     /// The AST node that encloses the comment. If `enclosing` is `None`, this comment is a top-level statement.
-    pub(super) enclosing: Option<AnyNodeRef<'src>>,
+    pub(super) enclosing: Option<SyntaxNode<'src>>,
     /// An AST node that comes directly before the comment. A child of `enclosing`.
-    pub(super) preceding: Option<AnyNodeRef<'src>>,
+    pub(super) preceding: Option<SyntaxNode<'src>>,
     /// An AST node that comes directly after the comment. A child of `enclosing`.
-    pub(super) following: Option<AnyNodeRef<'src>>,
+    pub(super) following: Option<SyntaxNode<'src>>,
 
     /// The line position of the comment - it can either be on its own line, or at the end of a line.
     pub(super) line_position: CommentLinePosition,
