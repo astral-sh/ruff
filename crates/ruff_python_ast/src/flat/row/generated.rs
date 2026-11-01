@@ -302,9 +302,8 @@ node_payloads! {
         args: u32 at 8 => arguments_args, set_arguments_args;
     }
     Parameters(parameters) {
-        extra_offset: u32 at 0 => parameters_extra_offset, set_parameters_extra_offset;
-        vararg: u32 at 4 => parameters_vararg, set_parameters_vararg;
-        kwarg: u32 at 8 => parameters_kwarg, set_parameters_kwarg;
+        args: u64 at 0 => parameters_args, set_parameters_args;
+        extra_offset: u32 at 8 => parameters_extra_offset, set_parameters_extra_offset;
     }
     Parameter(parameter) {
         name: u32 at 0 => parameter_name, set_parameter_name;
