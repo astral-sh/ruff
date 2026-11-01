@@ -321,7 +321,7 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
             visitor.visit_type_var_type(db, typevar);
         }
         KnownInstanceType::TypeAliasType(type_alias) => {
-            visitor.visit_type_alias_type(db, type_alias);
+            visitor.visit_type_alias_object(db, type_alias);
         }
         KnownInstanceType::Deprecated(_)
         | KnownInstanceType::Range { .. }
