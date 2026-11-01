@@ -117,6 +117,7 @@ impl<'db, 'a> PlaceLoadResolver<'db, 'a> {
         ResolvedPlaceLoad {
             place,
             deprecation_target: deprecation_target.unwrap_or(place),
+            crosses_scope_declaration: self.procedure.crosses_scope_declaration,
             constraint_keys: self.procedure.into_constraints(),
         }
     }
@@ -249,6 +250,8 @@ pub(crate) struct ResolvedPlaceLoad<'db> {
     pub(crate) deprecation_target: PlaceAndQualifiers<'db>,
     /// Constraint keys accumulated for expression-level narrowing.
     pub(crate) constraint_keys: Vec<(FileScopeId, ConstraintKey)>,
+    /// Whether resolution followed a `global` or `nonlocal` declaration.
+    pub(crate) crosses_scope_declaration: bool,
 }
 
 /// Selects the binding state used for a place load's own scope.
@@ -639,6 +642,9 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
             let forwards_to_global = is_lexical_enclosing_scope
                 && enclosing_place
                     .is_some_and(|place| place.as_symbol().is_some_and(Symbol::is_global));
+            let forwards_to_nonlocal = is_lexical_enclosing_scope
+                && enclosing_place
+                    .is_some_and(|place| place.as_symbol().is_some_and(Symbol::is_nonlocal));
             let root_place_was_reassigned = || {
                 enclosing_place_table
                     .parents(place_expr)
@@ -674,6 +680,9 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
                                 None,
                             );
                         }
+
+                        // A snapshot can also contain a binding declared `nonlocal`.
+                        self.crosses_scope_declaration |= forwards_to_nonlocal;
 
                         return (
                             Self::node_after_enclosing_scope(enclosing_scope.kind()),
@@ -722,7 +731,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
                 return (PlaceLoadResolutionNode::ImplicitClassBodySource(None), None);
             }
             // Keep walking across `nonlocal` declarations until reaching the owning scope.
-            if enclosing_place.as_symbol().is_some_and(Symbol::is_nonlocal) {
+            if forwards_to_nonlocal {
                 self.crosses_scope_declaration = true;
                 continue;
             }

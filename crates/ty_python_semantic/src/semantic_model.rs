@@ -459,6 +459,47 @@ impl<'db> SemanticModel<'db> {
             .flat_map(move |scope| index.ancestor_scopes(scope))
     }
 
+    /// Returns the definitions that may supply the value read by this use of a name.
+    ///
+    /// An unbound name and a name supplied by a builtin can both have an empty list of
+    /// definitions. [`DefinitionResolution::identifies_all_bindings()`] distinguishes these cases.
+    ///
+    /// Returns `None` if the scope is unavailable, the name is a plain assignment or deletion
+    /// target, or inference skipped the name inside a string annotation.
+    #[allow(dead_code, reason = "awaiting IDE integration")]
+    pub fn reaching_definitions(&self, name: &ast::ExprName) -> Option<DefinitionResolution<'db>> {
+        if name.ctx.is_del() {
+            return None;
+        }
+
+        let env = self.program_environment();
+        let scope = self.scope(name.into())?.to_scope_id(self.db, self.file);
+        let index = semantic_index(self.db, self.file);
+        let expression = ast::ExprRef::Name(name);
+        let place_expr = PlaceExpr::from_expr_name(name);
+        let scope_inference = infer_complete_scope_types(self.db, scope);
+
+        // Require an expression use ID to exclude plain stores. Names in parsed string annotations
+        // have no use IDs, so require an inferred type instead to exclude names in scopes that
+        // inference skipped, such as lambda bodies.
+        if self.in_string_annotation_expr.is_none() {
+            index.try_expression_use_id(expression)?;
+        } else {
+            scope_inference.try_expression_type(expression)?;
+        }
+
+        let mode = if self.in_string_annotation_expr.is_some() {
+            PlaceLoadMode::StringAnnotation
+        } else if scope_inference.is_deferred_name_load(name) {
+            PlaceLoadMode::Deferred
+        } else {
+            PlaceLoadMode::AtExpression(expression)
+        };
+        let resolver = PlaceLoadResolver::new(self.db, &env, index, scope, &place_expr, mode, None);
+
+        Some(DefinitionResolution::from_resolver(self.db, resolver))
+    }
+
     /// Returns the first local definition created by `covering_node`, if any.
     ///
     /// A local definition is a user-visible definition associated with `covering_node` itself, or
@@ -1170,10 +1211,18 @@ impl HasType for ast::ExceptHandlerExceptHandler {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write;
+
     use crate::db::tests::TestDbBuilder;
-    use crate::{HasType, SemanticModel};
+    use crate::{DefinitionResolution, HasType, SemanticModel};
+    use insta::assert_snapshot;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
+    use ruff_python_ast as ast;
+    use ruff_python_ast::visitor::{Visitor, walk_expr};
+    use ruff_python_trivia::textwrap::dedent;
+    use ruff_source_file::{LineIndex, LineRanges};
+    use ruff_text_size::{Ranged, TextRange};
     use ty_python_core::ProgramFile;
 
     #[test]
@@ -1236,5 +1285,451 @@ mod tests {
         assert!(ty.is_class_literal());
 
         Ok(())
+    }
+
+    #[test]
+    fn reaching_definitions_follow_statement_order() {
+        let source = "
+            value = 0
+            def function(condition):
+                value
+                if condition:
+                    value = 1
+                value
+                value = 2
+                value
+            ";
+
+        assert_snapshot!(render_reaching_definitions(source, "value", "/src/test.py", None), @"
+        1 | value = 0
+        2 | def function(condition):
+        3 |     value
+          |     ^^^^^ -> <none>
+        4 |     if condition:
+        5 |         value = 1
+        6 |     value
+          |     ^^^^^ -> value = 1 (line 5)
+        7 |     value = 2
+        8 |     value
+          |     ^^^^^ -> value = 2 (line 7)
+        ");
+    }
+
+    #[test]
+    fn reaching_definitions_distinguish_reads_from_deletion_targets() {
+        let source = "
+            value = 1
+            value += 1
+            del value
+            ";
+
+        assert_snapshot!(render_name_resolutions(source, "/src/test.py", None, |name| name.id == "value"), @"
+        1 | value = 1
+          | ^^^^^ -> <no resolution>
+        2 | value += 1
+          | ^^^^^ -> value = 1 (line 1)
+        3 | del value
+          |     ^^^^^ -> <no resolution>
+        ");
+    }
+
+    #[test]
+    fn reaching_definitions_distinguish_eager_and_deferred_uses() {
+        let source = "
+            from __future__ import annotations
+            from typing import Annotated
+
+            def tagged(tag):
+                return lambda function: function
+
+            label = 'first'
+
+            @tagged(label)
+            def function(argument: Annotated[str, label] = label):
+                return [label for label in (label,)]
+            label = 'second'
+            ";
+
+        assert_snapshot!(render_reaching_definitions(source, "label", "/src/test.py", None), @"
+         1 | from __future__ import annotations
+         2 | from typing import Annotated
+         3 |
+         4 | def tagged(tag):
+         5 |     return lambda function: function
+         6 |
+         7 | label = 'first'
+         8 |
+         9 | @tagged(label)
+           |         ^^^^^ -> label = 'first' (line 7)
+        10 | def function(argument: Annotated[str, label] = label):
+           |                                       ^^^^^ -> label = 'first' (line 7), label = 'second' (line 12)
+           |                                                ^^^^^ -> label = 'first' (line 7)
+        11 |     return [label for label in (label,)]
+           |             ^^^^^ -> label (line 11)
+           |                                 ^^^^^ -> label = 'first' (line 7), label = 'second' (line 12)
+        12 | label = 'second'
+        ");
+    }
+
+    #[test]
+    fn reaching_definitions_preserve_deferred_uses_in_function_decorators() {
+        let source = "
+            def register(cls): ...
+
+            @register(list[Item])
+            def handle_items(items): ...
+
+            class Item: ...
+            ";
+
+        assert_snapshot!(render_reaching_definitions(source, "Item", "/src/test.pyi", None), @"
+        1 | def register(cls): ...
+        2 |
+        3 | @register(list[Item])
+          |                ^^^^ -> class Item: ... (line 6)
+        4 | def handle_items(items): ...
+        5 |
+        6 | class Item: ...
+        ");
+    }
+
+    #[test]
+    fn reaching_definitions_follow_type_dependent_deferredness() {
+        let source = "
+            from typing import Annotated, TypeAlias as Marker
+            Weight: Marker = Annotated[float, unit]
+            unit = 'kg'
+            ";
+
+        assert_snapshot!(render_reaching_definitions(source, "unit", "/src/test.pyi", None), @"
+        1 | from typing import Annotated, TypeAlias as Marker
+        2 | Weight: Marker = Annotated[float, unit]
+          |                                   ^^^^ -> unit = 'kg' (line 3)
+        3 | unit = 'kg'
+        ");
+
+        let source = "
+            from typing import Annotated, Final as Marker
+            Weight: Marker = Annotated[float, unit]
+            unit = 'kg'
+            ";
+
+        assert_snapshot!(render_reaching_definitions(source, "unit", "/src/test.pyi", None), @"
+        1 | from typing import Annotated, Final as Marker
+        2 | Weight: Marker = Annotated[float, unit]
+          |                                   ^^^^ -> <none>
+        3 | unit = 'kg'
+        ");
+    }
+
+    #[test]
+    fn string_annotations_resolve_forward_references() {
+        let source = "
+            item: \"Value\"
+            class Value: ...
+            ";
+
+        assert_snapshot!(render_reaching_definitions(source, "Value", "/src/test.py", None), @r#"
+        1 | item: "Value"
+          |        ^^^^^ -> class Value: ... (line 2)
+        2 | class Value: ...
+        "#);
+    }
+
+    #[test]
+    fn reaching_definitions_skip_unsupported_scopes_in_string_annotations() {
+        // Lambdas and comprehensions inside string annotations have no indexed scopes. Resolving
+        // names in their bodies against the enclosing scope could return unrelated bindings.
+        let source = "
+            from typing import Annotated
+
+            tag = 'module'
+            plain: \"Annotated[int, tag]\"
+            function: \"Annotated[int, lambda tag=tag: tag]\"
+            items: \"Annotated[int, [tag for tag in (tag,)]]\"
+            ";
+
+        assert_snapshot!(render_reaching_definitions(source, "tag", "/src/test.py", None), @r#"
+        1 | from typing import Annotated
+        2 |
+        3 | tag = 'module'
+        4 | plain: "Annotated[int, tag]"
+          |                        ^^^ -> tag = 'module' (line 3)
+        5 | function: "Annotated[int, lambda tag=tag: tag]"
+          |                                      ^^^ -> tag = 'module' (line 3)
+          |                                           ^^^ -> <no resolution>
+        6 | items: "Annotated[int, [tag for tag in (tag,)]]"
+          |                         ^^^ -> <no resolution>
+          |                                         ^^^ -> tag = 'module' (line 3)
+        "#);
+    }
+
+    #[test]
+    fn class_scope_loads_resolve_local_and_enclosing_definitions() {
+        let source = "
+            value = 1
+            class C:
+                if condition:
+                    value = 2
+                result = value
+                value = 3
+                definite = value
+            ";
+
+        assert_snapshot!(render_reaching_definitions(source, "value", "/src/test.py", None), @"
+        1 | value = 1
+        2 | class C:
+        3 |     if condition:
+        4 |         value = 2
+        5 |     result = value
+          |              ^^^^^ -> value = 2 (line 4), value = 1 (line 1)
+        6 |     value = 3
+        7 |     definite = value
+          |                ^^^^^ -> value = 3 (line 6)
+        ");
+    }
+
+    #[test]
+    fn scope_declarations_are_reported_when_crossed() {
+        let source = "
+            value = 1
+            def with_global():
+                global value
+                return value
+            value = 2
+
+            def outer():
+                value = 3
+                def with_nonlocal():
+                    nonlocal value
+                    return value
+                def without_nonlocal():
+                    return value
+
+            def eager_outer():
+                value = 4
+                def intermediate():
+                    nonlocal value
+                    value = 5
+                    class Eager:
+                        result = value
+            ";
+
+        let detail = Some(ResolutionDetail::CrossesScopeDeclaration);
+        assert_snapshot!(render_reaching_definitions(source, "value", "/src/test.py", detail), @"
+         1 | value = 1
+         2 | def with_global():
+         3 |     global value
+         4 |     return value
+           |            ^^^^^ -> value = 1 (line 1), value = 2 (line 5)
+           | crosses_scope_declaration: true
+         5 | value = 2
+         6 |
+         7 | def outer():
+         8 |     value = 3
+         9 |     def with_nonlocal():
+        10 |         nonlocal value
+        11 |         return value
+           |                ^^^^^ -> value = 3 (line 8)
+           | crosses_scope_declaration: true
+        12 |     def without_nonlocal():
+        13 |         return value
+           |                ^^^^^ -> value = 3 (line 8)
+           | crosses_scope_declaration: false
+        14 |
+        15 | def eager_outer():
+        16 |     value = 4
+        17 |     def intermediate():
+        18 |         nonlocal value
+        19 |         value = 5
+        20 |         class Eager:
+        21 |             result = value
+           |                      ^^^^^ -> value = 5 (line 19)
+           | crosses_scope_declaration: true
+        ");
+    }
+
+    #[test]
+    fn builtin_fallbacks_prevent_identifying_all_bindings() {
+        let source = "
+            len
+            if condition:
+                len = 1
+            len
+            len = 2
+            len
+            ";
+
+        let detail = Some(ResolutionDetail::IdentifiesAllBindings);
+        assert_snapshot!(render_reaching_definitions(source, "len", "/src/test.py", detail), @"
+        1 | len
+          | ^^^ -> <none>
+          | identifies_all_bindings: false
+        2 | if condition:
+        3 |     len = 1
+        4 | len
+          | ^^^ -> len = 1 (line 3)
+          | identifies_all_bindings: false
+        5 | len = 2
+        6 | len
+          | ^^^ -> len = 2 (line 5)
+          | identifies_all_bindings: true
+        ");
+    }
+
+    #[test]
+    fn synthetic_loop_definitions_prevent_identifying_all_bindings() {
+        let source = "
+            def function(condition):
+                value = 1
+                while condition:
+                    value
+                    value = 2
+                    value
+            ";
+
+        let detail = Some(ResolutionDetail::IdentifiesAllBindings);
+        assert_snapshot!(render_reaching_definitions(source, "value", "/src/test.py", detail), @"
+        1 | def function(condition):
+        2 |     value = 1
+        3 |     while condition:
+        4 |         value
+          |         ^^^^^ -> value = 1 (line 2), while condition: (line 3)
+          | identifies_all_bindings: false
+        5 |         value = 2
+        6 |         value
+          |         ^^^^^ -> value = 2 (line 5)
+          | identifies_all_bindings: true
+        ");
+    }
+
+    #[derive(Clone, Copy)]
+    enum ResolutionDetail {
+        CrossesScopeDeclaration,
+        IdentifiesAllBindings,
+    }
+
+    /// Annotates reads of `name`, including those in parsed string annotations.
+    #[track_caller]
+    fn render_reaching_definitions(
+        source: &str,
+        name: &str,
+        path: &str,
+        detail: Option<ResolutionDetail>,
+    ) -> String {
+        render_name_resolutions(source, path, detail, |node| {
+            node.id == name && node.ctx.is_load()
+        })
+    }
+
+    /// Annotates matching names, including those in parsed string annotations.
+    #[track_caller]
+    fn render_name_resolutions(
+        source: &str,
+        path: &str,
+        detail: Option<ResolutionDetail>,
+        include_name: impl Fn(&ast::ExprName) -> bool,
+    ) -> String {
+        let source = dedent(source);
+        let source = source.trim();
+        let db = TestDbBuilder::new()
+            .with_file(path, source)
+            .build()
+            .expect("valid semantic model test database");
+        let file = system_path_to_file(&db, path).expect("test file exists");
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let module = parsed_module(&db, file.python_file(&db)).load(&db);
+        let mut names = NameResolutions {
+            model: SemanticModel::new(&db, file),
+            include_name: &include_name,
+            resolutions: Vec::new(),
+        };
+        names.visit_body(module.suite());
+        names.resolutions.sort_by_key(|(range, _)| range.start());
+        let line_index = LineIndex::from_source_text(source);
+
+        // Formatting into a String cannot fail.
+        let mut output = String::new();
+        for (line_number, line) in source.lines().enumerate() {
+            let space = if line.is_empty() { "" } else { " " };
+            let _ = writeln!(output, "{:>2} |{space}{line}", line_number + 1);
+            for (range, resolution) in &names.resolutions {
+                if line_index.line_index(range.start()).get() != line_number + 1 {
+                    continue;
+                }
+
+                let indent = " ".repeat(usize::from(
+                    range.start() - source.line_start(range.start()),
+                ));
+                let marker = "^".repeat(usize::from(range.len()));
+                let _ = write!(output, "   | {indent}{marker} -> ");
+                let Some(resolution) = resolution else {
+                    output.push_str("<no resolution>\n");
+                    continue;
+                };
+
+                if resolution.definitions().is_empty() {
+                    output.push_str("<none>");
+                }
+                for (index, definition) in resolution.definitions().iter().enumerate() {
+                    if index > 0 {
+                        output.push_str(", ");
+                    }
+                    let definition = definition.full_range(&db, &module).range();
+                    // Keep multiline definitions, such as synthetic loop headers, on one line.
+                    let first_line = source[definition].lines().next().unwrap_or_default();
+                    let _ = write!(
+                        output,
+                        "{} (line {})",
+                        first_line,
+                        line_index.line_index(definition.start())
+                    );
+                }
+                output.push('\n');
+                if let Some(detail) = detail {
+                    let (label, value) = match detail {
+                        ResolutionDetail::CrossesScopeDeclaration => (
+                            "crosses_scope_declaration",
+                            resolution.crosses_scope_declaration(),
+                        ),
+                        ResolutionDetail::IdentifiesAllBindings => (
+                            "identifies_all_bindings",
+                            resolution.identifies_all_bindings(),
+                        ),
+                    };
+                    let _ = writeln!(output, "   | {label}: {value}");
+                }
+            }
+        }
+
+        output
+    }
+
+    struct NameResolutions<'db, 'filter> {
+        model: SemanticModel<'db>,
+        include_name: &'filter dyn Fn(&ast::ExprName) -> bool,
+        resolutions: Vec<(TextRange, Option<DefinitionResolution<'db>>)>,
+    }
+
+    impl<'ast> Visitor<'ast> for NameResolutions<'_, '_> {
+        fn visit_expr(&mut self, expression: &'ast ast::Expr) {
+            if let ast::Expr::Name(name) = expression
+                && (self.include_name)(name)
+            {
+                self.resolutions
+                    .push((name.range(), self.model.reaching_definitions(name)));
+            } else if let ast::Expr::StringLiteral(string) = expression
+                && let Some((parsed, model)) = self.model.enter_string_annotation(string)
+            {
+                let mut nested = NameResolutions {
+                    model,
+                    include_name: self.include_name,
+                    resolutions: Vec::new(),
+                };
+                nested.visit_expr(parsed.expr());
+                self.resolutions.extend(nested.resolutions);
+            }
+            walk_expr(self, expression);
+        }
     }
 }
