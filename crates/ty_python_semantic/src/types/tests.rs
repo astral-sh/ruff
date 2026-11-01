@@ -26,6 +26,31 @@ fn member_lookup_result_size() {
 }
 
 #[test]
+fn sparse_and_shadowed_inherited_names_skip_base_pair_queries() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/example.py",
+        "
+        class Base:
+            value: int
+        class Mixin: ...
+        class Child(Base, Mixin):
+            value: int
+
+        class Other:
+            other: int
+        class Sparse(Base, Mixin, Other): ...
+        ",
+    )?;
+    let file = system_path_to_file(&db, "/src/example.py")?;
+    let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+    assert!(check_types(&db, file).is_empty());
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run_by_name(&db, "shared_inherited_names", None, &events);
+    Ok(())
+}
+
+#[test]
 fn property_deprecations_do_not_infer_accessor_signatures() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_dedented(
