@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::{NodeKind, Parameters};
@@ -14,6 +16,49 @@ struct ParameterGroups {
 }
 
 impl Builder {
+    /// Stores parameters read by the parser. Ordinary parameters are already in source
+    /// order. The range identifies the positional-or-keyword group between the other two.
+    pub fn parameters_from_slice(
+        &mut self,
+        range: TextRange,
+        ordinary: &[BuildId<crate::kind::ParameterWithDefault>],
+        regular: Range<usize>,
+        vararg: Option<BuildId<crate::kind::Parameter>>,
+        kwarg: Option<BuildId<crate::kind::Parameter>>,
+    ) -> BuildId<crate::kind::Parameters> {
+        if regular.start == 0
+            && regular.end == ordinary.len()
+            && vararg.is_none()
+            && kwarg.is_none()
+        {
+            let items = self.list(ordinary.iter().copied()).word();
+            return self.push_regular_parameters(range, items);
+        }
+        let start = self.ast.extra.len();
+        let vararg = vararg.map_or(0, |node| node.slot);
+        let kwarg = kwarg.map_or(0, |node| node.slot);
+        self.ast
+            .extra
+            .extend(ordinary[..regular.end].iter().map(|node| node.slot));
+        if vararg != 0 {
+            self.ast.extra.push(vararg);
+        }
+        self.ast
+            .extra
+            .extend(ordinary[regular.end..].iter().map(|node| node.slot));
+        if kwarg != 0 {
+            self.ast.extra.push(kwarg);
+        }
+        let groups = ParameterGroups {
+            positional_only: offset(regular.start),
+            regular: offset(regular.len()),
+            keyword_only: offset(ordinary.len() - regular.end),
+            vararg,
+            kwarg,
+        };
+        self.finish_parameters(range, start, groups)
+    }
+
     pub(super) fn parameters_from_groups(
         &mut self,
         range: TextRange,
