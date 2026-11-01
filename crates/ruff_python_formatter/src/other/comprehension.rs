@@ -1,5 +1,5 @@
 use ruff_formatter::{Buffer, FormatResult, format_args, write};
-use ruff_python_ast::{Comprehension, Expr};
+use ruff_python_ast::{Comprehension, Expr, ExprKind};
 use ruff_python_trivia::{SimpleTokenKind, find_only_token_in_range};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -10,10 +10,10 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatComprehension;
 
-impl FormatNodeRule<Comprehension> for FormatComprehension {
-    fn fmt_fields(&self, item: &Comprehension, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<ruff_python_ast::kind::Comprehension> for FormatComprehension {
+    fn fmt_fields(&self, item: Comprehension<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         struct Spacer<'a> {
-            expression: &'a Expr,
+            expression: Expr<'a>,
             preserve_parentheses: bool,
         }
 
@@ -35,8 +35,7 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
                 // ]
                 // ```
                 let will_be_parenthesized = self.preserve_parentheses
-                    && f.context()
-                        .is_expression_parenthesized(self.expression.into());
+                    && f.context().is_expression_parenthesized(self.expression);
 
                 if has_leading_comments && !will_be_parenthesized {
                     soft_line_break_or_space().fmt(f)
@@ -46,16 +45,12 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
             }
         }
 
-        let Comprehension {
-            range: _,
-            node_index: _,
-            target,
-            iter,
-            ifs,
-            is_async,
-        } = item;
+        let target = item.target();
+        let iter = item.iter();
+        let ifs = item.ifs();
+        let is_async = item.is_async();
 
-        if *is_async {
+        if is_async {
             write!(f, [token("async"), space()])?;
         }
 
@@ -149,16 +144,16 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
     }
 }
 
-struct ExprTupleWithoutParentheses<'a>(&'a Expr);
+struct ExprTupleWithoutParentheses<'a>(Expr<'a>);
 
 impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        match self.0 {
-            Expr::Tuple(expr_tuple) => expr_tuple
+        match self.0.classify() {
+            ExprKind::Tuple(expr_tuple) => expr_tuple
                 .format()
                 .with_options(TupleParentheses::Never)
                 .fmt(f),
-            other => other.format().fmt(f),
+            other => other.view().format().fmt(f),
         }
     }
 }

@@ -87,6 +87,7 @@
 //!
 //! It is possible to add an additional optional label to [`SourceComment`] If ever the need arises to distinguish two *dangling comments* in the formatting logic,
 
+use ruff_python_ast::AstNode as _;
 use std::cell::Cell;
 use std::fmt::Debug;
 use std::rc::Rc;
@@ -96,7 +97,7 @@ pub(crate) use format::{
     leading_alternate_branch_comments, leading_comments, leading_node_comments, trailing_comments,
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
-use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::SyntaxNode;
 use ruff_python_trivia::{CommentLinePosition, SuppressionKind, TriviaRanges};
 use ruff_text_size::{Ranged, TextRange};
 pub(crate) use visitor::collect_comments;
@@ -236,12 +237,12 @@ impl<'a> Comments<'a> {
 
     /// Extracts the comments from the AST.
     pub(crate) fn from_ast(
-        root: impl Into<AnyNodeRef<'a>>,
+        root: impl Into<SyntaxNode<'a>>,
         source_code: SourceCode<'a>,
         trivia: &'a TriviaRanges,
     ) -> Self {
         fn collect_comments<'a>(
-            root: AnyNodeRef<'a>,
+            root: SyntaxNode<'a>,
             source_code: SourceCode<'a>,
             trivia: &'a TriviaRanges,
         ) -> Comments<'a> {
@@ -264,12 +265,12 @@ impl<'a> Comments<'a> {
     /// A false result guarantees that the node has none. A true result can also
     /// mean another node with comments set the same bit in the filter.
     #[inline]
-    pub(crate) fn may_have_comment(&self, node: impl Into<AnyNodeRef<'a>>) -> bool {
+    pub(crate) fn may_have_comment(&self, node: impl Into<SyntaxNode<'a>>) -> bool {
         self.data.bloom_filter.might_contain(node.into())
     }
 
     #[inline]
-    fn possible_key(&self, node: impl Into<AnyNodeRef<'a>>) -> Option<NodeRefEqualityKey<'a>> {
+    fn possible_key(&self, node: impl Into<SyntaxNode<'a>>) -> Option<NodeRefEqualityKey<'a>> {
         let node = node.into();
         self.may_have_comment(node)
             .then(|| NodeRefEqualityKey::from_ref(node))
@@ -279,7 +280,7 @@ impl<'a> Comments<'a> {
     #[inline]
     pub(crate) fn has<T>(&self, node: T) -> bool
     where
-        T: Into<AnyNodeRef<'a>>,
+        T: Into<SyntaxNode<'a>>,
     {
         self.possible_key(node)
             .is_some_and(|key| self.data.comments.has(&key))
@@ -289,7 +290,7 @@ impl<'a> Comments<'a> {
     #[inline]
     pub(crate) fn has_leading<T>(&self, node: T) -> bool
     where
-        T: Into<AnyNodeRef<'a>>,
+        T: Into<SyntaxNode<'a>>,
     {
         !self.leading(node).is_empty()
     }
@@ -298,7 +299,7 @@ impl<'a> Comments<'a> {
     #[inline]
     pub(crate) fn leading<T>(&self, node: T) -> &[SourceComment]
     where
-        T: Into<AnyNodeRef<'a>>,
+        T: Into<SyntaxNode<'a>>,
     {
         self.possible_key(node)
             .map_or(&[], |key| self.data.comments.leading(&key))
@@ -307,7 +308,7 @@ impl<'a> Comments<'a> {
     /// Returns `true` if node has any [dangling comments](self#dangling-comments).
     pub(crate) fn has_dangling<T>(&self, node: T) -> bool
     where
-        T: Into<AnyNodeRef<'a>>,
+        T: Into<SyntaxNode<'a>>,
     {
         !self.dangling(node).is_empty()
     }
@@ -315,7 +316,7 @@ impl<'a> Comments<'a> {
     /// Returns the [dangling comments](self#dangling-comments) of `node`
     pub(crate) fn dangling<T>(&self, node: T) -> &[SourceComment]
     where
-        T: Into<AnyNodeRef<'a>>,
+        T: Into<SyntaxNode<'a>>,
     {
         self.possible_key(node)
             .map_or(&[], |key| self.data.comments.dangling(&key))
@@ -325,7 +326,7 @@ impl<'a> Comments<'a> {
     #[inline]
     pub(crate) fn trailing<T>(&self, node: T) -> &[SourceComment]
     where
-        T: Into<AnyNodeRef<'a>>,
+        T: Into<SyntaxNode<'a>>,
     {
         self.possible_key(node)
             .map_or(&[], |key| self.data.comments.trailing(&key))
@@ -335,7 +336,7 @@ impl<'a> Comments<'a> {
     #[inline]
     pub(crate) fn has_trailing<T>(&self, node: T) -> bool
     where
-        T: Into<AnyNodeRef<'a>>,
+        T: Into<SyntaxNode<'a>>,
     {
         !self.trailing(node).is_empty()
     }
@@ -344,7 +345,7 @@ impl<'a> Comments<'a> {
     #[inline]
     pub(crate) fn has_trailing_own_line<T>(&self, node: T) -> bool
     where
-        T: Into<AnyNodeRef<'a>>,
+        T: Into<SyntaxNode<'a>>,
     {
         self.trailing(node)
             .iter()
@@ -354,7 +355,7 @@ impl<'a> Comments<'a> {
     /// Returns an iterator over the [leading](self#leading-comments) and [trailing comments](self#trailing-comments) of `node`.
     pub(crate) fn leading_trailing<T>(&self, node: T) -> impl Iterator<Item = &SourceComment>
     where
-        T: Into<AnyNodeRef<'a>>,
+        T: Into<SyntaxNode<'a>>,
     {
         let comments = self.leading_dangling_trailing(node);
         comments.leading.iter().chain(comments.trailing)
@@ -366,7 +367,7 @@ impl<'a> Comments<'a> {
         node: T,
     ) -> LeadingDanglingTrailingComments<'_>
     where
-        T: Into<AnyNodeRef<'a>>,
+        T: Into<SyntaxNode<'a>>,
     {
         self.possible_key(node)
             .map_or(LeadingDanglingTrailing::EMPTY, |key| {
@@ -402,7 +403,7 @@ impl<'a> Comments<'a> {
 
     #[inline(always)]
     #[cfg(not(debug_assertions))]
-    pub(crate) fn mark_verbatim_node_comments_formatted(&self, _node: AnyNodeRef) {}
+    pub(crate) fn mark_verbatim_node_comments_formatted(&self, _node: SyntaxNode) {}
 
     /// Marks the comments of a node printed in verbatim (suppressed) as formatted.
     ///
@@ -410,26 +411,16 @@ impl<'a> Comments<'a> {
     /// The leading and trailing comments are not marked as formatted because they are formatted
     /// normally if `node` is the first or last node of a suppression range.
     #[cfg(debug_assertions)]
-    pub(crate) fn mark_verbatim_node_comments_formatted(&self, node: AnyNodeRef) {
-        use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
-
-        struct MarkVerbatimCommentsAsFormattedVisitor<'a>(&'a Comments<'a>);
-
-        impl<'a> SourceOrderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
-            fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
-                for comment in self.0.leading_dangling_trailing(node) {
-                    comment.mark_formatted();
-                }
-
-                TraversalSignal::Traverse
-            }
-        }
-
+    pub(crate) fn mark_verbatim_node_comments_formatted(&self, node: SyntaxNode) {
         for dangling in self.dangling(node) {
             dangling.mark_formatted();
         }
 
-        node.visit_source_order(&mut MarkVerbatimCommentsAsFormattedVisitor(self));
+        for descendant in node.descendants().skip(1) {
+            for comment in self.leading_dangling_trailing(descendant) {
+                comment.mark_formatted();
+            }
+        }
     }
 
     /// Returns an object that implements [Debug] for nicely printing the [`Comments`].
@@ -438,38 +429,8 @@ impl<'a> Comments<'a> {
     }
 
     /// Returns true if the node itself or any of its descendants have comments.
-    pub(crate) fn contains_comments(&self, node: AnyNodeRef) -> bool {
-        use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
-
-        struct Visitor<'a> {
-            comments: &'a Comments<'a>,
-            has_comment: bool,
-        }
-
-        impl<'a> SourceOrderVisitor<'a> for Visitor<'a> {
-            fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
-                if self.has_comment {
-                    TraversalSignal::Skip
-                } else if self.comments.has(node) {
-                    self.has_comment = true;
-                    TraversalSignal::Skip
-                } else {
-                    TraversalSignal::Traverse
-                }
-            }
-        }
-
-        if self.has(node) {
-            return true;
-        }
-
-        let mut visitor = Visitor {
-            comments: self,
-            has_comment: false,
-        };
-        node.visit_source_order(&mut visitor);
-
-        visitor.has_comment
+    pub(crate) fn contains_comments(&self, node: SyntaxNode) -> bool {
+        node.descendants().any(|descendant| self.has(descendant))
     }
 }
 
@@ -503,7 +464,7 @@ struct CommentsData<'a> {
     comments: CommentsMap<'a>,
 }
 
-/// A single-hash Bloom filter over the addresses of nodes with comments.
+/// A single-hash Bloom filter over the arena rows of nodes with comments.
 /// Different nodes can set the same bit, so a hit still needs an exact lookup.
 #[derive(Debug, Default)]
 struct CommentNodeFilter([u64; 32]);
@@ -519,14 +480,13 @@ impl CommentNodeFilter {
     }
 
     #[inline]
-    fn might_contain(&self, node: AnyNodeRef<'_>) -> bool {
+    fn might_contain(&self, node: SyntaxNode<'_>) -> bool {
         let (word, bit) = self.position(node);
         self.0[word] & bit != 0
     }
 
-    fn position(&self, node: AnyNodeRef<'_>) -> (usize, u64) {
-        // Drop the low bits because AST node addresses are typically aligned.
-        let index = node.as_ptr().as_ptr().addr() >> 3;
+    fn position(&self, node: SyntaxNode<'_>) -> (usize, u64) {
+        let index = node.node_id().index();
         ((index / 64) % self.0.len(), 1 << (index % 64))
     }
 }
@@ -548,14 +508,14 @@ mod tests {
     use insta::assert_debug_snapshot;
 
     use ruff_formatter::SourceCode;
-    use ruff_python_ast::{Mod, PySourceType};
+    use ruff_python_ast::PySourceType;
     use ruff_python_parser::{ParseOptions, Parsed, parse};
     use ruff_python_trivia::TriviaRanges;
 
     use crate::comments::{CommentNodeFilter, Comments, CommentsData, CommentsMap};
 
     struct CommentsTestCase<'a> {
-        parsed: Parsed<Mod>,
+        parsed: Parsed<ruff_python_ast::kind::Mod>,
         trivia: TriviaRanges,
         source_code: SourceCode<'a>,
     }
@@ -585,7 +545,7 @@ mod tests {
         let test_case = CommentsTestCase::from_code("pass");
         let node = test_case.parsed.syntax();
 
-        // Force a collision independently of where the allocator put the node.
+        // Force a collision regardless of the node's row.
         let mut bloom_filter = CommentNodeFilter::default();
         bloom_filter.0.fill(u64::MAX);
         let comments = Comments {

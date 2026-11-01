@@ -13,8 +13,8 @@ use ruff_python_ast::{FString, StringFlags};
 #[derive(Default)]
 pub struct FormatFString;
 
-impl FormatNodeRule<FString> for FormatFString {
-    fn fmt_fields(&self, item: &FString, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<ruff_python_ast::kind::FString> for FormatFString {
+    fn fmt_fields(&self, item: FString<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         let normalizer = StringNormalizer::from_context(f.context());
 
         let string_kind = normalizer.choose_quotes(item.into()).flags();
@@ -22,7 +22,7 @@ impl FormatNodeRule<FString> for FormatFString {
         let context = InterpolatedStringContext::new(
             string_kind,
             InterpolatedStringLayout::from_interpolated_string_elements(
-                &item.elements,
+                item.elements(),
                 f.context().source(),
             ),
         );
@@ -37,7 +37,7 @@ impl FormatNodeRule<FString> for FormatFString {
                 .interpolated_string_state()
                 .enter_string(context);
             let f = &mut WithInterpolatedStringState::new(state, &mut *f);
-            for element in &item.elements {
+            for element in item.elements() {
                 FormatInterpolatedStringElement::new(element, context).fmt(f)?;
             }
         }

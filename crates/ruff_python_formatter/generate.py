@@ -1,4 +1,8 @@
 #! /usr/bin/python
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
 
 """See CONTRIBUTING.md"""
 
@@ -9,6 +13,8 @@ import re
 from collections import defaultdict
 from pathlib import Path
 from subprocess import check_output
+
+import tomllib
 
 
 def rustfmt(code: str) -> str:
@@ -21,31 +27,21 @@ def rustfmt(code: str) -> str:
 root = Path(
     check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip(),
 )
-nodes_file = (
-    root.joinpath("crates")
-    .joinpath("ruff_python_ast")
-    .joinpath("src")
-    .joinpath("generated.rs")
-    .read_text()
-)
-node_lines = (
-    nodes_file.split("pub enum AnyNodeRef<'a> {")[1].split("}")[0].strip().splitlines()
-)
-nodes = []
-for node_line in node_lines:
-    node = node_line.split("(")[1].split(")")[0].split("::")[-1].removeprefix("&'a ")
-    # `FString` has a custom implementation while the formatting for
-    # `FStringLiteralElement`, `FStringFormatSpec` and `FStringExpressionElement` are
-    # handled by the `FString` implementation.
-    if node in (
-        "InterpolatedStringLiteralElement",
-        "InterpolatedElement",
-        "InterpolatedStringFormatSpec",
-        "Identifier",
-    ):
-        continue
-    nodes.append(node)
-print(nodes)
+formatted_by_parent = {
+    "Identifier",
+    "InterpolatedElement",
+    "InterpolatedStringFormatSpec",
+    "InterpolatedStringLiteralElement",
+}
+with (root / "crates" / "ruff_python_ast" / "ast.toml").open("rb") as schema:
+    ast = tomllib.load(schema)
+    node_groups = [name for name in ast if name != "ungrouped"]
+    nodes = [
+        node
+        for group in ast.values()
+        for node in group["nodes"]
+        if node not in formatted_by_parent
+    ]
 
 # %%
 # Generate newtypes with dummy FormatNodeRule implementations
@@ -107,8 +103,8 @@ for group, group_nodes in nodes_grouped.items():
             #[derive(Default)]
             pub struct Format{node};
 
-            impl FormatNodeRule<{node}> for Format{node} {{
-                fn fmt_fields(&self, item: &{node}, f: &mut PyFormatter) -> FormatResult<()> {{
+            impl FormatNodeRule<ruff_python_ast::kind::{node}> for Format{node} {{
+                fn fmt_fields(&self, item: {node}<'_>, f: &mut PyFormatter) -> FormatResult<()> {{
                     write!(f, [verbatim_text(item)])
                 }}
             }}
@@ -117,56 +113,48 @@ for group, group_nodes in nodes_grouped.items():
         node_path.write_text(rustfmt(code))
 
 # %%
-# Generate `FormatRule`, `AsFormat` and `IntoFormat`
+# Generate `FormatRule` and `IntoFormat`
 
 generated = """//! This is a generated file. Don't modify it by hand! Run `crates/ruff_python_formatter/generate.py` to re-generate the file.
 #![allow(unknown_lints, clippy::default_constructed_unit_structs)]
 
 use crate::context::PyFormatContext;
 use crate::{AsFormat, FormatNodeRule, IntoFormat, PyFormatter};
-use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatResult, FormatRule};
+use ruff_formatter::{FormatOwnedWithRule, FormatResult, FormatRule};
 use ruff_python_ast as ast;
 
 """
+generated += """
+macro_rules! impl_as_format {
+    ($($node:ident),* $(,)?) => { $(
+        impl<C> AsFormat<C> for ast::$node<'_> where Self: IntoFormat<C> {
+            type Format<'a> = <Self as IntoFormat<C>>::Format where Self: 'a;
+            fn format(&self) -> Self::Format<'_> { (*self).into_format() }
+        }
+    )* };
+}
+"""
+generated += (
+    "impl_as_format!(" + ", ".join([*node_groups, "Identifier", *nodes]) + ");\n"
+)
 for node in nodes:
     text = f"""
-        impl FormatRule<ast::{node}, PyFormatContext<'_>>
+        impl FormatRule<ast::{node}<'_>, PyFormatContext<'_>>
             for crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node}
         {{
             #[inline]
-            fn fmt(
-                &self,
-                node: &ast::{node},
-                f: &mut PyFormatter,
-            ) -> FormatResult<()> {{
-                FormatNodeRule::<ast::{node}>::fmt(self, node, f)
+            fn fmt(&self, node: &ast::{node}<'_>, f: &mut PyFormatter) -> FormatResult<()> {{
+                FormatNodeRule::<ast::kind::{node}>::fmt(self, *node, f)
             }}
         }}
-        impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::{node} {{
-            type Format<'a> = FormatRefWithRule<
-                'a,
-                ast::{node},
-                crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node},
-                PyFormatContext<'ast>,
-            >;
-            fn format(&self) -> Self::Format<'_> {{
-                FormatRefWithRule::new(
-                    self,
-                    crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node}::default(),
-                )
-            }}
-        }}
-        impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::{node} {{
+        impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::{node}<'_> {{
             type Format = FormatOwnedWithRule<
-                ast::{node},
+                Self,
                 crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node},
                 PyFormatContext<'ast>,
             >;
             fn into_format(self) -> Self::Format {{
-                FormatOwnedWithRule::new(
-                    self,
-                    crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node}::default(),
-                )
+                FormatOwnedWithRule::new(self, crate::{groups[group_for_node(node)]}::{to_camel_case(node)}::Format{node}::default())
             }}
         }}
     """
