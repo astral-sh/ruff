@@ -1,6 +1,6 @@
 use ruff_python_ast::helpers::{Truthiness, map_callable, map_subscript};
-use ruff_python_ast::{self as ast, Expr, ExprCall};
-use ruff_python_semantic::{BindingKind, Modules, SemanticModel, analyze};
+use ruff_python_ast::{self as ast, Expr, ExprCall, Stmt};
+use ruff_python_semantic::{BindingKind, Modules, ScopeId, SemanticModel, analyze};
 
 /// Return `true` if the given [`Expr`] is a special class attribute, like `__slots__`.
 ///
@@ -168,10 +168,7 @@ pub(super) fn dataclass_kind<'a>(
 }
 
 /// Return true if dataclass (stdlib or `attrs`) is frozen
-pub(super) fn is_frozen_dataclass(
-    dataclass_decorator: &ast::Decorator,
-    semantic: &SemanticModel,
-) -> bool {
+fn is_frozen_dataclass(dataclass_decorator: &ast::Decorator, semantic: &SemanticModel) -> bool {
     let Some(qualified_name) =
         semantic.resolve_qualified_name(map_callable(&dataclass_decorator.expression))
     else {
@@ -194,6 +191,28 @@ pub(super) fn is_frozen_dataclass(
         ["attrs" | "attr", "frozen"] => true,
         _ => false,
     }
+}
+
+/// Checks that the passed function is an instantiation of the class,
+/// retrieves the ``StmtClassDef`` and verifies that it is a frozen dataclass
+pub(crate) fn is_frozen_dataclass_instantiation(
+    func: &Expr,
+    semantic: &SemanticModel,
+    scope_id: ScopeId,
+) -> bool {
+    semantic
+        .lookup_attribute_in_scope(func, scope_id)
+        .is_some_and(|id| {
+            let binding = &semantic.binding(id);
+            let Some(Stmt::ClassDef(class_def)) = binding.statement(semantic) else {
+                return false;
+            };
+
+            let Some((_, dataclass_decorator)) = dataclass_kind(class_def, semantic) else {
+                return false;
+            };
+            is_frozen_dataclass(dataclass_decorator, semantic)
+        })
 }
 
 /// Returns `true` if the given class has "default copy" semantics.
