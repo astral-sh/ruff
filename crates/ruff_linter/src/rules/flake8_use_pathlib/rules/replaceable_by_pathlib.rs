@@ -1,6 +1,6 @@
 use ruff_diagnostics::Applicability;
+use ruff_python_ast::ExprCall;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{Expr, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -16,17 +16,22 @@ use crate::{Edit, Fix};
 
 pub(crate) fn replaceable_by_pathlib(
     checker: &Checker,
-    call: &ExprCall,
+    call: ExprCall<'_>,
     qualified_name: &QualifiedName,
 ) {
-    let range = call.func.range();
+    let range = call.func().range();
     match qualified_name.segments() {
         // PTH118
         ["os", module @ ("path" | "sep"), "join"] => {
             checker.report_diagnostic_if_enabled(
                 OsPathJoin {
                     module: module.to_string(),
-                    joiner: if call.arguments.args().any(Expr::is_starred_expr) {
+                    joiner: if call
+                        .arguments()
+                        .args()
+                        .iter()
+                        .any(ruff_python_ast::Expr::is_starred_expr)
+                    {
                         Joiner::Joinpath
                     } else {
                         Joiner::Slash
@@ -51,7 +56,7 @@ pub(crate) fn replaceable_by_pathlib(
             //               0           1              2            3                 4
             // glob.glob(pathname, *, root_dir=None, dir_fd=None, recursive=False, include_hidden=False)
             // ```
-            if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
+            if is_keyword_only_argument_non_default(call.arguments(), "dir_fd") {
                 return;
             }
 
@@ -64,7 +69,7 @@ pub(crate) fn replaceable_by_pathlib(
         }
         // PTH208
         ["os", "listdir"] => {
-            let path = call.arguments.find_argument_value("path", 0);
+            let path = call.arguments().find_argument_value("path", 0);
             if path.is_some_and(|expr| is_file_descriptor(expr, checker.semantic())) {
                 return;
             }

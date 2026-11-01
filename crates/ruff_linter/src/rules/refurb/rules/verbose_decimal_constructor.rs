@@ -4,7 +4,7 @@ use itertools::Itertools;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{ExprCallFields, ExprKind};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_text_size::Ranged;
 
@@ -75,7 +75,7 @@ impl Violation for VerboseDecimalConstructor {
 /// FURB157
 pub(crate) fn verbose_decimal_constructor(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call: &ExprCallFields<'_>,
     qualified_name: &QualifiedName,
 ) {
     if !matches!(qualified_name.segments(), ["decimal", "Decimal"]) {
@@ -87,10 +87,10 @@ pub(crate) fn verbose_decimal_constructor(
         return;
     };
 
-    match value {
-        Expr::StringLiteral(ast::ExprStringLiteral {
-            value: str_literal, ..
-        }) => {
+    match value.classify() {
+        ExprKind::StringLiteral(expr_string_literal) => {
+            let str_literal = expr_string_literal.value();
+
             // Parse the inner string as an integer.
             //
             // For reference, a string argument to `Decimal` is parsed in CPython
@@ -169,16 +169,20 @@ pub(crate) fn verbose_decimal_constructor(
                 applicability,
             ));
         }
-        Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) => {
+        ExprKind::Call(expr_call) => {
+            let func = expr_call.func();
+            let arguments = expr_call.arguments();
+
             // Must be a call to the `float` builtin.
             if !checker.semantic().match_builtin_expr(func, "float") {
                 return;
             }
 
             // Must have exactly one argument, which is a string literal.
-            let Some(float) = arguments.as_single_positional() else {
+            if !arguments.keywords().is_empty() {
+                return;
+            }
+            let Some([float]) = arguments.args().as_array() else {
                 return;
             };
             let Some(float_str) = as_non_finite_float_string_literal(float) else {

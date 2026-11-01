@@ -5,7 +5,7 @@ use libcst_native::{Arg, Expression};
 use regex::Regex;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 use ruff_python_codegen::Stylist;
 use ruff_text_size::Ranged;
 
@@ -65,7 +65,7 @@ impl Violation for FormatLiterals {
 }
 
 /// UP030
-pub(crate) fn format_literals(checker: &Checker, call: &ast::ExprCall, summary: &FormatSummary) {
+pub(crate) fn format_literals(checker: &Checker, call: ast::ExprCall<'_>, summary: &FormatSummary) {
     // The format we expect is, e.g.: `"{0} {1}".format(...)`
     if summary.has_nested_parts {
         return;
@@ -90,17 +90,23 @@ pub(crate) fn format_literals(checker: &Checker, call: &ast::ExprCall, summary: 
     let arguments = if is_sequential(&summary.indices) {
         Arguments::Preserve
     } else {
-        if call.arguments.len() < summary.indices.len()
-            || call
-                .arguments
-                .iter_source_order()
-                .enumerate()
-                .any(|(index, item)| match item {
-                    ast::ArgOrKeyword::Arg(arg) => {
-                        index < summary.indices.len() && arg.is_starred_expr()
-                    }
-                    ast::ArgOrKeyword::Keyword(_) => true,
-                })
+        // Ex) `"{1} {0}".format(foo=1, bar=2)`
+        if !call.arguments().keywords().is_empty() {
+            return;
+        }
+
+        // Ex) `"{1} {0}".format(foo)`
+        if call.arguments().args().len() < summary.indices.len() {
+            return;
+        }
+
+        // Ex) `"{1} {0}".format(*foo)`
+        if call
+            .arguments()
+            .args()
+            .iter()
+            .take(summary.indices.len())
+            .any(ast::Expr::is_starred_expr)
         {
             return;
         }
@@ -204,7 +210,7 @@ enum Arguments<'a> {
 
 /// Returns the corrected function call.
 fn generate_call(
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     arguments: Arguments,
     locator: &Locator,
     stylist: &Stylist,

@@ -3,7 +3,7 @@ use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{self as ast, Expr, Number};
+use ruff_python_ast::{self as ast, Expr, ExprKind, Number};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -79,14 +79,14 @@ impl Violation for RedundantLogBase {
 /// FURB163
 pub(crate) fn redundant_log_base(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     qualified_name: &QualifiedName,
 ) {
-    let [
-        ruff_python_ast::Argument::Positional(arg),
-        ruff_python_ast::Argument::Positional(base),
-    ] = call.arguments.items.as_slice()
-    else {
+    if !call.arguments().keywords().is_empty() {
+        return;
+    }
+
+    let Some([arg, base]) = call.arguments().args().as_array() else {
         return;
     };
 
@@ -135,27 +135,31 @@ impl Base {
     }
 }
 
-fn is_number_literal(expr: &Expr, value: i8) -> bool {
-    if let Expr::NumberLiteral(number_literal) = expr {
-        if let Number::Int(number) = &number_literal.value {
+fn is_number_literal(expr: Expr<'_>, value: i8) -> bool {
+    if let ExprKind::NumberLiteral(number_literal) = expr.classify() {
+        if let Number::Int(number) = &number_literal.value() {
             return number.as_i8().is_some_and(|number| number == value);
-        } else if let Number::Float(number) = number_literal.value {
+        } else if let Number::Float(number) = number_literal.value() {
             #[expect(clippy::float_cmp)]
-            return number == f64::from(value);
+            return *number == f64::from(value);
         }
     }
     false
 }
 
-fn generate_fix(checker: &Checker, call: &ast::ExprCall, base: Base, arg: &Expr) -> Result<Fix> {
+fn generate_fix(
+    checker: &Checker,
+    call: ast::ExprCall<'_>,
+    base: Base,
+    arg: Expr<'_>,
+) -> Result<Fix> {
     let (edit, binding) = checker.importer().get_or_import_symbol(
         &ImportRequest::import("math", base.to_log_function()),
         call.start(),
         checker.semantic(),
     )?;
 
-    let arg_range =
-        parenthesized_range(arg.into(), call.into(), checker.tokens()).unwrap_or(arg.range());
+    let arg_range = parenthesized_range(arg, call.into(), checker.tokens()).unwrap_or(arg.range());
     let arg_str = checker.locator().slice(arg_range);
 
     Ok(Fix::applicable_edits(

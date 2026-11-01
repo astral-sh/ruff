@@ -85,7 +85,7 @@ impl AlwaysFixableViolation for FutureRequiredTypeAnnotation {
 }
 
 /// FA102
-pub(crate) fn future_required_type_annotation(checker: &Checker, expr: &Expr, reason: Reason) {
+pub(crate) fn future_required_type_annotation(checker: &Checker, &expr: &Expr<'_>, reason: Reason) {
     checker
         .report_diagnostic(FutureRequiredTypeAnnotation { reason }, expr.range())
         .set_fix(Fix::unsafe_edit(checker.importer().add_future_import()));

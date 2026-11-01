@@ -1,7 +1,9 @@
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{
+    self as ast, Expr, ExprAttribute, ExprKind, ExprName, StmtClassDef, StmtKind, Suite,
+};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
@@ -62,7 +64,7 @@ impl Violation for NonSlotAssignment {
 }
 
 /// PLE0237
-pub(crate) fn non_slot_assignment(checker: &Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn non_slot_assignment(checker: &Checker, class_def: StmtClassDef<'_>) {
     let semantic = checker.semantic();
 
     // If the class inherits from another class (aside from `object`), then it's possible that
@@ -74,7 +76,7 @@ pub(crate) fn non_slot_assignment(checker: &Checker, class_def: &ast::StmtClassD
         return;
     }
 
-    for attribute in is_attributes_not_in_slots(&class_def.body) {
+    for attribute in is_attributes_not_in_slots(class_def.body()) {
         checker.report_diagnostic(
             NonSlotAssignment {
                 name: attribute.name.to_string(),
@@ -101,14 +103,19 @@ impl Ranged for AttributeAssignment<'_> {
 /// Return a list of attributes that are assigned to but not included in `__slots__`.
 ///
 /// If the `__slots__` attribute cannot be statically determined, returns an empty vector.
-fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
+fn is_attributes_not_in_slots(body: Suite<'_>) -> Vec<AttributeAssignment<'_>> {
     // First, collect all the attributes that are assigned to `__slots__`.
     let mut slots = FxHashSet::default();
     for statement in body {
-        match statement {
+        match statement.classify() {
             // Ex) `__slots__ = ("name",)`
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                let [Expr::Name(ast::ExprName { id, .. })] = targets.as_slice() else {
+            StmtKind::Assign(stmt_assign) => {
+                let targets = stmt_assign.targets();
+                let value = stmt_assign.value();
+
+                let Some([ast::ExprFields::Name(ast::ExprNameFields { id, .. })]) =
+                    targets.as_array().map(|items| items.map(Expr::fields))
+                else {
                     continue;
                 };
 
@@ -118,14 +125,13 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
             }
 
             // Ex) `__slots__: Tuple[str, ...] = ("name",)`
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                target,
-                value: Some(value),
-                ..
-            }) => {
-                let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() else {
+            StmtKind::AnnAssign(stmt_ann_assign) if let Some(value) = stmt_ann_assign.value() => {
+                let target = stmt_ann_assign.target();
+
+                let ExprKind::Name(name_node) = target.classify() else {
                     continue;
                 };
+                let id = name_node.id();
 
                 if id == "__slots__" && add_slots(value, &mut slots).is_none() {
                     return vec![];
@@ -133,10 +139,14 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
             }
 
             // Ex) `__slots__ += ("name",)`
-            Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
-                let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() else {
+            StmtKind::AugAssign(stmt_aug_assign) => {
+                let target = stmt_aug_assign.target();
+                let value = stmt_aug_assign.value();
+
+                let ExprKind::Name(name_node) = target.classify() else {
                     continue;
                 };
+                let id = name_node.id();
 
                 if id == "__slots__" && add_slots(value, &mut slots).is_none() {
                     return vec![];
@@ -152,19 +162,24 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
 
     // And, collect all the property name with setter.
     for statement in body {
-        let Stmt::FunctionDef(ast::StmtFunctionDef { decorator_list, .. }) = statement else {
+        let StmtKind::FunctionDef(function_def) = statement.classify() else {
             continue;
         };
+        let decorator_list = function_def.decorator_list();
 
         for decorator in decorator_list {
-            let Some(ast::ExprAttribute { value, attr, .. }) =
-                decorator.expression.as_attribute_expr()
+            let Some(ast::ExprAttributeFields { value, attr, .. }) = decorator
+                .expression()
+                .as_attribute_expr()
+                .map(ExprAttribute::fields)
             else {
                 continue;
             };
 
             if attr == "setter" {
-                let Some(ast::ExprName { id, .. }) = value.as_name_expr() else {
+                let Some(ast::ExprNameFields { id, .. }) =
+                    value.as_name_expr().map(ExprName::fields)
+                else {
                     continue;
                 };
                 slots.insert(id.as_str());
@@ -175,56 +190,69 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
     // Second, find any assignments that aren't included in `__slots__`.
     let mut assignments = vec![];
     for statement in body {
-        let Stmt::FunctionDef(ast::StmtFunctionDef { name, body, .. }) = statement else {
+        let StmtKind::FunctionDef(function_def) = statement.classify() else {
             continue;
         };
+        let name = function_def.name();
+        let body = function_def.body();
 
         if name == "__init__" {
             for statement in body {
-                match statement {
+                match statement.classify() {
                     // Ex) `self.name = name`
-                    Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                        let [Expr::Attribute(attribute)] = targets.as_slice() else {
+                    StmtKind::Assign(stmt_assign) => {
+                        let targets = stmt_assign.targets();
+
+                        let Some([ExprKind::Attribute(attribute)]) =
+                            targets.as_array().map(|items| items.map(Expr::classify))
+                        else {
                             continue;
                         };
-                        let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() else {
+                        let ExprKind::Name(name_node) = attribute.value().classify() else {
                             continue;
                         };
-                        if id == "self" && !slots.contains(attribute.attr.as_str()) {
+                        let id = name_node.id();
+                        if id == "self" && !slots.contains(attribute.attr().as_str()) {
                             assignments.push(AttributeAssignment {
-                                name: &attribute.attr,
+                                name: attribute.attr().as_str(),
                                 range: attribute.range(),
                             });
                         }
                     }
 
                     // Ex) `self.name: str = name`
-                    Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
-                        let Expr::Attribute(attribute) = target.as_ref() else {
+                    StmtKind::AnnAssign(stmt_ann_assign) => {
+                        let target = stmt_ann_assign.target();
+
+                        let ExprKind::Attribute(attribute) = target.classify() else {
                             continue;
                         };
-                        let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() else {
+                        let ExprKind::Name(name_node) = attribute.value().classify() else {
                             continue;
                         };
-                        if id == "self" && !slots.contains(attribute.attr.as_str()) {
+                        let id = name_node.id();
+                        if id == "self" && !slots.contains(attribute.attr().as_str()) {
                             assignments.push(AttributeAssignment {
-                                name: &attribute.attr,
+                                name: attribute.attr().as_str(),
                                 range: attribute.range(),
                             });
                         }
                     }
 
                     // Ex) `self.name += name`
-                    Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
-                        let Expr::Attribute(attribute) = target.as_ref() else {
+                    StmtKind::AugAssign(stmt_aug_assign) => {
+                        let target = stmt_aug_assign.target();
+
+                        let ExprKind::Attribute(attribute) = target.classify() else {
                             continue;
                         };
-                        let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() else {
+                        let ExprKind::Name(name_node) = attribute.value().classify() else {
                             continue;
                         };
-                        if id == "self" && !slots.contains(attribute.attr.as_str()) {
+                        let id = name_node.id();
+                        if id == "self" && !slots.contains(attribute.attr().as_str()) {
                             assignments.push(AttributeAssignment {
-                                name: &attribute.attr,
+                                name: attribute.attr().as_str(),
                                 range: attribute.range(),
                             });
                         }
@@ -239,18 +267,39 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
     assignments
 }
 
-/// Collects known slots and returns `None` if a name in the container is unknown.
-fn add_slots<'a>(expr: &'a Expr, slots: &mut FxHashSet<&'a str>) -> Option<()> {
-    let mut insert = |expr: &'a Expr| {
-        slots.insert(expr.as_string_literal_expr()?.value.to_str());
-        Some(())
+/// Return an iterator over the attributes enumerated in the given `__slots__` value.
+///
+/// If an attribute can't be statically determined, it will be `None`.
+fn slots_attributes(expr: Expr<'_>) -> impl Iterator<Item = Option<&str>> {
+    // Ex) `__slots__ = ("name",)`
+    let elts_iter = match expr.fields() {
+        ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
+        | ast::ExprFields::List(ast::ExprListFields { elts, .. })
+        | ast::ExprFields::Set(ast::ExprSetFields { elts, .. }) => {
+            Some(elts.iter().map(|elt| match elt.classify() {
+                ExprKind::StringLiteral(expr_string_literal) => {
+                    let value = expr_string_literal.value();
+                    Some(value.to_str())
+                }
+                _ => None,
+            }))
+        }
+        _ => None,
     };
-    let elts = match expr {
-        Expr::Dict(dict) => return dict.iter_keys().try_for_each(|key| insert(key?)),
-        Expr::Tuple(ast::ExprTuple { elts, .. })
-        | Expr::List(ast::ExprList { elts, .. })
-        | Expr::Set(ast::ExprSet { elts, .. }) => elts,
-        _ => return Some(()),
+
+    // Ex) `__slots__ = {"name": ...}`
+    let keys_iter = match expr.classify() {
+        ExprKind::Dict(dict) => Some(dict.iter_keys().map(|key| match key.map(Expr::fields) {
+            Some(ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields {
+                value, ..
+            })) => Some(value.to_str()),
+            _ => None,
+        })),
+        _ => None,
     };
-    elts.iter().try_for_each(insert)
+
+    elts_iter
+        .into_iter()
+        .flatten()
+        .chain(keys_iter.into_iter().flatten())
 }

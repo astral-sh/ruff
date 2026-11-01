@@ -1,15 +1,14 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Stmt, Suite};
-use ruff_python_codegen::Generator;
+use ruff_python_ast::{Arguments, Expr, ExprKind, NodeList, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
-use ruff_python_trivia::CommentRanges;
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
-use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
+use crate::rules::pyupgrade::fixes::{ClassField, functional_to_class_fix};
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `TypedDict` declarations that use functional syntax.
@@ -85,9 +84,9 @@ impl Violation for ConvertTypedDictFunctionalToClass {
 /// UP013
 pub(crate) fn convert_typed_dict_functional_to_class(
     checker: &Checker,
-    stmt: &Stmt,
-    targets: &[Expr],
-    value: &Expr,
+    stmt: Stmt<'_>,
+    targets: NodeList<'_, ruff_python_ast::kind::Expr>,
+    value: Expr<'_>,
 ) {
     let Some((class_name, arguments, base_class)) =
         match_typed_dict_assign(targets, value, checker.semantic())
@@ -95,7 +94,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
         return;
     };
 
-    let Some((body, keywords)) = match_fields_and_keywords(arguments) else {
+    let Some((fields, keywords)) = match_fields_and_keywords(arguments) else {
         return;
     };
 
@@ -107,14 +106,8 @@ pub(crate) fn convert_typed_dict_functional_to_class(
     );
     // TODO(charlie): Preserve indentation, to remove the first-column requirement.
     if checker.locator().is_at_start_of_line(stmt.start()) {
-        diagnostic.set_fix(convert_to_class(
-            stmt,
-            class_name,
-            body,
-            keywords,
-            base_class,
-            checker.generator(),
-            checker.comment_ranges(),
+        diagnostic.set_fix(functional_to_class_fix(
+            checker, stmt, class_name, base_class, fields, keywords,
         ));
     }
 }
@@ -122,182 +115,57 @@ pub(crate) fn convert_typed_dict_functional_to_class(
 /// Return the class name, arguments, keywords and base class for a `TypedDict`
 /// assignment.
 fn match_typed_dict_assign<'a>(
-    targets: &'a [Expr],
-    value: &'a Expr,
+    targets: NodeList<'a, ruff_python_ast::kind::Expr>,
+    value: Expr<'a>,
     semantic: &SemanticModel,
-) -> Option<(&'a str, &'a Arguments, &'a Expr)> {
-    let [Expr::Name(ast::ExprName { id: class_name, .. })] = targets else {
-        return None;
-    };
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments,
-        range_start: _,
-        node_index: _,
-    }) = value
-    else {
-        return None;
-    };
-    if !semantic.match_typing_expr(func, "TypedDict") {
-        return None;
-    }
-    Some((class_name, arguments, func))
-}
-
-/// Generate a [`Stmt::AnnAssign`] representing the provided field definition.
-fn create_field_assignment_stmt(field: &str, annotation: &Expr) -> Stmt {
-    ast::StmtAnnAssign {
-        target: Box::new(
-            ast::ExprName {
-                id: field.into(),
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            }
-            .into(),
-        ),
-        annotation: Box::new(annotation.clone()),
-        value: None,
-        simple: true,
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    }
-    .into()
-}
-
-/// Generate a `StmtKind:ClassDef` statement based on the provided body, keywords, and base class.
-fn create_class_def_stmt(
-    class_name: &str,
-    body: Suite,
-    class_keywords: Option<&Arguments>,
-    base_class: &Expr,
-) -> Stmt {
-    ast::StmtClassDef {
-        name: Identifier::new(class_name.to_string(), TextRange::default()),
-        arguments: Some(Box::new(Arguments {
-            items: std::iter::once(ast::Argument::Positional(base_class.clone()))
-                .chain(
-                    class_keywords
-                        .into_iter()
-                        .flat_map(Arguments::keywords)
-                        .cloned()
-                        .map(ast::Argument::Keyword),
-                )
-                .collect(),
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        })),
-        body,
-        type_params: None,
-        decorator_list: ast::DecoratorList::new(),
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    }
-    .into()
-}
-
-fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Suite> {
-    if items.is_empty() {
-        let node = Stmt::Pass(ast::StmtPass {
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        });
-        Some(Suite::from([node]))
-    } else {
-        items
-            .iter()
-            .map(|ast::DictItem { key, value, .. }| match key {
-                Some(Expr::StringLiteral(ast::ExprStringLiteral { value: field, .. })) => {
-                    if !is_identifier(field.to_str()) {
-                        return None;
-                    }
-                    // Converting TypedDict to class-based syntax is not safe if fields contain
-                    // private or dunder names, because private names will be mangled and dunder
-                    // names can confuse type checkers.
-                    if field.to_str().starts_with("__") {
-                        return None;
-                    }
-                    Some(create_field_assignment_stmt(field.to_str(), value))
-                }
-                _ => None,
-            })
-            .collect()
-    }
-}
-
-fn fields_from_dict_call(func: &Expr, arguments: &Arguments) -> Option<Suite> {
-    let ast::ExprName { id, .. } = func.as_name_expr()?;
-    if id != "dict" {
-        return None;
-    }
-    fields_from_keywords(arguments)
-}
-
-// Deprecated in Python 3.11, removed in Python 3.13.
-fn fields_from_keywords(arguments: &Arguments) -> Option<Suite> {
-    let mut keywords = arguments.keywords().peekable();
-    if keywords.peek().is_none() {
-        let node = Stmt::Pass(ast::StmtPass {
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        });
-        return Some(Suite::from([node]));
-    }
-
-    keywords
-        .map(|keyword| {
-            keyword
-                .arg
-                .as_ref()
-                .map(|field| create_field_assignment_stmt(field, &keyword.value))
-        })
-        .collect()
+) -> Option<(&'a str, Arguments<'a>, Expr<'a>)> {
+    let [target] = targets.as_array()?;
+    let class_name = target.as_name_expr()?.id();
+    let call = value.as_call_expr()?;
+    let base = call.func();
+    semantic
+        .match_typing_expr(base, "TypedDict")
+        .then_some((class_name, call.arguments(), base))
 }
 
 /// Match the fields and class keywords from a `TypedDict` call.
-fn match_fields_and_keywords(arguments: &Arguments) -> Option<(Suite, Option<&Arguments>)> {
-    let mut args = arguments.args();
-    let _typename = args.next()?;
-    match (args.next(), args.next()) {
-        // Ex) `TypedDict("MyType", {"a": int}, total=False)`
-        (Some(fields), None) => {
-            let suite = match fields {
-                Expr::Dict(dict) => fields_from_dict_literal(&dict.items)?,
-                Expr::Call(call) => fields_from_dict_call(&call.func, &call.arguments)?,
-                _ => return None,
-            };
-            Some((suite, Some(arguments)))
-        }
-        // Ex) `TypedDict("MyType", a=int)`
-        (None, _) => Some((fields_from_keywords(arguments)?, None)),
-        _ => None,
+fn match_fields_and_keywords(
+    arguments: Arguments<'_>,
+) -> Option<(
+    Vec<ClassField<'_>>,
+    NodeList<'_, ruff_python_ast::kind::Keyword>,
+)> {
+    let args = arguments.args();
+    let keywords = arguments.keywords();
+    if let Some([_typename, fields]) = args.as_array() {
+        let fields = match fields.classify() {
+            // TypedDict("MyType", {"a": int, "b": str})
+            ExprKind::Dict(dict) => dict
+                .items()
+                .iter()
+                .map(|item| {
+                    let name = item.key()?.as_string_literal_expr()?.value().to_str();
+                    // Private names are mangled in a class and dunder names can confuse type checkers.
+                    if !is_identifier(name) || name.starts_with("__") {
+                        return None;
+                    }
+                    Some(ClassField {
+                        name,
+                        annotation: item.value(),
+                    })
+                })
+                .collect::<Option<_>>()?,
+            // TypedDict("MyType", dict(a=int, b=str))
+            ExprKind::Call(call) if call.func().as_name_expr()?.id() == "dict" => {
+                ClassField::from_keywords(call.arguments().keywords())?
+            }
+            _ => return None,
+        };
+        Some((fields, keywords))
+    } else if let Some([_typename]) = args.as_array() {
+        // The keyword form was deprecated in Python 3.11 and removed in Python 3.13.
+        Some((ClassField::from_keywords(keywords)?, NodeList::default()))
+    } else {
+        None
     }
-}
-
-/// Generate a `Fix` to convert a `TypedDict` from functional to class.
-fn convert_to_class(
-    stmt: &Stmt,
-    class_name: &str,
-    body: Suite,
-    class_keywords: Option<&Arguments>,
-    base_class: &Expr,
-    generator: Generator,
-    comment_ranges: &CommentRanges,
-) -> Fix {
-    Fix::applicable_edit(
-        Edit::range_replacement(
-            generator.stmt(&create_class_def_stmt(
-                class_name,
-                body,
-                class_keywords,
-                base_class,
-            )),
-            stmt.range(),
-        ),
-        if comment_ranges.intersects(stmt.range()) {
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
-        },
-    )
 }

@@ -1,8 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{ArgOrKeyword, Expr, ExprCall, token::parenthesized_range};
+use ruff_python_ast::token::{TokenKind, parenthesized_range};
+use ruff_python_ast::{ExprCall, ExprKind, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -60,14 +59,18 @@ impl Violation for StarmapZip {
 }
 
 /// RUF058
-pub(crate) fn starmap_zip(checker: &Checker, call: &ExprCall, qualified_name: &QualifiedName) {
-    if !matches!(qualified_name.segments(), ["itertools", "starmap"]) {
+pub(crate) fn starmap_zip(checker: &Checker, call: ExprCall<'_>, qualified_name: &QualifiedName) {
+    let semantic = checker.semantic();
+
+    if !call.arguments().keywords().is_empty() {
         return;
     }
-    let [
-        ruff_python_ast::Argument::Positional(_),
-        ruff_python_ast::Argument::Positional(Expr::Call(iterable_call)),
-    ] = call.arguments.items.as_slice()
+
+    let Some([_map_func, ExprKind::Call(iterable_call)]) = call
+        .arguments()
+        .args()
+        .as_array()
+        .map(|items| items.map(ruff_python_ast::Expr::classify))
     else {
         return;
     };
@@ -78,27 +81,43 @@ pub(crate) fn starmap_zip(checker: &Checker, call: &ExprCall, qualified_name: &Q
         return;
     }
 
-    let mut has_positional = false;
-    let mut has_plain_positional = false;
-    let mut has_strict = false;
-    for item in iterable_call.arguments.iter_source_order() {
-        match item {
-            ArgOrKeyword::Arg(arg) => {
-                has_positional = true;
-                has_plain_positional = has_plain_positional || !arg.is_starred_expr();
+    let keywords = iterable_call.arguments().keywords();
+
+    match checker.target_version().cmp(&PythonVersion::PY314) {
+        // Keyword arguments not supported for `map` before Python 3.14
+        std::cmp::Ordering::Less => {
+            if keywords.next().is_some() {
+                return;
             }
-            ArgOrKeyword::Keyword(keyword)
-                if !has_strict
-                    && checker.target_version() >= PythonVersion::PY314
-                    && keyword.arg.as_ref().is_some_and(|name| name == "strict") =>
-            {
-                has_strict = true;
+        }
+        // Only supported keyword argument is `strict` starting in 3.14
+        std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => {
+            if keywords.len() > 1 {
+                return;
+            }
+            if keywords.len() == 1 && iterable_call.arguments().find_keyword("strict").is_none() {
+                return;
             }
             ArgOrKeyword::Keyword(_) => return,
         }
     }
-    // `zip(*a)` can be empty, whereas `map(func, *a)` requires an iterable.
-    if has_positional && !has_plain_positional {
+
+    let positionals = iterable_call.arguments().args();
+
+    // `zip(*a)` where `a` is empty is valid, but `map(_, *a)` isn't.
+    if !positionals.is_empty()
+        && positionals
+            .iter()
+            .all(ruff_python_ast::Expr::is_starred_expr)
+    {
+        return;
+    }
+
+    if !matches!(qualified_name.segments(), ["itertools", "starmap"]) {
+        return;
+    }
+
+    if !semantic.match_builtin_expr(iterable_call.func(), "zip") {
         return;
     }
 
@@ -110,12 +129,12 @@ pub(crate) fn starmap_zip(checker: &Checker, call: &ExprCall, qualified_name: &Q
 }
 
 /// Replace the `starmap` call with a call to the `map` builtin, if `map` has not been shadowed.
-fn replace_with_map(starmap: &ExprCall, zip: &ExprCall, checker: &Checker) -> Option<Fix> {
+fn replace_with_map(starmap: ExprCall<'_>, zip: ExprCall<'_>, checker: &Checker) -> Option<Fix> {
     if !checker.semantic().has_builtin_binding("map") {
         return None;
     }
 
-    let change_func_to_map = Edit::range_replacement("map".to_string(), starmap.func.range());
+    let change_func_to_map = Edit::range_replacement("map".to_string(), starmap.func().range());
 
     let mut remove_zip = vec![];
 
@@ -128,18 +147,18 @@ fn replace_with_map(starmap: &ExprCall, zip: &ExprCall, checker: &Checker) -> Op
         zip.start(),
     )));
 
-    let full_zip_func_range = parenthesized_range((&zip.func).into(), zip.into(), checker.tokens())
-        .unwrap_or(zip.func.range());
+    let full_zip_func_range =
+        parenthesized_range(zip.func(), zip.into(), checker.tokens()).unwrap_or(zip.func().range());
 
     // Delete the `zip` callee
     remove_zip.push(Edit::range_deletion(full_zip_func_range));
 
     // Delete the `(` from the `zip(...)` call
-    remove_zip.push(Edit::range_deletion(zip.arguments.l_paren_range()));
+    remove_zip.push(Edit::range_deletion(zip.arguments().l_paren_range()));
 
     // `zip` can be called without arguments but `map` can't.
-    if zip.arguments.is_empty() {
-        remove_zip.push(Edit::insertion("[]".to_string(), zip.arguments.start()));
+    if zip.arguments().is_empty() {
+        remove_zip.push(Edit::insertion("[]".to_string(), zip.arguments().start()));
     }
 
     let after_zip = checker.tokens().after(full_zip_range.end());
@@ -153,7 +172,7 @@ fn replace_with_map(starmap: &ExprCall, zip: &ExprCall, checker: &Checker) -> Op
     }
 
     // Delete the `)` from the `zip(...)` call
-    remove_zip.push(Edit::range_deletion(zip.arguments.r_paren_range()));
+    remove_zip.push(Edit::range_deletion(zip.arguments().r_paren_range()));
 
     // Delete any trailing parentheses wrapping the `zip` call.
     remove_zip.push(Edit::range_deletion(TextRange::new(
@@ -162,7 +181,7 @@ fn replace_with_map(starmap: &ExprCall, zip: &ExprCall, checker: &Checker) -> Op
     )));
 
     let comment_ranges = checker.comment_ranges();
-    let applicability = if comment_ranges.intersects(starmap.func.range())
+    let applicability = if comment_ranges.intersects(starmap.func().range())
         || comment_ranges.intersects(full_zip_range)
     {
         Applicability::Unsafe

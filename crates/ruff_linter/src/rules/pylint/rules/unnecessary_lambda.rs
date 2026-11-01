@@ -1,6 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, ArgOrKeyword, Expr, ExprLambda, ParameterItem, visitor};
+use ruff_python_ast::{self as ast, AstNode, Expr, ExprKind, ExprLambda, Parameter};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -71,46 +70,147 @@ impl Violation for UnnecessaryLambda {
 }
 
 /// PLW0108
-pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
-    let ExprLambda {
-        parameters,
-        body,
-        range: _,
-        node_index: _,
-    } = lambda;
+pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: ExprLambda<'_>) {
+    let parameters = lambda.parameters();
+    let body = lambda.body();
 
     // The lambda should consist of a single function call.
-    let Expr::Call(ast::ExprCall {
-        arguments, func, ..
-    }) = body.as_ref()
-    else {
+    let ExprKind::Call(call_node) = body.classify() else {
         return;
     };
+    let arguments = call_node.arguments();
+    let func = call_node.func();
 
     // Ignore call chains.
-    if let Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() {
+    if let ExprKind::Attribute(attribute) = func.classify() {
+        let value = attribute.value();
         if value.is_call_expr() {
             return;
         }
     }
 
-    let forwards = match parameters.as_deref() {
-        None => arguments.is_empty(),
-        Some(parameters) => forwards_arguments(parameters, arguments),
-    };
-    if !forwards {
+    // If at least one of the lambda parameters has a default value, abort. We can't know if the
+    // defaults provided by the lambda are the same as the defaults provided by the inner
+    // function.
+    if parameters.is_some_and(|parameters| {
+        parameters.args().iter().any(|parameter_with_default| {
+            let default = parameter_with_default.default();
+            default.is_some()
+        })
+    }) {
         return;
+    }
+
+    match parameters {
+        None => {
+            if !arguments.is_empty() {
+                return;
+            }
+        }
+        Some(parameters) => {
+            // Collect all starred arguments (e.g., `lambda *args: func(*args)`).
+            let call_varargs: Vec<Expr<'_>> = arguments
+                .args()
+                .iter()
+                .filter_map(|arg| {
+                    if let ExprKind::Starred(starred_node) = arg.classify() {
+                        let value = starred_node.value();
+                        Some(value)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            // Collect all keyword arguments (e.g., `lambda x, y: func(x=x, y=y)`).
+            let call_kwargs: Vec<Expr<'_>> = arguments
+                .keywords()
+                .iter()
+                .map(ast::Keyword::value)
+                .collect::<Vec<_>>();
+
+            // Collect all positional arguments (e.g., `lambda x, y: func(x, y)`).
+            let call_posargs: Vec<Expr<'_>> = arguments
+                .args()
+                .iter()
+                .filter(|arg| !arg.is_starred_expr())
+                .collect::<Vec<_>>();
+
+            // Ex) `lambda **kwargs: func(**kwargs)`
+            match parameters.kwarg() {
+                None => {
+                    if !call_kwargs.is_empty() {
+                        return;
+                    }
+                }
+                Some(kwarg) => {
+                    let [call_kwarg] = call_kwargs[..] else {
+                        return;
+                    };
+
+                    let ExprKind::Name(name_node) = call_kwarg.classify() else {
+                        return;
+                    };
+                    let id = name_node.id();
+
+                    if id.as_str() != kwarg.name().as_str() {
+                        return;
+                    }
+                }
+            }
+
+            // Ex) `lambda *args: func(*args)`
+            match parameters.vararg() {
+                None => {
+                    if !call_varargs.is_empty() {
+                        return;
+                    }
+                }
+                Some(vararg) => {
+                    let [call_vararg] = call_varargs[..] else {
+                        return;
+                    };
+
+                    let ExprKind::Name(name_node) = call_vararg.classify() else {
+                        return;
+                    };
+                    let id = name_node.id();
+
+                    if id.as_str() != vararg.name().as_str() {
+                        return;
+                    }
+                }
+            }
+
+            // Ex) `lambda x, y: func(x, y)`
+            let lambda_posargs: Vec<Parameter<'_>> = parameters
+                .args()
+                .iter()
+                .map(ast::ParameterWithDefault::parameter)
+                .collect::<Vec<_>>();
+            if call_posargs.len() != lambda_posargs.len() {
+                return;
+            }
+            for (param, arg) in lambda_posargs.iter().zip(call_posargs) {
+                let ExprKind::Name(name_node) = arg.classify() else {
+                    return;
+                };
+                let id = name_node.id();
+                if id.as_str() != param.name().as_str() {
+                    return;
+                }
+            }
+        }
     }
 
     // The lambda is necessary if it uses one of its parameters _as_ the function call.
     // Ex) `lambda x, y: x(y)`
-    let names = {
-        let mut finder = NameFinder::default();
-        finder.visit_expr(func);
-        finder.names
-    };
+    let names: Vec<_> = func
+        .descendants()
+        .filter_map(AstNode::cast::<ast::ExprName>)
+        .collect();
 
-    for name in &names {
+    for &name in &names {
         if let Some(binding_id) = checker.semantic().resolve_name(name) {
             let binding = checker.semantic().binding(binding_id);
             if checker.semantic().is_current_scope(binding.scope) {
@@ -122,7 +222,7 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
     let mut diagnostic = checker.report_diagnostic(UnnecessaryLambda, lambda.range());
     // Suppress the fix if the assignment expression target shadows one of the lambda's parameters.
     // This is necessary to avoid introducing a change in the behavior of the program.
-    for name in names {
+    for &name in &names {
         if let Some(binding_id) = checker.semantic().lookup_symbol(name.id()).binding_id() {
             let binding = checker.semantic().binding(binding_id);
             if checker
@@ -132,7 +232,7 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
                 .is_some()
                 && binding
                     .expression(checker.semantic())
-                    .is_some_and(Expr::is_named_expr)
+                    .is_some_and(ast::Expr::is_named_expr)
             {
                 return;
             }
@@ -141,77 +241,10 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
 
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         if func.is_named_expr() {
-            format!("({})", checker.locator().slice(func.as_ref()))
+            format!("({})", checker.locator().slice(func))
         } else {
-            checker.locator().slice(func.as_ref()).to_string()
+            checker.locator().slice(func).to_string()
         },
         lambda.range(),
     )));
-}
-
-/// Check whether the call forwards the lambda's positional-or-keyword and variadic parameters.
-fn forwards_arguments(parameters: &ast::Parameters, arguments: &ast::Arguments) -> bool {
-    let mut vararg = None;
-    let mut kwarg = None;
-    let mut positional = parameters.items.iter().filter_map(|item| match item {
-        ParameterItem::PositionalOrKeyword(parameter) => Some(parameter),
-        ParameterItem::Vararg(parameter) => {
-            // Parameter lookup selects the first `*` parameter on parser recovery.
-            vararg.get_or_insert(parameter);
-            None
-        }
-        ParameterItem::Kwarg(parameter) => {
-            // It selects the last `**` parameter.
-            kwarg = Some(parameter);
-            None
-        }
-        ParameterItem::PositionalOnly(_) | ParameterItem::KeywordOnly(_) => None,
-    });
-    let mut starred = None;
-    let mut keyword = None;
-    for argument in arguments.iter_source_order() {
-        let (slot, value) = match argument {
-            ArgOrKeyword::Arg(arg) => match arg {
-                Expr::Name(name) => {
-                    let Some(parameter) = positional.next() else {
-                        return false;
-                    };
-                    if parameter.default.is_some()
-                        || parameter.parameter.name.as_str() != name.id.as_str()
-                    {
-                        return false;
-                    }
-                    continue;
-                }
-                Expr::Starred(arg) => (&mut starred, arg.value.as_ref()),
-                _ => return false,
-            },
-            ArgOrKeyword::Keyword(arg) => (&mut keyword, arg.value.as_ref()),
-        };
-        let Some(name) = value.as_name_expr() else {
-            return false;
-        };
-        if slot.replace(name.id.as_str()).is_some() {
-            return false;
-        }
-    }
-    positional.next().is_none()
-        && vararg.map(|param| param.name.as_str()) == starred
-        && kwarg.map(|param| param.name.as_str()) == keyword
-}
-
-/// Identify all `Expr::Name` nodes in an AST.
-#[derive(Debug, Default)]
-struct NameFinder<'a> {
-    /// A map from identifier to defining expression.
-    names: Vec<&'a ast::ExprName>,
-}
-
-impl<'a> Visitor<'a> for NameFinder<'a> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        if let Expr::Name(expr_name) = expr {
-            self.names.push(expr_name);
-        }
-        visitor::walk_expr(self, expr);
-    }
 }

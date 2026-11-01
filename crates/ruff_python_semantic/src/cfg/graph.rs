@@ -1,10 +1,10 @@
 use ruff_index::{IndexVec, newtype_index};
-use ruff_python_ast::Stmt;
+use ruff_python_ast::{StmtKind, Suite};
 use ruff_text_size::{Ranged, TextRange};
 use smallvec::{SmallVec, smallvec};
 
 /// Returns the control flow graph associated to an array of statements
-pub fn build_cfg(stmts: &[Stmt]) -> ControlFlowGraph<'_> {
+pub fn build_cfg(stmts: Suite<'_>) -> ControlFlowGraph<'_> {
     let mut builder = CFGBuilder::with_capacity(stmts.len());
     builder.process_stmts(stmts);
     builder.finish()
@@ -38,7 +38,7 @@ impl<'stmt> ControlFlowGraph<'stmt> {
     }
 
     /// Returns the statements comprising the basic block at the given index
-    pub fn stmts(&self, block: BlockId) -> &'stmt [Stmt] {
+    pub fn stmts(&self, block: BlockId) -> Suite<'stmt> {
         self.blocks[block].stmts
     }
 
@@ -72,7 +72,7 @@ pub struct BlockId;
 struct BlockData<'stmt> {
     kind: BlockKind,
     /// Slice of statements regarded as executing unconditionally in order
-    stmts: &'stmt [Stmt],
+    stmts: Suite<'stmt>,
     /// Outgoing edges, indicating possible paths of execution after the
     /// block has concluded
     out: Edges,
@@ -191,7 +191,7 @@ impl<'stmt> CFGBuilder<'stmt> {
     }
 
     /// Runs the core logic for the builder.
-    fn process_stmts(&mut self, stmts: &'stmt [Stmt]) {
+    fn process_stmts(&mut self, stmts: Suite<'stmt>) {
         // SAFETY With notation as below, we always maintain the invariant
         // `start <= end + 1`. Since `end <= stmts.len() -1` we conclude that
         // `start <= stmts.len()`. It is therefore always safe to use `start` as
@@ -199,37 +199,37 @@ impl<'stmt> CFGBuilder<'stmt> {
         let mut start = 0;
         for (end, stmt) in stmts.iter().enumerate() {
             let cache_exit = self.exit();
-            match stmt {
-                Stmt::FunctionDef(_)
-                | Stmt::ClassDef(_)
-                | Stmt::Assign(_)
-                | Stmt::AugAssign(_)
-                | Stmt::AnnAssign(_)
-                | Stmt::TypeAlias(_)
-                | Stmt::Import(_)
-                | Stmt::ImportFrom(_)
-                | Stmt::Global(_)
-                | Stmt::Nonlocal(_)
-                | Stmt::Expr(_)
-                | Stmt::Pass(_)
-                | Stmt::Delete(_)
-                | Stmt::IpyEscapeCommand(_) => {}
+            match stmt.classify() {
+                StmtKind::FunctionDef(_)
+                | StmtKind::ClassDef(_)
+                | StmtKind::Assign(_)
+                | StmtKind::AugAssign(_)
+                | StmtKind::AnnAssign(_)
+                | StmtKind::TypeAlias(_)
+                | StmtKind::Import(_)
+                | StmtKind::ImportFrom(_)
+                | StmtKind::Global(_)
+                | StmtKind::Nonlocal(_)
+                | StmtKind::Expr(_)
+                | StmtKind::Pass(_)
+                | StmtKind::Delete(_)
+                | StmtKind::IpyEscapeCommand(_) => {}
                 // Loops
-                Stmt::While(_) => {}
-                Stmt::For(_) => {}
+                StmtKind::While(_) => {}
+                StmtKind::For(_) => {}
 
                 // Switch statements
-                Stmt::If(_) => {}
-                Stmt::Match(_) => {}
+                StmtKind::If(_) => {}
+                StmtKind::Match(_) => {}
 
                 // Exception handling statements
-                Stmt::Try(_) => {}
-                Stmt::With(_) => {}
+                StmtKind::Try(_) => {}
+                StmtKind::With(_) => {}
 
                 // Jumps
-                Stmt::Return(_) => {
+                StmtKind::Return(_) => {
                     let edges = Edges::always(self.cfg.terminal());
-                    self.set_current_block_stmts(&stmts[start..=end]);
+                    self.set_current_block_stmts(stmts.slice(start..=end));
                     self.set_current_block_edges(edges);
                     start = end + 1;
 
@@ -238,11 +238,11 @@ impl<'stmt> CFGBuilder<'stmt> {
                         self.move_to(next_block);
                     }
                 }
-                Stmt::Break(_) => {}
-                Stmt::Continue(_) => {}
-                Stmt::Raise(_) => {
+                StmtKind::Break(_) => {}
+                StmtKind::Continue(_) => {}
+                StmtKind::Raise(_) => {
                     let edges = Edges::always(self.cfg.terminal());
-                    self.set_current_block_stmts(&stmts[start..=end]);
+                    self.set_current_block_stmts(stmts.slice(start..=end));
                     self.set_current_block_edges(edges);
                     start = end + 1;
 
@@ -253,7 +253,7 @@ impl<'stmt> CFGBuilder<'stmt> {
                 }
 
                 // An `assert` is a mixture of a switch and a jump.
-                Stmt::Assert(_) => {}
+                StmtKind::Assert(_) => {}
             }
             // Restore exit
             self.update_exit(cache_exit);
@@ -263,7 +263,7 @@ impl<'stmt> CFGBuilder<'stmt> {
         // `self.current` should be pointing to an empty block
         // and we push the remaining statements to it here.
         if start < stmts.len() {
-            self.set_current_block_stmts(&stmts[start..]);
+            self.set_current_block_stmts(stmts.slice(start..));
         }
         // Add edge to exit if not already present
         if self.cfg.blocks[self.current].out.is_empty() {
@@ -301,7 +301,7 @@ impl<'stmt> CFGBuilder<'stmt> {
     /// Populates the current basic block with the given set of statements.
     ///
     /// This should only be called once on any given block.
-    fn set_current_block_stmts(&mut self, stmts: &'stmt [Stmt]) {
+    fn set_current_block_stmts(&mut self, stmts: Suite<'stmt>) {
         debug_assert!(
             self.cfg.blocks[self.current].stmts.is_empty(),
             "Attempting to set statements on an already populated basic block."

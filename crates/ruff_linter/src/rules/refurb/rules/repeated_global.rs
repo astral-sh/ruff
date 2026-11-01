@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Stmt;
+use ruff_python_ast::{Stmt, StmtKind, Suite};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -58,14 +58,14 @@ impl AlwaysFixableViolation for RepeatedGlobal {
 }
 
 /// FURB154
-pub(crate) fn repeated_global(checker: &Checker, mut suite: &[Stmt]) {
+pub(crate) fn repeated_global(checker: &Checker, mut suite: Suite<'_>) {
     while let Some(idx) = suite
         .iter()
         .position(|stmt| GlobalKind::from_stmt(stmt).is_some())
     {
-        let global_kind = GlobalKind::from_stmt(&suite[idx]).unwrap();
+        let global_kind = GlobalKind::from_stmt(suite.at(idx)).unwrap();
 
-        suite = &suite[idx..];
+        suite = suite.slice(idx..);
 
         // Collect until we see a non-`global` (or non-`nonlocal`) statement.
         let (globals_sequence, next_suite) = suite.split_at(
@@ -77,7 +77,9 @@ pub(crate) fn repeated_global(checker: &Checker, mut suite: &[Stmt]) {
 
         // If there are at least two consecutive `global` (or `nonlocal`) statements, raise a
         // diagnostic.
-        if let [first, .., last] = globals_sequence {
+        if globals_sequence.len() >= 2
+            && let (Some(first), Some(last)) = (globals_sequence.first(), globals_sequence.last())
+        {
             let range = first.range().cover(last.range());
 
             let applicability = if checker.comment_ranges().intersects(range) {
@@ -94,9 +96,9 @@ pub(crate) fn repeated_global(checker: &Checker, mut suite: &[Stmt]) {
                             "{global_kind} {}",
                             globals_sequence
                                 .iter()
-                                .flat_map(|stmt| match stmt {
-                                    Stmt::Global(stmt) => &stmt.names,
-                                    Stmt::Nonlocal(stmt) => &stmt.names,
+                                .flat_map(|stmt| match stmt.classify() {
+                                    StmtKind::Global(stmt) => stmt.names(),
+                                    StmtKind::Nonlocal(stmt) => stmt.names(),
                                     _ => unreachable!(),
                                 })
                                 .map(ruff_python_ast::Identifier::id)
@@ -119,10 +121,10 @@ enum GlobalKind {
 }
 
 impl GlobalKind {
-    fn from_stmt(stmt: &Stmt) -> Option<Self> {
-        match stmt {
-            Stmt::Global(_) => Some(GlobalKind::Global),
-            Stmt::Nonlocal(_) => Some(GlobalKind::NonLocal),
+    fn from_stmt(stmt: Stmt<'_>) -> Option<Self> {
+        match stmt.classify() {
+            StmtKind::Global(_) => Some(GlobalKind::Global),
+            StmtKind::Nonlocal(_) => Some(GlobalKind::NonLocal),
             _ => None,
         }
     }

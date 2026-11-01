@@ -56,7 +56,7 @@ impl Violation for DatetimeTimezoneUTC {
 }
 
 /// UP017
-pub(crate) fn datetime_utc_alias(checker: &Checker, expr: &Expr) {
+pub(crate) fn datetime_utc_alias(checker: &Checker, &expr: &Expr<'_>) {
     if checker
         .semantic()
         .resolve_qualified_name(expr)

@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{ExprKind, NodeList};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -52,19 +52,25 @@ impl Violation for AssignmentToOsEnviron {
 }
 
 /// B003
-pub(crate) fn assignment_to_os_environ(checker: &Checker, targets: &[Expr]) {
-    let [target] = targets else {
+pub(crate) fn assignment_to_os_environ(
+    checker: &Checker,
+    targets: NodeList<'_, ruff_python_ast::kind::Expr>,
+) {
+    let Some([target]) = targets.as_array() else {
         return;
     };
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = target else {
+    let ExprKind::Attribute(attribute) = target.classify() else {
         return;
     };
+    let value = attribute.value();
+    let attr = attribute.attr();
     if attr != "environ" {
         return;
     }
-    let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+    let ExprKind::Name(name) = value.classify() else {
         return;
     };
+    let id = name.id();
     if id != "os" {
         return;
     }

@@ -51,13 +51,13 @@ impl Violation for ComparisonOfConstant {
 }
 
 /// PLR0133
-pub(crate) fn comparison_of_constant(checker: &Checker, compare: &ExprCompare) {
+pub(crate) fn comparison_of_constant(checker: &Checker, compare: ExprCompare<'_>) {
     for (left, op, right) in compare.iter() {
         if left.is_literal_expr() && right.is_literal_expr() {
             checker.report_diagnostic(
                 ComparisonOfConstant {
                     left_constant: checker.generator().expr(left),
-                    op: *op,
+                    op,
                     right_constant: checker.generator().expr(right),
                 },
                 left.range(),

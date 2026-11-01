@@ -1,11 +1,10 @@
 use std::fmt;
 
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
-use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -61,7 +60,7 @@ impl Violation for ReSubPositionalArgs {
 /// B034
 pub(crate) fn re_sub_positional_args(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call: &ExprCallFields<'_>,
     qualified_name: &QualifiedName,
 ) {
     if !checker.semantic().seen_module(Modules::RE) {
@@ -75,8 +74,8 @@ pub(crate) fn re_sub_positional_args(
         _ => return,
     };
 
-    if call.arguments.args().nth(method.num_args()).is_some() {
-        checker.report_diagnostic(ReSubPositionalArgs { method }, call.range());
+    if call.arguments.args().len() > method.num_args() {
+        checker.report_diagnostic(ReSubPositionalArgs { method }, call.range);
     }
 }
 

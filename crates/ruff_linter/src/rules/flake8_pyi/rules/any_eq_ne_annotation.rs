@@ -65,16 +65,16 @@ impl AlwaysFixableViolation for AnyEqNeAnnotation {
 }
 
 /// PYI032
-pub(crate) fn any_eq_ne_annotation(checker: &Checker, name: &str, parameters: &Parameters) {
+pub(crate) fn any_eq_ne_annotation(checker: &Checker, name: &str, parameters: Parameters<'_>) {
     if !matches!(name, "__eq__" | "__ne__") {
         return;
     }
 
-    let Some((_, other)) = parameters.args().collect_tuple() else {
+    if parameters.args().len() != 2 {
         return;
     };
 
-    let Some(annotation) = other.annotation() else {
+    let Some(annotation) = parameters.args().at(1).annotation() else {
         return;
     };
 

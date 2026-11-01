@@ -1,5 +1,6 @@
 use itertools::Itertools;
-use rustc_hash::FxHashSet;
+use ruff_python_ast::ExprKind;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::parenthesized_range;
@@ -88,25 +89,23 @@ impl Violation for UnnecessaryDictKwargs {
 }
 
 /// PIE804
-pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: ast::ExprCall<'_>) {
     let mut duplicate_keywords = None;
-    for keyword in call.arguments.keywords() {
+    for keyword in call.arguments().keywords() {
         // keyword is a spread operator (indicated by None).
-        if keyword.arg.is_some() {
+        if keyword.arg().is_some() {
             continue;
         }
 
-        let Expr::Dict(dict) = keyword.value.as_ref() else {
+        let ExprKind::Dict(dict) = keyword.value().classify() else {
             continue;
         };
 
         // Ex) `foo(**{**bar})`
-        if let [
-            ast::DictItem {
-                key: None, value, ..
-            },
-        ] = dict.items.as_slice()
+        if let Some([item]) = dict.items().as_array()
+            && item.key().is_none()
         {
+            let value = item.value();
             let edit = Edit::range_replacement(
                 format!("**{}", checker.locator().slice(value)),
                 keyword.range(),
@@ -121,19 +120,19 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
         // `foo(**{"bar-bar": 1})`).
         let Some(kwargs) = dict
             .iter_keys()
-            .map(|key| key.and_then(as_kwarg))
-            .collect::<Option<Vec<_>>>()
-        else {
+            .filter_map(|key| key.and_then(as_kwarg))
+            .collect();
+        if kwargs.len() != dict.items().len() {
             continue;
         };
 
         let mut diagnostic = checker.report_diagnostic(UnnecessaryDictKwargs, keyword.range());
 
-        if dict.is_empty() {
+        if dict.items().is_empty() {
             diagnostic.try_set_fix(|| {
                 remove_argument(
-                    keyword,
-                    &call.arguments,
+                    &keyword,
+                    call.arguments(),
                     Parentheses::Preserve,
                     checker.source(),
                     checker.tokens(),
@@ -161,12 +160,8 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
                                     "{}={}",
                                     kwarg,
                                     checker.locator().slice(
-                                        parenthesized_range(
-                                            value.into(),
-                                            dict.into(),
-                                            checker.tokens()
-                                        )
-                                        .unwrap_or(value.range())
+                                        parenthesized_range(value, dict.into(), checker.tokens())
+                                            .unwrap_or(value.range())
                                     )
                                 )
                             })
@@ -189,15 +184,17 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
 
 /// Determine the set of keywords that appear in multiple positions (either directly, as in
 /// `func(x=1)`, or indirectly, as in `func(**{"x": 1})`).
-fn duplicates(call: &ast::ExprCall) -> FxHashSet<&str> {
-    let mut seen = FxHashSet::default();
-    let mut duplicates = FxHashSet::default();
-    for keyword in call.arguments.keywords() {
-        if let Some(name) = &keyword.arg {
+fn duplicates(call: ast::ExprCall<'_>) -> FxHashSet<&str> {
+    let mut seen =
+        FxHashSet::with_capacity_and_hasher(call.arguments().keywords().len(), FxBuildHasher);
+    let mut duplicates =
+        FxHashSet::with_capacity_and_hasher(call.arguments().keywords().len(), FxBuildHasher);
+    for keyword in call.arguments().keywords() {
+        if let Some(name) = keyword.arg() {
             if !seen.insert(name.as_str()) {
                 duplicates.insert(name.as_str());
             }
-        } else if let Expr::Dict(dict) = keyword.value.as_ref() {
+        } else if let ExprKind::Dict(dict) = keyword.value().classify() {
             for key in dict.iter_keys() {
                 if let Some(name) = key.and_then(as_kwarg) {
                     if !seen.insert(name) {
@@ -211,8 +208,9 @@ fn duplicates(call: &ast::ExprCall) -> FxHashSet<&str> {
 }
 
 /// Return `Some` if a key is a valid keyword argument name, or `None` otherwise.
-fn as_kwarg(key: &Expr) -> Option<&str> {
-    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = key {
+fn as_kwarg(key: Expr<'_>) -> Option<&str> {
+    if let ExprKind::StringLiteral(string_literal) = key.classify() {
+        let value = string_literal.value();
         if is_identifier(value.to_str()) {
             return Some(value.to_str());
         }

@@ -2,8 +2,8 @@ use std::fmt::{Display, Formatter};
 
 use itertools::Itertools;
 use ruff_python_ast::{
-    Expr, ExprBinOp, ExprSubscript, ExprTuple, Operator, ParameterWithDefault, Parameters, Stmt,
-    StmtClassDef, StmtFunctionDef,
+    self as ast, Expr, ExprKind, Operator, ParameterWithDefault, Parameters, StmtClassDef,
+    StmtFunctionDef, StmtKind,
 };
 use ruff_python_ast::{ParameterItem, ParameterRole};
 use smallvec::SmallVec;
@@ -134,26 +134,33 @@ enum ErrorKind {
 }
 
 /// PYI036
-pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef) {
-    let StmtFunctionDef {
-        is_async,
-        decorator_list,
-        name,
-        parameters,
-        ..
-    } = function;
+pub(crate) fn bad_exit_annotation(checker: &Checker, function: &ast::StmtFunctionDefFields<'_>) {
+    let is_async = function.is_async;
+    let decorator_list = function.decorator_list;
+    let name = function.name;
+    let parameters = function.parameters;
 
     let func_kind = match name.as_str() {
         "__exit__" if !is_async => FuncKind::Sync,
-        "__aexit__" if *is_async => FuncKind::Async,
+        "__aexit__" if is_async => FuncKind::Async,
         _ => return,
     };
 
     let semantic = checker.semantic();
 
-    let Some(Stmt::ClassDef(parent_class_def)) = semantic.current_statement_parent() else {
+    let Some(StmtKind::ClassDef(parent_class_def)) = semantic
+        .current_statement_parent()
+        .map(ruff_python_ast::Stmt::classify)
+    else {
         return;
     };
+
+    let non_self_positional_args: SmallVec<[ParameterWithDefault<'_>; 3]> = parameters
+        .posonlyargs()
+        .iter()
+        .chain(parameters.args())
+        .skip(1)
+        .collect();
 
     if is_overload(decorator_list, semantic) {
         check_positional_args_for_overloaded_method(
@@ -200,7 +207,28 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
     if non_self_positional_args.len() < 3 {
         check_short_args_list(checker, vararg, parameters.range(), func_kind);
     }
-    for range in required_keyword_ranges {
+
+    // Every positional argument (beyond the first four) must have a default.
+    for parameter in non_self_positional_args
+        .iter()
+        .skip(3)
+        .filter(|parameter| parameter.default().is_none())
+    {
+        checker.report_diagnostic(
+            BadExitAnnotation {
+                func_kind,
+                error_kind: ErrorKind::ArgsAfterFirstFourMustHaveDefault,
+            },
+            parameter.range(),
+        );
+    }
+
+    // ...as should all keyword-only arguments.
+    for parameter in parameters
+        .kwonlyargs()
+        .iter()
+        .filter(|arg| arg.default().is_none())
+    {
         checker.report_diagnostic(
             BadExitAnnotation {
                 func_kind,
@@ -215,15 +243,10 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
 
 /// Determine whether a "short" argument list (i.e., an argument list with less than four elements)
 /// contains a star-args argument annotated with `object`. If not, report an error.
-fn check_short_args_list(
-    checker: &Checker,
-    vararg: Option<&ruff_python_ast::Parameter>,
-    parameters_range: TextRange,
-    func_kind: FuncKind,
-) {
-    if let Some(varargs) = vararg {
+fn check_short_args_list(checker: &Checker, parameters: Parameters<'_>, func_kind: FuncKind) {
+    if let Some(varargs) = parameters.vararg() {
         if let Some(annotation) = varargs.annotation().filter(|ann| {
-            !checker.match_maybe_stringized_annotation(ann, |expr| {
+            !checker.match_maybe_stringized_annotation(*ann, |expr| {
                 is_object_or_unused(expr, checker.semantic())
             })
         }) {
@@ -260,11 +283,11 @@ fn check_short_args_list(
 /// (that is not decorated with `@typing.overload`) are annotated correctly.
 fn check_positional_args_for_non_overloaded_method(
     checker: &Checker,
-    non_self_positional_params: &[&ParameterWithDefault],
+    non_self_positional_params: &[ParameterWithDefault<'_>],
     kind: FuncKind,
 ) {
     // For each argument, define the predicate against which to check the annotation.
-    type AnnotationValidator = fn(&Expr, &SemanticModel) -> bool;
+    type AnnotationValidator = fn(Expr<'_>, &SemanticModel) -> bool;
 
     let validations: [(ErrorKind, AnnotationValidator); 3] = [
         (ErrorKind::FirstArgBadAnnotation, is_base_exception_type),
@@ -310,13 +333,14 @@ fn check_positional_args_for_non_overloaded_method(
 /// overload are annotated correctly.
 fn check_positional_args_for_overloaded_method(
     checker: &Checker,
-    parameters: &Parameters,
+    non_self_positional_args: &[ParameterWithDefault<'_>],
     kind: FuncKind,
-    parent_class_def: &StmtClassDef,
+    parent_class_def: StmtClassDef<'_>,
+    parameters_range: TextRange,
 ) {
     fn parameter_annotation_loosely_matches_predicate(
-        parameter: &ParameterWithDefault,
-        predicate: impl FnOnce(&Expr) -> bool,
+        parameter: ParameterWithDefault<'_>,
+        predicate: impl FnOnce(Expr<'_>) -> bool,
         checker: &Checker,
     ) -> bool {
         let Some(annotation) = parameter.annotation() else {
@@ -330,12 +354,13 @@ fn check_positional_args_for_overloaded_method(
     let semantic = checker.semantic();
 
     // Collect all the overloads for this method into a SmallVec
-    let function_overloads: SmallVec<[&StmtFunctionDef; 2]> = parent_class_def
-        .body
+    let function_overloads: SmallVec<[StmtFunctionDef<'_>; 2]> = parent_class_def
+        .body()
         .iter()
         .filter_map(|stmt| {
             let func_def = stmt.as_function_def_stmt()?;
-            if &func_def.name == kind.as_str() && is_overload(&func_def.decorator_list, semantic) {
+            if func_def.name() == kind.as_str() && is_overload(func_def.decorator_list(), semantic)
+            {
                 Some(func_def)
             } else {
                 None
@@ -348,27 +373,37 @@ fn check_positional_args_for_overloaded_method(
         return;
     }
 
-    for function_def in &function_overloads {
-        let StmtFunctionDef {
-            is_async,
-            parameters,
-            ..
-        } = function_def;
+    for &function_def in &function_overloads {
+        let is_async = function_def.is_async();
+        let parameters = function_def.parameters();
 
         // If any overloads are an unexpected sync/async colour, don't do any checking
-        if *is_async != kind.is_async() {
+        if is_async != kind.is_async() {
             return;
         }
 
-        // Each overload must have exactly four positional parameters, including self.
-        if parameters.len() != 4
-            || !parameters.roles().all(|role| {
-                matches!(
-                    role,
-                    ParameterRole::PositionalOnly | ParameterRole::PositionalOrKeyword
-                )
-            })
-        {
+        // If any overloads have any variadic arguments, don't do any checking
+        let ast::ParametersFields {
+            range: _,
+            node: _,
+            posonlyargs,
+            args,
+            vararg: None,
+            kwonlyargs,
+            kwarg: None,
+        } = parameters.fields()
+        else {
+            return;
+        };
+
+        // If any overloads have any keyword-only arguments, don't do any checking
+        if !kwonlyargs.is_empty() {
+            return;
+        }
+
+        // If the number of non-keyword-only arguments is not exactly equal to 4
+        // for any overloads, don't do any checking
+        if posonlyargs.len() + args.len() != 4 {
             return;
         }
     }
@@ -406,8 +441,8 @@ fn check_positional_args_for_overloaded_method(
     };
     if non_self_positional_args.iter().all(|parameter| {
         parameter_annotation_loosely_matches_predicate(
-            parameter,
-            Expr::is_none_literal_expr,
+            *parameter,
+            |expr| matches!(expr.classify(), ExprKind::NoneLiteral(_)),
             checker,
         )
     }) {
@@ -443,11 +478,13 @@ fn check_positional_args_for_overloaded_method(
 
 /// Return the non-`None` annotation element of a PEP 604-style union or `Optional` annotation.
 fn non_none_annotation_element<'a>(
-    annotation: &'a Expr,
+    annotation: Expr<'a>,
     semantic: &SemanticModel,
-) -> Option<&'a Expr> {
+) -> Option<Expr<'a>> {
     // E.g., `typing.Union` or `typing.Optional`
-    if let Expr::Subscript(ExprSubscript { value, slice, .. }) = annotation {
+    if let ExprKind::Subscript(subscript_node) = annotation.classify() {
+        let value = subscript_node.value();
+        let slice = subscript_node.slice();
         let qualified_name = semantic.resolve_qualified_name(value)?;
 
         if semantic.match_typing_qualified_name(&qualified_name, "Optional") {
@@ -462,11 +499,10 @@ fn non_none_annotation_element<'a>(
             return None;
         }
 
-        let ExprTuple { elts, .. } = slice.as_tuple_expr()?;
+        let expr_tuple = slice.as_tuple_expr()?;
+        let elts = expr_tuple.elts();
 
-        let [left, right] = elts.as_slice() else {
-            return None;
-        };
+        let [left, right] = elts.as_array()?;
 
         return match (left.is_none_literal_expr(), right.is_none_literal_expr()) {
             (false, true) => Some(left),
@@ -477,12 +513,12 @@ fn non_none_annotation_element<'a>(
     }
 
     // PEP 604-style union (e.g., `int | None`)
-    if let Expr::BinOp(ExprBinOp {
+    if let ast::ExprFields::BinOp(ast::ExprBinOpFields {
         op: Operator::BitOr,
         left,
         right,
         ..
-    }) = annotation
+    }) = annotation.fields()
     {
         if !left.is_none_literal_expr() {
             return Some(left);
@@ -499,7 +535,7 @@ fn non_none_annotation_element<'a>(
 }
 
 /// Return `true` if the [`Expr`] is the `object` builtin or the `_typeshed.Unused` type.
-fn is_object_or_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
+fn is_object_or_unused(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| {
@@ -511,7 +547,7 @@ fn is_object_or_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// Return `true` if the [`Expr`] is the `types.TracebackType` type.
-fn is_traceback_type(expr: &Expr, semantic: &SemanticModel) -> bool {
+fn is_traceback_type(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| {
@@ -520,10 +556,12 @@ fn is_traceback_type(expr: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// Return `true` if the [`Expr`] is, e.g., `Type[BaseException]`.
-fn is_base_exception_type(expr: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr else {
+fn is_base_exception_type(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
+    let ExprKind::Subscript(subscript) = expr.classify() else {
         return false;
     };
+    let value = subscript.value();
+    let slice = subscript.slice();
 
     if semantic.match_typing_expr(value, "Type") || semantic.match_builtin_expr(value, "type") {
         semantic.match_builtin_expr(slice, "BaseException")

@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -59,7 +59,11 @@ impl Violation for PytestFailWithoutMessage {
 }
 
 /// PT016
-pub(crate) fn fail_call(checker: &Checker, call: &ast::ExprCall, qualified_name: &QualifiedName) {
+pub(crate) fn fail_call(
+    checker: &Checker,
+    call: &ExprCallFields<'_>,
+    qualified_name: &QualifiedName,
+) {
     if matches!(qualified_name.segments(), ["pytest", "fail"]) {
         // Allow either `pytest.fail(reason="...")` (introduced in pytest 7.0) or
         // `pytest.fail(msg="...")` (deprecated in pytest 7.0)

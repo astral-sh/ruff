@@ -1,4 +1,4 @@
-use ruff_python_ast::{Argument, Arguments, Expr};
+use ruff_python_ast::{ExprKind, NodeList};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -58,13 +58,20 @@ impl Violation for StarArgUnpackingAfterKeywordArg {
 }
 
 /// B026
-pub(crate) fn star_arg_unpacking_after_keyword_arg(checker: &Checker, arguments: &Arguments) {
-    let mut items = arguments.items.iter();
-    if items.any(|item| matches!(item, Argument::Keyword(_))) {
-        for item in items {
-            if let Argument::Positional(Expr::Starred(starred)) = item {
-                checker.report_diagnostic(StarArgUnpackingAfterKeywordArg, starred.range());
-            }
+pub(crate) fn star_arg_unpacking_after_keyword_arg(
+    checker: &Checker,
+    args: NodeList<'_, ruff_python_ast::kind::Expr>,
+    keywords: NodeList<'_, ruff_python_ast::kind::Keyword>,
+) {
+    let Some(keyword) = keywords.first() else {
+        return;
+    };
+    for arg in args {
+        let ExprKind::Starred(_) = arg.classify() else {
+            continue;
+        };
+        if arg.start() <= keyword.start() {
+            continue;
         }
     }
 }

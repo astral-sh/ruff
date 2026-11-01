@@ -59,7 +59,7 @@ impl Violation for InvalidPrintSyntax {
 }
 
 /// F633
-pub(crate) fn invalid_print_syntax(checker: &Checker, left: &Expr) {
+pub(crate) fn invalid_print_syntax(checker: &Checker, left: Expr<'_>) {
     if checker.semantic().match_builtin_expr(left, "print") {
         checker.report_diagnostic(InvalidPrintSyntax, left.range());
     }

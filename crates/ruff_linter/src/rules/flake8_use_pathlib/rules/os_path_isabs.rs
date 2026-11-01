@@ -61,7 +61,7 @@ impl Violation for OsPathIsabs {
 }
 
 /// PTH117
-pub(crate) fn os_path_isabs(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_path_isabs(checker: &Checker, call: ExprCall<'_>, segments: &[&str]) {
     if segments != ["os", "path", "isabs"] {
         return;
     }

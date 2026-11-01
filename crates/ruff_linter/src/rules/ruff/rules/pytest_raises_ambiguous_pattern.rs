@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
 use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::{self as ast, ExprKind, Keyword, StringValue};
+use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -84,7 +85,7 @@ impl Violation for PytestRaisesAmbiguousPattern {
 /// RUF043
 pub(crate) fn pytest_raises_ambiguous_pattern(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call: &ast::ExprCallFields<'_>,
     qualified_name: &QualifiedName,
 ) {
     if !is_pytest_raises(qualified_name) {
@@ -93,24 +94,29 @@ pub(crate) fn pytest_raises_ambiguous_pattern(
 
     // It *can* be passed as a positional argument if you try very hard,
     // but pytest only documents it as a keyword argument, and it's quite hard pass it positionally
-    let Some(ast::Keyword { value, .. }) = call.arguments.find_keyword("match") else {
+    let Some(ast::KeywordFields { value, .. }) =
+        call.arguments.find_keyword("match").map(Keyword::fields)
+    else {
         return;
     };
 
-    let ast::Expr::StringLiteral(string) = value.as_ref() else {
+    let ExprKind::StringLiteral(string) = value.classify() else {
         return;
     };
 
-    let any_part_is_raw = string.value.iter().any(|part| part.flags.prefix().is_raw());
+    let any_part_is_raw = string
+        .value()
+        .iter()
+        .any(|part| part.flags().prefix().is_raw());
 
-    if any_part_is_raw || !string_has_unescaped_metacharacters(&string.value) {
+    if any_part_is_raw || !string_has_unescaped_metacharacters(string.value()) {
         return;
     }
 
-    checker.report_diagnostic(PytestRaisesAmbiguousPattern, string.range);
+    checker.report_diagnostic(PytestRaisesAmbiguousPattern, string.range());
 }
 
-fn string_has_unescaped_metacharacters(value: &ast::StringLiteralValue) -> bool {
+fn string_has_unescaped_metacharacters(value: StringValue<'_>) -> bool {
     let mut escaped = false;
 
     for character in value.chars() {

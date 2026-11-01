@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, Stmt, WithItem};
+use ruff_python_ast::{self as ast, Expr, ExprKind, NodeList, Stmt, StmtKind, Suite};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -163,8 +163,8 @@ fn is_pytest_warns(qualified_name: &QualifiedName) -> bool {
     matches!(qualified_name.segments(), ["pytest", "warns"])
 }
 
-const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
-    if let [stmt] = body {
+fn is_non_trivial_with_body(body: Suite<'_>) -> bool {
+    if let Some([stmt]) = body.as_array() {
         is_compound_statement(stmt)
     } else {
         true
@@ -172,7 +172,11 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 }
 
 /// PT029, PT030
-pub(crate) fn warns_call(checker: &Checker, call: &ast::ExprCall, qualified_name: &QualifiedName) {
+pub(crate) fn warns_call(
+    checker: &Checker,
+    call: &ast::ExprCallFields<'_>,
+    qualified_name: &QualifiedName,
+) {
     if is_pytest_warns(qualified_name) {
         if checker.is_rule_enabled(Rule::PytestWarnsWithoutWarning) {
             if call.arguments.is_empty() {
@@ -185,7 +189,7 @@ pub(crate) fn warns_call(checker: &Checker, call: &ast::ExprCall, qualified_name
                 if call
                     .arguments
                     .find_keyword("match")
-                    .is_none_or(|k| is_empty_or_null_string(&k.value))
+                    .is_none_or(|k| is_empty_or_null_string(k.value()))
                 {
                     warning_needs_match(checker, warning);
                 }
@@ -195,29 +199,51 @@ pub(crate) fn warns_call(checker: &Checker, call: &ast::ExprCall, qualified_name
 }
 
 /// PT031
-pub(crate) fn complex_warns(checker: &Checker, stmt: &Stmt, items: &[WithItem], body: &[Stmt]) {
-    let warns_called = items.iter().any(|item| match &item.context_expr {
-        Expr::Call(ast::ExprCall { func, .. }) => checker
-            .semantic()
-            .resolve_qualified_name(func)
-            .is_some_and(|name| is_pytest_warns(&name)),
-        _ => false,
-    });
+pub(crate) fn complex_warns(
+    checker: &Checker,
+    stmt: Stmt<'_>,
+    items: NodeList<'_, ruff_python_ast::kind::WithItem>,
+    body: Suite<'_>,
+) {
+    let warns_called = items
+        .iter()
+        .any(|item| match item.context_expr().classify() {
+            ExprKind::Call(expr_call) => {
+                let func = expr_call.func();
+
+                checker
+                    .semantic()
+                    .resolve_qualified_name(func)
+                    .is_some_and(|name| is_pytest_warns(&name))
+            }
+            _ => false,
+        });
 
     // Check body for `pytest.warns` context manager
     if warns_called {
-        let is_too_complex = if let [stmt] = body {
-            match stmt {
-                Stmt::With(ast::StmtWith { body, .. }) => is_non_trivial_with_body(body),
+        let is_too_complex = if let Some([stmt]) = body.as_array() {
+            match stmt.fields() {
+                ast::StmtFields::With(ast::StmtWithFields { body, .. }) => {
+                    is_non_trivial_with_body(body)
+                }
                 // Allow function and class definitions to test decorators.
-                Stmt::ClassDef(_) | Stmt::FunctionDef(_) => false,
+                ast::StmtFields::ClassDef(_) | ast::StmtFields::FunctionDef(_) => false,
                 // Allow empty `for` loops to test iterators.
-                Stmt::For(ast::StmtFor { body, .. }) => match &body[..] {
-                    [Stmt::Pass(_)] => false,
-                    [Stmt::Expr(ast::StmtExpr { value, .. })] => !value.is_ellipsis_literal_expr(),
+                ast::StmtFields::For(ast::StmtForFields { body, .. }) => match body.slice(..) {
+                    body if let Some([stmt]) = body.as_array()
+                        && let StmtKind::Pass(_) = stmt.classify() =>
+                    {
+                        false
+                    }
+                    body if let Some([stmt]) = body.as_array()
+                        && let ast::StmtFields::Expr(ast::StmtExprFields { value, .. }) =
+                            stmt.fields() =>
+                    {
+                        !value.is_ellipsis_literal_expr()
+                    }
                     _ => true,
                 },
-                stmt => is_compound_statement(stmt),
+                stmt => is_compound_statement(stmt.view()),
             }
         } else {
             true
@@ -230,7 +256,7 @@ pub(crate) fn complex_warns(checker: &Checker, stmt: &Stmt, items: &[WithItem], 
 }
 
 /// PT030
-fn warning_needs_match(checker: &Checker, warning: &Expr) {
+fn warning_needs_match(checker: &Checker, warning: Expr<'_>) {
     if let Some(qualified_name) =
         checker
             .semantic()

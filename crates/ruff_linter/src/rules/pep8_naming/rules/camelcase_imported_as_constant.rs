@@ -71,8 +71,8 @@ pub(crate) fn camelcase_imported_as_constant(
     checker: &Checker,
     name: &str,
     asname: &str,
-    alias: &Alias,
-    stmt: &Stmt,
+    alias: Alias<'_>,
+    stmt: Stmt<'_>,
     ignore_names: &IgnoreNames,
 ) {
     // Single-character names are ambiguous. It could be a class or a constant.

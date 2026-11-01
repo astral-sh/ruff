@@ -1,6 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, ExprKind, NodeList};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -89,18 +89,21 @@ impl Violation for UnreliableCallableCheck {
 /// B004
 pub(crate) fn unreliable_callable_check(
     checker: &Checker,
-    expr: &Expr,
-    func: &Expr,
-    arguments: &ast::Arguments,
+    &expr: &Expr<'_>,
+    func: Expr<'_>,
+    args: NodeList<'_, ast::kind::Expr>,
+    keywords: NodeList<'_, ast::kind::Keyword>,
 ) {
-    let (obj, attr) = match arguments.len() {
-        2 if let Some([obj, attr]) = arguments.as_positional_array() => (obj, attr),
-        3 if let Some([obj, attr, _]) = arguments.as_positional_array() => (obj, attr),
-        _ => return,
-    };
-    let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = attr else {
+    if arguments.keywords().next().is_some() {
+        return;
+    }
+    let Some(([obj, attr], _)) = args.split_first_chunk() else {
         return;
     };
+    let ExprKind::StringLiteral(string_literal) = attr.classify() else {
+        return;
+    };
+    let value = string_literal.value();
     if value != "__call__" {
         return;
     }

@@ -1,10 +1,10 @@
 use memchr::memchr_iter;
+use ruff_python_ast::{
+    InterpolatedStringElementKind, InterpolatedStringElements, StringLikePartKind,
+};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{
-    AnyStringFlags, InterpolatedStringElement, InterpolatedStringElements, StringLike,
-    StringLikePart,
-};
+use ruff_python_ast::{AnyStringFlags, StringLike};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
@@ -71,18 +71,18 @@ pub(crate) fn invalid_escape_sequence(checker: &Checker, string_like: StringLike
         if part.flags().is_raw_string() {
             continue;
         }
-        let state = match part {
-            StringLikePart::String(_) | StringLikePart::Bytes(_) => {
+        let state = match part.classify() {
+            StringLikePartKind::String(_) | StringLikePartKind::Bytes(_) => {
                 analyze_escape_chars(locator, part.range(), part.flags())
             }
-            StringLikePart::FString(f_string) => analyze_escape_chars_in_interpolated_string(
-                AnyStringFlags::from(f_string.flags),
-                &f_string.elements,
+            StringLikePartKind::FString(f_string) => analyze_escape_chars_in_interpolated_string(
+                AnyStringFlags::from(f_string.flags()),
+                f_string.elements(),
                 locator,
             ),
-            StringLikePart::TString(t_string) => analyze_escape_chars_in_interpolated_string(
-                AnyStringFlags::from(t_string.flags),
-                &t_string.elements,
+            StringLikePartKind::TString(t_string) => analyze_escape_chars_in_interpolated_string(
+                AnyStringFlags::from(t_string.flags()),
+                t_string.elements(),
                 locator,
             ),
         };
@@ -214,7 +214,7 @@ fn analyze_escape_chars(
 
 fn analyze_escape_chars_in_interpolated_string(
     flags: AnyStringFlags,
-    elements: &InterpolatedStringElements,
+    elements: InterpolatedStringElements<'_>,
     locator: &Locator,
 ) -> EscapeCharsState {
     let mut escape_chars_state = EscapeCharsState::default();
@@ -224,15 +224,15 @@ fn analyze_escape_chars_in_interpolated_string(
     // we must analyze escape characters in each f/t-string
     // element before pushing a diagnostic and fix.
     for element in elements {
-        match element {
-            InterpolatedStringElement::Literal(literal) => {
+        match element.classify() {
+            InterpolatedStringElementKind::Literal(literal) => {
                 escape_chars_state.update(analyze_escape_chars(locator, literal.range(), flags));
             }
-            InterpolatedStringElement::Interpolation(interpolation) => {
-                let Some(format_spec) = interpolation.format_spec.as_ref() else {
+            InterpolatedStringElementKind::Interpolation(interpolation) => {
+                let Some(format_spec) = interpolation.format_spec() else {
                     continue;
                 };
-                for literal in format_spec.elements.literals() {
+                for literal in format_spec.elements().literals() {
                     escape_chars_state.update(analyze_escape_chars(
                         locator,
                         literal.range(),

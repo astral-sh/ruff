@@ -4,7 +4,7 @@ use ruff_python_semantic::analyze::class::iter_super_class;
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprKind, StmtClassDef, StmtKind, Suite};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
@@ -54,13 +54,13 @@ impl Violation for RedefinedSlotsInSubclass {
 }
 
 // PLW0244
-pub(crate) fn redefined_slots_in_subclass(checker: &Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn redefined_slots_in_subclass(checker: &Checker, class_def: StmtClassDef<'_>) {
     // Early return if this is not a subclass
     if class_def.bases().next().is_none() {
         return;
     }
 
-    let ast::StmtClassDef { body, .. } = class_def;
+    let body = class_def.body();
     let class_slots = slots_members(body);
 
     // If there are no slots, we're safe
@@ -117,12 +117,12 @@ impl Ranged for Slot<'_> {
     }
 }
 
-fn check_super_slots(checker: &Checker, class_def: &ast::StmtClassDef, slot: &Slot) {
+fn check_super_slots(checker: &Checker, class_def: StmtClassDef<'_>, slot: &Slot) {
     for super_class in iter_super_class(class_def, checker.semantic()).skip(1) {
-        if slots_members(&super_class.body).contains(slot) {
+        if slots_members(super_class.body()).contains(slot) {
             checker.report_diagnostic(
                 RedefinedSlotsInSubclass {
-                    base: super_class.name.to_string(),
+                    base: super_class.name().to_string(),
                     slot_name: slot.name.to_string(),
                 },
                 slot.range(),
@@ -131,30 +131,35 @@ fn check_super_slots(checker: &Checker, class_def: &ast::StmtClassDef, slot: &Sl
     }
 }
 
-fn slots_members(body: &[Stmt]) -> FxHashSet<Slot<'_>> {
+fn slots_members(body: Suite<'_>) -> FxHashSet<Slot<'_>> {
     let mut members = FxHashSet::default();
     for stmt in body {
-        match stmt {
+        match stmt.classify() {
             // Ex) `__slots__ = ("name",)`
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                let [Expr::Name(ast::ExprName { id, .. })] = targets.as_slice() else {
+            StmtKind::Assign(stmt_assign) => {
+                let targets = stmt_assign.targets();
+                let value = stmt_assign.value();
+
+                let Some([target]) = targets.as_array() else {
                     continue;
                 };
 
-                if id == "__slots__" {
-                    collect_slots(value, &mut members);
+                if target
+                    .as_name_expr()
+                    .is_some_and(|name| name.id() == "__slots__")
+                {
+                    members.extend(slots_attributes(value));
                 }
             }
 
             // Ex) `__slots__: Tuple[str, ...] = ("name",)`
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                target,
-                value: Some(value),
-                ..
-            }) => {
-                let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() else {
+            StmtKind::AnnAssign(stmt_ann_assign) if let Some(value) = stmt_ann_assign.value() => {
+                let target = stmt_ann_assign.target();
+
+                let ExprKind::Name(name_node) = target.classify() else {
                     continue;
                 };
+                let id = name_node.id();
 
                 if id == "__slots__" {
                     collect_slots(value, &mut members);
@@ -162,10 +167,14 @@ fn slots_members(body: &[Stmt]) -> FxHashSet<Slot<'_>> {
             }
 
             // Ex) `__slots__ += ("name",)`
-            Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
-                let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() else {
+            StmtKind::AugAssign(stmt_aug_assign) => {
+                let target = stmt_aug_assign.target();
+                let value = stmt_aug_assign.value();
+
+                let ExprKind::Name(name_node) = target.classify() else {
                     continue;
                 };
+                let id = name_node.id();
 
                 if id == "__slots__" {
                     collect_slots(value, &mut members);
@@ -177,16 +186,47 @@ fn slots_members(body: &[Stmt]) -> FxHashSet<Slot<'_>> {
     members
 }
 
-fn collect_slots<'a>(expr: &'a Expr, members: &mut FxHashSet<Slot<'a>>) {
-    match expr {
-        Expr::Tuple(ast::ExprTuple { elts, .. })
-        | Expr::List(ast::ExprList { elts, .. })
-        | Expr::Set(ast::ExprSet { elts, .. }) => {
-            members.extend(elts.iter().filter_map(Slot::from_expr));
+fn slots_attributes(expr: Expr<'_>) -> impl Iterator<Item = Slot<'_>> {
+    // Ex) `__slots__ = ("name",)`
+    let elts_iter = match expr.fields() {
+        ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
+        | ast::ExprFields::List(ast::ExprListFields { elts, .. })
+        | ast::ExprFields::Set(ast::ExprSetFields { elts, .. }) => {
+            Some(elts.iter().filter_map(|elt| match elt.classify() {
+                ExprKind::StringLiteral(expr_string_literal) => {
+                    let value = expr_string_literal.value();
+                    let range = expr_string_literal.range();
+                    Some(Slot {
+                        name: value.to_str(),
+                        range,
+                    })
+                }
+                _ => None,
+            }))
         }
-        Expr::Dict(dict) => {
-            members.extend(dict.iter_keys().flatten().filter_map(Slot::from_expr));
-        }
-        _ => {}
-    }
+        _ => None,
+    };
+
+    // Ex) `__slots__ = {"name": ...}`
+    let keys_iter = match expr.classify() {
+        ExprKind::Dict(_) => Some(expr.as_dict_expr().unwrap().iter_keys().filter_map(|key| {
+            match key.map(Expr::fields) {
+                Some(ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields {
+                    value,
+                    range,
+                    node: _,
+                })) => Some(Slot {
+                    name: value.to_str(),
+                    range,
+                }),
+                _ => None,
+            }
+        })),
+        _ => None,
+    };
+
+    elts_iter
+        .into_iter()
+        .flatten()
+        .chain(keys_iter.into_iter().flatten())
 }

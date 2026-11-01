@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, ExprKind};
+
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
@@ -96,37 +97,44 @@ impl Violation for LoggingTooManyArgs {
 
 /// PLE1205
 /// PLE1206
-pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
-    let mut first = None;
-    let mut num_positional = 0;
-    for argument in call.arguments.iter_source_order() {
-        if argument.is_variadic() {
-            return;
-        }
-        if let ast::ArgOrKeyword::Arg(expr) = argument {
-            first.get_or_insert(expr);
-            num_positional += 1;
-        }
+pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    // If there are any starred arguments, abort.
+    if call
+        .arguments
+        .args()
+        .iter()
+        .any(ruff_python_ast::Expr::is_starred_expr)
+    {
+        return;
     }
 
-    match call.func.as_ref() {
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-            if LoggingLevel::from_attribute(attr).is_none() {
+    // If there are any starred keyword arguments, abort.
+    if call
+        .arguments
+        .keywords()
+        .iter()
+        .any(|keyword| keyword.arg().is_none())
+    {
+        return;
+    }
+
+    match call.func.classify() {
+        ExprKind::Attribute(expr_attribute) => {
+            let attr = expr_attribute.attr();
+
+            if LoggingLevel::from_attribute(attr.as_str()).is_none() {
                 return;
             }
             if !logging::is_logger_candidate(
-                &call.func,
+                call.func,
                 checker.semantic(),
                 &checker.settings().logger_objects,
             ) {
                 return;
             }
         }
-        Expr::Name(_) => {
-            let Some(qualified_name) = checker
-                .semantic()
-                .resolve_qualified_name(call.func.as_ref())
-            else {
+        ExprKind::Name(_) => {
+            let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func) else {
                 return;
             };
             let ["logging", attribute] = qualified_name.segments() else {
@@ -139,7 +147,9 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
         _ => return,
     }
 
-    let Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) = first else {
+    let Some(ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { value, .. })) =
+        call.arguments.find_positional(0).map(Expr::fields)
+    else {
         return;
     };
 
@@ -155,8 +165,8 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let num_message_args = num_positional - 1;
-    let has_keywords = call.arguments.len() != num_positional;
+    let num_message_args = call.arguments.args().len() - 1;
+    let num_keywords = call.arguments.keywords().len();
 
     if checker.is_rule_enabled(Rule::LoggingTooManyArgs) {
         if summary.num_positional < num_message_args {
