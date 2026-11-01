@@ -2,7 +2,6 @@ use std::iter::FusedIterator;
 use std::num::NonZeroU32;
 use std::slice;
 
-use arrayvec::ArrayVec;
 use ruff_text_size::Ranged;
 use smallvec::SmallVec;
 
@@ -369,66 +368,6 @@ impl Pending {
     #[inline]
     pub(super) fn resume(&mut self) -> u32 {
         self.nodes.pop().unwrap_or(0)
-    }
-}
-
-impl<'a> crate::Parameters<'a> {
-    pub(super) fn parameter_children(self) -> Children<'a> {
-        if self.has_only_regular_args() {
-            Children::rows(self.ast(), self.args().words())
-        } else {
-            Children::fields(self.syntax_node(), 7)
-        }
-    }
-
-    pub(super) fn first_parameter(self, pending: &mut Pending) -> u32 {
-        if self.has_only_regular_args() {
-            return pending.descend_list(self.args().words());
-        }
-        if self.vararg().is_none() && self.kwarg().is_none() {
-            pending.push_list(self.kwonlyargs().words());
-            pending.push_list(self.args().words());
-            return pending.descend_list(self.posonlyargs().words());
-        }
-        for field in self.child_fields().into_iter().rev() {
-            match field {
-                Field::One(Some(node)) => pending.push_node(node.slot.get()),
-                Field::Rows(words) => pending.push_list(words),
-                Field::One(None) => {}
-            }
-        }
-        pending.resume()
-    }
-
-    pub(super) fn child_fields(self) -> ArrayVec<Field<'a>, 7> {
-        // Each variadic can split one of the three ordinary lists into two slices.
-        let mut fields = ArrayVec::new();
-        let mut variadics = [self.vararg(), self.kwarg()];
-        variadics.sort_by_key(|p| p.map_or(u32::MAX, |p| p.start().to_u32()));
-        let mut variadics = variadics.into_iter().flatten().peekable();
-        for mut ordinary in [self.posonlyargs(), self.args(), self.kwonlyargs()] {
-            while let Some(variadic) = variadics.peek() {
-                // Error recovery can put a variadic parameter before ordinary ones.
-                let index = ordinary.partition_point(|p| p.start() <= variadic.start());
-                let (before, after) = ordinary.split_at(index);
-                if !before.is_empty() {
-                    fields.push(Field::Rows(before.words()));
-                }
-                ordinary = after;
-                if ordinary.is_empty() {
-                    break;
-                }
-                fields.push(Field::One(Some(variadic.syntax_node().node_id())));
-                variadics.next();
-            }
-            if !ordinary.is_empty() {
-                fields.push(Field::Rows(ordinary.words()));
-            }
-        }
-        for p in variadics {
-            fields.push(Field::One(Some(p.syntax_node().node_id())));
-        }
-        fields
     }
 }
 

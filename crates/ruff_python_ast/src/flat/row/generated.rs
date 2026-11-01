@@ -302,8 +302,8 @@ node_payloads! {
         args: u32 at 8 => arguments_args, set_arguments_args;
     }
     Parameters(parameters) {
-        args: u64 at 0 => parameters_args, set_parameters_args;
-        extra_offset: u32 at 8 => parameters_extra_offset, set_parameters_extra_offset;
+        items: u64 at 0 => parameters_items, set_parameters_items;
+        layout: u32 at 8 => parameters_layout, set_parameters_layout;
     }
     Parameter(parameter) {
         name: u32 at 0 => parameter_name, set_parameter_name;
@@ -550,7 +550,10 @@ impl super::Ast {
                 let group = node.retype::<crate::Arguments>();
                 Children::merged(self, group.args().words(), group.keywords().words())
             }
-            NodeKind::Parameters => node.retype::<crate::Parameters>().parameter_children(),
+            NodeKind::Parameters => Children::rows(
+                self,
+                node.retype::<crate::Parameters>().ordered_items().words(),
+            ),
             NodeKind::ElifElseClause => Children::sequence(
                 self,
                 {
@@ -837,12 +840,6 @@ impl super::Ast {
                 ),
                 _ => Field::One(None),
             },
-            NodeKind::Parameters => node
-                .retype::<crate::Parameters>()
-                .child_fields()
-                .into_iter()
-                .nth(usize::from(field))
-                .unwrap_or(Field::One(None)),
             NodeKind::MatchCase => match field {
                 0 => Field::One(Some(AstNodeId::from_word(
                     split_words(record.inline_word::<4, 4>())[0],
@@ -1219,7 +1216,9 @@ impl super::Ast {
                 let group = node.retype::<crate::Arguments>();
                 stack.descend_merged(self, group.args().words(), group.keywords().words())
             }
-            NodeKind::Parameters => node.retype::<crate::Parameters>().first_parameter(stack),
+            NodeKind::Parameters => {
+                stack.descend_list(node.retype::<crate::Parameters>().ordered_items().words())
+            }
             NodeKind::MatchCase => {
                 stack.push_list(
                     List::<AstNodeId<crate::kind::Any>>::new(self, {

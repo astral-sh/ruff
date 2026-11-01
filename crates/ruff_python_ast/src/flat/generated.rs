@@ -4273,83 +4273,37 @@ impl Builder {
         range: ruff_text_size::TextRange,
         [posonlyargs, args, vararg, kwonlyargs, kwarg]: [u64; 5],
     ) -> BuildId<crate::kind::Parameters> {
-        let mut row = Row::new(NodeKind::Parameters, range);
-        row.set_parameters_args(args);
-        if split_words(posonlyargs)[1] == 0
-            && split_words(kwonlyargs)[1] == 0
-            && vararg == 0
-            && kwarg == 0
-        {
-            row.set_parameters_extra_offset(ABSENT);
-        } else {
-            row.set_parameters_extra_offset(offset(self.ast.extra.len()));
-            self.ast.extra.extend([
-                split_words(posonlyargs)[0],
-                split_words(posonlyargs)[1],
-                split_words(vararg)[0],
-                split_words(kwonlyargs)[0],
-                split_words(kwonlyargs)[1],
-                split_words(kwarg)[0],
-            ]);
-        }
-        self.push(row)
+        self.parameters_from_groups(range, [posonlyargs, args, vararg, kwonlyargs, kwarg])
     }
 }
 impl<'a> crate::Parameters<'a> {
-    pub(super) fn has_only_regular_args(self) -> bool {
-        self.syntax.row.parameters_extra_offset() == ABSENT
+    #[inline]
+    pub(super) fn ordered_items(self) -> NodeList<'a, crate::kind::Any> {
+        List::new(self.syntax.ast, self.syntax.row.parameters_items())
     }
     #[inline]
     pub fn posonlyargs(self) -> NodeList<'a, crate::kind::ParameterWithDefault> {
-        let word = {
-            let base = self.syntax.row.parameters_extra_offset() as usize;
-            if base == ABSENT as usize {
-                0
-            } else {
-                self.syntax.ast.extra_word::<true>(base)
-            }
-        };
+        let word = self.parameter_group::<0>();
         List::new(self.syntax.ast, word)
     }
     #[inline]
     pub fn args(self) -> NodeList<'a, crate::kind::ParameterWithDefault> {
-        let word = self.syntax.row.parameters_args();
+        let word = self.parameter_group::<1>();
         List::new(self.syntax.ast, word)
     }
     #[inline]
     pub fn vararg(self) -> Option<crate::Parameter<'a>> {
-        let word = {
-            let base = self.syntax.row.parameters_extra_offset() as usize;
-            if base == ABSENT as usize {
-                0
-            } else {
-                self.syntax.ast.extra_word::<false>(base + 2)
-            }
-        };
+        let word = self.variadic_parameter::<false>();
         self.syntax.ast.optional_child(word)
     }
     #[inline]
     pub fn kwonlyargs(self) -> NodeList<'a, crate::kind::ParameterWithDefault> {
-        let word = {
-            let base = self.syntax.row.parameters_extra_offset() as usize;
-            if base == ABSENT as usize {
-                0
-            } else {
-                self.syntax.ast.extra_word::<true>(base + 3)
-            }
-        };
+        let word = self.parameter_group::<2>();
         List::new(self.syntax.ast, word)
     }
     #[inline]
     pub fn kwarg(self) -> Option<crate::Parameter<'a>> {
-        let word = {
-            let base = self.syntax.row.parameters_extra_offset() as usize;
-            if base == ABSENT as usize {
-                0
-            } else {
-                self.syntax.ast.extra_word::<false>(base + 5)
-            }
-        };
+        let word = self.variadic_parameter::<true>();
         self.syntax.ast.optional_child(word)
     }
 }
@@ -6339,7 +6293,8 @@ impl<'a> SyntaxNode<'a> {
             NodeKind::Parameters => {
                 let node = self.retype::<crate::Parameters>();
                 if node.has_only_regular_args() {
-                    for parameter in node.args() {
+                    for parameter in node.ordered_items() {
+                        let parameter = parameter.retype::<crate::ParameterWithDefault>();
                         visitor.visit_parameter_with_default(parameter);
                     }
                 } else {

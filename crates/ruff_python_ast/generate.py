@@ -419,10 +419,7 @@ def layout(
     if (complete := place(fields, None)) is not None:
         return complete, {}, None
     kept: list[WireField] = []
-    preferred = "args" if node == "Parameters" else None
-    for field in sorted(
-        fields, key=lambda field: (field.name != preferred, field.width)
-    ):
+    for field in sorted(fields, key=lambda field: field.width):
         if with_extra([*kept, field]) is not None:
             kept.append(field)
     placed = with_extra(kept)
@@ -459,6 +456,8 @@ def child_sources(
     """The source-ordered fields, each containing a handle or a list."""
     if not fields:
         return []
+    if node.name == "Parameters":
+        return [("list", f"{view}.ordered_items().words()")]
     result = []
     for field in fields:
         raw = words[field.name].replace("self.syntax.ast.extra_word", "self.extra_word")
@@ -518,8 +517,6 @@ def simple_children(sources: list[tuple[str, str]]) -> str | None:
 def child_field(
     node: Node, nodes: set[str], words: dict[str, str], _schema: list[InlineField]
 ) -> str:
-    if node.name == "Parameters":
-        return "node.retype::<crate::Parameters>().child_fields().into_iter().nth(usize::from(field)).unwrap_or(Field::One(None))"
     if node.name in {"Arguments", "PatternArguments"}:
         return "Field::One(None)"
     sources = child_sources(
@@ -534,8 +531,6 @@ def child_field(
 def direct_children(
     node: Node, nodes: set[str], words: dict[str, str], _schema: list[InlineField]
 ) -> str:
-    if node.name == "Parameters":
-        return "node.retype::<crate::Parameters>().parameter_children()"
     if node.name in {"Arguments", "PatternArguments"}:
         field = "args" if node.name == "Arguments" else "patterns"
         return f"let group = node.retype::<crate::{node.name}>(); Children::merged(self, group.{field}().words(), group.keywords().words())"
@@ -550,8 +545,6 @@ def direct_children(
 def next_descendant(
     node: Node, nodes: set[str], words: dict[str, str], _schema: list[InlineField]
 ) -> str:
-    if node.name == "Parameters":
-        return "node.retype::<crate::Parameters>().first_parameter(stack)"
     if node.name in {"Arguments", "PatternArguments"}:
         field = "args" if node.name == "Arguments" else "patterns"
         return f"let group = node.retype::<crate::{node.name}>(); stack.descend_merged(self, group.{field}().words(), group.keywords().words())"
@@ -624,7 +617,8 @@ def walk_fields(node: Node, nodes: set[str]) -> str:
     if node.name == "Parameters":
         return """
         if node.has_only_regular_args() {
-            for parameter in node.args() {
+            for parameter in node.ordered_items() {
+                let parameter = parameter.retype::<crate::ParameterWithDefault>();
                 visitor.visit_parameter_with_default(parameter);
             }
         } else {
@@ -1018,6 +1012,28 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
         initializers.append(
             f"(builder.{method}(self.range, [{parameters}]), self.range, crate::NodeKind::{n.name}) }} }}"
         )
+        if n.name == "Parameters":
+            schemas[n.name] = [InlineField("items", 0, 8), InlineField("layout", 8, 4)]
+            out.append(f"self.parameters_from_groups(range, [{parameters}]) }} }}")
+            out.append("impl<'a> crate::Parameters<'a> {")
+            out.append(
+                "#[inline] pub(super) fn ordered_items(self) -> NodeList<'a, crate::kind::Any> { List::new(self.syntax.ast, self.syntax.row.parameters_items()) }"
+            )
+            for f, read in zip(
+                fields,
+                [
+                    "parameter_group::<0>",
+                    "parameter_group::<1>",
+                    "variadic_parameter::<false>",
+                    "parameter_group::<2>",
+                    "variadic_parameter::<true>",
+                ],
+            ):
+                out.append(
+                    f"#[inline] pub fn {f.name}(self) -> {f.result} {{ let word = self.{read}(); {f.read} }}"
+                )
+            out.append("}")
+            continue
         mutable = "mut " if fields else ""
         out.append(f"let {mutable}row = Row::new(NodeKind::{n.name}, range);")
         if n.name == "ExprCompare":
@@ -1045,13 +1061,6 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
                 "row.set_expr_string_literal_text_offset(start); row.set_expr_string_literal_text_len(len);"
             )
         if spills:
-            if n.name == "Parameters":
-                # Ordinary positional-or-keyword parameters fit in the row.
-                out.append(
-                    "if split_words(posonlyargs)[1] == 0 && split_words(kwonlyargs)[1] == 0 "
-                    "&& vararg == 0 && kwarg == 0 { "
-                    "row.set_parameters_extra_offset(ABSENT); } else {"
-                )
             out.append(f"row.set_{arm}_extra_offset(offset(self.ast.extra.len()));")
             words = []
             for field in fields:
@@ -1060,8 +1069,6 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
                     if field.width == 8:
                         words.append(f"split_words({field.name})[1]")
             out.append("self.ast.extra.extend([" + ", ".join(words) + "]);")
-            if n.name == "Parameters":
-                out.append("}")
         if n.name in {"ExprYield", "ExprYieldFrom"}:
             out.append(
                 "let node = self.push(row);"
@@ -1091,8 +1098,6 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
                     }
                     """
                 )
-            if n.name == "Parameters":
-                out.append("pub(super) fn has_only_regular_args(self) -> bool { self.syntax.row.parameters_extra_offset() == ABSENT }")
             for f in fields:
                 if f.name in offsets:
                     raw = f"self.syntax.row.{arm}_{f.name}()"
@@ -1108,8 +1113,6 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
                     shared_base = f"split_words(record.inline_word::<{extra_offset}, 4>())[0] as usize"
                     index = "base" if not spills[f.name] else f"base + {spills[f.name]}"
                     read = f"self.syntax.ast.extra_word::<{str(f.width == 8).lower()}>({index})"
-                    if n.name == "Parameters":
-                        read = f"if base == ABSENT as usize {{ 0 }} else {{ {read} }}"
                     raw = f"{{ let base = {base}; {read} }}"
                     shared = f"{{ let base = {shared_base}; {read} }}"
                 if f.result == "&'a crate::name::Name":
