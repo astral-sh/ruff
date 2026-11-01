@@ -137,14 +137,30 @@ pub(crate) fn extract_fixed_length_iterable_element_types<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     iterable: &ast::Expr,
-    mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+    expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
 ) -> Option<Box<[Type<'db>]>> {
-    fn extend_fixed_length_iterable<'db>(
+    extract_fixed_length_iterable_elements(db, env, iterable, expression_type, |ty, _| ty)
+        .map(Vec::into_boxed_slice)
+}
+
+/// Extracts mapped elements from a statically known fixed-length iterable.
+///
+/// `map_element` receives each element type and its source range. For a non-literal iterable,
+/// every element uses the iterable's range. Returns `None` if the iteration length is unknown.
+pub(super) fn extract_fixed_length_iterable_elements<'db, T>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    iterable: &ast::Expr,
+    mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+    mut map_element: impl FnMut(Type<'db>, TextRange) -> T,
+) -> Option<Vec<T>> {
+    fn extend_fixed_length_iterable<'db, T>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         iterable: &ast::Expr,
         expression_type: &mut impl FnMut(&ast::Expr) -> Type<'db>,
-        element_types: &mut Vec<Type<'db>>,
+        map_element: &mut impl FnMut(Type<'db>, TextRange) -> T,
+        result: &mut Vec<T>,
     ) -> Option<()> {
         let elements = match iterable {
             ast::Expr::List(list) => Some(&list.elts),
@@ -160,10 +176,11 @@ pub(crate) fn extract_fixed_length_iterable_element_types<'db>(
                         env,
                         starred.value.as_ref(),
                         expression_type,
-                        element_types,
+                        map_element,
+                        result,
                     )?;
                 } else {
-                    element_types.push(expression_type(element));
+                    result.push(map_element(expression_type(element), element.range()));
                 }
             }
             return Some(());
@@ -172,13 +189,25 @@ pub(crate) fn extract_fixed_length_iterable_element_types<'db>(
         let iterable_type = expression_type(iterable);
         let spec = iterable_type.try_iterate(db, env).ok()?;
         let tuple = spec.as_fixed_length()?;
-        element_types.extend(tuple.all_elements().iter().copied());
+        result.extend(
+            tuple
+                .all_elements()
+                .iter()
+                .map(|ty| map_element(*ty, iterable.range())),
+        );
         Some(())
     }
 
-    let mut element_types = Vec::new();
-    extend_fixed_length_iterable(db, env, iterable, &mut expression_type, &mut element_types)?;
-    Some(element_types.into_boxed_slice())
+    let mut result = Vec::new();
+    extend_fixed_length_iterable(
+        db,
+        env,
+        iterable,
+        &mut expression_type,
+        &mut map_element,
+        &mut result,
+    )?;
+    Some(result)
 }
 
 impl<'db> Type<'db> {
