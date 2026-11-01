@@ -1,20 +1,23 @@
 //! Parsing of string literals, bytes literals, and implicit string concatenation.
+use crate::parser::syntax::{self as id, Construct};
+use ruff_python_ast::build;
 
 use bstr::ByteSlice;
 use std::fmt;
 
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{self as ast, AnyStringFlags, AtomicNodeIndex, Expr, StringFlags};
+use ruff_python_ast::{AnyStringFlags, StringFlags};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::error::{LexicalError, LexicalErrorType};
+use crate::parser::ParserStorage;
 
 #[derive(Debug)]
 pub(crate) enum StringType {
-    Str(ast::StringLiteral),
-    Bytes(ast::BytesLiteral),
-    FString(ast::FString),
-    TString(ast::TString),
+    Str(id::StringLiteral),
+    Bytes(id::BytesLiteral),
+    FString(id::FString),
+    TString(id::TString),
 }
 
 impl Ranged for StringType {
@@ -24,17 +27,6 @@ impl Ranged for StringType {
             Self::Bytes(node) => node.range(),
             Self::FString(node) => node.range(),
             Self::TString(node) => node.range(),
-        }
-    }
-}
-
-impl From<StringType> for Expr {
-    fn from(string: StringType) -> Self {
-        match string {
-            StringType::Str(node) => Expr::from(node),
-            StringType::Bytes(node) => Expr::from(node),
-            StringType::FString(node) => Expr::from(node),
-            StringType::TString(node) => Expr::from(node),
         }
     }
 }
@@ -279,14 +271,15 @@ impl<'src> StringParser<'src> {
 
     fn parse_interpolated_string_middle(
         mut self,
-    ) -> Result<ast::InterpolatedStringLiteralElement, LexicalError> {
+        storage: &mut ParserStorage,
+    ) -> Result<id::InterpolatedStringLiteralElement, LexicalError> {
         // Fast-path: if the f-string or t-string doesn't contain any escape sequences, return the literal.
         let Some(mut index) = memchr::memchr3(b'{', b'}', b'\\', self.source.as_bytes()) else {
-            return Ok(ast::InterpolatedStringLiteralElement {
-                value: self.source.into(),
+            return Ok(build::InterpolatedStringLiteralElement {
+                value: self.source,
                 range: self.range,
-                node_index: AtomicNodeIndex::NONE,
-            });
+            }
+            .parsed(storage));
         };
 
         let mut value = String::with_capacity(self.source.len());
@@ -366,14 +359,14 @@ impl<'src> StringParser<'src> {
             index = next_index;
         }
 
-        Ok(ast::InterpolatedStringLiteralElement {
-            value: value.into_boxed_str(),
+        Ok(build::InterpolatedStringLiteralElement {
+            value: &value,
             range: self.range,
-            node_index: AtomicNodeIndex::NONE,
-        })
+        }
+        .parsed(storage))
     }
 
-    fn parse_bytes(mut self) -> Result<StringType, LexicalError> {
+    fn parse_bytes(mut self, storage: &mut ParserStorage) -> Result<StringType, LexicalError> {
         if let Some(index) = self.source.as_bytes().find_non_ascii_byte() {
             let ch = self.source.chars().nth(index).unwrap();
             return Err(LexicalError::new(
@@ -387,22 +380,26 @@ impl<'src> StringParser<'src> {
 
         if self.flags.is_raw_string() {
             // For raw strings, no escaping is necessary.
-            return Ok(StringType::Bytes(ast::BytesLiteral {
-                value: self.source.as_bytes().into(),
-                range: self.range,
-                flags: self.flags.into(),
-                node_index: AtomicNodeIndex::NONE,
-            }));
+            return Ok(StringType::Bytes(
+                build::BytesLiteral {
+                    value: self.source.as_bytes(),
+                    range: self.range,
+                    flags: self.flags.into(),
+                }
+                .parsed(storage),
+            ));
         }
 
         let Some(mut escape) = memchr::memchr(b'\\', self.source.as_bytes()) else {
-            // If the string doesn't contain any escape sequences, return the owned string.
-            return Ok(StringType::Bytes(ast::BytesLiteral {
-                value: self.source.as_bytes().into(),
-                range: self.range,
-                flags: self.flags.into(),
-                node_index: AtomicNodeIndex::NONE,
-            }));
+            // Without escape sequences, the source already contains the decoded value.
+            return Ok(StringType::Bytes(
+                build::BytesLiteral {
+                    value: self.source.as_bytes(),
+                    range: self.range,
+                    flags: self.flags.into(),
+                }
+                .parsed(storage),
+            ));
         };
 
         // If the string contains escape sequences, we need to parse them.
@@ -435,33 +432,39 @@ impl<'src> StringParser<'src> {
             escape = next_escape;
         }
 
-        Ok(StringType::Bytes(ast::BytesLiteral {
-            value: value.into_boxed_slice(),
-            range: self.range,
-            flags: self.flags.into(),
-            node_index: AtomicNodeIndex::NONE,
-        }))
-    }
-
-    fn parse_string(mut self) -> Result<StringType, LexicalError> {
-        if self.flags.is_raw_string() {
-            // For raw strings, no escaping is necessary.
-            return Ok(StringType::Str(ast::StringLiteral {
-                value: self.source.into(),
+        Ok(StringType::Bytes(
+            build::BytesLiteral {
+                value: &value,
                 range: self.range,
                 flags: self.flags.into(),
-                node_index: AtomicNodeIndex::NONE,
-            }));
+            }
+            .parsed(storage),
+        ))
+    }
+
+    fn parse_string(mut self, storage: &mut ParserStorage) -> Result<StringType, LexicalError> {
+        if self.flags.is_raw_string() {
+            // For raw strings, no escaping is necessary.
+            return Ok(StringType::Str(
+                build::StringLiteral {
+                    value: self.source,
+                    range: self.range,
+                    flags: self.flags.into(),
+                }
+                .parsed(storage),
+            ));
         }
 
         let Some(mut escape) = memchr::memchr(b'\\', self.source.as_bytes()) else {
-            // If the string doesn't contain any escape sequences, return the owned string.
-            return Ok(StringType::Str(ast::StringLiteral {
-                value: self.source.into(),
-                range: self.range,
-                flags: self.flags.into(),
-                node_index: AtomicNodeIndex::NONE,
-            }));
+            // Without escape sequences, the source already contains the decoded value.
+            return Ok(StringType::Str(
+                build::StringLiteral {
+                    value: self.source,
+                    range: self.range,
+                    flags: self.flags.into(),
+                }
+                .parsed(storage),
+            ));
         };
 
         // If the string contains escape sequences, we need to parse them.
@@ -494,52 +497,58 @@ impl<'src> StringParser<'src> {
             escape = next_escape;
         }
 
-        Ok(StringType::Str(ast::StringLiteral {
-            value: value.into_boxed_str(),
-            range: self.range,
-            flags: self.flags.into(),
-            node_index: AtomicNodeIndex::NONE,
-        }))
+        Ok(StringType::Str(
+            build::StringLiteral {
+                value: &value,
+                range: self.range,
+                flags: self.flags.into(),
+            }
+            .parsed(storage),
+        ))
     }
 
-    fn parse(self) -> Result<StringType, LexicalError> {
+    fn parse(self, storage: &mut ParserStorage) -> Result<StringType, LexicalError> {
         if self.flags.is_byte_string() {
-            self.parse_bytes()
+            self.parse_bytes(storage)
         } else {
-            self.parse_string()
+            self.parse_string(storage)
         }
     }
 }
 
 pub(crate) fn parse_string_literal(
+    storage: &mut ParserStorage,
     source: &str,
     flags: AnyStringFlags,
     range: TextRange,
 ) -> Result<StringType, LexicalError> {
-    StringParser::new(source, flags, range.start() + flags.opener_len(), range).parse()
+    StringParser::new(source, flags, range.start() + flags.opener_len(), range).parse(storage)
 }
 
 pub(crate) fn parse_interpolated_string_literal_element(
+    storage: &mut ParserStorage,
     source: &str,
     flags: AnyStringFlags,
     range: TextRange,
-) -> Result<ast::InterpolatedStringLiteralElement, LexicalError> {
-    StringParser::new(source, flags, range.start(), range).parse_interpolated_string_middle()
+) -> Result<id::InterpolatedStringLiteralElement, LexicalError> {
+    StringParser::new(source, flags, range.start(), range).parse_interpolated_string_middle(storage)
 }
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::Suite;
+    use std::fmt::{self, Debug};
 
     use crate::error::LexicalErrorType;
-    use crate::{InterpolatedStringErrorType, ParseError, ParseErrorType, Parsed, parse_module};
+    use crate::{InterpolatedStringErrorType, ParseError, ParseErrorType, parse_module};
 
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";
     const UNIX_EOL: &str = "\n";
 
-    fn parse_suite(source: &str) -> Result<Suite, ParseError> {
-        parse_module(source).map(Parsed::into_suite)
+    fn parse_suite(source: &str) -> Result<impl Debug + use<>, ParseError> {
+        let parsed = parse_module(source)?;
+        // Keep the arena alive until the snapshot formats its borrowed statements.
+        Ok(fmt::from_fn(move |f| parsed.suite().fmt(f)))
     }
 
     fn nested_format_spec(prefix: char, depth: usize) -> String {
@@ -550,7 +559,7 @@ mod tests {
         format!(r#"{prefix}"{replacement_field}""#)
     }
 
-    fn string_parser_escaped_eol(eol: &str) -> Suite {
+    fn string_parser_escaped_eol(eol: &str) -> impl Debug {
         let source = format!(r"'text \{eol}more text'");
         parse_suite(&source).unwrap()
     }
