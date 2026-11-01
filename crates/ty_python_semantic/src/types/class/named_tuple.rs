@@ -460,7 +460,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                 .expect("Expected `NamedTuple` definition to be an assignment")
                 .as_call_expr()
                 .expect("Expected `NamedTuple` definition r.h.s. to be a call expression");
-            match definition_expression_type(db, definition, &node.arguments.args[1]) {
+            match definition_expression_type(db, definition, node.arguments().args().at(1)) {
                 Type::KnownInstance(KnownInstanceType::NamedTupleSpec(spec)) => spec,
                 _ => NamedTupleSpec::unknown(db),
             }

@@ -42,7 +42,7 @@ pub(crate) fn check_dynamic_class_definition<'db>(
         return;
     };
 
-    let Some(bases) = dynamic_class_bases_argument(&call_expr.arguments) else {
+    let Some(bases) = dynamic_class_bases_argument(call_expr.arguments()) else {
         return;
     };
 
@@ -54,7 +54,7 @@ pub(crate) fn check_dynamic_class_definition<'db>(
 
         // MRO succeeded, check for instance-layout-conflict.
         let mut disjoint_bases = IncompatibleBases::default();
-        let bases_tuple_elts = bases.as_tuple_expr().map(|tuple| tuple.elts.as_slice());
+        let bases_tuple_elts = bases.as_tuple_expr().map(ruff_python_ast::ExprTuple::elts);
 
         for (idx, base_type) in dynamic_class
             .explicit_bases(context.db())

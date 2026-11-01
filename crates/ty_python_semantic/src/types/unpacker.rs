@@ -1,4 +1,5 @@
 use crate::ProgramEnvironment;
+use ruff_python_ast::{self as ast, ExprKind, NodeList};
 use std::borrow::Cow;
 use std::debug_assert_matches;
 
@@ -6,8 +7,8 @@ use ruff_db::parsed::ParsedModuleRef;
 
 use rustc_hash::FxHashMap;
 
-use ruff_python_ast::visitor::{self, Visitor};
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{Expr, SyntaxNode, visitor};
 use ruff_text_size::Ranged;
 
 use crate::Db;
@@ -41,7 +42,7 @@ struct UnknownTargetCollector<'db, 'map> {
 }
 
 impl<'ast> Visitor<'ast> for UnknownTargetCollector<'_, '_> {
-    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+    fn visit_expr(&mut self, expr: Expr<'ast>) {
         self.targets.insert(expr.into(), Type::unknown());
         visitor::walk_expr(self, expr);
     }
@@ -77,11 +78,11 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     }
 
     /// Unpack the value to the target expression.
-    pub(crate) fn unpack(&mut self, target: &ast::Expr, value: UnpackValue<'db>) {
+    pub(crate) fn unpack(&mut self, target: Expr<'_>, value: UnpackValue<'db>) {
         let db = self.db();
         debug_assert_matches!(
-            target,
-            ast::Expr::List(_) | ast::Expr::Tuple(_),
+            target.classify(),
+            ExprKind::List(_) | ExprKind::Tuple(_),
             "Unpacking target must be a list or tuple expression"
         );
 
@@ -105,7 +106,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             UnpackKind::Iterable { mode } => {
                 let env = self.context.program_environment();
                 if !mode.is_async()
-                    && let ast::Expr::Dict(dict) = value_expr
+                    && let ExprKind::Dict(dict) = value_expr.classify()
                     && let Some((keys, _)) = dict_literal_key_value_types(db, env, dict, |expr| {
                         value_inference.expression_type(expr)
                     })
@@ -153,7 +154,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     }
 
     /// Records `Unknown` for a malformed unpack target and all of its descendant expressions.
-    fn record_unknown_target_subtree(&mut self, target: &ast::Expr) {
+    fn record_unknown_target_subtree(&mut self, target: Expr<'_>) {
         UnknownTargetCollector {
             targets: &mut self.targets,
         }
@@ -181,24 +182,26 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     /// is enough to resolve a lot of common cycles.
     fn unpack_inner(
         &mut self,
-        target: &ast::Expr,
-        value_expr: AnyNodeRef<'_>,
+        target: Expr<'_>,
+        value_expr: SyntaxNode<'_>,
         value: UnpackElement<'db, 'ast>,
         value_inference: &ExpressionInference<'db>,
     ) {
         let db = self.db();
         let env = self.context.program_environment();
-        let targets = match target {
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+        let targets = match target.fields() {
+            ast::ExprFields::Name(_)
+            | ast::ExprFields::Attribute(_)
+            | ast::ExprFields::Subscript(_) => {
                 self.targets.insert(target.into(), value.ty);
                 return;
             }
-            ast::Expr::Starred(starred) => {
-                self.unpack_inner(&starred.value, value_expr, value, value_inference);
+            ast::ExprFields::Starred(ast::ExprStarredFields { node: starred, .. }) => {
+                self.unpack_inner(starred.value(), value_expr, value, value_inference);
                 return;
             }
-            ast::Expr::List(ast::ExprList { elts, .. })
-            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => elts,
+            ast::ExprFields::List(ast::ExprListFields { elts, .. })
+            | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => elts,
             _ => {
                 // Recovered syntax can still create assignment definitions for descendants of
                 // malformed targets. Give the whole subtree an unknown type so later lookups
@@ -344,7 +347,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         for (target, (ty, expression, promote_literals)) in targets.iter().zip(inferred_targets) {
             self.unpack_inner(
                 target,
-                expression.map(AnyNodeRef::from).unwrap_or(value_expr),
+                expression.map(SyntaxNode::from).unwrap_or(value_expr),
                 UnpackElement {
                     ty: ty.build(),
                     expression,
@@ -429,9 +432,9 @@ impl<'db> UnpackResult<'db> {
 
 /// Return a tuple or list's elements when they correspond exactly to a fixed-length sequence.
 pub(super) fn fixed_sequence_elements(
-    expression: &ast::Expr,
+    expression: Expr<'_>,
     expected_length: usize,
-) -> Option<&[ast::Expr]> {
+) -> Option<NodeList<'_, ruff_python_ast::kind::Expr>> {
     let elements = sequence_elts(expression)?;
 
     if elements.len() != expected_length {
@@ -450,10 +453,10 @@ pub(super) fn fixed_sequence_elements(
 /// Explicit values before or after a starred element remain unambiguous. Literal expansions
 /// retain their source expressions too; values supplied by arbitrary iterables do not.
 pub(super) fn unpacked_assignment_value<'ast>(
-    unpack_target: &ast::Expr,
-    value: &'ast ast::Expr,
-    requested_target: &ast::Expr,
-) -> Option<&'ast ast::Expr> {
+    unpack_target: Expr<'_>,
+    value: Expr<'ast>,
+    requested_target: Expr<'_>,
+) -> Option<Expr<'ast>> {
     assignment_values_for_target(unpack_target, value, requested_target)
         .and_then(UnpackedAssignmentValues::into_single)
 }
@@ -464,29 +467,29 @@ pub(super) fn unpacked_assignment_value<'ast>(
 /// Literal expansions are flattened; an unknown source in the collected portion makes the
 /// correspondence ambiguous.
 pub(super) fn starred_assignment_values<'ast>(
-    unpack_target: &ast::Expr,
-    value: &'ast ast::Expr,
-    requested_target: &ast::Expr,
-) -> Option<Vec<&'ast ast::Expr>> {
+    unpack_target: Expr<'_>,
+    value: Expr<'ast>,
+    requested_target: Expr<'_>,
+) -> Option<Vec<Expr<'ast>>> {
     assignment_values_for_target(unpack_target, value, requested_target)
         .and_then(UnpackedAssignmentValues::into_collected)
 }
 
 #[derive(Debug, Clone)]
 enum UnpackedAssignmentValues<'ast> {
-    Single(&'ast ast::Expr),
-    Collected(Vec<&'ast ast::Expr>),
+    Single(Expr<'ast>),
+    Collected(Vec<Expr<'ast>>),
 }
 
 impl<'ast> UnpackedAssignmentValues<'ast> {
-    fn into_single(self) -> Option<&'ast ast::Expr> {
+    fn into_single(self) -> Option<Expr<'ast>> {
         match self {
             Self::Single(value) => Some(value),
             Self::Collected(_) => None,
         }
     }
 
-    fn into_collected(self) -> Option<Vec<&'ast ast::Expr>> {
+    fn into_collected(self) -> Option<Vec<Expr<'ast>>> {
         match self {
             Self::Single(_) => None,
             Self::Collected(values) => Some(values),
@@ -495,9 +498,9 @@ impl<'ast> UnpackedAssignmentValues<'ast> {
 }
 
 fn assignment_values_for_target<'ast>(
-    unpack_target: &ast::Expr,
-    value: &'ast ast::Expr,
-    requested_target: &ast::Expr,
+    unpack_target: Expr<'_>,
+    value: Expr<'ast>,
+    requested_target: Expr<'_>,
 ) -> Option<UnpackedAssignmentValues<'ast>> {
     if ExpressionNodeKey::from(unpack_target) == ExpressionNodeKey::from(requested_target) {
         return Some(UnpackedAssignmentValues::Single(value));
@@ -525,11 +528,10 @@ fn assignment_values_for_target<'ast>(
         .find(|(target, _)| target.range().contains_range(requested_target.range()))?;
     match source {
         TupleElement::Variable(values) => {
-            let ast::Expr::Starred(starred) = target else {
+            let ExprKind::Starred(starred) = target.classify() else {
                 return None;
             };
-            if ExpressionNodeKey::from(starred.value.as_ref())
-                != ExpressionNodeKey::from(requested_target)
+            if ExpressionNodeKey::from(starred.value()) != ExpressionNodeKey::from(requested_target)
             {
                 return None;
             }
@@ -543,8 +545,11 @@ fn assignment_values_for_target<'ast>(
     }
 }
 
-fn target_length(targets: &[ast::Expr]) -> TupleLength {
-    match targets.iter().position(ast::Expr::is_starred_expr) {
+fn target_length(targets: NodeList<'_, ruff_python_ast::kind::Expr>) -> TupleLength {
+    match targets
+        .iter()
+        .position(ruff_python_ast::Expr::is_starred_expr)
+    {
         Some(index) => TupleLength::Variable(index, targets.len() - index - 1),
         None => TupleLength::Fixed(targets.len()),
     }
@@ -555,7 +560,7 @@ fn target_length(targets: &[ast::Expr]) -> TupleLength {
 #[derive(Clone, Copy)]
 struct UnpackElement<'db, 'ast> {
     ty: Type<'db>,
-    expression: Option<&'ast ast::Expr>,
+    expression: Option<Expr<'ast>>,
     /// Widening a large tuple also widens nested tuple elements. Do not undo that widening
     /// when following the source expression during nested unpacking.
     promote_literals: bool,
@@ -593,7 +598,7 @@ fn sequence_from_type<'db, 'ast>(
 pub(super) fn collected_list_type<'db, 'ast>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    values: impl ExactSizeIterator<Item = (Type<'db>, Option<&'ast ast::Expr>)>,
+    values: impl ExactSizeIterator<Item = (Type<'db>, Option<Expr<'ast>>)>,
 ) -> Type<'db> {
     let is_empty = values.len() == 0;
     let mut elements = UnionBuilder::new(db, env).unpack_aliases(false);
@@ -618,10 +623,10 @@ pub(super) fn collected_list_type<'db, 'ast>(
 /// recursively; other starred expressions contribute the shape supplied by the caller. For
 /// `first, *rest, last = [1, *items, 2]`, the unknown width of `items` leaves both ends intact.
 fn literal_sequence<'ast, T: Clone>(
-    expression: &'ast ast::Expr,
+    expression: Expr<'ast>,
     promote: bool,
-    element: &impl Fn(&'ast ast::Expr, bool) -> T,
-    spread: &impl Fn(&'ast ast::Expr, bool, Option<usize>) -> Tuple<T, Vec<T>>,
+    element: &impl Fn(Expr<'ast>, bool) -> T,
+    spread: &impl Fn(Expr<'ast>, bool, Option<usize>) -> Tuple<T, Vec<T>>,
 ) -> Option<Tuple<T, Vec<T>>> {
     let (values, promote) = literal_sequence_elements(expression, promote)?;
     Some(sequence_from_literal_elements(
@@ -640,9 +645,9 @@ fn literal_sequence<'ast, T: Clone>(
 }
 
 fn literal_sequence_elements(
-    expression: &ast::Expr,
+    expression: Expr<'_>,
     promote: bool,
-) -> Option<(&[ast::Expr], bool)> {
+) -> Option<(NodeList<'_, ruff_python_ast::kind::Expr>, bool)> {
     // `a, *rest = (items := [1, "two"])` has the same elements as the list itself.
     let expression = expression.expression_value();
     let values = sequence_elts(expression)?;
@@ -654,14 +659,19 @@ fn literal_sequence_elements(
 /// all three positions count, even though the outer tuple has only two AST elements.
 /// Other starred iterables count as one item because their elements are not recovered from
 /// literal syntax. Stop counting as soon as the limit is exceeded.
-pub(super) fn tuple_literal_needs_promotion(values: &[ast::Expr]) -> bool {
+pub(super) fn tuple_literal_needs_promotion(
+    values: NodeList<'_, ruff_python_ast::kind::Expr>,
+) -> bool {
     /// Limit literal precision in large tuple expressions to avoid pathological inference costs.
     const MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE: usize = 64;
 
-    fn remaining_budget(values: &[ast::Expr], remaining: usize) -> Option<usize> {
+    fn remaining_budget(
+        values: NodeList<'_, ruff_python_ast::kind::Expr>,
+        remaining: usize,
+    ) -> Option<usize> {
         values.iter().try_fold(remaining, |remaining, value| {
-            if let ast::Expr::Starred(starred) = value
-                && let Some(values) = sequence_elts(starred.value.expression_value())
+            if let ExprKind::Starred(starred) = value.classify()
+                && let Some(values) = sequence_elts(starred.value().expression_value())
             {
                 remaining_budget(values, remaining)
             } else {
@@ -678,20 +688,22 @@ pub(super) fn tuple_literal_needs_promotion(values: &[ast::Expr]) -> bool {
 /// The caller chooses the variable-segment representation and how to concatenate it: tuple
 /// inference retains symbolic `TypeVarTuple` segments, while unpacking retains source expressions.
 pub(super) fn sequence_from_literal_elements<'ast, T, V>(
-    values: &'ast [ast::Expr],
+    values: NodeList<'ast, ruff_python_ast::kind::Expr>,
     promote: bool,
-    element: &impl Fn(&'ast ast::Expr, bool) -> T,
-    spread: &impl Fn(&'ast ast::Expr, bool, Option<usize>) -> Tuple<T, V>,
+    element: &impl Fn(Expr<'ast>, bool) -> T,
+    spread: &impl Fn(Expr<'ast>, bool, Option<usize>) -> Tuple<T, V>,
     concat: &impl Fn(TupleBuilder<T, V>, &Tuple<T, V>) -> TupleBuilder<T, V>,
 ) -> Tuple<T, V> {
     let mut builder = TupleBuilder::with_capacity(values.len());
     for value in values {
-        if let ast::Expr::Starred(starred) = value {
-            let unpacked = literal_sequence_elements(&starred.value, promote)
+        if let ExprKind::Starred(starred) = value.classify() {
+            let unpacked = literal_sequence_elements(starred.value(), promote)
                 .map(|(values, promote)| {
                     sequence_from_literal_elements(values, promote, element, spread, concat)
                 })
-                .unwrap_or_else(|| spread(value, promote, literal_iterable_length(&starred.value)));
+                .unwrap_or_else(|| {
+                    spread(value, promote, literal_iterable_length(starred.value()))
+                });
             builder = concat(builder, &unpacked);
         } else {
             builder.push(element(value, promote));
@@ -702,25 +714,30 @@ pub(super) fn sequence_from_literal_elements<'ast, T, V>(
 
 /// The literal element count used when inferring expansions such as `(*{"key": 1},)`.
 /// An expansion within a set or dictionary, as in `{*items}` or `{**items}`, makes that count unknown.
-fn literal_iterable_length(expression: &ast::Expr) -> Option<usize> {
-    match expression {
-        ast::Expr::Set(ast::ExprSet { elts, .. }) => elts
-            .iter()
-            .all(|element| !element.is_starred_expr())
-            .then_some(elts.len()),
-        ast::Expr::Dict(ast::ExprDict { items, .. }) => items
-            .iter()
-            .all(|item| item.key.is_some())
-            .then_some(items.len()),
+fn literal_iterable_length(expression: Expr<'_>) -> Option<usize> {
+    match expression.classify() {
+        ExprKind::Set(expr_set) => {
+            let elts = expr_set.elts();
+            elts.iter()
+                .all(|element| !element.is_starred_expr())
+                .then_some(elts.len())
+        }
+        ExprKind::Dict(expr_dict) => {
+            let items = expr_dict.items();
+            items
+                .iter()
+                .all(|item| item.key().is_some())
+                .then_some(items.len())
+        }
         _ => None,
     }
 }
 
 /// Extract the element slice from a list or tuple expression.
-fn sequence_elts(expr: &ast::Expr) -> Option<&[ast::Expr]> {
-    match expr {
-        ast::Expr::List(list) => Some(&list.elts),
-        ast::Expr::Tuple(tuple) => Some(&tuple.elts),
+fn sequence_elts(expr: Expr<'_>) -> Option<NodeList<'_, ruff_python_ast::kind::Expr>> {
+    match expr.classify() {
+        ExprKind::List(list) => Some(list.elts()),
+        ExprKind::Tuple(tuple) => Some(tuple.elts()),
         _ => None,
     }
 }

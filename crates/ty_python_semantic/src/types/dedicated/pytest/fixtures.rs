@@ -415,7 +415,7 @@ struct FixtureRequest<'db> {
 struct FixtureRequestContext<'db, 'ast> {
     function_definition: Definition<'db>,
     function_type: FunctionType<'db>,
-    function: &'ast ast::StmtFunctionDef,
+    function: ast::StmtFunctionDef<'ast>,
     module: &'ast ParsedModuleRef,
     index: &'db ty_python_core::SemanticIndex<'db>,
     class_scope: Option<FileScopeId>,
@@ -428,7 +428,7 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
     /// through one or more parameters.
     fn new(
         db: &'db dyn Db,
-        function_ref: &'db AstNodeRef<ast::StmtFunctionDef>,
+        function_ref: &'db AstNodeRef<ast::kind::StmtFunctionDef>,
         class_scope: Option<FileScopeId>,
         module: &'ast ParsedModuleRef,
         index: &'db ty_python_core::SemanticIndex<'db>,
@@ -445,7 +445,7 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
         // @pytest.fixture
         // def service(database): ...  # `database` is a fixture request.
         // ```
-        let is_fixture_dependency = !function.decorator_list.is_empty()
+        let is_fixture_dependency = !function.decorator_list().is_empty()
             && fixture_declaration(db, function_definition).is_some();
 
         // Pytest collects `unittest.TestCase` methods but does not inject fixtures into them.
@@ -547,7 +547,7 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
             parameter.keyword_name().is_some()
                 // ty applies PEP 484's legacy positional-only convention to leading `__name`
                 // parameters, but Python and pytest still inspect them as positional-or-keyword.
-                || (self.function.parameters.posonlyargs.is_empty()
+                || (self.function.parameters().posonlyargs().is_empty()
                     && parameter.is_positional_only())
         };
         let skips_receiver = self.function_type.has_implicit_receiver(db)
@@ -566,13 +566,13 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
     /// Returns whether static parametrization on the function or an enclosing class prevents this
     /// fixture request.
     fn directly_parametrized(&self, db: &'db dyn Db, parameter_name: &str) -> bool {
-        if !self.function.decorator_list.is_empty() {
+        if !self.function.decorator_list().is_empty() {
             let decorators = function_known_decorators(db, self.function_definition);
-            if self.function.decorator_list.iter().any(|decorator| {
+            if self.function.decorator_list().iter().any(|decorator| {
                 mark_excludes_fixture(
                     db,
                     self.function_definition,
-                    &decorator.expression,
+                    decorator.expression(),
                     parameter_name,
                     |expression| decorators.expression_type(expression),
                 )
@@ -590,13 +590,13 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
             let definition = self.index.expect_single_definition(class_ref);
             class_ref
                 .node(self.module)
-                .decorator_list
+                .decorator_list()
                 .iter()
                 .any(|decorator| {
                     mark_excludes_fixture(
                         db,
                         definition,
-                        &decorator.expression,
+                        decorator.expression(),
                         parameter_name,
                         |expression| Some(definition_expression_type(db, definition, expression)),
                     )
@@ -644,34 +644,34 @@ fn fixture_request_for_parameter<'db>(
 fn mock_patch_count<'db>(
     db: &'db dyn Db,
     function_definition: Definition<'db>,
-    function: &ast::StmtFunctionDef,
+    function: ast::StmtFunctionDef<'_>,
 ) -> usize {
-    if function.decorator_list.is_empty() {
+    if function.decorator_list().is_empty() {
         return 0;
     }
 
     let decorators = function_known_decorators(db, function_definition);
     function
-        .decorator_list
+        .decorator_list()
         .iter()
         .filter(|decorator| {
-            let Some(call) = decorator.expression.as_call_expr() else {
+            let Some(call) = decorator.expression().as_call_expr() else {
                 return false;
             };
             let new_position = if is_known_class_instance(
                 db,
                 function_definition,
-                decorators.expression_type(&call.func),
+                decorators.expression_type(call.func()),
                 "_patcher",
                 &[KnownModule::UnittestMock],
             ) {
                 1
-            } else if let Some(attribute) = call.func.as_attribute_expr()
-                && attribute.attr.as_str() == "object"
+            } else if let Some(attribute) = call.func().as_attribute_expr()
+                && attribute.attr().as_str() == "object"
                 && is_known_class_instance(
                     db,
                     function_definition,
-                    decorators.expression_type(&attribute.value),
+                    decorators.expression_type(attribute.value()),
                     "_patcher",
                     &[KnownModule::UnittestMock],
                 )
@@ -681,7 +681,7 @@ fn mock_patch_count<'db>(
                 return false;
             };
 
-            call.arguments
+            call.arguments()
                 .find_argument_value("new", new_position)
                 .is_none_or(|new| {
                     // Typeshed exposes `DEFAULT` as `Any`, so any dynamic value may enable
@@ -1052,7 +1052,7 @@ pub(super) fn fixture_declaration<'db>(
     };
     let module = parsed_module(db, definition.python_file(db)).load(db);
     let function = function_ref.node(&module);
-    let first_decorator = &function.decorator_list.first()?.expression;
+    let first_decorator = function.decorator_list().first()?.expression();
     let inference = function_known_decorators(db, definition);
     let expression = if definition.scope(db).node(db).scope_kind() == ScopeKind::Class
         && matches!(
@@ -1071,14 +1071,14 @@ pub(super) fn fixture_declaration<'db>(
         //
         // Accessing `LegacyTmpdirPlugin.tmpdir` invokes the `@staticmethod` descriptor and exposes
         // the fixture wrapper beneath it. Inspect the inner decorator to match that lookup.
-        let fixture_decorator = function.decorator_list.get(1)?;
-        &fixture_decorator.expression
+        let fixture_decorator = function.decorator_list().get(1)?;
+        fixture_decorator.expression()
     } else {
         first_decorator
     };
-    let (callee, arguments) = match expression {
-        ast::Expr::Call(call) => (call.func.as_ref(), Some(&call.arguments)),
-        expression => (expression, None),
+    let (callee, arguments) = match expression.classify() {
+        ast::ExprKind::Call(call) => (call.func(), Some(call.arguments())),
+        expression => (expression.view(), None),
     };
     let Type::FunctionLiteral(decorator) = inference.expression_type(callee)? else {
         return None;
@@ -1163,7 +1163,7 @@ fn exposures_contributed_by_definition<'db>(
                 db,
                 definition,
                 import.import(&parsed),
-                import.alias(&parsed).name.id(),
+                import.alias(&parsed).name().id(),
                 symbol_name,
             )
         }
@@ -1287,7 +1287,7 @@ fn fixture_exposures_for_name_in_scope<'db>(
 fn fixture_exposures_from_import<'db>(
     db: &'db dyn Db,
     importing_definition: Definition<'db>,
-    import: &ast::StmtImportFrom,
+    import: ast::StmtImportFrom<'_>,
     imported_name: &Name,
     local_name: &Name,
 ) -> Vec<FixtureExposure<'db>> {
@@ -1327,14 +1327,14 @@ fn fixture_exposures_from_import<'db>(
 /// Classifies the `name` argument to a fixture decorator.
 fn fixture_name_from_arguments<'db>(
     db: &'db dyn Db,
-    arguments: &ast::Arguments,
-    expression_type: &impl Fn(&ast::Expr) -> Option<Type<'db>>,
+    arguments: ast::Arguments<'_>,
+    expression_type: &impl Fn(ast::Expr<'_>) -> Option<Type<'db>>,
 ) -> FixtureName {
     let Some(name_keyword) = arguments.find_keyword("name") else {
         return FixtureName::Default;
     };
 
-    let Some(name_type) = expression_type(&name_keyword.value) else {
+    let Some(name_type) = expression_type(name_keyword.value()) else {
         return FixtureName::Unknown;
     };
     if name_type.is_none(db) {
@@ -1349,12 +1349,12 @@ fn fixture_name_from_arguments<'db>(
 
     FixtureName::Explicit {
         name: Name::new(name),
-        range: fixture_name_literal_range(&name_keyword.value, name),
+        range: fixture_name_literal_range(name_keyword.value(), name),
     }
 }
 
 /// Returns the content range when `expression` spells `name` as one string literal.
-fn fixture_name_literal_range(expression: &ast::Expr, name: &str) -> Option<TextRange> {
+fn fixture_name_literal_range(expression: ast::Expr<'_>, name: &str) -> Option<TextRange> {
     expression
         .as_string_literal_expr()?
         .as_single_part_string()
@@ -1379,21 +1379,21 @@ fn non_type_parameter_parent(
 fn mark_excludes_fixture<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    expression: &ast::Expr,
+    expression: ast::Expr<'_>,
     parameter_name: &str,
-    expression_type: impl Fn(&ast::Expr) -> Option<Type<'db>>,
+    expression_type: impl Fn(ast::Expr<'_>) -> Option<Type<'db>>,
 ) -> bool {
     let Some(call) = expression.as_call_expr() else {
         return false;
     };
-    if !expression_type(&call.func)
+    if !expression_type(call.func())
         .is_some_and(|ty| ty.is_instance_of(db, KnownClass::PytestParametrizeMarkDecorator))
     {
         return false;
     }
 
     let Some(names) = call
-        .arguments
+        .arguments()
         .find_argument_value("argnames", 0)
         .and_then(|argnames| {
             statically_known_parametrize_names(db, definition, argnames, &expression_type)
@@ -1408,7 +1408,7 @@ fn mark_excludes_fixture<'db>(
     is_indirect(
         db,
         definition,
-        &call.arguments,
+        call.arguments(),
         parameter_name,
         &expression_type,
     ) != Some(true)
@@ -1447,9 +1447,9 @@ fn is_known_class_instance(
 fn is_indirect<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    arguments: &ast::Arguments,
+    arguments: ast::Arguments<'_>,
     parameter_name: &str,
-    expression_type: &impl Fn(&ast::Expr) -> Option<Type<'db>>,
+    expression_type: &impl Fn(ast::Expr<'_>) -> Option<Type<'db>>,
 ) -> Option<bool> {
     let Some(expression) = arguments.find_argument_value("indirect", 2) else {
         return Some(false);
@@ -1469,8 +1469,8 @@ fn is_indirect<'db>(
 fn statically_known_parametrize_names<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    expression: &ast::Expr,
-    expression_type: &impl Fn(&ast::Expr) -> Option<Type<'db>>,
+    expression: ast::Expr<'_>,
+    expression_type: &impl Fn(ast::Expr<'_>) -> Option<Type<'db>>,
 ) -> Option<Vec<&'db str>> {
     let ty = expression_type(expression)?;
     if let Some(string) = ty.as_string_literal() {
@@ -1537,16 +1537,16 @@ fn static_string_sequence_for_module_symbol(
 fn static_string_sequence_from_expression<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    expression: &ast::Expr,
+    expression: ast::Expr<'_>,
 ) -> Option<Vec<String>> {
-    if let ast::Expr::BinOp(binary) = expression
-        && binary.op == ast::Operator::Add
+    if let ast::ExprKind::BinOp(binary) = expression.classify()
+        && binary.op() == ast::Operator::Add
     {
-        let mut strings = static_string_sequence_from_expression(db, definition, &binary.left)?;
+        let mut strings = static_string_sequence_from_expression(db, definition, binary.left())?;
         strings.extend(static_string_sequence_from_expression(
             db,
             definition,
-            &binary.right,
+            binary.right(),
         )?);
         return Some(strings);
     }
@@ -3542,15 +3542,13 @@ resource = None
             let function = find_function(module.suite(), &self.name).expect("test function exists");
             let index = semantic_index(db, file);
             let parameter = function
-                .parameters
+                .parameters()
                 .iter()
                 .find(|candidate| candidate.name().as_str() == parameter_name)
                 .expect("test parameter exists");
             match parameter {
-                ast::AnyParameterRef::Variadic(parameter) => {
-                    index.expect_single_definition(parameter)
-                }
-                ast::AnyParameterRef::NonVariadic(parameter) => {
+                ast::AnyParameter::Variadic(parameter) => index.expect_single_definition(parameter),
+                ast::AnyParameter::NonVariadic(parameter) => {
                     index.expect_single_definition(parameter)
                 }
             }
@@ -3575,14 +3573,14 @@ resource = None
     }
 
     fn find_function<'ast>(
-        statements: &'ast [ast::Stmt],
+        statements: ast::Suite<'ast>,
         selector: &str,
-    ) -> Option<&'ast ast::StmtFunctionDef> {
+    ) -> Option<ast::StmtFunctionDef<'ast>> {
         if let Some((class_name, nested)) = selector.split_once('.') {
             return statements.iter().find_map(|statement| {
                 let class = statement.as_class_def_stmt()?;
-                (class.name.as_str() == class_name)
-                    .then(|| find_function(&class.body, nested))
+                (class.name().as_str() == class_name)
+                    .then(|| find_function(class.body(), nested))
                     .flatten()
             });
         }
@@ -3590,7 +3588,7 @@ resource = None
         statements.iter().find_map(|statement| {
             statement
                 .as_function_def_stmt()
-                .filter(|function| function.name.as_str() == selector)
+                .filter(|function| function.name().as_str() == selector)
         })
     }
 

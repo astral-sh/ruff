@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::{self as ast, ExprKind};
 
 use super::TypeInferenceBuilder;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
@@ -15,7 +15,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// `x: TypeForm[int | str] = int | str`, and wrap it in `TypeForm[...]`.
     pub(super) fn infer_type_form_contextual_expression(
         &mut self,
-        expression: &ast::Expr,
+        expression: ast::Expr<'_>,
         target: Type<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db();
@@ -70,14 +70,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         ))
     }
 
-    fn contains_type_form_value(&self, expression: &ast::Expr, ty: Type<'db>) -> bool {
+    fn contains_type_form_value(&self, expression: ast::Expr<'_>, ty: Type<'db>) -> bool {
         struct ContainsTypeFormValue;
         type ContainsTypeFormValueVisitor<'db> =
             CycleDetector<'db, ContainsTypeFormValue, Type<'db>, bool, 3>;
 
         fn imp<'db>(
             builder: &TypeInferenceBuilder<'db, '_>,
-            expression: &ast::Expr,
+            expression: ast::Expr<'_>,
             ty: Type<'db>,
             visitor: &ContainsTypeFormValueVisitor<'db>,
         ) -> bool {
@@ -134,13 +134,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     pub(super) fn infer_type_form_call_expression(
         &mut self,
-        call_expression: &ast::ExprCall,
+        call_expression: ast::ExprCall<'_>,
     ) -> Type<'db> {
-        let arguments = &call_expression.arguments;
+        let arguments = call_expression.arguments();
 
-        if let [argument] = &*arguments.args
-            && arguments.keywords.is_empty()
-            && !matches!(argument, ast::Expr::Starred(_))
+        if let Some([argument]) = arguments.args().as_array()
+            && arguments.keywords().is_empty()
+            && !matches!(argument.classify(), ExprKind::Starred(_))
         {
             return TypeFormType::from_type_expression(
                 self.db(),
@@ -148,11 +148,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             );
         }
 
-        for argument in &*arguments.args {
+        for argument in arguments.args() {
             self.infer_expression(argument, TypeContext::default());
         }
-        for keyword in &*arguments.keywords {
-            self.infer_expression(&keyword.value, TypeContext::default());
+        for keyword in arguments.keywords() {
+            self.infer_expression(keyword.value(), TypeContext::default());
         }
 
         if let Some(builder) = self

@@ -1,5 +1,6 @@
 use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::AnyKind;
 use ruff_python_ast::find_node::covering_node;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -33,25 +34,22 @@ pub fn selection_range(db: &dyn Db, file: PythonFile<'_>, offset: TextSize) -> V
 
 /// Determines if a node should be included in the selection range hierarchy.
 /// This filters out intermediate nodes that don't provide meaningful selections.
-fn should_include_in_selection(node: ruff_python_ast::AnyNodeRef) -> bool {
-    use ruff_python_ast::AnyNodeRef;
-
+fn should_include_in_selection(node: ruff_python_ast::SyntaxNode) -> bool {
     // We will likely need to tune this based on user feedback. Some users may
     // prefer finer-grained selections while others may prefer coarser-grained.
-    match node {
+    match node.classify() {
         // Exclude nodes that don't represent meaningful semantic units for selection
-        AnyNodeRef::StmtExpr(_) => false,
+        AnyKind::StmtExpr(_) => false,
 
         _ => true,
     }
 }
 
 /// Determines the content range of a valid string or byte literal if it's non-empty.
-fn literal_content_range(node: ruff_python_ast::AnyNodeRef, offset: TextSize) -> Option<TextRange> {
-    use ruff_python_ast::AnyNodeRef;
-    let range = match node {
-        AnyNodeRef::StringLiteral(s) if !s.flags.is_invalid() => Some(s.content_range()),
-        AnyNodeRef::BytesLiteral(b) if !b.flags.is_invalid() => Some(b.content_range()),
+fn literal_content_range(node: ruff_python_ast::SyntaxNode, offset: TextSize) -> Option<TextRange> {
+    let range = match node.classify() {
+        AnyKind::StringLiteral(s) if !s.flags().is_invalid() => Some(s.content_range()),
+        AnyKind::BytesLiteral(b) if !b.flags().is_invalid() => Some(b.content_range()),
         _ => None,
     };
     range.filter(|&range| !range.is_empty() && range.contains_inclusive(offset))
