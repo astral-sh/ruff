@@ -9,7 +9,7 @@ use std::iter::FusedIterator;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::name::Name;
 use hashbrown::{HashTable, hash_table::Entry};
@@ -600,6 +600,7 @@ impl Ast {
 #[derive(Debug)]
 pub struct Builder {
     ast: Ast,
+    source: TextRange,
     scratch: Vec<u32>,
     name_ids: HashTable<u32>,
     recent_names: [u32; 32],
@@ -633,13 +634,19 @@ impl Default for Builder {
 }
 
 impl Builder {
-    /// Reserve initial capacity for the rows and side tables from the source length.
+    /// Start with a small sample of rows so a file with little syntax needs little storage.
     pub fn for_source(source: TextRange) -> Self {
         let bytes = source.len().to_usize();
         let estimated = (bytes / 18).min(4096);
+        let estimated_rows = if bytes <= 4096 {
+            estimated
+        } else {
+            estimated.min(128)
+        };
         Self {
+            source,
             ast: Ast {
-                rows: Vec::with_capacity(estimated),
+                rows: Vec::with_capacity(estimated_rows),
                 extra: Vec::with_capacity(estimated + estimated / 8),
                 names: Vec::with_capacity(estimated / 8),
                 ..Ast::default()
@@ -697,6 +704,10 @@ impl Builder {
         self.ast.bytes.truncate(checkpoint.bytes);
         self.ast.numbers.truncate(checkpoint.numbers);
         self.ast.debug_text.truncate(checkpoint.debug_text);
+    }
+
+    pub fn node_count(&self) -> usize {
+        self.ast.rows.len()
     }
 
     pub fn finish_tree<T>(self, root: BuildId<T>) -> Tree<T> {
@@ -794,8 +805,48 @@ impl Builder {
     #[inline]
     fn push<T: NodeType>(&mut self, row: Row) -> BuildId<T> {
         let index = offset(self.ast.rows.len() + 1);
-        self.ast.rows.push(row);
+        if self.ast.rows.len() < self.ast.rows.capacity() {
+            self.ast.rows.push(row);
+        } else {
+            self.grow_and_push(row);
+        }
         BuildId::new(index)
+    }
+
+    #[cold]
+    fn grow_and_push(&mut self, row: Row) {
+        if !self.source.is_empty() {
+            self.reserve_rows(row.end());
+        }
+        self.ast.rows.push(row);
+    }
+
+    fn reserve_rows(&mut self, end: TextSize) {
+        // A module can start with a long docstring or a license header. Allow its remaining
+        // source to be denser than the prefix, and leave some room for variation after it.
+        let rows = self.node_count();
+        let consumed = end.saturating_sub(self.source.start()).to_usize();
+        let remaining = self.source.end().saturating_sub(end).to_usize();
+        let estimate = rows.saturating_add(
+            remaining
+                .saturating_mul(rows)
+                .checked_div(consumed)
+                .unwrap_or(0)
+                .max(remaining / 10),
+        );
+        let additional = estimate
+            .saturating_add(estimate / 8)
+            .saturating_sub(rows)
+            .clamp(rows.div_ceil(4).max(4), rows.saturating_mul(128).max(4));
+        self.ast.rows.reserve_exact(additional);
+        let extra = self
+            .ast
+            .extra
+            .len()
+            .saturating_mul(additional)
+            .checked_div(rows)
+            .unwrap_or(0);
+        self.ast.extra.reserve_exact(extra);
     }
 
     fn store_bytes(&mut self, bytes: &[u8]) -> u64 {
