@@ -25,6 +25,7 @@ use ruff_linter::packaging::is_package;
 use crate::configuration::Configuration;
 use crate::pyproject::settings_toml;
 use crate::settings::Settings;
+use crate::uv::UvImportDiscovery;
 use crate::{FileResolverSettings, pyproject};
 
 /// The configuration information from a `pyproject.toml` file.
@@ -98,7 +99,7 @@ impl Relativity {
 pub struct Resolver<'a> {
     pyproject_config: &'a PyprojectConfig,
     /// All [`Settings`] that have been added to the resolver, along with their config file paths.
-    settings: Vec<(Settings, PathBuf)>,
+    settings: Vec<(Settings, Option<PathBuf>)>,
     /// A router from path to index into the `settings` vector.
     router: Router<usize>,
 }
@@ -141,7 +142,7 @@ impl<'a> Resolver<'a> {
     }
 
     /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
-    fn add(&mut self, path: &Path, settings: Settings, config_path: PathBuf) {
+    fn add(&mut self, path: &Path, settings: Settings, config_path: Option<PathBuf>) {
         self.settings.push((settings, config_path));
 
         // Normalize the path to use `/` separators and escape the '{' and '}' characters,
@@ -172,22 +173,57 @@ impl<'a> Resolver<'a> {
 
     /// Return the appropriate [`Settings`] and config file path for a given [`Path`].
     pub fn resolve_with_path(&self, path: &Path) -> (&Settings, Option<&Path>) {
-        match self.pyproject_config.strategy {
-            PyprojectDiscoveryStrategy::Fixed => (
+        if self.settings.is_empty() {
+            return (
                 &self.pyproject_config.settings,
                 self.pyproject_config.path.as_deref(),
-            ),
-            PyprojectDiscoveryStrategy::Hierarchical => self
-                .router
-                .at(path.to_slash_lossy().as_ref())
-                .map(|Match { value, .. }| {
-                    let (settings, config_path) = &self.settings[*value];
-                    (settings, Some(config_path.as_path()))
-                })
-                .unwrap_or((
-                    &self.pyproject_config.settings,
-                    self.pyproject_config.path.as_deref(),
-                )),
+            );
+        }
+        self.router
+            .at(path.to_slash_lossy().as_ref())
+            .map(|Match { value, .. }| {
+                let (settings, config_path) = &self.settings[*value];
+                (settings, config_path.as_deref())
+            })
+            .unwrap_or((
+                &self.pyproject_config.settings,
+                self.pyproject_config.path.as_deref(),
+            ))
+    }
+
+    /// Add import settings at uv project boundaries, which need not contain a Ruff configuration.
+    fn add_uv_projects(&mut self, files: &ResolvedFiles) {
+        if !self.settings().any(UvImportDiscovery::uses_import_sections) {
+            return;
+        }
+        let uv = UvImportDiscovery::default();
+        let mut seen = FxHashSet::default();
+        let mut projects: BTreeSet<_> = files
+            .iter()
+            .flatten()
+            .filter_map(|file| {
+                file.path()
+                    .parent()?
+                    .ancestors()
+                    .take_while(|dir| seen.insert(*dir))
+                    .find(|dir| UvImportDiscovery::is_project(dir))
+            })
+            .collect();
+
+        // Existing Ruff scopes inside a uv project take precedence over its root in the router.
+        for (settings, config) in &mut self.settings {
+            if let Some(dir) = config.as_deref().and_then(Path::parent) {
+                uv.apply(settings, dir);
+                projects.remove(dir);
+            }
+        }
+        for project in projects {
+            let (settings, config_path) = self.resolve_with_path(project);
+            self.add(
+                project,
+                settings.clone().with_uv_imports(Some(&uv), project),
+                config_path.map(Path::to_path_buf),
+            );
         }
     }
 
@@ -299,6 +335,10 @@ fn is_package_with_cache<'a>(
 /// Used to override options with the values provided by the CLI.
 pub trait ConfigurationTransformer {
     fn transform(&self, config: Configuration) -> Configuration;
+
+    fn use_uv(&self) -> bool {
+        false
+    }
 }
 
 /// Configurations shared during one traversal, before inheritance and overrides.
@@ -504,7 +544,7 @@ pub fn project_files_in_path<'a>(
                             ConfigurationOrigin::Ancestor,
                             Some(&configuration_cache),
                         )?;
-                        resolver.add(&root, settings, pyproject);
+                        resolver.add(&root, settings, Some(pyproject));
                         // We found the closest configuration.
                         break;
                     }
@@ -553,7 +593,11 @@ pub fn project_files_in_path<'a>(
     let mut visitor = PythonFilesVisitorBuilder::new(transformer, &state);
     walker.visit(&mut visitor);
 
-    state.finish()
+    let (files, mut resolver) = state.finish()?;
+    if transformer.use_uv() {
+        resolver.add_uv_projects(&files);
+    }
+    Ok((files, resolver))
 }
 
 type ResolvedFiles = Vec<Result<ResolvedFile, ignore::Error>>;
@@ -699,11 +743,11 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
                             Some(&self.global.configuration_cache),
                         ) {
                             Ok((root, settings)) => {
-                                self.global
-                                    .resolver
-                                    .write()
-                                    .unwrap()
-                                    .add(&root, settings, pyproject);
+                                self.global.resolver.write().unwrap().add(
+                                    &root,
+                                    settings,
+                                    Some(pyproject),
+                                );
                             }
                             Err(err) => {
                                 self.local_error = Err(err);
@@ -827,7 +871,7 @@ pub fn project_file_at_path(
                     ConfigurationOrigin::Unknown,
                     None,
                 )?;
-                resolver.add(&root, settings, pyproject);
+                resolver.add(&root, settings, Some(pyproject));
                 break;
             }
         }
