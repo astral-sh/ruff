@@ -7,7 +7,9 @@ use log::error;
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_python_ast::SourceType;
 use ruff_workspace::FormatterSettings;
-use ruff_workspace::resolver::{PyprojectConfig, Resolver, match_exclusion, project_file_at_path};
+use ruff_workspace::resolver::{
+    PyprojectDiscovery, Resolver, match_exclusion, project_file_at_path,
+};
 
 use crate::ExitStatus;
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
@@ -21,9 +23,9 @@ use crate::stdin::{parrot_stdin, read_from_stdin};
 pub(crate) fn format_stdin(
     cli: &FormatArguments,
     config_arguments: &ConfigArguments,
-    pyproject_config: &PyprojectConfig,
+    project_config: &PyprojectDiscovery,
 ) -> Result<ExitStatus> {
-    let mut resolver = Resolver::new(pyproject_config);
+    let mut resolver = Resolver::new(project_config);
     warn_incompatible_formatter_settings(&resolver);
 
     let mode = FormatMode::from_cli(cli);
@@ -38,7 +40,7 @@ pub(crate) fn format_stdin(
             }
 
             if filename.file_name().is_some_and(|name| {
-                match_exclusion(filename, name, &resolver.base_settings().formatter.exclude)
+                match_exclusion(filename, name, &resolver.root_settings().formatter.exclude)
             }) {
                 if mode.is_write() {
                     parrot_stdin()?;
@@ -49,7 +51,7 @@ pub(crate) fn format_stdin(
     }
 
     let path = cli.stdin_filename.as_deref();
-    let settings = &resolver.base_settings().formatter;
+    let settings = &resolver.root_settings().formatter;
 
     let source_type = path
         .map(|path| settings.extension.get_source_type(path))
@@ -61,8 +63,13 @@ pub(crate) fn format_stdin(
         return Ok(ExitStatus::Success);
     }
 
+    let source_code = read_from_stdin()?;
+    let settings = project_config
+        .root
+        .with_overrides(config_arguments)
+        .formatter(path, source_type, &source_code)?;
     // Format the file.
-    match format_source_code(path, cli.range, settings, source_type, mode) {
+    match format_source_code(path, cli.range, &settings, source_type, source_code, mode) {
         Ok(result) => match mode {
             FormatMode::Write => Ok(ExitStatus::Success),
             FormatMode::Check | FormatMode::Diff => {
@@ -86,12 +93,9 @@ fn format_source_code(
     range: Option<FormatRange>,
     settings: &FormatterSettings,
     source_type: SourceType,
+    source_code: String,
     mode: FormatMode,
 ) -> Result<FormatResult, FormatCommandError> {
-    // Read the source from stdin.
-    let source_code = read_from_stdin()
-        .map_err(|err| FormatCommandError::Read(path.map(Path::to_path_buf), err.into()))?;
-
     let source_kind = match SourceKind::from_source_code(source_code, source_type) {
         Ok(Some(source_kind)) => source_kind,
         Ok(None) => return Ok(FormatResult::Unchanged),
