@@ -405,22 +405,15 @@ impl super::Ast {
             | NodeKind::ExprYieldFrom
             | NodeKind::ExprStarred
             | NodeKind::PatternMatchValue
-            | NodeKind::Decorator => Children::one(
-                self,
-                Some(AstNodeId::from_word(
-                    split_words(record.inline_word::<0, 4>())[0],
-                )),
-            ),
+            | NodeKind::Decorator => {
+                Children::inline(self, record.inline_children::<0, 1, false, false>())
+            }
             NodeKind::StmtFunctionDef => Children::fields(node, 6),
             NodeKind::StmtClassDef => Children::fields(node, 5),
             NodeKind::StmtReturn | NodeKind::ExprYield | NodeKind::PatternMatchStar => {
-                Children::one(self, {
-                    let word = split_words(record.inline_word::<0, 4>())[0];
-                    (word != 0).then(|| AstNodeId::from_word(word))
-                })
+                Children::inline(self, record.inline_children::<0, 1, true, false>())
             }
             NodeKind::StmtTypeAlias
-            | NodeKind::StmtAnnAssign
             | NodeKind::StmtWhile
             | NodeKind::StmtIf
             | NodeKind::ExprIf
@@ -446,15 +439,12 @@ impl super::Ast {
             | NodeKind::ExprAttribute
             | NodeKind::ExprSubscript
             | NodeKind::PatternMatchClass
-            | NodeKind::PatternKeyword => Children::two(
-                self,
-                Some(AstNodeId::from_word(
-                    split_words(record.inline_word::<0, 4>())[0],
-                )),
-                Some(AstNodeId::from_word(
-                    split_words(record.inline_word::<4, 4>())[0],
-                )),
-            ),
+            | NodeKind::PatternKeyword => {
+                Children::inline(self, record.inline_children::<0, 2, false, false>())
+            }
+            NodeKind::StmtAnnAssign => {
+                Children::inline(self, record.inline_children::<0, 3, false, true>())
+            }
             NodeKind::StmtFor | NodeKind::StmtTry => Children::fields(node, 4),
             NodeKind::StmtWith => Children::fields(node, 2),
             NodeKind::StmtMatch
@@ -469,33 +459,18 @@ impl super::Ast {
                     .words(),
                 None,
             ),
-            NodeKind::StmtRaise | NodeKind::PatternMatchAs => Children::two(
-                self,
-                {
-                    let word = split_words(record.inline_word::<0, 4>())[0];
-                    (word != 0).then(|| AstNodeId::from_word(word))
-                },
-                {
-                    let word = split_words(record.inline_word::<4, 4>())[0];
-                    (word != 0).then(|| AstNodeId::from_word(word))
-                },
-            ),
+            NodeKind::StmtRaise | NodeKind::PatternMatchAs => {
+                Children::inline(self, record.inline_children::<0, 2, true, true>())
+            }
             NodeKind::StmtAssert
             | NodeKind::TypeParamTypeVarTuple
             | NodeKind::TypeParamParamSpec
             | NodeKind::Parameter
             | NodeKind::ParameterWithDefault
             | NodeKind::Alias
-            | NodeKind::WithItem => Children::two(
-                self,
-                Some(AstNodeId::from_word(
-                    split_words(record.inline_word::<0, 4>())[0],
-                )),
-                {
-                    let word = split_words(record.inline_word::<4, 4>())[0];
-                    (word != 0).then(|| AstNodeId::from_word(word))
-                },
-            ),
+            | NodeKind::WithItem => {
+                Children::inline(self, record.inline_children::<0, 2, false, true>())
+            }
             NodeKind::StmtImportFrom => Children::sequence(
                 self,
                 {
@@ -524,16 +499,9 @@ impl super::Ast {
             | NodeKind::StringLiteral
             | NodeKind::BytesLiteral
             | NodeKind::Identifier => Children::empty(self),
-            NodeKind::ExprLambda | NodeKind::DictItem | NodeKind::Keyword => Children::two(
-                self,
-                {
-                    let word = split_words(record.inline_word::<0, 4>())[0];
-                    (word != 0).then(|| AstNodeId::from_word(word))
-                },
-                Some(AstNodeId::from_word(
-                    split_words(record.inline_word::<4, 4>())[0],
-                )),
-            ),
+            NodeKind::ExprLambda | NodeKind::DictItem | NodeKind::Keyword => {
+                Children::inline(self, record.inline_children::<0, 2, true, false>())
+            }
             NodeKind::InterpolatedElement => Children::sequence(
                 self,
                 Some(AstNodeId::from_word(
@@ -652,19 +620,6 @@ impl super::Ast {
                 2 => Field::One(Some(AstNodeId::from_word(
                     split_words(record.inline_word::<8, 4>())[0],
                 ))),
-                _ => Field::One(None),
-            },
-            NodeKind::StmtAnnAssign => match field {
-                0 => Field::One(Some(AstNodeId::from_word(
-                    split_words(record.inline_word::<0, 4>())[0],
-                ))),
-                1 => Field::One(Some(AstNodeId::from_word(
-                    split_words(record.inline_word::<4, 4>())[0],
-                ))),
-                2 => Field::One({
-                    let word = split_words(record.inline_word::<8, 4>())[0];
-                    (word != 0).then(|| AstNodeId::from_word(word))
-                }),
                 _ => Field::One(None),
             },
             NodeKind::StmtFor => match field {

@@ -182,8 +182,8 @@ starred argument in the source, but the positional arguments are evaluated befor
 The source-order visitor follows the ordering recorded when parsing the arguments. The evaluation-order visitor reads the
 positional list first. Both walk the same rows.
 
-`node.children()` yields the immediate children in forward source order. It keeps up to two
-individual child IDs in the iterator. For a module it borrows the statement IDs
+`node.children()` yields the immediate children in forward source order. For a binary expression
+it borrows the two adjacent operand IDs from the row. For a module it borrows the statement IDs
 from the extra buffer. For nodes with a mix of child fields it opens each list as it reaches
 that field. Calling `next()` takes one traversal step without counting or copying the remaining
 children.
