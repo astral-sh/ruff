@@ -846,17 +846,14 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Rpar);
 
-        let keywords = self
-            .keyword_scratch
-            .take_range(keywords_snapshot, &mut self.storage);
         let arguments = build::Arguments {
             range: self.node_range(start),
-
             args: self
                 .expr_scratch
-                .take_range(args_snapshot, &mut self.storage)
-                .into_list(&mut self.storage),
-            keywords: keywords.into_list(&mut self.storage),
+                .take_range(args_snapshot, &mut self.storage),
+            keywords: self
+                .keyword_scratch
+                .take_range(keywords_snapshot, &mut self.storage),
         }
         .parsed(&mut self.storage);
 
