@@ -207,7 +207,7 @@ impl Indexer {
 
     /// Return `true` if a [`Stmt`] appears to be preceded by other statements in a multi-statement
     /// line.
-    pub fn preceded_by_multi_statement_line(&self, stmt: &Stmt, source: &str) -> bool {
+    pub fn preceded_by_multi_statement_line(&self, stmt: Stmt<'_>, source: &str) -> bool {
         has_leading_content(stmt.start(), source)
             || self
                 .preceded_by_continuations(stmt.start(), source)
@@ -216,12 +216,12 @@ impl Indexer {
 
     /// Return `true` if a [`Stmt`] appears to be followed by other statements in a multi-statement
     /// line.
-    pub fn followed_by_multi_statement_line(&self, stmt: &Stmt, source: &str) -> bool {
+    pub fn followed_by_multi_statement_line(&self, stmt: Stmt<'_>, source: &str) -> bool {
         has_trailing_content(stmt.end(), source)
     }
 
     /// Return `true` if a [`Stmt`] appears to be part of a multi-statement line.
-    pub fn in_multi_statement_line(&self, stmt: &Stmt, source: &str) -> bool {
+    pub fn in_multi_statement_line(&self, stmt: Stmt<'_>, source: &str) -> bool {
         self.followed_by_multi_statement_line(stmt, source)
             || self.preceded_by_multi_statement_line(stmt, source)
     }

@@ -3652,7 +3652,6 @@ dependencies = [
  "datatest-stable",
  "drop_bomb",
  "get-size2",
- "hashbrown 0.17.1",
  "insta",
  "itertools 0.15.0",
  "memchr",

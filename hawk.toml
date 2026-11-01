@@ -424,14 +424,6 @@ reason = "downstream parser clients retain borrowed result conversion"
 
 [[override]]
 lint = "hawk::dead_public"
-crate = "ruff_python_parser"
-item = "Parsed::<ruff_python_ast::ModExpression>::into_expr"
-kind = "inherent_method"
-level = "expect"
-reason = "parsed expressions retain borrowed and consuming accessors"
-
-[[override]]
-lint = "hawk::dead_public"
 crate = "ruff_python_semantic"
 item = "binding::Binding::<'a>::is_deleted"
 kind = "inherent_method"

@@ -1,4 +1,5 @@
-use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
+use ruff_python_ast::AstNode as _;
+use ruff_python_ast::{self as ast, IpyEscapeKind, Number};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::{Mode, ParseOptions, parse, parse_cells_unchecked, parse_expression, parse_module};
@@ -57,7 +58,8 @@ fn test_expr_mode_valid_syntax() {
 fn test_unicode_aliases() {
     // https://github.com/RustPython/RustPython/issues/4566
     let source = r#"x = "\N{BACKSPACE}another cool trick""#;
-    let suite = parse_module(source).unwrap().into_suite();
+    let parsed = parse_module(source).unwrap();
+    let suite = parsed.suite();
 
     insta::assert_debug_snapshot!(suite);
 }
@@ -65,26 +67,21 @@ fn test_unicode_aliases() {
 #[test]
 fn nfkc_normalizes_names() {
     let parsed = parse_expression("𝒞").unwrap();
-    let Expr::Name(name) = parsed.expr() else {
+    let ast::ExprKind::Name(name) = parsed.expr().classify() else {
         panic!("expected name expression, got {:?}", parsed.expr());
     };
 
-    assert_eq!(name.id.as_str(), "C");
+    assert_eq!(name.id().as_str(), "C");
 }
 
 #[test]
 fn nfkc_normalizes_dotted_names() {
-    let suite = parse_module("import 𝒞.𝒟").unwrap().into_suite();
-    let [Stmt::Import(import)] = suite.as_slice() else {
-        panic!("expected a single import statement, got {suite:?}");
-    };
-    let [alias] = import.names.as_slice() else {
-        panic!("expected a single import alias, got {:?}", import.names);
-    };
+    let parsed = parse_module("import 𝒞.𝒟").unwrap();
+    let [stmt] = parsed.suite().as_array().unwrap();
+    let [alias] = stmt.as_import_stmt().unwrap().names().as_array().unwrap();
 
-    assert_eq!(alias.name.id.as_str(), "C.D");
+    assert_eq!(alias.name().id(), "C.D");
 }
-
 #[test]
 fn number_values() {
     let cases = [
@@ -111,14 +108,14 @@ fn number_values() {
 
     for (source, expected) in cases {
         let parsed = parse_expression(source).unwrap();
-        let Expr::NumberLiteral(number) = parsed.expr() else {
+        let ast::ExprKind::NumberLiteral(number) = parsed.expr().classify() else {
             panic!(
                 "expected number expression for {source:?}, got {:?}",
                 parsed.expr()
             );
         };
 
-        assert_eq!(number.value, expected, "source: {source:?}");
+        assert_eq!(number.value(), &expected, "source: {source:?}");
     }
 }
 
@@ -146,16 +143,18 @@ fn interpolated_string_escaped_brace_values() {
 
     for (source, expected) in cases {
         let parsed = parse_expression(source).unwrap();
-        let elements = match parsed.expr() {
-            Expr::FString(string) => &string.as_single_part_fstring().unwrap().elements,
-            Expr::TString(string) => &string.as_single_part_tstring().unwrap().elements,
+        let elements = match parsed.expr().classify() {
+            ast::ExprKind::FString(string) => string.as_single_part_fstring().unwrap().elements(),
+            ast::ExprKind::TString(string) => string.as_single_part_tstring().unwrap().elements(),
             expression => panic!("expected interpolated string for {source:?}, got {expression:?}"),
         };
-        let [InterpolatedStringElement::Literal(literal)] = &**elements else {
+        let Some([ast::InterpolatedStringElementKind::Literal(literal)]) =
+            elements.as_array().map(|[node]| [node.classify()])
+        else {
             panic!("expected one literal element for {source:?}");
         };
 
-        assert_eq!(&*literal.value, expected, "source: {source:?}");
+        assert_eq!(literal.value(), expected, "source: {source:?}");
     }
 }
 
@@ -176,17 +175,15 @@ fn ipython_escape_command_values() {
     ];
 
     for (source, expected_kind, expected_value) in cases {
-        let suite = parse(source, ParseOptions::from(Mode::Ipython))
+        let parsed = parse(source, ParseOptions::from(Mode::Ipython))
             .unwrap()
             .try_into_module()
-            .unwrap()
-            .into_suite();
-        let [Stmt::IpyEscapeCommand(command)] = suite.as_slice() else {
-            panic!("expected one IPython escape command for {source:?}, got {suite:?}");
-        };
+            .unwrap();
+        let [stmt] = parsed.suite().as_array().unwrap();
+        let command = stmt.as_ipy_escape_command_stmt().unwrap();
 
-        assert_eq!(command.kind, expected_kind, "source: {source:?}");
-        assert_eq!(&*command.value, expected_value, "source: {source:?}");
+        assert_eq!(command.kind(), expected_kind, "source: {source:?}");
+        assert_eq!(command.value(), expected_value, "source: {source:?}");
     }
 }
 
@@ -198,23 +195,16 @@ fn ipython_escape_command_expression_values() {
     ];
 
     for (source, expected_kind, expected_value) in cases {
-        let suite = parse(source, ParseOptions::from(Mode::Ipython))
+        let parsed = parse(source, ParseOptions::from(Mode::Ipython))
             .unwrap()
             .try_into_module()
-            .unwrap()
-            .into_suite();
-        let [Stmt::Assign(assign)] = suite.as_slice() else {
-            panic!("expected one assignment for {source:?}, got {suite:?}");
-        };
-        let Expr::IpyEscapeCommand(command) = assign.value.as_ref() else {
-            panic!(
-                "expected an IPython escape command for {source:?}, got {:?}",
-                assign.value
-            );
-        };
+            .unwrap();
+        let [stmt] = parsed.suite().as_array().unwrap();
+        let value = stmt.as_assign_stmt().unwrap().value();
+        let command = value.as_ipy_escape_command_expr().unwrap();
 
-        assert_eq!(command.kind, expected_kind, "source: {source:?}");
-        assert_eq!(&*command.value, expected_value, "source: {source:?}");
+        assert_eq!(command.kind(), expected_kind, "source: {source:?}");
+        assert_eq!(command.value(), expected_value, "source: {source:?}");
     }
 }
 
@@ -369,9 +359,8 @@ fn cells_module_range_spans_source() {
     any(target_os = "linux", target_os = "macos", target_os = "windows")
 ))]
 mod stack_growth {
-    use std::assert_matches;
 
-    use ruff_python_ast::Stmt;
+    use std::assert_matches;
 
     use crate::{Mode, ParseOptions, parse_module};
 
@@ -394,8 +383,20 @@ mod stack_growth {
         );
         let parsed = parse_module(&src).unwrap();
 
-        assert_matches!(parsed.suite().first(), Some(Stmt::Assign(_)));
-        assert_matches!(parsed.suite().last(), Some(Stmt::Assign(_)));
+        assert_matches!(
+            parsed
+                .suite()
+                .first()
+                .map(ruff_python_ast::Stmt::is_assign_stmt),
+            Some(true)
+        );
+        assert_matches!(
+            parsed
+                .suite()
+                .last()
+                .map(ruff_python_ast::Stmt::is_assign_stmt),
+            Some(true)
+        );
     }
 
     #[test]
@@ -536,4 +537,329 @@ mod stack_growth {
         let source = format!("{}True\n", "not ".repeat(depth));
         parse_module(&source).unwrap();
     }
+}
+
+#[test]
+fn siblings_in_compound_statements() {
+    for (source, pairs) in [
+        (
+            "if cond: pass\nelif other: left; right\nelse: left; right",
+            2,
+        ),
+        (
+            "try: pass\nexcept TypeError: left; right\nelse: left; right\nfinally: left; right",
+            3,
+        ),
+        ("match value:\n    case 0: pass\n    case _: left; right", 1),
+    ] {
+        let parsed = parse_module(source).unwrap();
+        let parent = parsed.suite().first().unwrap();
+        let mut visited = 0;
+        for stmt in parent
+            .descendants()
+            .filter_map(ast::SyntaxNode::as_stmt_expr)
+        {
+            let suite = ast::traversal::suite(stmt, parent).unwrap();
+            if &source[stmt.range()] == "left" {
+                assert!(suite.previous_sibling().is_none());
+                assert_eq!(&source[suite.next_sibling().unwrap().range()], "right");
+            } else {
+                assert_eq!(&source[suite.previous_sibling().unwrap().range()], "left");
+                assert!(suite.next_sibling().is_none());
+            }
+            visited += 1;
+        }
+        assert_eq!(visited, 2 * pairs);
+    }
+}
+
+#[test]
+fn descendants_visit_a_subtree_in_source_order() {
+    let parsed = parse_expression("outside(call(keyword=x, *ys), sibling)").unwrap();
+    let call = parsed
+        .expr()
+        .as_call_expr()
+        .unwrap()
+        .arguments()
+        .args()
+        .first()
+        .unwrap();
+    let mut nodes = call.descendants();
+    assert!(nodes.next().unwrap().is_same_node(call));
+    let names: Vec<_> = nodes
+        .by_ref()
+        .filter_map(ast::AstNode::cast::<ast::ExprName>)
+        .map(|name| name.id().as_str())
+        .collect();
+    assert_eq!(names, ["call", "x", "ys"]);
+    assert!(nodes.next().is_none());
+}
+
+#[test]
+fn skipping_a_subtree_resumes_at_its_next_sibling() {
+    let parsed = parse_expression("a + f(b, c) + d").unwrap();
+    let mut nodes = parsed
+        .expr()
+        .descendants()
+        .skip_subtrees(ast::SyntaxNode::is_expr_call);
+    let names: Vec<_> = nodes
+        .by_ref()
+        .filter_map(ast::AstNode::cast::<ast::ExprName>)
+        .map(|name| name.id().as_str())
+        .collect();
+    assert_eq!(names, ["a", "d"]);
+    assert!(nodes.next().is_none());
+
+    let mut skip_root = parsed.expr().descendants().skip_subtrees(|_| true);
+    assert!(skip_root.next().unwrap().is_same_node(parsed.expr()));
+    assert!(skip_root.next().is_none());
+    assert!(skip_root.next().is_none());
+    assert!(parsed.expr().descendant_statements().next().is_none());
+}
+
+#[test]
+fn statements_in_nested_suites() {
+    let parsed =
+        parse_module("if a:\n    def f():\n        return 1\nelse:\n    import b\npass").unwrap();
+    let kinds: Vec<_> = parsed
+        .root()
+        .descendant_statements()
+        .map(ast::AstNode::node_kind)
+        .collect();
+    assert_eq!(
+        kinds,
+        [
+            ast::NodeKind::StmtIf,
+            ast::NodeKind::StmtFunctionDef,
+            ast::NodeKind::StmtReturn,
+            ast::NodeKind::StmtImport,
+            ast::NodeKind::StmtPass
+        ]
+    );
+    let first = parsed.suite().first().unwrap();
+    assert!(
+        first
+            .descendant_statements()
+            .next()
+            .unwrap()
+            .is_same_node(first)
+    );
+}
+
+#[test]
+fn copy_tuple_elements_into_a_separate_tree() {
+    let parsed = parse_expression("(obj.first, [item.second, -other.third])").unwrap();
+    let original = parsed.clone();
+    let tuple = parsed.expr().as_tuple_expr().unwrap();
+    let mut builder = ast::Builder::default();
+    let elts = builder.copy_nodes(tuple.elts().iter().rev());
+    let root = builder.add(ast::build::ExprTuple {
+        range: tuple.range(),
+        elts,
+        ctx: tuple.ctx(),
+        parenthesized: tuple.parenthesized(),
+    });
+    let reversed = builder.finish_tree(root);
+    drop(parsed);
+
+    let original = original.expr().as_tuple_expr().unwrap();
+    assert!(
+        reversed
+            .root()
+            .elts()
+            .iter()
+            .eq(original.elts().iter().rev())
+    );
+}
+#[test]
+fn flat_storage_nested_lists() {
+    let small = "[a.x, b.y]";
+    let large = std::iter::repeat_n("c.z", 257)
+        .collect::<Vec<_>>()
+        .join(", ");
+    let source = format!(
+        "({}, [{}], {})",
+        std::iter::repeat_n(small, 80)
+            .collect::<Vec<_>>()
+            .join(", "),
+        large,
+        small
+    );
+    let parsed = parse_expression(&source).unwrap();
+    let tuple = parsed.root().body().cast::<ast::ExprTuple>().unwrap();
+    assert_eq!(tuple.elts().len(), 82);
+    for (index, expr) in tuple.elts().iter().enumerate() {
+        let list = expr.cast::<ast::ExprList>().unwrap();
+        assert_eq!(list.elts().len(), if index == 80 { 257 } else { 2 });
+        for item in list.elts() {
+            let attribute = parsed
+                .ast()
+                .view(item.node_id())
+                .unwrap()
+                .cast::<ast::ExprAttribute>()
+                .unwrap();
+            assert!(attribute.value().cast::<ast::ExprName>().is_some());
+            assert_eq!(attribute.attr().id(), &source[attribute.attr().range()]);
+        }
+    }
+    let mut builder = ast::Builder::default();
+    let copied = builder.copy_node(parsed.expr());
+    assert_eq!(builder.get(copied), parsed.expr());
+}
+
+#[test]
+fn keyword_and_dotted_import_names_use_one_row_each() {
+    let parsed = parse_module("from a.b import c\nf(x=1, **y)\n").unwrap();
+    assert_eq!(parsed.ast().len(), parsed.root().descendants().count());
+}
+
+#[test]
+fn recovered_class_patterns_share_literal_rows() {
+    let source = "match x:\n    case [[['value']()]()](): pass\n";
+    let parsed = crate::parse_unchecked(source, ParseOptions::from(Mode::Module));
+    assert_eq!(parsed.errors().len(), 3);
+
+    // The outer class pattern has two recovered calls nested in its callee.
+    let root = parsed.root();
+    assert_eq!(
+        root.descendants()
+            .filter(|node| node.node_kind() == ast::NodeKind::ExprCall)
+            .count(),
+        2
+    );
+    let literal = root
+        .descendants()
+        .find_map(ast::AstNode::cast::<ast::StringLiteral>)
+        .unwrap();
+    assert_eq!(literal.value(), "value");
+    assert!(!parsed.ast().any_node(|node| {
+        node.node_kind() == ast::NodeKind::StringLiteral
+            && node.node_id() != literal.syntax_node().node_id()
+    }));
+}
+
+#[test]
+fn flat_storage_list_lengths() {
+    for count in 0..=8 {
+        let source = format!("[{}]", vec!["x"; count].join(", "));
+        let parsed = parse_expression(&source).unwrap();
+        let elements = parsed.root().body().cast::<ast::ExprList>().unwrap().elts();
+        assert_eq!(elements.len(), count);
+        assert_eq!(elements.is_empty(), count == 0);
+        assert!(elements.get(count).is_none());
+        for (index, item) in elements.iter().enumerate() {
+            assert_eq!(elements.get(index).unwrap().node_id(), item.node_id());
+        }
+    }
+}
+
+#[test]
+fn flat_storage_literals_survive_pool_growth() {
+    let long = "z".repeat(8192);
+    let source = format!(r#"["early", b"\x00\xff", "{long}", "é" "\n", f"start{{1}}end"]"#);
+    let mut builder = ast::Builder::default();
+    let expr = {
+        let parsed = parse_expression(&source).unwrap();
+        builder.copy_node(parsed.expr())
+    };
+    let tree = builder.finish_tree(expr);
+    let [early, bytes, large, joined, _] = tree
+        .root()
+        .as_list_expr()
+        .unwrap()
+        .elts()
+        .as_array()
+        .unwrap();
+    assert_eq!(
+        early.as_string_literal_expr().unwrap().value().to_str(),
+        "early"
+    );
+    assert_eq!(
+        bytes
+            .as_bytes_literal_expr()
+            .unwrap()
+            .value()
+            .as_slice()
+            .at(0)
+            .value(),
+        [0, 255]
+    );
+    assert_eq!(
+        large.as_string_literal_expr().unwrap().value().to_str(),
+        long
+    );
+    assert_eq!(
+        joined.as_string_literal_expr().unwrap().value().to_str(),
+        "é\n"
+    );
+}
+
+#[test]
+fn flat_string_text_ranges() {
+    for len in [0, 65_534, 65_535, 65_536] {
+        let text = "x".repeat(len);
+        let (left, right) = text.split_at(len / 2);
+        let source = format!(r#"["prefix", "{text}", "{left}" "{right}"]"#);
+        let parsed = parse_expression(&source).unwrap();
+        let list = parsed.expr().as_list_expr().unwrap();
+        let [_, single, joined] = list.elts().as_array().unwrap();
+        for (expr, count) in [(single, 1), (joined, 2)] {
+            let value = expr.as_string_literal_expr().unwrap().value();
+            assert_eq!(value.as_slice().len(), count);
+            assert_eq!(value.to_str(), text);
+        }
+    }
+}
+
+#[test]
+fn flat_string_part_iteration() {
+    for (source, expected) in [
+        ("'a' 'b'", [ast::NodeKind::StringLiteral; 2]),
+        ("b'a' b'b'", [ast::NodeKind::BytesLiteral; 2]),
+        (
+            "'a' f'{x}'",
+            [ast::NodeKind::StringLiteral, ast::NodeKind::FString],
+        ),
+        ("t'{x}' t'b'", [ast::NodeKind::TString; 2]),
+    ] {
+        let parsed = parse_expression(source).unwrap();
+        let literal = ast::StringLike::try_from(parsed.expr()).unwrap();
+        assert!(literal.is_implicit_concatenated());
+        let mut parts = literal.parts();
+        assert_eq!(parts.len(), 2);
+        let second = ast::SyntaxNode::from(parts.next_back().unwrap());
+        let first = ast::SyntaxNode::from(parts.next().unwrap());
+        assert_eq!([first.node_kind(), second.node_kind()], expected);
+        assert!(first.end() < second.start());
+        assert!(parts.next().is_none());
+    }
+}
+
+#[test]
+fn flat_storage_notebook_cells() {
+    let source = "a = [one.first, two.second]\nb = [three.third, four.fourth]\n";
+    let sep = TextSize::try_from(source.find('\n').unwrap()).unwrap();
+    let end = TextSize::try_from(source.len() - 1).unwrap();
+    let parsed = parse_cells_unchecked(
+        source,
+        [
+            TextRange::up_to(sep),
+            TextRange::new(sep + TextSize::new(1), end),
+        ],
+        &ParseOptions::from(Mode::Module),
+    );
+    let suite = parsed.root().body();
+    assert_eq!(suite.len(), 2);
+    for (index, statement) in suite.iter().enumerate() {
+        assert_eq!(suite.get(index).unwrap().node_id(), statement.node_id());
+        assert!(statement.cast::<ast::StmtAssign>().is_some());
+    }
+    let mut names = Vec::new();
+    for statement in suite {
+        let assignment = statement.as_assign_stmt().unwrap();
+        for element in assignment.value().as_list_expr().unwrap().elts() {
+            names.push(element.as_attribute_expr().unwrap().attr().id());
+        }
+    }
+    assert_eq!(names, ["first", "second", "third", "fourth"]);
 }
