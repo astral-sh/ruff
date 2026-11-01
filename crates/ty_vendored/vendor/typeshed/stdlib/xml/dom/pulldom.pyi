@@ -1,5 +1,3 @@
-"""Support for building partial DOM trees from SAX events."""
-
 import sys
 from _typeshed import Incomplete, Unused
 from collections.abc import MutableSequence, Sequence
@@ -34,11 +32,6 @@ _Event: TypeAlias = (
 )
 
 class PullDOM(ContentHandler):
-    """Content handler which turns SAX events into pull parser events.
-
-    The nodes are created, but they are not added to the tree.
-    """
-
     document: Document | None
     documentFactory: _DocumentFactory
 
@@ -76,8 +69,7 @@ class PullDOM(ContentHandler):
     def startDocument(self) -> None: ...
     def buildDocument(self, uri: str | None, tagname: str | None) -> Element: ...
     def endDocument(self) -> None: ...
-    def clear(self) -> None:
-        """clear(): Explicitly release parsing structures"""
+    def clear(self) -> None: ...
 
 class ErrorHandler:
     def warning(self, exception: BaseException) -> None: ...
@@ -85,8 +77,6 @@ class ErrorHandler:
     def fatalError(self, exception: BaseException) -> Never: ...
 
 class DOMEventStream:
-    """Stream of the pull parser events."""
-
     stream: _SupportsReadClose[bytes] | _SupportsReadClose[str]
     parser: XMLReader  # Set to none after .clear() is called
     bufsize: int
@@ -97,21 +87,12 @@ class DOMEventStream:
 
     def __next__(self) -> _Event: ...
     def __iter__(self) -> Self: ...
-    def getEvent(self) -> _Event | None:
-        """Return the next (event, node) tuple, or None at the end."""
-
-    def expandNode(self, node: Document) -> None:
-        """Expand all children of the node into the node."""
-
-    def reset(self) -> None:
-        """Discard unread events and prepare for parsing a new document."""
-
-    def clear(self) -> None:
-        """Release the parser and the document."""
+    def getEvent(self) -> _Event | None: ...
+    def expandNode(self, node: Document) -> None: ...
+    def reset(self) -> None: ...
+    def clear(self) -> None: ...
 
 class SAX2DOM(PullDOM):
-    """PullDOM which also adds every created node to the tree."""
-
     def startElementNS(self, name: _NSName, tagName: str | None, attrs: AttributesNSImpl) -> None: ...
     def startElement(self, name: str, attrs: AttributesImpl) -> None: ...
     def processingInstruction(self, target: str, data: str) -> None: ...
@@ -124,8 +105,5 @@ def parse(
     stream_or_string: str | _SupportsReadClose[bytes] | _SupportsReadClose[str],
     parser: XMLReader | None = None,
     bufsize: int | None = None,
-) -> DOMEventStream:
-    """Return a DOMEventStream for the given file name or file object."""
-
-def parseString(string: str, parser: XMLReader | None = None) -> DOMEventStream:
-    """Return a DOMEventStream for the given string."""
+) -> DOMEventStream: ...
+def parseString(string: str, parser: XMLReader | None = None) -> DOMEventStream: ...

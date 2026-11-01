@@ -1,5 +1,3 @@
-"""Token constants (from "token.h")."""
-
 from typing import Final
 
 ENDMARKER: Final[int]
