@@ -74,6 +74,7 @@ NoColors: Final[ANSIColors]
 
 if sys.version_info >= (3, 15):
     class CursesColors:
+        """Curses color constants for terminal UI theming."""
         BLACK: Final = 0
         RED: Final = 1
         GREEN: Final = 2
@@ -86,6 +87,11 @@ if sys.version_info >= (3, 15):
 
 if sys.version_info >= (3, 14):
     class ThemeSection(Mapping[str, str]):
+        """A mixin/base class for theme sections.
+
+It enables dictionary access to a section, as well as implements convenience
+methods.
+"""
         def __post_init__(self) -> None: ...
         def copy_with(self, **kwargs: str) -> Self: ...
         @classmethod
@@ -97,6 +103,7 @@ if sys.version_info >= (3, 14):
 if sys.version_info >= (3, 15):
     @dataclass(frozen=True, kw_only=True)
     class Argparse(ThemeSection):
+        """Argparse(*, usage: str = '\\x1b[1;34m', prog: str = '\\x1b[1;35m', prog_extra: str = '\\x1b[35m', heading: str = '\\x1b[1;34m', summary_long_option: str = '\\x1b[36m', summary_short_option: str = '\\x1b[32m', summary_label: str = '\\x1b[33m', summary_action: str = '\\x1b[32m', long_option: str = '\\x1b[1;36m', short_option: str = '\\x1b[1;32m', label: str = '\\x1b[1;33m', action: str = '\\x1b[1;32m', default: str = '\\x1b[90m', interpolated_value: str = '\\x1b[33m', reset: str = '\\x1b[0m', error: str = '\\x1b[1;35m', warning: str = '\\x1b[1;33m', message: str = '\\x1b[35m')"""
         usage: str = ...
         prog: str = ...
         prog_extra: str = ...
@@ -118,6 +125,7 @@ if sys.version_info >= (3, 15):
 
     @dataclass(frozen=True, kw_only=True)
     class Ast(ThemeSection):
+        """Ast(*, node: str = '\\x1b[36m', field: str = '\\x1b[34m', attribute: str = '\\x1b[90m', string: str = '\\x1b[32m', number: str = '\\x1b[33m', keyword: str = '\\x1b[1;34m', reset: str = '\\x1b[0m')"""
         node: str = ...
         field: str = ...
         attribute: str = ...
@@ -128,6 +136,7 @@ if sys.version_info >= (3, 15):
 
     @dataclass(frozen=True, kw_only=True)
     class Calendar(ThemeSection):
+        """Calendar(*, header: str = '\\x1b[1m', highlight: str = '\\x1b[30m\\x1b[43m', weekday: str = '\\x1b[36m', reset: str = '\\x1b[0m')"""
         header: str = ...
         highlight: str = ...
         weekday: str = ...
@@ -135,6 +144,7 @@ if sys.version_info >= (3, 15):
 
     @dataclass(frozen=True, kw_only=True)
     class Difflib(ThemeSection):
+        """A 'git diff'-like theme for `difflib.unified_diff`."""
         added: str = ...
         context: str = ...
         header: str = ...
@@ -144,6 +154,7 @@ if sys.version_info >= (3, 15):
 
     @dataclass(frozen=True, kw_only=True)
     class FancyCompleter(ThemeSection):
+        """FancyCompleter(*, function: str = '\\x1b[1;34m', builtin_function_or_method: str = '\\x1b[1;34m', method: str = '\\x1b[1;36m', method_wrapper: str = '\\x1b[1;36m', wrapper_descriptor: str = '\\x1b[1;36m', method_descriptor: str = '\\x1b[1;36m', int: str = '\\x1b[1;33m', float: str = '\\x1b[1;33m', complex: str = '\\x1b[1;33m', bool: str = '\\x1b[1;33m', type: str = '\\x1b[1;35m', module: str = '\\x1b[36m', NoneType: str = '\\x1b[90m', bytes: str = '\\x1b[1;32m', str: str = '\\x1b[1;32m')"""
         function: builtins.str = ...
         builtin_function_or_method: builtins.str = ...
         method: builtins.str = ...
@@ -162,6 +173,7 @@ if sys.version_info >= (3, 15):
 
     @dataclass(frozen=True, kw_only=True)
     class HttpServer(ThemeSection):
+        """HttpServer(*, error: str = '\\x1b[33m', path: str = '\\x1b[36m', serving: str = '\\x1b[32m', size: str = '\\x1b[90m', status_informational: str = '\\x1b[0m', status_ok: str = '\\x1b[32m', status_redirect: str = '\\x1b[96m', status_client_error: str = '\\x1b[33m', status_server_error: str = '\\x1b[31m', timestamp: str = '\\x1b[90m', url: str = '\\x1b[36m', reset: str = '\\x1b[0m')"""
         error: str = ...
         path: str = ...
         serving: str = ...
@@ -177,6 +189,11 @@ if sys.version_info >= (3, 15):
 
     @dataclass(frozen=True, kw_only=True)
     class LiveProfiler(ThemeSection):
+        """Theme section for the live profiling TUI (Tachyon profiler).
+
+Colors use CursesColors constants (BLACK, RED, GREEN, YELLOW,
+BLUE, MAGENTA, CYAN, WHITE, DEFAULT).
+"""
         title_fg: int = ...
         title_bg: int = ...
         pid_fg: int = ...
@@ -213,6 +230,7 @@ if sys.version_info >= (3, 15):
 
     @dataclass(frozen=True, kw_only=True)
     class ProfilerDump(ThemeSection):
+        """ProfilerDump(*, header: str = '\\x1b[1;34m', interpreter: str = '\\x1b[90m', thread: str = '\\x1b[1;36m', status: str = '\\x1b[33m', frame_index: str = '\\x1b[90m', frame: str = '\\x1b[1;32m', filename: str = '\\x1b[36m', line_no: str = '\\x1b[33m', source: str = '\\x1b[37m', source_highlight: str = '\\x1b[1;33m', opcode: str = '\\x1b[90m', warning: str = '\\x1b[33m', reset: str = '\\x1b[0m')"""
         header: str = ...
         interpreter: str = ...
         thread: str = ...
@@ -229,6 +247,7 @@ if sys.version_info >= (3, 15):
 
     @dataclass(frozen=True, kw_only=True)
     class Pickletools(ThemeSection):
+        """Pickletools(*, annotation: str = '\\x1b[90m', arg_number: str = '\\x1b[33m', arg_string: str = '\\x1b[32m', mark: str = '\\x1b[90m', op_call: str = '\\x1b[32m', op_container: str = '\\x1b[94m', op_memo: str = '\\x1b[35m', op_meta: str = '\\x1b[90m', op_stack: str = '\\x1b[1;31m', opcode_code: str = '\\x1b[36m', position: str = '\\x1b[90m', proto: str = '\\x1b[33m', reset: str = '\\x1b[0m')"""
         annotation: str = ...
         arg_number: str = ...
         arg_string: str = ...
@@ -245,6 +264,7 @@ if sys.version_info >= (3, 15):
 
     @dataclass(frozen=True, kw_only=True)
     class Syntax(ThemeSection):
+        """Syntax(*, prompt: str = '\\x1b[1;35m', keyword: str = '\\x1b[1;34m', keyword_constant: str = '\\x1b[1;34m', builtin: str = '\\x1b[36m', comment: str = '\\x1b[31m', string: str = '\\x1b[32m', number: str = '\\x1b[33m', op: str = '\\x1b[0m', definition: str = '\\x1b[1m', soft_keyword: str = '\\x1b[1;34m', reset: str = '\\x1b[0m')"""
         prompt: str = ...
         keyword: str = ...
         keyword_constant: str = ...
@@ -259,6 +279,7 @@ if sys.version_info >= (3, 15):
 
     @dataclass(frozen=True, kw_only=True)
     class Timeit(ThemeSection):
+        """Timeit(*, timing: str = '\\x1b[36m', best: str = '\\x1b[1;32m', per_loop: str = '\\x1b[32m', punctuation: str = '\\x1b[90m', warning: str = '\\x1b[33m', warning_worst: str = '\\x1b[35m', warning_best: str = '\\x1b[32m', reset: str = '\\x1b[0m')"""
         timing: str = ...
         best: str = ...
         per_loop: str = ...
@@ -270,6 +291,7 @@ if sys.version_info >= (3, 15):
 
     @dataclass(frozen=True, kw_only=True)
     class Tokenize(ThemeSection):
+        """Tokenize(*, whitespace: str = '\\x1b[90m', error: str = '\\x1b[1;31m', position: str = '\\x1b[90m', delimiter: str = '\\x1b[0m')"""
         whitespace: str = ...
         error: str = ...
         position: str = ...
@@ -277,6 +299,7 @@ if sys.version_info >= (3, 15):
 
     @dataclass(frozen=True, kw_only=True)
     class Traceback(ThemeSection):
+        """Traceback(*, type: str = '\\x1b[1;35m', message: str = '\\x1b[35m', note: str = '\\x1b[36m', filename: str = '\\x1b[35m', line_no: str = '\\x1b[35m', frame: str = '\\x1b[35m', error_highlight: str = '\\x1b[1;31m', error_range: str = '\\x1b[31m', reset: str = '\\x1b[0m')"""
         type: str = ...
         message: str = ...
         note: str = ...
@@ -289,6 +312,7 @@ if sys.version_info >= (3, 15):
 
     @dataclass(frozen=True, kw_only=True)
     class Unittest(ThemeSection):
+        """Unittest(*, passed: str = '\\x1b[32m', warn: str = '\\x1b[33m', fail: str = '\\x1b[31m', fail_info: str = '\\x1b[1;31m', reset: str = '\\x1b[0m')"""
         passed: str = ...
         warn: str = ...
         fail: str = ...
@@ -297,6 +321,11 @@ if sys.version_info >= (3, 15):
 
     @dataclass(frozen=True, kw_only=True)
     class Theme:
+        """A suite of themes for all sections of Python.
+
+When adding a new one, remember to also modify `copy_with` and `no_colors`
+below.
+"""
         argparse: Argparse = ...
         ast: Ast = ...
         calendar: Calendar = ...
@@ -328,13 +357,25 @@ if sys.version_info >= (3, 15):
             tokenize: Tokenize | None = None,
             traceback: Traceback | None = None,
             unittest: Unittest | None = None,
-        ) -> Self: ...
+        ) -> Self:
+            """Return a new Theme based on this instance with some sections replaced.
+
+Themes are immutable to protect against accidental modifications that
+could lead to invalid terminal states.
+"""
         @classmethod
-        def no_colors(cls) -> Self: ...
+        def no_colors(cls) -> Self:
+            """Return a new Theme where colors in all sections are empty strings.
+
+This allows writing user code as if colors are always used. The color
+fields will be ANSI color code strings when colorization is desired
+and possible, and empty strings otherwise.
+"""
 
 elif sys.version_info >= (3, 14):
     @dataclass(frozen=True, kw_only=True)
     class Argparse(ThemeSection):
+        """Argparse(*, usage: str = '\\x1b[1;34m', prog: str = '\\x1b[1;35m', prog_extra: str = '\\x1b[35m', heading: str = '\\x1b[1;34m', summary_long_option: str = '\\x1b[36m', summary_short_option: str = '\\x1b[32m', summary_label: str = '\\x1b[33m', summary_action: str = '\\x1b[32m', long_option: str = '\\x1b[1;36m', short_option: str = '\\x1b[1;32m', label: str = '\\x1b[1;33m', action: str = '\\x1b[1;32m', reset: str = '\\x1b[0m')"""
         usage: str = ...
         prog: str = ...
         prog_extra: str = ...
@@ -351,6 +392,7 @@ elif sys.version_info >= (3, 14):
 
     @dataclass(frozen=True)
     class Syntax(ThemeSection):
+        """Syntax(prompt: str = '\\x1b[1;35m', keyword: str = '\\x1b[1;34m', keyword_constant: str = '\\x1b[1;34m', builtin: str = '\\x1b[36m', comment: str = '\\x1b[31m', string: str = '\\x1b[32m', number: str = '\\x1b[33m', op: str = '\\x1b[0m', definition: str = '\\x1b[1m', soft_keyword: str = '\\x1b[1;34m', reset: str = '\\x1b[0m')"""
         prompt: str = ...
         keyword: str = ...
         keyword_constant: str = ...
@@ -365,6 +407,7 @@ elif sys.version_info >= (3, 14):
 
     @dataclass(frozen=True)
     class Traceback(ThemeSection):
+        """Traceback(type: str = '\\x1b[1;35m', message: str = '\\x1b[35m', filename: str = '\\x1b[35m', line_no: str = '\\x1b[35m', frame: str = '\\x1b[35m', error_highlight: str = '\\x1b[1;31m', error_range: str = '\\x1b[31m', reset: str = '\\x1b[0m')"""
         type: str = ...
         message: str = ...
         filename: str = ...
@@ -376,6 +419,7 @@ elif sys.version_info >= (3, 14):
 
     @dataclass(frozen=True)
     class Unittest(ThemeSection):
+        """Unittest(passed: str = '\\x1b[32m', warn: str = '\\x1b[33m', fail: str = '\\x1b[31m', fail_info: str = '\\x1b[1;31m', reset: str = '\\x1b[0m')"""
         passed: str = ...
         warn: str = ...
         fail: str = ...
@@ -384,6 +428,11 @@ elif sys.version_info >= (3, 14):
 
     @dataclass(frozen=True)
     class Theme:
+        """A suite of themes for all sections of Python.
+
+When adding a new one, remember to also modify `copy_with` and `no_colors`
+below.
+"""
         argparse: Argparse = ...
         syntax: Syntax = ...
         traceback: Traceback = ...
@@ -395,14 +444,26 @@ elif sys.version_info >= (3, 14):
             syntax: Syntax | None = None,
             traceback: Traceback | None = None,
             unittest: Unittest | None = None,
-        ) -> Self: ...
+        ) -> Self:
+            """Return a new Theme based on this instance with some sections replaced.
+
+Themes are immutable to protect against accidental modifications that
+could lead to invalid terminal states.
+"""
         @classmethod
-        def no_colors(cls) -> Self: ...
+        def no_colors(cls) -> Self:
+            """Return a new Theme where colors in all sections are empty strings.
+
+This allows writing user code as if colors are always used. The color
+fields will be ANSI color code strings when colorization is desired
+and possible, and empty strings otherwise.
+"""
 
 def get_colors(colorize: bool = False, *, file: _MaySupportFileno | None = None) -> ANSIColors: ...
 
 if sys.version_info >= (3, 14):
-    def decolor(text: str) -> str: ...
+    def decolor(text: str) -> str:
+        """Remove ANSI color codes from a string."""
 
 def can_colorize(*, file: _MaySupportFileno | None = None) -> bool: ...
 
@@ -414,5 +475,17 @@ if sys.version_info >= (3, 14):
 
     def get_theme(
         *, tty_file: _MaySupportFileno | None = None, force_color: bool = False, force_no_color: bool = False
-    ) -> Theme: ...
+    ) -> Theme:
+        """Returns the currently set theme, potentially in a zero-color variant.
+
+In cases where colorizing is not possible (see `can_colorize`), the returned
+theme contains all empty strings in all color definitions.
+See `Theme.no_colors()` for more information.
+
+It is recommended not to cache the result of this function for extended
+periods of time because the user might influence theme selection by
+the interactive shell, a debugger, or application-specific code. The
+environment (including environment variable state and console configuration
+on Windows) can also change in the course of the application life cycle.
+"""
     def set_theme(t: Theme) -> None: ...

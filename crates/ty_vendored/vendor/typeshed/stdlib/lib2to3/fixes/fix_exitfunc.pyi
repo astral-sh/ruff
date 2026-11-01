@@ -1,3 +1,6 @@
+"""
+Convert use of sys.exitfunc to use the atexit module.
+"""
 from _typeshed import Incomplete, StrPath
 from lib2to3 import fixer_base
 from typing import ClassVar, Literal
