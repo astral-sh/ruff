@@ -230,13 +230,9 @@ fn is_literal_key(expr: Expr<'_>) -> bool {
         }) => {
             signed_number_literal(left).is_some_and(|number| {
                 matches!(number.value(), ast::Number::Int(_) | ast::Number::Float(_))
-            }) && matches!(
-                right.fields(),
-                ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                    value: ast::Number::Complex { .. },
-                    ..
-                })
-            )
+            }) && right
+                .as_number_literal_expr()
+                .is_some_and(|number| number.value().is_complex())
         }
         _ => false,
     }

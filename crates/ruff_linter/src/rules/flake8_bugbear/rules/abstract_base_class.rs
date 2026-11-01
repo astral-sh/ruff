@@ -176,10 +176,10 @@ pub(crate) fn abstract_base_class(
         // If an ABC declares an attribute by providing a type annotation
         // but does not actually assign a value for that attribute,
         // assume it is intended to be an "abstract attribute"
-        if matches!(
-            stmt.fields(),
-            ast::StmtFields::AnnAssign(ast::StmtAnnAssignFields { value: None, .. })
-        ) {
+        if stmt
+            .as_ann_assign_stmt()
+            .is_some_and(|assignment| assignment.value().is_none())
+        {
             has_abstract_method = true;
             continue;
         }

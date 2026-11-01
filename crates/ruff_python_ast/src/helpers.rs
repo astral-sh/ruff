@@ -71,11 +71,10 @@ impl SideEffect {
 
     /// Classify a single expression node's side effect.
     fn from_expr(expr: Expr<'_>, is_builtin: &dyn Fn(&str) -> bool) -> Self {
-        match expr.fields() {
+        match expr.classify() {
             // Empty initializers for known builtins are side-effect-free.
-            ast::ExprFields::Call(ast::ExprCallFields {
-                func, arguments, ..
-            }) if arguments.is_empty() => {
+            ast::ExprKind::Call(call) if call.arguments().is_empty() => {
+                let func = call.func();
                 if let ast::ExprFields::Name(ast::ExprNameFields { id, .. }) = func.fields() {
                     if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
                         return Self::Absent;
@@ -85,7 +84,9 @@ impl SideEffect {
             }
 
             // Overloaded operators: only side-effect-free if both sides are literals.
-            ast::ExprFields::BinOp(ast::ExprBinOpFields { left, right, .. }) => {
+            ast::ExprKind::BinOp(binary) => {
+                let left = binary.left();
+                let right = binary.right();
                 if is_known_safe_binop_operand(left) && is_known_safe_binop_operand(right) {
                     Self::Absent
                 } else {
@@ -94,14 +95,16 @@ impl SideEffect {
             }
 
             // Non-literal f-string interpolation may invoke `__format__`/`__str__`.
-            ast::ExprFields::FString(ast::ExprFStringFields { value, .. }) => {
+            ast::ExprKind::FString(fstring) => {
+                let value = fstring.value();
                 if value.elements().any(has_uncertain_interpolation) {
                     Self::Possible
                 } else {
                     Self::Absent
                 }
             }
-            ast::ExprFields::TString(ast::ExprTStringFields { value, .. }) => {
+            ast::ExprKind::TString(tstring) => {
+                let value = tstring.value();
                 if value.elements().any(has_uncertain_interpolation) {
                     Self::Possible
                 } else {
@@ -110,40 +113,40 @@ impl SideEffect {
             }
 
             // Named expressions (walrus operator) are assignments.
-            ast::ExprFields::Named(_) => Self::Present,
+            ast::ExprKind::Named(_) => Self::Present,
 
             // Complex expressions that are assumed to have side effects.
-            ast::ExprFields::Await(_)
-            | ast::ExprFields::Call(_)
-            | ast::ExprFields::DictComp(_)
-            | ast::ExprFields::Generator(_)
-            | ast::ExprFields::ListComp(_)
-            | ast::ExprFields::SetComp(_)
-            | ast::ExprFields::Subscript(_)
-            | ast::ExprFields::Yield(_)
-            | ast::ExprFields::YieldFrom(_)
-            | ast::ExprFields::IpyEscapeCommand(_) => Self::Present,
+            ast::ExprKind::Await(_)
+            | ast::ExprKind::Call(_)
+            | ast::ExprKind::DictComp(_)
+            | ast::ExprKind::Generator(_)
+            | ast::ExprKind::ListComp(_)
+            | ast::ExprKind::SetComp(_)
+            | ast::ExprKind::Subscript(_)
+            | ast::ExprKind::Yield(_)
+            | ast::ExprKind::YieldFrom(_)
+            | ast::ExprKind::IpyEscapeCommand(_) => Self::Present,
 
             // Side-effect-free expressions — continue walking child nodes.
-            ast::ExprFields::BoolOp(_)
-            | ast::ExprFields::Compare(_)
-            | ast::ExprFields::Dict(_)
-            | ast::ExprFields::If(_)
-            | ast::ExprFields::Lambda(_)
-            | ast::ExprFields::List(_)
-            | ast::ExprFields::Set(_)
-            | ast::ExprFields::Slice(_)
-            | ast::ExprFields::Starred(_)
-            | ast::ExprFields::Tuple(_)
-            | ast::ExprFields::UnaryOp(_)
-            | ast::ExprFields::Attribute(_)
-            | ast::ExprFields::Name(_)
-            | ast::ExprFields::StringLiteral(_)
-            | ast::ExprFields::BytesLiteral(_)
-            | ast::ExprFields::NumberLiteral(_)
-            | ast::ExprFields::BooleanLiteral(_)
-            | ast::ExprFields::NoneLiteral(_)
-            | ast::ExprFields::EllipsisLiteral(_) => Self::Absent,
+            ast::ExprKind::BoolOp(_)
+            | ast::ExprKind::Compare(_)
+            | ast::ExprKind::Dict(_)
+            | ast::ExprKind::If(_)
+            | ast::ExprKind::Lambda(_)
+            | ast::ExprKind::List(_)
+            | ast::ExprKind::Set(_)
+            | ast::ExprKind::Slice(_)
+            | ast::ExprKind::Starred(_)
+            | ast::ExprKind::Tuple(_)
+            | ast::ExprKind::UnaryOp(_)
+            | ast::ExprKind::Attribute(_)
+            | ast::ExprKind::Name(_)
+            | ast::ExprKind::StringLiteral(_)
+            | ast::ExprKind::BytesLiteral(_)
+            | ast::ExprKind::NumberLiteral(_)
+            | ast::ExprKind::BooleanLiteral(_)
+            | ast::ExprKind::NoneLiteral(_)
+            | ast::ExprKind::EllipsisLiteral(_) => Self::Absent,
         }
     }
 }

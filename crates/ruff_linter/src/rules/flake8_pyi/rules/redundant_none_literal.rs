@@ -2,9 +2,7 @@ use anyhow::Result;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::operator_precedence::OperatorPrecedence;
 use ruff_python_ast::token::{Tokens, parenthesized_range};
-use ruff_python_ast::{
-    self as ast, Builder, Expr, ExprKind, ExprNoneLiteral, Operator, PythonVersion,
-};
+use ruff_python_ast::{Builder, Expr, ExprKind, ExprNoneLiteral, Operator, PythonVersion};
 use ruff_python_semantic::analyze::typing::{traverse_literal, traverse_union};
 use ruff_text_size::Ranged;
 
@@ -165,13 +163,8 @@ fn create_fix(
         .current_expressions()
         .skip(1)
         .take_while(|expr| {
-            matches!(
-                expr.fields(),
-                ast::ExprFields::BinOp(ast::ExprBinOpFields {
-                    op: Operator::BitOr,
-                    ..
-                })
-            )
+            expr.as_bin_op_expr()
+                .is_some_and(|binary| binary.op() == Operator::BitOr)
         })
         .last();
 

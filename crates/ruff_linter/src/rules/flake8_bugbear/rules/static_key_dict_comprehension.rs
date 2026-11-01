@@ -49,18 +49,15 @@ impl Violation for StaticKeyDictComprehension {
 }
 
 /// B035, RUF011
-pub(crate) fn static_key_dict_comprehension(
-    checker: &Checker,
-    dict_comp: &ast::ExprDictCompFields<'_>,
-) {
-    let Some(key) = dict_comp.key else {
+pub(crate) fn static_key_dict_comprehension(checker: &Checker, dict_comp: ast::ExprDictComp<'_>) {
+    let Some(key) = dict_comp.key() else {
         return;
     };
 
     // Collect the bound names in the comprehension's generators.
     let names = {
         let mut visitor = StoredNameFinder::default();
-        for generator in dict_comp.generators {
+        for generator in dict_comp.generators() {
             visitor.visit_comprehension(generator);
         }
         visitor.names

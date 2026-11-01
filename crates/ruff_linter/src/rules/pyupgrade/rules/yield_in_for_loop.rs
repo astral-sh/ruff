@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprYield;
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{self as ast, Expr, ExprKind, ExprName, StmtFor, StmtKind};
+use ruff_python_ast::{Expr, ExprKind, ExprName, StmtFor, StmtKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -95,12 +96,7 @@ pub(crate) fn yield_in_for_loop(checker: &Checker, stmt_for: StmtFor<'_>) {
         return;
     };
     let value = expr_node.value();
-    let ast::ExprFields::Yield(ast::ExprYieldFields {
-        value: Some(value),
-        range: _,
-        node: _,
-    }) = value.fields()
-    else {
+    let Some(value) = value.as_yield_expr().and_then(ExprYield::value) else {
         return;
     };
 

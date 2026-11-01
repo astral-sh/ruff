@@ -3,6 +3,7 @@ use crate::codes::Category;
 use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, ExprKind, PythonVersion};
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for uses of `foo.__dict__.get("__annotations__")` or
@@ -152,7 +153,7 @@ pub(crate) fn access_annotations_from_class_dict_with_get(
 /// RUF063
 pub(crate) fn access_annotations_from_class_dict_by_key(
     checker: &Checker,
-    subscript: &ast::ExprSubscriptFields<'_>,
+    subscript: ast::ExprSubscript<'_>,
 ) {
     let python_version = checker.target_version();
     let typing_extensions = checker.settings().typing_extensions;
@@ -166,23 +167,23 @@ pub(crate) fn access_annotations_from_class_dict_by_key(
 
     // 1. Check that the slice is a string literal "__annotations__"
     if subscript
-        .slice
+        .slice()
         .as_string_literal_expr()
         .is_none_or(|s| s.value().to_str() != "__annotations__")
     {
         return;
     }
 
-    // 2. Check that the `subscript.value` is `__dict__`
+    // 2. Check that the `subscript.value()` is `__dict__`
     let is_value_correct = subscript
-        .value
+        .value()
         .as_attribute_expr()
         .is_some_and(|attr| attr.attr().as_str() == "__dict__");
 
     if is_value_correct {
         checker.report_diagnostic(
             AccessAnnotationsFromClassDict { python_version },
-            subscript.range,
+            subscript.range(),
         );
     }
 }

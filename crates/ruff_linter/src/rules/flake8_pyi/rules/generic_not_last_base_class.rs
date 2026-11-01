@@ -103,11 +103,8 @@ impl Violation for GenericNotLastBaseClass {
 }
 
 /// PYI059
-pub(crate) fn generic_not_last_base_class(
-    checker: &Checker,
-    class_def: &ast::StmtClassDefFields<'_>,
-) {
-    let Some(bases) = class_def.arguments else {
+pub(crate) fn generic_not_last_base_class(checker: &Checker, class_def: ast::StmtClassDef<'_>) {
+    let Some(bases) = class_def.arguments() else {
         return;
     };
 

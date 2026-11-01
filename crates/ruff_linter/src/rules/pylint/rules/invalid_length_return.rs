@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::{self as ast, Expr, StmtFunctionDef, UnaryOp};
+use ruff_python_ast::{Expr, StmtFunctionDef, UnaryOp};
 use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
@@ -100,11 +100,7 @@ pub(crate) fn invalid_length_return(checker: &Checker, function_def: StmtFunctio
 
 /// Returns `true` if the given expression is a negative integer.
 fn is_negative_integer(value: Expr<'_>) -> bool {
-    matches!(
-        value.fields(),
-        ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
-            op: UnaryOp::USub,
-            ..
-        })
-    )
+    value
+        .as_unary_op_expr()
+        .is_some_and(|unary| unary.op() == UnaryOp::USub)
 }

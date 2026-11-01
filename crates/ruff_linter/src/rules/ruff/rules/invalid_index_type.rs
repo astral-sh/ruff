@@ -55,9 +55,9 @@ impl Violation for InvalidIndexType {
 }
 
 /// RUF016
-pub(crate) fn invalid_index_type(checker: &Checker, expr: &ast::ExprSubscriptFields<'_>) {
-    let value = expr.value;
-    let index = expr.slice;
+pub(crate) fn invalid_index_type(checker: &Checker, expr: ast::ExprSubscript<'_>) {
+    let value = expr.value();
+    let index = expr.slice();
 
     // Check the value being indexed is a list, tuple, string, f-string, bytes, or comprehension
     if !matches!(

@@ -186,16 +186,20 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
 /// NOTE: Aliased `TYPE_CHECKING`, i.e. `import typing.TYPE_CHECKING as TC; if TC: ...`
 /// will not be detected!
 fn is_type_checking_condition(expr: Expr<'_>) -> bool {
-    match expr.fields() {
+    match expr.classify() {
         // `if TYPE_CHECKING:`
-        ast::ExprFields::Name(ast::ExprNameFields { id, .. }) => id.as_str() == "TYPE_CHECKING",
+        ast::ExprKind::Name(name) => {
+            let id = name.id();
+            id.as_str() == "TYPE_CHECKING"
+        }
         // `if typing.TYPE_CHECKING:`
-        ast::ExprFields::Attribute(ast::ExprAttributeFields { value, attr, .. }) => {
+        ast::ExprKind::Attribute(attribute) => {
+            let value = attribute.value();
+            let attr = attribute.attr();
             attr.as_str() == "TYPE_CHECKING"
-                && matches!(
-                    value.fields(),
-                    ast::ExprFields::Name(ast::ExprNameFields { id, .. }) if id.as_str() == "typing"
-                )
+                && value
+                    .as_name_expr()
+                    .is_some_and(|name| name.id().as_str() == "typing")
         }
         _ => false,
     }
