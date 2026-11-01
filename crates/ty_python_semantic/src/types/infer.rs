@@ -389,6 +389,8 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
     db: &'db dyn Db,
     definitions: &[(Definition<'db>, Option<Specialization<'db>>)],
 ) -> Type<'db> {
+    const MAX_RECEIVERS_PER_CLASS: usize = 16;
+
     let env = ProgramEnvironment::from_definition(definitions[0].0);
     let write = |(definition, specialization): (Definition<'db>, Option<Specialization<'db>>),
                  stored| {
@@ -447,6 +449,12 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
                 let previous = seen.entry(class).or_default();
                 if previous.contains(&ty) {
                     continue;
+                }
+                // Rotating and swapping the arguments of Box[A, B, ...] can visit every
+                // permutation without ever nesting an argument more deeply. Once the set of
+                // possible operands gets too large, the remaining writes are unknown.
+                if previous.len() >= MAX_RECEIVERS_PER_CLASS {
+                    return Type::unknown();
                 }
                 // Repeated arithmetic on distinct literals can produce arbitrarily many values.
                 let receiver = match ty {

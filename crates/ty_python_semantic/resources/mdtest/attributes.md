@@ -589,6 +589,45 @@ class InitializedCounter:
 reveal_type(InitializedCounter().value)  # revealed: Grow[int] | Grow[list[int]]
 ```
 
+#### Augmented assignments that permute type arguments
+
+Rotating four type arguments and swapping the first two can produce all 24 permutations. Inference
+bounds the number of writes it follows even though the types never grow in depth.
+
+```py
+from __future__ import annotations
+from typing import Generic, TypeVar
+
+A = TypeVar("A")
+B = TypeVar("B")
+C = TypeVar("C")
+D = TypeVar("D")
+
+class Box(Generic[A, B, C, D]):
+    def __iadd__(self, n: int) -> Box[B, C, D, A]:
+        return Box()
+
+    def __imul__(self, n: int) -> Box[B, A, C, D]:
+        return Box()
+
+class Red: ...
+class Green: ...
+class Blue: ...
+class White: ...
+
+class Counter:
+    def __init__(self) -> None:
+        self.value = Box[Red, Green, Blue, White]()
+
+    def rotate(self) -> None:
+        self.value += 1
+
+    def swap(self) -> None:
+        self.value *= 1
+
+reveal_type(Counter().value)  # revealed: Box[Red, Green, Blue, White] | Unknown
+```
+
 #### Augmented assignments with expanding tuple results
 
 Repeatedly nesting an independently initialized tuple must converge instead of exhausting Salsa's
