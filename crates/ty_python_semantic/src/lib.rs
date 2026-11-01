@@ -142,9 +142,9 @@ impl Default for AnalysisSettings {
 pub enum ReturnTypeInference {
     /// Do not infer return types from function bodies. Unannotated functions
     /// will have an inferred return type of `Unknown`.
-    #[default]
     Never,
     /// Infer return types for unannotated functions and methods.
+    #[default]
     Always,
 }
 
