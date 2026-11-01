@@ -1570,8 +1570,8 @@ def constrained[T: (str, bytes)]():
     static_assert(not is_disjoint_from(list[list[T]], list[list[bytes]]))
 ```
 
-Two variables with disjoint upper bounds can both specialize to `Never`. A variable with a
-finite set of constraints must take one of its listed types.
+Two variables with disjoint upper bounds can both specialize to `Never`. A variable with a finite
+set of constraints must take one of its listed types.
 
 ```py
 def upper_bounds[T: int, U: str]():
