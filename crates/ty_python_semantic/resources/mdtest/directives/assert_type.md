@@ -259,3 +259,38 @@ def _(a: A):
         assert_type(a, Intersection[A, B, Not[C], Not[D]])
         assert_type(a, Intersection[B, A, Not[D], Not[C]])
 ```
+
+## Generic call narrowing
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+When generic call narrowing produces multiple valid specializations of a call to `assert_type`, a
+single type assertion is performed against the union of all inferred results.
+
+```py
+from typing import assert_type
+
+x: list[int | str] | list[int | None] = assert_type(list((1,)), list[int | str] | list[int | None])
+reveal_type(x)  # revealed: list[int | str] | list[int | None]
+```
+
+Note that when nested inside an outer generic call that produces multiple valid specializations, the
+type assertion is performed against the type of the inner expression when inferred without type
+context:
+
+```py
+from typing import assert_type
+from ty_extensions._internal import Unknown
+
+def identity[T](x: T) -> T:
+    return x
+
+x: list[list[int | str]] | list[list[int | None]] = [assert_type([1], list[int])]
+reveal_type(x)  # revealed: list[list[int | str]] | list[list[int | None]]
+
+x: list[int | str] | list[int | None] = identity(assert_type(list((1,)), list[int]))
+reveal_type(x)  # revealed: list[int | str] | list[int | None]
+```

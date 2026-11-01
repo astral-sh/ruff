@@ -6,6 +6,7 @@ use strum::IntoEnumIterator;
 
 use super::{ArgumentsIter, TypeInferenceBuilder};
 use crate::TypeQualifiers;
+use crate::types::call::CallError;
 use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
@@ -435,7 +436,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } else {
             callable_type
         };
-        let mut bindings =
+        let bindings =
             self.bindings_for_call(binding_callable)
                 .match_parameters(db, env, &call_arguments);
 
@@ -454,11 +455,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     builder.get_or_infer_expression(expr, tcx)
                 }
             },
-            &mut bindings,
+            bindings,
             call_expression_tcx,
         );
 
-        if result.is_err() {
+        let return_ty = result.map(|inferred| inferred.into_bindings().return_type(db, env));
+        return_ty.unwrap_or_else(|CallError(_, bindings)| {
             if can_infer
                 && arguments.keywords.iter().any(|keyword| {
                     keyword
@@ -485,9 +487,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             bindings.report_diagnostics(&self.context, call_expression.into());
-        }
-
-        bindings.return_type(db, env)
+            bindings.return_type(db, env)
+        })
     }
 
     /// Returns whether constructor arguments can safely constrain a generic `TypedDict`.
