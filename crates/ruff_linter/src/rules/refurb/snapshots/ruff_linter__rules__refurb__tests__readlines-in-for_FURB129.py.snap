@@ -310,3 +310,232 @@ help: Remove `readlines()`
 113 |     ):
     |
 note: This is an unsafe fix and may change runtime behavior
+
+FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+   --> FURB129.py:122:17
+    |
+120 | # Unsafe: these operations share the file position with direct iteration.
+121 | def file_operations(fp: io.TextIOBase):
+122 |     for line in fp.readlines():
+    |                 ^^^^^^^^^^^^^^
+123 |         if line.startswith("legacy_"):
+124 |             fp.seek(0, 2)
+    |
+help: Remove `readlines()`
+    |
+121 | def file_operations(fp: io.TextIOBase):
+    -     for line in fp.readlines():
+122 +     for line in fp:
+123 |         if line.startswith("legacy_"):
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+   --> FURB129.py:127:17
+    |
+125 |             fp.write(line.removeprefix("legacy_"))
+126 |
+127 |     for line in fp.readlines():
+    |                 ^^^^^^^^^^^^^^
+128 |         fp.read(1)
+    |
+help: Remove `readlines()`
+    |
+126 |
+    -     for line in fp.readlines():
+127 +     for line in fp:
+128 |         fp.read(1)
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+   --> FURB129.py:130:17
+    |
+128 |         fp.read(1)
+129 |
+130 |     for line in fp.readlines():
+    |                 ^^^^^^^^^^^^^^
+131 |         print(fp.tell())
+    |
+help: Remove `readlines()`
+    |
+129 |
+    -     for line in fp.readlines():
+130 +     for line in fp:
+131 |         print(fp.tell())
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+   --> FURB129.py:133:17
+    |
+131 |         print(fp.tell())
+132 |
+133 |     for line in fp.readlines():
+    |                 ^^^^^^^^^^^^^^
+134 |         fp.truncate()
+    |
+help: Remove `readlines()`
+    |
+132 |
+    -     for line in fp.readlines():
+133 +     for line in fp:
+134 |         fp.truncate()
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+   --> FURB129.py:136:17
+    |
+134 |         fp.truncate()
+135 |
+136 |     for line in fp.readlines():
+    |                 ^^^^^^^^^^^^^^
+137 |         fp.close()
+    |
+help: Remove `readlines()`
+    |
+135 |
+    -     for line in fp.readlines():
+136 +     for line in fp:
+137 |         fp.close()
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+   --> FURB129.py:140:36
+    |
+139 |     # Operations in comprehension elements and filters are also unsafe.
+140 |     a = [fp.readline() for line in fp.readlines()]
+    |                                    ^^^^^^^^^^^^^^
+141 |     b = {fp.tell() for line in fp.readlines()}
+142 |     c = {line: fp.write(line) for line in fp.readlines()}
+    |
+help: Remove `readlines()`
+    |
+139 |     # Operations in comprehension elements and filters are also unsafe.
+    -     a = [fp.readline() for line in fp.readlines()]
+140 +     a = [fp.readline() for line in fp]
+141 |     b = {fp.tell() for line in fp.readlines()}
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+   --> FURB129.py:141:32
+    |
+139 |     # Operations in comprehension elements and filters are also unsafe.
+140 |     a = [fp.readline() for line in fp.readlines()]
+141 |     b = {fp.tell() for line in fp.readlines()}
+    |                                ^^^^^^^^^^^^^^
+142 |     c = {line: fp.write(line) for line in fp.readlines()}
+143 |     d = [line for line in fp.readlines() if fp.seek(0)]
+    |
+help: Remove `readlines()`
+    |
+140 |     a = [fp.readline() for line in fp.readlines()]
+    -     b = {fp.tell() for line in fp.readlines()}
+141 +     b = {fp.tell() for line in fp}
+142 |     c = {line: fp.write(line) for line in fp.readlines()}
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+   --> FURB129.py:142:43
+    |
+140 |     a = [fp.readline() for line in fp.readlines()]
+141 |     b = {fp.tell() for line in fp.readlines()}
+142 |     c = {line: fp.write(line) for line in fp.readlines()}
+    |                                           ^^^^^^^^^^^^^^
+143 |     d = [line for line in fp.readlines() if fp.seek(0)]
+144 |     e = (fp.read(1) for line in fp.readlines())
+    |
+help: Remove `readlines()`
+    |
+141 |     b = {fp.tell() for line in fp.readlines()}
+    -     c = {line: fp.write(line) for line in fp.readlines()}
+142 +     c = {line: fp.write(line) for line in fp}
+143 |     d = [line for line in fp.readlines() if fp.seek(0)]
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+   --> FURB129.py:143:27
+    |
+141 |     b = {fp.tell() for line in fp.readlines()}
+142 |     c = {line: fp.write(line) for line in fp.readlines()}
+143 |     d = [line for line in fp.readlines() if fp.seek(0)]
+    |                           ^^^^^^^^^^^^^^
+144 |     e = (fp.read(1) for line in fp.readlines())
+    |
+help: Remove `readlines()`
+    |
+142 |     c = {line: fp.write(line) for line in fp.readlines()}
+    -     d = [line for line in fp.readlines() if fp.seek(0)]
+143 +     d = [line for line in fp if fp.seek(0)]
+144 |     e = (fp.read(1) for line in fp.readlines())
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+   --> FURB129.py:144:33
+    |
+142 |     c = {line: fp.write(line) for line in fp.readlines()}
+143 |     d = [line for line in fp.readlines() if fp.seek(0)]
+144 |     e = (fp.read(1) for line in fp.readlines())
+    |                                 ^^^^^^^^^^^^^^
+help: Remove `readlines()`
+    |
+143 |     d = [line for line in fp.readlines() if fp.seek(0)]
+    -     e = (fp.read(1) for line in fp.readlines())
+144 +     e = (fp.read(1) for line in fp)
+145 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+   --> FURB129.py:149:17
+    |
+147 | # Safe: unrelated file operations and queries that do not depend on the position.
+148 | def unrelated_operations(fp: io.TextIOBase, other: io.TextIOBase):
+149 |     for line in fp.readlines():
+    |                 ^^^^^^^^^^^^^^
+150 |         other.seek(0)
+151 |         print(fp.readable())
+    |
+help: Remove `readlines()`
+    |
+148 | def unrelated_operations(fp: io.TextIOBase, other: io.TextIOBase):
+    -     for line in fp.readlines():
+149 +     for line in fp:
+150 |         other.seek(0)
+    |
+
+FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+   --> FURB129.py:153:39
+    |
+151 |         print(fp.readable())
+152 |
+153 |     a = [other.readline() for line in fp.readlines()]
+    |                                       ^^^^^^^^^^^^^^
+154 |     b = [line for line in fp.readlines() if fp.readable()]
+    |
+help: Remove `readlines()`
+    |
+152 |
+    -     a = [other.readline() for line in fp.readlines()]
+153 +     a = [other.readline() for line in fp]
+154 |     b = [line for line in fp.readlines() if fp.readable()]
+    |
+
+FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+   --> FURB129.py:154:27
+    |
+153 |     a = [other.readline() for line in fp.readlines()]
+154 |     b = [line for line in fp.readlines() if fp.readable()]
+    |                           ^^^^^^^^^^^^^^
+help: Remove `readlines()`
+    |
+153 |     a = [other.readline() for line in fp.readlines()]
+    -     b = [line for line in fp.readlines() if fp.readable()]
+154 +     b = [line for line in fp if fp.readable()]
+    |
