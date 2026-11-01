@@ -721,6 +721,7 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
             | AnyNodeRef::Parameters(_)
             | AnyNodeRef::Parameter(_)
             | AnyNodeRef::ParameterWithDefault(_)
+            | AnyNodeRef::DictItem(_)
             | AnyNodeRef::Keyword(_)
             | AnyNodeRef::Alias(_)
             | AnyNodeRef::WithItem(_)

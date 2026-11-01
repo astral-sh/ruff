@@ -639,24 +639,25 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                         items.len(),
                         BuildHasherDefault::default(),
                     );
-                    let all_entries_known = items.iter().all(|ast::DictItem { key, value }| {
-                        let Some(ast::Expr::StringLiteral(key)) = key else {
-                            return false;
-                        };
-                        let Some(value_ty) = expression_type(value) else {
-                            return false;
-                        };
-                        // Replacing a duplicate key preserves its first position in the dictionary.
-                        keywords.insert(
-                            Name::new(key.value.to_str()),
-                            UnpackedTypedDictKey {
-                                value_ty,
-                                is_required: true,
-                                definition: None,
-                            },
-                        );
-                        true
-                    });
+                    let all_entries_known =
+                        items.iter().all(|ast::DictItem { key, value, .. }| {
+                            let Some(ast::Expr::StringLiteral(key)) = key else {
+                                return false;
+                            };
+                            let Some(value_ty) = expression_type(value) else {
+                                return false;
+                            };
+                            // Replacing a duplicate key preserves its first position in the dictionary.
+                            keywords.insert(
+                                Name::new(key.value.to_str()),
+                                UnpackedTypedDictKey {
+                                    value_ty,
+                                    is_required: true,
+                                    definition: None,
+                                },
+                            );
+                            true
+                        });
                     if all_entries_known {
                         *argument = KeywordArgument::Known {
                             types: argument.source_types().clone(),

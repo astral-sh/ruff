@@ -101,7 +101,12 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
         };
 
         // Ex) `foo(**{**bar})`
-        if let [ast::DictItem { key: None, value }] = dict.items.as_slice() {
+        if let [
+            ast::DictItem {
+                key: None, value, ..
+            },
+        ] = dict.items.as_slice()
+        {
             let edit = Edit::range_replacement(
                 format!("**{}", checker.locator().slice(value)),
                 keyword.range(),

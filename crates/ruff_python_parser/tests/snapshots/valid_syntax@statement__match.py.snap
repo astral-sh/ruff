@@ -4371,6 +4371,8 @@ Module(
                             range: 2959..2970,
                             items: [
                                 DictItem {
+                                    range: 2960..2969,
+                                    node_index: NodeIndex(None),
                                     key: Some(
                                         StringLiteral(
                                             ExprStringLiteral {
@@ -4478,6 +4480,8 @@ Module(
                             range: 3032..3049,
                             items: [
                                 DictItem {
+                                    range: 3033..3048,
+                                    node_index: NodeIndex(None),
                                     key: Some(
                                         StringLiteral(
                                             ExprStringLiteral {

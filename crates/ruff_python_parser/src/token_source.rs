@@ -212,6 +212,15 @@ impl<'src> TokenSource<'src> {
         self.tokens.truncate(tokens_position);
     }
 
+    /// Returns the last non-trivia token ending at or before `offset`.
+    pub(crate) fn previous_non_trivia(&self, offset: TextSize) -> Option<&Token> {
+        let end = self.tokens.partition_point(|token| token.end() <= offset);
+        self.tokens[..end]
+            .iter()
+            .rev()
+            .find(|token| !token.kind().is_trivia())
+    }
+
     /// Returns a slice of [`Token`] that are within the given `range`.
     pub(crate) fn in_range(&self, range: TextRange) -> &[Token] {
         let start = self
