@@ -3,7 +3,7 @@ use std::hash::Hash;
 use ruff_index::{FrozenIndexVec, IndexVec, newtype_index};
 use rustc_hash::FxHashMap;
 
-/// A table keyed by the dense source-order indices of nodes in a module.
+/// A table keyed by the arena rows of nodes in a module.
 /// Each block marks which of 64 nodes have a value. Counting the preceding
 /// set bits gives a node's position in the packed values for that block.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]

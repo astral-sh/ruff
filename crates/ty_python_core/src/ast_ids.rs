@@ -179,13 +179,13 @@ mod tests {
 
     #[test]
     fn uses_across_blocks_scopes_and_annotations() -> Result<(), ParseError> {
-        let source = format!("({}a, b, c, 'T')", "x, ".repeat(61));
+        let source = format!("({}a, b, c, 'T')", "x, ".repeat(63));
         let mut module = parse_module(&source)?;
         module.index_module();
         let [stmt] = module.suite().as_array().unwrap();
         let expr = stmt.as_expr_stmt().unwrap().value();
         let tuple = expr.as_tuple_expr().unwrap();
-        let [a, b, c, string] = tuple.elts().slice(61..).as_array().unwrap();
+        let [a, b, c, string] = tuple.elts().slice(63..).as_array().unwrap();
         assert_eq!(a.node_index().as_u32(), Some(63));
         assert_eq!(b.node_index().as_u32(), Some(64));
 

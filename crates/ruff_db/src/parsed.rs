@@ -218,9 +218,10 @@ impl ParsedModuleRef {
 
     /// Looks up a module row by its key.
     pub fn get_by_index(&self, index: NodeIndex) -> ruff_python_ast::SyntaxNode<'_> {
-        self.ast()
-            .node_by_index(index)
-            .expect("index belongs to the module")
+        index
+            .as_u32()
+            .and_then(|row| self.ast().row(row))
+            .expect("row belongs to the module")
     }
 }
 
