@@ -915,6 +915,8 @@ Module(
                             range: 219..255,
                             items: [
                                 DictItem {
+                                    range: 220..254,
+                                    node_index: NodeIndex(None),
                                     key: Some(
                                         TString(
                                             ExprTString {
