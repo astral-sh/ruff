@@ -1196,6 +1196,12 @@ impl<'db> ConstraintSetBuilder<'db> {
         Self::default()
     }
 
+    /// Whether all reasoning in this fresh builder has used only terminal constraint sets.
+    pub(crate) fn is_unused(&self) -> bool {
+        let storage = self.storage.borrow();
+        storage.compacted.is_none() && storage.typevars.is_empty() && storage.constraints.is_empty()
+    }
+
     /// Creates an [`OwnedConstraintSet`], consuming this builder in the process. You provide a
     /// callback that constructs a [`ConstraintSet`]. We then package that constraint set up with
     /// the storage arenas from this builder.
