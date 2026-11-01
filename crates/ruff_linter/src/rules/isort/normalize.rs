@@ -151,6 +151,13 @@ pub(crate) fn normalize_imports<'a>(
                     }
                 }
 
+                // Whether the statement is split into one statement per aliased member, as in
+                // `from a import (b, c as d,)`. The trailing comma belongs to the original
+                // statement, so it shouldn't force each resulting statement onto multiple lines.
+                let split_aliases = !settings.combine_as_imports
+                    && names.len() > 1
+                    && names.iter().any(|alias| alias.asname.is_some());
+
                 // Create an entry for every alias (member) within the statement.
                 for alias in names {
                     let import_from = if alias.name == "*" {
@@ -212,7 +219,10 @@ pub(crate) fn normalize_imports<'a>(
                     }
 
                     // Propagate trailing commas.
-                    if !isolate_aliases && matches!(trailing_comma, TrailingComma::Present) {
+                    if !isolate_aliases
+                        && !split_aliases
+                        && matches!(trailing_comma, TrailingComma::Present)
+                    {
                         import_from.trailing_comma = TrailingComma::Present;
                     }
                 }
