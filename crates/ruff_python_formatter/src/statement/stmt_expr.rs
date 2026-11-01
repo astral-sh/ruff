@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Operator, StmtExpr};
+use ruff_python_ast::{Expr, Operator, StmtExpr};
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
@@ -30,16 +30,15 @@ impl FormatNodeRule<ruff_python_ast::kind::StmtExpr> for FormatStmtExpr {
 }
 
 fn is_arithmetic_like(expression: Expr<'_>) -> bool {
-    matches!(
-        expression.fields(),
-        ast::ExprFields::BinOp(ast::ExprBinOpFields {
-            op: Operator::BitOr
+    expression.as_bin_op_expr().is_some_and(|binary| {
+        matches!(
+            binary.op(),
+            Operator::BitOr
                 | Operator::BitXor
                 | Operator::LShift
                 | Operator::RShift
                 | Operator::Add
-                | Operator::Sub,
-            ..
-        })
-    )
+                | Operator::Sub
+        )
+    })
 }

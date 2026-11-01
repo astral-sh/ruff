@@ -1158,55 +1158,29 @@ pub(crate) fn has_own_parentheses(
     expr: Expr<'_>,
     context: &PyFormatContext,
 ) -> Option<OwnParentheses> {
-    match expr.fields() {
+    let is_empty = match expr.classify() {
         // These expressions are always non-empty.
-        ast::ExprFields::ListComp(_)
-        | ast::ExprFields::SetComp(_)
-        | ast::ExprFields::DictComp(_)
-        | ast::ExprFields::Subscript(_) => Some(OwnParentheses::NonEmpty),
-
-        ast::ExprFields::Generator(ast::ExprGeneratorFields {
-            node: generator, ..
-        }) if generator.parenthesized() => Some(OwnParentheses::NonEmpty),
+        ExprKind::ListComp(_)
+        | ExprKind::SetComp(_)
+        | ExprKind::DictComp(_)
+        | ExprKind::Subscript(_) => return Some(OwnParentheses::NonEmpty),
+        ExprKind::Generator(generator) if generator.parenthesized() => {
+            return Some(OwnParentheses::NonEmpty);
+        }
 
         // These expressions must contain _some_ child or trivia token in order to be non-empty.
-        ast::ExprFields::List(ast::ExprListFields { elts, .. })
-        | ast::ExprFields::Set(ast::ExprSetFields { elts, .. }) => {
-            if !elts.is_empty() || context.comments().has_dangling(SyntaxNode::from(expr)) {
-                Some(OwnParentheses::NonEmpty)
-            } else {
-                Some(OwnParentheses::Empty)
-            }
-        }
+        ExprKind::List(list) => list.elts().is_empty(),
+        ExprKind::Set(set) => set.elts().is_empty(),
+        ExprKind::Tuple(tuple) if tuple.parenthesized() => tuple.elts().is_empty(),
+        ExprKind::Dict(dict) => dict.items().is_empty(),
+        ExprKind::Call(call) => call.arguments().is_empty(),
+        _ => return None,
+    };
 
-        ast::ExprFields::Tuple(ast::ExprTupleFields {
-            node: tuple,
-            parenthesized: true,
-            ..
-        }) => {
-            if !tuple.elts().is_empty() || context.comments().has_dangling(SyntaxNode::from(expr)) {
-                Some(OwnParentheses::NonEmpty)
-            } else {
-                Some(OwnParentheses::Empty)
-            }
-        }
-
-        ast::ExprFields::Dict(ast::ExprDictFields { items, .. }) => {
-            if !items.is_empty() || context.comments().has_dangling(SyntaxNode::from(expr)) {
-                Some(OwnParentheses::NonEmpty)
-            } else {
-                Some(OwnParentheses::Empty)
-            }
-        }
-        ast::ExprFields::Call(ast::ExprCallFields { arguments, .. }) => {
-            if !arguments.is_empty() || context.comments().has_dangling(SyntaxNode::from(expr)) {
-                Some(OwnParentheses::NonEmpty)
-            } else {
-                Some(OwnParentheses::Empty)
-            }
-        }
-
-        _ => None,
+    if is_empty && !context.comments().has_dangling(expr.syntax_node()) {
+        Some(OwnParentheses::Empty)
+    } else {
+        Some(OwnParentheses::NonEmpty)
     }
 }
 
@@ -1325,74 +1299,56 @@ impl From<Operator> for OperatorPrecedence {
 ///
 /// Returns `false` for expressions that are guaranteed to never split.
 pub(crate) fn is_splittable_expression(expr: Expr<'_>, context: &PyFormatContext) -> bool {
-    match expr.fields() {
+    let can_split_child = |child| {
+        context.is_expression_parenthesized(child) || is_splittable_expression(child, context)
+    };
+    match expr.classify() {
         // Single token expressions. They never have any split points.
-        ast::ExprFields::Named(_)
-        | ast::ExprFields::Name(_)
-        | ast::ExprFields::NumberLiteral(_)
-        | ast::ExprFields::BooleanLiteral(_)
-        | ast::ExprFields::NoneLiteral(_)
-        | ast::ExprFields::EllipsisLiteral(_)
-        | ast::ExprFields::Slice(_)
-        | ast::ExprFields::IpyEscapeCommand(_) => false,
+        ExprKind::Named(_)
+        | ExprKind::Name(_)
+        | ExprKind::NumberLiteral(_)
+        | ExprKind::BooleanLiteral(_)
+        | ExprKind::NoneLiteral(_)
+        | ExprKind::EllipsisLiteral(_)
+        | ExprKind::Slice(_)
+        | ExprKind::IpyEscapeCommand(_) => false,
 
         // Expressions that insert split points when parenthesized.
-        ast::ExprFields::Compare(_)
-        | ast::ExprFields::BinOp(_)
-        | ast::ExprFields::BoolOp(_)
-        | ast::ExprFields::If(_)
-        | ast::ExprFields::Generator(_)
-        | ast::ExprFields::Subscript(_)
-        | ast::ExprFields::Await(_)
-        | ast::ExprFields::ListComp(_)
-        | ast::ExprFields::SetComp(_)
-        | ast::ExprFields::DictComp(_)
-        | ast::ExprFields::YieldFrom(_) => true,
+        ExprKind::Compare(_)
+        | ExprKind::BinOp(_)
+        | ExprKind::BoolOp(_)
+        | ExprKind::If(_)
+        | ExprKind::Generator(_)
+        | ExprKind::Subscript(_)
+        | ExprKind::Await(_)
+        | ExprKind::ListComp(_)
+        | ExprKind::SetComp(_)
+        | ExprKind::DictComp(_)
+        | ExprKind::YieldFrom(_) => true,
 
         // Sequence types can split if they contain at least one element.
-        ast::ExprFields::Tuple(ast::ExprTupleFields { node: tuple, .. }) => {
-            !tuple.elts().is_empty()
-        }
-        ast::ExprFields::Dict(ast::ExprDictFields { node: dict, .. }) => !dict.items().is_empty(),
-        ast::ExprFields::Set(ast::ExprSetFields { node: set, .. }) => !set.elts().is_empty(),
-        ast::ExprFields::List(ast::ExprListFields { node: list, .. }) => !list.elts().is_empty(),
+        ExprKind::Tuple(tuple) => !tuple.elts().is_empty(),
+        ExprKind::Dict(dict) => !dict.items().is_empty(),
+        ExprKind::Set(set) => !set.elts().is_empty(),
+        ExprKind::List(list) => !list.elts().is_empty(),
 
-        ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields { node: unary, .. }) => {
-            is_splittable_expression(unary.operand(), context)
-        }
-        ast::ExprFields::Yield(ast::ExprYieldFields { value, .. }) => value.is_some(),
+        ExprKind::UnaryOp(unary) => is_splittable_expression(unary.operand(), context),
+        ExprKind::Yield(yield_expr) => yield_expr.value().is_some(),
 
-        ast::ExprFields::Call(ast::ExprCallFields {
-            arguments, func, ..
-        }) => !arguments.is_empty() || context.is_expression_parenthesized(func),
+        ExprKind::Call(call) => {
+            !call.arguments().is_empty() || context.is_expression_parenthesized(call.func())
+        }
 
         // String like literals can expand if they are implicit concatenated.
-        ast::ExprFields::FString(ast::ExprFStringFields { node: fstring, .. }) => {
-            fstring.value().is_implicit_concatenated()
-        }
-        ast::ExprFields::TString(ast::ExprTStringFields { node: tstring, .. }) => {
-            tstring.value().is_implicit_concatenated()
-        }
-        ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { node: string, .. }) => {
-            string.value().is_implicit_concatenated()
-        }
-        ast::ExprFields::BytesLiteral(ast::ExprBytesLiteralFields { node: bytes, .. }) => {
-            bytes.value().is_implicit_concatenated()
-        }
+        ExprKind::FString(fstring) => fstring.value().is_implicit_concatenated(),
+        ExprKind::TString(tstring) => tstring.value().is_implicit_concatenated(),
+        ExprKind::StringLiteral(string) => string.value().is_implicit_concatenated(),
+        ExprKind::BytesLiteral(bytes) => bytes.value().is_implicit_concatenated(),
 
         // Expressions that have no split points per se, but they contain nested sub expressions that might expand.
-        ast::ExprFields::Lambda(ast::ExprLambdaFields {
-            body: expression, ..
-        })
-        | ast::ExprFields::Starred(ast::ExprStarredFields {
-            value: expression, ..
-        })
-        | ast::ExprFields::Attribute(ast::ExprAttributeFields {
-            value: expression, ..
-        }) => {
-            context.is_expression_parenthesized(expression)
-                || is_splittable_expression(expression, context)
-        }
+        ExprKind::Lambda(lambda) => can_split_child(lambda.body()),
+        ExprKind::Starred(starred) => can_split_child(starred.value()),
+        ExprKind::Attribute(attribute) => can_split_child(attribute.value()),
     }
 }
 
