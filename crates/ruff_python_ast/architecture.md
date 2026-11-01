@@ -189,7 +189,9 @@ that field. Calling `next()` takes one traversal step without counting or copyin
 children.
 
 `node.descendants()` starts with the node itself and walks its subtree in preorder.
-It pushes the remaining siblings onto a stack of child IDs in reverse source order.
+When it enters a list, it keeps a
+borrowed slice of the remaining child handles. The stack grows with nesting depth, so a
+search for the first statement in a long module can stop without copying the rest of the suite.
 A visitor can prune subtrees and maintain an ancestor stack on entry and exit. Rows store
 links to their children and carry no parent pointer.
 

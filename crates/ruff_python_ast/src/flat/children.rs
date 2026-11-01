@@ -1,4 +1,5 @@
 use std::iter::FusedIterator;
+use std::mem;
 use std::num::NonZeroU32;
 use std::slice;
 
@@ -143,7 +144,7 @@ impl FusedIterator for Children<'_> {}
 pub struct Descendants<'a> {
     ast: &'a Ast,
     next: Option<NonZeroU32>,
-    pending: Pending,
+    pending: Pending<'a>,
 }
 
 impl<'a> Descendants<'a> {
@@ -285,25 +286,45 @@ impl<'a> StatementLists<'a> {
     }
 }
 
-/// Child IDs waiting to be visited, with the next sibling at the top.
-#[derive(Default)]
-pub(super) struct Pending {
+/// Fixed child fields need only a handle. A list stores its cursor at the depth
+/// where its next sibling should be visited after nested fields finish.
+pub(super) struct Pending<'a> {
     nodes: Vec<u32>,
+    // Resume this slice once all scalar fields pushed after it have been consumed.
+    // With no suspended list, the sentinel depth makes `resume` pop scalar fields directly.
+    rows: slice::Iter<'a, u32>,
+    depth: usize,
+    outer: Vec<(usize, &'a [u32])>,
 }
 
-impl Pending {
+impl Default for Pending<'_> {
+    fn default() -> Self {
+        Self {
+            nodes: Vec::new(),
+            rows: slice::Iter::default(),
+            depth: usize::MAX,
+            outer: Vec::new(),
+        }
+    }
+}
+
+impl<'a> Pending<'a> {
     #[inline]
     pub(super) fn push_node(&mut self, node: u32) {
         self.nodes.push(node);
     }
 
     #[inline]
-    pub(super) fn push_list(&mut self, words: &[u32]) {
-        self.nodes.extend(words.iter().rev().copied());
+    fn suspend(&mut self) {
+        if !self.rows.as_slice().is_empty() {
+            self.outer
+                .push((self.depth, mem::take(&mut self.rows).as_slice()));
+        }
+        self.depth = self.nodes.len();
     }
 
     #[inline]
-    pub(super) fn descend_list(&mut self, words: &[u32]) -> u32 {
+    pub(super) fn descend_list(&mut self, words: &'a [u32]) -> u32 {
         let Some((&first, rest)) = words.split_first() else {
             return self.resume();
         };
@@ -311,9 +332,42 @@ impl Pending {
         first
     }
 
+    /// Returns the next stored child ID, or the reserved slot zero at the end of the walk.
     #[inline]
     pub(super) fn resume(&mut self) -> u32 {
-        self.nodes.pop().unwrap_or(0)
+        if self.nodes.len() != self.depth {
+            return self.nodes.pop().unwrap_or(0);
+        }
+        if let Some(&first) = self.rows.next() {
+            return first;
+        }
+        self.resume_outer()
+    }
+
+    fn resume_outer(&mut self) -> u32 {
+        let Some(&(depth, rows)) = self.outer.last() else {
+            self.depth = usize::MAX;
+            return self.nodes.pop().unwrap_or(0);
+        };
+        self.depth = depth;
+        if self.nodes.len() != depth {
+            return self.nodes.pop().unwrap_or(0);
+        }
+        self.outer.pop();
+        self.rows = rows.iter();
+        self.rows.next().copied().unwrap_or(0)
+    }
+
+    #[inline]
+    pub(super) fn push_list(&mut self, words: &'a [u32]) {
+        match words {
+            [] => {}
+            &[only] => self.nodes.push(only),
+            words => {
+                self.suspend();
+                self.rows = words.iter();
+            }
+        }
     }
 }
 
@@ -357,7 +411,7 @@ mod tests {
     }
 
     #[test]
-    fn descendants_visit_wide_suites() {
+    fn descendants_borrow_wide_suites() {
         let mut builder = Builder::default();
         let range = TextRange::default();
         let body = builder.map_list(0..1024, |builder, _| {
@@ -374,6 +428,14 @@ mod tests {
             nodes.next().map(AstNode::node_kind),
             Some(NodeKind::StmtPass)
         );
-        assert_eq!(nodes.count(), 1023);
+        let words = module.body().words();
+        let pending = nodes.pending.rows.as_slice();
+        assert!(pending.len() >= words.len() - 2);
+        assert_eq!(
+            pending.as_ptr(),
+            words[words.len() - pending.len()..].as_ptr()
+        );
+        assert_eq!(nodes.pending.nodes.capacity(), 0);
+        assert_eq!(nodes.pending.outer.capacity(), 0);
     }
 }

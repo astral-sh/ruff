@@ -865,7 +865,11 @@ impl super::Ast {
         }
     }
     #[inline]
-    pub(super) fn next_descendant<'a>(&'a self, node: SyntaxNode<'a>, stack: &mut Pending) -> u32 {
+    pub(super) fn next_descendant<'a>(
+        &'a self,
+        node: SyntaxNode<'a>,
+        stack: &mut Pending<'a>,
+    ) -> u32 {
         let record = node.row;
         match record.kind() {
             NodeKind::ModModule
