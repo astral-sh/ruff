@@ -453,7 +453,8 @@ enum DunderAllOrigin {
 
 /// Checks if the given expression is a name expression for `__all__`.
 fn is_dunder_all(expr: Expr<'_>) -> bool {
-    matches!(expr.fields(), ast::ExprFields::Name(ast::ExprNameFields { id, .. }) if id == "__all__")
+    expr.as_name_expr()
+        .is_some_and(|name| name.id() == "__all__")
 }
 
 /// Create and return a [`Name`] from the given expression, [`None`] if it is an invalid expression

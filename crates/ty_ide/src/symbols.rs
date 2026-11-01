@@ -1298,8 +1298,8 @@ impl<'db> SymbolVisitor<'db> {
     }
 
     fn visit_stmt_impl(&mut self, stmt: Stmt<'db>) {
-        match stmt.fields() {
-            ast::StmtFields::FunctionDef(ast::StmtFunctionDefFields { node: func_def, .. }) => {
+        match stmt.classify() {
+            ast::StmtKind::FunctionDef(func_def) => {
                 let kind = SymbolKind::function_kind(
                     func_def.name().as_str(),
                     self.iter_symbol_stack()
@@ -1349,9 +1349,7 @@ impl<'db> SymbolVisitor<'db> {
 
                 self.pop_symbol();
             }
-            ast::StmtFields::ClassDef(ast::StmtClassDefFields {
-                node: class_def, ..
-            }) => {
+            ast::StmtKind::ClassDef(class_def) => {
                 let symbol = SymbolTree {
                     parent: None,
                     name: class_def.name().to_string(),
@@ -1391,9 +1389,7 @@ impl<'db> SymbolVisitor<'db> {
                 // Restore the previous class scope state
                 self.in_class = was_in_class;
             }
-            ast::StmtFields::TypeAlias(ast::StmtTypeAliasFields {
-                node: type_alias, ..
-            }) => {
+            ast::StmtKind::TypeAlias(type_alias) => {
                 // Include assignments only when we're in global or class scope
                 if self.in_function {
                     return;
@@ -1403,19 +1399,18 @@ impl<'db> SymbolVisitor<'db> {
                 };
                 self.add_name_symbol(stmt, name.id(), name.range(), SymbolKind::Variable);
             }
-            ast::StmtFields::Assign(ast::StmtAssignFields { node: assign, .. }) => {
+            ast::StmtKind::Assign(assign) => {
                 self.add_all_assignment(assign.targets().first(), Some(assign.value()));
                 source_order::walk_stmt(self, stmt);
             }
-            ast::StmtFields::AnnAssign(ast::StmtAnnAssignFields {
-                node: ann_assign, ..
-            }) => {
+            ast::StmtKind::AnnAssign(ann_assign) => {
                 self.add_all_assignment(Some(ann_assign.target()), ann_assign.value());
                 source_order::walk_stmt(self, stmt);
             }
-            ast::StmtFields::AugAssign(ast::StmtAugAssignFields {
-                target, op, value, ..
-            }) => {
+            ast::StmtKind::AugAssign(assign) => {
+                let ast::StmtAugAssignFields {
+                    target, op, value, ..
+                } = assign.fields();
                 if !target.is_name_expr() {
                     self.visit_expr(target);
                 }
@@ -1444,7 +1439,7 @@ impl<'db> SymbolVisitor<'db> {
                     self.all_invalid = true;
                 }
             }
-            ast::StmtFields::Expr(ast::StmtExprFields { node: expr, .. }) => {
+            ast::StmtKind::Expr(expr) => {
                 source_order::walk_stmt(self, stmt);
 
                 // We don't care about `__all__` unless we're
@@ -1479,7 +1474,7 @@ impl<'db> SymbolVisitor<'db> {
                     self.all_invalid = true;
                 }
             }
-            ast::StmtFields::Import(ast::StmtImportFields { node: import, .. }) => {
+            ast::StmtKind::Import(import) => {
                 // We ignore any names introduced by imports
                 // unless we're specifically looking for the
                 // set of exported symbols.
@@ -1495,9 +1490,7 @@ impl<'db> SymbolVisitor<'db> {
                     self.add_import_alias(AstImport::Import(import), alias);
                 }
             }
-            ast::StmtFields::ImportFrom(ast::StmtImportFromFields {
-                node: import_from, ..
-            }) => {
+            ast::StmtKind::ImportFrom(import_from) => {
                 // We ignore any names introduced by imports
                 // unless we're specifically looking for the
                 // set of exported symbols.
@@ -1628,7 +1621,8 @@ enum DunderAllOrigin {
 
 /// Checks if the given expression is a name expression for `__all__`.
 fn is_dunder_all(expr: Expr<'_>) -> bool {
-    matches!(expr.fields(), ast::ExprFields::Name(ast::ExprNameFields { id, .. }) if id == "__all__")
+    expr.as_name_expr()
+        .is_some_and(|name| name.id() == "__all__")
 }
 
 fn is_recognized_all_assignment(stmt: Stmt<'_>, name: ExprName<'_>) -> bool {

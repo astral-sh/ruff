@@ -304,59 +304,39 @@ impl MemberExprBuilder {
     }
 
     fn subscript_part(subscript_slice: Expr<'_>) -> Option<(SegmentKind, MemberPathPart<'_>)> {
-        match subscript_slice.fields() {
+        match subscript_slice.classify() {
             // Handle integer subscripts, like `x[0]`.
-            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                value: Number::Int(index),
-                ..
-            }) => Some((
-                SegmentKind::IntSubscript,
-                MemberPathPart::Owned(format_char!("{index}")),
-            )),
-            // Handle negative integer subscripts, like `x[-1]`.
-            ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
-                op: UnaryOp::USub,
-                operand,
-                ..
-            }) => match operand.fields() {
-                ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                    value: Number::Int(index),
-                    ..
-                }) => Some((
-                    SegmentKind::IntSubscript,
-                    MemberPathPart::Owned(format_char!("-{index}")),
-                )),
-                _ => None,
-            },
-            // Handle positive integer subscripts with explicit plus, like `x[+1]`.
-            ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
-                op: UnaryOp::UAdd,
-                operand,
-                ..
-            }) => match operand.fields() {
-                ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                    value: Number::Int(index),
-                    ..
-                }) => Some((
+            ast::ExprKind::NumberLiteral(number) => {
+                let Number::Int(index) = number.value() else {
+                    return None;
+                };
+                Some((
                     SegmentKind::IntSubscript,
                     MemberPathPart::Owned(format_char!("{index}")),
-                )),
-                _ => None,
-            },
+                ))
+            }
+            // Handle signed integer subscripts, like `x[-1]` and `x[+1]`.
+            ast::ExprKind::UnaryOp(unary) => {
+                let index = unary.operand().as_int_literal()?;
+                let index = match unary.op() {
+                    UnaryOp::USub => format_char!("-{index}"),
+                    UnaryOp::UAdd => format_char!("{index}"),
+                    UnaryOp::Not | UnaryOp::Invert => return None,
+                };
+                Some((SegmentKind::IntSubscript, MemberPathPart::Owned(index)))
+            }
             // Handle boolean subscripts, like `x[True]` or `x[False]`.
             // In Python, `True` and `False` are equivalent to `1` and `0` for indexing.
-            ast::ExprFields::BooleanLiteral(ast::ExprBooleanLiteralFields { value, .. }) => Some((
+            ast::ExprKind::BooleanLiteral(boolean) => Some((
                 SegmentKind::IntSubscript,
-                MemberPathPart::Borrowed(if value { "1" } else { "0" }),
+                MemberPathPart::Borrowed(if boolean.value() { "1" } else { "0" }),
             )),
-            ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields {
-                node: string, ..
-            }) => Some((
+            ast::ExprKind::StringLiteral(string) => Some((
                 SegmentKind::StringSubscript,
                 MemberPathPart::Borrowed(string.value().to_str()),
             )),
             // Handle bytes literal subscripts, like `x[b"key"]`.
-            ast::ExprFields::BytesLiteral(ast::ExprBytesLiteralFields { node: bytes, .. }) => {
+            ast::ExprKind::BytesLiteral(bytes) => {
                 let bytes_vec: Vec<u8> = bytes.value().bytes().collect();
                 let text = String::from_utf8_lossy(&bytes_vec);
                 Some((

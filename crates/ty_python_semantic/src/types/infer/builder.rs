@@ -1685,41 +1685,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// normal attribute or subscript lookup on its receiver.
     fn fallback_member_declared_type(&mut self, node: SyntaxNode<'_>) -> Option<Type<'db>> {
         let db = self.db();
-        if let ast::AnyFields::ExprAttribute(ast::ExprAttributeFields { value, attr, .. }) =
-            node.fields()
-        {
-            let value_type = self.try_expression_type(value).unwrap_or_else(|| {
-                self.infer_maybe_standalone_expression(value, TypeContext::default())
-            });
-            if let Place::Defined(DefinedPlace {
-                ty,
-                definedness: Definedness::AlwaysDefined,
-                ..
-            }) = value_type
-                .member(db, self.program_environment(), attr.as_str())
-                .place
-            {
-                // TODO: also consider qualifiers on the attribute
-                Some(ty)
-            } else {
-                None
+        match node.classify() {
+            ast::AnyKind::ExprAttribute(attribute) => {
+                let value = attribute.value();
+                let value_type = self.try_expression_type(value).unwrap_or_else(|| {
+                    self.infer_maybe_standalone_expression(value, TypeContext::default())
+                });
+                if let Place::Defined(DefinedPlace {
+                    ty,
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                }) = value_type
+                    .member(db, self.program_environment(), attribute.attr().as_str())
+                    .place
+                {
+                    // TODO: also consider qualifiers on the attribute
+                    Some(ty)
+                } else {
+                    None
+                }
             }
-        } else if let ast::AnyFields::ExprSubscript(ast::ExprSubscriptFields {
-            node: subscript,
-            value,
-            slice,
-            ctx,
-            ..
-        }) = node.fields()
-        {
-            let value_ty = self.get_or_infer_expression(value, TypeContext::default());
-            let slice_ty = self.get_or_infer_expression(slice, TypeContext::default());
-            Some(
-                self.infer_subscript_expression_types(subscript, value_ty, slice_ty, ctx)
+            ast::AnyKind::ExprSubscript(subscript) => {
+                let value_ty =
+                    self.get_or_infer_expression(subscript.value(), TypeContext::default());
+                let slice_ty =
+                    self.get_or_infer_expression(subscript.slice(), TypeContext::default());
+                Some(
+                    self.infer_subscript_expression_types(
+                        subscript,
+                        value_ty,
+                        slice_ty,
+                        subscript.ctx(),
+                    )
                     .unwrap_or_else(|recovery_ty| recovery_ty),
-            )
-        } else {
-            None
+                )
+            }
+            _ => None,
         }
     }
 
@@ -13328,9 +13329,9 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             bound_ty = declared_ty;
         }
         // In the following cases, the bound type may not be the same as the RHS value type.
-        if let ast::AnyFields::ExprAttribute(ast::ExprAttributeFields { value, attr, .. }) =
-            self.node.fields()
-        {
+        if let Some(attribute) = self.node.cast::<ast::ExprAttribute>() {
+            let value = attribute.value();
+            let attr = attribute.attr();
             let value_ty = builder.try_expression_type(value).unwrap_or_else(|| {
                 builder.infer_maybe_standalone_expression(value, TypeContext::default())
             });
@@ -13381,9 +13382,8 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                 builder.discard_dict_key_assignments_for(self.binding);
                 bound_ty = declared_ty;
             }
-        } else if let ast::AnyFields::ExprSubscript(ast::ExprSubscriptFields { value, .. }) =
-            self.node.fields()
-        {
+        } else if let Some(subscript) = self.node.cast::<ast::ExprSubscript>() {
+            let value = subscript.value();
             let value_ty = builder
                 .try_expression_type(value)
                 .unwrap_or_else(|| builder.infer_expression(value, TypeContext::default()));
