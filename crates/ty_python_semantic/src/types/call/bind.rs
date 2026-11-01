@@ -5911,28 +5911,6 @@ fn enumerate_argument_types<'a, 'db>(
     })
 }
 
-/// With no evidence from the expected return type, every call in this program
-/// with the same generic context and inferred arguments has the same parameter context.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial = |_, _, _, _, _| None,
-    heap_size = ruff_memory_usage::heap_size,
-)]
-fn inferred_parameter_context<'db>(
-    db: &'db dyn Db,
-    generic_context: GenericContext<'db>,
-    program: ty_python_core::Program<'db>,
-    inference: Option<TypeVarInference<'db>>,
-) -> Option<Specialization<'db>> {
-    Some(parameter_context_specialization(
-        db,
-        &ProgramEnvironment::from_program(program),
-        generic_context,
-        inference,
-        &FxHashMap::default(),
-    ))
-}
-
 /// Combines the expected return type and the type arguments inferred so far
 /// into the context for the next argument-inference pass.
 fn parameter_context_specialization<'db>(
@@ -8638,6 +8616,10 @@ impl<'db> Binding<'db> {
     /// Parameter types are specialized based on the constraints from the declared type of the
     /// call expression, as well as the argument types inferred from the previous round of
     /// fixpoint iteration.
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None while the inferred parameter context is resolving a cycle"
+    )]
     pub(crate) fn argument_type_context_specialization(
         &self,
         db: &'db dyn Db,
@@ -8645,6 +8627,28 @@ impl<'db> Binding<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<Specialization<'db>> {
+        /// With no evidence from the expected return type, every call in this program
+        /// with the same generic context and inferred arguments has the same parameter context.
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial = |_, _, _, _, _| None,
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn inferred_parameter_context<'db>(
+            db: &'db dyn Db,
+            generic_context: GenericContext<'db>,
+            program: ty_python_core::Program<'db>,
+            inference: Option<TypeVarInference<'db>>,
+        ) -> Option<Specialization<'db>> {
+            Some(parameter_context_specialization(
+                db,
+                &ProgramEnvironment::from_program(program),
+                generic_context,
+                inference,
+                &FxHashMap::default(),
+            ))
+        }
+
         let generic_context = self.signature.generic_context?;
 
         let mut return_type_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
