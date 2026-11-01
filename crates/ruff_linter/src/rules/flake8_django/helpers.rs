@@ -1,6 +1,9 @@
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_python_semantic::{SemanticModel, analyze};
+
+use crate::checkers::ast::Checker;
 
 /// Return `true` if a Python class appears to be a Django model, based on its base classes.
 pub(super) fn is_model(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
@@ -31,6 +34,21 @@ pub(super) fn is_model_field(expr: &Expr, semantic: &SemanticModel) -> bool {
                 .segments()
                 .starts_with(&["django", "db", "models"])
         })
+}
+
+/// Return `true` if `qualified_name` refers to `django.urls.path` or any of the
+/// user-configured `extend-path-functions`.
+pub(super) fn is_path_function(qualified_name: &QualifiedName, checker: &Checker) -> bool {
+    if matches!(qualified_name.segments(), ["django", "urls", "path"]) {
+        return true;
+    }
+    checker
+        .settings()
+        .flake8_django
+        .extend_path_functions
+        .iter()
+        .map(|name| QualifiedName::from_dotted_name(name))
+        .any(|target| *qualified_name == target)
 }
 
 /// Return the name of the field type, if the expression is constructor for a Django model field.
