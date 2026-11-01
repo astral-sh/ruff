@@ -118,3 +118,11 @@ SLF001 Private member accessed: `_private_thing__`
 69 |
 70 | print(foo.public_thing)
    |
+
+SLF001 Private member accessed: `_unknown_private_member`
+   --> SLF001.py:187:1
+    |
+185 | import sys
+186 |
+187 | sys._unknown_private_member  # SLF001
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
