@@ -23,21 +23,62 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## What it does
 /// De-duplicates, groups, and sorts imports based on the provided `isort` settings.
 ///
+/// By default, imports are categorized into the following sections in order:
+/// 1. `future` (`__future__`)
+/// 2. `standard-library` (e.g., `sys`, `os`, `json`)
+/// 3. `third-party` (e.g., `numpy`, `pandas`, `boto3`)
+/// 4. `first-party` (modules within the current project or package)
+/// 5. `local-folder` (relative imports starting with `.`, e.g., `from . import utils`)
+///
+/// Each section is separated by a single blank line. Within each section, imports are
+/// sorted alphabetically (by default, straight imports like `import sys` precede `from`
+/// imports like `from os import path`).
+///
+/// Following PEP 8, the rule also enforces blank lines after the import block:
+/// - By default, two blank lines are expected between an import block and a top-level
+///   function or class definition.
+/// - One blank line is expected between an import block and any other top-level code
+///   (such as variable assignments).
+/// - In typing stub files (`.pyi`), at most one blank line is expected.
+///
 /// ## Why is this bad?
-/// Consistency is good. Use a common convention for imports to make your code
-/// more readable and idiomatic.
+/// Consistency is good. Grouping and sorting imports according to standard conventions
+/// makes module dependencies easier to scan at a glance, reduces merge conflicts, and
+/// makes codebases more readable.
 ///
 /// ## Example
 /// ```python
-/// import pandas
-/// import numpy as np
+/// import boto3
+/// import json
+///
+/// def lambda_handler(event, context):
+///     pass
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// import numpy as np
-/// import pandas
+/// import json
+///
+/// import boto3
+///
+///
+/// def lambda_handler(event, context):
+///     pass
 /// ```
+///
+/// ## Options
+/// - `lint.isort.lines-after-imports`
+/// - `lint.isort.section-order`
+/// - `lint.isort.default-section`
+/// - `lint.isort.no-sections`
+/// - `lint.isort.known-first-party`
+/// - `lint.isort.known-third-party`
+/// - `lint.isort.extra-standard-library`
+/// - `lint.isort.sections`
+///
+/// ## References
+/// - [PEP 8: Imports](https://peps.python.org/pep-0008/#imports)
+/// - [isort documentation](https://pycqa.github.io/isort/)
 ///
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.110", category = Category::Style)]
