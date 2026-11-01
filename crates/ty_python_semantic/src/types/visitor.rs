@@ -691,29 +691,6 @@ pub(super) fn may_contain_typevar_from<'db>(
         found: Cell<bool>,
     }
 
-    impl<'db> TypeVarOccurrenceVisitor<'_, 'db> {
-        fn visit_guarded(
-            &self,
-            db: &'db dyn Db,
-            ty: Type<'db>,
-            visit_arguments: impl FnOnce(),
-            visit: impl FnOnce(),
-        ) {
-            let identity = ty.to_type_identity(db);
-            self.active_types.visit(
-                &identity,
-                || {
-                    // An exact cycle adds no new dependencies. A coarsened identity can hide
-                    // a different specialization, whose arguments still need inspecting.
-                    if !matches!(identity, TypeIdentity::Other(_)) {
-                        visit_arguments();
-                    }
-                },
-                visit,
-            );
-        }
-    }
-
     impl<'db> TypeVisitor<'db> for TypeVarOccurrenceVisitor<'_, 'db> {
         fn should_visit_lazy_type_attributes(&self) -> bool {
             false
@@ -738,7 +715,7 @@ pub(super) fn may_contain_typevar_from<'db>(
         }
 
         fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-            self.visit_guarded(
+            self.active_types.visit_type(
                 db,
                 Type::TypeAlias(alias),
                 || walk_type_alias_arguments(db, alias, self),
@@ -747,7 +724,7 @@ pub(super) fn may_contain_typevar_from<'db>(
         }
 
         fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-            self.visit_guarded(
+            self.active_types.visit_type(
                 db,
                 Type::Recursive(recursive),
                 || {
@@ -773,7 +750,7 @@ pub(super) fn may_contain_typevar_from<'db>(
                 .class_origin(db)
                 .and_then(|class| class.definition(db))
             else {
-                self.visit_guarded(db, ty, || {}, visit_members);
+                self.active_types.visit_type(db, ty, || {}, visit_members);
                 return;
             };
 
@@ -797,7 +774,7 @@ pub(super) fn may_contain_typevar_from<'db>(
             if let Some(class) = typed_dict.defining_class() {
                 self.visit_type(db, class.into());
             }
-            self.visit_guarded(
+            self.active_types.visit_type(
                 db,
                 Type::TypedDict(typed_dict),
                 || {},
@@ -808,7 +785,7 @@ pub(super) fn may_contain_typevar_from<'db>(
         }
 
         fn visit_newtype_instance_type(&self, db: &'db dyn Db, newtype: NewType<'db>) {
-            self.visit_guarded(
+            self.active_types.visit_type(
                 db,
                 Type::NewTypeInstance(newtype),
                 || {},
@@ -819,7 +796,7 @@ pub(super) fn may_contain_typevar_from<'db>(
         }
 
         fn visit_type_var_type(&self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) {
-            self.visit_guarded(
+            self.active_types.visit_type(
                 db,
                 Type::KnownInstance(KnownInstanceType::TypeVar(typevar)),
                 || {},

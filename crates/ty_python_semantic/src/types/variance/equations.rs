@@ -82,6 +82,19 @@ impl<'db> VarianceTerm<'db> {
         self.evaluate_with(db, &|variable| variable.effective_variance(db))
     }
 
+    /// Does this term represent a non-bivariant use of the type variable passed to `variance_of`?
+    /// For example, `list[T]` uses `T`, while `Ignore[T]` erases `T` if `type Ignore[X] = None`.
+    pub(in crate::types) fn is_non_bivariant(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::Constant(variance) => variance != TypeVarVariance::Bivariant,
+            Self::Variable(variable) => variable.is_non_bivariant(db),
+            Self::Join(sum) => sum.terms(db).iter().any(|term| term.is_non_bivariant(db)),
+            Self::Compose(product) => {
+                product.left(db).is_non_bivariant(db) && product.right(db).is_non_bivariant(db)
+            }
+        }
+    }
+
     /// Substitute the supplied variable values; the component solver supplies its current
     /// approximations for members and effective variance for references outside the component.
     fn evaluate_with(
@@ -183,6 +196,27 @@ impl<'db> VarianceVariable<'db> {
         } else {
             self.equation(db).evaluate(db)
         }
+    }
+
+    /// For a growing recursive specialization, estimate parameter use from the constructor's
+    /// formal parameters so that the equations stay finite.
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
+    fn is_non_bivariant(self, db: &'db dyn Db) -> bool {
+        if let VarianceOrigin::ProtocolParameter(_, declared) = self.origin(db) {
+            return declared != TypeVarVariance::Bivariant;
+        }
+
+        // Specialization can erase a recursive reference. An equation that is already
+        // constant gives the answer without consulting the constructor's parameters.
+        let equation = self.equation(db);
+        if !matches!(equation, VarianceTerm::Constant(_))
+            && let VarianceOrigin::Recursive(recursive) = self.origin(db)
+            && let Some(parameter_variance) =
+                recursive.growing_parameter_variance(db, self.typevar(db))
+        {
+            return parameter_variance.is_non_bivariant(db);
+        }
+        equation.is_non_bivariant(db)
     }
 
     /// Return the defining expression, or declared variance for an unsupported protocol.
