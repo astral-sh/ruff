@@ -583,8 +583,8 @@ info: Type variable defined here
 
 ## Calls with the same inferred type arguments
 
-The tag does not contribute to the type of `value`, but each call still needs to check its tag.
-A bound violation must point to the argument that supplied the value, even when keywords are
+The tag does not contribute to the type of `value`, but each call still needs to check its tag. A
+bound violation must point to the argument that supplied the value, even when keywords are
 reordered.
 
 ```py
