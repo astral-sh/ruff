@@ -1234,8 +1234,6 @@ class AnySelf(Protocol):
 ```
 
 Assignments in a comprehension and augmented assignments are also writes to the instance.
-`__getattr__` provides the read side of `+=` below, although the write is not yet recognized as
-establishing an instance attribute:
 
 ```py
 class AssignmentForms(Protocol):
@@ -1246,7 +1244,7 @@ class AssignmentForms(Protocol):
         [None for self.from_comprehension in [1]]  # error: [ambiguous-protocol-member]
 
     def augmented_assignment(self) -> None:
-        # error: [unresolved-attribute]
+        # The hook supplies the initial value, but the protocol must still declare the member.
         self.augmented += 1  # snapshot: ambiguous-protocol-member
 ```
 

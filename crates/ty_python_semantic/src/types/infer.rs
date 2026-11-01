@@ -60,8 +60,8 @@ use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, KnownClass, RecursiveType, StaticClassLiteral, Type, TypeAndQualifiers,
-    TypeQualifiers,
+    ClassLiteral, KnownClass, MemberLookupPolicy, RecursiveType, StaticClassLiteral, Type,
+    TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType,
 };
 use crate::{Db, FxIndexSet};
 
@@ -277,6 +277,161 @@ pub(crate) fn infer_definition_types<'db>(
     let env = ProgramEnvironment::from_file(program_file);
     TypeInferenceBuilder::for_definition(db, &env, definition, &module)
         .finish_definition(definition)
+}
+
+/// Can another call use this specialization without expanding the type arguments recursively?
+///
+/// Different arguments can select different overloads, as in `Step[int] -> Step[str] -> Done`.
+/// Allow substitutions at the leaves and reductions in nesting. Repeatedly instantiating
+/// `Grow[T] -> Grow[list[T]]` would otherwise have no fixed point.
+fn non_expanding_receiver<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    current: Type<'db>,
+    previous: Type<'db>,
+) -> bool {
+    if current == previous {
+        return true;
+    }
+    let Type::NominalInstance(_) = current else {
+        return false;
+    };
+    let Some((_, current_args)) = current.class_specialization(db, env) else {
+        return true;
+    };
+    // Tuple length changes have already been widened by the assignment.
+    if current_args.tuple(db).is_some() {
+        return false;
+    }
+    previous
+        .class_specialization(db, env)
+        .is_some_and(|(_, previous_args)| {
+            let current = current_args.types(db);
+            let previous = previous_args.types(db);
+            current.len() <= previous.len()
+                && current
+                    .iter()
+                    .zip(previous)
+                    .all(|(&current, &previous)| non_expanding_receiver(db, env, current, previous))
+        })
+}
+
+/// An operator's explicit receiver annotation can distinguish this specialization even if its
+/// type arguments grow. The finite set of declared receivers bounds this part of the search.
+fn is_declared_operator_receiver<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ClassLiteral<'db>,
+    op: ast::Operator,
+    receiver: Type<'db>,
+) -> bool {
+    [op.in_place_dunder(), op.dunder()].into_iter().any(|name| {
+        let member = class.class_member(db, env, name, MemberLookupPolicy::NO_AUGMENTED_BINDINGS);
+        let Some(Type::FunctionLiteral(function)) = member.place.ignore_possibly_undefined() else {
+            return false;
+        };
+        function
+            .without_updated_signatures(db)
+            .signature(db)
+            .iter()
+            .any(|signature| {
+                signature
+                    .parameters()
+                    .get(0)
+                    .is_some_and(|parameter| parameter.annotated_type() == receiver)
+            })
+    })
+}
+
+/// Infer the storage shared by augmented writes to one attribute along the receiver's MRO.
+///
+/// Start with the independent read at each assignment. A later call can read a value stored
+/// by any of these assignments, subject to the narrowing at that call site.
+pub(super) fn infer_augmented_attribute_writes<'db>(
+    db: &'db dyn Db,
+    definitions: &[(Definition<'db>, Option<Specialization<'db>>)],
+) -> Type<'db> {
+    let env = ProgramEnvironment::from_definition(definitions[0].0);
+    let write = |(definition, specialization): (Definition<'db>, Option<Specialization<'db>>),
+                 stored| {
+        let file = definition.program_file(db);
+        let env = ProgramEnvironment::from_file(file);
+        let module = parsed_module(db, file.python_file(db)).load(db);
+        let DefinitionKind::AugmentedAssignment(assignment) = definition.kind(db) else {
+            unreachable!("only augmented assignments contribute augmented bindings");
+        };
+        let assignment = assignment.node(&module);
+        let (before, after) = TypeInferenceBuilder::for_definition(db, &env, definition, &module)
+            .finish_augmented_attribute_write(assignment, stored);
+        (
+            before.apply_optional_specialization(db, specialization),
+            after.map(|ty| ty.apply_optional_specialization(db, specialization)),
+            assignment.op,
+        )
+    };
+    let alternatives = |ty: Type<'db>| match ty {
+        Type::Union(union) => Either::Left(union.elements(db).iter().copied()),
+        ty => Either::Right(std::iter::once(ty)),
+    };
+    let class_of = |ty: Type<'db>| {
+        ty.nominal_class(db, &env)
+            .map(|class| class.class_literal(db))
+    };
+    let mut writes = UnionBuilder::new(db, &env);
+    let mut receivers = Vec::with_capacity(definitions.len());
+    for &binding in definitions {
+        let (before, after, op) = write(binding, None);
+        let mut seen = FxHashMap::default();
+        for ty in alternatives(before) {
+            if let Some(class) = class_of(ty) {
+                seen.entry(class).or_insert_with(Vec::new).push(ty);
+            }
+        }
+        receivers.push((binding, op, seen));
+        if let Some(after) = after {
+            writes.add_in_place(after);
+        }
+    }
+    let mut frontier = writes.build();
+    let mut result = frontier;
+    loop {
+        let mut next = UnionBuilder::new(db, &env);
+        for (binding, op, seen) in &mut receivers {
+            for ty in alternatives(frontier) {
+                let Some(class) = class_of(ty) else { continue };
+                let previous = seen.entry(class).or_default();
+                if previous.contains(&ty) {
+                    continue;
+                }
+                // Repeated arithmetic on distinct literals can produce arbitrarily many values.
+                let receiver = match ty {
+                    Type::LiteralValue(literal) if !previous.is_empty() => {
+                        literal.fallback_instance(db, &env)
+                    }
+                    ty => ty,
+                };
+                if previous.contains(&receiver)
+                    || (!previous.is_empty()
+                        && !previous
+                            .iter()
+                            .any(|&before| non_expanding_receiver(db, &env, receiver, before))
+                        && !is_declared_operator_receiver(db, &env, class, *op, receiver))
+                {
+                    continue;
+                }
+                previous.push(receiver);
+                if let (_, Some(written), _) = write(*binding, Some(receiver)) {
+                    next.add_in_place(written);
+                }
+            }
+        }
+        if next.is_empty() {
+            break;
+        }
+        frontier = next.build();
+        result = UnionType::from_two_elements(db, &env, result, frontier);
+    }
+    result
 }
 
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.

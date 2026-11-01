@@ -1329,7 +1329,7 @@ enum InstanceFallbackShadowsNonDataDescriptor {
 
 bitflags! {
     #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
-    pub(crate) struct MemberLookupPolicy: u8 {
+    pub(crate) struct MemberLookupPolicy: u16 {
         /// Dunder methods are looked up on the meta-type of a type without potentially falling
         /// back on attributes on the type itself. For example, when implicitly invoked on an
         /// instance, dunder methods are not looked up as instance attributes. And when invoked
@@ -1377,6 +1377,13 @@ bitflags! {
         /// track the owned and inherited generic contexts separately in `Signature` and not
         /// preemptively merge them.
         const NO_INHERITED_GENERIC_CONTEXT = 1 << 6;
+
+        /// Read the attribute established independently of augmented assignments to it.
+        const NO_AUGMENTED_BINDINGS = 1 << 7;
+
+        /// Resolve receiver storage for assignment. A write can create storage that a read
+        /// can only observe after an earlier method call.
+        const WRITE_TARGET = 1 << 8;
     }
 }
 
@@ -4872,12 +4879,22 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
+        self.instance_member_with_policy(db, env, name, MemberLookupPolicy::default())
+    }
+
+    fn instance_member_with_policy(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
         match self {
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, env, |elem| {
-                elem.instance_member(db, env, name)
+                elem.instance_member_with_policy(db, env, name, policy)
             }),
 
             Type::Intersection(intersection) => {
@@ -4885,7 +4902,7 @@ impl<'db> Type<'db> {
                     enums::instance_member_for_enum_complement(db, env, complement, name)
                 } else {
                     intersection.map_with_boundness_and_qualifiers(db, env, |elem| {
-                        elem.instance_member(db, env, name)
+                        elem.instance_member_with_policy(db, env, name, policy)
                     })
                 }
             }
@@ -4896,19 +4913,19 @@ impl<'db> Type<'db> {
 
             Type::Recursive(recursive) => recursive
                 .unfold(db, env)
-                .map(|unfolded| unfolded.instance_member(db, env, name))
+                .map(|unfolded| unfolded.instance_member_with_policy(db, env, name, policy))
                 .unwrap_or(Place::bound(self).into()),
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
 
-            Type::NominalInstance(instance) => {
-                instance.class(db, env).instance_member(db, env, name)
-            }
+            Type::NominalInstance(instance) => instance
+                .class(db, env)
+                .instance_member_with_policy(db, env, name, policy),
             Type::NewTypeInstance(newtype) => newtype
                 .concrete_base_type(db)
-                .instance_member(db, env, name),
+                .instance_member_with_policy(db, env, name, policy),
 
-            Type::ProtocolInstance(protocol) => protocol.instance_member(db, env, name),
+            Type::ProtocolInstance(protocol) => protocol.instance_member(db, env, name, policy),
 
             Type::FunctionLiteral(function) => function
                 .runtime_class(db)
@@ -4935,11 +4952,11 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.require_bound_or_constraints(db, env) {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        bound.instance_member(db, env, name)
+                        bound.instance_member_with_policy(db, env, name, policy)
                     }
                     TypeVarBoundOrConstraints::Constraints(constraints) => constraints
                         .map_with_boundness_and_qualifiers(db, env, |constraint| {
-                            constraint.instance_member(db, env, name)
+                            constraint.instance_member_with_policy(db, env, name, policy)
                         }),
                 }
             }
@@ -4989,7 +5006,9 @@ impl<'db> Type<'db> {
 
             Type::TypedDict(_) => Place::Undefined.into(),
 
-            Type::TypeAlias(alias) => alias.value_type(db).instance_member(db, env, name),
+            Type::TypeAlias(alias) => alias
+                .value_type(db)
+                .instance_member_with_policy(db, env, name, policy),
         }
     }
 
@@ -6050,7 +6069,7 @@ impl<'db> Type<'db> {
                     .into();
                 }
 
-                let fallback = this.instance_member(db, env, name_str);
+                let fallback = this.instance_member_with_policy(db, env, name_str, key.policy(db));
 
                 let result = Type::invoke_descriptor_protocol(
                     db,

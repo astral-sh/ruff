@@ -454,9 +454,8 @@ reveal_type(UninitializedCounter().value)  # revealed: Unknown
 
 ## Dynamically provided attributes
 
-A dynamic attribute hook can provide the initial value read by an augmented assignment. Ordinary
-attribute lookup preserves the hook's return type, but the resulting assignment is not yet
-recognized as establishing instance storage.
+A dynamic attribute hook can supply the initial value of an augmented assignment. The assignment
+then creates an instance attribute that subsequent calls can read.
 
 ```py
 class DynamicCounter:
@@ -464,8 +463,6 @@ class DynamicCounter:
         return 0
 
     def increment(self) -> None:
-        # TODO: Recognize the instance attribute established after reading from a dynamic hook.
-        # error: [unresolved-attribute]
         self.value += 1
 
 reveal_type(DynamicCounter().value)  # revealed: int
@@ -479,8 +476,6 @@ class InterceptedCounter:
         return 0
 
     def increment(self) -> None:
-        # TODO: Recognize the instance attribute established after reading from a dynamic hook.
-        # error: [unresolved-attribute]
         self.value += 1
 
 reveal_type(InterceptedCounter().value)  # revealed: int

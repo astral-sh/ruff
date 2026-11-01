@@ -1026,7 +1026,7 @@ fn class_object_assignment_members<'db>(
     }
 
     let receiver_member = object_ty
-        .find_name_in_mro_with_policy(db, env, attribute, MemberLookupPolicy::default())
+        .find_name_in_mro_with_policy(db, env, attribute, MemberLookupPolicy::WRITE_TARGET)
         .filter(|class_attr| !class_attr.place.is_undefined())?;
 
     Some(if definitely_non_data_descriptor {
@@ -1110,9 +1110,14 @@ pub(super) fn assignment_attribute_members<'db>(
             | Type::TypeGuard(_)
             | Type::TypeForm(_)
             | Type::TypedDict(_)
-            | Type::NewTypeInstance(_) => object_ty.instance_member(db, env, attribute),
+            | Type::NewTypeInstance(_) => object_ty.instance_member_with_policy(
+                db,
+                env,
+                attribute,
+                MemberLookupPolicy::WRITE_TARGET,
+            ),
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
-                object_ty.class_object_member(db, env, attribute, MemberLookupPolicy::default())
+                object_ty.class_object_member(db, env, attribute, MemberLookupPolicy::WRITE_TARGET)
             }
             Type::Union(..)
             | Type::Intersection(..)

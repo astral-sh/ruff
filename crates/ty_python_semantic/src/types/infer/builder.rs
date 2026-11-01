@@ -139,7 +139,7 @@ use crate::types::{
     TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule,
     UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
     extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
-    is_discarded_dict_key_assignment, self_typevar_origin_class_literal, todo_type,
+    is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
 use ty_python_core::definition::{
@@ -221,6 +221,17 @@ fn should_preserve_inferred_binding_type(ty: Type<'_>) -> bool {
 /// uses 7 field specifiers. We could probably store more inline if this turns out to be a
 /// performance problem. For now, we optimize for memory usage.
 const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
+
+/// Which value may reach an attribute read while inferring an augmented assignment.
+#[derive(Clone, Copy)]
+enum AttributeRead<'db> {
+    /// Resolve the attribute normally, including all inferred writes.
+    Normal,
+    /// Read the value available before any augmented assignment has run.
+    Initial,
+    /// Apply the use site's narrowing to a value stored by an earlier augmented assignment.
+    Stored(Type<'db>),
+}
 
 /// Builder to infer all types in a region.
 ///
@@ -5052,7 +5063,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_definition(assignment);
         } else {
             // Non-name assignment targets are inferred as ordinary expressions, not definitions.
-            if let Ok(result_ty) = self.infer_augment_assignment(assignment) {
+            if let Ok(result_ty) = self.infer_augment_assignment(assignment, AttributeRead::Normal)
+                // If the operator never returns, Python never writes to the target.
+                && !result_ty.is_never()
+            {
                 let target = assignment.target.as_ref();
                 match target {
                     ast::Expr::Attribute(attribute) => {
@@ -5095,6 +5109,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         value_expr: &ast::Expr,
         infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
         state: &mut BinaryInferenceState<'db>,
+        read: AttributeRead<'db>,
     ) -> Result<Type<'db>, Type<'db>> {
         let db = self.db();
         let env = self.program_environment();
@@ -5140,8 +5155,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         value_expr,
                         &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
                         state,
+                        read,
                     ) {
                         Ok(ty) => ty,
+                        // Only successful alternatives can write to inferred instance storage.
+                        Err(_) if !matches!(read, AttributeRead::Normal) => Type::Never,
                         Err(recovery_ty) => {
                             operation_failed = true;
                             recovery_ty
@@ -5239,15 +5257,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let target_ty = self
-            .infer_augment_assignment(assignment)
+            .infer_augment_assignment(assignment, AttributeRead::Normal)
             .unwrap_or_else(|recovery_ty| recovery_ty);
         self.add_binding(assignment.target.as_ref().into(), definition)
             .insert(self, target_ty);
     }
 
+    /// Infer the receiver and the value written on a possible call to this augmented assignment.
+    pub(super) fn finish_augmented_attribute_write(
+        mut self,
+        assignment: &ast::StmtAugAssign,
+        stored: Option<Type<'db>>,
+    ) -> (Type<'db>, Option<Type<'db>>) {
+        // The ordinary assignment checks the operator and the write against the inferred member.
+        self.context.suppress_diagnostics();
+        self.context.defuse();
+        let read = stored.map_or(AttributeRead::Initial, AttributeRead::Stored);
+        let written = self.infer_augment_assignment(assignment, read).ok();
+        let before = self.expression_type(&assignment.target);
+        let written = written.map(|after| {
+            UnionType::widen_growing_tuples(self.db(), self.program_environment(), before, after)
+                .unwrap_or(after)
+        });
+        (before, written)
+    }
+
     fn infer_augment_assignment(
         &mut self,
         assignment: &ast::StmtAugAssign,
+        read: AttributeRead<'db>,
     ) -> Result<Type<'db>, Type<'db>> {
         let ast::StmtAugAssign {
             range: _,
@@ -5266,7 +5304,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ast::Expr::Attribute(attr) => {
                 let result = self
-                    .infer_attribute_load(attr)
+                    .infer_attribute_load_with(attr, read)
                     .map(|ty| ty.inner_type())
                     .map_err(|ty| ty.inner_type());
                 let previous_value = result.unwrap_or_else(|recovery_ty| recovery_ty);
@@ -5290,6 +5328,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value,
             &mut |builder, tcx| builder.infer_expression(value, tcx),
             &mut state,
+            read,
         );
         self.report_deprecated_functions(assignment, state.deprecated_functions);
 
@@ -10025,7 +10064,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Type::instance(db, env, collection_literal.identity_specialization(db));
                 let collection_generic_context = collection_literal.generic_context(db);
                 let mut identity_bindings = self
-                    .infer_attribute_load_impl(attribute, identity_instance)
+                    .infer_attribute_load_impl(attribute, identity_instance, AttributeRead::Normal)
                     .unwrap_or_else(|recovery_ty| recovery_ty)
                     .inner_type()
                     .bindings(db, env)
@@ -11097,9 +11136,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         attribute: &ast::ExprAttribute,
     ) -> Result<TypeAndQualifiers<'db>, TypeAndQualifiers<'db>> {
+        self.infer_attribute_load_with(attribute, AttributeRead::Normal)
+    }
+
+    fn infer_attribute_load_with(
+        &mut self,
+        attribute: &ast::ExprAttribute,
+        read: AttributeRead<'db>,
+    ) -> Result<TypeAndQualifiers<'db>, TypeAndQualifiers<'db>> {
         let value_type =
             self.infer_maybe_standalone_expression(&attribute.value, TypeContext::default());
-        self.infer_attribute_load_impl(attribute, value_type)
+        self.infer_attribute_load_impl(attribute, value_type, read)
     }
 
     /// Reject access to a generic instance attribute through a class while retaining the normal
@@ -11135,6 +11182,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         attribute: &ast::ExprAttribute,
         mut value_type: Type<'db>,
+        read: AttributeRead<'db>,
     ) -> Result<TypeAndQualifiers<'db>, TypeAndQualifiers<'db>> {
         fn union_elements_missing_attribute<'db>(
             db: &'db dyn Db,
@@ -11154,19 +11202,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let env = self.program_environment();
         let ast::ExprAttribute { value, attr, .. } = attribute;
-        let db = self.db();
-        if let Type::TypeVar(typevar) = value_type
-            && let Some(ClassLiteral::Static(class)) =
-                self_typevar_origin_class_literal(db, typevar)
-            && class.only_augments_instance_attribute(db, attr)
-            && let Some(bound) = typevar.typevar(db).upper_bound(db, env)
-        {
-            // An augmented assignment reads the attribute it defines. Resolve the instance
-            // attribute before looking it up through `Self`, so the inherited initializer and
-            // the result of the update contribute to the same inference cycle.
-            let _ = bound.member(db, env, attr);
-        }
 
+        let db = self.db();
         let mut constraint_keys = vec![];
 
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type
@@ -11200,8 +11237,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
             }
         }
+        let policy = match read {
+            AttributeRead::Normal => MemberLookupPolicy::default(),
+            AttributeRead::Initial => MemberLookupPolicy::NO_AUGMENTED_BINDINGS,
+            AttributeRead::Stored(ty) => {
+                return Ok(assigned_type.unwrap_or_else(|| {
+                    TypeAndQualifiers::new(
+                        self.narrow_expr_with_applicable_constraints(
+                            attribute,
+                            ty,
+                            &constraint_keys,
+                        ),
+                        TypeOrigin::Inferred,
+                        TypeQualifiers::empty(),
+                    )
+                }));
+            }
+        };
         let member_lookup = value_type
-            .try_member_lookup(db, env, &attr.id)
+            .member_lookup_with_policy_and_receiver(db, env, &attr.id, policy, None)
             .unwrap_or_else(|error| {
                 error.report_diagnostic(
                     &self.context,
@@ -11503,6 +11557,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Even if we can obtain the attribute type based on the assignments, we still perform default type inference
         // (to report errors).
         let inferred_type = assigned_type.unwrap_or(resolved_type);
+        // A possibly absent field can still supply the operand on executions where it is present.
+        if matches!(read, AttributeRead::Initial)
+            && (assigned_type.is_some()
+                || matches!(lookup_result, Err(LookupError::PossiblyUndefined(_))))
+        {
+            return Ok(inferred_type);
+        }
         lookup_result
             .map(|_| inferred_type)
             .map_err(|_| inferred_type)

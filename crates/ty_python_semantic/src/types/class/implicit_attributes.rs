@@ -10,7 +10,8 @@ use crate::{
     types::{
         KnownClass, Truthiness, Type, TypeContext, UnionBuilder, definition_expression_type,
         function::{is_implicit_classmethod, is_implicit_staticmethod},
-        infer::infer_unpack_types,
+        generics::Specialization,
+        infer::{infer_augmented_attribute_writes, infer_unpack_types},
         infer_expression_type, inferred_declaration,
         member::Member,
     },
@@ -49,8 +50,8 @@ impl<'db> StaticClassLiteral<'db> {
     ///         self.value += 1
     /// ```
     ///
-    /// Here, `value` remains undefined until MRO lookup finds an independent class or instance
-    /// attribute. The same rule applies to `cls.value` in a classmethod.
+    /// Here, `value` remains undefined unless a class member, an instance binding, or a dynamic
+    /// attribute hook supplies its first value. The same rule applies to `cls.value`.
     pub(super) fn implicit_attribute_bindings(
         self,
         db: &'db dyn Db,
@@ -65,32 +66,6 @@ impl<'db> StaticClassLiteral<'db> {
                 },
                 |attribute| Self::implicit_attribute_inner(db, attribute),
             )
-    }
-
-    /// Are augmented assignments the only writes to `self.<name>` in this class?
-    pub(in crate::types) fn only_augments_instance_attribute(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-    ) -> bool {
-        self.implicit_attribute_name(db, name, MethodDecorator::None)
-            .is_some_and(|attribute| Self::only_augments_attribute_inner(db, attribute))
-    }
-
-    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-    fn only_augments_attribute_inner(
-        db: &'db dyn Db,
-        attribute: ImplicitAttributeName<'db>,
-    ) -> bool {
-        let assignments =
-            attribute_assignments(db, attribute.class_body_scope(db), attribute.name(db));
-        let mut writes = assignments
-            .flat_map(|(bindings, _)| bindings.filter_map(|binding| binding.binding.definition()))
-            .peekable();
-        writes.peek().is_some()
-            && writes.all(|definition| {
-                matches!(definition.kind(db), DefinitionKind::AugmentedAssignment(_))
-            })
     }
 
     /// Does a method establish instance storage for an attribute already typed by the class?
@@ -398,7 +373,7 @@ pub(super) struct ImplicitAttribute<'db> {
     pub(super) augmented_bindings: Option<AugmentedBindings<'db>>,
 }
 
-/// Augmented assignments deferred until MRO lookup finds the attribute they read.
+/// A nonempty group of augmented assignments to the same attribute in one class.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(super) struct AugmentedBindings<'db> {
     #[returns(deref)]
@@ -407,6 +382,34 @@ pub(super) struct AugmentedBindings<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for AugmentedBindings<'_> {}
+
+/// The augmented assignments that share storage along an MRO, specialized for that receiver.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(super) struct AugmentedAttributeWrites<'db> {
+    #[returns(deref)]
+    pub(super) definitions: Box<[(Definition<'db>, Option<Specialization<'db>>)]>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for AugmentedAttributeWrites<'_> {}
+
+#[salsa::tracked]
+impl<'db> AugmentedAttributeWrites<'db> {
+    /// Infer the values these methods can write, starting with the attribute established
+    /// independently of them. A method can return a different receiver class for a later update.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, bindings: AugmentedAttributeWrites<'db>| {
+            let env = ProgramEnvironment::from_definition(bindings.definitions(db)[0].0);
+            result.cycle_normalized(db, &env, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    pub(super) fn inferred_type(self, db: &'db dyn Db) -> Type<'db> {
+        infer_augmented_attribute_writes(db, self.definitions(db))
+    }
+}
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct ImplicitAttributeName<'db> {

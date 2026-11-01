@@ -443,6 +443,103 @@ class C:
 reveal_type(C().value)  # revealed: Before | After | FallbackAfter | Fallback
 ```
 
+When the default is absent, the first append can add an integer to a tuple of strings.
+
+```py
+class Tuples:
+    if flag():
+        values = ()
+
+    def __getattr__(self, name: str) -> tuple[str, ...]:
+        return ("fallback",)
+
+    def append(self, item: int) -> None:
+        # error: [invalid-assignment]
+        # error: [possibly-missing-attribute]
+        self.values += (item,)
+
+reveal_type(Tuples().values)  # revealed: tuple[str | int, ...]
+```
+
+`__getattr__` can also provide the first operand when there is no default. A later call reads the
+value that the previous call stored. Here the subclass's first write makes the base method's update
+reachable.
+
+```py
+from typing import final
+
+@final
+class Start:
+    def __iadd__(self, other: int) -> Before:
+        return Before()
+
+class Dynamic:
+    def __getattr__(self, name: str) -> Start:
+        return Start()
+
+    def again(self) -> None:
+        if isinstance(self.value, Before):
+            self.value += 1
+
+class Derived(Dynamic):
+    def first(self) -> None:
+        if isinstance(self.value, Start):
+            self.value += 1
+
+reveal_type(Dynamic().value)  # revealed: Start
+reveal_type(Derived().value)  # revealed: Before | After | Start
+```
+
+A classmethod can get its first operand from the metaclass.
+
+```py
+class Meta(type):
+    def __getattr__(cls, name: str) -> Start:
+        return Start()
+
+class DynamicClass(metaclass=Meta):
+    @classmethod
+    def update(cls) -> None:
+        cls.value += 1
+
+reveal_type(DynamicClass.value)  # revealed: Before | After | Start
+```
+
+Repeated updates can widen a literal supplied by the hook or select another overload on the same
+generic class.
+
+```py
+from typing import Generic, Literal, TypeVar, overload
+
+class Count:
+    def __getattr__(self, name: str) -> Literal[0]:
+        return 0
+
+    def bump(self) -> None:
+        self.value += 1
+
+reveal_type(Count().value)  # revealed: int
+
+T = TypeVar("T")
+
+class Step(Generic[T]):
+    @overload
+    def __iadd__(self: "Step[int]", n: int) -> "Step[list[int]]": ...
+    @overload
+    def __iadd__(self: "Step[list[int]]", n: int) -> After: ...
+    def __iadd__(self, n: int) -> "Step[list[int]] | After":
+        raise NotImplementedError
+
+class Steps:
+    def __getattr__(self, name: str) -> Step[int]:
+        return Step()
+
+    def bump(self) -> None:
+        self.value += 1
+
+reveal_type(Steps().value)  # revealed: Step[list[int]] | After | Step[int]
+```
+
 #### Augmented assignments with expanding generic results
 
 An augmented assignment can repeatedly expand a generic attribute's type arguments. Inference must
@@ -525,14 +622,21 @@ reveal_type(Child().value)  # revealed: Before | After
 #### Repeated updates to an inherited tuple
 
 An instance starts with the empty tuple set by its base class. On later calls to `add`, `before`
-includes items appended by earlier calls.
+includes items appended by earlier calls. Writing to the same name on another object has no effect.
 
 ```py
 class Base:
     def __init__(self) -> None:
         self.values = ()
 
+class Other:
+    values: tuple[int, ...]
+
 class Entries(Base):
+    @staticmethod
+    def clear(other: Other) -> None:
+        other.values = ()
+
     def add(self, item: int) -> tuple[()]:
         before = self.values
         self.values += (item,)  # ok

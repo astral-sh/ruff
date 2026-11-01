@@ -2928,12 +2928,15 @@ impl<'db> StaticClassLiteral<'db> {
         env: &ProgramEnvironment<'db>,
         specialization: Option<Specialization<'db>>,
         name: &str,
+        policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         if self.is_typed_dict(db) || self.lacks_instance_storage(db, name) {
             return Place::Undefined.into();
         }
 
-        match MroLookup::new(db, env, self.iter_mro(db, specialization)).instance_member(name) {
+        match MroLookup::new(db, env, self.iter_mro(db, specialization))
+            .instance_member(name, policy)
+        {
             InstanceMemberResult::Done(result) => result,
             InstanceMemberResult::TypedDict => KnownClass::TypedDictFallback
                 .to_instance(db, env)
