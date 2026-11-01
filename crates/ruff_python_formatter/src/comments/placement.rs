@@ -132,7 +132,7 @@ fn handle_parenthesized_comment<'a>(
     //     ),
     // ]
     // ```
-    let range = TextRange::new(preceding.end(), comment.start());
+    let range = comment.range_before(preceding.end());
     let tokenizer = SimpleTokenizer::new(source, range);
     if tokenizer
         .skip_trivia()
@@ -163,7 +163,7 @@ fn handle_parenthesized_comment<'a>(
     //     y
     // ]
     // ```
-    let range = TextRange::new(comment.end(), following.start());
+    let range = comment.range_after(following.start());
     let tokenizer = SimpleTokenizer::new(source, range);
     if tokenizer
         .skip_trivia()
@@ -413,7 +413,7 @@ fn handle_end_of_line_comment_around_body<'a>(
     // ```
     if let Some(following) = comment.following_node() {
         if following.is_first_statement_in_body(comment.enclosing_node())
-            && SimpleTokenizer::new(source, TextRange::new(comment.end(), following.start()))
+            && SimpleTokenizer::new(source, comment.range_after(following.start()))
                 .skip_trivia()
                 .next()
                 .is_none()
@@ -489,10 +489,9 @@ fn handle_own_line_comment_around_body<'a>(
     //     # default placement comment
     //     def inline_after_else(): ...
     // ```
-    let maybe_token =
-        SimpleTokenizer::new(source, TextRange::new(preceding.end(), comment.start()))
-            .skip_trivia()
-            .next();
+    let maybe_token = SimpleTokenizer::new(source, comment.range_before(preceding.end()))
+        .skip_trivia()
+        .next();
     if maybe_token.is_some() {
         return CommentPlacement::Default(comment);
     }
@@ -569,7 +568,7 @@ fn handle_own_line_comment_between_statements<'a>(
     //
     // y = 2
     // ```
-    if max_empty_lines(&source[TextRange::new(comment.end(), following.start())]) == 0 {
+    if empty_lines_after(&comment, following.start(), source) == 0 {
         CommentPlacement::leading(following, comment)
     } else {
         CommentPlacement::trailing(preceding, comment)
@@ -1113,7 +1112,7 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
     }
 
     // Make the comment a leading comment if there's no empty line between the comment and the function / class header
-    if max_empty_lines(&source[TextRange::new(comment.end(), following.start())]) == 0 {
+    if empty_lines_after(&comment, following.start(), source) == 0 {
         CommentPlacement::leading(following, comment)
     } else {
         // Otherwise attach the comment as trailing comment to the previous statement
@@ -1335,7 +1334,7 @@ fn handle_dict_unpacking_comment<'a>(
         Some(preceding) => preceding.end(),
         None => comment.enclosing_node().start(),
     };
-    let mut tokens = SimpleTokenizer::new(source, TextRange::new(preceding_end, comment.start()))
+    let mut tokens = SimpleTokenizer::new(source, comment.range_before(preceding_end))
         .skip_trivia()
         .skip_while(|token| token.kind == SimpleTokenKind::RParen);
 
@@ -1740,7 +1739,7 @@ fn handle_pattern_match_mapping_comment<'a>(
         None => comment.enclosing_node().start(),
     };
     let mut tokens =
-        SimpleTokenizer::new(source, TextRange::new(preceding_end, comment.start())).skip_trivia();
+        SimpleTokenizer::new(source, comment.range_before(preceding_end)).skip_trivia();
 
     // If the remaining tokens from the previous node include `**`, mark as a dangling comment.
     if tokens.any(|token| token.kind == SimpleTokenKind::DoubleStar) {
@@ -2379,7 +2378,22 @@ fn are_parameters_parenthesized(parameters: &Parameters, contents: &str) -> bool
 }
 
 /// Counts the number of empty lines in `contents`.
+/// Returns the number of empty lines between `comment` and `end`, like [`max_empty_lines`], without
+/// lexing the comments after `comment` again.
+fn empty_lines_after(comment: &DecoratedComment, end: TextSize, source: &str) -> u32 {
+    max_newlines(&source[comment.range_after(end)])
+        .max(comment.max_newlines_after(end))
+        .saturating_sub(1)
+}
+
+#[cfg(test)]
 fn max_empty_lines(contents: &str) -> u32 {
+    max_newlines(contents).saturating_sub(1)
+}
+
+/// Returns the largest number of consecutive newlines in `contents`, up to the first token that
+/// isn't trivia.
+fn max_newlines(contents: &str) -> u32 {
     let mut newlines = 0u32;
     let mut max_new_lines = 0;
 
@@ -2403,8 +2417,7 @@ fn max_empty_lines(contents: &str) -> u32 {
         }
     }
 
-    max_new_lines = newlines.max(max_new_lines);
-    max_new_lines.saturating_sub(1)
+    newlines.max(max_new_lines)
 }
 
 #[cfg(test)]

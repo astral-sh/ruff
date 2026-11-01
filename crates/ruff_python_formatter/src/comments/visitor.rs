@@ -8,7 +8,7 @@ use ruff_python_ast::{Mod, Stmt};
 // pre-order.
 #[allow(clippy::wildcard_imports)]
 use ruff_python_ast::visitor::source_order::*;
-use ruff_python_trivia::{CommentLinePosition, CommentRanges, TriviaRanges};
+use ruff_python_trivia::{CommentLinePosition, CommentRanges, TriviaRanges, is_python_whitespace};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::node_key::NodeRefEqualityKey;
@@ -34,6 +34,8 @@ pub(super) struct CommentsVisitor<'a, 'builder> {
     parents: Vec<AnyNodeRef<'a>>,
     preceding_node: Option<AnyNodeRef<'a>>,
     comment_ranges: Peekable<std::slice::Iter<'a, TextRange>>,
+    /// The [`CommentRun`] of each comment, in the same order as `comment_ranges`.
+    comment_runs: std::vec::IntoIter<CommentRun>,
 }
 
 impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
@@ -48,7 +50,14 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
             parents: Vec::new(),
             preceding_node: None,
             comment_ranges: comment_ranges.iter().peekable(),
+            comment_runs: CommentRun::compute(comment_ranges, source_code.as_str()).into_iter(),
         }
+    }
+
+    fn next_comment_run(&mut self) -> CommentRun {
+        self.comment_runs
+            .next()
+            .expect("every comment range to have a comment run")
     }
 
     pub(super) fn visit(mut self, root: AnyNodeRef<'a>) {
@@ -94,6 +103,7 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                     self.source_code.as_str(),
                 ),
                 slice: self.source_code.slice(*comment_range),
+                run: self.next_comment_run(),
             };
 
             self.builder.push_comment(comment);
@@ -137,6 +147,7 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                     self.source_code.as_str(),
                 ),
                 slice: self.source_code.slice(*comment_range),
+                run: self.next_comment_run(),
             };
 
             self.builder.push_comment(comment);
@@ -184,6 +195,7 @@ pub(crate) struct DecoratedComment<'a> {
     parent: Option<AnyNodeRef<'a>>,
     line_position: CommentLinePosition,
     slice: SourceCodeSlice,
+    run: CommentRun,
 }
 
 impl<'a> DecoratedComment<'a> {
@@ -323,6 +335,104 @@ impl<'a> DecoratedComment<'a> {
     pub(crate) fn slice(&self) -> &SourceCodeSlice {
         &self.slice
     }
+
+    /// Returns the part of `start..self.start()` that can contain tokens.
+    ///
+    /// The comments right before this comment that are separated from it and from each other only
+    /// by whitespace and newlines contain no tokens, so they are left out. Lexing them again for
+    /// every comment would make placing a long run of comments quadratic.
+    pub(super) fn range_before(&self, start: TextSize) -> TextRange {
+        TextRange::new(start, self.run.range.start().clamp(start, self.start()))
+    }
+
+    /// Returns the part of `self.end()..end` that can contain tokens.
+    ///
+    /// See [`DecoratedComment::range_before`].
+    pub(super) fn range_after(&self, end: TextSize) -> TextRange {
+        if self.run.range.end() <= end {
+            TextRange::new(self.run.range.end(), end)
+        } else {
+            TextRange::new(self.end(), end)
+        }
+    }
+
+    /// Returns the largest number of newlines between two of the comments that
+    /// [`DecoratedComment::range_after`] leaves out of `self.end()..end`.
+    pub(super) fn max_newlines_after(&self, end: TextSize) -> u32 {
+        if self.run.range.end() <= end {
+            self.run.max_newlines_to_end
+        } else {
+            0
+        }
+    }
+}
+
+/// A run of comments that are separated from each other only by whitespace and newlines, seen from
+/// one of its comments.
+#[derive(Debug, Clone, Copy)]
+struct CommentRun {
+    /// From the start of the first comment in the run to the end of the last one.
+    range: TextRange,
+
+    /// The largest number of newlines between two consecutive comments of the run, counting only
+    /// the comments from this comment to the end of the run.
+    max_newlines_to_end: u32,
+}
+
+impl CommentRun {
+    /// Computes the run of every comment in `comment_ranges`, in linear time.
+    fn compute(comment_ranges: &[TextRange], source: &str) -> Vec<CommentRun> {
+        // The number of newlines between each comment and the next one, or `None` if there's
+        // anything other than whitespace and newlines between them.
+        let gaps: Vec<Option<u32>> = comment_ranges
+            .windows(2)
+            .map(|pair| {
+                newlines_in_whitespace(&source[TextRange::new(pair[0].end(), pair[1].start())])
+            })
+            .collect();
+
+        let mut runs: Vec<CommentRun> = comment_ranges
+            .iter()
+            .map(|range| CommentRun {
+                range: *range,
+                max_newlines_to_end: 0,
+            })
+            .collect();
+
+        for i in 1..runs.len() {
+            if gaps[i - 1].is_some() {
+                runs[i].range = TextRange::new(runs[i - 1].range.start(), runs[i].range.end());
+            }
+        }
+
+        for i in (0..runs.len().saturating_sub(1)).rev() {
+            if let Some(newlines) = gaps[i] {
+                runs[i].range = TextRange::new(runs[i].range.start(), runs[i + 1].range.end());
+                runs[i].max_newlines_to_end = newlines.max(runs[i + 1].max_newlines_to_end);
+            }
+        }
+
+        runs
+    }
+}
+
+/// Returns the number of newlines in `text`, or `None` if it contains anything other than
+/// whitespace and newlines.
+fn newlines_in_whitespace(text: &str) -> Option<u32> {
+    let mut newlines = 0;
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\n' => newlines += 1,
+            '\r' => {
+                chars.next_if_eq(&'\n');
+                newlines += 1;
+            }
+            c if is_python_whitespace(c) => {}
+            _ => return None,
+        }
+    }
+    Some(newlines)
 }
 
 impl Ranged for DecoratedComment<'_> {
