@@ -53,6 +53,10 @@ impl Violation for StopIterationReturn {
 
 /// PLR1708
 pub(crate) fn stop_iteration_return(checker: &Checker, function_def: ast::StmtFunctionDef<'_>) {
+    if !function_def.body_may_contain_yield() {
+        return;
+    }
+
     let mut analyzer = GeneratorAnalyzer {
         checker,
         has_yield: false,
