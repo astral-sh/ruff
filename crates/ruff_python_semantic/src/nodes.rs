@@ -1,5 +1,7 @@
+use std::ptr;
+
 use ruff_index::{IndexVec, newtype_index};
-use ruff_python_ast::{Expr, Stmt};
+use ruff_python_ast::{Ast, AstNode, AstNodeId, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::BranchId;
@@ -13,10 +15,20 @@ use crate::BranchId;
 #[derive(Ord, PartialOrd)]
 pub struct NodeId;
 
+#[newtype_index]
+struct AnnotationNodeId;
+
+#[derive(Debug, Copy, Clone)]
+enum SyntaxNode {
+    Stmt(AstNodeId<ruff_python_ast::kind::Stmt>),
+    Expr(AstNodeId<ruff_python_ast::kind::Expr>),
+    Annotation(AnnotationNodeId),
+}
+
 /// An AST node in a program, along with a pointer to its parent node (if any).
 #[derive(Debug)]
-struct NodeWithParent<'a> {
-    node: NodeRef<'a>,
+struct NodeWithParent {
+    node: SyntaxNode,
     /// The ID of the parent of this node, if any.
     parent: Option<NodeId>,
     /// The branch ID of this node, if any.
@@ -24,12 +36,23 @@ struct NodeWithParent<'a> {
 }
 
 /// The nodes of a program indexed by [`NodeId`]
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Nodes<'a> {
-    entries: IndexVec<NodeId, NodeWithParent<'a>>,
+    module: &'a Ast,
+    entries: IndexVec<NodeId, NodeWithParent>,
+    /// String annotations are parsed into separate trees with their own row indices.
+    annotations: IndexVec<AnnotationNodeId, NodeRef<'a>>,
 }
 
 impl<'a> Nodes<'a> {
+    pub(crate) fn new(module: &'a Ast) -> Self {
+        Self {
+            module,
+            entries: IndexVec::new(),
+            annotations: IndexVec::new(),
+        }
+    }
+
     /// Inserts a new AST node into the tree and returns its unique ID.
     #[inline]
     pub(crate) fn insert(
@@ -38,6 +61,15 @@ impl<'a> Nodes<'a> {
         parent: Option<NodeId>,
         branch: Option<BranchId>,
     ) -> NodeId {
+        let node = match node {
+            NodeRef::Stmt(stmt) if ptr::eq(stmt.ast(), self.module) => {
+                SyntaxNode::Stmt(stmt.node_id())
+            }
+            NodeRef::Expr(expr) if ptr::eq(expr.ast(), self.module) => {
+                SyntaxNode::Expr(expr.node_id())
+            }
+            _ => SyntaxNode::Annotation(self.annotations.push(node)),
+        };
         self.entries.push(NodeWithParent {
             node,
             parent,
@@ -64,22 +96,46 @@ impl<'a> Nodes<'a> {
 
     #[inline]
     pub(crate) fn node(&self, id: NodeId) -> NodeRef<'a> {
-        self.entries[id].node
+        match self.entries[id].node {
+            SyntaxNode::Stmt(stmt) => NodeRef::Stmt(
+                self.module
+                    .view(stmt)
+                    .expect("statement belongs to the module"),
+            ),
+            SyntaxNode::Expr(expr) => NodeRef::Expr(
+                self.module
+                    .view(expr)
+                    .expect("expression belongs to the module"),
+            ),
+            SyntaxNode::Annotation(other) => self.annotations[other],
+        }
     }
 
     #[inline]
     pub(crate) fn statement(&self, id: NodeId) -> Option<Stmt<'a>> {
-        self.entries[id].node.as_statement()
+        match self.entries[id].node {
+            SyntaxNode::Stmt(stmt) => self.module.view(stmt),
+            SyntaxNode::Expr(_) => None,
+            SyntaxNode::Annotation(other) => self.annotations[other].as_statement(),
+        }
     }
 
     #[inline]
     pub(crate) fn expression(&self, id: NodeId) -> Option<Expr<'a>> {
-        self.entries[id].node.as_expression()
+        match self.entries[id].node {
+            SyntaxNode::Stmt(_) => None,
+            SyntaxNode::Expr(expr) => self.module.view(expr),
+            SyntaxNode::Annotation(other) => self.annotations[other].as_expression(),
+        }
     }
 
     #[inline]
     pub(crate) fn is_statement(&self, id: NodeId) -> bool {
-        self.entries[id].node.is_statement()
+        match self.entries[id].node {
+            SyntaxNode::Stmt(_) => true,
+            SyntaxNode::Expr(_) => false,
+            SyntaxNode::Annotation(other) => self.annotations[other].is_statement(),
+        }
     }
 }
 
@@ -145,7 +201,7 @@ mod tests {
         let module = parse_module("module").unwrap();
         let first = parse_expression("first").unwrap();
         let second = parse_expression("second").unwrap();
-        let mut nodes = Nodes::default();
+        let mut nodes = Nodes::new(module.ast());
 
         let stmt = module.suite().first().unwrap();
         let expr = stmt.as_expr_stmt().unwrap().value();

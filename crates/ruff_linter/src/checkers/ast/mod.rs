@@ -275,6 +275,7 @@ impl<'a> Checker<'a> {
         context: &'a LintContext<'a>,
     ) -> Self {
         let semantic = SemanticModel::new(
+            parsed,
             &settings.typing_modules,
             &settings.builtins,
             target_version.linter_version(),

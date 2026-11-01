@@ -10,6 +10,7 @@ use ruff_python_ast::{
     self as ast, Alias, Expr, ExprContext, ExprKind, PySourceType, PythonVersion, Stmt,
     StmtKind,
 };
+use ruff_python_parser::Parsed;
 use ruff_python_stdlib::builtins::{is_python_builtin, python_builtins, python_magic_globals};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -208,6 +209,7 @@ pub struct SemanticModel<'a> {
 
 impl<'a> SemanticModel<'a> {
     pub fn new(
+        parsed: &'a Parsed<ast::kind::ModModule>,
         typing_modules: &'a [String],
         custom_builtins: &'a [String],
         target_version: PythonVersion,
@@ -215,13 +217,14 @@ impl<'a> SemanticModel<'a> {
         path: &Path,
         module: Module<'a>,
     ) -> Self {
+        let ast = parsed.ast();
         let mut semantic = Self {
             typing_modules,
             custom_builtins,
             target_version,
             source_type,
             module,
-            nodes: Nodes::default(),
+            nodes: Nodes::new(ast),
             node_id: None,
             branches: Branches::default(),
             branch_id: None,
