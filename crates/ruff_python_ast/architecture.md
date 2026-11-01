@@ -200,7 +200,10 @@ table stores a typed statement or expression handle. An ancestor search can skip
 handles before looking up a statement in the module. A string annotation has a separate arena,
 so its semantic entry points to a view that retains the annotation's context.
 
-The linter looks up a name’s binding by its starting offset in the source.
+The linter indexes a module's name bindings by row. Names parsed inside string tokens use a
+separate table keyed by source offset because two names in a concatenated string annotation can
+share an offset. If another tree overlaps a module name's offset, the linter looks up names from
+both trees in a shared offset table.
 
 ## Node identity
 
