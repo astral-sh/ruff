@@ -2,6 +2,7 @@ use crate::parser::syntax::{self as id, Construct, IntoList};
 use ruff_python_ast::AstNode as _;
 use ruff_python_ast::{AstNodeId, ExprKind, ListId, build};
 use std::fmt::{Display, Write};
+use std::iter;
 
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, ExprContext, IpyEscapeKind, Operator, PythonVersion};
@@ -1244,7 +1245,7 @@ impl<'src> Parser<'src> {
     fn parse_assign_statement(&mut self, target: ParsedExpr, start: TextSize) -> id::StmtAssign {
         self.bump(TokenKind::Equal);
 
-        let mut targets = vec![target.expr];
+        let mut additional_targets = Vec::new();
 
         // test_err assign_stmt_missing_rhs
         // x =
@@ -1280,22 +1281,23 @@ impl<'src> Parser<'src> {
 
                 std::mem::swap(&mut value, &mut parsed_expr);
 
-                targets.push(parsed_expr.expr);
+                additional_targets.push(parsed_expr.expr);
             });
         }
 
-        for target in &mut targets {
+        let targets = iter::once(target.expr).chain(additional_targets.iter().copied());
+        for target in targets.clone() {
             self.storage.set_expr_context(target.id, ExprContext::Store);
             // test_err assign_stmt_invalid_target
             // 1 = 1
             // x = 1 = 2
             // x = 1 = y = 2 = z
             // ["a", "b"] = ["a", "b"]
-            self.validate_assignment_target(target);
+            self.validate_assignment_target(&target);
         }
 
         build::StmtAssign {
-            targets: self.storage.list(targets).into_list(&mut self.storage),
+            targets: self.storage.list(targets),
             value: value.expr.id,
             range: self.node_range(start),
         }
