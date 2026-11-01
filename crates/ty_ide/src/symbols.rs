@@ -1594,7 +1594,7 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
         let binding = match pattern {
             ast::Pattern::MatchStar(pattern) => pattern.name.as_ref(),
             ast::Pattern::MatchAs(pattern) => pattern.name.as_ref(),
-            ast::Pattern::MatchMapping(pattern) => pattern.rest.as_ref(),
+            ast::Pattern::MatchMapping(pattern) => pattern.rest(),
             _ => None,
         };
 
