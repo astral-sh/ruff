@@ -186,3 +186,10 @@ def f():
         print(b)
         if c:
             d
+
+
+# Preserve the indentation after an explicit line continuation.
+if outer:
+    if inner:
+        value = first + \
+                    second

@@ -7,13 +7,11 @@ use libcst_native::ParenthesizedNode;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt, whitespace};
-use ruff_python_codegen::Stylist;
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_source_file::LineRanges;
+use ruff_source_file::{LineRanges, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::cst::helpers::space;
@@ -136,32 +134,30 @@ pub(crate) fn nested_if_statements(
         nested_if.start(),
         nested_if.body()[0].start(),
     )) {
-        diagnostic.try_set_optional_fix(|| {
-            match collapse_nested_if(checker.locator(), checker.stylist(), nested_if) {
-                Ok(edit) => {
-                    if edit.content().is_none_or(|content| {
-                        fits(
-                            content,
-                            (&nested_if).into(),
-                            checker.locator(),
-                            checker.settings().pycodestyle.max_line_length,
-                            checker.settings().tab_size,
-                        )
-                    }) {
-                        Ok(Some(Fix::applicable_edit(
-                            edit,
-                            if is_collapsible_if_fix_safe_enabled(checker.settings()) {
-                                Safe
-                            } else {
-                                Unsafe
-                            },
-                        )))
-                    } else {
-                        Ok(None)
-                    }
+        diagnostic.try_set_optional_fix(|| match collapse_nested_if(checker, nested_if) {
+            Ok(edit) => {
+                if edit.content().is_none_or(|content| {
+                    fits(
+                        content,
+                        (&nested_if).into(),
+                        checker.locator(),
+                        checker.settings().pycodestyle.max_line_length,
+                        checker.settings().tab_size,
+                    )
+                }) {
+                    Ok(Some(Fix::applicable_edit(
+                        edit,
+                        if is_collapsible_if_fix_safe_enabled(checker.settings()) {
+                            Safe
+                        } else {
+                            Unsafe
+                        },
+                    )))
+                } else {
+                    Ok(None)
                 }
-                Err(err) => bail!("Failed to collapse `if`: {err}"),
             }
+            Err(err) => bail!("Failed to collapse `if`: {err}"),
         });
     }
 }
@@ -310,7 +306,12 @@ fn parenthesize_and_operand(expr: libcst_native::Expression) -> libcst_native::E
 }
 
 /// Convert `if a: if b:` to `if a and b:`.
-fn collapse_nested_if(locator: &Locator, stylist: &Stylist, nested_if: NestedIf) -> Result<Edit> {
+fn collapse_nested_if(checker: &Checker, nested_if: NestedIf) -> Result<Edit> {
+    if let Some(edit) = collapse_single_line_headers(checker, nested_if) {
+        return Ok(edit);
+    }
+    let locator = checker.locator();
+    let stylist = checker.stylist();
     // Infer the indentation of the outer block.
     let Some(outer_indent) = whitespace::indentation(locator.contents(), &nested_if) else {
         bail!("Unable to fix multiline statement");
@@ -406,4 +407,86 @@ fn collapse_nested_if(locator: &Locator, stylist: &Stylist, nested_if: NestedIf)
 
     let range = locator.lines_range(nested_if.range());
     Ok(Edit::range_replacement(contents.to_string(), range))
+}
+
+/// Join two single-line headers and remove one level of indentation from the inner suite.
+/// Multiline strings, continuation lines, and trivia around the tests need the CST.
+fn collapse_single_line_headers(checker: &Checker, outer: NestedIf) -> Option<Edit> {
+    let locator = checker.locator();
+    let (keyword, left): (&str, &Expr) = match outer {
+        NestedIf::If(stmt) => ("if ", &stmt.test),
+        NestedIf::Elif(clause) => ("elif ", clause.test.as_ref()?),
+    };
+    let [Stmt::If(inner)] = outer.body() else {
+        return None;
+    };
+    let right = &inner.test;
+    let range = locator.lines_range(outer.range());
+    let inner_line = locator.line_range(inner.start());
+
+    if locator.slice(TextRange::new(outer.start(), left.start())) != keyword
+        || locator.slice(TextRange::new(inner.start(), right.start())) != "if "
+        || locator.line_end(left.start()) < left.end()
+        || inner_line.end() < right.end()
+        || locator.slice(TextRange::new(left.end(), locator.line_end(left.end()))) != ":"
+        || !locator.after(right.end()).starts_with(':')
+        || checker.indexer().multiline_ranges().intersects(range)
+        || checker
+            .indexer()
+            .interpolated_string_ranges()
+            .intersects(range)
+    {
+        return None;
+    }
+
+    let continuations = checker.indexer().continuation_line_starts();
+    let first = continuations.partition_point(|&start| start < range.start());
+    if continuations
+        .get(first)
+        .is_some_and(|&start| range.contains(start))
+    {
+        return None;
+    }
+
+    let indent = locator.slice(TextRange::new(range.start(), outer.start()));
+    let inner_indent = locator.slice(TextRange::new(inner_line.start(), inner.start()));
+    if !inner_indent.starts_with(indent) || !inner_indent.bytes().all(|byte| byte == b' ') {
+        return None;
+    }
+
+    let mut replacement = String::with_capacity(range.len().to_usize());
+    replacement.push_str(indent);
+    replacement.push_str(keyword);
+    let write_operand = |output: &mut String, operand: &Expr| {
+        let parens = match operand {
+            Expr::BoolOp(op) => op.op == ast::BoolOp::Or,
+            Expr::If(_) | Expr::Lambda(_) | Expr::Named(_) => true,
+            _ => false,
+        };
+        if parens {
+            output.push('(');
+        }
+        output.push_str(locator.slice(operand));
+        if parens {
+            output.push(')');
+        }
+    };
+    write_operand(&mut replacement, left);
+    replacement.push_str(" and ");
+    write_operand(&mut replacement, right);
+
+    let mut body = locator
+        .slice(TextRange::new(right.end(), range.end()))
+        .universal_newlines();
+    replacement.push_str(body.next()?.as_full_str());
+    for line in body {
+        if line.as_str().is_empty() {
+            replacement.push_str(line.as_full_str());
+        } else {
+            let suffix = line.as_full_str().strip_prefix(inner_indent)?;
+            replacement.push_str(indent);
+            replacement.push_str(suffix);
+        }
+    }
+    Some(Edit::range_replacement(replacement, range))
 }

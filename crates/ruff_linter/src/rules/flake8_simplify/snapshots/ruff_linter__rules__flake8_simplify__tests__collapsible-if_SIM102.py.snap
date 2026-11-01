@@ -352,3 +352,25 @@ help: Combine `if` statements using `and`
 177 |
     |
 note: This is an unsafe fix and may change runtime behavior
+
+SIM102 [*] Use a single `if` statement instead of nested `if` statements
+   --> SIM102.py:192:1
+    |
+191 |   # Preserve the indentation after an explicit line continuation.
+192 | / if outer:
+193 | |     if inner:
+    | |_____________^
+194 |           value = first + \
+195 |                       second
+    |
+help: Combine `if` statements using `and`
+    |
+191 | # Preserve the indentation after an explicit line continuation.
+    - if outer:
+    -     if inner:
+    -         value = first + \
+192 + if outer and inner:
+193 +     value = first + \
+194 |                     second
+    |
+note: This is an unsafe fix and may change runtime behavior
