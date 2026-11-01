@@ -125,8 +125,8 @@ node_payloads! {
         body: u32 at 4 => expr_lambda_body, set_expr_lambda_body;
     }
     ExprIf(expr_if) {
-        test: u32 at 0 => expr_if_test, set_expr_if_test;
-        body: u32 at 4 => expr_if_body, set_expr_if_body;
+        body: u32 at 0 => expr_if_body, set_expr_if_body;
+        test: u32 at 4 => expr_if_test, set_expr_if_test;
         orelse: u32 at 8 => expr_if_orelse, set_expr_if_orelse;
     }
     ExprDict(expr_dict) {
@@ -416,7 +416,6 @@ impl super::Ast {
             NodeKind::StmtTypeAlias
             | NodeKind::StmtWhile
             | NodeKind::StmtIf
-            | NodeKind::ExprIf
             | NodeKind::ExprDictComp
             | NodeKind::ExprSlice
             | NodeKind::ExceptHandlerExceptHandler
@@ -501,6 +500,9 @@ impl super::Ast {
             | NodeKind::Identifier => Children::empty(self),
             NodeKind::ExprLambda | NodeKind::DictItem | NodeKind::Keyword => {
                 Children::inline(self, record.inline_children::<0, 2, true, false>())
+            }
+            NodeKind::ExprIf => {
+                Children::inline(self, record.inline_children::<0, 3, false, false>())
             }
             NodeKind::InterpolatedElement => Children::sequence(
                 self,
@@ -705,18 +707,6 @@ impl super::Ast {
                     })
                     .words(),
                 ),
-                _ => Field::One(None),
-            },
-            NodeKind::ExprIf => match field {
-                0 => Field::One(Some(AstNodeId::from_word(
-                    split_words(record.inline_word::<4, 4>())[0],
-                ))),
-                1 => Field::One(Some(AstNodeId::from_word(
-                    split_words(record.inline_word::<0, 4>())[0],
-                ))),
-                2 => Field::One(Some(AstNodeId::from_word(
-                    split_words(record.inline_word::<8, 4>())[0],
-                ))),
                 _ => Field::One(None),
             },
             NodeKind::ExprDictComp => match field {
@@ -1099,8 +1089,8 @@ impl super::Ast {
             }
             NodeKind::ExprIf => {
                 stack.push_node(split_words(record.inline_word::<8, 4>())[0]);
-                stack.push_node(split_words(record.inline_word::<0, 4>())[0]);
-                split_words(record.inline_word::<4, 4>())[0]
+                stack.push_node(split_words(record.inline_word::<4, 4>())[0]);
+                split_words(record.inline_word::<0, 4>())[0]
             }
             NodeKind::ExprDictComp => {
                 stack.push_list(
