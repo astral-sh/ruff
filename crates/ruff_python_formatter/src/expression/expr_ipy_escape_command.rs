@@ -7,16 +7,16 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprIpyEscapeCommand;
 
-impl FormatNodeRule<ExprIpyEscapeCommand> for FormatExprIpyEscapeCommand {
-    fn fmt_fields(&self, item: &ExprIpyEscapeCommand, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<ruff_python_ast::kind::ExprIpyEscapeCommand> for FormatExprIpyEscapeCommand {
+    fn fmt_fields(&self, item: ExprIpyEscapeCommand<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         source_text_slice(item.range()).fmt(f)
     }
 }
 
-impl NeedsParentheses for ExprIpyEscapeCommand {
+impl NeedsParentheses for ExprIpyEscapeCommand<'_> {
     fn needs_parentheses(
         &self,
-        _parent: ruff_python_ast::AnyNodeRef,
+        _parent: ruff_python_ast::SyntaxNode,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
         OptionalParentheses::Never

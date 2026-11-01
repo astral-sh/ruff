@@ -6,15 +6,11 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatTypeParamTypeVar;
 
-impl FormatNodeRule<TypeParamTypeVar> for FormatTypeParamTypeVar {
-    fn fmt_fields(&self, item: &TypeParamTypeVar, f: &mut PyFormatter) -> FormatResult<()> {
-        let TypeParamTypeVar {
-            range: _,
-            node_index: _,
-            name,
-            bound,
-            default,
-        } = item;
+impl FormatNodeRule<ruff_python_ast::kind::TypeParamTypeVar> for FormatTypeParamTypeVar {
+    fn fmt_fields(&self, item: TypeParamTypeVar<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let name = item.name();
+        let bound = item.bound();
+        let default = item.default();
         name.format().fmt(f)?;
         if let Some(bound) = bound {
             write!(f, [token(":"), space(), bound.format()])?;
