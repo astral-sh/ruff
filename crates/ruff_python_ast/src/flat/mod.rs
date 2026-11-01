@@ -598,7 +598,6 @@ impl Ast {
 /// Mutable construction state. Nested lists share scratch space, so building the
 /// children of a list never interleaves their extra data with its own elements.
 #[derive(Debug)]
-#[derive(Default)]
 pub struct Builder {
     ast: Ast,
     scratch: Vec<u32>,
@@ -627,7 +626,30 @@ pub struct Checkpoint {
     debug_text: usize,
 }
 
+impl Default for Builder {
+    fn default() -> Self {
+        Self::for_source(TextRange::default())
+    }
+}
+
 impl Builder {
+    /// Reserve initial capacity for the rows and side tables from the source length.
+    pub fn for_source(source: TextRange) -> Self {
+        let bytes = source.len().to_usize();
+        let estimated = (bytes / 18).min(4096);
+        Self {
+            ast: Ast {
+                rows: Vec::with_capacity(estimated),
+                extra: Vec::with_capacity(estimated + estimated / 8),
+                names: Vec::with_capacity(estimated / 8),
+                ..Ast::default()
+            },
+            name_ids: HashTable::with_capacity(estimated / 8),
+            scratch: Vec::new(),
+            recent_names: [0; 32],
+        }
+    }
+
     /// Turns a name expression into the identifier for a keyword argument. When the name is
     /// the last row, its expression handle expires and the identifier can reuse that row.
     pub fn take_name(&mut self, name: BuildId<crate::kind::ExprName>) -> build::Identifier {

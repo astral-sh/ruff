@@ -146,6 +146,8 @@ position. Rewinding discards the abandoned rows and their variable-length data. 
 also spans all cells of a notebook. Each cell appends its top-level statement handles, and the
 parser emits a single module for the concatenated source.
 
+The builder estimates its initial row and side-table capacities from the source length.
+
 After parsing, the tree owns the rows and side tables. The builder releases its scratch buffers
 and name lookup table. Returning a child view borrows the same tree. Freeing the tree releases
 the rows and side tables without recursively dropping statements or expressions.

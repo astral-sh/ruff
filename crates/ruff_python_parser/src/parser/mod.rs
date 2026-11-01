@@ -107,7 +107,7 @@ impl<'src> Parser<'src> {
         start_offset: TextSize,
         options: ParseOptions,
     ) -> Self {
-        let storage = ParserStorage::default();
+        let storage = ParserStorage::for_source(TextRange::new(start_offset, TextSize::of(source)));
         Self::with_storage(source, start_offset, options, storage)
     }
 
