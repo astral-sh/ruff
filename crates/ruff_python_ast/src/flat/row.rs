@@ -12,26 +12,41 @@ use super::children::{Children, Field, Pending, StatementLists};
 use super::{AstNodeId, List, NodeList, SyntaxNode, split_words};
 
 #[derive(Copy, Clone)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-#[repr(C, align(8))]
-pub(super) struct Row {
+#[repr(C)]
+struct TaggedBytes {
     fields: [u8; 15],
     kind: NodeKind,
+}
+
+#[derive(Copy, Clone)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+#[repr(C)]
+pub(super) struct Row {
+    payload: Payload,
     span: TextRange,
 }
 
 impl Row {
     pub(super) const fn new(kind: NodeKind, span: TextRange) -> Self {
         Self {
-            fields: [0; 15],
-            kind,
+            payload: Payload {
+                raw: TaggedBytes {
+                    fields: [0; 15],
+                    kind,
+                },
+            },
             span,
         }
     }
 
     #[inline]
     pub(super) const fn kind(&self) -> NodeKind {
-        self.kind
+        // SAFETY: Construction initializes the kind. The generated setters write only
+        // individual integer fields whose ends are checked to precede the kind.
+        #[expect(unsafe_code)]
+        unsafe {
+            self.payload.raw.kind
+        }
     }
 
     pub(super) fn set_range(&mut self, span: TextRange) {
@@ -41,9 +56,13 @@ impl Row {
     /// Reads a field shared by several layouts in the generated descendant or string-part walk.
     #[inline]
     fn inline_word<const OFFSET: usize, const WIDTH: usize>(&self) -> u64 {
-        const { assert!(WIDTH <= 8 && OFFSET + WIDTH <= offset_of!(Row, kind)) };
+        const { assert!(WIDTH <= 8 && OFFSET + WIDTH <= offset_of!(TaggedBytes, kind)) };
+        // SAFETY: Construction initializes every byte and setters only write integers.
+        // No setter replaces a whole union member, which could copy uninitialized padding.
+        #[expect(unsafe_code)]
+        let bytes = unsafe { &self.payload.raw.fields };
         let mut word = [0; 8];
-        word[..WIDTH].copy_from_slice(&self.fields[OFFSET..OFFSET + WIDTH]);
+        word[..WIDTH].copy_from_slice(&bytes[OFFSET..OFFSET + WIDTH]);
         u64::from_le_bytes(word)
     }
 }
@@ -63,27 +82,50 @@ impl fmt::Debug for Row {
     }
 }
 
-// Offsets are generated from the same schema as the builder and borrowed nodes.
-macro_rules! node_fields {
-    ($($kind:ident {
-        $($ty:ident at $offset:literal => $get:ident, $set:ident;)+
+#[cfg(feature = "get-size")]
+impl get_size2::GetSize for Payload {}
+
+// Generate each union member, its accessors, and its layout checks from one field list.
+// The members stay private even to the rest of the AST implementation.
+macro_rules! node_payloads {
+    ($($kind:ident($arm:ident) {
+        $($( [$pad:ident; $gap:literal] )?
+          $field:ident: $ty:ident at $offset:literal => $get:ident, $set:ident;)+
     })+) => {
+        #[derive(Clone, Copy)]
+        #[repr(C, align(8))]
+        union Payload {
+            raw: TaggedBytes,
+            $($arm: $kind,)+
+        }
+
         $(
+            #[derive(Clone, Copy)]
+            #[repr(C)]
+            struct $kind {
+                $($( $pad: [u8; $gap], )? $field: $ty,)+
+            }
+
+            const _: () = {
+                $(assert!(offset_of!($kind, $field) == $offset);
+                  assert!($offset + size_of::<$ty>() <= offset_of!(TaggedBytes, kind));)+
+            };
+
             impl Row {
                 $(
                     #[inline]
                     pub(super) fn $get(&self) -> $ty {
-                        const { assert!($offset + size_of::<$ty>() <= offset_of!(Row, kind)) };
                         debug_assert_eq!(self.kind(), NodeKind::$kind);
-                        let mut bytes = [0; size_of::<$ty>()];
-                        bytes.copy_from_slice(&self.fields[$offset..$offset + size_of::<$ty>()]);
-                        <$ty>::from_le_bytes(bytes)
+                        // SAFETY: Every byte is initialized and all bit patterns are valid
+                        // for the unsigned integer stored at this aligned field offset.
+                        #[expect(unsafe_code)]
+                        $ty::from_le(unsafe { self.payload.$arm.$field })
                     }
 
                     #[inline]
                     pub(super) fn $set(&mut self, value: $ty) {
                         debug_assert_eq!(self.kind(), NodeKind::$kind);
-                        self.fields[$offset..$offset + size_of::<$ty>()].copy_from_slice(&value.to_le_bytes());
+                        self.payload.$arm.$field = value.to_le();
                     }
                 )+
             }
@@ -94,7 +136,8 @@ macro_rules! node_fields {
 include!("row/generated.rs");
 
 const _: () = {
-    assert!(size_of::<NodeKind>() == 1 && offset_of!(Row, kind) == 15);
+    assert!(size_of::<NodeKind>() == 1 && offset_of!(TaggedBytes, kind) == 15);
+    assert!(size_of::<TaggedBytes>() == 16 && size_of::<Payload>() == 16);
     assert!(offset_of!(Row, span) == 16 && size_of::<Row>() == 24 && align_of::<Row>() == 8);
 };
 
