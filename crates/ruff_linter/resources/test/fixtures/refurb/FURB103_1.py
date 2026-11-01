@@ -24,3 +24,8 @@ with p.open("w") as f:
 
 with Path("foo", "bar", "baz").open("w") as f:
     f.write("test")
+
+# See: https://github.com/astral-sh/ruff/issues/29452
+with Path("file.txt").open("w") as f:
+    flag and f.write("test")
+

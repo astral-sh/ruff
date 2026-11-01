@@ -270,3 +270,36 @@ help: Replace with `Path("tmp_path/pyproject.toml")....`
 159 + pathlib.Path("tmp_path/pyproject.toml").write_text(dedent(
 160 |         """
     |
+
+FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text("test")`
+   --> FURB103_0.py:173:6
+    |
+171 | # See: https://github.com/astral-sh/ruff/issues/29452
+172 | # Do not offer fix when `write()` is nested within an expression
+173 | with open("file.txt", "w") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+174 |     flag and f.write("test")
+    |
+help: Replace with `Path("file.txt").write_text("test")`
+
+FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text("test")`
+   --> FURB103_0.py:176:6
+    |
+174 |     flag and f.write("test")
+175 |
+176 | with open("file.txt", "w") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+177 |     print(f.write("test"))
+    |
+help: Replace with `Path("file.txt").write_text("test")`
+
+FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text("test")`
+   --> FURB103_0.py:179:6
+    |
+177 |     print(f.write("test"))
+178 |
+179 | with open("file.txt", "w") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+180 |     f.write("test") if flag else None
+    |
+help: Replace with `Path("file.txt").write_text("test")`
