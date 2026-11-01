@@ -5,8 +5,8 @@ use ruff_python_ast::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix, TStringPrefix,
 };
 use ruff_python_ast::{
-    AnyStringFlags, FString, InterpolatedStringElement, StringFlags, StringLike, StringLikePart,
-    TString,
+    AnyStringFlags, FString, InterpolatedStringElement, InterpolatedStringElements, StringFlags,
+    StringLike, StringLikePart, TString,
 };
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
@@ -262,6 +262,16 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 }
             };
 
+            // Joining the parts can change the string's value when a part ends with an
+            // octal escape that is still hungry for digits and the next part starts with
+            // an octal digit: CPython resolves the escapes of each part before joining
+            // them, so `"\1" "2"` is `"\x012"`, whereas the joined literal `"\12"` is
+            // `"\n"`. Keep such strings split instead.
+            // https://github.com/astral-sh/ruff/issues/28842
+            if join_changes_value(string, context) {
+                return None;
+            }
+
             Some(AnyStringFlags::new(prefix, quote, TripleQuotes::No))
         }
 
@@ -418,4 +428,138 @@ impl Format<PyFormatContext<'_>> for FormatLiteralContent {
         }
         Ok(())
     }
+}
+
+/// Returns `true` if joining the parts of `string` into a single literal would
+/// change the string's value.
+///
+/// CPython resolves the escape sequences of each part before concatenating the
+/// parts, so an octal escape at the end of one part can't absorb digits from the
+/// start of the next part: `"\1" "2"` is `"\x012"`, whereas the joined literal
+/// `"\12"` is `"\n"`. Octal escapes are the only escapes that can span a part
+/// boundary: `\ooo` takes one to three octal digits, so a part can end with an
+/// escape that is still hungry for digits. The other escapes can't: `\xhh`,
+/// `\uhhhh`, and `\Uhhhhhhhh` demand their full syntax (a part ending with a
+/// truncated one wouldn't parse), and a `\c` escape is complete after a single
+/// character.
+fn join_changes_value(string: StringLike, context: &PyFormatContext) -> bool {
+    let source = context.source();
+
+    // The trailing literal text of the preceding part, if no interpolation sits
+    // between the parts (an interpolation breaks the boundary because a `{` or
+    // `}` can't be absorbed by an escape).
+    let mut previous_trailing: Option<&str> = None;
+
+    for part in string.parts() {
+        // An empty part contributes no text, so it doesn't move the boundary:
+        // the digits after it are still adjacent to the previous part's text.
+        let PartContribution::Text { leading, trailing } = part_contribution(part, source) else {
+            continue;
+        };
+
+        if previous_trailing.is_some_and(|previous| octal_escape_absorbs_digit(previous, leading)) {
+            return true;
+        }
+
+        previous_trailing = trailing;
+    }
+
+    false
+}
+
+/// What a part contributes to the text of the joined literal at a part boundary.
+enum PartContribution<'a> {
+    /// The part contributes no text (e.g., an empty string).
+    Empty,
+    /// The first character of the text the part contributes (`{` if the part
+    /// starts with an interpolation), and the literal text it ends with (`None`
+    /// if the part ends with an interpolation).
+    Text {
+        leading: char,
+        trailing: Option<&'a str>,
+    },
+}
+
+fn part_contribution<'a>(part: StringLikePart<'a>, source: &'a str) -> PartContribution<'a> {
+    match part {
+        StringLikePart::String(_) | StringLikePart::Bytes(_) => {
+            let content = &source[part.content_range()];
+            match content.chars().next() {
+                Some(leading) => PartContribution::Text {
+                    leading,
+                    trailing: Some(content),
+                },
+                None => PartContribution::Empty,
+            }
+        }
+        StringLikePart::FString(fstring) => interpolated_contribution(&fstring.elements, source),
+        StringLikePart::TString(tstring) => interpolated_contribution(&tstring.elements, source),
+    }
+}
+
+fn interpolated_contribution<'a>(
+    elements: &'a InterpolatedStringElements,
+    source: &'a str,
+) -> PartContribution<'a> {
+    let mut leading = None;
+    let mut trailing = None;
+
+    for element in elements {
+        match element {
+            InterpolatedStringElement::Literal(literal) => {
+                let text = &source[literal.range()];
+                if text.is_empty() {
+                    continue;
+                }
+                if leading.is_none() {
+                    leading = text.chars().next();
+                }
+                trailing = Some(text);
+            }
+            InterpolatedStringElement::Interpolation(_) => {
+                if leading.is_none() {
+                    leading = Some('{');
+                }
+                trailing = None;
+            }
+        }
+    }
+
+    match leading {
+        Some(leading) => PartContribution::Text { leading, trailing },
+        None => PartContribution::Empty,
+    }
+}
+
+/// Returns `true` if `trailing` ends with an octal escape that would absorb
+/// `leading` as an additional digit once the parts are joined.
+fn octal_escape_absorbs_digit(trailing: &str, leading: char) -> bool {
+    // Only an octal digit can extend an octal escape.
+    if !matches!(leading, '0'..='7') {
+        return false;
+    }
+
+    let bytes = trailing.as_bytes();
+
+    // Count the octal digits the escape at the end of the part has consumed.
+    let mut escape_start = bytes.len();
+    while escape_start > 0 && matches!(bytes[escape_start - 1], b'0'..=b'7') {
+        escape_start -= 1;
+    }
+
+    // A three-digit escape is complete (`\ooo` takes at most three digits), so
+    // only a one- or two-digit escape can absorb another digit.
+    if !matches!(bytes.len() - escape_start, 1 | 2) {
+        return false;
+    }
+
+    // The digits only form an escape if the backslash before them isn't escaped
+    // itself, i.e., it's preceded by an even number of backslashes.
+    trailing[..escape_start]
+        .chars()
+        .rev()
+        .take_while(|c| *c == '\\')
+        .count()
+        % 2
+        == 1
 }
