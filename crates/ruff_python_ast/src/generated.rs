@@ -4050,6 +4050,12 @@ impl ruff_text_size::Ranged for crate::ParameterWithDefault {
     }
 }
 
+impl ruff_text_size::Ranged for crate::DictItem {
+    fn range(&self) -> ruff_text_size::TextRange {
+        self.range
+    }
+}
+
 impl ruff_text_size::Ranged for crate::Keyword {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
@@ -4609,6 +4615,12 @@ impl crate::HasNodeIndex for crate::Parameter {
 }
 
 impl crate::HasNodeIndex for crate::ParameterWithDefault {
+    fn node_index(&self) -> &crate::AtomicNodeIndex {
+        &self.node_index
+    }
+}
+
+impl crate::HasNodeIndex for crate::DictItem {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
     }
@@ -5911,6 +5923,7 @@ pub enum AnyNodeRef<'a> {
     Parameters(&'a crate::Parameters),
     Parameter(&'a crate::Parameter),
     ParameterWithDefault(&'a crate::ParameterWithDefault),
+    DictItem(&'a crate::DictItem),
     Keyword(&'a crate::Keyword),
     Alias(&'a crate::Alias),
     WithItem(&'a crate::WithItem),
@@ -6810,6 +6823,12 @@ impl<'a> From<&'a crate::ParameterWithDefault> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a crate::DictItem> for AnyNodeRef<'a> {
+    fn from(node: &'a crate::DictItem) -> AnyNodeRef<'a> {
+        AnyNodeRef::DictItem(node)
+    }
+}
+
 impl<'a> From<&'a crate::Keyword> for AnyNodeRef<'a> {
     fn from(node: &'a crate::Keyword) -> AnyNodeRef<'a> {
         AnyNodeRef::Keyword(node)
@@ -6967,6 +6986,7 @@ impl ruff_text_size::Ranged for AnyNodeRef<'_> {
             AnyNodeRef::Parameters(node) => node.range(),
             AnyNodeRef::Parameter(node) => node.range(),
             AnyNodeRef::ParameterWithDefault(node) => node.range(),
+            AnyNodeRef::DictItem(node) => node.range(),
             AnyNodeRef::Keyword(node) => node.range(),
             AnyNodeRef::Alias(node) => node.range(),
             AnyNodeRef::WithItem(node) => node.range(),
@@ -7068,6 +7088,7 @@ impl crate::HasNodeIndex for AnyNodeRef<'_> {
             AnyNodeRef::Parameters(node) => node.node_index(),
             AnyNodeRef::Parameter(node) => node.node_index(),
             AnyNodeRef::ParameterWithDefault(node) => node.node_index(),
+            AnyNodeRef::DictItem(node) => node.node_index(),
             AnyNodeRef::Keyword(node) => node.node_index(),
             AnyNodeRef::Alias(node) => node.node_index(),
             AnyNodeRef::WithItem(node) => node.node_index(),
@@ -7171,6 +7192,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::Parameters(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::Parameter(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::ParameterWithDefault(node) => std::ptr::NonNull::from(*node).cast(),
+            AnyNodeRef::DictItem(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::Keyword(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::Alias(node) => std::ptr::NonNull::from(*node).cast(),
             AnyNodeRef::WithItem(node) => std::ptr::NonNull::from(*node).cast(),
@@ -7276,6 +7298,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::Parameters(node) => node.visit_source_order(visitor),
             AnyNodeRef::Parameter(node) => node.visit_source_order(visitor),
             AnyNodeRef::ParameterWithDefault(node) => node.visit_source_order(visitor),
+            AnyNodeRef::DictItem(node) => node.visit_source_order(visitor),
             AnyNodeRef::Keyword(node) => node.visit_source_order(visitor),
             AnyNodeRef::Alias(node) => node.visit_source_order(visitor),
             AnyNodeRef::WithItem(node) => node.visit_source_order(visitor),
@@ -7444,6 +7467,7 @@ pub enum AnyRootNodeRef<'a> {
     Parameters(&'a crate::Parameters),
     Parameter(&'a crate::Parameter),
     ParameterWithDefault(&'a crate::ParameterWithDefault),
+    DictItem(&'a crate::DictItem),
     Keyword(&'a crate::Keyword),
     Alias(&'a crate::Alias),
     WithItem(&'a crate::WithItem),
@@ -7481,6 +7505,7 @@ pub enum RootNodeKind {
     Parameters,
     Parameter,
     ParameterWithDefault,
+    DictItem,
     Keyword,
     Alias,
     WithItem,
@@ -7513,6 +7538,7 @@ impl RootNodeKind {
         Self::Parameters,
         Self::Parameter,
         Self::ParameterWithDefault,
+        Self::DictItem,
         Self::Keyword,
         Self::Alias,
         Self::WithItem,
@@ -7546,18 +7572,19 @@ impl RootNodeKind {
             12 => Some(Self::Parameters),
             13 => Some(Self::Parameter),
             14 => Some(Self::ParameterWithDefault),
-            15 => Some(Self::Keyword),
-            16 => Some(Self::Alias),
-            17 => Some(Self::WithItem),
-            18 => Some(Self::MatchCase),
-            19 => Some(Self::Decorator),
-            20 => Some(Self::ElifElseClause),
-            21 => Some(Self::TypeParams),
-            22 => Some(Self::FString),
-            23 => Some(Self::TString),
-            24 => Some(Self::StringLiteral),
-            25 => Some(Self::BytesLiteral),
-            26 => Some(Self::Identifier),
+            15 => Some(Self::DictItem),
+            16 => Some(Self::Keyword),
+            17 => Some(Self::Alias),
+            18 => Some(Self::WithItem),
+            19 => Some(Self::MatchCase),
+            20 => Some(Self::Decorator),
+            21 => Some(Self::ElifElseClause),
+            22 => Some(Self::TypeParams),
+            23 => Some(Self::FString),
+            24 => Some(Self::TString),
+            25 => Some(Self::StringLiteral),
+            26 => Some(Self::BytesLiteral),
+            27 => Some(Self::Identifier),
 
             _ => None,
         }
@@ -8565,6 +8592,23 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ParameterWithDefault {
     }
 }
 
+impl<'a> From<&'a crate::DictItem> for AnyRootNodeRef<'a> {
+    #[inline]
+    fn from(node: &'a crate::DictItem) -> AnyRootNodeRef<'a> {
+        AnyRootNodeRef::DictItem(node)
+    }
+}
+
+impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::DictItem {
+    type Error = ();
+    fn try_from(node: AnyRootNodeRef<'a>) -> Result<&'a crate::DictItem, ()> {
+        match node {
+            AnyRootNodeRef::DictItem(node) => Ok(node),
+            _ => Err(()),
+        }
+    }
+}
+
 impl<'a> From<&'a crate::Keyword> for AnyRootNodeRef<'a> {
     #[inline]
     fn from(node: &'a crate::Keyword) -> AnyRootNodeRef<'a> {
@@ -8787,6 +8831,7 @@ impl ruff_text_size::Ranged for AnyRootNodeRef<'_> {
             AnyRootNodeRef::Parameters(node) => node.range(),
             AnyRootNodeRef::Parameter(node) => node.range(),
             AnyRootNodeRef::ParameterWithDefault(node) => node.range(),
+            AnyRootNodeRef::DictItem(node) => node.range(),
             AnyRootNodeRef::Keyword(node) => node.range(),
             AnyRootNodeRef::Alias(node) => node.range(),
             AnyRootNodeRef::WithItem(node) => node.range(),
@@ -8821,6 +8866,7 @@ impl crate::HasNodeIndex for AnyRootNodeRef<'_> {
             AnyRootNodeRef::Parameters(node) => node.node_index(),
             AnyRootNodeRef::Parameter(node) => node.node_index(),
             AnyRootNodeRef::ParameterWithDefault(node) => node.node_index(),
+            AnyRootNodeRef::DictItem(node) => node.node_index(),
             AnyRootNodeRef::Keyword(node) => node.node_index(),
             AnyRootNodeRef::Alias(node) => node.node_index(),
             AnyRootNodeRef::WithItem(node) => node.node_index(),
@@ -8896,6 +8942,9 @@ impl<'a> AnyRootNodeRef<'a> {
                 RootNodeKind::ParameterWithDefault,
                 std::ptr::NonNull::from(node).cast(),
             ),
+            AnyRootNodeRef::DictItem(node) => {
+                (RootNodeKind::DictItem, std::ptr::NonNull::from(node).cast())
+            }
             AnyRootNodeRef::Keyword(node) => {
                 (RootNodeKind::Keyword, std::ptr::NonNull::from(node).cast())
             }
@@ -8998,6 +9047,9 @@ impl<'a> AnyRootNodeRef<'a> {
                 RootNodeKind::ParameterWithDefault => AnyRootNodeRef::ParameterWithDefault(
                     &*pointer.cast::<crate::ParameterWithDefault>(),
                 ),
+                RootNodeKind::DictItem => {
+                    AnyRootNodeRef::DictItem(&*pointer.cast::<crate::DictItem>())
+                }
                 RootNodeKind::Keyword => {
                     AnyRootNodeRef::Keyword(&*pointer.cast::<crate::Keyword>())
                 }
@@ -9057,6 +9109,7 @@ impl<'a> AnyRootNodeRef<'a> {
             AnyRootNodeRef::Parameters(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::Parameter(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::ParameterWithDefault(node) => node.visit_source_order(visitor),
+            AnyRootNodeRef::DictItem(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::Keyword(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::Alias(node) => node.visit_source_order(visitor),
             AnyRootNodeRef::WithItem(node) => node.visit_source_order(visitor),
@@ -9157,6 +9210,7 @@ pub enum NodeKind {
     Parameters,
     Parameter,
     ParameterWithDefault,
+    DictItem,
     Keyword,
     Alias,
     WithItem,
@@ -9258,6 +9312,7 @@ impl AnyNodeRef<'_> {
             AnyNodeRef::Parameters(_) => NodeKind::Parameters,
             AnyNodeRef::Parameter(_) => NodeKind::Parameter,
             AnyNodeRef::ParameterWithDefault(_) => NodeKind::ParameterWithDefault,
+            AnyNodeRef::DictItem(_) => NodeKind::DictItem,
             AnyNodeRef::Keyword(_) => NodeKind::Keyword,
             AnyNodeRef::Alias(_) => NodeKind::Alias,
             AnyNodeRef::WithItem(_) => NodeKind::WithItem,
@@ -10681,6 +10736,23 @@ impl ExprIf {
         visitor.visit_expr(body);
         visitor.visit_expr(test);
         visitor.visit_expr(orelse);
+    }
+}
+
+impl ExprDict {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprDict {
+            items,
+            range: _,
+            node_index: _,
+        } = self;
+
+        for elm in items {
+            visitor.visit_dict_item(elm);
+        }
     }
 }
 

@@ -956,6 +956,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ast::DictItem {
                         key: Some(key),
                         value,
+                        ..
                     },
                 ] = &*dict.items
                 {

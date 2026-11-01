@@ -512,6 +512,8 @@ Module(
                                                         range: 208..214,
                                                         items: [
                                                             DictItem {
+                                                                range: 209..213,
+                                                                node_index: NodeIndex(None),
                                                                 key: Some(
                                                                     NumberLiteral(
                                                                         ExprNumberLiteral {

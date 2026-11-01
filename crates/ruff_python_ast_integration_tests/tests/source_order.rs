@@ -3,8 +3,11 @@ use std::fmt::{Debug, Write};
 use insta::assert_snapshot;
 
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
-use ruff_python_ast::{AnyNodeRef, BoolOp, CmpOp, Operator, Singleton, UnaryOp};
-use ruff_python_parser::{Mode, ParseOptions, parse};
+use ruff_python_ast::{
+    AnyNodeRef, BoolOp, CmpOp, DictItem, Operator, PySourceType, Singleton, UnaryOp,
+};
+use ruff_python_parser::{Mode, ParseOptions, parse, parse_unchecked_source};
+use ruff_text_size::Ranged;
 
 #[test]
 fn function_arguments() {
@@ -49,6 +52,45 @@ fn dict_comprehension() {
     let trace = trace_source_order_visitation(source);
 
     assert_snapshot!(trace);
+}
+
+#[test]
+fn dictionary_entry_ranges() {
+    #[derive(Default)]
+    struct Entries<'a>(Vec<&'a DictItem>);
+
+    impl<'a> SourceOrderVisitor<'a> for Entries<'a> {
+        fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+            if let AnyNodeRef::DictItem(entry) = node {
+                self.0.push(entry);
+            }
+            TraversalSignal::Traverse
+        }
+    }
+
+    for (source, valid, expected) in [
+        (
+            "{(key): (value), **(rest)}",
+            true,
+            &[("(key): (value)", "value"), ("**(rest)", "rest")][..],
+        ),
+        (
+            "match x:\n    case {**  # capture\n          rest} + 1: pass\n",
+            false,
+            &[("**  # capture\n          rest", "rest")][..],
+        ),
+    ] {
+        let parsed = parse_unchecked_source(source, PySourceType::Python);
+        assert_eq!(parsed.errors().is_empty(), valid);
+        let mut entries = Entries::default();
+        entries.visit_body(parsed.suite());
+        let ranges: Vec<_> = entries
+            .0
+            .iter()
+            .map(|entry| (&source[entry.range()], &source[entry.value.range()]))
+            .collect();
+        assert_eq!(ranges, expected);
+    }
 }
 
 #[test]
