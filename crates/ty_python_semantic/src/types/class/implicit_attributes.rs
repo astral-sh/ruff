@@ -387,6 +387,8 @@ impl get_size2::GetSize for AugmentedBindings<'_> {}
 pub(super) struct AugmentedAttributeWrites<'db> {
     #[returns(copy)]
     pub(super) receiver: Type<'db>,
+    #[returns(copy)]
+    pub(super) reads_storage: bool,
     #[returns(deref)]
     pub(super) definitions: Box<[(Definition<'db>, ClassType<'db>)]>,
 }
@@ -408,7 +410,12 @@ impl<'db> AugmentedAttributeWrites<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(super) fn inferred_type(self, db: &'db dyn Db) -> Type<'db> {
-        infer_augmented_attribute_writes(db, self.receiver(db), self.definitions(db))
+        infer_augmented_attribute_writes(
+            db,
+            self.receiver(db),
+            self.definitions(db),
+            self.reads_storage(db),
+        )
     }
 }
 

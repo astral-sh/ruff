@@ -342,6 +342,7 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
     db: &'db dyn Db,
     receiver: Type<'db>,
     definitions: &[(Definition<'db>, ClassType<'db>)],
+    reads_storage: bool,
 ) -> Type<'db> {
     let env = ProgramEnvironment::from_definition(definitions[0].0);
     let lookup_class = receiver.nominal_class(db, &env).or_else(|| {
@@ -409,6 +410,9 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
         }
     }
     let mut frontier = writes.build();
+    if !reads_storage {
+        return frontier;
+    }
     let mut result = frontier;
     let mut widened = FxHashMap::default();
     loop {

@@ -454,8 +454,8 @@ reveal_type(UninitializedCounter().value)  # revealed: Unknown
 
 ## Dynamically provided attributes
 
-A dynamic attribute hook can supply the initial value of an augmented assignment. The assignment
-then creates an instance attribute that subsequent calls can read.
+If `__getattr__` supplies the first value, the augmented assignment can create an instance attribute
+that subsequent calls read directly.
 
 ```py
 class DynamicCounter:
@@ -486,17 +486,53 @@ def write(obj: StringsOnly) -> None:
     obj.value = "ok"
 ```
 
-The same behavior applies when the attribute is provided by `__getattribute__`.
+A custom `__getattribute__` runs on every read, including after the operator stores a different type
+in the instance dictionary.
 
 ```py
-class InterceptedCounter:
-    def __getattribute__(self, name: str) -> int:
+from typing import Any, Literal, overload
+
+class Seed:
+    def __iadd__(self, n: float) -> int:
         return 0
 
-    def increment(self) -> None:
-        self.value += 1
+class InterceptedCounter:
+    @overload
+    def __getattribute__(self, name: Literal["value"]) -> Seed: ...
+    @overload
+    def __getattribute__(self, name: str) -> Any: ...
+    def __getattribute__(self, name: str) -> Any:
+        if name == "value":
+            return Seed()
+        return super().__getattribute__(name)
 
-reveal_type(InterceptedCounter().value)  # revealed: int
+    def increment(self) -> None:
+        self.value += 0.5
+
+reveal_type(InterceptedCounter().value)  # revealed: Seed
+
+def write_storage(obj: InterceptedCounter) -> None:
+    obj.value = 0
+    obj.value = 0.5  # error: [invalid-assignment]
+```
+
+A conditionally defined getter leaves the stored value visible when the class uses the default
+lookup.
+
+```py
+def conditional(enabled: bool) -> None:
+    class Counter:
+        def __getattr__(self, name: str) -> Seed:
+            return Seed()
+
+        if enabled:
+            def __getattribute__(self, name: str) -> Seed:
+                return Seed()
+
+        def bump(self) -> None:
+            self.value += 1
+
+    reveal_type(Counter().value)  # revealed: int | Seed
 ```
 
 ## Class-level defaults in diamond inheritance

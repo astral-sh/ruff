@@ -3038,6 +3038,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         env: &ProgramEnvironment<'db>,
         receiver: Type<'db>,
         bindings: &[(ClassType<'db>, AugmentedBindings<'db>)],
+        reads_storage: bool,
     ) -> (Type<'db>, Provenance<'db>) {
         let mut definitions = Vec::new();
         let mut provenance = Provenance::Unknown;
@@ -3047,11 +3048,15 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 provenance = provenance.or(Provenance::SingleDefinition(definition));
             }
         }
-        let inferred_ty =
-            AugmentedAttributeWrites::new(db, receiver, definitions.into_boxed_slice())
-                .inferred_type(db)
-                .promote(db, env)
-                .promote_singletons(db, env);
+        let inferred_ty = AugmentedAttributeWrites::new(
+            db,
+            receiver,
+            reads_storage,
+            definitions.into_boxed_slice(),
+        )
+        .inferred_type(db)
+        .promote(db, env)
+        .promote_singletons(db, env);
         let inferred_ty = if let Some(elements) =
             inferred_ty.as_union().map(|union| union.elements(db))
             && elements.iter().any(Type::is_divergent)
@@ -3092,29 +3097,32 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             return None;
         }
         let receiver = receiver();
-        if policy.contains(MemberLookupPolicy::WRITE_TARGET)
-            && !receiver
-                .class_member_with_policy(
-                    db,
-                    env,
-                    "__setattr__",
-                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                        | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK
-                        | MemberLookupPolicy::NO_AUGMENTED_BINDINGS,
-                )
+        let write = policy.contains(MemberLookupPolicy::WRITE_TARGET);
+        let hook_policy = MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+            | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK
+            | MemberLookupPolicy::NO_AUGMENTED_BINDINGS;
+        let hook = |name| {
+            receiver
+                .class_member_with_policy(db, env, name, hook_policy)
                 .place
-                .is_undefined()
-        {
-            // The hook decides which values can be assigned to this name. Inferring an
-            // instance dictionary entry from `self.count += 1` cannot give `self.count = 1`
-            // permission to bypass a setter that accepts only strings.
+        };
+        if write && !hook("__setattr__").is_undefined() {
+            // A custom setter can require a str even when `self.value += 1` would store an int.
+            // Leave the write to the usual setter validation.
             return None;
         }
-        let (ty, provenance) = Self::infer_augmented_bindings(db, env, receiver, bindings);
+        // An overriding getter can keep returning Seed after the dictionary receives an int.
+        // If the getter is only conditionally defined, ordinary reads can still see the int.
+        let reads_storage = !hook("__getattribute__").is_definitely_bound();
+        if !write && !reads_storage {
+            return None;
+        }
+        let (ty, provenance) =
+            Self::infer_augmented_bindings(db, env, receiver, bindings, reads_storage);
         (!ty.is_never()).then_some(DefinedPlace {
             ty,
             origin: TypeOrigin::Inferred,
-            definedness: if policy.contains(MemberLookupPolicy::WRITE_TARGET) {
+            definedness: if write {
                 Definedness::AlwaysDefined
             } else {
                 Definedness::PossiblyUndefined
@@ -3210,6 +3218,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 &self.env,
                                 receiver(),
                                 &pending_augmented_bindings,
+                                true,
                             );
                             defined.ty = UnionType::from_two_elements(
                                 db,
@@ -3361,6 +3370,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 &self.env,
                                 receiver(),
                                 &pending_augmented_bindings,
+                                true,
                             );
                             union = union.add(inferred_ty);
                             provenance = provenance.or(inferred_provenance);
@@ -3404,6 +3414,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 &self.env,
                                 receiver(),
                                 &pending_augmented_bindings,
+                                true,
                             );
                             union = union.add(inferred_ty);
                             provenance = provenance.or(inferred_provenance);
