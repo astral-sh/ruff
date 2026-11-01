@@ -2159,7 +2159,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             match (arg.as_ref(), value) {
                                 // Ex) NamedTuple("a", **{"a": int})
                                 (None, Expr::Dict(dict)) => {
-                                    for ast::DictItem { key, value } in dict {
+                                    for ast::DictItem { key, value, .. } in dict {
                                         if let Some(key) = key.as_ref() {
                                             self.visit_non_type_definition(key);
                                             self.visit_type_definition(value);
@@ -2192,7 +2192,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 node_index: _,
                             }) = arg
                             {
-                                for ast::DictItem { key, value } in items {
+                                for ast::DictItem { key, value, .. } in items {
                                     if let Some(key) = key {
                                         self.visit_non_type_definition(key);
                                     }

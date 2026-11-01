@@ -1,8 +1,9 @@
 use crate::{
-    Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator, ElifElseClause,
-    ExceptHandler, Expr, FString, InterpolatedStringElement, Keyword, MatchCase, Mod, Operator,
-    Parameter, ParameterWithDefault, Parameters, Pattern, PatternArguments, PatternKeyword,
-    Singleton, Stmt, StringLiteral, TString, TypeParam, TypeParams, UnaryOp, WithItem,
+    Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator, DictItem,
+    ElifElseClause, ExceptHandler, Expr, FString, InterpolatedStringElement, Keyword, MatchCase,
+    Mod, Operator, Parameter, ParameterWithDefault, Parameters, Pattern, PatternArguments,
+    PatternKeyword, Singleton, Stmt, StringLiteral, TString, TypeParam, TypeParams, UnaryOp,
+    WithItem,
 };
 use crate::{AnyNodeRef, Identifier};
 
@@ -104,6 +105,11 @@ pub trait SourceOrderVisitor<'a> {
     #[inline]
     fn visit_alias(&mut self, alias: &'a Alias) {
         walk_alias(self, alias);
+    }
+
+    #[inline]
+    fn visit_dict_item(&mut self, dict_item: &'a DictItem) {
+        walk_dict_item(self, dict_item);
     }
 
     #[inline]
@@ -417,6 +423,17 @@ where
 
     if visitor.enter_node(node).is_traverse() {
         keyword.visit_source_order(visitor);
+    }
+    visitor.leave_node(node);
+}
+
+pub fn walk_dict_item<'a, V>(visitor: &mut V, dict_item: &'a DictItem)
+where
+    V: SourceOrderVisitor<'a> + ?Sized,
+{
+    let node = AnyNodeRef::from(dict_item);
+    if visitor.enter_node(node).is_traverse() {
+        dict_item.visit_source_order(visitor);
     }
     visitor.leave_node(node);
 }

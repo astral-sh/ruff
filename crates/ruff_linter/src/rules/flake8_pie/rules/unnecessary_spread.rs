@@ -49,7 +49,7 @@ impl Violation for UnnecessarySpread {
 pub(crate) fn unnecessary_spread(checker: &Checker, dict: &ast::ExprDict) {
     // The first "end" is the start of the dictionary, immediately following the open bracket.
     let mut prev_end = dict.start() + TextSize::from(1);
-    for ast::DictItem { key, value } in dict {
+    for ast::DictItem { key, value, .. } in dict {
         if key.is_none() {
             // We only care about when the key is None which indicates a spread `**`
             // inside a dict.

@@ -234,7 +234,7 @@ impl Parser<'_> {
                             ParseErrorType::OtherError("Invalid mapping pattern key".to_string()),
                             &pattern,
                         );
-                        recovery::pattern_to_expr(pattern)
+                        recovery::pattern_to_expr(pattern, &parser.tokens)
                     }
                 };
                 keys.push(key);
@@ -626,7 +626,7 @@ impl Parser<'_> {
             lhs.value
         } else {
             self.add_error(ParseErrorType::ExpectedRealNumber, &lhs);
-            Box::new(recovery::pattern_to_expr(lhs))
+            Box::new(recovery::pattern_to_expr(lhs, &self.tokens))
         };
 
         let rhs_pattern = self.parse_match_pattern_lhs(AllowStarPattern::No);
@@ -637,7 +637,7 @@ impl Parser<'_> {
             rhs.value
         } else {
             self.add_error(ParseErrorType::ExpectedImaginaryNumber, &rhs_pattern);
-            Box::new(recovery::pattern_to_expr(rhs_pattern))
+            Box::new(recovery::pattern_to_expr(rhs_pattern, &self.tokens))
         };
 
         let range = self.node_range(start);
@@ -716,7 +716,7 @@ impl Parser<'_> {
                     ParseErrorType::OtherError("Invalid value for a class pattern".to_string()),
                     &pattern,
                 );
-                Box::new(recovery::pattern_to_expr(pattern))
+                Box::new(recovery::pattern_to_expr(pattern, &self.tokens))
             }
         };
 

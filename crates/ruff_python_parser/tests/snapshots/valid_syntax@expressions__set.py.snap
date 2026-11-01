@@ -664,6 +664,8 @@ Module(
                                         range: 300..311,
                                         items: [
                                             DictItem {
+                                                range: 301..305,
+                                                node_index: NodeIndex(None),
                                                 key: Some(
                                                     Name(
                                                         ExprName {
@@ -684,6 +686,8 @@ Module(
                                                 ),
                                             },
                                             DictItem {
+                                                range: 307..310,
+                                                node_index: NodeIndex(None),
                                                 key: None,
                                                 value: Name(
                                                     ExprName {

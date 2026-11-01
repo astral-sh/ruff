@@ -2183,11 +2183,17 @@ impl<'src> Parser<'src> {
                 return Expr::Dict(self.parse_dictionary_expression(
                     Some(value.expr),
                     dict_value.expr,
+                    after_brace,
                     start,
                 ));
             }
 
-            return Expr::Dict(self.parse_dictionary_expression(None, value.expr, start));
+            return Expr::Dict(self.parse_dictionary_expression(
+                None,
+                value.expr,
+                after_brace,
+                start,
+            ));
         }
 
         // For dictionary expressions, the key uses the `expression` rule while for
@@ -2271,6 +2277,7 @@ impl<'src> Parser<'src> {
                     Expr::Dict(self.parse_dictionary_expression(
                         Some(key_or_element.expr),
                         value.expr,
+                        after_brace,
                         start,
                     ))
                 }
@@ -2488,31 +2495,42 @@ impl<'src> Parser<'src> {
         &mut self,
         key: Option<Expr>,
         value: Expr,
+        first_item_start: TextSize,
         start: TextSize,
     ) -> ast::ExprDict {
+        let first = ast::DictItem {
+            range: self.node_range(first_item_start),
+            node_index: AtomicNodeIndex::NONE,
+            key,
+            value,
+        };
         if !self.at_sequence_end() {
             self.expect(TokenKind::Comma);
         }
 
-        let mut items = vec![ast::DictItem { key, value }];
-
+        let mut items = vec![first];
         self.parse_comma_separated_list(RecoveryContextKind::DictElements, |parser| {
-            if parser.eat(TokenKind::DoubleStar) {
-                // Handle dictionary unpacking. Here, the grammar is `'**' bitwise_or`
-                // which requires limiting the expression.
-                items.push(ast::DictItem {
-                    key: None,
-                    value: parser.parse_expression_with_bitwise_or_precedence().expr,
-                });
+            let start = parser.node_start();
+            let (key, value) = if parser.eat(TokenKind::DoubleStar) {
+                // Dictionary unpacking accepts a bitwise OR expression after `**`.
+                (
+                    None,
+                    parser.parse_expression_with_bitwise_or_precedence().expr,
+                )
             } else {
                 let key = parser.parse_conditional_expression_or_higher().expr;
                 parser.expect(TokenKind::Colon);
-
-                items.push(ast::DictItem {
-                    key: Some(key),
-                    value: parser.parse_conditional_expression_or_higher().expr,
-                });
-            }
+                (
+                    Some(key),
+                    parser.parse_conditional_expression_or_higher().expr,
+                )
+            };
+            items.push(ast::DictItem {
+                range: parser.node_range(start),
+                node_index: AtomicNodeIndex::NONE,
+                key,
+                value,
+            });
         });
 
         self.expect(TokenKind::Rbrace);

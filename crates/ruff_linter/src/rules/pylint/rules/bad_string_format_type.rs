@@ -189,7 +189,7 @@ fn is_valid_dict(formats: &[CFormatStrOrBytes<String>], items: &[ast::DictItem])
                 .map(|mapping_key| (mapping_key.as_str(), format))
         })
         .collect();
-    for ast::DictItem { key, value } in items {
+    for ast::DictItem { key, value, .. } in items {
         let Some(key) = key else {
             return true;
         };

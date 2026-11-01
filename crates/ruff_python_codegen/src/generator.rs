@@ -1055,7 +1055,7 @@ impl<'a> Generator<'a> {
             Expr::Dict(dict) => {
                 self.p("{");
                 let mut first = true;
-                for ast::DictItem { key, value } in dict {
+                for ast::DictItem { key, value, .. } in dict {
                     self.p_delim(&mut first, ", ");
                     if let Some(key) = key {
                         self.unparse_expr(key, precedence::COMMA);

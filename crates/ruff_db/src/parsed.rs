@@ -720,6 +720,12 @@ mod indexed {
         }
 
         #[inline]
+        fn visit_dict_item(&mut self, item: &'a DictItem) {
+            self.visit_node(item);
+            walk_dict_item(self, item);
+        }
+
+        #[inline]
         fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
             self.visit_node(except_handler);
             walk_except_handler(self, except_handler);
@@ -925,7 +931,7 @@ class C[T](Base, metaclass=Meta):
                     elif code is None:
                         return t"{code}"
                     else:
-                        return "string"
+                        return {code: "string", **kwargs}
                 case _:
                     return b"bytes"
 "#,
@@ -967,7 +973,7 @@ class C[T](Base, metaclass=Meta):
                     kind,
                     RootNodeKind::Mod | RootNodeKind::InterpolatedStringFormatSpec
                 );
-                assert_eq!(seen_kinds[usize::from(*kind as u8)], is_indexed);
+                assert_eq!(seen_kinds[usize::from(*kind as u8)], is_indexed, "{kind:?}");
             }
         }
     }
