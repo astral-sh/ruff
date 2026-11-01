@@ -32,6 +32,44 @@ pub struct UnionType<'db> {
     pub(crate) recursively_defined: RecursivelyDefined,
 }
 
+// Whole-input memoization pays for its key on wider unions, where the individual
+// ordered redundancy comparisons would otherwise be repeated quadratically.
+const WIDE_UNION: usize = 8;
+
+#[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
+struct OrderedUnionInput<'db> {
+    #[returns(copy)]
+    program: Program<'db>,
+    #[returns(deref)]
+    elements: Box<[Type<'db>]>,
+    #[returns(copy)]
+    unpack_aliases: bool,
+    #[returns(copy)]
+    recursively_defined: RecursivelyDefined,
+}
+
+impl<'db> OrderedUnionInput<'db> {
+    fn normalize(self, db: &'db dyn Db) -> Type<'db> {
+        fn build<'db>(db: &'db dyn Db, input: OrderedUnionInput<'db>) -> Type<'db> {
+            let env = ProgramEnvironment::from_program(input.program(db));
+            let mut builder = UnionBuilder::new(db, &env).unpack_aliases(input.unpack_aliases(db));
+            for &ty in input.elements(db) {
+                builder.add_in_place(ty);
+            }
+            builder
+                .or_recursively_defined(input.recursively_defined(db))
+                .build()
+        }
+
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn normalized<'db>(db: &'db dyn Db, input: OrderedUnionInput<'db>) -> Option<Type<'db>> {
+            Some(build(db, input))
+        }
+
+        normalized(db, self).unwrap_or_else(|| build(db, self))
+    }
+}
+
 pub(crate) fn walk_union<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     union: UnionType<'db>,
@@ -62,6 +100,17 @@ impl<'db> UnionType<'db> {
         T: Into<Type<'db>>,
     {
         let mut iter_elements = elements.into_iter();
+        if iter_elements.size_hint().0 >= WIDE_UNION {
+            let elements = iter_elements.map(Into::into).collect::<Box<[_]>>();
+            return OrderedUnionInput::new(
+                db,
+                env.program(db),
+                elements,
+                true,
+                RecursivelyDefined::No,
+            )
+            .normalize(db);
+        }
 
         if let Some(first) = iter_elements.next() {
             if let Some(second) = iter_elements.next() {
@@ -116,6 +165,18 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
+        let elements = elements.into_iter();
+        if elements.size_hint().0 >= WIDE_UNION {
+            let elements = elements.map(Into::into).collect::<Box<[_]>>();
+            return OrderedUnionInput::new(
+                db,
+                env.program(db),
+                elements,
+                false,
+                RecursivelyDefined::No,
+            )
+            .normalize(db);
+        }
         let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
         for element in elements {
             builder.add_in_place(element.into());
@@ -325,6 +386,22 @@ impl<'db> UnionType<'db> {
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty);
             if &new_ty != ty {
+                if elements.len() >= WIDE_UNION {
+                    let mapped = elements[..i]
+                        .iter()
+                        .copied()
+                        .chain(std::iter::once(new_ty))
+                        .chain(iter.map(|(_, element)| transform_fn(element)))
+                        .collect::<Box<[_]>>();
+                    return OrderedUnionInput::new(
+                        db,
+                        env.program(db),
+                        mapped,
+                        false,
+                        self.recursively_defined(db),
+                    )
+                    .normalize(db);
+                }
                 let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
                 for prev in &elements[..i] {
                     builder.add_in_place(*prev);
