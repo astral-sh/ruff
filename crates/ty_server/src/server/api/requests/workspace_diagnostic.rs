@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use indexmap::IndexSet;
 use lsp_server::RequestId;
 use lsp_types::WorkspaceDiagnosticRequest;
 use lsp_types::{
@@ -280,9 +282,13 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         // which also handles the case where a file no longer has diagnostics because
         // it's no longer part of the project.
         if !diagnostics.is_empty() || !unnecessary_hints.is_empty() {
-            state
-                .response
-                .write_diagnostics_for_file(db, file, diagnostics, &unnecessary_hints);
+            state.response.write_diagnostics_for_file(
+                db,
+                file,
+                diagnostics,
+                &unnecessary_hints,
+                DiagnosticSource::File,
+            );
         }
 
         state.response.maybe_flush();
@@ -306,7 +312,13 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
 
         for (file, diagnostics) in by_file {
             let unnecessary_hints = hints(db, file);
-            response.write_diagnostics_for_file(db, file, &diagnostics, &unnecessary_hints);
+            response.write_diagnostics_for_file(
+                db,
+                file,
+                &diagnostics,
+                &unnecessary_hints,
+                DiagnosticSource::Project,
+            );
         }
         response.maybe_flush();
     }
@@ -347,7 +359,16 @@ struct ResponseWriter<'a> {
     // `file_to_uri` isn't guaranteed to return the exact same URI as the one provided
     // by the client.
     previous_result_ids: FxHashMap<DocumentKey, (Uri, String)>,
+    // Two workspace folders can discover the same manifest. Keep both folders' diagnostics
+    // until we can send a single report for that URI.
+    shared_manifest_diagnostics: Option<BTreeMap<Uri, IndexSet<lsp_types::Diagnostic>>>,
     global_settings: &'a GlobalSettings,
+}
+
+#[derive(Clone, Copy)]
+enum DiagnosticSource {
+    File,
+    Project,
 }
 
 impl<'a> ResponseWriter<'a> {
@@ -385,6 +406,7 @@ impl<'a> ResponseWriter<'a> {
             position_encoding,
             client_capabilities: snapshot.resolved_client_capabilities(),
             previous_result_ids,
+            shared_manifest_diagnostics: (snapshot.projects().len() > 1).then(BTreeMap::new),
             global_settings: snapshot.global_settings(),
         }
     }
@@ -395,6 +417,7 @@ impl<'a> ResponseWriter<'a> {
         file: File,
         diagnostics: &[Diagnostic],
         unnecessary_hints: &[Hint],
+        source: DiagnosticSource,
     ) {
         let Some(uri) = file_to_uri(db, file) else {
             tracing::debug!("Failed to convert file path to URI at {}", file.path(db));
@@ -409,27 +432,56 @@ impl<'a> ResponseWriter<'a> {
             return;
         }
 
+        let settings = self.global_settings;
+        let encoding = self.position_encoding;
+        let capabilities = self.client_capabilities;
+        let diagnostics = diagnostics
+            .iter()
+            .filter(|diagnostic| settings.should_show_diagnostic(diagnostic));
+        let render = || {
+            let mut items: Vec<_> = diagnostics
+                .clone()
+                .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, encoding, capabilities).1)
+                .collect();
+            items.extend(unnecessary_hints_to_lsp_diagnostics(
+                db,
+                file,
+                encoding,
+                unnecessary_hints,
+            ));
+            items
+        };
+        if matches!(source, DiagnosticSource::Project)
+            && let Some(manifests) = &mut self.shared_manifest_diagnostics
+        {
+            manifests.entry(uri).or_default().extend(render());
+            return;
+        }
+        let Some(result_id) = Diagnostics::result_id_from_hash(
+            db,
+            diagnostics.clone(),
+            unnecessary_hints,
+            capabilities,
+        ) else {
+            // Leave any previous result ID for `into_final_report` to clear. Without a previous
+            // result, there is nothing to report and the request can continue long polling.
+            return;
+        };
+        self.write_report_for_uri(uri, result_id, render);
+    }
+
+    fn write_report_for_uri(
+        &mut self,
+        uri: Uri,
+        result_id: String,
+        render: impl FnOnce() -> Vec<lsp_types::Diagnostic>,
+    ) {
         let key = DocumentKey::from_uri(&uri);
         let version = self
             .index
             .open_document_handle(&uri)
             .map(|doc| doc.version())
             .ok();
-
-        let diagnostics = diagnostics
-            .iter()
-            .filter(|diagnostic| self.global_settings.should_show_diagnostic(diagnostic));
-        let Some(result_id) = Diagnostics::result_id_from_hash(
-            db,
-            diagnostics.clone(),
-            unnecessary_hints,
-            self.client_capabilities,
-        ) else {
-            // Leave any previous result ID for `into_final_report` to clear. Without a previous
-            // result, there is nothing to report and the request can continue long polling.
-            return;
-        };
-
         let previous_result_id = self.previous_result_ids.remove(&key).map(|(_uri, id)| id);
 
         let report = match previous_result_id {
@@ -444,36 +496,16 @@ impl<'a> ResponseWriter<'a> {
                     },
                 )
             }
-            _ => {
-                let mut lsp_diagnostics = diagnostics
-                    .map(|diagnostic| {
-                        to_lsp_diagnostic(
-                            db,
-                            diagnostic,
-                            self.position_encoding,
-                            self.client_capabilities,
-                        )
-                        .1
-                    })
-                    .collect::<Vec<_>>();
-                lsp_diagnostics.extend(unnecessary_hints_to_lsp_diagnostics(
-                    db,
-                    file,
-                    self.position_encoding,
-                    unnecessary_hints,
-                ));
-
-                WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(
-                    WorkspaceFullDocumentDiagnosticReport {
-                        uri,
-                        version,
-                        full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                            result_id: Some(result_id),
-                            items: lsp_diagnostics,
-                        },
+            _ => WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(
+                WorkspaceFullDocumentDiagnosticReport {
+                    uri,
+                    version,
+                    full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                        result_id: Some(result_id),
+                        items: render(),
                     },
-                )
-            }
+                },
+            ),
         };
 
         self.write_report(report);
@@ -506,6 +538,15 @@ impl<'a> ResponseWriter<'a> {
     /// diagnostics and if it already sent some diagnostics.
     fn into_final_report(mut self) -> WorkspaceDiagnosticReport {
         let mut items = Vec::new();
+
+        for (uri, diagnostics) in self.shared_manifest_diagnostics.take().unwrap_or_default() {
+            if !diagnostics.is_empty() {
+                let diagnostics: Vec<_> = diagnostics.into_iter().collect();
+                let mut hasher = DefaultHasher::new();
+                diagnostics.hash(&mut hasher);
+                self.write_report_for_uri(uri, format!("{:016x}", hasher.finish()), || diagnostics);
+            }
+        }
 
         // Handle files that had diagnostics in previous request but no longer have any
         // Any remaining entries in previous_results are files that were fixed
