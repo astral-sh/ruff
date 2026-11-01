@@ -1,12 +1,14 @@
-use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, ExprContext, Stmt, UnaryOp};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{
+    Builder, CmpOp, Expr, ExprKind, Stmt, StmtFunctionDefFields, StmtKind, UnaryOp,
+};
+use ruff_text_size::Ranged;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::Name;
 use ruff_python_semantic::ScopeKind;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::fix::syntax;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -140,22 +142,31 @@ fn is_dunder_method(name: &str) -> bool {
     )
 }
 
-fn is_exception_check(stmt: &Stmt) -> bool {
-    let Stmt::If(ast::StmtIf { body, .. }) = stmt else {
+fn is_exception_check(stmt: Stmt<'_>) -> bool {
+    let StmtKind::If(if_stmt) = stmt.classify() else {
         return false;
     };
-    matches!(body.as_slice(), [Stmt::Raise(_)])
+    let body = if_stmt.body();
+    matches!(
+        body.as_array().map(|items| items.map(Stmt::classify)),
+        Some([StmtKind::Raise(_)])
+    )
 }
 
 /// SIM201
-pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp, operand: &Expr) {
+pub(crate) fn negation_with_equal_op(
+    checker: &Checker,
+    &expr: &Expr<'_>,
+    op: UnaryOp,
+    operand: Expr<'_>,
+) {
     if !matches!(op, UnaryOp::Not) {
         return;
     }
-    let Expr::Compare(compare) = operand else {
+    let ExprKind::Compare(compare) = operand.classify() else {
         return;
     };
-    if !matches!(&*compare.ops, [CmpOp::Eq]) {
+    if !matches!(&compare.ops().as_array(), Some([CmpOp::Eq])) {
         return;
     }
     if is_exception_check(checker.semantic().current_statement()) {
@@ -163,10 +174,10 @@ pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp
     }
 
     // Avoid flagging issues in dunder implementations.
-    if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) =
-        &checker.semantic().current_scope().kind
+    if let ScopeKind::Function(stmt_function_def) = &checker.semantic().current_scope().kind
+        && let StmtFunctionDefFields { name, .. } = stmt_function_def.fields()
     {
-        if is_dunder_method(name) {
+        if is_dunder_method(name.as_str()) {
             return;
         }
     }
@@ -178,14 +189,10 @@ pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp
         },
         expr.range(),
     );
-    let node = ast::ExprCompare {
-        ops: [CmpOp::NotEq].into(),
-        operands: compare.operands.clone(),
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
+    let mut builder = Builder::default();
+    let replacement = syntax::with_comparison_op(&mut builder, compare, CmpOp::NotEq);
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        checker.generator().expr(&node.into()),
+        checker.generator().expr(builder.get(replacement)),
         expr.range(),
     )));
 }
@@ -193,17 +200,17 @@ pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp
 /// SIM202
 pub(crate) fn negation_with_not_equal_op(
     checker: &Checker,
-    expr: &Expr,
+    &expr: &Expr<'_>,
     op: UnaryOp,
-    operand: &Expr,
+    operand: Expr<'_>,
 ) {
     if !matches!(op, UnaryOp::Not) {
         return;
     }
-    let Expr::Compare(compare) = operand else {
+    let ExprKind::Compare(compare) = operand.classify() else {
         return;
     };
-    if !matches!(&*compare.ops, [CmpOp::NotEq]) {
+    if !matches!(&compare.ops().as_array(), Some([CmpOp::NotEq])) {
         return;
     }
     if is_exception_check(checker.semantic().current_statement()) {
@@ -211,10 +218,10 @@ pub(crate) fn negation_with_not_equal_op(
     }
 
     // Avoid flagging issues in dunder implementations.
-    if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) =
-        &checker.semantic().current_scope().kind
+    if let ScopeKind::Function(stmt_function_def) = &checker.semantic().current_scope().kind
+        && let StmtFunctionDefFields { name, .. } = stmt_function_def.fields()
     {
-        if is_dunder_method(name) {
+        if is_dunder_method(name.as_str()) {
             return;
         }
     }
@@ -226,32 +233,24 @@ pub(crate) fn negation_with_not_equal_op(
         },
         expr.range(),
     );
-    let node = ast::ExprCompare {
-        ops: [CmpOp::Eq].into(),
-        operands: compare.operands.clone(),
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
+    let mut builder = Builder::default();
+    let replacement = syntax::with_comparison_op(&mut builder, compare, CmpOp::Eq);
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        checker.generator().expr(&node.into()),
+        checker.generator().expr(builder.get(replacement)),
         expr.range(),
     )));
 }
 
 /// SIM208
-pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, operand: &Expr) {
+pub(crate) fn double_negation(checker: &Checker, &expr: &Expr<'_>, op: UnaryOp, operand: Expr<'_>) {
     if !matches!(op, UnaryOp::Not) {
         return;
     }
-    let Expr::UnaryOp(ast::ExprUnaryOp {
-        op: operand_op,
-        operand,
-        range: _,
-        node_index: _,
-    }) = operand
-    else {
+    let ExprKind::UnaryOp(unary_op) = operand.classify() else {
         return;
     };
+    let operand_op = unary_op.op();
+    let operand = unary_op.operand();
     if !matches!(operand_op, UnaryOp::Not) {
         return;
     }
@@ -264,29 +263,15 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
     );
     if checker.semantic().in_boolean_test() {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            checker.locator().slice(operand.as_ref()).to_string(),
+            checker.locator().slice(operand).to_string(),
             expr.range(),
         )));
     } else if checker.semantic().has_builtin_binding("bool") {
-        let node = ast::ExprName {
-            id: Name::new_static("bool"),
-            ctx: ExprContext::Load,
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        };
-        let node1 = ast::ExprCall {
-            func: Box::new(node.into()),
-            arguments: Arguments {
-                args: [*operand.clone()].into(),
-                keywords: std::iter::empty().collect(),
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            },
-            range_start: ruff_text_size::TextSize::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        };
+        let mut builder = Builder::default();
+        let args = builder.copy_nodes([operand]);
+        let replacement = syntax::call_name(&mut builder, "bool", args);
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            checker.generator().expr(&node1.into()),
+            checker.generator().expr(builder.get(replacement)),
             expr.range(),
         )));
     }

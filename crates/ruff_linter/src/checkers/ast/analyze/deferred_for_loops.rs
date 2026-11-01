@@ -1,5 +1,3 @@
-use ruff_python_ast::Stmt;
-
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::rules::{flake8_bugbear, flake8_simplify, perflint, pylint, pyupgrade, refurb};
@@ -12,7 +10,7 @@ pub(crate) fn deferred_for_loops(checker: &mut Checker) {
 
         let checker = &*checker;
 
-        let Stmt::For(stmt_for) = checker.semantic.current_statement() else {
+        let Some(stmt_for) = checker.semantic.current_statement().as_for_stmt() else {
             unreachable!("Expected Stmt::For");
         };
         if checker.is_rule_enabled(Rule::UnusedLoopControlVariable) {

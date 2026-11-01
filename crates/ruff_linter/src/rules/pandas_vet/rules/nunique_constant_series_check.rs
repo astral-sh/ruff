@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, CmpOp, Expr, Int};
+use ruff_python_ast::{self as ast, CmpOp, ExprCompare, ExprKind, Int, Number};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -63,7 +63,7 @@ impl Violation for PandasNuniqueConstantSeriesCheck {
 }
 
 /// PD101
-pub(crate) fn nunique_constant_series_check(checker: &Checker, compare: &ast::ExprCompare) {
+pub(crate) fn nunique_constant_series_check(checker: &Checker, compare: ExprCompare<'_>) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
@@ -79,24 +79,27 @@ pub(crate) fn nunique_constant_series_check(checker: &Checker, compare: &ast::Ex
 
     // Right should be the integer 1.
     if !matches!(
-        right,
-        Expr::NumberLiteral(ast::ExprNumberLiteral {
-            value: ast::Number::Int(Int::ONE),
+        right.fields(),
+        ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+            value: Number::Int(Int::ONE),
             range: _,
-            node_index: _,
+            node: _,
         })
     ) {
         return;
     }
 
     // Check if call is `.nuniuqe()`.
-    let Expr::Call(ast::ExprCall { func, .. }) = left else {
+    let ExprKind::Call(call_node) = left.classify() else {
         return;
     };
+    let func = call_node.func();
 
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+    let ExprKind::Attribute(attribute) = func.classify() else {
         return;
     };
+    let value = attribute.value();
+    let attr = attribute.attr();
 
     if attr.as_str() != "nunique" {
         return;

@@ -1,5 +1,6 @@
 //! Insert statements into Python code.
 
+use ruff_python_ast::{StmtKind, Suite};
 use std::ops::Add;
 
 use ruff_diagnostics::Edit;
@@ -55,7 +56,7 @@ impl<'a> Insertion<'a> {
     /// This is used for insertions in notebook cells where the source code and AST are for
     /// the entire notebook but the insertion should be constrained to a specific cell.
     pub fn start_of_file(
-        body: &[Stmt],
+        body: Suite<'_>,
         contents: &str,
         stylist: &Stylist,
         within_range: Option<TextRange>,
@@ -65,7 +66,7 @@ impl<'a> Insertion<'a> {
                 let start = body.partition_point(|stmt| stmt.start() < range.start());
                 let end = body.partition_point(|stmt| stmt.end() <= range.end());
 
-                &body[start..end]
+                body.slice(start..end)
             })
             .unwrap_or(body);
 
@@ -139,7 +140,11 @@ impl<'a> Insertion<'a> {
     /// in this case is the line after `import math`, and will include a trailing newline.
     ///
     /// The statement itself is assumed to be at the top-level of the module.
-    pub fn end_of_statement(stmt: &Stmt, contents: &str, stylist: &Stylist) -> Insertion<'static> {
+    pub fn end_of_statement(
+        stmt: Stmt<'_>,
+        contents: &str,
+        stylist: &Stylist,
+    ) -> Insertion<'static> {
         let location = stmt.end();
         if let Some(offset) = match_semicolon(&contents[location.to_usize()..]) {
             // If the first token after the statement is a semicolon, insert after the semicolon as
@@ -183,11 +188,11 @@ impl<'a> Insertion<'a> {
     ///
     /// This returns `None` when `stmt` isn't a `from ... import ...`
     /// statement.
-    pub fn existing_import(stmt: &Stmt, tokens: &Tokens) -> Option<Insertion<'static>> {
-        let Stmt::ImportFrom(ref import_from) = *stmt else {
+    pub fn existing_import(stmt: Stmt<'_>, tokens: &Tokens) -> Option<Insertion<'static>> {
+        let StmtKind::ImportFrom(ref import_from) = stmt.classify() else {
             return None;
         };
-        if let Some(at) = import_from.names.last().map(Ranged::end) {
+        if let Some(at) = import_from.names().last().map(|alias| alias.end()) {
             return Some(Insertion::inline(", ", at, ""));
         }
         // Our AST can deal with partial `from ... import`
@@ -357,7 +362,7 @@ impl<'a> Insertion<'a> {
 }
 
 /// Find the end of the docstring (first string statement).
-fn match_docstring_end(body: &[Stmt]) -> Option<TextSize> {
+fn match_docstring_end(body: Suite<'_>) -> Option<TextSize> {
     let stmt = body.first()?;
     if !is_docstring_stmt(stmt) {
         return None;

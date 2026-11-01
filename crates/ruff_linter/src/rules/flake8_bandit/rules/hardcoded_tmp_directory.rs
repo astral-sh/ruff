@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, StringLike};
+use ruff_python_ast::{self as ast, Expr, FStringPartView, StringLike, StringLikeKind};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -59,28 +59,30 @@ impl Violation for HardcodedTempFile {
 
 /// S108
 pub(crate) fn hardcoded_tmp_directory(checker: &Checker, string: StringLike) {
-    match string {
-        StringLike::String(ast::ExprStringLiteral { value, .. }) => {
+    match string.classify() {
+        StringLikeKind::String(expr_string_literal) => {
+            let value = expr_string_literal.value();
             check(checker, value.to_str(), string.range());
         }
-        StringLike::FString(ast::ExprFString { value, .. }) => {
+        StringLikeKind::FString(expr_fstring) => {
+            let value = expr_fstring.value();
             for part in value {
                 match part {
-                    ast::FStringPartRef::Literal(literal) => {
-                        check(checker, literal, literal.range());
+                    FStringPartView::Literal(literal) => {
+                        check(checker, literal.value(), literal.range());
                     }
-                    ast::FStringPartRef::FString(f_string) => {
-                        for literal in f_string.elements.literals() {
-                            check(checker, literal, literal.range());
+                    FStringPartView::FString(f_string) => {
+                        for literal in f_string.elements().literals() {
+                            check(checker, literal.value(), literal.range());
                         }
                     }
                 }
             }
         }
         // These are not actually strings
-        StringLike::Bytes(_) => (),
+        StringLikeKind::Bytes(_) => (),
         // TODO(dylan) - verify that we should skip these
-        StringLike::TString(_) => (),
+        StringLikeKind::TString(_) => (),
     }
 }
 
@@ -95,8 +97,10 @@ fn check(checker: &Checker, value: &str, range: TextRange) {
         return;
     }
 
-    if let Some(Expr::Call(ast::ExprCall { func, .. })) =
-        checker.semantic().current_expression_parent()
+    if let Some(ast::ExprFields::Call(ast::ExprCallFields { func, .. })) = checker
+        .semantic()
+        .current_expression_parent()
+        .map(Expr::fields)
     {
         if checker
             .semantic()

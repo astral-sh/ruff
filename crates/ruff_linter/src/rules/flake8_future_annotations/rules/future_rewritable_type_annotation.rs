@@ -87,7 +87,7 @@ impl AlwaysFixableViolation for FutureRewritableTypeAnnotation {
 }
 
 /// FA100
-pub(crate) fn future_rewritable_type_annotation(checker: &Checker, expr: &Expr) {
+pub(crate) fn future_rewritable_type_annotation(checker: &Checker, expr: Expr<'_>) {
     let name = checker
         .semantic()
         .resolve_qualified_name(expr)

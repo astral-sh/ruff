@@ -52,7 +52,7 @@ impl AlwaysFixableViolation for RegexFlagAlias {
 }
 
 /// FURB167
-pub(crate) fn regex_flag_alias(checker: &Checker, expr: &Expr) {
+pub(crate) fn regex_flag_alias(checker: &Checker, &expr: &Expr<'_>) {
     if !checker.semantic().seen_module(Modules::RE) {
         return;
     }

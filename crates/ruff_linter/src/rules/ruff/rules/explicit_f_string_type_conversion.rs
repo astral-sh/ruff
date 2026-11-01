@@ -5,7 +5,9 @@ use anyhow::Result;
 use libcst_native::{LeftParen, ParenthesizedNode, RightParen};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::{TokenKind, parenthesized_range};
-use ruff_python_ast::{self as ast, Expr, OperatorPrecedence};
+use ruff_python_ast::{
+    self as ast, Expr, ExprCall, ExprKind, FString, InterpolatedElement, OperatorPrecedence,
+};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -63,13 +65,13 @@ impl Violation for ExplicitFStringTypeConversion {
 }
 
 /// RUF010
-pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &ast::FString) {
-    for (index, element) in f_string.elements.iter().enumerate() {
-        let Some(ast::InterpolatedElement {
+pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: FString<'_>) {
+    for (index, element) in f_string.elements().iter().enumerate() {
+        let Some(ast::InterpolatedElementFields {
             expression,
             conversion,
             ..
-        }) = element.as_interpolation()
+        }) = element.as_interpolation().map(InterpolatedElement::fields)
         else {
             continue;
         };
@@ -79,33 +81,33 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
             continue;
         }
 
-        let Expr::Call(call) = expression.as_ref() else {
+        let ExprKind::Call(call) = expression.classify() else {
             continue;
         };
 
         let Some(conversion) = checker
             .semantic()
-            .resolve_builtin_symbol(&call.func)
+            .resolve_builtin_symbol(call.func())
             .and_then(Conversion::from_str)
         else {
             continue;
         };
         let arg = match conversion {
             // Handles the cases: `f"{str(object=arg)}"` and `f"{str(arg)}"`
-            Conversion::Str if call.arguments.len() == 1 => {
-                let Some(arg) = call.arguments.find_argument_value("object", 0) else {
+            Conversion::Str if call.arguments().len() == 1 => {
+                let Some(arg) = call.arguments().find_argument_value("object", 0) else {
                     continue;
                 };
                 arg
             }
             Conversion::Str | Conversion::Repr | Conversion::Ascii => {
                 // Can't be a conversion otherwise.
-                if !call.arguments.keywords.is_empty() {
+                if !call.arguments().keywords().is_empty() {
                     continue;
                 }
 
                 // Can't be a conversion otherwise.
-                let [arg] = call.arguments.args.as_ref() else {
+                let Some([arg]) = call.arguments().args().as_array() else {
                     continue;
                 };
                 arg
@@ -120,7 +122,7 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
         // Don't report diagnostic for f-string with debug text.
         if element
             .as_interpolation()
-            .is_some_and(|interpolation| interpolation.debug_text.is_some())
+            .is_some_and(|interpolation| interpolation.debug_text().is_some())
         {
             return;
         }
@@ -138,10 +140,10 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
 fn convert_call_to_conversion_flag(
     checker: &Checker,
     conversion: Conversion,
-    f_string: &ast::FString,
+    f_string: FString<'_>,
     index: usize,
-    call: &ast::ExprCall,
-    arg: &Expr,
+    call: ExprCall<'_>,
+    arg: Expr<'_>,
 ) -> Result<Fix> {
     let source_code = checker.locator().slice(f_string);
     let output = transform_expression(source_code, checker.stylist(), |mut expression| {
@@ -179,9 +181,8 @@ fn convert_call_to_conversion_flag(
     let call_range = call.range();
     // Use the parenthesized range of the arg (within call.arguments) to account for
     // any extra parens that wrap the argument and whose content will be preserved.
-    let effective_arg_range =
-        parenthesized_range(arg.into(), (&call.arguments).into(), checker.tokens())
-            .unwrap_or_else(|| arg.range());
+    let effective_arg_range = parenthesized_range(arg, (call.arguments()).into(), checker.tokens())
+        .unwrap_or_else(|| arg.range());
     let has_deletable_comments = comment_ranges.intersects(TextRange::new(
         call_range.start(),
         effective_arg_range.start(),
@@ -199,7 +200,7 @@ fn convert_call_to_conversion_flag(
     ))
 }
 
-fn starts_with_brace(checker: &Checker, arg: &Expr) -> bool {
+fn starts_with_brace(checker: &Checker, arg: Expr<'_>) -> bool {
     checker
         .tokens()
         .in_range(arg.range())
@@ -213,10 +214,10 @@ fn needs_paren(precedence: OperatorPrecedence) -> bool {
     precedence <= OperatorPrecedence::Lambda
 }
 
-fn needs_paren_expr(arg: &Expr) -> bool {
+fn needs_paren_expr(arg: Expr<'_>) -> bool {
     // Generator expressions need to be parenthesized in f-string expressions
     if let Some(generator) = arg.as_generator_expr() {
-        return !generator.parenthesized;
+        return !generator.parenthesized();
     }
 
     // Check precedence for other expressions

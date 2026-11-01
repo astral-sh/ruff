@@ -61,8 +61,8 @@ impl Violation for CamelcaseImportedAsAcronym {
 pub(crate) fn camelcase_imported_as_acronym(
     name: &str,
     asname: &str,
-    alias: &Alias,
-    stmt: &Stmt,
+    alias: Alias<'_>,
+    stmt: Stmt<'_>,
     checker: &Checker,
 ) {
     if helpers::is_camelcase(name)
@@ -95,23 +95,23 @@ pub(crate) fn camelcase_imported_as_acronym(
 
 fn is_ignored_because_of_import_convention(
     asname: &str,
-    stmt: &Stmt,
-    alias: &Alias,
+    stmt: Stmt<'_>,
+    alias: Alias<'_>,
     checker: &Checker,
 ) -> bool {
     let full_name = if let Some(import_from) = stmt.as_import_from_stmt() {
         // Never test relative imports for exclusion because we can't resolve the full-module name.
-        let Some(module) = import_from.module.as_ref() else {
+        let Some(module) = import_from.module() else {
             return false;
         };
 
-        if import_from.level != 0 {
+        if import_from.level() != 0 {
             return false;
         }
 
-        std::borrow::Cow::Owned(format!("{module}.{}", alias.name))
+        std::borrow::Cow::Owned(format!("{module}.{}", alias.name()))
     } else {
-        std::borrow::Cow::Borrowed(&*alias.name)
+        std::borrow::Cow::Borrowed(alias.name().as_str())
     };
 
     // Ignore names that follow a community-agreed import convention.

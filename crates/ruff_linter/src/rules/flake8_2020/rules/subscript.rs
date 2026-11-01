@@ -173,20 +173,20 @@ impl Violation for SysVersionSlice1 {
 }
 
 /// YTT101, YTT102, YTT301, YTT303
-pub(crate) fn subscript(checker: &Checker, value: &Expr, slice: &Expr) {
+pub(crate) fn subscript(checker: &Checker, value: Expr<'_>, slice: Expr<'_>) {
     if is_sys(value, "version", checker.semantic()) {
-        match slice {
-            Expr::Slice(ast::ExprSlice {
+        match slice.fields() {
+            ast::ExprFields::Slice(ast::ExprSliceFields {
                 lower: None,
                 upper: Some(upper),
                 step: None,
                 range: _,
-                node_index: _,
+                node: _,
             }) => {
-                if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                if let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
                     value: ast::Number::Int(i),
                     ..
-                }) = upper.as_ref()
+                }) = upper.fields()
                 {
                     if *i == 1 && checker.is_rule_enabled(Rule::SysVersionSlice1) {
                         checker.report_diagnostic(SysVersionSlice1, value.range());
@@ -196,7 +196,7 @@ pub(crate) fn subscript(checker: &Checker, value: &Expr, slice: &Expr) {
                 }
             }
 
-            Expr::NumberLiteral(ast::ExprNumberLiteral {
+            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
                 value: ast::Number::Int(i),
                 ..
             }) => {

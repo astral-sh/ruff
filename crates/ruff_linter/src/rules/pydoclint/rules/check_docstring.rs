@@ -3,7 +3,9 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, Stmt, visitor};
+use ruff_python_ast::{
+    self as ast, ExceptHandlerKind, Expr, ExprKind, NodeList, Stmt, StmtKind, visitor,
+};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -894,11 +896,11 @@ struct BodyEntries<'a> {
 struct BodyVisitor<'a> {
     returns: Vec<ReturnEntry>,
     yields: Vec<YieldEntry>,
-    currently_suspended_exceptions: Option<&'a ast::Expr>,
+    currently_suspended_exceptions: Option<ast::Expr<'a>>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
     semantic: &'a SemanticModel<'a>,
     /// Maps exception variable names to their exception expressions in the current except clause
-    exception_variables: FxHashMap<&'a str, &'a ast::Expr>,
+    exception_variables: FxHashMap<&'a str, ast::Expr<'a>>,
 }
 
 impl<'a> BodyVisitor<'a> {
@@ -943,7 +945,7 @@ impl<'a> BodyVisitor<'a> {
     }
 
     /// Store `exception` if its qualified name does not correspond to one of the exempt types.
-    fn maybe_store_exception(&mut self, exception: &'a Expr, range: TextRange) {
+    fn maybe_store_exception(&mut self, exception: Expr<'a>, range: TextRange) {
         let Some(qualified_name) = self.semantic.resolve_qualified_name(exception) else {
             return;
         };
@@ -958,16 +960,16 @@ impl<'a> BodyVisitor<'a> {
 }
 
 impl<'a> Visitor<'a> for BodyVisitor<'a> {
-    fn visit_except_handler(&mut self, handler: &'a ast::ExceptHandler) {
-        let ast::ExceptHandler::ExceptHandler(handler_inner) = handler;
-        self.currently_suspended_exceptions = handler_inner.type_.as_deref();
+    fn visit_except_handler(&mut self, handler: ast::ExceptHandler<'a>) {
+        let ExceptHandlerKind::ExceptHandler(handler_inner) = handler.classify();
+        self.currently_suspended_exceptions = handler_inner.type_();
 
         // Track exception variable bindings
-        if let Some(name) = handler_inner.name.as_ref() {
+        if let Some(name) = handler_inner.name() {
             if let Some(exceptions) = self.currently_suspended_exceptions {
                 // Store the exception expression(s) for later resolution
                 self.exception_variables
-                    .insert(name.id.as_str(), exceptions);
+                    .insert(name.id().as_str(), exceptions);
             }
         }
 
@@ -977,10 +979,12 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
         self.exception_variables.clear();
     }
 
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::Raise(ast::StmtRaise { exc, .. }) => {
-                if let Some(exc) = exc.as_ref() {
+    fn visit_stmt(&mut self, stmt: Stmt<'a>) {
+        match stmt.classify() {
+            StmtKind::Raise(stmt_raise) => {
+                let exc = stmt_raise.exc();
+
+                if let Some(exc) = exc {
                     // First try to resolve the exception directly
                     if let Some(qualified_name) =
                         self.semantic.resolve_qualified_name(map_callable(exc))
@@ -989,22 +993,23 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                             qualified_name,
                             range: exc.range(),
                         });
-                    } else if let ast::Expr::Name(name) = exc.as_ref() {
+                    } else if let ExprKind::Name(name) = exc.classify() {
                         // If it's a variable name, check if it's bound to an exception in the
                         // current except clause
-                        if let Some(exception_expr) = self.exception_variables.get(name.id.as_str())
+                        if let Some(exception_expr) =
+                            self.exception_variables.get(name.id().as_str())
                         {
-                            if let ast::Expr::Tuple(tuple) = exception_expr {
+                            if let ExprKind::Tuple(tuple) = exception_expr.classify() {
                                 for exception in tuple {
                                     self.maybe_store_exception(exception, stmt.range());
                                 }
                             } else {
-                                self.maybe_store_exception(exception_expr, stmt.range());
+                                self.maybe_store_exception(*exception_expr, stmt.range());
                             }
                         }
                     }
                 } else if let Some(exceptions) = self.currently_suspended_exceptions {
-                    if let ast::Expr::Tuple(tuple) = exceptions {
+                    if let ExprKind::Tuple(tuple) = exceptions.classify() {
                         for exception in tuple {
                             self.maybe_store_exception(exception, stmt.range());
                         }
@@ -1013,13 +1018,11 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                     }
                 }
             }
-            Stmt::Return(ast::StmtReturn {
-                range,
-                node_index: _,
-                value: Some(value),
-            }) => {
+            StmtKind::Return(stmt_return) if let Some(value) = stmt_return.value() => {
+                let range = stmt_return.range();
+
                 self.returns.push(ReturnEntry {
-                    range: *range,
+                    range,
                     kind: if value.is_none_literal_expr() {
                         ReturnEntryKind::ExplicitNone
                     } else {
@@ -1027,52 +1030,48 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                     },
                 });
             }
-            Stmt::Return(ast::StmtReturn {
-                range,
-                node_index: _,
-                value: None,
-            }) => {
+            StmtKind::Return(stmt_return) if stmt_return.value().is_none() => {
+                let range = stmt_return.range();
+
                 self.returns.push(ReturnEntry {
-                    range: *range,
+                    range,
                     kind: ReturnEntryKind::ImplicitNone,
                 });
             }
-            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => return,
+            StmtKind::FunctionDef(_) | StmtKind::ClassDef(_) => return,
             _ => {}
         }
 
         visitor::walk_stmt(self, stmt);
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Yield(ast::ExprYield {
-                range,
-                node_index: _,
-                value: Some(value),
-            }) => {
+    fn visit_expr(&mut self, expr: Expr<'a>) {
+        match expr.classify() {
+            ExprKind::Yield(expr_yield) if let Some(value) = expr_yield.value() => {
+                let range = expr_yield.range();
+
                 self.yields.push(YieldEntry {
-                    range: *range,
+                    range,
                     is_none_yield: value.is_none_literal_expr(),
                 });
             }
-            Expr::Yield(ast::ExprYield {
-                range,
-                node_index: _,
-                value: None,
-            }) => {
+            ExprKind::Yield(expr_yield) if expr_yield.value().is_none() => {
+                let range = expr_yield.range();
+
                 self.yields.push(YieldEntry {
-                    range: *range,
+                    range,
                     is_none_yield: true,
                 });
             }
-            Expr::YieldFrom(ast::ExprYieldFrom { range, .. }) => {
+            ExprKind::YieldFrom(expr_yield_from) => {
+                let range = expr_yield_from.range();
+
                 self.yields.push(YieldEntry {
-                    range: *range,
+                    range,
                     is_none_yield: false,
                 });
             }
-            Expr::Lambda(_) => return,
+            ExprKind::Lambda(_) => return,
             _ => {}
         }
         visitor::walk_expr(self, expr);
@@ -1105,8 +1104,8 @@ fn returns_documented(
         || (matches!(convention, Some(Convention::Google)) && starts_with_returns(docstring))
 }
 
-fn should_document_returns(function_def: &ast::StmtFunctionDef) -> bool {
-    !matches!(function_def.name.as_str(), "__new__")
+fn should_document_returns(function_def: ast::StmtFunctionDef<'_>) -> bool {
+    !matches!(function_def.name().as_str(), "__new__")
 }
 
 fn starts_with_yields(docstring: &Docstring) -> bool {
@@ -1128,12 +1127,12 @@ fn yields_documented(
 #[derive(Debug, Copy, Clone)]
 enum GeneratorOrIteratorArguments<'a> {
     Unparameterized,
-    Single(&'a Expr),
-    Several(&'a [Expr]),
+    Single(Expr<'a>),
+    Several(NodeList<'a, ast::kind::Expr>),
 }
 
 impl<'a> GeneratorOrIteratorArguments<'a> {
-    fn first(self) -> Option<&'a Expr> {
+    fn first(self) -> Option<Expr<'a>> {
         match self {
             Self::Unparameterized => None,
             Self::Single(element) => Some(element),
@@ -1145,14 +1144,14 @@ impl<'a> GeneratorOrIteratorArguments<'a> {
         match self {
             Self::Unparameterized => true,
             Self::Single(_) => true,
-            Self::Several(elements) => elements.get(2).is_none_or(Expr::is_none_literal_expr),
+            Self::Several(elements) => elements.get(2).is_none_or(ast::Expr::is_none_literal_expr),
         }
     }
 }
 
 /// Returns the arguments to a generator annotation, if it exists.
 fn generator_annotation_arguments<'a>(
-    expr: &'a Expr,
+    expr: Expr<'a>,
     semantic: &'a SemanticModel,
 ) -> Option<GeneratorOrIteratorArguments<'a>> {
     let qualified_name = semantic.resolve_qualified_name(map_subscript(expr))?;
@@ -1165,8 +1164,10 @@ fn generator_annotation_arguments<'a>(
             "collections",
             "abc",
             "Iterable" | "AsyncIterable" | "Iterator" | "AsyncIterator",
-        ] => match expr {
-            Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
+        ] => match expr.classify() {
+            ExprKind::Subscript(expr_subscript) => {
+                let slice = expr_subscript.slice();
+
                 Some(GeneratorOrIteratorArguments::Single(slice))
             }
             _ => Some(GeneratorOrIteratorArguments::Unparameterized),
@@ -1175,10 +1176,12 @@ fn generator_annotation_arguments<'a>(
             "typing" | "typing_extensions",
             "Generator" | "AsyncGenerator",
         ]
-        | ["collections", "abc", "Generator" | "AsyncGenerator"] => match expr {
-            Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
-                if let Expr::Tuple(tuple) = &**slice {
-                    Some(GeneratorOrIteratorArguments::Several(tuple.elts.as_slice()))
+        | ["collections", "abc", "Generator" | "AsyncGenerator"] => match expr.classify() {
+            ExprKind::Subscript(expr_subscript) => {
+                let slice = expr_subscript.slice();
+
+                if let ExprKind::Tuple(tuple) = slice.classify() {
+                    Some(GeneratorOrIteratorArguments::Several(tuple.elts()))
                 } else {
                     // `Generator[int]` implies `Generator[int, None, None]`
                     // as it uses a PEP-696 TypeVar with default values
@@ -1193,7 +1196,7 @@ fn generator_annotation_arguments<'a>(
 
 fn is_generator_function_annotated_as_returning_none(
     entries: &BodyEntries,
-    return_annotations: &Expr,
+    return_annotations: Expr<'_>,
     semantic: &SemanticModel,
 ) -> bool {
     if entries.yields.is_empty() {
@@ -1208,8 +1211,8 @@ fn parameters_from_signature<'a>(docstring: &'a Docstring) -> Vec<&'a str> {
     let Some(function) = docstring.definition.as_function_def() else {
         return parameters;
     };
-    for param in &function.parameters {
-        parameters.push(param.name());
+    for param in function.parameters().iter() {
+        parameters.push(param.name().as_str());
     }
     parameters
 }
@@ -1263,7 +1266,7 @@ pub(crate) fn check_docstring(
 
     let body_entries = {
         let mut visitor = BodyVisitor::new(semantic);
-        visitor.visit_body(&function_def.body);
+        visitor.visit_body(function_def.body());
         visitor.finish()
     };
 
@@ -1277,7 +1280,7 @@ pub(crate) fn check_docstring(
             let extra_property_decorators = checker.settings().pydocstyle.property_decorators();
             if !definition.is_property(extra_property_decorators, semantic) {
                 if !body_entries.returns.is_empty() {
-                    match function_def.returns.as_deref() {
+                    match function_def.returns() {
                         // Ignore it if it's annotated as returning `None`
                         // or it's a generator function annotated as returning `None`,
                         // i.e. any of `-> None`, `-> Iterator[...]` or `-> Generator[..., ..., None]`
@@ -1309,10 +1312,14 @@ pub(crate) fn check_docstring(
     if checker.is_rule_enabled(Rule::DocstringMissingYields) {
         if !yields_documented(docstring, &docstring_sections, convention) {
             if !body_entries.yields.is_empty() {
-                match function_def.returns.as_deref() {
+                match function_def.returns() {
                     Some(returns)
                         if !generator_annotation_arguments(returns, semantic).is_some_and(
-                            |arguments| arguments.first().is_none_or(Expr::is_none_literal_expr),
+                            |arguments| {
+                                arguments
+                                    .first()
+                                    .is_none_or(ast::Expr::is_none_literal_expr)
+                            },
                         ) =>
                     {
                         checker.report_diagnostic(DocstringMissingYields, docstring.range());
@@ -1358,7 +1365,9 @@ pub(crate) fn check_docstring(
     // DOC102
     if checker.is_rule_enabled(Rule::DocstringExtraneousParameter) {
         // Don't report extraneous parameters if the signature defines *args or **kwargs
-        if function_def.parameters.vararg.is_none() && function_def.parameters.kwarg.is_none() {
+        if function_def.parameters().vararg().is_none()
+            && function_def.parameters().kwarg().is_none()
+        {
             if let Some(docstring_params) = docstring_sections.parameters {
                 for docstring_param in &docstring_params.parameters {
                     if !signature_parameters.contains(&docstring_param.name) {
@@ -1376,7 +1385,7 @@ pub(crate) fn check_docstring(
 
     // Avoid applying "extraneous" rules to abstract methods. An abstract method's docstring _could_
     // document that it raises an exception without including the exception in the implementation.
-    if !visibility::is_abstract(&function_def.decorator_list, semantic) {
+    if !visibility::is_abstract(function_def.decorator_list(), semantic) {
         // DOC202
         if checker.is_rule_enabled(Rule::DocstringExtraneousReturns) {
             if docstring_sections.returns.is_some() {

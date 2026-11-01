@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::StmtNonlocalFields;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -56,11 +56,11 @@ impl Violation for NonlocalAndGlobal {
 }
 
 /// PLE0115
-pub(crate) fn nonlocal_and_global(checker: &Checker, nonlocal: &ast::StmtNonlocal) {
+pub(crate) fn nonlocal_and_global(checker: &Checker, nonlocal: &StmtNonlocalFields<'_>) {
     // Determine whether any of the newly declared `nonlocal` variables are already declared as
     // `global`.
-    for name in &nonlocal.names {
-        if let Some(global) = checker.semantic().global(name) {
+    for name in nonlocal.names {
+        if let Some(global) = checker.semantic().global(name.as_str()) {
             checker.report_diagnostic(
                 NonlocalAndGlobal {
                     name: name.to_string(),

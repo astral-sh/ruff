@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_docstring_stmt;
-use ruff_python_ast::{self as ast, StringLike};
+use ruff_python_ast::{self as ast, InterpolatedStringElementKind, StringLike, StringLikeKind};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -74,13 +74,13 @@ pub(crate) fn string_or_bytes_too_long(checker: &Checker, string: StringLike) {
         return;
     }
 
-    let length = match string {
-        StringLike::String(ast::ExprStringLiteral { value, .. }) => value.chars().count(),
-        StringLike::Bytes(ast::ExprBytesLiteral { value, .. }) => value.len(),
-        StringLike::FString(node) => count_f_string_chars(node),
+    let length = match string.classify() {
+        StringLikeKind::String(literal) => literal.value().chars().count(),
+        StringLikeKind::Bytes(literal) => literal.value().len(),
+        StringLikeKind::FString(node) => count_f_string_chars(node),
         // TODO(dylan): decide how to count chars, especially
         // if interpolations are of different type than `str`
-        StringLike::TString(_) => {
+        StringLikeKind::TString(_) => {
             return;
         }
     };
@@ -97,18 +97,18 @@ pub(crate) fn string_or_bytes_too_long(checker: &Checker, string: StringLike) {
 
 /// Count the number of visible characters in an f-string. This accounts for
 /// implicitly concatenated f-strings as well.
-fn count_f_string_chars(f_string: &ast::ExprFString) -> usize {
+fn count_f_string_chars(f_string: ast::ExprFString<'_>) -> usize {
     f_string
-        .value
+        .value()
         .iter()
         .map(|part| match part {
-            ast::FStringPartRef::Literal(string) => string.chars().count(),
-            ast::FStringPartRef::FString(f_string) => f_string
-                .elements
+            ast::FStringPartView::Literal(string) => string.chars().count(),
+            ast::FStringPartView::FString(f_string) => f_string
+                .elements()
                 .iter()
-                .map(|element| match element {
-                    ast::InterpolatedStringElement::Literal(string) => string.chars().count(),
-                    ast::InterpolatedStringElement::Interpolation(expr) => {
+                .map(|element| match element.classify() {
+                    InterpolatedStringElementKind::Literal(string) => string.chars().count(),
+                    InterpolatedStringElementKind::Interpolation(expr) => {
                         expr.range().len().to_usize()
                     }
                 })
@@ -117,7 +117,7 @@ fn count_f_string_chars(f_string: &ast::ExprFString) -> usize {
         .sum()
 }
 
-fn is_warnings_dot_deprecated(expr: Option<&ast::Expr>, semantic: &SemanticModel) -> bool {
+fn is_warnings_dot_deprecated(expr: Option<ast::Expr<'_>>, semantic: &SemanticModel) -> bool {
     // Does `expr` represent a call to `warnings.deprecated` or `typing_extensions.deprecated`?
     let Some(expr) = expr else {
         return false;
@@ -126,7 +126,7 @@ fn is_warnings_dot_deprecated(expr: Option<&ast::Expr>, semantic: &SemanticModel
         return false;
     };
     semantic
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func())
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),

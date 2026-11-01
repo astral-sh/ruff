@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, ExprCall, Stmt, StmtFunctionDef};
+use ruff_python_ast::{self as ast, ExprKind, StmtFunctionDef};
 use ruff_python_semantic::{BindingKind, Modules, ScopeKind};
 use ruff_text_size::Ranged;
 
@@ -97,7 +96,7 @@ impl Violation for AirflowTaskBranchAsShortCircuit {
 }
 
 /// AIR004 (decorator form)
-pub(crate) fn task_branch_as_short_circuit(checker: &Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn task_branch_as_short_circuit(checker: &Checker, function_def: StmtFunctionDef<'_>) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
@@ -106,7 +105,7 @@ pub(crate) fn task_branch_as_short_circuit(checker: &Checker, function_def: &Stm
         return;
     }
 
-    if could_be_short_circuit(&function_def.body) {
+    if could_be_short_circuit(function_def) {
         checker.report_diagnostic(
             AirflowTaskBranchAsShortCircuit {
                 kind: BranchKind::Decorator,
@@ -117,14 +116,17 @@ pub(crate) fn task_branch_as_short_circuit(checker: &Checker, function_def: &Stm
 }
 
 /// AIR004 (operator form)
-pub(crate) fn branch_python_operator_as_short_circuit(checker: &Checker, call: &ExprCall) {
+pub(crate) fn branch_python_operator_as_short_circuit(
+    checker: &Checker,
+    call: &ast::ExprCallFields<'_>,
+) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
 
     let semantic = checker.semantic();
 
-    let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) else {
+    let Some(qualified_name) = semantic.resolve_qualified_name(call.func) else {
         return;
     };
 
@@ -151,7 +153,7 @@ pub(crate) fn branch_python_operator_as_short_circuit(checker: &Checker, call: &
         return;
     };
 
-    let Expr::Name(name_expr) = &keyword.value else {
+    let ExprKind::Name(name_expr) = keyword.value().classify() else {
         return;
     };
 
@@ -167,7 +169,7 @@ pub(crate) fn branch_python_operator_as_short_circuit(checker: &Checker, call: &
         return;
     };
 
-    if could_be_short_circuit(&function_def.body) {
+    if could_be_short_circuit(function_def) {
         checker.report_diagnostic(
             AirflowTaskBranchAsShortCircuit {
                 kind: BranchKind::Operator,
@@ -179,11 +181,8 @@ pub(crate) fn branch_python_operator_as_short_circuit(checker: &Checker, call: &
 
 /// Returns `true` if the function body has 2+ return statements with exactly
 /// one non-empty list return — indicating a short-circuit pattern.
-fn could_be_short_circuit(body: &[Stmt]) -> bool {
-    let mut visitor = ReturnStatementVisitor::default();
-    visitor.visit_body(body);
-
-    let returns = &visitor.returns;
+fn could_be_short_circuit(function: StmtFunctionDef<'_>) -> bool {
+    let returns = ReturnStatementVisitor::for_function(function).returns;
     if returns.len() < 2 {
         return false;
     }
@@ -191,8 +190,8 @@ fn could_be_short_circuit(body: &[Stmt]) -> bool {
     let non_empty_list_count = returns
         .iter()
         .filter(|ret| {
-            ret.value.as_deref().is_some_and(
-                |value| matches!(value, Expr::List(ast::ExprList { elts, .. }) if !elts.is_empty()),
+            ret.value().is_some_and(
+                |value| matches!(value.fields(), ast::ExprFields::List(ast::ExprListFields { elts, .. }) if !elts.is_empty()),
             )
         })
         .count();

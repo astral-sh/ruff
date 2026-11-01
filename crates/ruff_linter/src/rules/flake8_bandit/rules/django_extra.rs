@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprAttribute};
+use ruff_python_ast::{self as ast, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -46,39 +46,42 @@ impl Violation for DjangoExtra {
 }
 
 /// S610
-pub(crate) fn django_extra(checker: &Checker, call: &ast::ExprCall) {
-    let Expr::Attribute(ExprAttribute { attr, .. }) = call.func.as_ref() else {
+pub(crate) fn django_extra(checker: &Checker, call: ast::ExprCall<'_>) {
+    let ExprKind::Attribute(attribute) = call.func().classify() else {
         return;
     };
+    let attr = attribute.attr();
 
     if attr.as_str() != "extra" {
         return;
     }
 
     if is_call_insecure(call) {
-        checker.report_diagnostic(DjangoExtra, call.arguments.range());
+        checker.report_diagnostic(DjangoExtra, call.arguments().range());
     }
 }
 
-fn is_call_insecure(call: &ast::ExprCall) -> bool {
+fn is_call_insecure(call: ast::ExprCall<'_>) -> bool {
     for (argument_name, position) in [("select", 0), ("where", 1), ("tables", 3)] {
-        if let Some(argument) = call.arguments.find_argument_value(argument_name, position) {
+        if let Some(argument) = call
+            .arguments()
+            .find_argument_value(argument_name, position)
+        {
             match argument_name {
-                "select" => match argument {
-                    Expr::Dict(dict) => {
-                        if dict.iter().any(|ast::DictItem { key, value, .. }| {
-                            key.as_ref()
-                                .is_some_and(|key| !key.is_string_literal_expr())
-                                || !value.is_string_literal_expr()
+                "select" => match argument.classify() {
+                    ExprKind::Dict(dict) => {
+                        if dict.items().iter().any(|item| {
+                            item.key().is_some_and(|key| !key.is_string_literal_expr())
+                                || !item.value().is_string_literal_expr()
                         }) {
                             return true;
                         }
                     }
                     _ => return true,
                 },
-                "where" | "tables" => match argument {
-                    Expr::List(list) => {
-                        if !list.iter().all(Expr::is_string_literal_expr) {
+                "where" | "tables" => match argument.classify() {
+                    ExprKind::List(list) => {
+                        if !list.elts().iter().all(ast::Expr::is_string_literal_expr) {
                             return true;
                         }
                     }

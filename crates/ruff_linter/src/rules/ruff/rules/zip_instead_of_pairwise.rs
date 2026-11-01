@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr, Int};
+use ruff_python_ast::{self as ast, Expr, ExprKind, Int, Number};
 use ruff_text_size::Ranged;
 
 use crate::codes::Category;
@@ -65,25 +65,30 @@ struct SliceInfo {
 }
 
 /// Return the argument name, lower bound, and upper bound for an expression, if it's a slice.
-fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
-    let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr else {
+fn match_slice_info(expr: Expr<'_>) -> Option<SliceInfo> {
+    let ExprKind::Subscript(subscript) = expr.classify() else {
         return None;
     };
+    let value = subscript.value();
+    let slice = subscript.slice();
 
-    let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+    let ExprKind::Name(name_node) = value.classify() else {
         return None;
     };
+    let id = name_node.id();
 
-    let Expr::Slice(ast::ExprSlice { lower, step, .. }) = slice.as_ref() else {
+    let ExprKind::Slice(slice_node) = slice.classify() else {
         return None;
     };
+    let lower = slice_node.lower();
+    let step = slice_node.step();
 
     // Avoid false positives for slices with a step.
     if let Some(step) = step {
         if !matches!(
-            step.as_ref(),
-            Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: ast::Number::Int(Int::ONE),
+            step.fields(),
+            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+                value: Number::Int(Int::ONE),
                 ..
             })
         ) {
@@ -92,12 +97,12 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
     }
 
     // If the slice start is a non-constant, we can't be sure that it's successive.
-    let slice_start = if let Some(lower) = lower.as_ref() {
-        let Expr::NumberLiteral(ast::ExprNumberLiteral {
-            value: ast::Number::Int(int),
+    let slice_start = if let Some(lower) = lower {
+        let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+            value: Number::Int(int),
             range: _,
-            node_index: _,
-        }) = lower.as_ref()
+            node: _,
+        }) = lower.fields()
         else {
             return None;
         };
@@ -113,15 +118,13 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
 }
 
 /// RUF007
-pub(crate) fn zip_instead_of_pairwise(checker: &Checker, call: &ast::ExprCall) {
-    let ast::ExprCall {
-        func,
-        arguments: Arguments { args, .. },
-        ..
-    } = call;
+pub(crate) fn zip_instead_of_pairwise(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    let func = call.func;
+    let arguments = call.arguments;
+    let args = arguments.args();
 
     // Require exactly two positional arguments.
-    let [first, second] = args.as_ref() else {
+    let Some([first, second]) = args.as_array() else {
         return;
     };
 
@@ -137,7 +140,8 @@ pub(crate) fn zip_instead_of_pairwise(checker: &Checker, call: &ast::ExprCall) {
 
     // Allow the first argument to be a `Name` or `Subscript`.
     let Some(first_arg_info) = ({
-        if let Expr::Name(ast::ExprName { id, .. }) = first {
+        if let ExprKind::Name(name_node_view) = first.classify() {
+            let id = name_node_view.id();
             Some(SliceInfo {
                 id: id.to_string(),
                 slice_start: None,
@@ -172,7 +176,7 @@ pub(crate) fn zip_instead_of_pairwise(checker: &Checker, call: &ast::ExprCall) {
             checker.semantic(),
         )?;
         let reference_edit =
-            Edit::range_replacement(format!("{binding}({})", first_arg_info.id), call.range());
+            Edit::range_replacement(format!("{binding}({})", first_arg_info.id), call.range);
         Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
     });
 }

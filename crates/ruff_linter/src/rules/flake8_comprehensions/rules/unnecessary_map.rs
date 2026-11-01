@@ -3,8 +3,10 @@ use std::fmt;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, ExprContext, Parameters, Stmt};
-use ruff_python_ast::{ExprLambda, visitor};
+use ruff_python_ast::{
+    self as ast, Expr, ExprCall, ExprContext, ExprKind, ExprLambda, NodeList, Parameters, Stmt,
+    Suite, visitor,
+};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -92,11 +94,11 @@ impl Violation for UnnecessaryMap {
 }
 
 /// C417
-pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_map(checker: &Checker, call: ExprCall<'_>) {
     let semantic = checker.semantic();
-    let (func, arguments) = (&call.func, &call.arguments);
+    let (func, arguments) = (call.func(), call.arguments());
 
-    if !arguments.keywords.is_empty() {
+    if !arguments.keywords().is_empty() {
         return;
     }
 
@@ -108,8 +110,8 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
 
     let (lambda, iterables) = match object_type {
         ObjectType::Generator => {
-            let parent_call_func = match parent {
-                Some(Expr::Call(call)) => Some(&call.func),
+            let parent_call_func = match parent.map(Expr::classify) {
+                Some(ExprKind::Call(call)) => Some(call.func()),
                 _ => None,
             };
 
@@ -126,7 +128,11 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
         }
 
         ObjectType::List | ObjectType::Set | ObjectType::Dict => {
-            let [Expr::Call(inner_call)] = arguments.args.as_ref() else {
+            let Some([ExprKind::Call(inner_call)]) = arguments
+                .args()
+                .as_array()
+                .map(|items| items.map(Expr::classify))
+            else {
                 return;
             };
 
@@ -135,8 +141,8 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
             };
 
             if object_type == ObjectType::Dict {
-                let (Expr::Tuple(ast::ExprTuple { elts, .. })
-                | Expr::List(ast::ExprList { elts, .. })) = &*lambda.body
+                let (ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
+                | ast::ExprFields::List(ast::ExprListFields { elts, .. })) = lambda.body().fields()
                 else {
                     return;
                 };
@@ -153,7 +159,7 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
     // If the lambda body contains a `yield` or `yield from`, rewriting `map(lambda ...)` to a
     // generator expression or any comprehension is invalid Python syntax
     // (e.g., `yield` is not allowed inside generator or comprehension expressions). In such cases, skip.
-    if lambda_contains_yield(&lambda.body) {
+    if lambda_contains_yield(lambda.body()) {
         return;
     }
 
@@ -186,7 +192,7 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
     });
 }
 
-fn is_list_set_or_dict(func: &Expr, semantic: &SemanticModel) -> bool {
+fn is_list_set_or_dict(func: Expr<'_>, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| {
@@ -198,20 +204,21 @@ fn is_list_set_or_dict(func: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 fn map_lambda_and_iterables<'a>(
-    call: &'a ast::ExprCall,
+    call: ExprCall<'a>,
     semantic: &'a SemanticModel,
-) -> Option<(&'a ExprLambda, &'a [Expr])> {
-    if !semantic.match_builtin_expr(&call.func, "map") {
+) -> Option<(ExprLambda<'a>, NodeList<'a, ruff_python_ast::kind::Expr>)> {
+    if !semantic.match_builtin_expr(call.func(), "map") {
         return None;
     }
 
-    let arguments = &call.arguments;
+    let arguments = call.arguments();
 
-    if !arguments.keywords.is_empty() {
+    if !arguments.keywords().is_empty() {
         return None;
     }
 
-    let Some((Expr::Lambda(lambda), iterables)) = arguments.args.split_first() else {
+    let (expr, iterables) = arguments.args().split_first()?;
+    let ExprKind::Lambda(lambda) = expr.classify() else {
         return None;
     };
 
@@ -219,9 +226,9 @@ fn map_lambda_and_iterables<'a>(
 }
 
 /// Returns true if the expression tree contains a `yield` or `yield from` expression.
-fn lambda_contains_yield(expr: &Expr) -> bool {
+fn lambda_contains_yield(expr: Expr<'_>) -> bool {
     any_over_expr(expr, |expr| {
-        matches!(expr, Expr::Yield(_) | Expr::YieldFrom(_))
+        matches!(expr.classify(), ExprKind::Yield(_) | ExprKind::YieldFrom(_))
     })
 }
 
@@ -230,8 +237,8 @@ fn lambda_contains_yield(expr: &Expr) -> bool {
 /// * It has exactly one parameter
 /// * That parameter is not variadic
 /// * That parameter does not have a default value
-fn lambda_has_expected_arity(lambda: &ExprLambda) -> bool {
-    let Some(parameters) = lambda.parameters.as_deref() else {
+fn lambda_has_expected_arity(lambda: ExprLambda<'_>) -> bool {
+    let Some(parameters) = lambda.parameters() else {
         return false;
     };
 
@@ -239,14 +246,14 @@ fn lambda_has_expected_arity(lambda: &ExprLambda) -> bool {
         return false;
     }
 
-    let [parameter] = &*parameters.args else {
+    let Some([parameter]) = parameters.args().as_array() else {
         return false;
     };
 
-    if parameter.default.is_some() {
+    if parameter.default().is_some() {
         return false;
     }
-    if late_binding(parameters, &lambda.body) {
+    if late_binding(parameters, lambda.body()) {
         return false;
     }
 
@@ -262,7 +269,7 @@ pub(crate) enum ObjectType {
 }
 
 impl ObjectType {
-    fn from(func: &Expr, semantic: &SemanticModel) -> Option<Self> {
+    fn from(func: Expr<'_>, semantic: &SemanticModel) -> Option<Self> {
         match semantic.resolve_builtin_symbol(func) {
             Some("map") => Some(Self::Generator),
             Some("list") => Some(Self::List),
@@ -301,7 +308,7 @@ impl fmt::Display for ObjectType {
 ///
 /// Would yield an incorrect result, as the `x` in the inner lambda would be bound to the last
 /// value of `x` in the comprehension.
-fn late_binding(parameters: &Parameters, body: &Expr) -> bool {
+fn late_binding(parameters: Parameters<'_>, body: Expr<'_>) -> bool {
     let mut visitor = LateBindingVisitor::new(parameters);
     visitor.visit_expr(body);
     visitor.late_bound
@@ -310,15 +317,15 @@ fn late_binding(parameters: &Parameters, body: &Expr) -> bool {
 #[derive(Debug)]
 struct LateBindingVisitor<'a> {
     /// The arguments to the current lambda.
-    parameters: &'a Parameters,
+    parameters: Parameters<'a>,
     /// The arguments to any lambdas within the current lambda body.
-    lambdas: Vec<Option<&'a Parameters>>,
+    lambdas: Vec<Option<Parameters<'a>>>,
     /// Whether any names within the current lambda body are late-bound within nested lambdas.
     late_bound: bool,
 }
 
 impl<'a> LateBindingVisitor<'a> {
-    fn new(parameters: &'a Parameters) -> Self {
+    fn new(parameters: Parameters<'a>) -> Self {
         Self {
             parameters,
             lambdas: Vec::new(),
@@ -328,29 +335,27 @@ impl<'a> LateBindingVisitor<'a> {
 }
 
 impl<'a> Visitor<'a> for LateBindingVisitor<'a> {
-    fn visit_stmt(&mut self, _stmt: &'a Stmt) {}
+    fn visit_stmt(&mut self, _stmt: Stmt<'a>) {}
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Lambda(ast::ExprLambda { parameters, .. }) => {
-                self.lambdas.push(parameters.as_deref());
+    fn visit_expr(&mut self, expr: Expr<'a>) {
+        match expr.classify() {
+            ExprKind::Lambda(expr_lambda) => {
+                let parameters = expr_lambda.parameters();
+
+                self.lambdas.push(parameters);
                 visitor::walk_expr(self, expr);
                 self.lambdas.pop();
             }
-            Expr::Name(ast::ExprName {
-                id,
-                ctx: ExprContext::Load,
-                ..
-            }) => {
+            ExprKind::Name(expr_name) if expr_name.ctx() == ExprContext::Load => {
+                let id = expr_name.id();
+
                 // If we're within a nested lambda...
                 if !self.lambdas.is_empty() {
                     // If the name is defined in the current lambda...
                     if self.parameters.includes(id) {
                         // And isn't overridden by any nested lambdas...
                         if !self.lambdas.iter().any(|parameters| {
-                            parameters
-                                .as_ref()
-                                .is_some_and(|parameters| parameters.includes(id))
+                            parameters.is_some_and(|parameters| parameters.includes(id))
                         }) {
                             // Then it's late-bound.
                             self.late_bound = true;
@@ -362,5 +367,5 @@ impl<'a> Visitor<'a> for LateBindingVisitor<'a> {
         }
     }
 
-    fn visit_body(&mut self, _body: &'a [Stmt]) {}
+    fn visit_body(&mut self, _body: Suite<'a>) {}
 }

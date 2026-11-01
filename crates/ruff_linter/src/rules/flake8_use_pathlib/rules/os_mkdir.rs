@@ -69,7 +69,7 @@ impl Violation for OsMkdir {
 }
 
 /// PTH102
-pub(crate) fn os_mkdir(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_mkdir(checker: &Checker, call: ExprCall<'_>, segments: &[&str]) {
     if segments != ["os", "mkdir"] {
         return;
     }
@@ -79,14 +79,14 @@ pub(crate) fn os_mkdir(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     //           0     1                2
     // os.mkdir(path, mode=0o777, *, dir_fd=None)
     // ```
-    if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
+    if is_keyword_only_argument_non_default(call.arguments(), "dir_fd") {
         return;
     }
 
     let range = call.range();
-    let mut diagnostic = checker.report_diagnostic(OsMkdir, call.func.range());
+    let mut diagnostic = checker.report_diagnostic(OsMkdir, call.func().range());
 
-    let Some(path) = call.arguments.find_argument_value("path", 0) else {
+    let Some(path) = call.arguments().find_argument_value("path", 0) else {
         return;
     };
 
@@ -94,11 +94,11 @@ pub(crate) fn os_mkdir(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         return;
     }
 
-    if call.arguments.len() > 2 {
+    if call.arguments().len() > 2 {
         return;
     }
 
-    if has_unknown_keywords_or_starred_expr(&call.arguments, &["path", "mode"]) {
+    if has_unknown_keywords_or_starred_expr(call.arguments(), &["path", "mode"]) {
         return;
     }
 
@@ -118,7 +118,7 @@ pub(crate) fn os_mkdir(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         let path_code = checker.locator().slice(path.range());
 
         let mkdir_args = call
-            .arguments
+            .arguments()
             .find_argument_value("mode", 1)
             .map(|expr| format!("mode={}", checker.locator().slice(expr.range())))
             .unwrap_or_default();

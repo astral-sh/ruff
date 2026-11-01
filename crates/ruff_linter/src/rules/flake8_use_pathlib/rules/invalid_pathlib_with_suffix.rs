@@ -2,7 +2,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, PythonVersion, StringFlags};
+use ruff_python_ast::{self as ast, ExprKind, PythonVersion, StringFlags};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::{self, PathlibPathChecker, TypeChecker};
 use ruff_text_size::Ranged;
@@ -86,8 +86,8 @@ impl Violation for InvalidPathlibWithSuffix {
 }
 
 /// PTH210
-pub(crate) fn invalid_pathlib_with_suffix(checker: &Checker, call: &ast::ExprCall) {
-    let (func, arguments) = (&call.func, &call.arguments);
+pub(crate) fn invalid_pathlib_with_suffix(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    let (func, arguments) = (call.func, call.arguments);
 
     if !is_path_with_suffix_call(checker.semantic(), func) {
         return;
@@ -97,11 +97,14 @@ pub(crate) fn invalid_pathlib_with_suffix(checker: &Checker, call: &ast::ExprCal
         return;
     }
 
-    let Some(ast::Expr::StringLiteral(string)) = arguments.find_argument_value("suffix", 0) else {
+    let Some(ExprKind::StringLiteral(string)) = arguments
+        .find_argument_value("suffix", 0)
+        .map(ast::Expr::classify)
+    else {
         return;
     };
 
-    let string_value = string.value.to_str();
+    let string_value = string.value().to_str();
 
     if string_value.is_empty() {
         return;
@@ -111,7 +114,7 @@ pub(crate) fn invalid_pathlib_with_suffix(checker: &Checker, call: &ast::ExprCal
         return;
     }
 
-    let [first_part, ..] = string.value.as_slice() else {
+    let Some((first_part, _)) = string.value().as_slice().split_first() else {
         return;
     };
 
@@ -124,9 +127,9 @@ pub(crate) fn invalid_pathlib_with_suffix(checker: &Checker, call: &ast::ExprCal
     }
 
     let mut diagnostic =
-        checker.report_diagnostic(InvalidPathlibWithSuffix { single_dot }, call.range());
+        checker.report_diagnostic(InvalidPathlibWithSuffix { single_dot }, call.range);
     if !single_dot {
-        let after_leading_quote = string.start() + first_part.flags.opener_len();
+        let after_leading_quote = string.start() + first_part.flags().opener_len();
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
             ".".to_string(),
             after_leading_quote,
@@ -134,22 +137,24 @@ pub(crate) fn invalid_pathlib_with_suffix(checker: &Checker, call: &ast::ExprCal
     }
 }
 
-fn is_path_with_suffix_call(semantic: &SemanticModel, func: &ast::Expr) -> bool {
-    let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func else {
+fn is_path_with_suffix_call(semantic: &SemanticModel, func: ast::Expr<'_>) -> bool {
+    let ExprKind::Attribute(attribute) = func.classify() else {
         return false;
     };
+    let value = attribute.value();
+    let attr = attribute.attr();
 
     if attr != "with_suffix" {
         return false;
     }
 
-    match &**value {
-        ast::Expr::Name(name) => {
+    match value.classify() {
+        ExprKind::Name(name) => {
             let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
                 return false;
             };
             typing::is_pathlib_path(binding, semantic)
         }
-        expr => PathlibPathChecker::match_initializer(expr, semantic),
+        expr => PathlibPathChecker::match_initializer(expr.view(), semantic),
     }
 }

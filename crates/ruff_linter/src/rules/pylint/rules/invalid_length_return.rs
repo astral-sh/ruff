@@ -1,8 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, StmtFunctionDef, UnaryOp};
 use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
@@ -52,8 +51,8 @@ impl Violation for InvalidLengthReturnType {
 }
 
 /// PLE0303
-pub(crate) fn invalid_length_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
-    if function_def.name.as_str() != "__len__" {
+pub(crate) fn invalid_length_return(checker: &Checker, function_def: StmtFunctionDef<'_>) {
+    if function_def.name().as_str() != "__len__" {
         return;
     }
 
@@ -79,14 +78,10 @@ pub(crate) fn invalid_length_return(checker: &Checker, function_def: &ast::StmtF
         return;
     }
 
-    let returns = {
-        let mut visitor = ReturnStatementVisitor::default();
-        visitor.visit_body(&function_def.body);
-        visitor.returns
-    };
+    let returns = ReturnStatementVisitor::for_function(function_def).returns;
 
     for stmt in returns {
-        if let Some(value) = stmt.value.as_deref() {
+        if let Some(value) = stmt.value() {
             if is_negative_integer(value)
                 || !matches!(
                     ResolvedPythonType::from(value),
@@ -104,11 +99,11 @@ pub(crate) fn invalid_length_return(checker: &Checker, function_def: &ast::StmtF
 }
 
 /// Returns `true` if the given expression is a negative integer.
-fn is_negative_integer(value: &Expr) -> bool {
+fn is_negative_integer(value: Expr<'_>) -> bool {
     matches!(
-        value,
-        Expr::UnaryOp(ast::ExprUnaryOp {
-            op: ast::UnaryOp::USub,
+        value.fields(),
+        ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
+            op: UnaryOp::USub,
             ..
         })
     )

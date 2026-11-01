@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, ExprKind};
 use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatSpec, CFormatString, CFormatType,
 };
@@ -108,7 +108,7 @@ impl Violation for LoggingEagerConversion {
 }
 
 /// RUF065
-pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn logging_eager_conversion(checker: &Checker, call: ast::ExprCall<'_>) {
     let Some((logging_call_type, _range)) = find_logging_call(checker, call) else {
         return;
     };
@@ -119,12 +119,14 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
     };
 
     // Extract a format string from the logging statement msg argument
-    let Some(Expr::StringLiteral(string_literal)) =
-        call.arguments.find_argument_value("msg", msg_pos)
+    let Some(ExprKind::StringLiteral(string_literal)) = call
+        .arguments()
+        .find_argument_value("msg", msg_pos)
+        .map(ast::Expr::classify)
     else {
         return;
     };
-    let Ok(format_string) = CFormatString::from_str(string_literal.value.to_str()) else {
+    let Ok(format_string) = CFormatString::from_str(string_literal.value().to_str()) else {
         return;
     };
 
@@ -139,20 +141,17 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
             }
         })
         .zip(
-            call.arguments
-                .args
+            call.arguments()
+                .args()
                 .iter()
                 .skip(msg_pos + 1)
                 .take_while(|arg| !arg.is_starred_expr()),
         )
     {
         // Check if the argument is a call to eagerly format a value
-        if let Expr::Call(ast::ExprCall {
-            func,
-            arguments: str_call_args,
-            ..
-        }) = arg
-        {
+        if let ExprKind::Call(call_node) = arg.classify() {
+            let func = call_node.func();
+            let str_call_args = call_node.arguments();
             let CFormatType::String(format_conversion) = spec.format_type else {
                 continue;
             };
@@ -162,7 +161,7 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
                 // %s with str() - remove str() call
                 // Only flag if str() has exactly one argument (positional or keyword) that is not unpacked
                 FormatConversion::Str
-                    if checker.semantic().match_builtin_expr(func.as_ref(), "str")
+                    if checker.semantic().match_builtin_expr(func, "str")
                         && str_call_args.len() == 1
                         && str_call_args
                             .find_argument("object", 0)
@@ -177,9 +176,7 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
                     );
                 }
                 // %s with repr() - suggest using %r instead
-                FormatConversion::Str
-                    if checker.semantic().match_builtin_expr(func.as_ref(), "repr") =>
-                {
+                FormatConversion::Str if checker.semantic().match_builtin_expr(func, "repr") => {
                     checker.report_diagnostic(
                         LoggingEagerConversion {
                             format_conversion: FormatConversion::Repr,
@@ -189,11 +186,7 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
                     );
                 }
                 // %s with ascii() - suggest using %a instead
-                FormatConversion::Str
-                    if checker
-                        .semantic()
-                        .match_builtin_expr(func.as_ref(), "ascii") =>
-                {
+                FormatConversion::Str if checker.semantic().match_builtin_expr(func, "ascii") => {
                     checker.report_diagnostic(
                         LoggingEagerConversion {
                             format_conversion: FormatConversion::Ascii,
@@ -204,7 +197,7 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
                 }
                 // %s with oct() - suggest using %#o instead
                 FormatConversion::Str
-                    if checker.semantic().match_builtin_expr(func.as_ref(), "oct")
+                    if checker.semantic().match_builtin_expr(func, "oct")
                         && !has_complex_conversion_specifier(spec) =>
                 {
                     checker.report_diagnostic(
@@ -217,7 +210,7 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
                 }
                 // %s with hex() - suggest using %#x instead
                 FormatConversion::Str
-                    if checker.semantic().match_builtin_expr(func.as_ref(), "hex")
+                    if checker.semantic().match_builtin_expr(func, "hex")
                         && !has_complex_conversion_specifier(spec) =>
                 {
                     checker.report_diagnostic(

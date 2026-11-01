@@ -4,8 +4,7 @@ use std::sync::LazyLock;
 use regex::{CaptureMatches, Regex};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
-use ruff_python_ast::{Arguments, Expr, ExprCall, ExprSubscript, Parameter, ParameterWithDefault};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprKind, Parameter, ParameterWithDefault};
 use ruff_python_semantic::{BindingKind, Modules, ScopeKind, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextSize};
@@ -110,7 +109,7 @@ impl Violation for FastApiUnusedPathParameter {
 /// FAST003
 pub(crate) fn fastapi_unused_path_parameter(
     checker: &Checker,
-    function_def: &ast::StmtFunctionDef,
+    function_def: ast::StmtFunctionDef<'_>,
 ) {
     if !checker.semantic().seen_module(Modules::FASTAPI) {
         return;
@@ -118,7 +117,7 @@ pub(crate) fn fastapi_unused_path_parameter(
 
     // Get the route path from the decorator.
     let route_decorator = function_def
-        .decorator_list
+        .decorator_list()
         .iter()
         .find_map(|decorator| is_fastapi_route_decorator(decorator, checker.semantic()));
 
@@ -126,14 +125,14 @@ pub(crate) fn fastapi_unused_path_parameter(
         return;
     };
 
-    let Some(path_arg) = route_decorator.arguments.args.first() else {
+    let Some(path_arg) = route_decorator.arguments().args().first() else {
         return;
     };
     let diagnostic_range = path_arg.range();
 
     // We can't really handle anything other than string literals.
     let path = match path_arg.as_string_literal_expr() {
-        Some(path_arg) => &path_arg.value,
+        Some(path_arg) => &path_arg.value(),
         None => return,
     };
 
@@ -144,12 +143,12 @@ pub(crate) fn fastapi_unused_path_parameter(
     let mut named_args = vec![];
 
     for parameter_with_default in non_posonly_non_variadic_parameters(function_def) {
-        let ParameterWithDefault { parameter, .. } = parameter_with_default;
+        let parameter = parameter_with_default.parameter();
 
         if let Some(alias) = parameter_alias(parameter, checker.semantic()) {
             named_args.push(alias);
         } else {
-            named_args.push(parameter.name.as_str());
+            named_args.push(parameter.name().as_str());
         }
 
         let Some(dependency) =
@@ -178,15 +177,15 @@ pub(crate) fn fastapi_unused_path_parameter(
         // the path parameter injection won't work, but we also can't fix it (yet), since we'd need
         // to make the parameter non-positional-only.
         let is_positional = function_def
-            .parameters
-            .posonlyargs
+            .parameters()
+            .posonlyargs()
             .iter()
             .any(|param| param.name() == path_param);
 
         let mut diagnostic = checker.report_diagnostic(
             FastApiUnusedPathParameter {
                 arg_name: path_param.to_string(),
-                function_name: function_def.name.to_string(),
+                function_name: function_def.name().to_string(),
                 is_positional,
             },
             #[expect(clippy::cast_possible_truncation)]
@@ -197,7 +196,7 @@ pub(crate) fn fastapi_unused_path_parameter(
         if !is_positional && is_identifier(path_param) && path_param != "__debug__" {
             if let Some(edit) = add_parameter(
                 path_param,
-                &function_def.parameters,
+                function_def.parameters(),
                 checker.locator().contents(),
             ) {
                 diagnostic.set_fix(Fix::unsafe_edit(edit));
@@ -208,13 +207,13 @@ pub(crate) fn fastapi_unused_path_parameter(
 
 /// Returns an iterator over the non-positional-only, non-variadic parameters of a function.
 fn non_posonly_non_variadic_parameters(
-    function_def: &ast::StmtFunctionDef,
-) -> impl Iterator<Item = &ParameterWithDefault> {
+    function_def: ast::StmtFunctionDef<'_>,
+) -> impl Iterator<Item = ParameterWithDefault<'_>> {
     function_def
-        .parameters
-        .args
+        .parameters()
+        .args()
         .iter()
-        .chain(&function_def.parameters.kwonlyargs)
+        .chain(function_def.parameters().kwonlyargs())
 }
 
 #[derive(Debug, is_macro::Is)]
@@ -259,7 +258,7 @@ impl<'a> Dependency<'a> {
     /// ): ...
     /// ```
     fn from_parameter(
-        parameter: &'a ParameterWithDefault,
+        parameter: ParameterWithDefault<'a>,
         semantic: &SemanticModel<'a>,
     ) -> Option<Self> {
         if let Some(dependency) = parameter
@@ -269,24 +268,26 @@ impl<'a> Dependency<'a> {
             return Some(dependency);
         }
 
-        let ExprSubscript { value, slice, .. } = parameter.annotation()?.as_subscript_expr()?;
+        let expr_subscript = parameter.annotation()?.as_subscript_expr()?;
+        let value = expr_subscript.value();
+        let slice = expr_subscript.slice();
 
         if !semantic.match_typing_expr(value, "Annotated") {
             return None;
         }
 
-        let Expr::Tuple(tuple) = slice.as_ref() else {
+        let ExprKind::Tuple(tuple) = slice.classify() else {
             return None;
         };
 
-        let mut dependencies = tuple.elts.iter().skip(1).filter_map(|metadata_element| {
+        let mut dependencies = tuple.elts().iter().skip(1).filter_map(|metadata_element| {
             let arguments = depends_arguments(metadata_element, semantic)?;
 
             // Arguments to `Depends` can be empty if the dependency is a class
             // that FastAPI will call to create an instance of the class itself.
             // https://fastapi.tiangolo.com/tutorial/dependencies/classes-as-dependencies/#shortcut
             if arguments.is_empty() {
-                Self::from_dependency_name(tuple.elts.first()?.as_name_expr()?, semantic)
+                Self::from_dependency_name(tuple.elts().first()?.as_name_expr()?, semantic)
             } else {
                 Self::from_depends_call(arguments, semantic)
             }
@@ -301,22 +302,22 @@ impl<'a> Dependency<'a> {
         }
     }
 
-    fn from_default(expr: &'a Expr, semantic: &SemanticModel<'a>) -> Option<Self> {
+    fn from_default(expr: Expr<'a>, semantic: &SemanticModel<'a>) -> Option<Self> {
         let arguments = depends_arguments(expr, semantic)?;
 
         Self::from_depends_call(arguments, semantic)
     }
 
-    fn from_depends_call(arguments: &'a Arguments, semantic: &SemanticModel<'a>) -> Option<Self> {
+    fn from_depends_call(arguments: Arguments<'a>, semantic: &SemanticModel<'a>) -> Option<Self> {
         let dep_arg = arguments.find_argument_value("dependency", 0)?;
 
-        match dep_arg {
+        match dep_arg.classify() {
             // `Depends(some_callable)` — a name reference (function or class).
-            Expr::Name(name) => Self::from_dependency_name(name, semantic),
+            ExprKind::Name(name) => Self::from_dependency_name(name, semantic),
             // `Depends(SomeClass(...))` — a call expression. If the callee is a
             // class, FastAPI will invoke `__call__` on the resulting instance.
-            Expr::Call(call) => {
-                let Expr::Name(name) = call.func.as_ref() else {
+            ExprKind::Call(call) => {
+                let ExprKind::Name(name) = call.func().classify() else {
                     return None;
                 };
                 Self::from_dependency_instance(name, semantic)
@@ -329,7 +330,7 @@ impl<'a> Dependency<'a> {
     ///
     /// For classes, FastAPI calls the class constructor, so the parameters come
     /// from `__init__`.
-    fn from_dependency_name(name: &'a ast::ExprName, semantic: &SemanticModel<'a>) -> Option<Self> {
+    fn from_dependency_name(name: ast::ExprName<'a>, semantic: &SemanticModel<'a>) -> Option<Self> {
         let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
             return Some(Self::Unknown);
         };
@@ -359,7 +360,7 @@ impl<'a> Dependency<'a> {
     ///
     /// FastAPI calls the instance, so the parameters come from `__call__`.
     fn from_dependency_instance(
-        name: &'a ast::ExprName,
+        name: ast::ExprName<'a>,
         semantic: &SemanticModel<'a>,
     ) -> Option<Self> {
         let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
@@ -392,20 +393,20 @@ impl<'a> Dependency<'a> {
             .any(|expr| is_pydantic_base_model(expr, semantic))
         {
             class_def
-                .body
+                .body()
                 .iter()
                 .filter_map(|stmt| {
                     stmt.as_ann_assign_stmt()
-                        .and_then(|ann_assign| ann_assign.target.as_name_expr())
-                        .map(|name| name.id.as_str())
+                        .and_then(|ann_assign| ann_assign.target().as_name_expr())
+                        .map(|name| name.id().as_str())
                 })
                 .collect()
         } else {
             let method_def = class_def
-                .body
+                .body()
                 .iter()
-                .filter_map(|stmt| stmt.as_function_def_stmt())
-                .find(|func_def| func_def.name.as_str() == method_name)?;
+                .filter_map(ast::Stmt::as_function_def_stmt)
+                .find(|func_def| func_def.name().as_str() == method_name)?;
             // Skip `self` parameter
             non_posonly_non_variadic_parameters(method_def)
                 .skip(1)
@@ -417,28 +418,27 @@ impl<'a> Dependency<'a> {
     }
 }
 
-fn depends_arguments<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a Arguments> {
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = expr
-    else {
+fn depends_arguments<'a>(expr: Expr<'a>, semantic: &SemanticModel) -> Option<Arguments<'a>> {
+    let ExprKind::Call(call_node) = expr.classify() else {
         return None;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
-    if !is_fastapi_depends(func.as_ref(), semantic) {
+    if !is_fastapi_depends(func, semantic) {
         return None;
     }
 
     Some(arguments)
 }
 
-fn is_fastapi_depends(expr: &Expr, semantic: &SemanticModel) -> bool {
+fn is_fastapi_depends(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["fastapi", "Depends"]))
 }
 
-fn is_pydantic_base_model(expr: &Expr, semantic: &SemanticModel) -> bool {
+fn is_pydantic_base_model(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| {
@@ -448,48 +448,46 @@ fn is_pydantic_base_model(expr: &Expr, semantic: &SemanticModel) -> bool {
 
 /// Extract the expected in-route name for a given parameter, if it has an alias.
 /// For example, given `document_id: Annotated[str, Path(alias="documentId")]`, returns `"documentId"`.
-fn parameter_alias<'a>(parameter: &'a Parameter, semantic: &SemanticModel) -> Option<&'a str> {
-    let Some(annotation) = &parameter.annotation else {
+fn parameter_alias<'a>(parameter: Parameter<'a>, semantic: &SemanticModel) -> Option<&'a str> {
+    let annotation = parameter.annotation()?;
+
+    let ExprKind::Subscript(subscript) = annotation.classify() else {
         return None;
     };
 
-    let Expr::Subscript(subscript) = annotation.as_ref() else {
+    let ExprKind::Tuple(tuple) = subscript.slice().classify() else {
         return None;
     };
 
-    let Expr::Tuple(tuple) = subscript.slice.as_ref() else {
-        return None;
-    };
-
-    let Some(Expr::Call(path)) = tuple.elts.get(1) else {
+    let Some(ExprKind::Call(path)) = tuple.elts().get(1).map(Expr::classify) else {
         return None;
     };
 
     // Find the `alias` keyword argument.
     let alias = path
-        .arguments
+        .arguments()
         .find_keyword("alias")
-        .map(|alias| &alias.value)?;
+        .map(ast::Keyword::value)?;
 
     // Ensure that it's a literal string.
-    let Expr::StringLiteral(alias) = alias else {
+    let ExprKind::StringLiteral(alias) = alias.classify() else {
         return None;
     };
 
     // Verify that the subscript was a `typing.Annotated`.
-    if !semantic.match_typing_expr(&subscript.value, "Annotated") {
+    if !semantic.match_typing_expr(subscript.value(), "Annotated") {
         return None;
     }
 
     // Verify that the call was a `fastapi.Path`.
     if !semantic
-        .resolve_qualified_name(&path.func)
+        .resolve_qualified_name(path.func())
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["fastapi", "Path"]))
     {
         return None;
     }
 
-    Some(alias.value.to_str())
+    Some(alias.value().to_str())
 }
 
 /// An iterator to extract parameters from FastAPI route paths.

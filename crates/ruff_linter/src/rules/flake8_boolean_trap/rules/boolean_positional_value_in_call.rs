@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -54,13 +54,13 @@ impl Violation for BooleanPositionalValueInCall {
 }
 
 /// FBT003
-pub(crate) fn boolean_positional_value_in_call(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn boolean_positional_value_in_call(checker: &Checker, call: ast::ExprCall<'_>) {
     if allow_boolean_trap(call, checker) {
         return;
     }
     for arg in call
-        .arguments
-        .args
+        .arguments()
+        .args()
         .iter()
         .filter(|arg| arg.is_boolean_literal_expr())
     {

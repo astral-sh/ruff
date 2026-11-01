@@ -1,4 +1,4 @@
-use ruff_python_ast::Expr;
+use ruff_python_ast::{Expr, NodeList};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -66,7 +66,11 @@ impl Violation for FormatInGetTextFuncCall {
 }
 
 /// INT002
-pub(crate) fn format_in_gettext_func_call(checker: &Checker, func: &Expr, args: &[Expr]) {
+pub(crate) fn format_in_gettext_func_call(
+    checker: &Checker,
+    func: Expr<'_>,
+    args: NodeList<'_, ruff_python_ast::kind::Expr>,
+) {
     // Check first argument (singular)
     if let Some(first) = args.first() {
         if is_format_call(first) {
@@ -85,10 +89,10 @@ pub(crate) fn format_in_gettext_func_call(checker: &Checker, func: &Expr, args: 
 
 /// Return `true` if `expr` is a call to the `format` attribute, as in
 /// `s.format(...)`.
-fn is_format_call(expr: &Expr) -> bool {
+fn is_format_call(expr: Expr<'_>) -> bool {
     expr.as_call_expr().is_some_and(|call| {
-        call.func
+        call.func()
             .as_attribute_expr()
-            .is_some_and(|attr| &attr.attr == "format")
+            .is_some_and(|attr| attr.attr() == "format")
     })
 }

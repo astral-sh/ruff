@@ -1,5 +1,4 @@
-use ruff_python_ast as ast;
-use ruff_python_ast::{Parameter, Parameters, Stmt, StmtExpr, StmtFunctionDef, StmtRaise};
+use ruff_python_ast::{ExprKind, Parameter, Parameters, StmtFunctionDef};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::{function_type, visibility};
@@ -291,25 +290,28 @@ impl Argumentable {
 }
 
 /// Check a plain function for unused arguments.
-fn function(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, checker: &Checker) {
+fn function(
+    argumentable: Argumentable,
+    parameters: Parameters<'_>,
+    scope: &Scope,
+    checker: &Checker,
+) {
     let ignore_variadic_names = checker
         .settings()
         .flake8_unused_arguments
         .ignore_variadic_names;
     let args = parameters
         .iter_non_variadic_params()
-        .map(|parameter_with_default| &parameter_with_default.parameter)
+        .map(ruff_python_ast::ParameterWithDefault::parameter)
         .chain(
             parameters
-                .vararg
-                .as_deref()
+                .vararg()
                 .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         )
         .chain(
             parameters
-                .kwarg
-                .as_deref()
+                .kwarg()
                 .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         );
@@ -317,7 +319,12 @@ fn function(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, 
 }
 
 /// Check a method for unused arguments.
-fn method(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, checker: &Checker) {
+fn method(
+    argumentable: Argumentable,
+    parameters: Parameters<'_>,
+    scope: &Scope,
+    checker: &Checker,
+) {
     let ignore_variadic_names = checker
         .settings()
         .flake8_unused_arguments
@@ -325,18 +332,16 @@ fn method(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, ch
     let args = parameters
         .iter_non_variadic_params()
         .skip(1)
-        .map(|parameter_with_default| &parameter_with_default.parameter)
+        .map(ruff_python_ast::ParameterWithDefault::parameter)
         .chain(
             parameters
-                .vararg
-                .as_deref()
+                .vararg()
                 .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         )
         .chain(
             parameters
-                .kwarg
-                .as_deref()
+                .kwarg()
                 .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         );
@@ -345,7 +350,7 @@ fn method(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, ch
 
 fn call<'a>(
     argumentable: Argumentable,
-    parameters: impl Iterator<Item = &'a Parameter>,
+    parameters: impl Iterator<Item = Parameter<'a>>,
     scope: &Scope,
     checker: &Checker,
 ) {
@@ -353,16 +358,16 @@ fn call<'a>(
     let dummy_variable_rgx = &checker.settings().dummy_variable_rgx;
     for arg in parameters {
         let Some(binding) = scope
-            .get(arg.name())
+            .get(arg.name().as_str())
             .map(|binding_id| semantic.binding(binding_id))
         else {
             continue;
         };
         if binding.kind.is_argument()
             && binding.is_unused()
-            && !dummy_variable_rgx.is_match(arg.name())
+            && !dummy_variable_rgx.is_match(arg.name().as_str())
         {
-            argumentable.check_for(checker, arg.name.to_string(), binding.range());
+            argumentable.check_for(checker, arg.name().to_string(), binding.range());
         }
     }
 }
@@ -381,50 +386,57 @@ fn call<'a>(
 /// [`is_stub`]: function_type::is_stub
 /// [`EM101`]: https://docs.astral.sh/ruff/rules/raw-string-in-exception/
 pub(crate) fn is_not_implemented_stub_with_variable(
-    function_def: &StmtFunctionDef,
+    function_def: StmtFunctionDef<'_>,
     semantic: &SemanticModel,
 ) -> bool {
     // Ignore doc-strings.
-    let statements = match function_def.body.as_slice() {
-        [Stmt::Expr(StmtExpr { value, .. }), rest @ ..] if value.is_string_literal_expr() => rest,
-        _ => &function_def.body,
+    let statements = match function_def.body() {
+        body if let Some((stmt, rest)) = body.split_first()
+            && let Some(expr) = stmt.as_expr_stmt()
+            && expr.value().is_string_literal_expr() =>
+        {
+            rest
+        }
+        _ => function_def.body(),
     };
 
-    let [
-        Stmt::Assign(ast::StmtAssign { targets, value, .. }),
-        Stmt::Raise(StmtRaise {
-            exc: Some(exception),
-            ..
-        }),
-    ] = statements
-    else {
+    let Some([assign, raise]) = statements.as_array() else {
+        return false;
+    };
+    let (Some(assign), Some(raise)) = (assign.as_assign_stmt(), raise.as_raise_stmt()) else {
+        return false;
+    };
+    let Some(exception) = raise.exc() else {
         return false;
     };
 
-    if !matches!(**value, ast::Expr::StringLiteral(_) | ast::Expr::FString(_)) {
+    if !matches!(
+        assign.value().classify(),
+        ExprKind::StringLiteral(_) | ExprKind::FString(_)
+    ) {
         return false;
     }
 
-    let ast::Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = &**exception
-    else {
+    let ExprKind::Call(call_node) = exception.classify() else {
         return false;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
     if !semantic.match_builtin_expr(func, "NotImplementedError") {
         return false;
     }
 
-    let [argument] = &*arguments.args else {
+    let Some([argument]) = arguments.args().as_array() else {
         return false;
     };
 
-    let [target] = targets.as_slice() else {
+    let Some([target]) = assign.targets().as_array() else {
         return false;
     };
 
-    argument.as_name_expr().map(ast::ExprName::id) == target.as_name_expr().map(ast::ExprName::id)
+    argument.as_name_expr().map(ruff_python_ast::ExprName::id)
+        == target.as_name_expr().map(ruff_python_ast::ExprName::id)
 }
 
 /// ARG001, ARG002, ARG003, ARG004, ARG005
@@ -438,16 +450,12 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
     };
 
     match &scope.kind {
-        ScopeKind::Function(
-            function_def @ ast::StmtFunctionDef {
-                name,
-                parameters,
-                decorator_list,
-                ..
-            },
-        ) => {
+        ScopeKind::Function(function_def @ stmt_function_def) => {
+            let name = stmt_function_def.name();
+            let parameters = stmt_function_def.parameters();
+            let decorator_list = stmt_function_def.decorator_list();
             match function_type::classify(
-                name,
+                name.as_str(),
                 decorator_list,
                 parent,
                 checker.semantic(),
@@ -456,8 +464,8 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
             ) {
                 function_type::FunctionType::Function => {
                     if checker.is_rule_enabled(Argumentable::Function.rule_code())
-                        && !function_type::is_stub(function_def, checker.semantic())
-                        && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
+                        && !function_type::is_stub(*function_def, checker.semantic())
+                        && !is_not_implemented_stub_with_variable(*function_def, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
                         function(Argumentable::Function, parameters, scope, checker);
@@ -465,11 +473,11 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                 }
                 function_type::FunctionType::Method => {
                     if checker.is_rule_enabled(Argumentable::Method.rule_code())
-                        && !function_type::is_stub(function_def, checker.semantic())
-                        && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
-                        && (!visibility::is_magic(name)
-                            || visibility::is_init(name)
-                            || visibility::is_call(name))
+                        && !function_type::is_stub(*function_def, checker.semantic())
+                        && !is_not_implemented_stub_with_variable(*function_def, checker.semantic())
+                        && (!visibility::is_magic(name.as_str())
+                            || visibility::is_init(name.as_str())
+                            || visibility::is_call(name.as_str()))
                         && !visibility::is_abstract(decorator_list, checker.semantic())
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
@@ -479,11 +487,11 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                 }
                 function_type::FunctionType::ClassMethod => {
                     if checker.is_rule_enabled(Argumentable::ClassMethod.rule_code())
-                        && !function_type::is_stub(function_def, checker.semantic())
-                        && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
-                        && (!visibility::is_magic(name)
-                            || visibility::is_init(name)
-                            || visibility::is_call(name))
+                        && !function_type::is_stub(*function_def, checker.semantic())
+                        && !is_not_implemented_stub_with_variable(*function_def, checker.semantic())
+                        && (!visibility::is_magic(name.as_str())
+                            || visibility::is_init(name.as_str())
+                            || visibility::is_call(name.as_str()))
                         && !visibility::is_abstract(decorator_list, checker.semantic())
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
@@ -493,11 +501,11 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                 }
                 function_type::FunctionType::StaticMethod => {
                     if checker.is_rule_enabled(Argumentable::StaticMethod.rule_code())
-                        && !function_type::is_stub(function_def, checker.semantic())
-                        && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
-                        && (!visibility::is_magic(name)
-                            || visibility::is_init(name)
-                            || visibility::is_call(name))
+                        && !function_type::is_stub(*function_def, checker.semantic())
+                        && !is_not_implemented_stub_with_variable(*function_def, checker.semantic())
+                        && (!visibility::is_magic(name.as_str())
+                            || visibility::is_init(name.as_str())
+                            || visibility::is_call(name.as_str()))
                         && !visibility::is_abstract(decorator_list, checker.semantic())
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
@@ -507,8 +515,8 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                 }
                 function_type::FunctionType::NewMethod => {
                     if checker.is_rule_enabled(Argumentable::StaticMethod.rule_code())
-                        && !function_type::is_stub(function_def, checker.semantic())
-                        && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
+                        && !function_type::is_stub(*function_def, checker.semantic())
+                        && !is_not_implemented_stub_with_variable(*function_def, checker.semantic())
                         && !visibility::is_abstract(decorator_list, checker.semantic())
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
@@ -520,7 +528,8 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
                 }
             }
         }
-        ScopeKind::Lambda(ast::ExprLambda { parameters, .. }) => {
+        ScopeKind::Lambda(expr_lambda) => {
+            let parameters = expr_lambda.parameters();
             if let Some(parameters) = parameters {
                 if checker.is_rule_enabled(Argumentable::Lambda.rule_code()) {
                     function(Argumentable::Lambda, parameters, scope, checker);

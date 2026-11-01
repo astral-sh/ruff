@@ -1,10 +1,23 @@
 use ruff_notebook::CellOffsets;
+use ruff_python_ast::{AstNodeId, Builder, Expr, ExprContext, ExprKind, ListId};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use crate::fix::syntax;
+
+/// Builds the single assignment or deletion target for a constant attribute name.
+pub(super) fn attribute_target(
+    builder: &mut Builder,
+    object: Expr<'_>,
+    attribute: &str,
+    ctx: ExprContext,
+) -> ListId<AstNodeId<ruff_python_ast::kind::Expr>> {
+    let value = builder.copy_node(object);
+    let target = syntax::attribute(builder, value, attribute, ctx);
+    builder.list([target])
+}
 
 /// Return `true` if the statement containing the current expression is the last
 /// top-level expression in the cell. This assumes that the source is a Jupyter
@@ -31,15 +44,14 @@ pub(super) fn at_last_top_level_expression_in_cell(
 
 /// Return `true` if the [`Expr`] appears to be an infinite iterator (e.g., a call to
 /// `itertools.cycle` or similar).
-pub(crate) fn is_infinite_iterable(arg: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, keywords, .. },
-        ..
-    }) = &arg
-    else {
+pub(crate) fn is_infinite_iterable(arg: Expr<'_>, semantic: &SemanticModel) -> bool {
+    let ExprKind::Call(call_node) = arg.classify() else {
         return false;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
+    let args = arguments.args();
+    let keywords = arguments.keywords();
 
     semantic
         .resolve_qualified_name(func)
@@ -52,14 +64,14 @@ pub(crate) fn is_infinite_iterable(arg: &Expr, semantic: &SemanticModel) -> bool
                 }
 
                 // Ex) `itertools.repeat(1, None)`
-                if args.len() == 2 && args[1].is_none_literal_expr() {
+                if args.len() == 2 && args.at(1).is_none_literal_expr() {
                     return true;
                 }
 
                 // Ex) `itertools.repeat(1, times=None)`
                 for keyword in keywords {
-                    if keyword.arg.as_ref().is_some_and(|name| name == "times")
-                        && keyword.value.is_none_literal_expr()
+                    if keyword.arg().is_some_and(|name| name == "times")
+                        && keyword.value().is_none_literal_expr()
                     {
                         return true;
                     }
@@ -73,7 +85,7 @@ pub(crate) fn is_infinite_iterable(arg: &Expr, semantic: &SemanticModel) -> bool
 
 /// Return `true` if any expression in the iterator appears to be an infinite iterator.
 pub(crate) fn any_infinite_iterables<'a>(
-    iter: impl IntoIterator<Item = &'a Expr>,
+    iter: impl IntoIterator<Item = Expr<'a>>,
     semantic: &SemanticModel,
 ) -> bool {
     iter.into_iter()

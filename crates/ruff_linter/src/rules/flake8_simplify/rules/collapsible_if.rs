@@ -1,12 +1,12 @@
 use ruff_diagnostics::Applicability::{Safe, Unsafe};
+use ruff_python_ast::{ExprKind, StmtKind};
 use std::borrow::Cow;
 
 use anyhow::{Result, bail};
 use libcst_native::ParenthesizedNode;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt, whitespace};
+use ruff_python_ast::{BoolOp, ElifElseClause, Expr, Stmt, StmtIf, SyntaxNode, whitespace};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::{LineRanges, UniversalNewlines};
@@ -81,8 +81,8 @@ impl Violation for CollapsibleIf {
 /// SIM102
 pub(crate) fn nested_if_statements(
     checker: &Checker,
-    stmt_if: &ast::StmtIf,
-    parent: Option<&Stmt>,
+    stmt_if: StmtIf<'_>,
+    parent: Option<Stmt<'_>>,
 ) {
     let Some(nested_if) = nested_if_body(stmt_if) else {
         return;
@@ -94,12 +94,12 @@ pub(crate) fn nested_if_statements(
     };
 
     // Check if the parent is already emitting a larger diagnostic including this if statement
-    if let Some(Stmt::If(stmt_if)) = parent {
+    if let Some(StmtKind::If(stmt_if)) = parent.map(Stmt::classify) {
         if let Some(nested_if) = nested_if_body(stmt_if) {
             // In addition to repeating the `nested_if_body` and `find_last_nested_if` check, we
             // also need to be the first child in the parent
             let body = nested_if.body();
-            if matches!(&body[0], Stmt::If(inner) if *inner == *stmt_if)
+            if matches!(body.at(0).classify(), StmtKind::If(inner) if inner == stmt_if)
                 && find_last_nested_if(body).is_some()
             {
                 return;
@@ -132,7 +132,7 @@ pub(crate) fn nested_if_statements(
     // statements.
     if !checker.comment_ranges().intersects(TextRange::new(
         nested_if.start(),
-        nested_if.body()[0].start(),
+        nested_if.body().at(0).start(),
     )) {
         diagnostic.try_set_optional_fix(|| match collapse_nested_if(checker, nested_if) {
             Ok(edit) => {
@@ -164,15 +164,15 @@ pub(crate) fn nested_if_statements(
 
 #[derive(Debug, Clone, Copy)]
 pub(super) enum NestedIf<'a> {
-    If(&'a ast::StmtIf),
-    Elif(&'a ElifElseClause),
+    If(StmtIf<'a>),
+    Elif(ElifElseClause<'a>),
 }
 
 impl<'a> NestedIf<'a> {
-    fn body(self) -> &'a [Stmt] {
+    fn body(self) -> ruff_python_ast::Suite<'a> {
         match self {
-            NestedIf::If(stmt_if) => &stmt_if.body,
-            NestedIf::Elif(clause) => &clause.body,
+            NestedIf::If(stmt_if) => stmt_if.body(),
+            NestedIf::Elif(clause) => clause.body(),
         }
     }
 
@@ -190,34 +190,29 @@ impl Ranged for NestedIf<'_> {
     }
 }
 
-impl<'a> From<&NestedIf<'a>> for AnyNodeRef<'a> {
+impl<'a> From<&NestedIf<'a>> for SyntaxNode<'a> {
     fn from(value: &NestedIf<'a>) -> Self {
         match value {
-            NestedIf::If(stmt_if) => (*stmt_if).into(),
-            NestedIf::Elif(clause) => (*clause).into(),
+            NestedIf::If(stmt_if) => (stmt_if).into(),
+            NestedIf::Elif(clause) => (clause).into(),
         }
     }
 }
 
 /// Returns the body, the range of the `if` or `elif` and whether the range is for an `if` or `elif`
-fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf<'_>> {
-    let ast::StmtIf {
-        test,
-        elif_else_clauses,
-        ..
-    } = stmt_if;
+fn nested_if_body(stmt_if: StmtIf<'_>) -> Option<NestedIf<'_>> {
+    let test = stmt_if.test();
+    let elif_else_clauses = stmt_if.elif_else_clauses();
 
     // It must be the last condition, otherwise there could be another `elif` or `else` that only
     // depends on the outer of the two conditions
     let (test, nested_if) = if let Some(clause) = elif_else_clauses.last() {
-        if let Some(test) = &clause.test {
+        {
+            let test = clause.test()?;
             (test, NestedIf::Elif(clause))
-        } else {
-            // The last condition is an `else` (different rule)
-            return None;
         }
     } else {
-        (test.as_ref(), NestedIf::If(stmt_if))
+        (test, NestedIf::If(stmt_if))
     };
 
     // The nested if must be the only child, otherwise there is at least one more statement that
@@ -249,36 +244,28 @@ fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf<'_>> {
 ///         z = 1
 ///         ...
 /// ```
-fn find_last_nested_if(body: &[Stmt]) -> Option<&Expr> {
-    let [
-        Stmt::If(ast::StmtIf {
-            test,
-            body: inner_body,
-            elif_else_clauses,
-            ..
-        }),
-    ] = body
-    else {
-        return None;
-    };
-    if !elif_else_clauses.is_empty() {
+fn find_last_nested_if(body: ruff_python_ast::Suite<'_>) -> Option<Expr<'_>> {
+    let [nested] = body.as_array()?;
+    let nested = nested.as_if_stmt()?;
+    if !nested.elif_else_clauses().is_empty() {
         return None;
     }
-    find_last_nested_if(inner_body).or(Some(test))
+    Some(find_last_nested_if(nested.body()).unwrap_or_else(|| nested.test()))
 }
 
 /// Returns `true` if an expression is an `if __name__ == "__main__":` check.
-fn is_main_check(expr: &Expr) -> bool {
-    if let Expr::Compare(ast::ExprCompare { operands, .. }) = expr
-        && let [
-            Expr::Name(ast::ExprName { id, .. }),
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }),
-        ] = &**operands
-    {
-        id == "__name__" && value == "__main__"
-    } else {
-        false
-    }
+fn is_main_check(expr: Expr<'_>) -> bool {
+    let Some([left, right]) = expr
+        .as_compare_expr()
+        .and_then(|compare| compare.operands().as_array())
+    else {
+        return false;
+    };
+    left.as_name_expr()
+        .is_some_and(|name| name.id() == "__name__")
+        && right
+            .as_string_literal_expr()
+            .is_some_and(|string| string.value().to_str() == "__main__")
 }
 
 fn parenthesize_and_operand(expr: libcst_native::Expression) -> libcst_native::Expression {
@@ -413,14 +400,13 @@ fn collapse_nested_if(checker: &Checker, nested_if: NestedIf) -> Result<Edit> {
 /// Multiline strings, continuation lines, and trivia around the tests need the CST.
 fn collapse_single_line_headers(checker: &Checker, outer: NestedIf) -> Option<Edit> {
     let locator = checker.locator();
-    let (keyword, left): (&str, &Expr) = match outer {
-        NestedIf::If(stmt) => ("if ", &stmt.test),
-        NestedIf::Elif(clause) => ("elif ", clause.test.as_ref()?),
+    let (keyword, left) = match outer {
+        NestedIf::If(stmt) => ("if ", stmt.test()),
+        NestedIf::Elif(clause) => ("elif ", clause.test()?),
     };
-    let [Stmt::If(inner)] = outer.body() else {
-        return None;
-    };
-    let right = &inner.test;
+    let [inner] = outer.body().as_array()?;
+    let inner = inner.as_if_stmt()?;
+    let right = inner.test();
     let range = locator.lines_range(outer.range());
     let inner_line = locator.line_range(inner.start());
 
@@ -457,10 +443,10 @@ fn collapse_single_line_headers(checker: &Checker, outer: NestedIf) -> Option<Ed
     let mut replacement = String::with_capacity(range.len().to_usize());
     replacement.push_str(indent);
     replacement.push_str(keyword);
-    let write_operand = |output: &mut String, operand: &Expr| {
-        let parens = match operand {
-            Expr::BoolOp(op) => op.op == ast::BoolOp::Or,
-            Expr::If(_) | Expr::Lambda(_) | Expr::Named(_) => true,
+    let write_operand = |output: &mut String, operand: Expr<'_>| {
+        let parens = match operand.classify() {
+            ExprKind::BoolOp(op) => op.op() == BoolOp::Or,
+            ExprKind::If(_) | ExprKind::Lambda(_) | ExprKind::Named(_) => true,
             _ => false,
         };
         if parens {

@@ -1,6 +1,6 @@
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
+use ruff_python_ast::{Arguments, Expr, Keyword};
 
 use crate::model::SemanticModel;
 
@@ -17,16 +17,18 @@ use crate::model::SemanticModel;
 /// bar.error()
 /// ```
 pub fn is_logger_candidate(
-    func: &Expr,
+    func: Expr<'_>,
     semantic: &SemanticModel,
     logger_objects: &[String],
 ) -> bool {
-    let Expr::Attribute(ast::ExprAttribute { value, .. }) = func else {
+    let Some(attribute_node) = func.as_attribute_expr() else {
         return false;
     };
+    let value = attribute_node.value();
 
     // If the attribute is an inline instantiation, match against known constructors.
-    if let Expr::Call(ast::ExprCall { func, .. }) = &**value {
+    if let Some(call_node) = value.as_call_expr() {
+        let func = call_node.func();
         return semantic
             .resolve_qualified_name(func)
             .is_some_and(|qualified_name| {
@@ -78,19 +80,19 @@ pub fn is_logger_candidate(
 
 /// If the keywords to a logging call contain `exc_info=True` or `exc_info=sys.exc_info()`,
 /// return the `Keyword` for `exc_info`.
-pub fn exc_info<'a>(arguments: &'a Arguments, semantic: &SemanticModel) -> Option<&'a Keyword> {
+pub fn exc_info<'a>(arguments: Arguments<'a>, semantic: &SemanticModel) -> Option<Keyword<'a>> {
     let exc_info = arguments.find_keyword("exc_info")?;
 
     // Ex) `logging.error("...", exc_info=True)`
-    if is_const_true(&exc_info.value) {
+    if is_const_true(exc_info.value()) {
         return Some(exc_info);
     }
 
     // Ex) `logging.error("...", exc_info=sys.exc_info())`
     if exc_info
-        .value
+        .value()
         .as_call_expr()
-        .and_then(|call| semantic.resolve_qualified_name(&call.func))
+        .and_then(|call| semantic.resolve_qualified_name(call.func()))
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["sys", "exc_info"]))
     {
         return Some(exc_info);

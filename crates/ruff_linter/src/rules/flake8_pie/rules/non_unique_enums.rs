@@ -3,7 +3,7 @@ use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::{self as ast, Expr, ExprCall, Stmt};
+use ruff_python_ast::{Expr, ExprKind, Stmt, StmtKind, Suite};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -56,10 +56,10 @@ impl Violation for NonUniqueEnums {
 }
 
 /// PIE796
-pub(crate) fn non_unique_enums(checker: &Checker, parent: &Stmt, body: &[Stmt]) {
+pub(crate) fn non_unique_enums(checker: &Checker, parent: Stmt<'_>, body: Suite<'_>) {
     let semantic = checker.semantic();
 
-    let Stmt::ClassDef(parent) = parent else {
+    let StmtKind::ClassDef(parent) = parent.classify() else {
         return;
     };
 
@@ -73,13 +73,15 @@ pub(crate) fn non_unique_enums(checker: &Checker, parent: &Stmt, body: &[Stmt]) 
 
     let mut seen_targets: FxHashSet<ComparableExpr> = FxHashSet::default();
     for stmt in body {
-        let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
+        let StmtKind::Assign(assign) = stmt.classify() else {
             continue;
         };
+        let value = assign.value();
 
         if is_call_to_enum_auto(semantic, value) {
             continue;
-        } else if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value.as_ref() {
+        } else if let ExprKind::Tuple(tuple) = value.classify() {
+            let elts = tuple.elts();
             if elts.iter().any(|elt| is_call_to_enum_auto(semantic, elt)) {
                 continue;
             }
@@ -102,32 +104,39 @@ pub(crate) fn non_unique_enums(checker: &Checker, parent: &Stmt, body: &[Stmt]) 
     }
 }
 
-fn is_call_to_enum_auto(semantic: &SemanticModel, expr: &Expr) -> bool {
+fn is_call_to_enum_auto(semantic: &SemanticModel, expr: Expr<'_>) -> bool {
     expr.as_call_expr().is_some_and(|call| {
         semantic
-            .resolve_qualified_name(&call.func)
+            .resolve_qualified_name(call.func())
             .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["enum", "auto"]))
     })
 }
 
 /// Whether the value is a bare ellipsis literal (`A = ...`)
 /// or a casted one (`A = cast(SomeType, ...)`).
-fn member_has_unknown_value(semantic: &SemanticModel, expr: &Expr) -> bool {
-    match expr {
-        Expr::EllipsisLiteral(_) => true,
+fn member_has_unknown_value(semantic: &SemanticModel, expr: Expr<'_>) -> bool {
+    match expr.classify() {
+        ExprKind::EllipsisLiteral(_) => true,
 
-        Expr::Call(ExprCall {
-            func, arguments, ..
-        }) => {
+        ExprKind::Call(expr_call) => {
+            let func = expr_call.func();
+            let arguments = expr_call.arguments();
+
             if !semantic.match_typing_expr(func, "cast") {
                 return false;
             }
 
-            if !arguments.keywords.is_empty() {
+            if !arguments.keywords().is_empty() {
                 return false;
             }
 
-            matches!(arguments.args.as_ref(), [_, Expr::EllipsisLiteral(_)])
+            matches!(
+                arguments
+                    .args()
+                    .as_array()
+                    .map(|items| items.map(Expr::classify)),
+                Some([_, ExprKind::EllipsisLiteral(_)])
+            )
         }
 
         _ => false,

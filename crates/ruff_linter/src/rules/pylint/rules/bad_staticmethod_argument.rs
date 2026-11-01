@@ -1,6 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_python_ast::ParameterWithDefault;
 use ruff_python_semantic::Scope;
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::analyze::function_type::FunctionType;
@@ -62,19 +61,16 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
         return;
     };
 
-    let ast::StmtFunctionDef {
-        name,
-        decorator_list,
-        parameters,
-        ..
-    } = func;
+    let name = func.name();
+    let decorator_list = func.decorator_list();
+    let parameters = func.parameters();
 
     let Some(parent) = checker.semantic().first_non_type_parent_scope(scope) else {
         return;
     };
 
     let type_ = function_type::classify(
-        name,
+        name.as_str(),
         decorator_list,
         parent,
         checker.semantic(),
@@ -89,18 +85,19 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
         }
     }
 
-    let Some(ParameterWithDefault {
+    let Some(ast::ParameterWithDefaultFields {
         parameter: self_or_cls,
         ..
     }) = parameters
-        .posonlyargs
+        .posonlyargs()
         .first()
-        .or_else(|| parameters.args.first())
+        .or_else(|| parameters.args().first())
+        .map(ruff_python_ast::ParameterWithDefault::fields)
     else {
         return;
     };
 
-    match (name.as_str(), self_or_cls.name.as_str()) {
+    match (name.as_str(), self_or_cls.name().as_str()) {
         ("__new__", "cls") => {
             return;
         }
@@ -110,7 +107,7 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
 
     checker.report_diagnostic(
         BadStaticmethodArgument {
-            argument_name: self_or_cls.name.to_string(),
+            argument_name: self_or_cls.name().to_string(),
         },
         self_or_cls.range(),
     );

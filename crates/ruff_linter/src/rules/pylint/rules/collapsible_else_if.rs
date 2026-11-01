@@ -1,8 +1,9 @@
 use anyhow::Result;
+use ruff_python_ast::{self as ast, StmtKind};
 
-use ast::whitespace::indentation;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, ElifElseClause, Stmt};
+use ruff_python_ast::whitespace::indentation;
+use ruff_python_ast::{ElifElseClause, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::CommentRanges;
@@ -69,23 +70,22 @@ impl Violation for CollapsibleElseIf {
 }
 
 /// PLR5501
-pub(crate) fn collapsible_else_if(checker: &Checker, stmt: &Stmt) {
-    let Stmt::If(ast::StmtIf {
-        elif_else_clauses, ..
-    }) = stmt
-    else {
+pub(crate) fn collapsible_else_if(checker: &Checker, stmt: Stmt<'_>) {
+    let StmtKind::If(if_stmt) = stmt.classify() else {
         return;
     };
+    let elif_else_clauses = if_stmt.elif_else_clauses();
 
-    let Some(
-        else_clause @ ElifElseClause {
-            body, test: None, ..
-        },
-    ) = elif_else_clauses.last()
+    let Some(else_clause @ elif_else_clause) = elif_else_clauses.last() else {
+        return;
+    };
+    let ast::ElifElseClauseFields {
+        body, test: None, ..
+    } = elif_else_clause.fields()
     else {
         return;
     };
-    let [first @ Stmt::If(ast::StmtIf { .. })] = body.as_slice() else {
+    let Some([first]) = body.as_array().filter(|[stmt]| stmt.is_if_stmt()) else {
         return;
     };
 
@@ -107,8 +107,8 @@ pub(crate) fn collapsible_else_if(checker: &Checker, stmt: &Stmt) {
 
 /// Generate [`Fix`] to convert an `else` block to an `elif` block.
 fn convert_to_elif(
-    first: &Stmt,
-    else_clause: &ElifElseClause,
+    first: Stmt<'_>,
+    else_clause: ElifElseClause<'_>,
     locator: &Locator,
     indexer: &Indexer,
     stylist: &Stylist,
@@ -122,7 +122,7 @@ fn convert_to_elif(
     let trivia_range = TextRange::new(else_line_end, inner_if_line_start);
 
     // Identify the indentation of the outer clause
-    let Some(indentation) = indentation(locator.contents(), else_clause) else {
+    let Some(indentation) = indentation(locator.contents(), &else_clause) else {
         return Err(anyhow::anyhow!("`else` is expected to be on its own line"));
     };
 

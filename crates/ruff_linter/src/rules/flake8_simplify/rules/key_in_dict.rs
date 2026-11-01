@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{self as ast, Arguments, CmpOp, Comprehension, Expr};
+use ruff_python_ast::{self as ast, CmpOp, Comprehension, Expr, ExprKind, SyntaxNode};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
@@ -57,23 +56,29 @@ impl AlwaysFixableViolation for InDictKeys {
 }
 
 /// SIM118
-fn key_in_dict(checker: &Checker, left: &Expr, right: &Expr, operator: CmpOp, parent: AnyNodeRef) {
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, keywords, .. },
-        range_start: _,
-        node_index: _,
-    }) = &right
-    else {
+fn key_in_dict(
+    checker: &Checker,
+    left: Expr<'_>,
+    right: Expr<'_>,
+    operator: CmpOp,
+    parent: SyntaxNode,
+) {
+    let ExprKind::Call(call) = right.classify() else {
         return;
     };
+    let func = call.func();
+    let arguments = call.arguments();
+    let args = arguments.args();
+    let keywords = arguments.keywords();
     if !(args.is_empty() && keywords.is_empty()) {
         return;
     }
 
-    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
+    let ExprKind::Attribute(attribute_node) = func.classify() else {
         return;
     };
+    let attr = attribute_node.attr();
+    let value = attribute_node.value();
     if attr != "keys" {
         return;
     }
@@ -85,16 +90,14 @@ fn key_in_dict(checker: &Checker, left: &Expr, right: &Expr, operator: CmpOp, pa
     // ```
     if value
         .as_name_expr()
-        .is_some_and(|name| matches!(name.id.as_str(), "self"))
+        .is_some_and(|name| matches!(name.id().as_str(), "self"))
     {
         return;
     }
 
     // Extract the exact range of the left and right expressions.
-    let left_range =
-        parenthesized_range(left.into(), parent, checker.tokens()).unwrap_or(left.range());
-    let right_range =
-        parenthesized_range(right.into(), parent, checker.tokens()).unwrap_or(right.range());
+    let left_range = parenthesized_range(left, parent, checker.tokens()).unwrap_or(left.range());
+    let right_range = parenthesized_range(right, parent, checker.tokens()).unwrap_or(right.range());
 
     let mut diagnostic = checker.report_diagnostic(
         InDictKeys {
@@ -154,32 +157,32 @@ fn key_in_dict(checker: &Checker, left: &Expr, right: &Expr, operator: CmpOp, pa
 }
 
 /// SIM118 in a `for` loop.
-pub(crate) fn key_in_dict_for(checker: &Checker, for_stmt: &ast::StmtFor) {
+pub(crate) fn key_in_dict_for(checker: &Checker, for_stmt: ast::StmtFor<'_>) {
     key_in_dict(
         checker,
-        &for_stmt.target,
-        &for_stmt.iter,
+        for_stmt.target(),
+        for_stmt.iter(),
         CmpOp::In,
         for_stmt.into(),
     );
 }
 
 /// SIM118 in a comprehension.
-pub(crate) fn key_in_dict_comprehension(checker: &Checker, comprehension: &Comprehension) {
+pub(crate) fn key_in_dict_comprehension(checker: &Checker, comprehension: Comprehension<'_>) {
     key_in_dict(
         checker,
-        &comprehension.target,
-        &comprehension.iter,
+        comprehension.target(),
+        comprehension.iter(),
         CmpOp::In,
         comprehension.into(),
     );
 }
 
 /// SIM118 in a comparison.
-pub(crate) fn key_in_dict_compare(checker: &Checker, compare: &ast::ExprCompare) {
+pub(crate) fn key_in_dict_compare(checker: &Checker, compare: ast::ExprCompare<'_>) {
     let Some((left, op @ (CmpOp::In | CmpOp::NotIn), right)) = compare.as_single() else {
         return;
     };
 
-    key_in_dict(checker, left, right, *op, compare.into());
+    key_in_dict(checker, left, right, op, compare.into());
 }

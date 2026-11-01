@@ -48,7 +48,7 @@ impl Violation for SixPY3 {
 }
 
 /// YTT202
-pub(crate) fn name_or_attribute(checker: &Checker, expr: &Expr) {
+pub(crate) fn name_or_attribute(checker: &Checker, &expr: &Expr<'_>) {
     if !checker.semantic().seen_module(Modules::SIX) {
         return;
     }

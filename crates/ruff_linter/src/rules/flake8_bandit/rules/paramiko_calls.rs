@@ -39,7 +39,7 @@ impl Violation for ParamikoCall {
 }
 
 /// S601
-pub(crate) fn paramiko_call(checker: &Checker, func: &Expr) {
+pub(crate) fn paramiko_call(checker: &Checker, func: Expr<'_>) {
     if checker
         .semantic()
         .resolve_qualified_name(func)

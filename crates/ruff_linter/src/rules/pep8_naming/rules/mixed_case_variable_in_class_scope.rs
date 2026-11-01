@@ -60,7 +60,7 @@ pub(crate) fn mixed_case_variable_in_class_scope(
     checker: &Checker,
     range: TextRange,
     name: &str,
-    class_def: &ast::StmtClassDef,
+    class_def: ast::StmtClassDef<'_>,
 ) {
     if !helpers::is_mixed_case(name) {
         return;

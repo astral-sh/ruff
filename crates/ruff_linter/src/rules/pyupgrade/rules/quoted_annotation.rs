@@ -1,8 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Stmt;
+use ruff_python_ast::StmtKind;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::LineRanges;
+use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -143,9 +144,9 @@ pub(crate) fn quoted_annotation(checker: &Checker, annotation: &str, range: Text
 }
 
 fn in_parameter_annotation(offset: TextSize, semantic: &SemanticModel) -> bool {
-    let Stmt::FunctionDef(stmt) = semantic.current_statement() else {
+    let StmtKind::FunctionDef(stmt) = semantic.current_statement().classify() else {
         return false;
     };
 
-    stmt.parameters.range.contains(offset)
+    stmt.parameters().range().contains(offset)
 }

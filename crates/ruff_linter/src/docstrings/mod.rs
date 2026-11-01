@@ -16,14 +16,14 @@ pub(crate) mod styles;
 pub(crate) struct Docstring<'a> {
     pub(crate) definition: &'a Definition<'a>,
     /// The literal AST node representing the docstring.
-    pub(crate) expr: &'a ast::StringLiteral,
+    pub(crate) expr: ast::StringLiteral<'a>,
     /// The source file the docstring was defined in.
     pub(crate) source: &'a str,
 }
 
 impl<'a> Docstring<'a> {
     fn flags(&self) -> ast::StringLiteralFlags {
-        self.expr.flags
+        self.expr.flags()
     }
 
     /// The contents of the docstring, including the opening and closing quotes.

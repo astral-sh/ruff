@@ -1,6 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::PythonVersion;
-use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::{ExprCall, ExprKind, PythonVersion};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
@@ -65,51 +64,50 @@ impl AlwaysFixableViolation for BitCount {
 }
 
 /// FURB161
-pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
+pub(crate) fn bit_count(checker: &Checker, call: ExprCall<'_>) {
     // `int.bit_count()` was added in Python 3.10
     if checker.target_version() < PythonVersion::PY310 {
         return;
     }
 
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
+    let ExprKind::Attribute(attribute) = call.func().classify() else {
         return;
     };
+    let attr = attribute.attr();
+    let value = attribute.value();
 
     // Ensure that we're performing a `.count(...)`.
     if attr.as_str() != "count" {
         return;
     }
 
-    if !call.arguments.keywords.is_empty() {
+    if !call.arguments().keywords().is_empty() {
         return;
     }
-    let [arg] = &*call.arguments.args else {
+    let Some([arg]) = call.arguments().args().as_array() else {
         return;
     };
 
-    let Expr::StringLiteral(ast::ExprStringLiteral {
-        value: count_value, ..
-    }) = arg
-    else {
+    let ExprKind::StringLiteral(string_literal) = arg.classify() else {
         return;
     };
+    let count_value = string_literal.value();
 
     // Ensure that we're performing a `.count("1")`.
     if count_value != "1" {
         return;
     }
 
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = value.as_ref()
-    else {
+    let ExprKind::Call(call_node) = value.classify() else {
         return;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
-    if !arguments.keywords.is_empty() {
+    if !arguments.keywords().is_empty() {
         return;
     }
-    let [arg] = &*arguments.args else {
+    let Some([arg]) = arguments.args().as_array() else {
         return;
     };
 
@@ -127,8 +125,8 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
 
     // If we're calling a method on an integer, or an expression with lower precedence, parenthesize
     // it.
-    let parenthesize = match arg {
-        Expr::NumberLiteral(ast::ExprNumberLiteral { .. }) => {
+    let parenthesize = match arg.classify() {
+        ExprKind::NumberLiteral(_) => {
             let mut chars = literal_text.chars();
             !matches!(
                 (chars.next(), chars.next()),
@@ -136,40 +134,40 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
             )
         }
 
-        Expr::StringLiteral(inner) => inner.value.is_implicit_concatenated(),
-        Expr::BytesLiteral(inner) => inner.value.is_implicit_concatenated(),
-        Expr::FString(inner) => inner.value.is_implicit_concatenated(),
-        Expr::TString(inner) => inner.value.is_implicit_concatenated(),
+        ExprKind::StringLiteral(inner) => inner.value().is_implicit_concatenated(),
+        ExprKind::BytesLiteral(inner) => inner.value().is_implicit_concatenated(),
+        ExprKind::FString(inner) => inner.value().is_implicit_concatenated(),
+        ExprKind::TString(inner) => inner.value().is_implicit_concatenated(),
 
-        Expr::Await(_)
-        | Expr::Starred(_)
-        | Expr::UnaryOp(_)
-        | Expr::BinOp(_)
-        | Expr::BoolOp(_)
-        | Expr::If(_)
-        | Expr::Named(_)
-        | Expr::Lambda(_)
-        | Expr::Slice(_)
-        | Expr::Yield(_)
-        | Expr::YieldFrom(_)
-        | Expr::Name(_)
-        | Expr::List(_)
-        | Expr::Compare(_)
-        | Expr::Tuple(_)
-        | Expr::Generator(_)
-        | Expr::IpyEscapeCommand(_) => true,
+        ExprKind::Await(_)
+        | ExprKind::Starred(_)
+        | ExprKind::UnaryOp(_)
+        | ExprKind::BinOp(_)
+        | ExprKind::BoolOp(_)
+        | ExprKind::If(_)
+        | ExprKind::Named(_)
+        | ExprKind::Lambda(_)
+        | ExprKind::Slice(_)
+        | ExprKind::Yield(_)
+        | ExprKind::YieldFrom(_)
+        | ExprKind::Name(_)
+        | ExprKind::List(_)
+        | ExprKind::Compare(_)
+        | ExprKind::Tuple(_)
+        | ExprKind::Generator(_)
+        | ExprKind::IpyEscapeCommand(_) => true,
 
-        Expr::Call(_)
-        | Expr::Dict(_)
-        | Expr::Set(_)
-        | Expr::ListComp(_)
-        | Expr::SetComp(_)
-        | Expr::DictComp(_)
-        | Expr::BooleanLiteral(_)
-        | Expr::NoneLiteral(_)
-        | Expr::EllipsisLiteral(_)
-        | Expr::Attribute(_)
-        | Expr::Subscript(_) => false,
+        ExprKind::Call(_)
+        | ExprKind::Dict(_)
+        | ExprKind::Set(_)
+        | ExprKind::ListComp(_)
+        | ExprKind::SetComp(_)
+        | ExprKind::DictComp(_)
+        | ExprKind::BooleanLiteral(_)
+        | ExprKind::NoneLiteral(_)
+        | ExprKind::EllipsisLiteral(_)
+        | ExprKind::Attribute(_)
+        | ExprKind::Subscript(_) => false,
     };
 
     // check if the fix is safe or not

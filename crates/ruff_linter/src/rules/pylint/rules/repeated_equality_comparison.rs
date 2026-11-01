@@ -1,11 +1,11 @@
 use itertools::Itertools;
+use ruff_python_ast::{Builder, ExprBoolOpFields, ExprKind, build};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
-use ast::ExprContext;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{any_over_expr, contains_effect};
-use ruff_python_ast::{self as ast, AtomicNodeIndex, BoolOp, CmpOp, Expr};
+use ruff_python_ast::{BoolOp, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -13,6 +13,7 @@ use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::fix::syntax;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -87,9 +88,8 @@ impl AlwaysFixableViolation for RepeatedEqualityComparison {
 }
 
 /// PLR1714
-pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::ExprBoolOp) {
-    // Map from expression hash to (starting offset, number of comparisons, list
-    let mut value_to_comparators: FxHashMap<ComparableExpr, (&Expr, Vec<&Expr>, Vec<usize>)> =
+pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ExprBoolOpFields<'_>) {
+    let mut value_to_comparators: FxHashMap<ComparableExpr, _> =
         FxHashMap::with_capacity_and_hasher(bool_op.values.len() * 2, FxBuildHasher);
 
     for (i, value) in bool_op.values.iter().enumerate() {
@@ -97,7 +97,7 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
             continue;
         };
 
-        if matches!(left, Expr::Name(_) | Expr::Attribute(_)) {
+        if matches!(left.classify(), ExprKind::Name(_) | ExprKind::Attribute(_)) {
             let (_, left_matches, index_matches) = value_to_comparators
                 .entry(left.into())
                 .or_insert_with(|| (left, Vec::new(), Vec::new()));
@@ -105,7 +105,7 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
             index_matches.push(i);
         }
 
-        if matches!(right, Expr::Name(_) | Expr::Attribute(_)) {
+        if matches!(right.classify(), ExprKind::Name(_) | ExprKind::Attribute(_)) {
             let (_, right_matches, index_matches) = value_to_comparators
                 .entry(right.into())
                 .or_insert_with(|| (right, Vec::new(), Vec::new()));
@@ -124,7 +124,7 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
         }
 
         // Break into sequences of consecutive comparisons.
-        let mut sequences: Vec<(Vec<usize>, Vec<&Expr>)> = Vec::new();
+        let mut sequences: Vec<(Vec<usize>, Vec<Expr<'_>>)> = Vec::new();
         let mut last = None;
         for (index, comparator) in indices.iter().zip(comparators) {
             if last.is_some_and(|last| last + 1 == *index) {
@@ -171,51 +171,56 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                     )),
                     all_hashable,
                 },
-                bool_op.range(),
+                bool_op.range,
             );
 
             // Grab the remaining comparisons.
             let [first, .., last] = indices.as_slice() else {
                 unreachable!("Indices should have at least two elements")
             };
-            let before = bool_op.values.iter().take(*first).cloned();
-            let after = bool_op.values.iter().skip(last + 1).cloned();
-
+            let mut builder = Builder::default();
+            let elts = builder.copy_nodes(comparators);
             let comparator = if all_hashable {
-                Expr::Set(ast::ExprSet {
-                    elts: comparators.iter().copied().cloned().collect(),
-                    range: TextRange::default(),
-                    node_index: AtomicNodeIndex::NONE,
-                })
+                builder
+                    .add(build::ExprSet {
+                        range: TextRange::default(),
+                        elts,
+                    })
+                    .into()
             } else {
-                Expr::Tuple(ast::ExprTuple {
-                    elts: comparators.iter().copied().cloned().collect(),
-                    range: TextRange::default(),
-                    node_index: AtomicNodeIndex::NONE,
-                    ctx: ExprContext::Load,
-                    parenthesized: true,
-                })
+                syntax::tuple(&mut builder, elts)
             };
-
+            let left = builder.copy_node(expr);
+            let operands = builder.list([left, comparator]);
+            let ops = builder.list([match bool_op.op {
+                BoolOp::Or => CmpOp::In,
+                BoolOp::And => CmpOp::NotIn,
+            }]);
+            let membership = builder
+                .add(build::ExprCompare {
+                    range: bool_op.range,
+                    operands,
+                    ops,
+                })
+                .into();
+            let values = builder.map_list(
+                (0..=*first).chain(last + 1..bool_op.values.len()),
+                |builder, index| {
+                    if index == *first {
+                        membership
+                    } else {
+                        builder.copy_node(bool_op.values.at(index))
+                    }
+                },
+            );
+            let expression = builder.add(build::ExprBoolOp {
+                range: bool_op.range,
+                op: bool_op.op,
+                values,
+            });
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                checker.generator().expr(&Expr::BoolOp(ast::ExprBoolOp {
-                    op: bool_op.op,
-                    values: before
-                        .chain(std::iter::once(Expr::Compare(ast::ExprCompare {
-                            ops: match bool_op.op {
-                                BoolOp::Or => [CmpOp::In].into(),
-                                BoolOp::And => [CmpOp::NotIn].into(),
-                            },
-                            operands: Box::from([expr.clone(), comparator]),
-                            range: bool_op.range(),
-                            node_index: AtomicNodeIndex::NONE,
-                        })))
-                        .chain(after)
-                        .collect(),
-                    range: bool_op.range(),
-                    node_index: AtomicNodeIndex::NONE,
-                })),
-                bool_op.range(),
+                checker.generator().expr(builder.get(expression).into()),
+                bool_op.range,
             )));
         }
     }
@@ -226,9 +231,9 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
 /// joined with `and`.
 fn to_allowed_value<'a>(
     bool_op: BoolOp,
-    value: &'a Expr,
+    value: Expr<'a>,
     semantic: &SemanticModel,
-) -> Option<(&'a Expr, &'a Expr)> {
+) -> Option<(Expr<'a>, Expr<'a>)> {
     // Ignore, e.g., `foo == bar == baz`.
     let (left, op, right) = value.as_compare_expr()?.as_single()?;
 
@@ -269,9 +274,9 @@ fn to_allowed_value<'a>(
 /// Generate a string like `obj in (a, b, c)` or `obj not in (a, b, c)`.
 /// If `all_hashable` is `true`, the string will use a set instead of a tuple.
 fn merged_membership_test(
-    left: &Expr,
+    left: Expr<'_>,
     op: BoolOp,
-    comparators: &[&Expr],
+    comparators: &[Expr<'_>],
     locator: &Locator,
     all_hashable: bool,
 ) -> String {

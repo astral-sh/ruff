@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::generate_comparison;
-use ruff_python_ast::{self as ast, CmpOp, Expr, ExprStringLiteral};
+use ruff_python_ast::{self as ast, CmpOp, Expr, ExprCompare, ExprKind};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -66,7 +66,7 @@ impl Violation for SingleItemMembershipTest {
 }
 
 /// FURB171
-pub(crate) fn single_item_membership_test(checker: &Checker, compare: &ast::ExprCompare) {
+pub(crate) fn single_item_membership_test(checker: &Checker, compare: ExprCompare<'_>) {
     let Some((left, op, right)) = compare.as_single() else {
         return;
     };
@@ -88,7 +88,7 @@ pub(crate) fn single_item_membership_test(checker: &Checker, compare: &ast::Expr
             generate_comparison(
                 left,
                 &[membership_test.replacement_op()],
-                std::slice::from_ref(item),
+                [item],
                 compare.into(),
                 checker.tokens(),
                 checker.source(),
@@ -112,20 +112,22 @@ pub(crate) fn single_item_membership_test(checker: &Checker, compare: &ast::Expr
 
 /// Return the single item wrapped in `Some` if the expression contains a single
 /// item, otherwise return `None`.
-fn single_item<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Expr> {
-    match expr {
-        Expr::List(ast::ExprList { elts, .. })
-        | Expr::Tuple(ast::ExprTuple { elts, .. })
-        | Expr::Set(ast::ExprSet { elts, .. }) => match elts.as_slice() {
-            [Expr::Starred(_)] => None,
-            [item] => Some(item),
-            _ => None,
-        },
-        Expr::Call(ast::ExprCall {
+fn single_item<'a>(expr: Expr<'a>, semantic: &'a SemanticModel) -> Option<Expr<'a>> {
+    match expr.fields() {
+        ast::ExprFields::List(ast::ExprListFields { elts, .. })
+        | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
+        | ast::ExprFields::Set(ast::ExprSetFields { elts, .. }) => {
+            match elts.as_array().map(|items| items.map(Expr::classify)) {
+                Some([ExprKind::Starred(_)]) => None,
+                Some([item]) => Some(item.view()),
+                _ => None,
+            }
+        }
+        ast::ExprFields::Call(ast::ExprCallFields {
             func,
             arguments,
-            range_start: _,
-            node_index: _,
+            range: _,
+            node: _,
         }) => {
             if arguments.len() != 1 || !is_set_method(func, semantic) {
                 return None;
@@ -135,16 +137,16 @@ fn single_item<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Ex
                 .find_positional(0)
                 .and_then(|arg| single_item(arg, semantic))
         }
-        string_expr @ Expr::StringLiteral(ExprStringLiteral { value: string, .. })
+        ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { value: string, .. })
             if string.chars().count() == 1 =>
         {
-            Some(string_expr)
+            Some(expr)
         }
         _ => None,
     }
 }
 
-fn is_set_method(func: &Expr, semantic: &SemanticModel) -> bool {
+fn is_set_method(func: Expr<'_>, semantic: &SemanticModel) -> bool {
     ["set", "frozenset"]
         .iter()
         .any(|s| semantic.match_builtin_expr(func, s))

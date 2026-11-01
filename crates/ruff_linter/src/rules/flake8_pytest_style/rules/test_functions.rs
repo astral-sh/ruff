@@ -52,18 +52,21 @@ impl Violation for PytestParameterWithDefaultArgument {
 }
 
 /// PT028
-pub(crate) fn parameter_with_default_argument(checker: &Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn parameter_with_default_argument(
+    checker: &Checker,
+    function_def: StmtFunctionDef<'_>,
+) {
     if !is_likely_pytest_test(function_def, checker) {
         return;
     }
 
-    for parameter in function_def.parameters.iter_non_variadic_params() {
+    for parameter in function_def.parameters().iter_non_variadic_params() {
         let Some(default) = parameter.default() else {
             continue;
         };
         let parameter_name = parameter.name().to_string();
         let kind = PytestParameterWithDefaultArgument { parameter_name };
-        let edit = Edit::deletion(parameter.parameter.end(), parameter.end());
+        let edit = Edit::deletion(parameter.parameter().end(), parameter.end());
         let fix = Fix::display_only_edit(edit);
         checker
             .report_diagnostic(kind, default.range())

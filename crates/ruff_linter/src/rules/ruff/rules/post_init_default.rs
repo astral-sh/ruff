@@ -93,8 +93,8 @@ impl Violation for PostInitDefault {
 }
 
 /// RUF033
-pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunctionDef) {
-    if &function_def.name != "__post_init__" {
+pub(crate) fn post_init_default(checker: &Checker, function_def: ast::StmtFunctionDef<'_>) {
+    if function_def.name() != "__post_init__" {
         return;
     }
 
@@ -113,7 +113,7 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
 
     let mut stopped_fixes = false;
 
-    for parameter in function_def.parameters.iter_non_variadic_params() {
+    for parameter in function_def.parameters().iter_non_variadic_params() {
         let Some(default) = parameter.default() else {
             continue;
         };
@@ -135,26 +135,26 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
 /// `dataclasses.InitVar` pseudo-field.
 fn use_initvar(
     current_scope: &Scope,
-    post_init_def: &ast::StmtFunctionDef,
-    parameter_with_default: &ast::ParameterWithDefault,
-    default: &ast::Expr,
+    post_init_def: ast::StmtFunctionDef<'_>,
+    parameter_with_default: ast::ParameterWithDefault<'_>,
+    default: ast::Expr<'_>,
     checker: &Checker,
 ) -> anyhow::Result<Fix> {
-    let parameter = &parameter_with_default.parameter;
-    if current_scope.has(&parameter.name) {
+    let parameter = parameter_with_default.parameter();
+    if current_scope.has(parameter.name().as_str()) {
         return Err(anyhow::anyhow!(
             "Cannot add a `{}: InitVar` field to the class body, as a field by that name already exists",
-            parameter.name
+            parameter.name()
         ));
     }
 
     // If the annotation references a type variable scoped to `__post_init__`
     // (PEP 695), moving it to the class body would produce a `NameError`.
     if let Some(annotation) = parameter.annotation() {
-        if let Some(type_params) = &post_init_def.type_params {
+        if let Some(type_params) = post_init_def.type_params() {
             if any_over_expr(annotation, |expr| {
                 expr.as_name_expr()
-                    .is_some_and(|name| type_params.iter().any(|tp| tp.name().id == name.id))
+                    .is_some_and(|name| type_params.iter().any(|tp| tp.name().id() == name.id()))
             }) {
                 return Err(anyhow::anyhow!(
                     "Annotation references a type variable scoped to `__post_init__`"
@@ -173,12 +173,8 @@ fn use_initvar(
 
     let locator = checker.locator();
 
-    let default_loc = parenthesized_range(
-        default.into(),
-        parameter_with_default.into(),
-        checker.tokens(),
-    )
-    .unwrap_or(default.range());
+    let default_loc = parenthesized_range(default, parameter_with_default.into(), checker.tokens())
+        .unwrap_or(default.range());
 
     // Delete the default value. For example,
     // - def __post_init__(self, foo: int = 0) -> None: ...
@@ -188,7 +184,7 @@ fn use_initvar(
     // Add `dataclasses.InitVar` field to class body.
     let content = {
         let default = locator.slice(default_loc);
-        let parameter_name = locator.slice(&parameter.name);
+        let parameter_name = locator.slice(parameter.name());
         let line_ending = checker.stylist().line_ending().as_str();
 
         if let Some(annotation) = &parameter

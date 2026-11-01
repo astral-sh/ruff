@@ -1,8 +1,8 @@
 use ruff_diagnostics::{Applicability, Fix};
+use ruff_python_ast::ExprSetFields;
 use rustc_hash::FxHashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
 use ruff_python_ast::Expr;
 use ruff_python_ast::comparable::HashableExpr;
 use ruff_text_size::Ranged;
@@ -71,9 +71,9 @@ impl Violation for DuplicateValue {
 }
 
 /// B033
-pub(crate) fn duplicate_value(checker: &Checker, set: &ast::ExprSet) {
-    let mut seen_values: FxHashMap<HashableExpr, &Expr> = FxHashMap::default();
-    for (index, value) in set.iter().enumerate() {
+pub(crate) fn duplicate_value(checker: &Checker, set: &ExprSetFields<'_>) {
+    let mut seen_values: FxHashMap<HashableExpr, Expr<'_>> = FxHashMap::default();
+    for (index, value) in set.elts.iter().enumerate() {
         if value.is_literal_expr() {
             if let Some(existing) = seen_values.insert(HashableExpr::from(value), value) {
                 let mut diagnostic = checker.report_diagnostic(
@@ -85,7 +85,7 @@ pub(crate) fn duplicate_value(checker: &Checker, set: &ast::ExprSet) {
                 );
                 diagnostic.secondary_annotation("Previous occurrence here", existing);
                 diagnostic.try_set_fix(|| {
-                    edits::remove_member(&set.elts, index, checker.locator().contents()).map(
+                    edits::remove_member(set.elts, index, checker.locator().contents()).map(
                         |edit| {
                             let applicability = if checker.comment_ranges().intersects(edit.range())
                             {

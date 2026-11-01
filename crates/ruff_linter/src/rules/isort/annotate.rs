@@ -1,5 +1,5 @@
 use ruff_python_ast::token::Tokens;
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::{Stmt, StmtKind};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -11,7 +11,7 @@ use super::types::{AliasData, TrailingComma};
 use super::{AnnotatedAliasData, AnnotatedImport};
 
 pub(crate) fn annotate_imports<'a>(
-    imports: &'a [&'a Stmt],
+    imports: &'a [Stmt<'a>],
     comments: Vec<Comment<'a>>,
     locator: &Locator<'a>,
     split_on_trailing_comma: bool,
@@ -22,13 +22,12 @@ pub(crate) fn annotate_imports<'a>(
     imports
         .iter()
         .map(|import| {
-            match import {
-                Stmt::Import(ast::StmtImport {
-                    names,
-                    range,
-                    is_lazy,
-                    node_index: _,
-                }) => {
+            match import.classify() {
+                StmtKind::Import(stmt_import) => {
+                    let names = stmt_import.names();
+                    let range = stmt_import.range();
+                    let is_lazy = stmt_import.is_lazy();
+
                     // Find comments above.
                     let mut atop = vec![];
                     while let Some(comment) =
@@ -51,23 +50,21 @@ pub(crate) fn annotate_imports<'a>(
                         names: names
                             .iter()
                             .map(|alias| AliasData {
-                                name: locator.slice(&alias.name),
-                                asname: alias.asname.as_ref().map(|asname| locator.slice(asname)),
-                                is_lazy: *is_lazy,
+                                name: locator.slice(alias.name()),
+                                asname: alias.asname().map(|asname| locator.slice(asname)),
+                                is_lazy,
                             })
                             .collect(),
                         atop,
                         inline,
                     }
                 }
-                Stmt::ImportFrom(ast::StmtImportFrom {
-                    module,
-                    names,
-                    level,
-                    is_lazy,
-                    range: _,
-                    node_index: _,
-                }) => {
+                StmtKind::ImportFrom(stmt_import_from) => {
+                    let module = stmt_import_from.module();
+                    let names = stmt_import_from.names();
+                    let level = stmt_import_from.level();
+                    let is_lazy = stmt_import_from.is_lazy();
+
                     // Find comments above.
                     let mut atop = vec![];
                     while let Some(comment) =
@@ -117,8 +114,8 @@ pub(crate) fn annotate_imports<'a>(
                             }
 
                             AnnotatedAliasData {
-                                name: locator.slice(&alias.name),
-                                asname: alias.asname.as_ref().map(|asname| locator.slice(asname)),
+                                name: locator.slice(alias.name()),
+                                asname: alias.asname().map(|asname| locator.slice(asname)),
                                 atop: alias_atop,
                                 inline: alias_inline,
                                 trailing: vec![],
@@ -156,12 +153,12 @@ pub(crate) fn annotate_imports<'a>(
                     }
 
                     AnnotatedImport::ImportFrom {
-                        module: module.as_ref().map(|module| locator.slice(module)),
+                        module: module.map(|module| locator.slice(module)),
                         names: aliases,
-                        level: *level,
-                        is_lazy: *is_lazy,
+                        level,
+                        is_lazy,
                         trailing_comma: if split_on_trailing_comma {
-                            trailing_comma(import, tokens)
+                            trailing_comma(*import, tokens)
                         } else {
                             TrailingComma::default()
                         },

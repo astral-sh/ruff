@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, ExprKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -56,16 +56,18 @@ impl Violation for UnnecessaryLiteralWithinDictCall {
 }
 
 /// C418
-pub(crate) fn unnecessary_literal_within_dict_call(checker: &Checker, call: &ast::ExprCall) {
-    if !call.arguments.keywords.is_empty() {
+pub(crate) fn unnecessary_literal_within_dict_call(checker: &Checker, call: ast::ExprCall<'_>) {
+    if !call.arguments().keywords().is_empty() {
         return;
     }
-    if call.arguments.args.len() > 1 {
+    if call.arguments().args().len() > 1 {
         return;
     }
-    let Some(argument) =
-        helpers::first_argument_with_matching_function("dict", &call.func, &call.arguments.args)
-    else {
+    let Some(argument) = helpers::first_argument_with_matching_function(
+        "dict",
+        call.func(),
+        call.arguments().args(),
+    ) else {
         return;
     };
     let Some(argument_kind) = DictKind::try_from_expr(argument) else {
@@ -108,10 +110,10 @@ impl DictKind {
         }
     }
 
-    const fn try_from_expr(expr: &Expr) -> Option<Self> {
-        match expr {
-            Expr::Dict(_) => Some(Self::Literal),
-            Expr::DictComp(_) => Some(Self::Comprehension),
+    fn try_from_expr(expr: Expr<'_>) -> Option<Self> {
+        match expr.classify() {
+            ExprKind::Dict(_) => Some(Self::Literal),
+            ExprKind::DictComp(_) => Some(Self::Comprehension),
             _ => None,
         }
     }

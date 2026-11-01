@@ -1,7 +1,8 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, ExprSubscript};
+
 use ruff_python_semantic::analyze::typing::is_list;
 use ruff_python_semantic::{Binding, SemanticModel};
 use ruff_text_size::Ranged;
@@ -59,8 +60,8 @@ impl Violation for SliceCopy {
 }
 
 /// FURB145
-pub(crate) fn slice_copy(checker: &Checker, subscript: &ast::ExprSubscript) {
-    if subscript.ctx.is_store() || subscript.ctx.is_del() {
+pub(crate) fn slice_copy(checker: &Checker, subscript: ExprSubscript<'_>) {
+    if subscript.ctx().is_store() || subscript.ctx().is_del() {
         return;
     }
 
@@ -68,7 +69,7 @@ pub(crate) fn slice_copy(checker: &Checker, subscript: &ast::ExprSubscript) {
         return;
     };
     let mut diagnostic = checker.report_diagnostic(SliceCopy, subscript.range());
-    let replacement = generate_method_call(name.clone(), "copy", checker.generator());
+    let replacement = generate_method_call(name.as_str(), "copy", checker.generator());
 
     let applicability = if checker.comment_ranges().intersects(subscript.range()) {
         Applicability::Unsafe
@@ -84,24 +85,25 @@ pub(crate) fn slice_copy(checker: &Checker, subscript: &ast::ExprSubscript) {
 
 /// Matches `obj[:]` where `obj` is a list.
 fn match_list_full_slice<'a>(
-    subscript: &'a ast::ExprSubscript,
+    subscript: ExprSubscript<'a>,
     semantic: &SemanticModel,
 ) -> Option<&'a Name> {
     // Check that it is `obj[:]`.
     if !matches!(
-        subscript.slice.as_ref(),
-        Expr::Slice(ast::ExprSlice {
+        subscript.slice().fields(),
+        ast::ExprFields::Slice(ast::ExprSliceFields {
             lower: None,
             upper: None,
             step: None,
             range: _,
-            node_index: _,
+            node: _,
         })
     ) {
         return None;
     }
 
-    let ast::ExprName { id, .. } = subscript.value.as_name_expr()?;
+    let expr_name = subscript.value().as_name_expr()?;
+    let id = expr_name.id();
 
     // Check that `obj` is a list.
     let scope = semantic.current_scope();

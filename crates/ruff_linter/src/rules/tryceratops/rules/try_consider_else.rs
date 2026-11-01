@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+use ruff_python_ast::{NodeList, StmtKind, Suite};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::contains_effect;
@@ -65,18 +65,14 @@ impl Violation for TryConsiderElse {
 /// TRY300
 pub(crate) fn try_consider_else(
     checker: &Checker,
-    body: &[Stmt],
-    orelse: &[Stmt],
-    handler: &[ExceptHandler],
+    body: Suite<'_>,
+    orelse: Suite<'_>,
+    handler: NodeList<'_, ruff_python_ast::kind::ExceptHandler>,
 ) {
     if body.len() > 1 && orelse.is_empty() && !handler.is_empty() {
         if let Some(stmt) = body.last() {
-            if let Stmt::Return(ast::StmtReturn {
-                value,
-                range: _,
-                node_index: _,
-            }) = stmt
-            {
+            if let StmtKind::Return(return_node) = stmt.classify() {
+                let value = return_node.value();
                 if let Some(value) = value {
                     if contains_effect(value, |id| checker.semantic().has_builtin_binding(id)) {
                         return;

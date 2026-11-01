@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprKind;
 
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -61,7 +62,7 @@ impl Violation for TypeComparison {
 }
 
 /// E721
-pub(crate) fn type_comparison(checker: &Checker, compare: &ast::ExprCompare) {
+pub(crate) fn type_comparison(checker: &Checker, compare: ast::ExprCompare<'_>) {
     for (left, _, right) in compare
         .iter()
         .filter(|(_, op, _)| matches!(op, CmpOp::Eq | CmpOp::NotEq))
@@ -80,13 +81,17 @@ pub(crate) fn type_comparison(checker: &Checker, compare: &ast::ExprCompare) {
 }
 
 /// Returns `true` if the [`Expr`] is known to evaluate to a type (e.g., `int`, or `type(1)`).
-fn is_type(expr: &Expr, semantic: &SemanticModel) -> bool {
-    match expr {
-        Expr::Call(ast::ExprCall { func, .. }) => {
+fn is_type(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
+    match expr.classify() {
+        ExprKind::Call(expr_call) => {
+            let func = expr_call.func();
+
             // Ex) `type(obj) == type(1)`
             semantic.match_builtin_expr(func, "type")
         }
-        Expr::Name(ast::ExprName { id, .. }) => {
+        ExprKind::Name(expr_name) => {
+            let id = expr_name.id();
+
             // Ex) `type(obj) == int`
             matches!(
                 id.as_str(),
@@ -193,14 +198,21 @@ fn is_type(expr: &Expr, semantic: &SemanticModel) -> bool {
 /// > classes, and they are meant to be comparable not just to their own class, but also to the
 /// > corresponding scalar types (e.g., `x.dtype == np.float32`) and strings (e.g.,
 /// > `x.dtype == ['i1,i4']`; basically, __eq__ always tries to do `dtype(other)`).
-fn is_dtype(expr: &Expr, semantic: &SemanticModel) -> bool {
-    match expr {
+fn is_dtype(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
+    match expr.classify() {
         // Ex) `np.dtype(obj)`
-        Expr::Call(ast::ExprCall { func, .. }) => semantic
-            .resolve_qualified_name(func)
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["numpy", "dtype"])),
+        ExprKind::Call(expr_call) => {
+            let func = expr_call.func();
+            semantic
+                .resolve_qualified_name(func)
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["numpy", "dtype"])
+                })
+        }
         // Ex) `obj.dtype`
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+        ExprKind::Attribute(expr_attribute) => {
+            let attr = expr_attribute.attr();
+
             // Ex) `obj.dtype`
             attr.as_str() == "dtype"
         }

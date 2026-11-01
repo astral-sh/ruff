@@ -1,14 +1,15 @@
+use ruff_text_size::Ranged;
 use std::collections::HashMap;
 use std::fmt::Debug;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::statement_visitor::{self, StatementVisitor};
+use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
-    ExceptHandler, ExceptHandlerExceptHandler, Expr, ExprAttribute, ExprCall, ExprSubscript,
-    ExprTuple, Stmt, StmtAssign, StmtAugAssign, StmtDelete, StmtFor, StmtIf, StmtTry, StmtWhile,
-    visitor::{self, Visitor},
+    self as ast, Expr, ExprKind, NodeList, Stmt, StmtFor, StmtKind, Suite, statement_visitor,
+    visitor,
 };
 use ruff_text_size::TextRange;
 
@@ -55,37 +56,36 @@ impl Violation for LoopIteratorMutation {
 }
 
 /// B909
-pub(crate) fn loop_iterator_mutation(checker: &Checker, stmt_for: &StmtFor) {
-    let StmtFor {
-        target,
-        iter,
-        body,
-        orelse: _,
-        is_async: _,
-        range: _,
-        node_index: _,
-    } = stmt_for;
+pub(crate) fn loop_iterator_mutation(checker: &Checker, stmt_for: StmtFor<'_>) {
+    let target = stmt_for.target();
+    let iter = stmt_for.iter();
+    let body = stmt_for.body();
 
-    let (index, target, iter) = match iter.as_ref() {
-        Expr::Name(_) | Expr::Attribute(_) => {
+    let (index, target, iter) = match iter.classify() {
+        ExprKind::Name(_) | ExprKind::Attribute(_) => {
             // Ex) Given, `for item in items:`, `item` is the index and `items` is the iterable.
-            (&**target, &**target, &**iter)
+            (target, target, iter)
         }
         // Ex) Given `for i, item in enumerate(items):`, `i` is the index and `items` is the
         // iterable.
-        Expr::Call(ExprCall {
-            func, arguments, ..
-        }) if checker.semantic().match_builtin_expr(func, "enumerate") => {
+        ExprKind::Call(expr_call)
+            if checker
+                .semantic()
+                .match_builtin_expr(expr_call.func(), "enumerate") =>
+        {
+            let arguments = expr_call.arguments();
+
             // Ex) `items`
-            let Some(iter) = arguments.args.first() else {
+            let Some(iter) = arguments.args().first() else {
                 return;
             };
 
-            let Expr::Tuple(ExprTuple { elts, .. }) = &**target else {
+            let ExprKind::Tuple(tuple) = target.classify() else {
                 return;
             };
+            let elts = tuple.elts();
 
-            let [index, target] = elts.as_slice() else {
+            let Some([index, target]) = elts.as_array() else {
                 return;
             };
 
@@ -119,7 +119,7 @@ pub(crate) fn loop_iterator_mutation(checker: &Checker, stmt_for: &StmtFor) {
 /// See [the Python tutorial on `else` clauses on loops][else-clauses].
 ///
 /// [else-clauses]: https://docs.python.org/3/tutorial/controlflow.html#else-clauses-on-loops
-fn body_may_skip_else(body: &[Stmt]) -> bool {
+fn body_may_skip_else(body: Suite<'_>) -> bool {
     let mut finder = SkipsElseFinder::default();
     finder.visit_body(body);
     finder.found
@@ -131,35 +131,41 @@ struct SkipsElseFinder {
 }
 
 impl StatementVisitor<'_> for SkipsElseFinder {
-    fn visit_body(&mut self, body: &[Stmt]) {
+    fn visit_body(&mut self, body: Suite<'_>) {
         for stmt in body {
             self.visit_stmt(stmt);
             // After a terminator, remaining statements are unreachable.
             if matches!(
-                stmt,
-                Stmt::Break(_) | Stmt::Return(_) | Stmt::Continue(_) | Stmt::Raise(_)
+                stmt.classify(),
+                StmtKind::Break(_)
+                    | StmtKind::Return(_)
+                    | StmtKind::Continue(_)
+                    | StmtKind::Raise(_)
             ) {
                 break;
             }
         }
     }
 
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+    fn visit_stmt(&mut self, stmt: Stmt<'_>) {
         if self.found {
             return;
         }
-        match stmt {
+        match stmt.fields() {
             // `break`/`return`/`raise` all skip the enclosing loop's
             // `else` clause; see Python docs on `else` clauses for loops.
-            Stmt::Break(_) | Stmt::Return(_) | Stmt::Raise(_) => self.found = true,
+            ast::StmtFields::Break(_) | ast::StmtFields::Return(_) | ast::StmtFields::Raise(_) => {
+                self.found = true;
+            }
             // Don't look inside nested loop bodies, but do check their
             // `else` clause — a `break` there targets the enclosing loop.
-            Stmt::For(StmtFor { orelse, .. }) | Stmt::While(StmtWhile { orelse, .. }) => {
+            ast::StmtFields::For(ast::StmtForFields { orelse, .. })
+            | ast::StmtFields::While(ast::StmtWhileFields { orelse, .. }) => {
                 self.visit_body(orelse);
             }
             // Nested function/class bodies can't affect the enclosing
             // loop's control flow.
-            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
+            ast::StmtFields::FunctionDef(_) | ast::StmtFields::ClassDef(_) => {}
             _ => statement_visitor::walk_stmt(self, stmt),
         }
     }
@@ -168,9 +174,13 @@ impl StatementVisitor<'_> for SkipsElseFinder {
 /// Whether `body` has an unconditional terminator at its top level.
 /// Used to decide if a `try` statement's `finally` clause always exits the
 /// enclosing control flow (loop or function).
-fn unconditionally_terminates(body: &[Stmt]) -> bool {
-    body.iter()
-        .any(|stmt| matches!(stmt, Stmt::Return(_) | Stmt::Raise(_) | Stmt::Break(_)))
+fn unconditionally_terminates(body: Suite<'_>) -> bool {
+    body.iter().any(|stmt| {
+        matches!(
+            stmt.classify(),
+            StmtKind::Return(_) | StmtKind::Raise(_) | StmtKind::Break(_)
+        )
+    })
 }
 
 /// Returns `true` if the method mutates when called on an iterator.
@@ -206,9 +216,9 @@ fn is_mutating_function(function_name: &str) -> bool {
 /// loop's mutations.
 #[derive(Debug)]
 struct LoopMutationsVisitor<'a> {
-    iter: &'a Expr,
-    target: &'a Expr,
-    index: &'a Expr,
+    iter: Expr<'a>,
+    target: Expr<'a>,
+    index: Expr<'a>,
     mutations: HashMap<u32, Vec<TextRange>>,
     branch: u32,
     next_branch_id: u32,
@@ -217,7 +227,7 @@ struct LoopMutationsVisitor<'a> {
 
 impl<'a> LoopMutationsVisitor<'a> {
     /// Initialize the visitor.
-    fn new(iter: &'a Expr, target: &'a Expr, index: &'a Expr) -> Self {
+    fn new(iter: Expr<'a>, target: Expr<'a>, index: Expr<'a>) -> Self {
         Self {
             iter,
             target,
@@ -252,16 +262,14 @@ impl<'a> LoopMutationsVisitor<'a> {
     }
 
     /// Handle, e.g., `del items[0]`.
-    fn handle_delete(&mut self, range: TextRange, targets: &[Expr]) {
+    fn handle_delete(
+        &mut self,
+        range: TextRange,
+        targets: NodeList<'_, ruff_python_ast::kind::Expr>,
+    ) {
         for target in targets {
-            if let Expr::Subscript(ExprSubscript {
-                range: _,
-                node_index: _,
-                value,
-                slice: _,
-                ctx: _,
-            }) = target
-            {
+            if let ExprKind::Subscript(subscript) = target.classify() {
+                let value = subscript.value();
                 // Find, e.g., `del items[0]`.
                 if ComparableExpr::from(self.iter) == ComparableExpr::from(value) {
                     self.add_mutation(range);
@@ -271,16 +279,15 @@ impl<'a> LoopMutationsVisitor<'a> {
     }
 
     /// Handle, e.g., `items[0] = 1`.
-    fn handle_assign(&mut self, range: TextRange, targets: &[Expr]) {
+    fn handle_assign(
+        &mut self,
+        range: TextRange,
+        targets: NodeList<'_, ruff_python_ast::kind::Expr>,
+    ) {
         for target in targets {
-            if let Expr::Subscript(ExprSubscript {
-                range: _,
-                node_index: _,
-                value,
-                slice,
-                ctx: _,
-            }) = target
-            {
+            if let ExprKind::Subscript(subscript) = target.classify() {
+                let value = subscript.value();
+                let slice = subscript.slice();
                 // Find, e.g., `items[0] = 1`.
                 if ComparableExpr::from(self.iter) == ComparableExpr::from(value) {
                     // But allow, e.g., `for item in items: items[item] = 1`.
@@ -295,26 +302,22 @@ impl<'a> LoopMutationsVisitor<'a> {
     }
 
     /// Handle, e.g., `items += [1]`.
-    fn handle_aug_assign(&mut self, range: TextRange, target: &Expr) {
+    fn handle_aug_assign(&mut self, range: TextRange, target: Expr<'_>) {
         if ComparableExpr::from(self.iter) == ComparableExpr::from(target) {
             self.add_mutation(range);
         }
     }
 
     /// Handle, e.g., `items.append(1)`.
-    fn handle_call(&mut self, func: &Expr) {
-        if let Expr::Attribute(ExprAttribute {
-            range,
-            node_index: _,
-            value,
-            attr,
-            ctx: _,
-        }) = func
-        {
+    fn handle_call(&mut self, func: Expr<'_>) {
+        if let ExprKind::Attribute(attribute) = func.classify() {
+            let range = attribute.range();
+            let value = attribute.value();
+            let attr = attribute.attr();
             if is_mutating_function(attr.as_str()) {
                 // Find, e.g., `items.remove(1)`.
                 if ComparableExpr::from(self.iter) == ComparableExpr::from(value) {
-                    self.add_mutation(*range);
+                    self.add_mutation(range);
                 }
             }
         }
@@ -323,51 +326,58 @@ impl<'a> LoopMutationsVisitor<'a> {
 
 /// Walk statements to detect mutations and track control-flow terminators.
 impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
-    fn visit_body(&mut self, body: &'a [Stmt]) {
+    fn visit_body(&mut self, body: Suite<'a>) {
         for stmt in body {
             self.visit_stmt(stmt);
             // After a terminator, remaining statements are unreachable.
             if matches!(
-                stmt,
-                Stmt::Break(_) | Stmt::Return(_) | Stmt::Continue(_) | Stmt::Raise(_)
+                stmt.classify(),
+                StmtKind::Break(_)
+                    | StmtKind::Return(_)
+                    | StmtKind::Continue(_)
+                    | StmtKind::Raise(_)
             ) {
                 break;
             }
         }
     }
 
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
+    fn visit_stmt(&mut self, stmt: Stmt<'a>) {
+        match stmt.classify() {
             // Ex) `del items[0]`
-            Stmt::Delete(StmtDelete {
-                range,
-                targets,
-                node_index: _,
-            }) => {
-                self.handle_delete(*range, targets);
+            StmtKind::Delete(stmt_delete) => {
+                let range = stmt_delete.range();
+                let targets = stmt_delete.targets();
+
+                self.handle_delete(range, targets);
                 visitor::walk_stmt(self, stmt);
             }
 
             // Ex) `items[0] = 1`
-            Stmt::Assign(StmtAssign { range, targets, .. }) => {
-                self.handle_assign(*range, targets);
+            StmtKind::Assign(stmt_assign) => {
+                let range = stmt_assign.range();
+                let targets = stmt_assign.targets();
+
+                self.handle_assign(range, targets);
                 visitor::walk_stmt(self, stmt);
             }
 
             // Ex) `items += [1]`
-            Stmt::AugAssign(StmtAugAssign { range, target, .. }) => {
-                self.handle_aug_assign(*range, target);
+            StmtKind::AugAssign(stmt_aug_assign) => {
+                let range = stmt_aug_assign.range();
+                let target = stmt_aug_assign.target();
+
+                self.handle_aug_assign(range, target);
                 visitor::walk_stmt(self, stmt);
             }
 
             // Ex) `for y in other: ...`
-            Stmt::For(StmtFor {
-                target,
-                iter,
-                body,
-                orelse,
-                ..
-            }) => {
+            StmtKind::For(stmt_for) => {
+                let target = stmt_for.target();
+                let iter = stmt_for.iter();
+                let body = stmt_for.body();
+                let orelse = stmt_for.orelse();
+
                 self.visit_expr(iter);
                 self.visit_expr(target);
 
@@ -394,9 +404,11 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
             }
 
             // Ex) `while cond: ...`
-            Stmt::While(StmtWhile {
-                test, body, orelse, ..
-            }) => {
+            StmtKind::While(stmt_while) => {
+                let test = stmt_while.test();
+                let body = stmt_while.body();
+                let orelse = stmt_while.orelse();
+
                 self.visit_expr(test);
 
                 let saved_branch = self.branch;
@@ -419,12 +431,11 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
             }
 
             // Ex) `if True: items.append(1)`
-            Stmt::If(StmtIf {
-                test,
-                body,
-                elif_else_clauses,
-                ..
-            }) => {
+            StmtKind::If(stmt_if) => {
+                let test = stmt_if.test();
+                let body = stmt_if.body();
+                let elif_else_clauses = stmt_if.elif_else_clauses();
+
                 let saved_branch = self.branch;
 
                 // Handle the `if` branch.
@@ -442,13 +453,12 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
             }
 
             // Ex) `try: ... except: ... else: ... finally: ...`
-            Stmt::Try(StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
+            StmtKind::Try(stmt_try) => {
+                let body = stmt_try.body();
+                let handlers = stmt_try.handlers();
+                let orelse = stmt_try.orelse();
+                let finalbody = stmt_try.finalbody();
+
                 let saved_branch = self.branch;
 
                 self.enter_new_branch();
@@ -462,11 +472,9 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 }
 
                 for handler in handlers {
-                    let ExceptHandler::ExceptHandler(ExceptHandlerExceptHandler {
-                        type_,
-                        body,
-                        ..
-                    }) = handler;
+                    let ast::ExceptHandlerFields::ExceptHandler(
+                        ast::ExceptHandlerExceptHandlerFields { type_, body, .. },
+                    ) = handler.fields();
                     self.enter_new_branch();
                     if let Some(type_) = type_ {
                         self.visit_expr(type_);
@@ -495,7 +503,7 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
             }
 
             // Return exits the function; the loop can't re-iterate.
-            Stmt::Return(_) => {
+            StmtKind::Return(_) => {
                 if let Some(mutations) = self.mutations.get_mut(&self.branch) {
                     mutations.clear();
                 }
@@ -503,7 +511,7 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
 
             // Only clear at the outermost loop — a nested break doesn't
             // stop the outer iteration.
-            Stmt::Break(_) => {
+            StmtKind::Break(_) => {
                 if self.loop_depth == 0
                     && let Some(mutations) = self.mutations.get_mut(&self.branch)
                 {
@@ -512,10 +520,10 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
             }
 
             // Mutation still reachable on the next iteration.
-            Stmt::Continue(_) => {}
+            StmtKind::Continue(_) => {}
 
             // Avoid recursion for class and function definitions.
-            Stmt::ClassDef(_) | Stmt::FunctionDef(_) => {}
+            StmtKind::ClassDef(_) | StmtKind::FunctionDef(_) => {}
 
             // Default case.
             _ => {
@@ -524,9 +532,10 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: Expr<'a>) {
         // Ex) `items.append(1)`
-        if let Expr::Call(ExprCall { func, .. }) = expr {
+        if let ExprKind::Call(call) = expr.classify() {
+            let func = call.func();
             self.handle_call(func);
         }
 

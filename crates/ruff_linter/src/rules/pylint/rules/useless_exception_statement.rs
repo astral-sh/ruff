@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, ExprKind, StmtKind};
 use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_python_stdlib::builtins;
 use ruff_text_size::Ranged;
@@ -58,10 +58,11 @@ impl Violation for UselessExceptionStatement {
 }
 
 /// PLW0133
-pub(crate) fn useless_exception_statement(checker: &Checker, expr: &ast::StmtExpr) {
-    let Expr::Call(ast::ExprCall { func, .. }) = expr.value.as_ref() else {
+pub(crate) fn useless_exception_statement(checker: &Checker, expr: ast::StmtExpr<'_>) {
+    let ExprKind::Call(call) = expr.value().classify() else {
         return;
     };
+    let func = call.func();
 
     if is_builtin_exception(func, checker.semantic(), checker.target_version())
         || (is_custom_exception_checking_enabled(checker.settings())
@@ -77,7 +78,7 @@ pub(crate) fn useless_exception_statement(checker: &Checker, expr: &ast::StmtExp
 
 /// Returns `true` if the given expression is a builtin exception.
 fn is_builtin_exception(
-    expr: &Expr,
+    expr: Expr<'_>,
     semantic: &SemanticModel,
     target_version: PythonVersion,
 ) -> bool {
@@ -91,7 +92,7 @@ fn is_builtin_exception(
 
 /// Returns `true` if the given expression is a custom exception.
 fn is_custom_exception(
-    expr: &Expr,
+    expr: Expr<'_>,
     semantic: &SemanticModel,
     target_version: PythonVersion,
 ) -> bool {
@@ -109,7 +110,7 @@ fn is_custom_exception(
         return false;
     };
     let statement = semantic.statement(source);
-    if let ast::Stmt::ClassDef(class_def) = statement {
+    if let StmtKind::ClassDef(class_def) = statement.classify() {
         return analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
             if let ["" | "builtins", name] = qualified_name.segments() {
                 return builtins::is_exception(name, target_version.minor);

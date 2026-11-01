@@ -1,8 +1,7 @@
 use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
-use ruff_python_ast::{Arguments, Expr};
+use ruff_python_ast::{self as ast, Expr, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -64,39 +63,39 @@ impl AlwaysFixableViolation for IncorrectDictIterator {
 }
 
 /// PERF102 for `for` loops.
-pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor) {
-    check_dict_items_usage(checker, stmt_for.target.as_ref(), stmt_for.iter.as_ref());
+pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: ast::StmtFor<'_>) {
+    check_dict_items_usage(checker, stmt_for.target(), stmt_for.iter());
 }
 
 /// PERF102 for comprehensions and generators.
 pub(crate) fn incorrect_dict_iterator_comprehension(
     checker: &Checker,
-    comprehension: &ast::Comprehension,
+    comprehension: ast::Comprehension<'_>,
 ) {
-    check_dict_items_usage(checker, &comprehension.target, &comprehension.iter);
+    check_dict_items_usage(checker, comprehension.target(), comprehension.iter());
 }
 
-fn check_dict_items_usage(checker: &Checker, target: &Expr, iter: &Expr) {
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = target else {
+fn check_dict_items_usage(checker: &Checker, target: Expr<'_>, iter: Expr<'_>) {
+    let ExprKind::Tuple(tuple) = target.classify() else {
         return;
     };
-    let [key, value] = elts.as_slice() else {
+    let elts = tuple.elts();
+    let Some([key, value]) = elts.as_array() else {
         return;
     };
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, .. },
-        ..
-    }) = iter
-    else {
+    let ExprKind::Call(call) = iter.classify() else {
         return;
     };
+    let func = call.func();
+    let arguments = call.arguments();
+    let args = arguments.args();
     if !args.is_empty() {
         return;
     }
-    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
+    let ExprKind::Attribute(attribute) = func.classify() else {
         return;
     };
+    let attr = attribute.attr();
     if attr != "items" {
         return;
     }

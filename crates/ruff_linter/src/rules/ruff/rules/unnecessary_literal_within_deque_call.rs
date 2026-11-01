@@ -1,5 +1,6 @@
 use ruff_diagnostics::{Applicability, Edit};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{ArgOrKeyword, ExprKind};
 
 use ruff_python_ast::helpers::is_empty_f_string;
 use ruff_python_ast::token::parenthesized_range;
@@ -71,10 +72,9 @@ impl Violation for UnnecessaryEmptyIterableWithinDequeCall {
 }
 
 /// RUF037
-pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &ast::ExprCall) {
-    let ast::ExprCall {
-        func, arguments, ..
-    } = deque;
+pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: ast::ExprCall<'_>) {
+    let func = deque.func();
+    let arguments = deque.arguments();
 
     let Some(qualified) = checker.semantic().resolve_qualified_name(func) else {
         return;
@@ -89,25 +89,25 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &a
 
     let maxlen = arguments.find_argument_value("maxlen", 1);
 
-    let is_empty_literal = match iterable.value() {
-        Expr::Dict(dict) => dict.is_empty(),
-        Expr::List(list) => list.is_empty(),
-        Expr::Tuple(tuple) => tuple.is_empty(),
-        Expr::Call(call) => {
+    let is_empty_literal = match iterable.value().classify() {
+        ExprKind::Dict(dict) => dict.items().is_empty(),
+        ExprKind::List(list) => list.elts().is_empty(),
+        ExprKind::Tuple(tuple) => tuple.elts().is_empty(),
+        ExprKind::Call(call) => {
             checker
                 .semantic()
-                .resolve_builtin_symbol(&call.func)
+                .resolve_builtin_symbol(call.func())
                 // other lints should handle empty list/dict/tuple calls,
                 // but this means that the lint still applies before those are fixed
                 .is_some_and(|name| {
                     name == "set" || name == "list" || name == "dict" || name == "tuple"
                 })
-                && call.arguments.is_empty()
+                && call.arguments().is_empty()
         }
-        Expr::StringLiteral(string) => string.value.is_empty(),
-        Expr::BytesLiteral(bytes) => bytes.value.is_empty(),
-        Expr::FString(fstring) => is_empty_f_string(fstring),
-        Expr::TString(tstring) => tstring.value.is_empty_iterable(),
+        ExprKind::StringLiteral(string) => string.value().is_empty(),
+        ExprKind::BytesLiteral(bytes) => bytes.value().is_empty(),
+        ExprKind::FString(fstring) => is_empty_f_string(fstring),
+        ExprKind::TString(tstring) => tstring.value().is_empty_iterable(),
         _ => false,
     };
     if !is_empty_literal {
@@ -124,7 +124,12 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &a
     // Return without a fix in the presence of a starred argument because we can't accurately
     // generate the fix. If all of the arguments are unpacked (e.g. `deque(*([], 10))`), we will
     // have already returned after the first `find_argument_value` call.
-    if deque.arguments.args.iter().any(Expr::is_starred_expr) {
+    if deque
+        .arguments()
+        .args()
+        .iter()
+        .any(ast::Expr::is_starred_expr)
+    {
         return;
     }
 
@@ -133,16 +138,16 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &a
 
 fn fix_unnecessary_literal_in_deque(
     checker: &Checker,
-    iterable: ast::ArgOrKeyword,
-    deque: &ast::ExprCall,
-    maxlen: Option<&Expr>,
+    iterable: ArgOrKeyword,
+    deque: ast::ExprCall<'_>,
+    maxlen: Option<Expr<'_>>,
 ) -> anyhow::Result<Fix> {
     // if `maxlen` is `Some`, we know there were exactly two arguments, and we can replace the whole
     // call. otherwise, we only delete the `iterable` argument and leave the others untouched.
     let edit = if let Some(maxlen) = maxlen {
         let deque_name = checker.locator().slice(
-            parenthesized_range(deque.func.as_ref().into(), deque.into(), checker.tokens())
-                .unwrap_or(deque.func.range()),
+            parenthesized_range(deque.func(), deque.into(), checker.tokens())
+                .unwrap_or(deque.func().range()),
         );
         let len_str = checker.locator().slice(maxlen);
         let deque_str = format!("{deque_name}(maxlen={len_str})");
@@ -150,7 +155,7 @@ fn fix_unnecessary_literal_in_deque(
     } else {
         remove_argument(
             &iterable,
-            &deque.arguments,
+            deque.arguments(),
             Parentheses::Preserve,
             checker.source(),
             checker.tokens(),
@@ -159,7 +164,7 @@ fn fix_unnecessary_literal_in_deque(
     let has_comments = checker.comment_ranges().intersects(edit.range());
     // we've already checked maxlen.is_some() && args != 2 above, so this is the only problematic
     // case left
-    let unknown_arguments = maxlen.is_none() && deque.arguments.len() != 1;
+    let unknown_arguments = maxlen.is_none() && deque.arguments().len() != 1;
     let applicability = if has_comments || unknown_arguments {
         Applicability::Unsafe
     } else {

@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
 use ruff_python_ast::token::parenthesized_range;
+use ruff_python_ast::{self as ast, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -52,7 +52,7 @@ impl AlwaysFixableViolation for ParenthesizeChainedOperators {
 }
 
 /// RUF021
-pub(crate) fn parenthesize_chained_logical_operators(checker: &Checker, expr: &ast::ExprBoolOp) {
+pub(crate) fn parenthesize_chained_logical_operators(checker: &Checker, expr: ast::ExprBoolOp<'_>) {
     // We're only interested in `and` expressions inside `or` expressions:
     // - `a or b or c` => `BoolOp(values=[Name("a"), Name("b"), Name("c")], op=Or)`
     // - `a and b and c` => `BoolOp(values=[Name("a"), Name("b"), Name("c")], op=And)`
@@ -67,17 +67,12 @@ pub(crate) fn parenthesize_chained_logical_operators(checker: &Checker, expr: &a
     // (if they're parenthesized already, that's great!),
     // so we can ignore all cases where an `Or` node
     // exists inside an `And` node.
-    if expr.op.is_and() {
+    if expr.op().is_and() {
         return;
     }
-    for condition in &expr.values {
-        match condition {
-            ast::Expr::BoolOp(
-                bool_op @ ast::ExprBoolOp {
-                    op: ast::BoolOp::And,
-                    ..
-                },
-            ) => {
+    for condition in expr.values() {
+        match condition.classify() {
+            ExprKind::BoolOp(bool_op) if bool_op.op() == ast::BoolOp::And => {
                 let locator = checker.locator();
                 let source_range = bool_op.range();
                 if parenthesized_range(bool_op.into(), expr.into(), checker.tokens()).is_none() {

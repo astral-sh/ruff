@@ -6,7 +6,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::stmt_if::{BranchKind, IfElifBranch, if_elif_branches};
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Int, StmtIf};
+use ruff_python_ast::{self as ast, CmpOp, Expr, ExprKind, Int, NodeList, StmtIf};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
@@ -89,9 +89,9 @@ enum Reason {
 }
 
 /// UP036
-pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
+pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: StmtIf<'_>) {
     for branch in if_elif_branches(stmt_if) {
-        let Expr::Compare(compare) = &branch.test else {
+        let ExprKind::Compare(compare) = branch.test.classify() else {
             continue;
         };
 
@@ -103,8 +103,8 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
             continue;
         }
 
-        match comparison {
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => match op {
+        match comparison.fields() {
+            ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => match op {
                 CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE => {
                     let Some(version) = extract_version(elts) else {
                         return;
@@ -149,7 +149,7 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
                 }
                 _ => {}
             },
-            Expr::NumberLiteral(ast::ExprNumberLiteral {
+            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
                 value: ast::Number::Int(int),
                 ..
             }) => {
@@ -270,11 +270,15 @@ fn version_always_less_than(
 /// `else` should be inlined at the top level.
 fn fix_always_false_branch(
     checker: &Checker,
-    stmt_if: &StmtIf,
+    stmt_if: StmtIf<'_>,
     branch: &IfElifBranch,
 ) -> Option<Fix> {
     match branch.kind {
-        BranchKind::If => match stmt_if.elif_else_clauses.first() {
+        BranchKind::If => match stmt_if
+            .elif_else_clauses()
+            .first()
+            .map(ast::ElifElseClause::fields)
+        {
             // If we have a lone `if`, delete as statement (insert pass in parent if required)
             None => {
                 let stmt = checker.semantic().current_statement();
@@ -283,7 +287,7 @@ fn fix_always_false_branch(
                 Some(Fix::unsafe_edit(edit))
             }
             // If we have an `if` and an `elif`, turn the `elif` into an `if`
-            Some(ElifElseClause {
+            Some(ast::ElifElseClauseFields {
                 test: Some(_),
                 range,
                 ..
@@ -301,12 +305,12 @@ fn fix_always_false_branch(
                 )))
             }
             // If we only have an `if` and an `else`, dedent the `else` block
-            Some(ElifElseClause {
+            Some(ast::ElifElseClauseFields {
                 body, test: None, ..
             }) => {
                 let start = body.first()?;
                 let end = body.last()?;
-                if indentation(checker.source(), start).is_none() {
+                if indentation(checker.source(), &start).is_none() {
                     // Inline `else` block (e.g., `else: x = 1`).
                     Some(Fix::unsafe_edit(Edit::range_replacement(
                         checker
@@ -316,7 +320,7 @@ fn fix_always_false_branch(
                         stmt_if.range(),
                     )))
                 } else {
-                    indentation(checker.source(), stmt_if)
+                    indentation(checker.source(), &stmt_if)
                         .and_then(|indentation| {
                             adjust_indentation(
                                 TextRange::new(
@@ -354,9 +358,9 @@ fn fix_always_false_branch(
             // ... to here (exclusive) ^    x = 3
             // ```
             let next_start = stmt_if
-                .elif_else_clauses
+                .elif_else_clauses()
                 .iter()
-                .map(Ranged::start)
+                .map(|node| node.start())
                 .find(|start| *start > branch.start());
             Some(Fix::unsafe_edit(Edit::deletion(
                 branch.start(),
@@ -375,7 +379,7 @@ fn fix_always_false_branch(
 /// ```
 fn fix_always_true_branch(
     checker: &Checker,
-    stmt_if: &StmtIf,
+    stmt_if: StmtIf<'_>,
     branch: &IfElifBranch,
 ) -> Option<Fix> {
     match branch.kind {
@@ -384,14 +388,14 @@ fn fix_always_true_branch(
             // the rest.
             let start = branch.body.first()?;
             let end = branch.body.last()?;
-            if indentation(checker.source(), start).is_none() {
+            if indentation(checker.source(), &start).is_none() {
                 // Inline `if` block (e.g., `if ...: x = 1`).
                 Some(Fix::unsafe_edit(Edit::range_replacement(
                     checker
                         .locator()
                         .slice(TextRange::new(start.start(), end.end()))
                         .to_string(),
-                    stmt_if.range,
+                    stmt_if.range(),
                 )))
             } else {
                 indentation(checker.source(), &stmt_if)
@@ -430,13 +434,13 @@ fn fix_always_true_branch(
 }
 
 /// Return the version tuple as a sequence of [`Int`] values.
-fn extract_version(elts: &[Expr]) -> Option<Vec<Int>> {
+fn extract_version(elts: NodeList<'_, ast::kind::Expr>) -> Option<Vec<Int>> {
     let mut version: Vec<Int> = vec![];
     for elt in elts {
-        let Expr::NumberLiteral(ast::ExprNumberLiteral {
+        let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
             value: ast::Number::Int(int),
             ..
-        }) = &elt
+        }) = elt.fields()
         else {
             return None;
         };
@@ -451,7 +455,7 @@ fn extract_version(elts: &[Expr]) -> Option<Vec<Int>> {
 /// - Direct access: `sys.version_info`
 /// - Subscript access: `sys.version_info[:2]`, `sys.version_info[0]`
 /// - Major version attribute: `sys.version_info.major`
-fn is_valid_version_info(semantic: &SemanticModel, left: &Expr) -> bool {
+fn is_valid_version_info(semantic: &SemanticModel, left: Expr<'_>) -> bool {
     semantic
         .resolve_qualified_name(map_subscript(left))
         .is_some_and(|name| matches!(name.segments(), ["sys", "version_info"]))

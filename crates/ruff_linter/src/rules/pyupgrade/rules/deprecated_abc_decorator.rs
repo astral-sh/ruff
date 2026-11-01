@@ -1,4 +1,4 @@
-use ruff_python_ast::Decorator;
+use ruff_python_ast::NodeList;
 use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::Ranged;
 
@@ -73,7 +73,10 @@ impl AlwaysFixableViolation for DeprecatedAbcDecorator {
 }
 
 /// UP051
-pub(crate) fn deprecated_abc_decorator(checker: &Checker, decorator_list: &[Decorator]) {
+pub(crate) fn deprecated_abc_decorator(
+    checker: &Checker,
+    decorator_list: NodeList<'_, ruff_python_ast::kind::Decorator>,
+) {
     for decorator in decorator_list {
         // Look for, e.g., `import abc; @abc.abstractclassmethod`, etc.
         for (from, to) in [
@@ -83,11 +86,11 @@ pub(crate) fn deprecated_abc_decorator(checker: &Checker, decorator_list: &[Deco
         ] {
             if checker
                 .semantic()
-                .resolve_qualified_name(&decorator.expression)
+                .resolve_qualified_name(decorator.expression())
                 .is_some_and(|qualified_name| qualified_name.segments() == ["abc", from])
             {
-                let mut diagnostic =
-                    checker.report_diagnostic(DeprecatedAbcDecorator { from, to }, decorator.range);
+                let mut diagnostic = checker
+                    .report_diagnostic(DeprecatedAbcDecorator { from, to }, decorator.range());
                 let indentation =
                     indentation_at_offset(decorator.range().start(), checker.source());
                 let Some(indentation) = indentation else {
@@ -109,7 +112,7 @@ pub(crate) fn deprecated_abc_decorator(checker: &Checker, decorator_list: &[Deco
                             checker.semantic(),
                         )?;
                     let replace_edit =
-                        Edit::range_replacement(replace_binding, decorator.expression.range());
+                        Edit::range_replacement(replace_binding, decorator.expression().range());
 
                     Ok(Fix::safe_edits(
                         replace_import_edit,

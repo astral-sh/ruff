@@ -34,7 +34,7 @@ impl Violation for ExecBuiltin {
 }
 
 /// S102
-pub(crate) fn exec_used(checker: &Checker, func: &Expr) {
+pub(crate) fn exec_used(checker: &Checker, func: Expr<'_>) {
     if checker.semantic().match_builtin_expr(func, "exec") {
         checker.report_diagnostic(ExecBuiltin, func.range());
     }

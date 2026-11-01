@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprList, ExprName, ExprTuple, Stmt, StmtFor};
+use ruff_python_ast::{self as ast, Expr, ExprKind, ExprName, StmtFor, StmtKind};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::{Binding, ScopeId, SemanticModel, TypingOnlyBindingsStatus};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -74,16 +74,16 @@ pub(crate) fn for_loop_writes_binding(checker: &Checker, binding: &Binding) {
 
     let Some(for_stmt) = binding
         .statement(semantic)
-        .and_then(|stmt| stmt.as_for_stmt())
+        .and_then(ruff_python_ast::Stmt::as_for_stmt)
     else {
         return;
     };
 
-    if for_stmt.is_async {
+    if for_stmt.is_async() {
         return;
     }
 
-    let binding_names = binding_names(&for_stmt.target);
+    let binding_names = binding_names(for_stmt.target());
 
     if !binding_names
         .first()
@@ -96,9 +96,9 @@ pub(crate) fn for_loop_writes_binding(checker: &Checker, binding: &Binding) {
 }
 
 /// FURB122
-pub(crate) fn for_loop_writes_stmt(checker: &Checker, for_stmt: &StmtFor) {
+pub(crate) fn for_loop_writes_stmt(checker: &Checker, for_stmt: StmtFor<'_>) {
     // Loops with bindings are handled later.
-    if !binding_names(&for_stmt.target).is_empty() {
+    if !binding_names(for_stmt.target()).is_empty() {
         return;
     }
 
@@ -115,14 +115,17 @@ pub(crate) fn for_loop_writes_stmt(checker: &Checker, for_stmt: &StmtFor) {
 ///     #      ^      ^                   ^
 ///     ...
 /// ```
-fn binding_names(for_target: &Expr) -> Vec<&ExprName> {
-    fn collect_names<'a>(expr: &'a Expr, names: &mut Vec<&'a ExprName>) {
-        match expr {
-            Expr::Name(name) => names.push(name),
+fn binding_names(for_target: Expr<'_>) -> Vec<ExprName<'_>> {
+    fn collect_names<'a>(expr: Expr<'a>, names: &mut Vec<ExprName<'a>>) {
+        match expr.fields() {
+            ast::ExprFields::Name(ast::ExprNameFields { node: name, .. }) => names.push(name),
 
-            Expr::Starred(starred) => collect_names(&starred.value, names),
+            ast::ExprFields::Starred(ast::ExprStarredFields { node: starred, .. }) => {
+                collect_names(starred.value(), names);
+            }
 
-            Expr::List(ExprList { elts, .. }) | Expr::Tuple(ExprTuple { elts, .. }) => elts
+            ast::ExprFields::List(ast::ExprListFields { elts, .. })
+            | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => elts
                 .iter()
                 .for_each(|element| collect_names(element, names)),
 
@@ -138,36 +141,40 @@ fn binding_names(for_target: &Expr) -> Vec<&ExprName> {
 /// FURB122
 fn for_loop_writes(
     checker: &Checker,
-    for_stmt: &StmtFor,
+    for_stmt: StmtFor<'_>,
     scope_id: ScopeId,
-    binding_names: &[&ExprName],
+    binding_names: &[ExprName<'_>],
 ) {
-    if !for_stmt.orelse.is_empty() {
+    if !for_stmt.orelse().is_empty() {
         return;
     }
-    let [Stmt::Expr(stmt_expr)] = for_stmt.body.as_slice() else {
+    let Some([StmtKind::Expr(stmt_expr)]) = for_stmt
+        .body()
+        .as_array()
+        .map(|items| items.map(ruff_python_ast::Stmt::classify))
+    else {
         return;
     };
 
-    let Some(call_expr) = stmt_expr.value.as_call_expr() else {
+    let Some(call_expr) = stmt_expr.value().as_call_expr() else {
         return;
     };
-    let Some(expr_attr) = call_expr.func.as_attribute_expr() else {
+    let Some(expr_attr) = call_expr.func().as_attribute_expr() else {
         return;
     };
 
-    if &expr_attr.attr != "write" {
+    if expr_attr.attr() != "write" {
         return;
     }
 
-    if !call_expr.arguments.keywords.is_empty() {
+    if !call_expr.arguments().keywords().is_empty() {
         return;
     }
-    let [write_arg] = call_expr.arguments.args.as_ref() else {
+    let Some([write_arg]) = call_expr.arguments().args().as_array() else {
         return;
     };
 
-    let Some(io_object_name) = expr_attr.value.as_name_expr() else {
+    let Some(io_object_name) = expr_attr.value().as_name_expr() else {
         return;
     };
 
@@ -182,13 +189,15 @@ fn for_loop_writes(
         return;
     }
 
-    if loop_variables_are_used_outside_loop(binding_names, for_stmt.range, semantic, scope_id) {
+    if loop_variables_are_used_outside_loop(binding_names, for_stmt.range(), semantic, scope_id) {
         return;
     }
 
     let locator = checker.locator();
-    let content = match (for_stmt.target.as_ref(), write_arg) {
-        (Expr::Name(for_target), Expr::Name(write_arg)) if for_target.id == write_arg.id => {
+    let content = match (for_stmt.target().classify(), write_arg.classify()) {
+        (ExprKind::Name(for_target), ExprKind::Name(write_arg))
+            if for_target.id() == write_arg.id() =>
+        {
             format!(
                 "{}.writelines({})",
                 locator.slice(io_object_name),
@@ -207,35 +216,35 @@ fn for_loop_writes(
         }
     };
 
-    let applicability = if checker.comment_ranges().intersects(for_stmt.range) {
+    let applicability = if checker.comment_ranges().intersects(for_stmt.range()) {
         Applicability::Unsafe
     } else {
         Applicability::Safe
     };
     let fix = Fix::applicable_edit(
-        Edit::range_replacement(content, for_stmt.range),
+        Edit::range_replacement(content, for_stmt.range()),
         applicability,
     );
 
     checker
         .report_diagnostic(
             ForLoopWrites {
-                name: io_object_name.id.to_string(),
+                name: io_object_name.id().to_string(),
             },
-            for_stmt.range,
+            for_stmt.range(),
         )
         .set_fix(fix);
 }
 
 fn loop_variables_are_used_outside_loop(
-    binding_names: &[&ExprName],
+    binding_names: &[ExprName<'_>],
     loop_range: TextRange,
     semantic: &SemanticModel,
     scope_id: ScopeId,
 ) -> bool {
-    let find_binding_id = |name: &ExprName, offset: TextSize| {
+    let find_binding_id = |name: ExprName<'_>, offset: TextSize| {
         semantic.simulate_runtime_load_at_location_in_scope(
-            name.id.as_str(),
+            name.id().as_str(),
             TextRange::at(offset, 0.into()),
             scope_id,
             TypingOnlyBindingsStatus::Disallowed,
@@ -250,9 +259,9 @@ fn loop_variables_are_used_outside_loop(
     // # ^ Load here
     // ```
     let name_overwrites_outer =
-        |name: &ExprName| find_binding_id(name, loop_range.start()).is_some();
+        |name: ExprName<'_>| find_binding_id(name, loop_range.start()).is_some();
 
-    let name_is_used_later = |name: &ExprName| {
+    let name_is_used_later = |name: ExprName<'_>| {
         let Some(binding_id) = find_binding_id(name, loop_range.end()) else {
             return false;
         };
@@ -270,5 +279,5 @@ fn loop_variables_are_used_outside_loop(
 
     binding_names
         .iter()
-        .any(|name| name_overwrites_outer(name) || name_is_used_later(name))
+        .any(|name| name_overwrites_outer(*name) || name_is_used_later(*name))
 }

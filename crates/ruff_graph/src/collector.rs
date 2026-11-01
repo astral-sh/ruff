@@ -33,25 +33,23 @@ impl<'a> Collector<'a> {
     }
 
     #[must_use]
-    pub(crate) fn collect(mut self, module: &Mod) -> Vec<CollectedImport> {
+    pub(crate) fn collect(mut self, module: Mod<'_>) -> Vec<CollectedImport> {
         walk_module(&mut self, module);
         self.imports
     }
 }
 
 impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
-    fn visit_stmt(&mut self, stmt: &'ast Stmt) {
-        match stmt {
-            Stmt::ImportFrom(ast::StmtImportFrom {
+    fn visit_stmt(&mut self, stmt: Stmt<'ast>) {
+        match stmt.fields() {
+            ast::StmtFields::ImportFrom(ast::StmtImportFromFields {
                 names,
                 module,
                 level,
                 is_lazy: _,
                 range: _,
-                node_index: _,
+                node: _,
             }) => {
-                let module = module.as_deref();
-                let level = *level;
                 for alias in names {
                     let mut components = vec![];
 
@@ -75,12 +73,12 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
 
                     // Add the module path.
                     if let Some(module) = module {
-                        components.extend(module.split('.'));
+                        components.extend(module.as_str().split('.'));
                     }
 
                     // Add the alias name, unless it's a wildcard import.
-                    if alias.name.as_str() != "*" {
-                        components.push(alias.name.as_str());
+                    if alias.name().as_str() != "*" {
+                        components.push(alias.name().as_str());
                     }
 
                     if let Some(module_name) = ModuleName::from_components(components) {
@@ -88,24 +86,24 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                     }
                 }
             }
-            Stmt::Import(ast::StmtImport {
+            ast::StmtFields::Import(ast::StmtImportFields {
                 names,
                 is_lazy: _,
                 range: _,
-                node_index: _,
+                node: _,
             }) => {
                 for alias in names {
-                    if let Some(module_name) = ModuleName::new(alias.name.as_str()) {
+                    if let Some(module_name) = ModuleName::new(alias.name().as_str()) {
                         self.imports.push(CollectedImport::Import(module_name));
                     }
                 }
             }
-            Stmt::If(ast::StmtIf {
+            ast::StmtFields::If(ast::StmtIfFields {
                 test,
                 body,
                 elif_else_clauses,
                 range: _,
-                node_index: _,
+                node: _,
             }) => {
                 // Skip TYPE_CHECKING blocks if not requested
                 if self.type_checking_imports || !is_type_checking_condition(test) {
@@ -116,32 +114,32 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                     self.visit_elif_else_clause(clause);
                 }
             }
-            Stmt::FunctionDef(_)
-            | Stmt::ClassDef(_)
-            | Stmt::While(_)
-            | Stmt::With(_)
-            | Stmt::Match(_)
-            | Stmt::Try(_)
-            | Stmt::For(_) => {
+            ast::StmtFields::FunctionDef(_)
+            | ast::StmtFields::ClassDef(_)
+            | ast::StmtFields::While(_)
+            | ast::StmtFields::With(_)
+            | ast::StmtFields::Match(_)
+            | ast::StmtFields::Try(_)
+            | ast::StmtFields::For(_) => {
                 // Always traverse into compound statements.
                 walk_stmt(self, stmt);
             }
 
-            Stmt::Return(_)
-            | Stmt::Delete(_)
-            | Stmt::Assign(_)
-            | Stmt::AugAssign(_)
-            | Stmt::AnnAssign(_)
-            | Stmt::TypeAlias(_)
-            | Stmt::Raise(_)
-            | Stmt::Assert(_)
-            | Stmt::Global(_)
-            | Stmt::Nonlocal(_)
-            | Stmt::Expr(_)
-            | Stmt::Pass(_)
-            | Stmt::Break(_)
-            | Stmt::Continue(_)
-            | Stmt::IpyEscapeCommand(_) => {
+            ast::StmtFields::Return(_)
+            | ast::StmtFields::Delete(_)
+            | ast::StmtFields::Assign(_)
+            | ast::StmtFields::AugAssign(_)
+            | ast::StmtFields::AnnAssign(_)
+            | ast::StmtFields::TypeAlias(_)
+            | ast::StmtFields::Raise(_)
+            | ast::StmtFields::Assert(_)
+            | ast::StmtFields::Global(_)
+            | ast::StmtFields::Nonlocal(_)
+            | ast::StmtFields::Expr(_)
+            | ast::StmtFields::Pass(_)
+            | ast::StmtFields::Break(_)
+            | ast::StmtFields::Continue(_)
+            | ast::StmtFields::IpyEscapeCommand(_) => {
                 // Only traverse simple statements when string imports is enabled.
                 if self.string_imports.enabled {
                     walk_stmt(self, stmt);
@@ -150,13 +148,13 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'ast Expr) {
+    fn visit_expr(&mut self, expr: Expr<'ast>) {
         if self.string_imports.enabled {
-            if let Expr::StringLiteral(ast::ExprStringLiteral {
+            if let ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields {
                 value,
                 range: _,
-                node_index: _,
-            }) = expr
+                node: _,
+            }) = expr.fields()
             {
                 let value = value.to_str();
                 // Determine whether the string literal "looks like" an import statement: contains
@@ -187,16 +185,16 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
 ///
 /// NOTE: Aliased `TYPE_CHECKING`, i.e. `import typing.TYPE_CHECKING as TC; if TC: ...`
 /// will not be detected!
-fn is_type_checking_condition(expr: &Expr) -> bool {
-    match expr {
+fn is_type_checking_condition(expr: Expr<'_>) -> bool {
+    match expr.fields() {
         // `if TYPE_CHECKING:`
-        Expr::Name(ast::ExprName { id, .. }) => id.as_str() == "TYPE_CHECKING",
+        ast::ExprFields::Name(ast::ExprNameFields { id, .. }) => id.as_str() == "TYPE_CHECKING",
         // `if typing.TYPE_CHECKING:`
-        Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+        ast::ExprFields::Attribute(ast::ExprAttributeFields { value, attr, .. }) => {
             attr.as_str() == "TYPE_CHECKING"
                 && matches!(
-                    value.as_ref(),
-                    Expr::Name(ast::ExprName { id, .. }) if id.as_str() == "typing"
+                    value.fields(),
+                    ast::ExprFields::Name(ast::ExprNameFields { id, .. }) if id.as_str() == "typing"
                 )
         }
         _ => false,

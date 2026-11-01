@@ -69,7 +69,7 @@ impl Violation for OsPathExpanduser {
 }
 
 /// PTH111
-pub(crate) fn os_path_expanduser(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_path_expanduser(checker: &Checker, call: ExprCall<'_>, segments: &[&str]) {
     if segments != ["os", "path", "expanduser"] {
         return;
     }

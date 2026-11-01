@@ -6,7 +6,7 @@ use ruff_python_ast::helpers::{
 };
 use ruff_python_ast::token::{TokenKind, Tokens, parenthesized_range};
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{Expr, StmtIf};
+use ruff_python_ast::{Expr, ExprKind, StmtIf};
 use ruff_python_semantic::analyze::typing;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -75,13 +75,10 @@ impl AlwaysFixableViolation for UnnecessaryIf {
 }
 
 /// RUF050
-pub(crate) fn unnecessary_if(checker: &Checker, stmt: &StmtIf) {
-    let StmtIf {
-        test,
-        body,
-        elif_else_clauses,
-        ..
-    } = stmt;
+pub(crate) fn unnecessary_if(checker: &Checker, stmt: StmtIf<'_>) {
+    let test = stmt.test();
+    let body = stmt.body();
+    let elif_else_clauses = stmt.elif_else_clauses();
 
     // Only handle bare `if` blocks — `elif`/`else` branches are handled by
     // RUF047 (needless-else)
@@ -104,7 +101,7 @@ pub(crate) fn unnecessary_if(checker: &Checker, stmt: &StmtIf) {
     }
 
     let has_side_effects = contains_effect(test, |id| checker.semantic().has_builtin_binding(id))
-        || any_over_expr(test, |expr| matches!(expr, Expr::Named(_)));
+        || any_over_expr(test, |expr| matches!(expr.classify(), ExprKind::Named(_)));
 
     let mut diagnostic = checker.report_diagnostic(UnnecessaryIf, stmt.range());
 
@@ -125,11 +122,15 @@ pub(crate) fn unnecessary_if(checker: &Checker, stmt: &StmtIf) {
 }
 
 /// Return the `if` condition in a form that remains a single valid expression statement.
-fn condition_as_expression_statement(test: &Expr, stmt: &StmtIf, checker: &Checker) -> String {
+fn condition_as_expression_statement(
+    test: Expr<'_>,
+    stmt: StmtIf<'_>,
+    checker: &Checker,
+) -> String {
     let has_top_level_line_break = has_top_level_line_break(test.range(), checker.tokens());
 
     if has_top_level_line_break
-        && let Some(range) = parenthesized_range(test.into(), stmt.into(), checker.tokens())
+        && let Some(range) = parenthesized_range(test, stmt.into(), checker.tokens())
     {
         return checker.locator().slice(range).to_string();
     }
@@ -164,7 +165,7 @@ fn has_top_level_line_break(range: TextRange, tokens: &Tokens) -> bool {
 }
 
 /// Returns `true` if the `if` statement contains a comment
-fn if_contains_comments(stmt: &StmtIf, checker: &Checker) -> bool {
+fn if_contains_comments(stmt: StmtIf<'_>, checker: &Checker) -> bool {
     let source = checker.source();
 
     // Use `line_end` (before the newline) instead of `full_line_end` (after
@@ -173,7 +174,7 @@ fn if_contains_comments(stmt: &StmtIf, checker: &Checker) -> bool {
     let stmt_line_end = source.line_end(stmt.end());
     let check_range = TextRange::new(stmt.start(), stmt_line_end);
 
-    let Some(last_stmt) = stmt.body.last() else {
+    let Some(last_stmt) = stmt.body().last() else {
         return false;
     };
 
@@ -185,8 +186,8 @@ fn if_contains_comments(stmt: &StmtIf, checker: &Checker) -> bool {
 
 /// Returns `true` if the `if` branch has a trailing own-line comment
 fn if_has_trailing_comment(
-    stmt: &StmtIf,
-    last_body_stmt: &ruff_python_ast::Stmt,
+    stmt: StmtIf<'_>,
+    last_body_stmt: ruff_python_ast::Stmt<'_>,
     stmt_full_end: TextSize,
     checker: &Checker,
 ) -> bool {
@@ -194,7 +195,7 @@ fn if_has_trailing_comment(
 
     // Compare against the `if` keyword indentation rather than the body
     // statement — handles single-line forms like `if True: pass`
-    let stmt_indentation = indentation(source, stmt).unwrap_or_default().text_len();
+    let stmt_indentation = indentation(source, &stmt).unwrap_or_default().text_len();
 
     for token in tokens.after(stmt_full_end) {
         match token.kind() {

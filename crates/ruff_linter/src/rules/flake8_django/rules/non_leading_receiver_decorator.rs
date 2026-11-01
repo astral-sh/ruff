@@ -1,4 +1,4 @@
-use ruff_python_ast::Decorator;
+use ruff_python_ast::NodeList;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
@@ -53,17 +53,20 @@ impl Violation for DjangoNonLeadingReceiverDecorator {
 }
 
 /// DJ013
-pub(crate) fn non_leading_receiver_decorator(checker: &Checker, decorator_list: &[Decorator]) {
+pub(crate) fn non_leading_receiver_decorator(
+    checker: &Checker,
+    decorator_list: NodeList<'_, ruff_python_ast::kind::Decorator>,
+) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
 
     let mut seen_receiver = false;
     for (i, decorator) in decorator_list.iter().enumerate() {
-        let is_receiver = decorator.expression.as_call_expr().is_some_and(|call| {
+        let is_receiver = decorator.expression().as_call_expr().is_some_and(|call| {
             checker
                 .semantic()
-                .resolve_qualified_name(&call.func)
+                .resolve_qualified_name(call.func())
                 .is_some_and(|qualified_name| {
                     matches!(
                         qualified_name.segments(),

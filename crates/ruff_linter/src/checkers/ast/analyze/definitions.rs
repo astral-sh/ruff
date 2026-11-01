@@ -162,7 +162,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 ..
             }) = definition
             {
-                pylint::rules::bad_dunder_method_name(checker, method);
+                pylint::rules::bad_dunder_method_name(checker, *method);
             }
         }
 

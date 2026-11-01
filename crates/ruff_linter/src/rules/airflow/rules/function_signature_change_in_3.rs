@@ -4,7 +4,7 @@ use crate::rules::airflow::helpers::{FunctionSignatureChange, is_method_in_subcl
 use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{Arguments, Expr, ExprAttribute, ExprCall, Identifier, StmtFunctionDef};
+use ruff_python_ast::{Arguments, Expr, ExprKind, Identifier, StmtFunctionDef};
 use ruff_python_semantic::Modules;
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
@@ -60,26 +60,27 @@ impl Violation for Airflow3IncompatibleFunctionSignature {
 }
 
 /// AIR303
-pub(crate) fn airflow_3_incompatible_function_signature(checker: &Checker, expr: &Expr) {
+pub(crate) fn airflow_3_incompatible_function_signature(checker: &Checker, &expr: &Expr<'_>) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
 
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = expr
-    else {
+    let ExprKind::Call(call_node) = expr.classify() else {
         return;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
     // Handle method calls on instances
-    if let Expr::Attribute(ExprAttribute { attr, value, .. }) = func.as_ref() {
+    if let ExprKind::Attribute(attribute) = func.classify() {
+        let attr = attribute.attr();
+        let value = attribute.value();
         // Resolve the qualified name: try variable assignments first, then fall back to direct
         // constructor calls.
         let qualified_name = typing::resolve_assignment(value, checker.semantic()).or_else(|| {
             value
                 .as_call_expr()
-                .and_then(|call| checker.semantic().resolve_qualified_name(&call.func))
+                .and_then(|call| checker.semantic().resolve_qualified_name(call.func()))
         });
 
         if let Some(qualified_name) = qualified_name {
@@ -99,7 +100,7 @@ pub(crate) fn airflow_3_incompatible_function_signature(checker: &Checker, expr:
 /// AIR303
 pub(crate) fn airflow_3_incompatible_method_signature_def(
     checker: &Checker,
-    function_def: &StmtFunctionDef,
+    function_def: StmtFunctionDef<'_>,
 ) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
@@ -117,20 +118,20 @@ pub(crate) fn airflow_3_incompatible_method_signature_def(
             )
         },
     ) {
-        let parameters = &function_def.parameters;
-        let positional_count = parameters.posonlyargs.len() + parameters.args.len();
+        let parameters = function_def.parameters();
+        let positional_count = parameters.posonlyargs().len() + parameters.args().len();
 
         let is_valid_signature = match positional_count {
             // check valid signature `def get_link(self, operator, *, ti_key)`
             2 => parameters
-                .kwonlyargs
+                .kwonlyargs()
                 .iter()
                 .any(|p| p.name().as_str() == "ti_key"),
             // check valid signature `def get_link(self, operator, ti_key)`
             3 => parameters
-                .posonlyargs
+                .posonlyargs()
                 .iter()
-                .chain(parameters.args.iter())
+                .chain(parameters.args().iter())
                 .nth(2)
                 .is_some_and(|p| p.name().as_str() == "ti_key"),
             _ => false,
@@ -144,7 +145,7 @@ pub(crate) fn airflow_3_incompatible_method_signature_def(
                         "Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.",
                     ),
                 },
-                function_def.name.range(),
+                function_def.name().range(),
             );
         }
     }
@@ -153,11 +154,14 @@ pub(crate) fn airflow_3_incompatible_method_signature_def(
 fn check_method_arguments(
     checker: &Checker,
     qualified_name: &QualifiedName,
-    attr: &Identifier,
-    arguments: &Arguments,
+    attr: Identifier<'_>,
+    arguments: Arguments<'_>,
 ) {
-    let has_positional_args =
-        arguments.find_positional(0).is_some() || arguments.args.iter().any(Expr::is_starred_expr);
+    let has_positional_args = arguments.find_positional(0).is_some()
+        || arguments
+            .args()
+            .iter()
+            .any(ruff_python_ast::Expr::is_starred_expr);
 
     if let ["airflow", "lineage", "hook", "HookLineageCollector"] = qualified_name.segments() {
         if attr.as_str() == "create_asset" && has_positional_args {
@@ -177,8 +181,8 @@ fn check_method_arguments(
 fn check_constructor_arguments(
     checker: &Checker,
     qualified_name: &QualifiedName,
-    arguments: &Arguments,
-    func: &Expr,
+    arguments: Arguments<'_>,
+    func: Expr<'_>,
 ) {
     if let ["airflow", "Dataset"]
     | ["airflow", "datasets", "Dataset"]
@@ -202,15 +206,15 @@ fn check_constructor_arguments(
 }
 
 /// Check if an expression is a dictionary.
-fn is_dict_expression(checker: &Checker, expr: &Expr) -> bool {
-    match expr {
-        Expr::Dict(_) => true,
-        Expr::DictComp(_) => true,
-        Expr::Call(call) => checker
+fn is_dict_expression(checker: &Checker, expr: Expr<'_>) -> bool {
+    match expr.classify() {
+        ExprKind::Dict(_) => true,
+        ExprKind::DictComp(_) => true,
+        ExprKind::Call(call) => checker
             .semantic()
-            .resolve_builtin_symbol(&call.func)
+            .resolve_builtin_symbol(call.func())
             .is_some_and(|name| name == "dict"),
-        Expr::Name(name) => checker
+        ExprKind::Name(name) => checker
             .semantic()
             .resolve_name(name)
             .map(|id| checker.semantic().binding(id))

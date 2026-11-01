@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{ExprCallFields, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -62,10 +62,10 @@ impl Violation for UnsafeYAMLLoad {
 }
 
 /// S506
-pub(crate) fn unsafe_yaml_load(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn unsafe_yaml_load(checker: &Checker, call: &ExprCallFields<'_>) {
     if checker
         .semantic()
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["yaml", "load"]))
     {
         if let Some(loader_arg) = call.arguments.find_argument_value("Loader", 1) {
@@ -87,9 +87,17 @@ pub(crate) fn unsafe_yaml_load(checker: &Checker, call: &ast::ExprCall) {
                         ))
                 })
             {
-                let loader = match loader_arg {
-                    Expr::Attribute(ast::ExprAttribute { attr, .. }) => Some(attr.to_string()),
-                    Expr::Name(ast::ExprName { id, .. }) => Some(id.to_string()),
+                let loader = match loader_arg.classify() {
+                    ExprKind::Attribute(expr_attribute) => {
+                        let attr = expr_attribute.attr();
+
+                        Some(attr.to_string())
+                    }
+                    ExprKind::Name(expr_name) => {
+                        let id = expr_name.id();
+
+                        Some(id.to_string())
+                    }
                     _ => None,
                 };
                 checker.report_diagnostic(UnsafeYAMLLoad { loader }, loader_arg.range());

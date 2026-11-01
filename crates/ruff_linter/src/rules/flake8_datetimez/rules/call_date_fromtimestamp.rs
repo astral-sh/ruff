@@ -61,7 +61,7 @@ impl Violation for CallDateFromtimestamp {
 }
 
 /// DTZ012
-pub(crate) fn call_date_fromtimestamp(checker: &Checker, func: &Expr, location: TextRange) {
+pub(crate) fn call_date_fromtimestamp(checker: &Checker, func: Expr<'_>, location: TextRange) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
     }

@@ -1,8 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_ast::name::Name;
-use ruff_python_ast::traversal;
-use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprContext, Stmt, UnaryOp};
+use ruff_python_ast::{
+    BuildId, Builder, Expr, ExprFields, ExprKind, ExprUnaryOpFields, ListId, Stmt, StmtFields,
+    StmtIfFields, StmtKind, StmtReturnFields, UnaryOp, build, traversal,
+};
 use ruff_python_codegen::Generator;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
@@ -10,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits::fits;
+use crate::fix::syntax;
 use crate::line_width::LineWidthBuilder;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -72,7 +74,7 @@ impl Violation for ReimplementedBuiltin {
 }
 
 /// SIM110, SIM111
-pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: Stmt<'_>) {
     if !checker.semantic().current_scope().kind.is_function() {
         return;
     }
@@ -102,9 +104,12 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
     match (loop_.return_value, terminal.return_value) {
         // Replace with `any`.
         (true, false) => {
+            let mut builder = Builder::default();
+            let test = builder.copy_node(loop_.test);
             let contents = return_stmt(
-                Name::new_static("any"),
-                loop_.test,
+                &mut builder,
+                "any",
+                test,
                 loop_.target,
                 loop_.iter,
                 checker.generator(),
@@ -137,44 +142,33 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
         }
         // Replace with `all`.
         (false, true) => {
+            let mut builder = Builder::default();
             // Invert the condition.
             let test = {
-                if let Expr::UnaryOp(ast::ExprUnaryOp {
+                if let ExprFields::UnaryOp(ExprUnaryOpFields {
                     op: UnaryOp::Not,
                     operand,
                     range: _,
-                    node_index: _,
-                }) = &loop_.test
+                    node: _,
+                }) = loop_.test.fields()
                 {
-                    *operand.clone()
-                } else if let Expr::Compare(compare) = &loop_.test
+                    builder.copy_node(operand)
+                } else if let ExprKind::Compare(compare) = loop_.test.classify()
                     && let Some((_, op, _)) = compare.as_single()
                 {
-                    let node = ast::ExprCompare {
-                        ops: [op.negate()].into(),
-                        operands: compare.operands.clone(),
-                        range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                    };
-                    node.into()
+                    syntax::with_comparison_op(&mut builder, compare, op.negate())
                 } else {
-                    let node = ast::ExprUnaryOp {
-                        op: UnaryOp::Not,
-                        operand: Box::new(loop_.test.clone()),
-                        range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                    };
-                    node.into()
+                    syntax::not_expr(&mut builder, loop_.test)
                 }
             };
             let contents = return_stmt(
-                Name::new_static("all"),
-                &test,
+                &mut builder,
+                "all",
+                test,
                 loop_.target,
                 loop_.iter,
                 checker.generator(),
             );
-
             // Don't flag if the resulting expression would exceed the maximum line length.
             let line_start = checker.locator().line_start(stmt.start());
             if LineWidthBuilder::new(checker.settings().tab_size)
@@ -218,11 +212,11 @@ struct Loop<'a> {
     /// The `return` value of the loop.
     return_value: bool,
     /// The test condition in the loop.
-    test: &'a Expr,
+    test: Expr<'a>,
     /// The target of the loop.
-    target: &'a Expr,
+    target: Expr<'a>,
     /// The iterator of the loop.
-    iter: &'a Expr,
+    iter: Expr<'a>,
 }
 
 /// Represents a `return` statement following a `for` loop, like:
@@ -244,57 +238,56 @@ struct Loop<'a> {
 #[derive(Debug)]
 struct Terminal<'a> {
     return_value: bool,
-    stmt: &'a Stmt,
+    stmt: Stmt<'a>,
 }
 
-fn match_loop(stmt: &Stmt) -> Option<Loop<'_>> {
-    let Stmt::For(ast::StmtFor {
-        body, target, iter, ..
-    }) = stmt
-    else {
+fn match_loop(stmt: Stmt<'_>) -> Option<Loop<'_>> {
+    let StmtKind::For(for_stmt) = stmt.classify() else {
         return None;
     };
+    let body = for_stmt.body();
+    let target = for_stmt.target();
+    let iter = for_stmt.iter();
 
     // The loop itself should contain a single `if` statement, with a single `return` statement in
     // the body.
-    let [
-        Stmt::If(ast::StmtIf {
-            body: nested_body,
-            test: nested_test,
-            elif_else_clauses: nested_elif_else_clauses,
-            range: _,
-            node_index: _,
-        }),
-    ] = body.as_slice()
+    let Some(
+        [
+            StmtFields::If(StmtIfFields {
+                body: nested_body,
+                test: nested_test,
+                elif_else_clauses: nested_elif_else_clauses,
+                ..
+            }),
+        ],
+    ) = body.as_array().map(|items| items.map(Stmt::fields))
     else {
         return None;
     };
     if !nested_elif_else_clauses.is_empty() {
         return None;
     }
-    let [
-        Stmt::Return(ast::StmtReturn {
-            value: Some(value),
-            range: _,
-            node_index: _,
-        }),
-    ] = nested_body.as_slice()
+    let [stmt] = nested_body.as_array()?;
+    let StmtFields::Return(StmtReturnFields {
+        value: Some(value), ..
+    }) = stmt.fields()
     else {
         return None;
     };
-    let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = value.as_ref() else {
+    let ExprKind::BooleanLiteral(boolean_literal) = value.classify() else {
         return None;
     };
+    let value = boolean_literal.value();
 
     Some(Loop {
-        return_value: *value,
+        return_value: value,
         test: nested_test,
         target,
         iter,
     })
 }
 
-/// If a `Stmt::For` contains an `else` with a single boolean `return`, return the [`Terminal`]
+/// If a `for` loop contains an `else` with a single boolean `return`, return the [`Terminal`]
 /// representing that `return`.
 ///
 /// For example, matches the `return` in:
@@ -304,36 +297,36 @@ fn match_loop(stmt: &Stmt) -> Option<Loop<'_>> {
 ///         return True
 /// return False
 /// ```
-fn match_else_return(stmt: &Stmt) -> Option<Terminal<'_>> {
-    let Stmt::For(ast::StmtFor { orelse, .. }) = stmt else {
+fn match_else_return(stmt: Stmt<'_>) -> Option<Terminal<'_>> {
+    let StmtKind::For(for_stmt) = stmt.classify() else {
         return None;
     };
+    let orelse = for_stmt.orelse();
 
     // The `else` block has to contain a single `return True` or `return False`.
-    let [
-        Stmt::Return(ast::StmtReturn {
-            value: Some(next_value),
-            range: _,
-            node_index: _,
-        }),
-    ] = orelse.as_slice()
+    let Some(
+        [
+            StmtFields::Return(StmtReturnFields {
+                value: Some(next_value),
+                ..
+            }),
+        ],
+    ) = orelse.as_array().map(|items| items.map(Stmt::fields))
     else {
         return None;
     };
-    let Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-        value: next_value, ..
-    }) = next_value.as_ref()
-    else {
+    let ExprKind::BooleanLiteral(boolean_literal) = next_value.classify() else {
         return None;
     };
+    let next_value = boolean_literal.value();
 
     Some(Terminal {
-        return_value: *next_value,
+        return_value: next_value,
         stmt,
     })
 }
 
-/// If a `Stmt::For` is followed by a boolean `return`, return the [`Terminal`] representing that
+/// If a `for` loop is followed by a boolean `return`, return the [`Terminal`] representing that
 /// `return`.
 ///
 /// For example, matches the `return` in:
@@ -344,10 +337,11 @@ fn match_else_return(stmt: &Stmt) -> Option<Terminal<'_>> {
 /// else:
 ///     return False
 /// ```
-fn match_sibling_return<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Terminal<'a>> {
-    let Stmt::For(ast::StmtFor { orelse, .. }) = stmt else {
+fn match_sibling_return<'a>(stmt: Stmt<'a>, sibling: Stmt<'a>) -> Option<Terminal<'a>> {
+    let StmtKind::For(for_stmt) = stmt.classify() else {
         return None;
     };
+    let orelse = for_stmt.orelse();
 
     // The loop itself shouldn't have an `else` block.
     if !orelse.is_empty() {
@@ -355,71 +349,62 @@ fn match_sibling_return<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Termina
     }
 
     // The next statement has to be a `return True` or `return False`.
-    let Stmt::Return(ast::StmtReturn {
+    let StmtFields::Return(StmtReturnFields {
         value: Some(next_value),
         range: _,
-        node_index: _,
-    }) = &sibling
+        node: _,
+    }) = sibling.fields()
     else {
         return None;
     };
-    let Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-        value: next_value, ..
-    }) = next_value.as_ref()
-    else {
+    let ExprKind::BooleanLiteral(boolean_literal) = next_value.classify() else {
         return None;
     };
+    let next_value = boolean_literal.value();
 
     Some(Terminal {
-        return_value: *next_value,
+        return_value: next_value,
         stmt: sibling,
     })
 }
 
 /// Generate a return statement for an `any` or `all` builtin comprehension.
-fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Generator) -> String {
-    let node = ast::ExprGenerator {
-        elt: Box::new(test.clone()),
-        generators: vec![Comprehension {
-            target: target.clone(),
-            iter: iter.clone(),
-            ifs: vec![],
-            is_async: false,
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        }],
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+fn return_stmt(
+    builder: &mut Builder,
+    builtin: &str,
+    test: BuildId<ruff_python_ast::kind::Expr>,
+    target: Expr<'_>,
+    iter: Expr<'_>,
+    generator: Generator,
+) -> String {
+    let range = TextRange::default();
+    let comprehension = build::Comprehension {
+        range,
+        target: builder.copy_node(target),
+        iter: builder.copy_node(iter),
+        ifs: ListId::default(),
+        is_async: false,
+    };
+    let comprehension = builder.add(comprehension);
+    let generators = builder.list([comprehension]);
+    let expression = builder.add(build::ExprGenerator {
+        range,
+        elt: test,
+        generators,
         parenthesized: false,
-    };
-    let node1 = ast::ExprName {
-        id,
-        ctx: ExprContext::Load,
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    let node2 = ast::ExprCall {
-        func: Box::new(node1.into()),
-        arguments: Arguments {
-            args: [node.into()].into(),
-            keywords: std::iter::empty().collect(),
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        },
-        range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    let node3 = ast::StmtReturn {
-        value: Some(Box::new(node2.into())),
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    generator.stmt(&node3.into())
+    });
+    let argument: BuildId<ruff_python_ast::kind::Expr> = expression.into();
+    let args = builder.list([argument]);
+    let value = syntax::call_name(builder, builtin, args);
+    let statement = builder.add(build::StmtReturn {
+        range,
+        value: Some(value),
+    });
+    generator.stmt(builder.get(statement).into())
 }
-
 /// Return `true` if the [`Expr`] contains an `await`, `yield`, or `yield from` expression.
-fn contains_yield_like(expr: &Expr) -> bool {
-    any_over_expr(expr, &Expr::is_await_expr)
-        || any_over_expr(expr, &Expr::is_yield_expr)
-        || any_over_expr(expr, &Expr::is_yield_from_expr)
+fn contains_yield_like(expr: Expr<'_>) -> bool {
+    any_over_expr(expr, ruff_python_ast::Expr::is_await_expr)
+        || any_over_expr(expr, ruff_python_ast::Expr::is_yield_expr)
+        || any_over_expr(expr, ruff_python_ast::Expr::is_yield_from_expr)
 }

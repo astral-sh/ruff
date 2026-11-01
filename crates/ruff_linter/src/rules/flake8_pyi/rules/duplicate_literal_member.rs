@@ -4,12 +4,13 @@ use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::{self as ast, Expr, ExprContext};
+use ruff_python_ast::{Builder, Expr, ExprKind};
 use ruff_python_semantic::analyze::typing::traverse_literal;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::fix::syntax;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
@@ -58,13 +59,13 @@ impl AlwaysFixableViolation for DuplicateLiteralMember {
 }
 
 /// PYI062
-pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
+pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, &expr: &Expr<'a>) {
     let mut seen_nodes: HashSet<ComparableExpr<'_>, _> = FxHashSet::default();
-    let mut unique_nodes: Vec<&Expr> = Vec::new();
+    let mut unique_nodes: Vec<Expr<'_>> = Vec::new();
     let mut diagnostics = Vec::new();
 
     // Adds a member to `literal_exprs` if it is a `Literal` annotation
-    let mut check_for_duplicate_members = |expr: &'a Expr, _: &'a Expr| {
+    let mut check_for_duplicate_members = |expr: Expr<'a>, _: Expr<'a>| {
         // If we've already seen this literal member, raise a violation.
         if seen_nodes.insert(expr.into()) {
             unique_nodes.push(expr);
@@ -86,26 +87,15 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
     }
 
     // If there's at least one diagnostic, create a fix to remove the duplicate members.
-    if let Expr::Subscript(subscript) = expr {
-        let subscript = Expr::Subscript(ast::ExprSubscript {
-            slice: Box::new(if let [elt] = unique_nodes.as_slice() {
-                (*elt).clone()
-            } else {
-                Expr::Tuple(ast::ExprTuple {
-                    elts: unique_nodes.into_iter().cloned().collect(),
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                    ctx: ExprContext::Load,
-                    parenthesized: false,
-                })
-            }),
-            value: subscript.value.clone(),
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            ctx: ExprContext::Load,
-        });
+    if let ExprKind::Subscript(subscript) = expr.classify() {
+        let mut builder = Builder::default();
+        let value = builder.copy_node(subscript.value());
+        let subscript = syntax::subscript_members(&mut builder, value, unique_nodes.into_iter());
         let fix = Fix::applicable_edit(
-            Edit::range_replacement(checker.generator().expr(&subscript), expr.range()),
+            Edit::range_replacement(
+                checker.generator().expr(builder.get(subscript)),
+                expr.range(),
+            ),
             if checker.comment_ranges().intersects(expr.range()) {
                 Applicability::Unsafe
             } else {

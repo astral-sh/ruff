@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::{TokenKind, Tokens};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, ExprKind};
 use ruff_text_size::{Ranged, TextLen, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -46,18 +46,17 @@ impl Violation for UnnecessarySpread {
 }
 
 /// PIE800
-pub(crate) fn unnecessary_spread(checker: &Checker, dict: &ast::ExprDict) {
+pub(crate) fn unnecessary_spread(checker: &Checker, dict: ast::ExprDict<'_>) {
     // The first "end" is the start of the dictionary, immediately following the open bracket.
     let mut prev_end = dict.start() + TextSize::from(1);
-    for ast::DictItem { key, value, .. } in dict {
-        if key.is_none() {
-            // We only care about when the key is None which indicates a spread `**`
-            // inside a dict.
-            if let Expr::Dict(inner) = value {
-                let mut diagnostic = checker.report_diagnostic(UnnecessarySpread, value.range());
-                if let Some(fix) = unnecessary_spread_fix(inner, prev_end, checker.tokens()) {
-                    diagnostic.set_fix(fix);
-                }
+    for item in dict {
+        let value = item.value();
+        if item.key().is_none()
+            && let ExprKind::Dict(inner) = value.classify()
+        {
+            let mut diagnostic = checker.report_diagnostic(UnnecessarySpread, value.range());
+            if let Some(fix) = unnecessary_spread_fix(inner, prev_end, checker.tokens()) {
+                diagnostic.set_fix(fix);
             }
         }
         prev_end = value.end();
@@ -66,7 +65,7 @@ pub(crate) fn unnecessary_spread(checker: &Checker, dict: &ast::ExprDict) {
 
 /// Generate a [`Fix`] to remove an unnecessary dictionary spread.
 fn unnecessary_spread_fix(
-    dict: &ast::ExprDict,
+    dict: ast::ExprDict<'_>,
     prev_end: TextSize,
     tokens: &Tokens,
 ) -> Option<Fix> {

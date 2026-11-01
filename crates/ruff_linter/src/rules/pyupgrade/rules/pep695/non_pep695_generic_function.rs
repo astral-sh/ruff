@@ -1,7 +1,7 @@
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::StmtFunctionDef;
+use ruff_python_ast as ast;
 use ruff_python_ast::visitor::Visitor;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -102,7 +102,10 @@ impl Violation for NonPEP695GenericFunction {
 }
 
 /// UP047
-pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn non_pep695_generic_function(
+    checker: &Checker,
+    function_def: &ast::StmtFunctionDefFields<'_>,
+) {
     // PEP-695 syntax is only available on Python 3.12+
     if checker.target_version() < PythonVersion::PY312 {
         return;
@@ -113,12 +116,9 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
         return;
     }
 
-    let StmtFunctionDef {
-        name,
-        type_params,
-        parameters,
-        ..
-    } = function_def;
+    let name = function_def.name;
+    let type_params = function_def.type_params;
+    let parameters = function_def.parameters;
 
     // TODO(brent) handle methods, for now return early in a class body. For example, an additional
     // generic parameter on the method needs to be handled separately from one already on the class
@@ -144,7 +144,7 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
     }
 
     let mut type_vars = Vec::new();
-    for parameter in parameters {
+    for parameter in parameters.iter() {
         if let Some(annotation) = parameter.annotation() {
             let vars = {
                 let mut visitor = TypeVarReferenceVisitor {

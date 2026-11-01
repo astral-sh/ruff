@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprAttribute};
+use ruff_python_ast::{ExprCallFields, ExprKind};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -65,14 +65,15 @@ impl Violation for OsSepSplit {
 }
 
 /// PTH206
-pub(crate) fn os_sep_split(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn os_sep_split(checker: &Checker, call: &ExprCallFields<'_>) {
     if !checker.semantic().seen_module(Modules::OS) {
         return;
     }
 
-    let Expr::Attribute(ExprAttribute { attr, .. }) = call.func.as_ref() else {
+    let ExprKind::Attribute(attribute_node) = call.func.classify() else {
         return;
     };
+    let attr = attribute_node.attr();
 
     if attr.as_str() != "split" {
         return;
