@@ -4056,26 +4056,45 @@ impl Builder {
         range: ruff_text_size::TextRange,
         [patterns, keywords]: [u64; 2],
     ) -> BuildId<crate::kind::PatternArguments> {
+        let groups = self.ordered_argument_lists(patterns, keywords);
+        self.push_pattern_arguments_parts(range, groups)
+    }
+    #[inline]
+    fn push_pattern_arguments_parts(
+        &mut self,
+        range: ruff_text_size::TextRange,
+        (keywords, positional, interleaved): (u64, u32, bool),
+    ) -> BuildId<crate::kind::PatternArguments> {
         let mut row = Row::new(NodeKind::PatternArguments, range);
-        let [patterns, keywords] =
-            super::list::Interval::pack_pair(&mut self.ast.extra, [patterns, keywords]);
-        row.set_pattern_arguments_patterns(split_words(patterns)[0]);
-        row.set_pattern_arguments_keywords(keywords);
+        row.set_pattern_arguments_keyword_group(keywords);
+        row.set_pattern_arguments_positional_len(positional);
+        row.set_pattern_arguments_interleaved(u8::from(interleaved));
         self.push(row)
     }
 }
 impl<'a> crate::PatternArguments<'a> {
     #[inline]
+    pub(super) fn ordered_items(self) -> NodeList<'a, crate::kind::Any> {
+        List::new(
+            self.syntax.ast,
+            super::ordered::argument_items(
+                self.syntax.row.pattern_arguments_keyword_group(),
+                self.syntax.row.pattern_arguments_positional_len(),
+                self.syntax.row.pattern_arguments_interleaved(),
+            ),
+        )
+    }
+    #[inline]
     pub fn patterns(self) -> NodeList<'a, crate::kind::Pattern> {
         let word = super::list::Interval::preceding(
-            self.syntax.row.pattern_arguments_keywords(),
-            u64::from(self.syntax.row.pattern_arguments_patterns()),
+            self.syntax.row.pattern_arguments_keyword_group(),
+            u64::from(self.syntax.row.pattern_arguments_positional_len()),
         );
         List::new(self.syntax.ast, word)
     }
     #[inline]
     pub fn keywords(self) -> NodeList<'a, crate::kind::PatternKeyword> {
-        let word = self.syntax.row.pattern_arguments_keywords();
+        let word = self.syntax.row.pattern_arguments_keyword_group();
         List::new(self.syntax.ast, word)
     }
 }
@@ -5644,14 +5663,21 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::PatternArguments(node) => build::PatternArguments {
-                range: node.range(),
-                patterns: self.map_list(node.patterns(), |b, child| b.copy_with(child, rewriter)),
-                keywords: self.map_list(node.keywords(), |b, child| b.copy_with(child, rewriter)),
+            AnyKind::PatternArguments(node) => {
+                let first = self.map_list(node.patterns(), |b, child| b.copy_with(child, rewriter));
+                let second =
+                    self.map_list(node.keywords(), |b, child| b.copy_with(child, rewriter));
+                let template = (node.syntax.row.pattern_arguments_interleaved() != 0)
+                    .then(|| node.ordered_items());
+                let groups = self.copy_argument_order(
+                    first.word(),
+                    second.word(),
+                    template,
+                    NodeKind::PatternKeyword,
+                );
+                self.push_pattern_arguments_parts(node.range(), groups)
+                    .cast()
             }
-            .emit(self)
-            .0
-            .cast(),
             AnyKind::PatternKeyword(node) => build::PatternKeyword {
                 range: node.range(),
                 attr: self.copy_with(node.attr(), rewriter),
