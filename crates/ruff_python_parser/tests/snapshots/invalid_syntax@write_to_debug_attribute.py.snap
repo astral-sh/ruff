@@ -1,0 +1,297 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/write_to_debug_attribute.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..90,
+        body: [
+            Delete(
+                StmtDelete {
+                    node_index: NodeIndex(None),
+                    range: 0..15,
+                    targets: [
+                        Attribute(
+                            ExprAttribute {
+                                node_index: NodeIndex(None),
+                                range: 4..15,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 4..5,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                attr: Identifier {
+                                    id: Name("__debug__"),
+                                    range: 6..15,
+                                    node_index: NodeIndex(None),
+                                },
+                                ctx: Del,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Delete(
+                StmtDelete {
+                    node_index: NodeIndex(None),
+                    range: 16..41,
+                    targets: [
+                        Attribute(
+                            ExprAttribute {
+                                node_index: NodeIndex(None),
+                                range: 20..23,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 20..21,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                attr: Identifier {
+                                    id: Name("y"),
+                                    range: 22..23,
+                                    node_index: NodeIndex(None),
+                                },
+                                ctx: Del,
+                            },
+                        ),
+                        Attribute(
+                            ExprAttribute {
+                                node_index: NodeIndex(None),
+                                range: 25..36,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 25..26,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                attr: Identifier {
+                                    id: Name("__debug__"),
+                                    range: 27..36,
+                                    node_index: NodeIndex(None),
+                                },
+                                ctx: Del,
+                            },
+                        ),
+                        Attribute(
+                            ExprAttribute {
+                                node_index: NodeIndex(None),
+                                range: 38..41,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 38..39,
+                                        id: Name("z"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                attr: Identifier {
+                                    id: Name("a"),
+                                    range: 40..41,
+                                    node_index: NodeIndex(None),
+                                },
+                                ctx: Del,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    node_index: NodeIndex(None),
+                    range: 42..57,
+                    targets: [
+                        Attribute(
+                            ExprAttribute {
+                                node_index: NodeIndex(None),
+                                range: 42..53,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 42..43,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                attr: Identifier {
+                                    id: Name("__debug__"),
+                                    range: 44..53,
+                                    node_index: NodeIndex(None),
+                                },
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            node_index: NodeIndex(None),
+                            range: 56..57,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    node_index: NodeIndex(None),
+                    range: 58..89,
+                    targets: [
+                        Tuple(
+                            ExprTuple {
+                                node_index: NodeIndex(None),
+                                range: 58..79,
+                                elts: [
+                                    Attribute(
+                                        ExprAttribute {
+                                            node_index: NodeIndex(None),
+                                            range: 58..61,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 58..59,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: Name("y"),
+                                                range: 60..61,
+                                                node_index: NodeIndex(None),
+                                            },
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    Attribute(
+                                        ExprAttribute {
+                                            node_index: NodeIndex(None),
+                                            range: 63..74,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 63..64,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: Name("__debug__"),
+                                                range: 65..74,
+                                                node_index: NodeIndex(None),
+                                            },
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    Attribute(
+                                        ExprAttribute {
+                                            node_index: NodeIndex(None),
+                                            range: 76..79,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 76..77,
+                                                    id: Name("z"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: Name("a"),
+                                                range: 78..79,
+                                                node_index: NodeIndex(None),
+                                            },
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ],
+                                ctx: Store,
+                                parenthesized: false,
+                            },
+                        ),
+                    ],
+                    value: Tuple(
+                        ExprTuple {
+                            node_index: NodeIndex(None),
+                            range: 82..89,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 82..83,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 85..86,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 88..89,
+                                        value: Int(
+                                            3,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | del x.__debug__
+  |     ^^^^^^^^^^^ Syntax Error: cannot delete `__debug__` on Python 3.14 (syntax was removed in 3.14)
+2 | del x.y, x.__debug__, z.a
+3 | x.__debug__ = 1
+  |
+
+
+  |
+1 | del x.__debug__
+2 | del x.y, x.__debug__, z.a
+  |          ^^^^^^^^^^^ Syntax Error: cannot delete `__debug__` on Python 3.14 (syntax was removed in 3.14)
+3 | x.__debug__ = 1
+4 | x.y, x.__debug__, z.a = 1, 2, 3
+  |
+
+
+  |
+1 | del x.__debug__
+2 | del x.y, x.__debug__, z.a
+3 | x.__debug__ = 1
+  | ^^^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+4 | x.y, x.__debug__, z.a = 1, 2, 3
+  |
+
+
+  |
+2 | del x.y, x.__debug__, z.a
+3 | x.__debug__ = 1
+4 | x.y, x.__debug__, z.a = 1, 2, 3
+  |      ^^^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
