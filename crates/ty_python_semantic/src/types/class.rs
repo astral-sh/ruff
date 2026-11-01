@@ -1,4 +1,4 @@
-use crate::ProgramEnvironment;
+use crate::{Program, ProgramEnvironment};
 use std::fmt::Write;
 
 pub(crate) use self::dynamic_literal::{
@@ -1477,6 +1477,47 @@ impl<'db> ClassType<'db> {
         })
     }
 
+    /// Resolve each concrete MRO entry's origin once, retaining MRO order when an
+    /// origin contributes more than one specialization. Dynamic entries can match a
+    /// different target themselves, so keep those MROs on the ordinary path.
+    #[salsa::tracked(
+        returns(as_ref),
+        cycle_initial=|_, _, _| None,
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn relation_mro(self, db: &'db dyn Db) -> Option<Box<[(ClassLiteral<'db>, ClassType<'db>)]>> {
+        let mut classes = Vec::new();
+        for base in self.iter_mro(db) {
+            match base {
+                ClassBase::Class(class) => classes.push((class.class_literal(db), class)),
+                ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => {}
+                ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => return None,
+            }
+        }
+        Some(classes.into_boxed_slice())
+    }
+
+    /// An explicit inheritance path can contribute a different specialization of the
+    /// same origin. Keep all such aliases in their original traversal order.
+    #[salsa::tracked(
+        returns(as_ref),
+        cycle_initial=|_, _, _, _| None,
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn explicit_generic_bases(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+    ) -> Option<Box<[(StaticClassLiteral<'db>, GenericAlias<'db>)]>> {
+        let env = ProgramEnvironment::from_program(program);
+        Some(
+            self.iter_explicit_ancestors(db, &env)
+                .filter_map(ClassType::into_generic_alias)
+                .map(|alias| (alias.origin(db), alias))
+                .collect(),
+        )
+    }
+
     /// Is this class final?
     pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
         self.class_literal(db).is_final(db)
@@ -2699,7 +2740,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         let mut generic_target = None;
-        let result = source.iter_mro(db).when_any(db, self.constraints, |base| {
+        let target_literal = target.class_literal(db);
+        let bases = match source.relation_mro(db) {
+            Some(classes) => Either::Left(classes.iter().filter_map(|&(origin, base)| {
+                (origin == target_literal).then_some(ClassBase::Class(base))
+            })),
+            None => Either::Right(source.iter_mro(db)),
+        };
+        let result = bases.when_any(db, self.constraints, |base| {
             match base {
                 ClassBase::Any => ConstraintSet::from_bool(
                     self.constraints,
@@ -2753,17 +2801,27 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // still establish the relation: `Child(Gradual, Concrete)` is a subtype of `Base[int]`
         // through `Concrete`, even if `Gradual` contributes `Base[Any]` to Child's MRO.
         result.or(db, self.constraints, || {
-            source
-                .iter_explicit_ancestors(db, self.env)
-                .filter_map(ClassType::into_generic_alias)
-                .filter(|ancestor| ancestor.origin(db) == target.origin(db))
-                .when_any(db, self.constraints, |ancestor| {
-                    self.check_specialization_pair(
-                        db,
-                        ancestor.specialization(db),
-                        target.specialization(db),
-                    )
-                })
+            let origin = target.origin(db);
+            let candidates = match source.explicit_generic_bases(db, self.env.program(db)) {
+                Some(bases) => Either::Left(
+                    bases
+                        .iter()
+                        .filter_map(|&(literal, alias)| (literal == origin).then_some(alias)),
+                ),
+                None => Either::Right(
+                    source
+                        .iter_explicit_ancestors(db, self.env)
+                        .filter_map(ClassType::into_generic_alias)
+                        .filter(|ancestor| ancestor.origin(db) == origin),
+                ),
+            };
+            candidates.when_any(db, self.constraints, |ancestor| {
+                self.check_specialization_pair(
+                    db,
+                    ancestor.specialization(db),
+                    target.specialization(db),
+                )
+            })
         })
     }
 }
