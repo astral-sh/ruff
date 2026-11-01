@@ -167,6 +167,7 @@ mod newtype;
 mod overrides;
 mod protocol_class;
 mod recursive;
+mod regex;
 pub(crate) use recursive::RecursiveMapping;
 pub use recursive::{RecursiveType, RecursiveVar, UnfoldResult};
 pub(crate) mod relation;
@@ -2887,6 +2888,9 @@ impl<'db> Type<'db> {
             }
             Type::PropertyInstance(property) => {
                 property.instance_fallback(db, env).nominal_class(db, env)
+            }
+            Type::KnownInstance(KnownInstanceType::Regex(regex)) => {
+                regex.instance_fallback(db, env).nominal_class(db, env)
             }
             Type::SlotDescriptor(_) => KnownClass::MemberDescriptorType
                 .to_instance(db, env)
@@ -6403,6 +6407,21 @@ impl<'db> Type<'db> {
                 {
                     Place::bound(wrapper).into()
                 }
+                Type::KnownInstance(KnownInstanceType::Regex(regex)) => {
+                    if let Some(member) = regex.member(db, name_str) {
+                        Place::bound(member).into()
+                    } else {
+                        regex
+                            .instance_fallback(db, env)
+                            .member_lookup_with_policy_and_receiver(
+                                db,
+                                env,
+                                name_str,
+                                policy,
+                                Some(receiver.unwrap_or(this)),
+                            )
+                    }
+                }
                 Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => match name_str {
                     "__func__" | "__wrapped__" => Place::bound(wrapper.wrapped(db)).into(),
                     "__call__" if wrapper.class(db) == KnownClass::Staticmethod => {
@@ -9152,6 +9171,7 @@ impl<'db> Type<'db> {
                 KnownInstanceType::FunctoolsPartial(_)
                 | KnownInstanceType::FunctoolsPartialCall(_)
                 | KnownInstanceType::MethodWrapper(_)
+                | KnownInstanceType::Regex(_)
                 | KnownInstanceType::Range { .. } => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
                         *self, scope_id
@@ -9594,6 +9614,7 @@ impl<'db> Type<'db> {
                         | KnownInstanceType::Literal(_)
                         | KnownInstanceType::NewType(_)
                         | KnownInstanceType::Sentinel(_)
+                        | KnownInstanceType::Regex(_)
                         | KnownInstanceType::NamedTupleSpec(_),
                 )
                 | Type::KnownBoundMethod(
@@ -10464,6 +10485,7 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::NewType(_)
                 | KnownInstanceType::Sentinel(_)
                 | KnownInstanceType::Range { .. }
+                | KnownInstanceType::Regex(_)
                 | KnownInstanceType::FunctoolsPartial(_)
                 | KnownInstanceType::FunctoolsPartialCall(_) => {
                     // TODO: For some of these, we may need to try to find legacy typevars in inner types.
@@ -10597,6 +10619,9 @@ impl<'db> Type<'db> {
             Type::SpecialForm(special_form) => {
                 Type::string_literal(db, special_form.to_compact_string())
             }
+            Type::KnownInstance(KnownInstanceType::Regex(_)) => {
+                KnownClass::Str.to_instance(db, env)
+            }
             Type::KnownInstance(known_instance) => {
                 Type::string_literal(db, known_instance.repr(db, env).to_compact_string())
             }
@@ -10635,6 +10660,9 @@ impl<'db> Type<'db> {
                 _ => KnownClass::Str.to_instance(db, env),
             },
             Type::SpecialForm(special_form) => Type::string_literal(db, &*special_form.to_string()),
+            Type::KnownInstance(KnownInstanceType::Regex(_)) => {
+                KnownClass::Str.to_instance(db, env)
+            }
             Type::KnownInstance(known_instance) => {
                 Type::string_literal(db, known_instance.repr(db, env).to_compact_string())
             }
@@ -10678,6 +10706,9 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::NewType(newtype) => {
                     Some(TypeDefinition::NewType(newtype.definition(db)))
+                }
+                KnownInstanceType::Regex(regex) => {
+                    regex.instance_fallback(db, env).definition(db, env)
                 }
                 _ => None,
             },
