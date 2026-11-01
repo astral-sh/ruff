@@ -187,6 +187,15 @@ impl Violation for InvalidCharacterZeroWidthSpace {
     }
 }
 
+/// Interpolation depth matters for fixes, so avoid walking every token unless
+/// the source contains a character one of these rules could report.
+pub(crate) fn contains_invalid_string_character(source: &str) -> bool {
+    let bytes = source.as_bytes();
+    memchr::memchr3(0, 0x08, 0x1a, bytes).is_some()
+        || memchr::memchr(0x1b, bytes).is_some()
+        || memchr::memmem::find(bytes, "\u{200b}".as_bytes()).is_some()
+}
+
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
 pub(crate) fn invalid_string_characters(
     context: &LintContext,
