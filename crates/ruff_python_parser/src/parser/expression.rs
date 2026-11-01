@@ -1,6 +1,7 @@
 use crate::parser::syntax::{self as id, Construct, IntoList};
 use ruff_python_ast::AstNode as _;
 use ruff_python_ast::{Builder, ExprKind, FStringPartId, ListId, build};
+use std::iter;
 use std::ops::Deref;
 
 use bitflags::bitflags;
@@ -1258,7 +1259,7 @@ impl<'src> Parser<'src> {
 
         let operands_snapshot = self.expr_scratch.snapshot();
         self.expr_scratch.push(lhs.id);
-        let mut operators = thin_vec::thin_vec![op];
+        let mut additional_ops = ThinVec::new();
 
         let mut progress = ParserProgress::default();
 
@@ -1285,15 +1286,14 @@ impl<'src> Parser<'src> {
             };
 
             self.bump_cmp_op(next_op);
-            operators.push(next_op);
+            additional_ops.push(next_op);
         }
 
         build::ExprCompare {
-            ops: operators.into_list(&mut self.storage),
+            ops: self.storage.list(iter::once(op).chain(additional_ops)),
             operands: self
                 .expr_scratch
-                .take_range(operands_snapshot, &mut self.storage)
-                .into_list(&mut self.storage),
+                .take_range(operands_snapshot, &mut self.storage),
             range: self.node_range(start),
         }
         .parsed(&mut self.storage)
