@@ -2061,13 +2061,19 @@ impl PendingReachability {
                 narrowing_constraints,
                 reachability_constraints,
             );
-            current.merge(
-                branch_state,
-                narrowing_constraints,
-                reachability_constraints,
-            );
             if let Some(inputs) = inputs {
-                last_singleton_merge = Some((inputs, current.singleton_constraints()));
+                let merged = current.merge_singleton(
+                    &branch_state,
+                    narrowing_constraints,
+                    reachability_constraints,
+                );
+                last_singleton_merge = Some((inputs, merged));
+            } else {
+                current.merge(
+                    branch_state,
+                    narrowing_constraints,
+                    reachability_constraints,
+                );
             }
         }
     }

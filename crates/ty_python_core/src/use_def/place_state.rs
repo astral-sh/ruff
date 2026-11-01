@@ -570,17 +570,15 @@ pub(crate) struct PlaceState {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) struct SingletonConstraints {
-    binding_reachability: ScopedReachabilityConstraintId,
-    binding_narrowing: ScopedNarrowingConstraint,
-    declaration_reachability: ScopedReachabilityConstraintId,
+    narrowing: ScopedNarrowingConstraint,
+    reachability: ScopedReachabilityConstraintId,
 }
 
-impl SingletonConstraints {
-    fn new(binding: &LiveBinding, declaration: &LiveDeclaration) -> Self {
+impl From<&LiveBinding> for SingletonConstraints {
+    fn from(binding: &LiveBinding) -> Self {
         Self {
-            binding_reachability: binding.reachability_constraint,
-            binding_narrowing: binding.narrowing_constraint,
-            declaration_reachability: declaration.reachability_constraint,
+            narrowing: binding.narrowing_constraint,
+            reachability: binding.reachability_constraint,
         }
     }
 }
@@ -593,9 +591,8 @@ impl PlaceState {
         let [declaration] = self.declarations.live_declarations.as_slice() else {
             return None;
         };
-        self.bindings
-            .unbound_narrowing_constraint
-            .is_none()
+        (self.bindings.unbound_narrowing_constraint.is_none()
+            && binding.reachability_constraint == declaration.reachability_constraint)
             .then_some((binding, declaration))
     }
 
@@ -605,30 +602,36 @@ impl PlaceState {
     ) -> Option<(SingletonConstraints, SingletonConstraints)> {
         let (left, left_decl) = self.singleton()?;
         let (right, right_decl) = other.singleton()?;
-        (left.binding == right.binding && left_decl.declaration == right_decl.declaration).then(
-            || {
-                (
-                    SingletonConstraints::new(left, left_decl),
-                    SingletonConstraints::new(right, right_decl),
-                )
-            },
-        )
+        (left.binding == right.binding && left_decl.declaration == right_decl.declaration)
+            .then(|| (left.into(), right.into()))
     }
 
-    pub(super) fn singleton_constraints(&self) -> SingletonConstraints {
-        SingletonConstraints::new(
-            &self.bindings.live_bindings[0],
-            &self.declarations.live_declarations[0],
-        )
+    /// Merge the constraints after both matched singleton states have been materialized.
+    /// A pending path applies the same reachability to the binding and the declaration.
+    pub(super) fn merge_singleton(
+        &mut self,
+        other: &Self,
+        narrowing: &mut NarrowingConstraintsBuilder,
+        reachability: &mut ReachabilityConstraintsBuilder,
+    ) -> SingletonConstraints {
+        let a = &self.bindings.live_bindings[0];
+        let b = &other.bindings.live_bindings[0];
+        let merged = SingletonConstraints {
+            narrowing: narrowing.add_or_constraint(a.narrowing_constraint, b.narrowing_constraint),
+            reachability: reachability
+                .add_or_constraint(a.reachability_constraint, b.reachability_constraint),
+        };
+        self.set_singleton_constraints(merged);
+        merged
     }
 
     pub(super) fn set_singleton_constraints(&mut self, constraints: SingletonConstraints) {
         let binding = &mut self.bindings.live_bindings[0];
-        binding.reachability_constraint = constraints.binding_reachability;
-        binding.narrowing_constraint = constraints.binding_narrowing;
-        self.declarations.live_declarations[0].reachability_constraint =
-            constraints.declaration_reachability;
+        binding.narrowing_constraint = constraints.narrowing;
+        binding.reachability_constraint = constraints.reachability;
+        self.declarations.live_declarations[0].reachability_constraint = constraints.reachability;
     }
+
     /// Return a new [`PlaceState`] representing an unbound, undeclared place.
     pub(super) fn undefined(reachability: ScopedReachabilityConstraintId) -> Self {
         Self {
