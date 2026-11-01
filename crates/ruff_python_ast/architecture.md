@@ -21,11 +21,13 @@ which associates it with its borrowed type `ExprBinOp<'ast>`. A group marker suc
 `kind::Expr` accepts any expression kind. `Ast::view` takes the ID and returns the
 corresponding borrowed node. IDs are local to a particular parse.
 
-An ID stores the node’s allocation index plus one as a `NonZeroU32`. Zero represents an
-absent child, so `Option<AstNodeId<T>>` occupies the same four bytes as `AstNodeId<T>`.
-The first node occupies row 0 and has `id.index() == 0`. Use `ast.row(0)` to borrow it.
-`ast.len()` counts stored nodes and `ast.any_node(predicate)` scans them, including rows
-retained by parser recovery. Use `root.descendants()` to walk the reachable tree in source order.
+An ID stores the node's physical slot as a `NonZeroU32`. The builder reserves slot 0 for
+an absent child, so `Option<AstNodeId<T>>` occupies the same four bytes as `AstNodeId<T>`.
+Each parsed arena, including a separately parsed string annotation, pays for one unused
+24-byte row. Allocation indices are zero-based. The first node occupies physical slot 1,
+has `id.index() == 0`, and is returned by `ast.row(0)`. `ast.len()` counts stored nodes
+and `ast.any_node(predicate)` scans them, including rows retained by parser recovery.
+Both skip the reserved slot. Use `root.descendants()` to walk the reachable tree in source order.
 
 Accept `Expr<'ast>` when reading any expression or `Stmt<'ast>` when reading a statement.
 A concrete `ExprCall<'ast>` converts to `Expr<'ast>` with `.into()` and still refers to the
@@ -128,7 +130,7 @@ A formatter can iterate the parts in either direction and read each token's kind
 The parser creates a row when it finishes a grammar production. In `left + right`, it emits the
 two names first and passes their slots to the binary expression's constructor. The parser's
 temporary `Node<T>` carries the kind, source range and a `BuildId<T>`. A build ID holds the same
-one-based ID as a handle in a plain `u32`, so emitting a node and writing its ID into its
+physical slot as a handle in a plain `u32`, so emitting a node and writing its slot into its
 parent need no nonzero check. The finished tree and consumers that retain a node use `AstNodeId<T>`.
 
 Nested lists of the same kind share a scratch buffer of four-byte slots. Each

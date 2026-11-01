@@ -870,7 +870,7 @@ mod tests {
     }
 
     #[test]
-    fn arena_queries_visit_only_stored_nodes() -> Result<(), ParseError> {
+    fn arena_queries_skip_the_reserved_slot() -> Result<(), ParseError> {
         let empty = Ast::default();
         assert!(empty.is_empty());
         assert!(!empty.any_node(|_| true));
