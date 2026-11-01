@@ -767,16 +767,13 @@ enum ComparableStringElement<'a> {
 
 impl<'a> From<ast::InterpolatedStringElement<'a>> for ComparableStringElement<'a> {
     fn from(element: ast::InterpolatedStringElement<'a>) -> Self {
-        match element.fields() {
-            ast::InterpolatedStringElementFields::Literal(
-                ast::InterpolatedStringLiteralElementFields { value, .. },
-            ) => Self::Literal(Cow::Borrowed(value)),
-            ast::InterpolatedStringElementFields::Interpolation(
-                ast::InterpolatedElementFields {
-                    node: interpolation,
-                    ..
-                },
-            ) => Self::Interpolation(interpolation),
+        match element.classify() {
+            ast::InterpolatedStringElementKind::Literal(literal) => {
+                Self::Literal(Cow::Borrowed(literal.value()))
+            }
+            ast::InterpolatedStringElementKind::Interpolation(interpolation) => {
+                Self::Interpolation(interpolation)
+            }
         }
     }
 }
@@ -2293,17 +2290,11 @@ impl<'a> From<Expr<'a>> for HashableExpr<'a> {
         }
 
         fn as_number(expr: Expr<'_>) -> Option<HashableNumber> {
-            match expr.fields() {
-                ast::ExprFields::BooleanLiteral(ast::ExprBooleanLiteralFields {
-                    node: boolean,
-                    ..
-                }) => Some(HashableNumber::real(HashableReal::Integer(i128::from(
-                    u8::from(boolean.value()),
-                )))),
-                ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                    node: number,
-                    ..
-                }) => match &number.value() {
+            match expr.classify() {
+                ast::ExprKind::BooleanLiteral(boolean) => Some(HashableNumber::real(
+                    HashableReal::Integer(i128::from(u8::from(boolean.value()))),
+                )),
+                ast::ExprKind::NumberLiteral(number) => match number.value() {
                     Number::Int(int) => HashableReal::from_int(int).map(HashableNumber::real),
                     Number::Float(float) => {
                         Some(HashableNumber::real(HashableReal::from_float(*float)))
@@ -2313,26 +2304,19 @@ impl<'a> From<Expr<'a>> for HashableExpr<'a> {
                         HashableReal::from_float(*imag),
                     )),
                 },
-                ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields { op, operand, .. }) => match op {
-                    ast::UnaryOp::UAdd => as_number(operand),
-                    ast::UnaryOp::USub => as_number(operand).map(HashableNumber::negate),
+                ast::ExprKind::UnaryOp(unary) => match unary.op() {
+                    ast::UnaryOp::UAdd => as_number(unary.operand()),
+                    ast::UnaryOp::USub => as_number(unary.operand()).map(HashableNumber::negate),
                     ast::UnaryOp::Invert | ast::UnaryOp::Not => None,
                 },
-                ast::ExprFields::BinOp(ast::ExprBinOpFields {
-                    left,
-                    op: op @ (ast::Operator::Add | ast::Operator::Sub),
-                    right,
-                    ..
-                }) => {
-                    let real = as_number(left)?.into_real()?.into_float();
-                    let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                        value:
-                            Number::Complex {
-                                real: complex_real,
-                                imag,
-                            },
-                        ..
-                    }) = right.fields()
+                ast::ExprKind::BinOp(binary)
+                    if let op @ (ast::Operator::Add | ast::Operator::Sub) = binary.op() =>
+                {
+                    let real = as_number(binary.left())?.into_real()?.into_float();
+                    let Number::Complex {
+                        real: complex_real,
+                        imag,
+                    } = binary.right().as_number_literal_expr()?.value()
                     else {
                         return None;
                     };
