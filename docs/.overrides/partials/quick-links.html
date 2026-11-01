@@ -1,0 +1,18 @@
+<nav class="md-nav md-nav--secondary astral-quick-links" aria-label="Table of contents">
+  <span class="md-nav__title">Table of contents</span>
+  <ul class="md-nav__list">
+    {% for title, target in [
+      ("Getting Started", "tutorial/"),
+      ("Installation", "installation/"),
+      ("Linter", "linter/"),
+      ("Formatter", "formatter/"),
+      ("Rules", "rules/")
+    ] %}
+    <li class="md-nav__item">
+      <a href="{{ target | url }}" class="md-nav__link{% if page.url == target %} md-nav__link--active{% endif %}"{% if page.url == target %} aria-current="page"{% endif %}>
+        <span class="md-ellipsis">{{ title }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</nav>
