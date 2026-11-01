@@ -15,6 +15,7 @@
 //! have the same shape in that they evaluate to the same value.
 
 use crate as ast;
+use crate::AstNode;
 use crate::{Expr, Number};
 use std::borrow::Cow;
 use std::fmt;
@@ -32,24 +33,35 @@ use std::marker::PhantomData;
 /// - `Return => stmt_return_fields` delegates to a function taking
 ///   `&ast::StmtReturn` and returning `Option<ComparableExpr<'_>>`. Only the
 ///   return value participates in comparison.
-/// - `Pass(ast::StmtPass { range: _, node_index: _ })` compares just the
+/// - `Pass(ast::StmtPassFields { range: _, node: _ })` compares just the
 ///   variant. Any two `pass` statements are structurally equal.
 ///
 /// Destructure the node exhaustively in the helper or the inline pattern so
 /// that adding an AST field forces a decision about whether to compare it.
+macro_rules! hash_comparable_kind {
+    ($ast:ident, $node:expr $(, $classify:ident)?; $state:ident) => {{
+        let kind = $node$(.$classify())?;
+        std::mem::discriminant(&kind).hash($state);
+        kind
+    }};
+}
+
 macro_rules! compare_enum {
-    ($key:ident($ast:ident) {
+    ($key:ident($ast:ident $(, $classify:ident)? $(; $guard:ident)?) {
         $($variant:ident $(($ignored:pat))? $(=> $fields:ident)?,)*
     }) => {
         impl PartialEq for $key<'_> {
             fn eq(&self, other: &Self) -> bool {
-                match self.0 {
+                $(if self.0.$guard() != other.0.$guard() { return false; })?
+                let kind = self.0$(.$classify())?;
+                let other = other.0$(.$classify())?;
+                match kind {
                     $(
-                        $(ast::$ast::$variant(left) => match other.0 {
+                        $(ast::$ast::$variant(left) => match other {
                             ast::$ast::$variant(right) => $fields(left) == $fields(right),
                             _ => false,
                         },)?
-                        $(ast::$ast::$variant($ignored) => matches!(other.0, ast::$ast::$variant(_)),)?
+                        $(ast::$ast::$variant(node) => { let $ignored = node.fields(); matches!(other, ast::$ast::$variant(_)) },)?
                     )*
                 }
             }
@@ -59,11 +71,11 @@ macro_rules! compare_enum {
 
         impl Hash for $key<'_> {
             fn hash<H: Hasher>(&self, state: &mut H) {
-                std::mem::discriminant::<ast::$ast>(&self.0).hash(state);
-                match self.0 {
+                let kind = hash_comparable_kind!($ast, self.0 $(, $classify)?; state);
+                match kind {
                     $(
                         $(ast::$ast::$variant(node) => $fields(node).hash(state),)?
-                        $(ast::$ast::$variant($ignored) => {},)?
+                        $(ast::$ast::$variant(node) => { let $ignored = node.fields(); },)?
                     )*
                 }
             }
@@ -71,13 +83,13 @@ macro_rules! compare_enum {
 
         impl fmt::Debug for $key<'_> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                match self.0 {
+                match self.0$(.$classify())? {
                     $(
                         $(ast::$ast::$variant(node) => f
                             .debug_tuple(stringify!($variant))
                             .field(&$fields(node))
                             .finish(),)?
-                        $(ast::$ast::$variant($ignored) => f.write_str(stringify!($variant)),)?
+                        $(ast::$ast::$variant(node) => { let $ignored = node.fields(); f.write_str(stringify!($variant)) },)?
                     )*
                 }
             }
@@ -91,17 +103,17 @@ struct ComparableAlias<'a> {
     asname: Option<&'a str>,
 }
 
-impl<'a> From<&'a ast::Alias> for ComparableAlias<'a> {
-    fn from(alias: &'a ast::Alias) -> Self {
-        let ast::Alias {
+impl<'a> From<ast::Alias<'a>> for ComparableAlias<'a> {
+    fn from(alias: ast::Alias<'a>) -> Self {
+        let ast::AliasFields {
             name,
             asname,
             range: _,
-            node_index: _,
-        } = alias;
+            node: _,
+        } = alias.fields();
         Self {
             name: name.as_str(),
-            asname: asname.as_deref(),
+            asname: asname.map(ast::Identifier::as_str),
         }
     }
 }
@@ -112,17 +124,17 @@ struct ComparableWithItem<'a> {
     optional_vars: Option<ComparableExpr<'a>>,
 }
 
-impl<'a> From<&'a ast::WithItem> for ComparableWithItem<'a> {
-    fn from(with_item: &'a ast::WithItem) -> Self {
-        let ast::WithItem {
+impl<'a> From<ast::WithItem<'a>> for ComparableWithItem<'a> {
+    fn from(with_item: ast::WithItem<'a>) -> Self {
+        let ast::WithItemFields {
             context_expr,
             optional_vars,
             range: _,
-            node_index: _,
-        } = with_item;
+            node: _,
+        } = with_item.fields();
         Self {
             context_expr: context_expr.into(),
-            optional_vars: optional_vars.as_ref().map(Into::into),
+            optional_vars: optional_vars.map(Into::into),
         }
     }
 }
@@ -133,14 +145,14 @@ struct ComparablePatternKeyword<'a> {
     pattern: ComparablePattern<'a>,
 }
 
-impl<'a> From<&'a ast::PatternKeyword> for ComparablePatternKeyword<'a> {
-    fn from(keyword: &'a ast::PatternKeyword) -> Self {
-        let ast::PatternKeyword {
+impl<'a> From<ast::PatternKeyword<'a>> for ComparablePatternKeyword<'a> {
+    fn from(keyword: ast::PatternKeyword<'a>) -> Self {
+        let ast::PatternKeywordFields {
             attr,
             pattern,
             range: _,
-            node_index: _,
-        } = keyword;
+            node: _,
+        } = keyword.fields();
         Self {
             attr: attr.as_str(),
             pattern: pattern.into(),
@@ -150,15 +162,15 @@ impl<'a> From<&'a ast::PatternKeyword> for ComparablePatternKeyword<'a> {
 
 /// A borrowed structural comparison key for a match pattern.
 #[derive(Clone, Copy)]
-pub struct ComparablePattern<'a>(&'a ast::Pattern);
+pub struct ComparablePattern<'a>(ast::Pattern<'a>);
 
-impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
-    fn from(node: &'a ast::Pattern) -> Self {
+impl<'a> From<ast::Pattern<'a>> for ComparablePattern<'a> {
+    fn from(node: ast::Pattern<'a>) -> Self {
         Self(node)
     }
 }
 
-compare_enum!(ComparablePattern(Pattern) {
+compare_enum!(ComparablePattern(PatternKind, classify) {
     MatchValue => match_value_fields,
     MatchSingleton => match_singleton_fields,
     MatchSequence => match_sequence_fields,
@@ -169,59 +181,72 @@ compare_enum!(ComparablePattern(Pattern) {
     MatchOr => match_or_fields,
 });
 
-fn match_value_fields(node: &ast::PatternMatchValue) -> ComparableExpr<'_> {
-    let ast::PatternMatchValue {
+fn match_value_fields(node: ast::PatternMatchValue<'_>) -> ComparableExpr<'_> {
+    let ast::PatternMatchValueFields {
         value,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     value.into()
 }
 
-fn match_singleton_fields(node: &ast::PatternMatchSingleton) -> ast::Singleton {
-    let ast::PatternMatchSingleton {
+fn match_singleton_fields(node: ast::PatternMatchSingleton<'_>) -> ast::Singleton {
+    let ast::PatternMatchSingletonFields {
         value,
         range: _,
-        node_index: _,
-    } = node;
-    *value
+        node: _,
+    } = node.fields();
+    value
 }
 
-fn match_sequence_fields(node: &ast::PatternMatchSequence) -> ComparablePatternSlice<'_> {
-    let ast::PatternMatchSequence {
+fn match_sequence_fields(node: ast::PatternMatchSequence<'_>) -> ComparablePatternSlice<'_> {
+    let ast::PatternMatchSequenceFields {
         patterns,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     ComparableSlice::new(patterns)
 }
 
-type ComparableMappingPatternItem<'a> =
-    ast::MappingPatternItem<ComparableExpr<'a>, ComparablePattern<'a>, &'a str>;
+struct MatchMappingFields<'a>(ast::MappingPatternItems<'a>);
 
-impl<'a> From<&'a ast::MappingPatternItem> for ComparableMappingPatternItem<'a> {
-    fn from(item: &'a ast::MappingPatternItem) -> Self {
-        match item {
+impl fmt::Debug for MatchMappingFields<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.entries()).finish()
+    }
+}
+
+impl MatchMappingFields<'_> {
+    fn entries(
+        &self,
+    ) -> impl Iterator<Item = ast::MappingPatternItem<ComparableExpr<'_>, ComparablePattern<'_>, &str>>
+    {
+        self.0.into_iter().map(|item| match item {
             ast::MappingPatternItem::Entry { key, pattern } => ast::MappingPatternItem::Entry {
                 key: key.into(),
                 pattern: pattern.into(),
             },
-            ast::MappingPatternItem::Rest(identifier) => {
-                ast::MappingPatternItem::Rest(identifier.as_str())
-            }
+            ast::MappingPatternItem::Rest(name) => ast::MappingPatternItem::Rest(name.as_str()),
+        })
+    }
+}
+impl PartialEq for MatchMappingFields<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.entries().eq(other.entries())
+    }
+}
+impl Eq for MatchMappingFields<'_> {}
+impl Hash for MatchMappingFields<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.into_iter().count().hash(state);
+        for entry in self.entries() {
+            entry.hash(state);
         }
     }
 }
 
-fn match_mapping_fields(
-    node: &ast::PatternMatchMapping,
-) -> ComparableSlice<'_, ast::MappingPatternItem, ComparableMappingPatternItem<'_>> {
-    let ast::PatternMatchMapping {
-        items,
-        range: _,
-        node_index: _,
-    } = node;
-    ComparableSlice::new(items)
+fn match_mapping_fields(node: ast::PatternMatchMapping<'_>) -> MatchMappingFields<'_> {
+    MatchMappingFields(node.items())
 }
 
 type ComparablePatternOrKeyword<'a> =
@@ -239,34 +264,28 @@ impl<'a> From<&'a ast::PatternOrKeyword> for ComparablePatternOrKeyword<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct MatchClassFields<'a> {
     cls: ComparableExpr<'a>,
-    items: ComparableSlice<'a, ast::PatternOrKeyword, ComparablePatternOrKeyword<'a>>,
+    patterns: ComparablePatternSlice<'a>,
+    keywords: ComparableSlice<'a, ast::kind::PatternKeyword, ComparablePatternKeyword<'a>>,
 }
 
-fn match_class_fields(node: &ast::PatternMatchClass) -> MatchClassFields<'_> {
-    let ast::PatternMatchClass {
-        cls,
-        arguments:
-            ast::PatternArguments {
-                items,
-                range: _,
-                node_index: _,
-            },
-        range: _,
-        node_index: _,
-    } = node;
+fn match_class_fields(node: ast::PatternMatchClass<'_>) -> MatchClassFields<'_> {
+    let ast::PatternMatchClassFields { cls, arguments, .. } = node.fields();
+    let ast::PatternArgumentsFields {
+        patterns, keywords, ..
+    } = arguments.fields();
     MatchClassFields {
         cls: cls.into(),
         items: ComparableSlice::new(items),
     }
 }
 
-fn match_star_fields(node: &ast::PatternMatchStar) -> Option<&str> {
-    let ast::PatternMatchStar {
+fn match_star_fields(node: ast::PatternMatchStar<'_>) -> Option<&str> {
+    let ast::PatternMatchStarFields {
         name,
         range: _,
-        node_index: _,
-    } = node;
-    name.as_deref()
+        node: _,
+    } = node.fields();
+    name.map(ast::Identifier::as_str)
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -275,25 +294,25 @@ struct MatchAsFields<'a> {
     name: Option<&'a str>,
 }
 
-fn match_as_fields(node: &ast::PatternMatchAs) -> MatchAsFields<'_> {
-    let ast::PatternMatchAs {
+fn match_as_fields(node: ast::PatternMatchAs<'_>) -> MatchAsFields<'_> {
+    let ast::PatternMatchAsFields {
         pattern,
         name,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     MatchAsFields {
-        pattern: pattern.as_deref().map(Into::into),
-        name: name.as_deref(),
+        pattern: pattern.map(Into::into),
+        name: name.map(ast::Identifier::as_str),
     }
 }
 
-fn match_or_fields(node: &ast::PatternMatchOr) -> ComparablePatternSlice<'_> {
-    let ast::PatternMatchOr {
+fn match_or_fields(node: ast::PatternMatchOr<'_>) -> ComparablePatternSlice<'_> {
+    let ast::PatternMatchOrFields {
         patterns,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     ComparableSlice::new(patterns)
 }
 
@@ -304,43 +323,43 @@ struct ComparableMatchCase<'a> {
     body: ComparableStmtSlice<'a>,
 }
 
-impl<'a> From<&'a ast::MatchCase> for ComparableMatchCase<'a> {
-    fn from(match_case: &'a ast::MatchCase) -> Self {
-        let ast::MatchCase {
+impl<'a> From<ast::MatchCase<'a>> for ComparableMatchCase<'a> {
+    fn from(match_case: ast::MatchCase<'a>) -> Self {
+        let ast::MatchCaseFields {
             pattern,
             guard,
             body,
             range: _,
-            node_index: _,
-        } = match_case;
+            node: _,
+        } = match_case.fields();
         Self {
             pattern: pattern.into(),
-            guard: guard.as_ref().map(Into::into),
+            guard: guard.map(Into::into),
             body: ComparableSlice::new(body),
         }
     }
 }
 
-impl<'a> From<&'a ast::Decorator> for ComparableExpr<'a> {
-    fn from(decorator: &'a ast::Decorator) -> Self {
-        let ast::Decorator {
+impl<'a> From<ast::Decorator<'a>> for ComparableExpr<'a> {
+    fn from(decorator: ast::Decorator<'a>) -> Self {
+        let ast::DecoratorFields {
             expression,
             range: _,
-            node_index: _,
-        } = decorator;
+            node: _,
+        } = decorator.fields();
         expression.into()
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct ComparableText<'a>(&'a str);
-impl<'a> From<&'a ast::Identifier> for ComparableText<'a> {
-    fn from(identifier: &'a ast::Identifier) -> Self {
-        let ast::Identifier {
+impl<'a> From<ast::Identifier<'a>> for ComparableText<'a> {
+    fn from(identifier: ast::Identifier<'a>) -> Self {
+        let ast::IdentifierFields {
             id,
             range: _,
-            node_index: _,
-        } = identifier;
+            node: _,
+        } = identifier.fields();
         Self(id.as_str())
     }
 }
@@ -387,13 +406,13 @@ impl Hash for ComparableNumber<'_> {
 }
 
 /// Borrows a sequence and converts each element as it is visited.
-struct ComparableSlice<'a, T, C> {
-    items: &'a [T],
+struct ComparableSlice<'a, T: ast::NodeType, C> {
+    items: ast::NodeList<'a, T>,
     comparable: PhantomData<fn() -> C>,
 }
 
-impl<'a, T, C> ComparableSlice<'a, T, C> {
-    fn new(items: &'a [T]) -> Self {
+impl<'a, T: ast::NodeType, C> ComparableSlice<'a, T, C> {
+    fn new(items: ast::NodeList<'a, T>) -> Self {
         Self {
             items,
             comparable: PhantomData,
@@ -402,33 +421,37 @@ impl<'a, T, C> ComparableSlice<'a, T, C> {
 
     fn iter(&self) -> impl Iterator<Item = C>
     where
-        C: From<&'a T>,
+        C: From<T::Borrowed<'a>>,
     {
         self.items.iter().map(C::from)
     }
 }
 
-impl<'a, T, C: From<&'a T> + fmt::Debug> fmt::Debug for ComparableSlice<'a, T, C> {
+impl<'a, T: ast::NodeType, C: From<T::Borrowed<'a>> + fmt::Debug> fmt::Debug
+    for ComparableSlice<'a, T, C>
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_list().entries(self.iter()).finish()
     }
 }
 
-impl<T, C> Default for ComparableSlice<'_, T, C> {
+impl<T: ast::NodeType, C> Default for ComparableSlice<'_, T, C> {
     fn default() -> Self {
-        Self::new(&[])
+        Self::new(ast::NodeList::default())
     }
 }
 
-impl<'a, T, C: From<&'a T> + PartialEq> PartialEq for ComparableSlice<'a, T, C> {
+impl<'a, T: ast::NodeType, C: From<T::Borrowed<'a>> + PartialEq> PartialEq
+    for ComparableSlice<'a, T, C>
+{
     fn eq(&self, other: &Self) -> bool {
         self.items.len() == other.items.len() && self.iter().eq(other.iter())
     }
 }
 
-impl<'a, T, C: From<&'a T> + Eq> Eq for ComparableSlice<'a, T, C> {}
+impl<'a, T: ast::NodeType, C: From<T::Borrowed<'a>> + Eq> Eq for ComparableSlice<'a, T, C> {}
 
-impl<'a, T, C: From<&'a T> + Hash> Hash for ComparableSlice<'a, T, C> {
+impl<'a, T: ast::NodeType, C: From<T::Borrowed<'a>> + Hash> Hash for ComparableSlice<'a, T, C> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.items.len().hash(state);
         for item in self.iter() {
@@ -437,110 +460,35 @@ impl<'a, T, C: From<&'a T> + Hash> Hash for ComparableSlice<'a, T, C> {
     }
 }
 
-type ComparableStmtSlice<'a> = ComparableSlice<'a, ast::Stmt, ComparableStmt<'a>>;
-type ComparablePatternSlice<'a> = ComparableSlice<'a, ast::Pattern, ComparablePattern<'a>>;
+type ComparableStmtSlice<'a> = ComparableSlice<'a, ast::kind::Stmt, ComparableStmt<'a>>;
+type ComparablePatternSlice<'a> = ComparableSlice<'a, ast::kind::Pattern, ComparablePattern<'a>>;
 type ComparableComprehensionSlice<'a> =
-    ComparableSlice<'a, ast::Comprehension, ComparableComprehension<'a>>;
-type ComparableExprSlice<'a> = ComparableSlice<'a, Expr, ComparableExpr<'a>>;
+    ComparableSlice<'a, ast::kind::Comprehension, ComparableComprehension<'a>>;
+type ComparableExprSlice<'a> = ComparableSlice<'a, ast::kind::Expr, ComparableExpr<'a>>;
 
-#[derive(Default)]
-struct ComparableArguments<'a>(Option<&'a ast::Arguments>);
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-enum ComparableArgument<'a> {
-    Positional(ComparableExpr<'a>),
-    Keyword(ComparableKeyword<'a>),
+#[derive(Debug, Default, PartialEq, Eq, Hash)]
+struct ComparableArguments<'a> {
+    args: ComparableExprSlice<'a>,
+    keywords: ComparableSlice<'a, ast::kind::Keyword, ComparableKeyword<'a>>,
 }
 
-impl<'a> From<ast::ArgOrKeyword<'a>> for ComparableArgument<'a> {
-    fn from(argument: ast::ArgOrKeyword<'a>) -> Self {
-        match argument {
-            ast::ArgOrKeyword::Arg(expr) => Self::Positional(expr.into()),
-            ast::ArgOrKeyword::Keyword(keyword) => Self::Keyword(keyword.into()),
+impl<'a> From<ast::Arguments<'a>> for ComparableArguments<'a> {
+    fn from(arguments: ast::Arguments<'a>) -> Self {
+        let ast::ArgumentsFields {
+            args,
+            keywords,
+            range: _,
+            node: _,
+        } = arguments.fields();
+        Self {
+            args: ComparableSlice::new(args),
+            keywords: ComparableSlice::new(keywords),
         }
-    }
-}
-
-fn grouped_arguments<'a>(
-    items: impl Iterator<Item = ast::ArgOrKeyword<'a>> + Clone,
-) -> impl Iterator<Item = ComparableArgument<'a>> {
-    items
-        .clone()
-        .filter(|item| matches!(item, ast::ArgOrKeyword::Arg(_)))
-        .chain(items.filter(|item| matches!(item, ast::ArgOrKeyword::Keyword(_))))
-        .map(ComparableArgument::from)
-}
-
-impl fmt::Debug for ComparableArguments<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut list = f.debug_list();
-        if let Some(arguments) = self.0 {
-            arguments.for_each_in_evaluation_order(|arg| {
-                list.entry(&ComparableArgument::from(arg));
-            });
-        }
-        list.finish()
-    }
-}
-
-impl PartialEq for ComparableArguments<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        let (left_args, right_args) = match (self.0, other.0) {
-            (Some(left), Some(right)) => (left, right),
-            (Some(args), None) | (None, Some(args)) => return args.is_empty(),
-            (None, None) => return true,
-        };
-        if left_args.len() != right_args.len() {
-            return false;
-        }
-        for (index, (left, right)) in left_args
-            .iter_source_order()
-            .zip(right_args.iter_source_order())
-            .enumerate()
-        {
-            let equal = match (left, right) {
-                (ast::ArgOrKeyword::Arg(left), ast::ArgOrKeyword::Arg(right)) => {
-                    ComparableExpr::from(left) == ComparableExpr::from(right)
-                }
-                (ast::ArgOrKeyword::Keyword(left), ast::ArgOrKeyword::Keyword(right)) => {
-                    ComparableKeyword::from(left) == ComparableKeyword::from(right)
-                }
-                // f(key=x, *ys) and f(*ys, key=x) evaluate their arguments in the same order.
-                _ => {
-                    return grouped_arguments(left_args.iter_source_order().skip(index)).eq(
-                        grouped_arguments(right_args.iter_source_order().skip(index)),
-                    );
-                }
-            };
-            if !equal {
-                return false;
-            }
-        }
-        true
-    }
-}
-
-impl Eq for ComparableArguments<'_> {}
-
-impl Hash for ComparableArguments<'_> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        let Some(arguments) = self.0 else {
-            0usize.hash(state);
-            return;
-        };
-        arguments.len().hash(state);
-        arguments.for_each_in_evaluation_order(|arg| ComparableArgument::from(arg).hash(state));
-    }
-}
-
-impl<'a> From<&'a ast::Arguments> for ComparableArguments<'a> {
-    fn from(arguments: &'a ast::Arguments) -> Self {
-        Self(Some(arguments))
     }
 }
 
 #[derive(Clone, Copy)]
-struct ComparableParameters<'a>(&'a ast::Parameters);
+struct ComparableParameters<'a>(ast::Parameters<'a>);
 
 impl fmt::Debug for ComparableParameters<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -562,37 +510,34 @@ impl Hash for ComparableParameters<'_> {
     }
 }
 
-type ComparableParametersFields<'a> =
-    ComparableSlice<'a, ast::ParameterItem, ComparableParameterItem<'a>>;
-
-impl<'a> From<&'a ast::Parameters> for ComparableParametersFields<'a> {
-    fn from(parameters: &'a ast::Parameters) -> Self {
-        let ast::Parameters {
-            items,
-            range: _,
-            node_index: _,
-        } = parameters;
-        ComparableSlice::new(items)
-    }
-}
-
 #[derive(Debug, PartialEq, Eq, Hash)]
-enum ComparableParameterItem<'a> {
-    PositionalOnly(ComparableParameterWithDefault<'a>),
-    PositionalOrKeyword(ComparableParameterWithDefault<'a>),
-    Vararg(ComparableParameter<'a>),
-    KeywordOnly(ComparableParameterWithDefault<'a>),
-    Kwarg(ComparableParameter<'a>),
+struct ComparableParametersFields<'a> {
+    posonlyargs:
+        ComparableSlice<'a, ast::kind::ParameterWithDefault, ComparableParameterWithDefault<'a>>,
+    args: ComparableSlice<'a, ast::kind::ParameterWithDefault, ComparableParameterWithDefault<'a>>,
+    vararg: Option<ComparableParameter<'a>>,
+    kwonlyargs:
+        ComparableSlice<'a, ast::kind::ParameterWithDefault, ComparableParameterWithDefault<'a>>,
+    kwarg: Option<ComparableParameter<'a>>,
 }
 
-impl<'a> From<&'a ast::ParameterItem> for ComparableParameterItem<'a> {
-    fn from(item: &'a ast::ParameterItem) -> Self {
-        match item {
-            ast::ParameterItem::PositionalOnly(p) => Self::PositionalOnly(p.into()),
-            ast::ParameterItem::PositionalOrKeyword(p) => Self::PositionalOrKeyword(p.into()),
-            ast::ParameterItem::Vararg(p) => Self::Vararg(p.into()),
-            ast::ParameterItem::KeywordOnly(p) => Self::KeywordOnly(p.into()),
-            ast::ParameterItem::Kwarg(p) => Self::Kwarg(p.into()),
+impl<'a> From<ast::Parameters<'a>> for ComparableParametersFields<'a> {
+    fn from(parameters: ast::Parameters<'a>) -> Self {
+        let ast::ParametersFields {
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+            range: _,
+            node: _,
+        } = parameters.fields();
+        Self {
+            posonlyargs: ComparableSlice::new(posonlyargs),
+            args: ComparableSlice::new(args),
+            vararg: vararg.map(Into::into),
+            kwonlyargs: ComparableSlice::new(kwonlyargs),
+            kwarg: kwarg.map(Into::into),
         }
     }
 }
@@ -603,17 +548,17 @@ struct ComparableParameter<'a> {
     annotation: Option<ComparableExpr<'a>>,
 }
 
-impl<'a> From<&'a ast::Parameter> for ComparableParameter<'a> {
-    fn from(arg: &'a ast::Parameter) -> Self {
-        let ast::Parameter {
+impl<'a> From<ast::Parameter<'a>> for ComparableParameter<'a> {
+    fn from(arg: ast::Parameter<'a>) -> Self {
+        let ast::ParameterFields {
             name,
             annotation,
             range: _,
-            node_index: _,
-        } = arg;
+            node: _,
+        } = arg.fields();
         Self {
             arg: name.as_str(),
-            annotation: annotation.as_ref().map(Into::into),
+            annotation: annotation.map(Into::into),
         }
     }
 }
@@ -624,17 +569,17 @@ struct ComparableParameterWithDefault<'a> {
     default: Option<ComparableExpr<'a>>,
 }
 
-impl<'a> From<&'a ast::ParameterWithDefault> for ComparableParameterWithDefault<'a> {
-    fn from(arg: &'a ast::ParameterWithDefault) -> Self {
-        let ast::ParameterWithDefault {
+impl<'a> From<ast::ParameterWithDefault<'a>> for ComparableParameterWithDefault<'a> {
+    fn from(arg: ast::ParameterWithDefault<'a>) -> Self {
+        let ast::ParameterWithDefaultFields {
             parameter,
             default,
             range: _,
-            node_index: _,
-        } = arg;
+            node: _,
+        } = arg.fields();
         Self {
             def: parameter.into(),
-            default: default.as_ref().map(Into::into),
+            default: default.map(Into::into),
         }
     }
 }
@@ -645,17 +590,17 @@ pub struct ComparableKeyword<'a> {
     value: ComparableExpr<'a>,
 }
 
-impl<'a> From<&'a ast::Keyword> for ComparableKeyword<'a> {
-    fn from(keyword: &'a ast::Keyword) -> Self {
-        let ast::Keyword {
+impl<'a> From<ast::Keyword<'a>> for ComparableKeyword<'a> {
+    fn from(keyword: ast::Keyword<'a>) -> Self {
+        let ast::KeywordFields {
             arg,
             value,
             range: _,
-            node_index: _,
-        } = keyword;
+            node: _,
+        } = keyword.fields();
         Self {
-            arg: arg.as_ref().map(ast::Identifier::as_str),
-            value: value.as_ref().into(),
+            arg: arg.map(ast::Identifier::as_str),
+            value: value.into(),
         }
     }
 }
@@ -668,21 +613,21 @@ struct ComparableComprehension<'a> {
     is_async: bool,
 }
 
-impl<'a> From<&'a ast::Comprehension> for ComparableComprehension<'a> {
-    fn from(comprehension: &'a ast::Comprehension) -> Self {
-        let ast::Comprehension {
+impl<'a> From<ast::Comprehension<'a>> for ComparableComprehension<'a> {
+    fn from(comprehension: ast::Comprehension<'a>) -> Self {
+        let ast::ComprehensionFields {
             target,
             iter,
             ifs,
             is_async,
             range: _,
-            node_index: _,
-        } = comprehension;
+            node: _,
+        } = comprehension.fields();
         Self {
             target: target.into(),
             iter: iter.into(),
             ifs: ComparableSlice::new(ifs),
-            is_async: *is_async,
+            is_async,
         }
     }
 }
@@ -694,18 +639,18 @@ struct ComparableExceptHandler<'a> {
     body: ComparableStmtSlice<'a>,
 }
 
-impl<'a> From<&'a ast::ExceptHandler> for ComparableExceptHandler<'a> {
-    fn from(except_handler: &'a ast::ExceptHandler) -> Self {
-        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+impl<'a> From<ast::ExceptHandler<'a>> for ComparableExceptHandler<'a> {
+    fn from(except_handler: ast::ExceptHandler<'a>) -> Self {
+        let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
             type_,
             name,
             body,
             range: _,
-            node_index: _,
-        }) = except_handler;
+            node: _,
+        }) = except_handler.fields();
         Self {
-            type_: type_.as_ref().map(Into::into),
-            name: name.as_deref(),
+            type_: type_.map(Into::into),
+            name: name.map(ast::Identifier::as_str),
             body: ComparableSlice::new(body),
         }
     }
@@ -714,8 +659,8 @@ impl<'a> From<&'a ast::ExceptHandler> for ComparableExceptHandler<'a> {
 /// Compares normalized elements. The enclosing expression distinguishes f-strings from t-strings.
 #[derive(Clone, Copy)]
 enum ComparableInterpolatedString<'a> {
-    FString(&'a ast::FStringValue),
-    TString(&'a ast::TStringValue),
+    FString(ast::FStringValue<'a>),
+    TString(ast::TStringValue<'a>),
 }
 
 impl<'a> ComparableInterpolatedString<'a> {
@@ -727,8 +672,7 @@ impl<'a> ComparableInterpolatedString<'a> {
     /// - An f-string part with the literal `" and three "` and the interpolation `{bar!s}`.
     ///
     /// All three pieces of literal text form one comparable element between the
-    /// two interpolations. Equality compares these elements in order, and hashing
-    /// visits the same sequence.
+    /// two interpolations. A single piece can stay borrowed.
     ///
     /// [CPython's `string.templatelib.Template`] has one more string than interpolation.
     /// Interleaving the two sequences, starting with a string, recovers the reading
@@ -747,12 +691,6 @@ impl<'a> ComparableInterpolatedString<'a> {
                         return Some(element);
                     }
                     ComparableStringElement::Literal(mut text) => {
-                        // In `f"{x}a" "b"`, after the interpolation, `raw.next()`
-                        // returns `Literal(Cow::Borrowed("a"))` by value. The pattern
-                        // moves the `Cow` into the mutable local variable `text`.
-                        // Its `&str` points into the AST. `text += next` appends "b" by
-                        // replacing the local `Cow` with an owned `String` containing "ab".
-                        // In `f"{x}ab"`, "ab" stays borrowed and compares equal by content.
                         while let Some(ComparableStringElement::Literal(next)) =
                             raw.next_if(|next| matches!(next, ComparableStringElement::Literal(_)))
                         {
@@ -767,19 +705,16 @@ impl<'a> ComparableInterpolatedString<'a> {
         })
     }
 
-    /// Flatten the parts in source order. Each element borrows from the AST,
-    /// and adjacent literal pieces are still separate at this point.
     fn raw_elements(self) -> impl Iterator<Item = ComparableStringElement<'a>> {
         enum Parts<'a> {
-            FString(ast::FStringParts<'a>),
-            TString(std::slice::Iter<'a, ast::TString>),
+            FString(ast::ListIter<'a, ast::FStringPart>),
+            TString(ast::ListIter<'a, ast::AstNodeId<ast::kind::TString>>),
         }
-
         let mut parts = match self {
             Self::FString(value) => Parts::FString(value.iter()),
-            Self::TString(value) => Parts::TString(value.as_slice().iter()),
+            Self::TString(value) => Parts::TString(value.iter()),
         };
-        let mut elements = [].iter();
+        let mut elements = ast::InterpolatedStringElements::default().iter();
         std::iter::from_fn(move || {
             loop {
                 if let Some(element) = elements.next() {
@@ -787,27 +722,14 @@ impl<'a> ComparableInterpolatedString<'a> {
                 }
                 elements = match &mut parts {
                     Parts::FString(parts) => match parts.next()? {
-                        ast::FStringPartRef::FString(ast::FString {
-                            elements,
-                            range: _,
-                            node_index: _,
-                            flags: _,
-                        }) => elements.iter(),
-                        ast::FStringPartRef::Literal(part) => {
+                        ast::FStringPartView::FString(part) => part.elements().iter(),
+                        ast::FStringPartView::Literal(part) => {
                             return Some(ComparableStringElement::Literal(Cow::Borrowed(
-                                ComparableText::from(part).0,
+                                part.value(),
                             )));
                         }
                     },
-                    Parts::TString(parts) => {
-                        let ast::TString {
-                            elements,
-                            range: _,
-                            node_index: _,
-                            flags: _,
-                        } = parts.next()?;
-                        elements.iter()
-                    }
+                    Parts::TString(parts) => parts.next()?.elements().iter(),
                 };
             }
         })
@@ -840,20 +762,21 @@ impl Hash for ComparableInterpolatedString<'_> {
 
 enum ComparableStringElement<'a> {
     Literal(Cow<'a, str>),
-    Interpolation(&'a ast::InterpolatedElement),
+    Interpolation(ast::InterpolatedElement<'a>),
 }
 
-impl<'a> From<&'a ast::InterpolatedStringElement> for ComparableStringElement<'a> {
-    fn from(element: &'a ast::InterpolatedStringElement) -> Self {
-        match element {
-            ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
-                value,
-                range: _,
-                node_index: _,
-            }) => Self::Literal(Cow::Borrowed(value)),
-            ast::InterpolatedStringElement::Interpolation(interpolation) => {
-                Self::Interpolation(interpolation)
-            }
+impl<'a> From<ast::InterpolatedStringElement<'a>> for ComparableStringElement<'a> {
+    fn from(element: ast::InterpolatedStringElement<'a>) -> Self {
+        match element.fields() {
+            ast::InterpolatedStringElementFields::Literal(
+                ast::InterpolatedStringLiteralElementFields { value, .. },
+            ) => Self::Literal(Cow::Borrowed(value)),
+            ast::InterpolatedStringElementFields::Interpolation(
+                ast::InterpolatedElementFields {
+                    node: interpolation,
+                    ..
+                },
+            ) => Self::Interpolation(interpolation),
         }
     }
 }
@@ -863,7 +786,7 @@ impl PartialEq for ComparableStringElement<'_> {
         match (self, other) {
             (Self::Literal(left), Self::Literal(right)) => left == right,
             (Self::Interpolation(left), Self::Interpolation(right)) => {
-                interpolation_fields(left) == interpolation_fields(right)
+                interpolation_fields(*left) == interpolation_fields(*right)
             }
             (Self::Literal(_), Self::Interpolation(_))
             | (Self::Interpolation(_), Self::Literal(_)) => false,
@@ -875,7 +798,7 @@ impl fmt::Debug for ComparableStringElement<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Literal(text) => text.fmt(f),
-            Self::Interpolation(element) => interpolation_fields(element).fmt(f),
+            Self::Interpolation(element) => interpolation_fields(*element).fmt(f),
         }
     }
 }
@@ -887,7 +810,7 @@ impl Hash for ComparableStringElement<'_> {
         std::mem::discriminant(self).hash(state);
         match self {
             Self::Literal(text) => text.hash(state),
-            Self::Interpolation(interpolation) => interpolation_fields(interpolation).hash(state),
+            Self::Interpolation(interpolation) => interpolation_fields(*interpolation).hash(state),
         }
     }
 }
@@ -913,31 +836,26 @@ struct InterpolationFields<'a> {
     expression: ComparableExpr<'a>,
     debug_text: Option<Cow<'a, str>>,
     conversion: ast::ConversionFlag,
-    format_spec:
-        Option<ComparableSlice<'a, ast::InterpolatedStringElement, ComparableStringElement<'a>>>,
+    format_spec: Option<
+        ComparableSlice<'a, ast::kind::InterpolatedStringElement, ComparableStringElement<'a>>,
+    >,
 }
 
-fn interpolation_fields(node: &ast::InterpolatedElement) -> InterpolationFields<'_> {
-    let ast::InterpolatedElement {
+fn interpolation_fields(node: ast::InterpolatedElement<'_>) -> InterpolationFields<'_> {
+    let ast::InterpolatedElementFields {
         expression,
         debug_text,
         conversion,
         format_spec,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
 
     InterpolationFields {
         expression: expression.into(),
-        debug_text: debug_text.as_ref().map(comparable_debug_text),
-        conversion: *conversion,
-        format_spec: format_spec.as_deref().map(
-            |ast::InterpolatedStringFormatSpec {
-                 elements,
-                 range: _,
-                 node_index: _,
-             }| ComparableSlice::new(elements),
-        ),
+        debug_text: debug_text.map(comparable_debug_text),
+        conversion,
+        format_spec: format_spec.map(|spec| ComparableSlice::new(spec.elements())),
     }
 }
 
@@ -947,16 +865,16 @@ struct ComparableElifElseClause<'a> {
     body: ComparableStmtSlice<'a>,
 }
 
-impl<'a> From<&'a ast::ElifElseClause> for ComparableElifElseClause<'a> {
-    fn from(elif_else_clause: &'a ast::ElifElseClause) -> Self {
-        let ast::ElifElseClause {
+impl<'a> From<ast::ElifElseClause<'a>> for ComparableElifElseClause<'a> {
+    fn from(elif_else_clause: ast::ElifElseClause<'a>) -> Self {
+        let ast::ElifElseClauseFields {
             range: _,
-            node_index: _,
+            node: _,
             test,
             body,
-        } = elif_else_clause;
+        } = elif_else_clause.fields();
         Self {
-            test: test.as_ref().map(Into::into),
+            test: test.map(Into::into),
             body: ComparableSlice::new(body),
         }
     }
@@ -964,67 +882,67 @@ impl<'a> From<&'a ast::ElifElseClause> for ComparableElifElseClause<'a> {
 
 /// A structural key for literal expressions that compares each string or bytes part separately.
 #[derive(Clone, Copy)]
-pub struct ComparableLiteral<'a>(ast::LiteralExpressionRef<'a>);
+pub struct ComparableLiteral<'a>(ast::LiteralExpression<'a>);
 
-impl<'a> From<ast::LiteralExpressionRef<'a>> for ComparableLiteral<'a> {
-    fn from(literal: ast::LiteralExpressionRef<'a>) -> Self {
+impl<'a> From<ast::LiteralExpression<'a>> for ComparableLiteral<'a> {
+    fn from(literal: ast::LiteralExpression<'a>) -> Self {
         Self(literal)
     }
 }
 
-compare_enum!(ComparableLiteral(LiteralExpressionRef) {
+compare_enum!(ComparableLiteral(LiteralExpression) {
     StringLiteral => string_literal_parts,
     BytesLiteral => bytes_literal_parts,
     NumberLiteral => number_literal_fields,
     BooleanLiteral => boolean_literal_fields,
-    NoneLiteral(ast::ExprNoneLiteral { range: _, node_index: _ }),
-    EllipsisLiteral(ast::ExprEllipsisLiteral { range: _, node_index: _ }),
+    NoneLiteral(ast::ExprNoneLiteralFields { range: _, node: _ }),
+    EllipsisLiteral(ast::ExprEllipsisLiteralFields { range: _, node: _ }),
 });
 
 fn string_literal_parts(
-    node: &ast::ExprStringLiteral,
-) -> ComparableSlice<'_, ast::StringLiteral, ComparableText<'_>> {
-    let ast::ExprStringLiteral {
+    node: ast::ExprStringLiteral<'_>,
+) -> ComparableSlice<'_, ast::kind::StringLiteral, ComparableText<'_>> {
+    let ast::ExprStringLiteralFields {
         value,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     ComparableSlice::new(value.as_slice())
 }
 
 fn bytes_literal_parts(
-    node: &ast::ExprBytesLiteral,
-) -> ComparableSlice<'_, ast::BytesLiteral, ComparableBytesLiteral<'_>> {
-    let ast::ExprBytesLiteral {
+    node: ast::ExprBytesLiteral<'_>,
+) -> ComparableSlice<'_, ast::kind::BytesLiteral, ComparableBytesLiteral<'_>> {
+    let ast::ExprBytesLiteralFields {
         value,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     ComparableSlice::new(value.as_slice())
 }
 
-impl<'a> From<&'a ast::StringLiteral> for ComparableText<'a> {
-    fn from(literal: &'a ast::StringLiteral) -> Self {
-        let ast::StringLiteral {
+impl<'a> From<ast::StringLiteral<'a>> for ComparableText<'a> {
+    fn from(literal: ast::StringLiteral<'a>) -> Self {
+        let ast::StringLiteralFields {
             value,
             range: _,
-            node_index: _,
+            node: _,
             flags: _,
-        } = literal;
+        } = literal.fields();
         Self(value)
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct ComparableBytesLiteral<'a>(&'a [u8]);
-impl<'a> From<&'a ast::BytesLiteral> for ComparableBytesLiteral<'a> {
-    fn from(literal: &'a ast::BytesLiteral) -> Self {
-        let ast::BytesLiteral {
+impl<'a> From<ast::BytesLiteral<'a>> for ComparableBytesLiteral<'a> {
+    fn from(literal: ast::BytesLiteral<'a>) -> Self {
+        let ast::BytesLiteralFields {
             value,
             range: _,
-            node_index: _,
+            node: _,
             flags: _,
-        } = literal;
+        } = literal.fields();
         Self(value)
     }
 }
@@ -1035,17 +953,11 @@ struct ComparableDictItem<'a> {
     value: ComparableExpr<'a>,
 }
 
-impl<'a> From<&'a ast::DictItem> for ComparableDictItem<'a> {
-    fn from(
-        ast::DictItem {
-            key,
-            value,
-            range: _,
-            node_index: _,
-        }: &'a ast::DictItem,
-    ) -> Self {
+impl<'a> From<ast::DictItem<'a>> for ComparableDictItem<'a> {
+    fn from(item: ast::DictItem<'a>) -> Self {
+        let ast::DictItemFields { key, value, .. } = item.fields();
         Self {
-            key: key.as_ref().map(ComparableExpr::from),
+            key: key.map(ComparableExpr::from),
             value: value.into(),
         }
     }
@@ -1053,9 +965,9 @@ impl<'a> From<&'a ast::DictItem> for ComparableDictItem<'a> {
 
 /// A borrowed expression key that ignores source locations and expression context.
 #[derive(Clone, Copy)]
-pub struct ComparableExpr<'a>(ast::ExprRef<'a>);
+pub struct ComparableExpr<'a>(ast::Expr<'a>);
 
-compare_enum!(ComparableExpr(ExprRef) {
+compare_enum!(ComparableExpr(ExprKind, classify; node_kind) {
     BoolOp => bool_op_fields,
     Named => named_fields,
     BinOp => bin_op_fields,
@@ -1079,8 +991,8 @@ compare_enum!(ComparableExpr(ExprRef) {
     BytesLiteral => bytes_literal_fields,
     NumberLiteral => number_literal_fields,
     BooleanLiteral => boolean_literal_fields,
-    NoneLiteral(ast::ExprNoneLiteral { range: _, node_index: _ }),
-    EllipsisLiteral(ast::ExprEllipsisLiteral { range: _, node_index: _ }),
+    NoneLiteral(ast::ExprNoneLiteralFields { range: _, node: _ }),
+    EllipsisLiteral(ast::ExprEllipsisLiteralFields { range: _, node: _ }),
     Attribute => attribute_fields,
     Subscript => subscript_fields,
     Starred => starred_fields,
@@ -1091,21 +1003,21 @@ compare_enum!(ComparableExpr(ExprRef) {
     IpyEscapeCommand => ipy_escape_command_fields,
 });
 
-impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
-    fn from(expr: &'a ast::Expr) -> Self {
-        Self(expr.into())
+impl<'a> From<ast::Expr<'a>> for ComparableExpr<'a> {
+    fn from(expr: ast::Expr<'a>) -> Self {
+        Self(expr)
     }
 }
 
-impl<'a> From<&'a ast::ExprName> for ComparableExpr<'a> {
-    fn from(name: &'a ast::ExprName) -> Self {
+impl<'a> From<ast::ExprName<'a>> for ComparableExpr<'a> {
+    fn from(name: ast::ExprName<'a>) -> Self {
         Self(name.into())
     }
 }
 
-impl<'a> From<&'a Box<ast::Expr>> for ComparableExpr<'a> {
-    fn from(expr: &'a Box<ast::Expr>) -> Self {
-        (expr.as_ref()).into()
+impl<'a> From<&ast::Expr<'a>> for ComparableExpr<'a> {
+    fn from(expr: &ast::Expr<'a>) -> Self {
+        Self::from(*expr)
     }
 }
 
@@ -1115,15 +1027,15 @@ struct BoolOpFields<'a> {
     values: ComparableExprSlice<'a>,
 }
 
-fn bool_op_fields(node: &ast::ExprBoolOp) -> BoolOpFields<'_> {
-    let ast::ExprBoolOp {
+fn bool_op_fields(node: ast::ExprBoolOp<'_>) -> BoolOpFields<'_> {
+    let ast::ExprBoolOpFields {
         op,
         values,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     BoolOpFields {
-        op: *op,
+        op,
         values: ComparableSlice::new(values),
     }
 }
@@ -1134,13 +1046,13 @@ struct NamedFields<'a> {
     value: ComparableExpr<'a>,
 }
 
-fn named_fields(node: &ast::ExprNamed) -> NamedFields<'_> {
-    let ast::ExprNamed {
+fn named_fields(node: ast::ExprNamed<'_>) -> NamedFields<'_> {
+    let ast::ExprNamedFields {
         target,
         value,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     NamedFields {
         target: target.into(),
         value: value.into(),
@@ -1154,17 +1066,17 @@ struct BinOpFields<'a> {
     right: ComparableExpr<'a>,
 }
 
-fn bin_op_fields(node: &ast::ExprBinOp) -> BinOpFields<'_> {
-    let ast::ExprBinOp {
+fn bin_op_fields(node: ast::ExprBinOp<'_>) -> BinOpFields<'_> {
+    let ast::ExprBinOpFields {
         left,
         op,
         right,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     BinOpFields {
         left: left.into(),
-        op: *op,
+        op,
         right: right.into(),
     }
 }
@@ -1175,15 +1087,15 @@ struct UnaryOpFields<'a> {
     operand: ComparableExpr<'a>,
 }
 
-fn unary_op_fields(node: &ast::ExprUnaryOp) -> UnaryOpFields<'_> {
-    let ast::ExprUnaryOp {
+fn unary_op_fields(node: ast::ExprUnaryOp<'_>) -> UnaryOpFields<'_> {
+    let ast::ExprUnaryOpFields {
         op,
         operand,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     UnaryOpFields {
-        op: *op,
+        op,
         operand: operand.into(),
     }
 }
@@ -1194,15 +1106,15 @@ struct LambdaFields<'a> {
     body: ComparableExpr<'a>,
 }
 
-fn lambda_fields(node: &ast::ExprLambda) -> LambdaFields<'_> {
-    let ast::ExprLambda {
+fn lambda_fields(node: ast::ExprLambda<'_>) -> LambdaFields<'_> {
+    let ast::ExprLambdaFields {
         parameters,
         body,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     LambdaFields {
-        parameters: parameters.as_deref().map(ComparableParameters),
+        parameters: parameters.map(ComparableParameters),
         body: body.into(),
     }
 }
@@ -1214,14 +1126,14 @@ struct IfFields<'a> {
     orelse: ComparableExpr<'a>,
 }
 
-fn if_fields(node: &ast::ExprIf) -> IfFields<'_> {
-    let ast::ExprIf {
+fn if_fields(node: ast::ExprIf<'_>) -> IfFields<'_> {
+    let ast::ExprIfFields {
         test,
         body,
         orelse,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     IfFields {
         test: test.into(),
         body: body.into(),
@@ -1229,21 +1141,23 @@ fn if_fields(node: &ast::ExprIf) -> IfFields<'_> {
     }
 }
 
-fn dict_fields(node: &ast::ExprDict) -> ComparableSlice<'_, ast::DictItem, ComparableDictItem<'_>> {
-    let ast::ExprDict {
+fn dict_fields(
+    node: ast::ExprDict<'_>,
+) -> ComparableSlice<'_, ast::kind::DictItem, ComparableDictItem<'_>> {
+    let ast::ExprDictFields {
         items,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     ComparableSlice::new(items)
 }
 
-fn set_fields(node: &ast::ExprSet) -> ComparableExprSlice<'_> {
-    let ast::ExprSet {
+fn set_fields(node: ast::ExprSet<'_>) -> ComparableExprSlice<'_> {
+    let ast::ExprSetFields {
         elts,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     ComparableSlice::new(elts)
 }
 
@@ -1254,7 +1168,7 @@ struct ComprehensionExprFields<'a> {
 }
 
 impl<'a> ComprehensionExprFields<'a> {
-    fn new(elt: &'a Expr, generators: &'a [ast::Comprehension]) -> Self {
+    fn new(elt: Expr<'a>, generators: ast::NodeList<'a, ast::kind::Comprehension>) -> Self {
         Self {
             elt: elt.into(),
             generators: ComparableSlice::new(generators),
@@ -1262,100 +1176,122 @@ impl<'a> ComprehensionExprFields<'a> {
     }
 }
 
-fn list_comp_fields(node: &ast::ExprListComp) -> ComprehensionExprFields<'_> {
-    let ast::ExprListComp {
+fn list_comp_fields(node: ast::ExprListComp<'_>) -> ComprehensionExprFields<'_> {
+    let ast::ExprListCompFields {
         elt,
         generators,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     ComprehensionExprFields::new(elt, generators)
 }
 
-fn set_comp_fields(node: &ast::ExprSetComp) -> ComprehensionExprFields<'_> {
-    let ast::ExprSetComp {
+fn set_comp_fields(node: ast::ExprSetComp<'_>) -> ComprehensionExprFields<'_> {
+    let ast::ExprSetCompFields {
         elt,
         generators,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     ComprehensionExprFields::new(elt, generators)
 }
 
 fn dict_comp_fields(
-    node: &ast::ExprDictComp,
+    node: ast::ExprDictComp<'_>,
 ) -> (
     Option<ComparableExpr<'_>>,
     ComparableExpr<'_>,
     ComparableComprehensionSlice<'_>,
 ) {
-    let ast::ExprDictComp {
+    let ast::ExprDictCompFields {
         key,
         value,
         generators,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     (
-        key.as_ref().map(Into::into),
+        key.map(Into::into),
         value.into(),
         ComparableSlice::new(generators),
     )
 }
 
-fn generator_fields(node: &ast::ExprGenerator) -> ComprehensionExprFields<'_> {
-    let ast::ExprGenerator {
+fn generator_fields(node: ast::ExprGenerator<'_>) -> ComprehensionExprFields<'_> {
+    let ast::ExprGeneratorFields {
         elt,
         generators,
         range: _,
-        node_index: _,
+        node: _,
         parenthesized: _,
-    } = node;
+    } = node.fields();
     ComprehensionExprFields::new(elt, generators)
 }
 
-fn await_fields(node: &ast::ExprAwait) -> ComparableExpr<'_> {
-    let ast::ExprAwait {
+fn await_fields(node: ast::ExprAwait<'_>) -> ComparableExpr<'_> {
+    let ast::ExprAwaitFields {
         value,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     value.into()
 }
 
-fn yield_fields(node: &ast::ExprYield) -> Option<ComparableExpr<'_>> {
-    let ast::ExprYield {
+fn yield_fields(node: ast::ExprYield<'_>) -> Option<ComparableExpr<'_>> {
+    let ast::ExprYieldFields {
         value,
         range: _,
-        node_index: _,
-    } = node;
-    value.as_ref().map(Into::into)
+        node: _,
+    } = node.fields();
+    value.map(Into::into)
 }
 
-fn yield_from_fields(node: &ast::ExprYieldFrom) -> ComparableExpr<'_> {
-    let ast::ExprYieldFrom {
+fn yield_from_fields(node: ast::ExprYieldFrom<'_>) -> ComparableExpr<'_> {
+    let ast::ExprYieldFromFields {
         value,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     value.into()
+}
+
+struct ComparableOps<'a>(ast::List<'a, ast::CmpOp>);
+impl fmt::Debug for ComparableOps<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.0).finish()
+    }
+}
+
+impl PartialEq for ComparableOps<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.len() == other.0.len() && self.0.iter().eq(other.0.iter())
+    }
+}
+impl Eq for ComparableOps<'_> {}
+impl Hash for ComparableOps<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.len().hash(state);
+        for operator in self.0 {
+            operator.hash(state);
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct CompareFields<'a> {
-    ops: &'a [ast::CmpOp],
+    ops: ComparableOps<'a>,
     operands: ComparableExprSlice<'a>,
 }
 
-fn compare_fields(node: &ast::ExprCompare) -> CompareFields<'_> {
-    let ast::ExprCompare {
+fn compare_fields(node: ast::ExprCompare<'_>) -> CompareFields<'_> {
+    let ast::ExprCompareFields {
         ops,
         operands,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     CompareFields {
-        ops,
+        ops: ComparableOps(ops),
         operands: ComparableSlice::new(operands),
     }
 }
@@ -1366,73 +1302,73 @@ struct CallFields<'a> {
     arguments: ComparableArguments<'a>,
 }
 
-fn call_fields(node: &ast::ExprCall) -> CallFields<'_> {
-    let ast::ExprCall {
+fn call_fields(node: ast::ExprCall<'_>) -> CallFields<'_> {
+    let ast::ExprCallFields {
         func,
         arguments,
-        range_start: _,
-        node_index: _,
-    } = node;
+        range: _,
+        node: _,
+    } = node.fields();
     CallFields {
         func: func.into(),
         arguments: arguments.into(),
     }
 }
 
-fn f_string_fields(node: &ast::ExprFString) -> ComparableInterpolatedString<'_> {
-    let ast::ExprFString {
+fn f_string_fields(node: ast::ExprFString<'_>) -> ComparableInterpolatedString<'_> {
+    let ast::ExprFStringFields {
         value,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     ComparableInterpolatedString::FString(value)
 }
 
-fn t_string_fields(node: &ast::ExprTString) -> ComparableInterpolatedString<'_> {
-    let ast::ExprTString {
+fn t_string_fields(node: ast::ExprTString<'_>) -> ComparableInterpolatedString<'_> {
+    let ast::ExprTStringFields {
         value,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     ComparableInterpolatedString::TString(value)
 }
 
-fn string_literal_fields(node: &ast::ExprStringLiteral) -> &str {
-    let ast::ExprStringLiteral {
+fn string_literal_fields(node: ast::ExprStringLiteral<'_>) -> &str {
+    let ast::ExprStringLiteralFields {
         value,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     // `"a" "b"` and `"ab"` both yield "ab". The AST caches the joined text
     // for the first spelling and lends the single literal's text for the second.
     value.to_str()
 }
 
-fn bytes_literal_fields(node: &ast::ExprBytesLiteral) -> ComparableBytes<'_> {
-    let ast::ExprBytesLiteral {
+fn bytes_literal_fields(node: ast::ExprBytesLiteral<'_>) -> ComparableBytes<'_> {
+    let ast::ExprBytesLiteralFields {
         value,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     ComparableBytes(value)
 }
 
-fn number_literal_fields(node: &ast::ExprNumberLiteral) -> ComparableNumber<'_> {
-    let ast::ExprNumberLiteral {
+fn number_literal_fields(node: ast::ExprNumberLiteral<'_>) -> ComparableNumber<'_> {
+    let ast::ExprNumberLiteralFields {
         value,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     ComparableNumber(value)
 }
 
-fn boolean_literal_fields(node: &ast::ExprBooleanLiteral) -> bool {
-    let ast::ExprBooleanLiteral {
+fn boolean_literal_fields(node: ast::ExprBooleanLiteral<'_>) -> bool {
+    let ast::ExprBooleanLiteralFields {
         value,
         range: _,
-        node_index: _,
-    } = node;
-    *value
+        node: _,
+    } = node.fields();
+    value
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1441,14 +1377,14 @@ struct AttributeFields<'a> {
     attr: &'a str,
 }
 
-fn attribute_fields(node: &ast::ExprAttribute) -> AttributeFields<'_> {
-    let ast::ExprAttribute {
+fn attribute_fields(node: ast::ExprAttribute<'_>) -> AttributeFields<'_> {
+    let ast::ExprAttributeFields {
         value,
         attr,
         ctx: _,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     AttributeFields {
         value: value.into(),
         attr: attr.as_str(),
@@ -1461,58 +1397,58 @@ struct SubscriptFields<'a> {
     slice: ComparableExpr<'a>,
 }
 
-fn subscript_fields(node: &ast::ExprSubscript) -> SubscriptFields<'_> {
-    let ast::ExprSubscript {
+fn subscript_fields(node: ast::ExprSubscript<'_>) -> SubscriptFields<'_> {
+    let ast::ExprSubscriptFields {
         value,
         slice,
         ctx: _,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     SubscriptFields {
         value: value.into(),
         slice: slice.into(),
     }
 }
 
-fn starred_fields(node: &ast::ExprStarred) -> ComparableExpr<'_> {
-    let ast::ExprStarred {
+fn starred_fields(node: ast::ExprStarred<'_>) -> ComparableExpr<'_> {
+    let ast::ExprStarredFields {
         value,
         ctx: _,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     value.into()
 }
 
-fn name_fields(node: &ast::ExprName) -> &str {
-    let ast::ExprName {
+fn name_fields(node: ast::ExprName<'_>) -> &str {
+    let ast::ExprNameFields {
         id,
         ctx: _,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     id.as_str()
 }
 
-fn list_fields(node: &ast::ExprList) -> ComparableExprSlice<'_> {
-    let ast::ExprList {
+fn list_fields(node: ast::ExprList<'_>) -> ComparableExprSlice<'_> {
+    let ast::ExprListFields {
         elts,
         ctx: _,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     ComparableSlice::new(elts)
 }
 
-fn tuple_fields(node: &ast::ExprTuple) -> ComparableExprSlice<'_> {
-    let ast::ExprTuple {
+fn tuple_fields(node: ast::ExprTuple<'_>) -> ComparableExprSlice<'_> {
+    let ast::ExprTupleFields {
         elts,
         ctx: _,
         range: _,
-        node_index: _,
+        node: _,
         parenthesized: _,
-    } = node;
+    } = node.fields();
     ComparableSlice::new(elts)
 }
 
@@ -1523,18 +1459,18 @@ struct SliceFields<'a> {
     step: Option<ComparableExpr<'a>>,
 }
 
-fn slice_fields(node: &ast::ExprSlice) -> SliceFields<'_> {
-    let ast::ExprSlice {
+fn slice_fields(node: ast::ExprSlice<'_>) -> SliceFields<'_> {
+    let ast::ExprSliceFields {
         lower,
         upper,
         step,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     SliceFields {
-        lower: lower.as_ref().map(Into::into),
-        upper: upper.as_ref().map(Into::into),
-        step: step.as_ref().map(Into::into),
+        lower: lower.map(Into::into),
+        upper: upper.map(Into::into),
+        step: step.map(Into::into),
     }
 }
 
@@ -1544,22 +1480,24 @@ struct IpyEscapeCommandFields<'a> {
     value: &'a str,
 }
 
-fn ipy_escape_command_fields(node: &ast::ExprIpyEscapeCommand) -> IpyEscapeCommandFields<'_> {
-    let ast::ExprIpyEscapeCommand {
+fn ipy_escape_command_fields(node: ast::ExprIpyEscapeCommand<'_>) -> IpyEscapeCommandFields<'_> {
+    let ast::ExprIpyEscapeCommandFields {
         kind,
         value,
         range: _,
-        node_index: _,
-    } = node;
-    IpyEscapeCommandFields { kind: *kind, value }
+        node: _,
+    } = node.fields();
+    IpyEscapeCommandFields { kind, value }
 }
 
-struct ComparableBytes<'a>(&'a ast::BytesLiteralValue);
+struct ComparableBytes<'a>(ast::BytesValue<'a>);
 
 impl PartialEq for ComparableBytes<'_> {
     fn eq(&self, other: &Self) -> bool {
-        if let ([left], [right]) = (self.0.as_slice(), other.0.as_slice()) {
-            return left.as_slice() == right.as_slice();
+        if let (Some([left]), Some([right])) =
+            (self.0.as_slice().as_array(), other.0.as_slice().as_array())
+        {
+            return left.value() == right.value();
         }
 
         // Implicit concatenation makes `b'ab' b'c'` equal to `b'a' b'bc'`.
@@ -1571,11 +1509,11 @@ impl PartialEq for ComparableBytes<'_> {
         let mut right_parts = other
             .0
             .iter()
-            .map(ast::BytesLiteral::as_slice)
+            .map(ast::BytesLiteral::value)
             .filter(|part| !part.is_empty());
         let mut right: &[u8] = &[];
         for part in self.0 {
-            let mut left = part.as_slice();
+            let mut left = part.value();
             while !left.is_empty() {
                 if right.is_empty() {
                     let Some(next) = right_parts.next() else {
@@ -1600,8 +1538,8 @@ impl PartialEq for ComparableBytes<'_> {
 impl fmt::Debug for ComparableBytes<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut list = f.debug_list();
-        for part in self.0 {
-            list.entries(part.as_slice());
+        for part in self.0.as_slice() {
+            list.entries(part.value());
         }
         list.finish()
     }
@@ -1617,27 +1555,27 @@ impl Hash for ComparableBytes<'_> {
     }
 }
 
-type ComparableTypeParams<'a> = ComparableSlice<'a, ast::TypeParam, ComparableTypeParam<'a>>;
-impl<'a> From<&'a ast::TypeParams> for ComparableTypeParams<'a> {
-    fn from(params: &'a ast::TypeParams) -> Self {
-        let ast::TypeParams {
+type ComparableTypeParams<'a> = ComparableSlice<'a, ast::kind::TypeParam, ComparableTypeParam<'a>>;
+impl<'a> From<ast::TypeParams<'a>> for ComparableTypeParams<'a> {
+    fn from(params: ast::TypeParams<'a>) -> Self {
+        let ast::TypeParamsFields {
             type_params,
             range: _,
-            node_index: _,
-        } = params;
+            node: _,
+        } = params.fields();
         Self::new(type_params)
     }
 }
 
-struct ComparableTypeParam<'a>(&'a ast::TypeParam);
+struct ComparableTypeParam<'a>(ast::TypeParam<'a>);
 
-impl<'a> From<&'a ast::TypeParam> for ComparableTypeParam<'a> {
-    fn from(node: &'a ast::TypeParam) -> Self {
+impl<'a> From<ast::TypeParam<'a>> for ComparableTypeParam<'a> {
+    fn from(node: ast::TypeParam<'a>) -> Self {
         Self(node)
     }
 }
 
-compare_enum!(ComparableTypeParam(TypeParam) {
+compare_enum!(ComparableTypeParam(TypeParamKind, classify) {
     TypeVar => type_var_fields,
     TypeVarTuple => type_var_tuple_fields,
     ParamSpec => param_spec_fields,
@@ -1650,18 +1588,18 @@ struct TypeVarFields<'a> {
     default: Option<ComparableExpr<'a>>,
 }
 
-fn type_var_fields(node: &ast::TypeParamTypeVar) -> TypeVarFields<'_> {
-    let ast::TypeParamTypeVar {
+fn type_var_fields(node: ast::TypeParamTypeVar<'_>) -> TypeVarFields<'_> {
+    let ast::TypeParamTypeVarFields {
         name,
         bound,
         default,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     TypeVarFields {
         name: name.as_str(),
-        bound: bound.as_ref().map(Into::into),
-        default: default.as_ref().map(Into::into),
+        bound: bound.map(Into::into),
+        default: default.map(Into::into),
     }
 }
 
@@ -1671,43 +1609,43 @@ struct VariadicTypeParamFields<'a> {
     default: Option<ComparableExpr<'a>>,
 }
 
-fn type_var_tuple_fields(node: &ast::TypeParamTypeVarTuple) -> VariadicTypeParamFields<'_> {
-    let ast::TypeParamTypeVarTuple {
+fn type_var_tuple_fields(node: ast::TypeParamTypeVarTuple<'_>) -> VariadicTypeParamFields<'_> {
+    let ast::TypeParamTypeVarTupleFields {
         name,
         default,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     VariadicTypeParamFields {
         name: name.as_str(),
-        default: default.as_ref().map(Into::into),
+        default: default.map(Into::into),
     }
 }
 
-fn param_spec_fields(node: &ast::TypeParamParamSpec) -> VariadicTypeParamFields<'_> {
-    let ast::TypeParamParamSpec {
+fn param_spec_fields(node: ast::TypeParamParamSpec<'_>) -> VariadicTypeParamFields<'_> {
+    let ast::TypeParamParamSpecFields {
         name,
         default,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     VariadicTypeParamFields {
         name: name.as_str(),
-        default: default.as_ref().map(Into::into),
+        default: default.map(Into::into),
     }
 }
 
 /// A borrowed structural comparison key for a statement.
 #[derive(Clone, Copy)]
-pub struct ComparableStmt<'a>(&'a ast::Stmt);
+pub struct ComparableStmt<'a>(ast::Stmt<'a>);
 
-impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
-    fn from(node: &'a ast::Stmt) -> Self {
+impl<'a> From<ast::Stmt<'a>> for ComparableStmt<'a> {
+    fn from(node: ast::Stmt<'a>) -> Self {
         Self(node)
     }
 }
 
-compare_enum!(ComparableStmt(Stmt) {
+compare_enum!(ComparableStmt(StmtKind, classify) {
     FunctionDef => stmt_function_def_fields,
     ClassDef => stmt_class_def_fields,
     Return => stmt_return_fields,
@@ -1730,15 +1668,15 @@ compare_enum!(ComparableStmt(Stmt) {
     Nonlocal => stmt_nonlocal_fields,
     IpyEscapeCommand => stmt_ipy_escape_command_fields,
     Expr => stmt_expr_fields,
-    Pass(ast::StmtPass { range: _, node_index: _ }),
-    Break(ast::StmtBreak { range: _, node_index: _ }),
-    Continue(ast::StmtContinue { range: _, node_index: _ }),
+    Pass(ast::StmtPassFields { range: _, node: _ }),
+    Break(ast::StmtBreakFields { range: _, node: _ }),
+    Continue(ast::StmtContinueFields { range: _, node: _ }),
 });
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtFunctionDefFields<'a> {
     is_async: bool,
-    decorator_list: ComparableSlice<'a, ast::Decorator, ComparableExpr<'a>>,
+    decorator_list: ComparableSlice<'a, ast::kind::Decorator, ComparableExpr<'a>>,
     name: &'a str,
     type_params: Option<ComparableTypeParams<'a>>,
     parameters: ComparableParameters<'a>,
@@ -1746,8 +1684,8 @@ struct StmtFunctionDefFields<'a> {
     body: ComparableStmtSlice<'a>,
 }
 
-fn stmt_function_def_fields(node: &ast::StmtFunctionDef) -> StmtFunctionDefFields<'_> {
-    let ast::StmtFunctionDef {
+fn stmt_function_def_fields(node: ast::StmtFunctionDef<'_>) -> StmtFunctionDefFields<'_> {
+    let ast::StmtFunctionDefFields {
         is_async,
         name,
         parameters,
@@ -1756,62 +1694,62 @@ fn stmt_function_def_fields(node: &ast::StmtFunctionDef) -> StmtFunctionDefField
         returns,
         type_params,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     StmtFunctionDefFields {
-        is_async: *is_async,
+        is_async,
         name: name.as_str(),
         parameters: ComparableParameters(parameters),
         body: ComparableSlice::new(body),
         decorator_list: ComparableSlice::new(decorator_list),
-        returns: returns.as_ref().map(Into::into),
-        type_params: type_params.as_deref().map(Into::into),
+        returns: returns.map(Into::into),
+        type_params: type_params.map(Into::into),
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtClassDefFields<'a> {
-    decorator_list: ComparableSlice<'a, ast::Decorator, ComparableExpr<'a>>,
+    decorator_list: ComparableSlice<'a, ast::kind::Decorator, ComparableExpr<'a>>,
     name: &'a str,
     type_params: Option<ComparableTypeParams<'a>>,
     arguments: ComparableArguments<'a>,
     body: ComparableStmtSlice<'a>,
 }
 
-fn stmt_class_def_fields(node: &ast::StmtClassDef) -> StmtClassDefFields<'_> {
-    let ast::StmtClassDef {
+fn stmt_class_def_fields(node: ast::StmtClassDef<'_>) -> StmtClassDefFields<'_> {
+    let ast::StmtClassDefFields {
         name,
         arguments,
         body,
         decorator_list,
         type_params,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     StmtClassDefFields {
         name: name.as_str(),
-        arguments: arguments.as_deref().map(Into::into).unwrap_or_default(),
+        arguments: arguments.map(Into::into).unwrap_or_default(),
         body: ComparableSlice::new(body),
         decorator_list: ComparableSlice::new(decorator_list),
-        type_params: type_params.as_deref().map(Into::into),
+        type_params: type_params.map(Into::into),
     }
 }
 
-fn stmt_return_fields(node: &ast::StmtReturn) -> Option<ComparableExpr<'_>> {
-    let ast::StmtReturn {
+fn stmt_return_fields(node: ast::StmtReturn<'_>) -> Option<ComparableExpr<'_>> {
+    let ast::StmtReturnFields {
         value,
         range: _,
-        node_index: _,
-    } = node;
-    value.as_ref().map(Into::into)
+        node: _,
+    } = node.fields();
+    value.map(Into::into)
 }
 
-fn stmt_delete_fields(node: &ast::StmtDelete) -> ComparableExprSlice<'_> {
-    let ast::StmtDelete {
+fn stmt_delete_fields(node: ast::StmtDelete<'_>) -> ComparableExprSlice<'_> {
+    let ast::StmtDeleteFields {
         targets,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     ComparableSlice::new(targets)
 }
 
@@ -1822,17 +1760,17 @@ struct StmtTypeAliasFields<'a> {
     value: ComparableExpr<'a>,
 }
 
-fn stmt_type_alias_fields(node: &ast::StmtTypeAlias) -> StmtTypeAliasFields<'_> {
-    let ast::StmtTypeAlias {
+fn stmt_type_alias_fields(node: ast::StmtTypeAlias<'_>) -> StmtTypeAliasFields<'_> {
+    let ast::StmtTypeAliasFields {
         range: _,
-        node_index: _,
+        node: _,
         name,
         type_params,
         value,
-    } = node;
+    } = node.fields();
     StmtTypeAliasFields {
         name: name.into(),
-        type_params: type_params.as_deref().map(Into::into),
+        type_params: type_params.map(Into::into),
         value: value.into(),
     }
 }
@@ -1843,13 +1781,13 @@ struct StmtAssignFields<'a> {
     value: ComparableExpr<'a>,
 }
 
-fn stmt_assign_fields(node: &ast::StmtAssign) -> StmtAssignFields<'_> {
-    let ast::StmtAssign {
+fn stmt_assign_fields(node: ast::StmtAssign<'_>) -> StmtAssignFields<'_> {
+    let ast::StmtAssignFields {
         targets,
         value,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     StmtAssignFields {
         targets: ComparableSlice::new(targets),
         value: value.into(),
@@ -1863,17 +1801,17 @@ struct StmtAugAssignFields<'a> {
     value: ComparableExpr<'a>,
 }
 
-fn stmt_aug_assign_fields(node: &ast::StmtAugAssign) -> StmtAugAssignFields<'_> {
-    let ast::StmtAugAssign {
+fn stmt_aug_assign_fields(node: ast::StmtAugAssign<'_>) -> StmtAugAssignFields<'_> {
+    let ast::StmtAugAssignFields {
         target,
         op,
         value,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     StmtAugAssignFields {
         target: target.into(),
-        op: *op,
+        op,
         value: value.into(),
     }
 }
@@ -1886,20 +1824,20 @@ struct StmtAnnAssignFields<'a> {
     simple: bool,
 }
 
-fn stmt_ann_assign_fields(node: &ast::StmtAnnAssign) -> StmtAnnAssignFields<'_> {
-    let ast::StmtAnnAssign {
+fn stmt_ann_assign_fields(node: ast::StmtAnnAssign<'_>) -> StmtAnnAssignFields<'_> {
+    let ast::StmtAnnAssignFields {
         target,
         annotation,
         value,
         simple,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     StmtAnnAssignFields {
         target: target.into(),
         annotation: annotation.into(),
-        value: value.as_ref().map(Into::into),
-        simple: *simple,
+        value: value.map(Into::into),
+        simple,
     }
 }
 
@@ -1912,18 +1850,18 @@ struct StmtForFields<'a> {
     orelse: ComparableStmtSlice<'a>,
 }
 
-fn stmt_for_fields(node: &ast::StmtFor) -> StmtForFields<'_> {
-    let ast::StmtFor {
+fn stmt_for_fields(node: ast::StmtFor<'_>) -> StmtForFields<'_> {
+    let ast::StmtForFields {
         is_async,
         target,
         iter,
         body,
         orelse,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     StmtForFields {
-        is_async: *is_async,
+        is_async,
         target: target.into(),
         iter: iter.into(),
         body: ComparableSlice::new(body),
@@ -1938,14 +1876,14 @@ struct StmtWhileFields<'a> {
     orelse: ComparableStmtSlice<'a>,
 }
 
-fn stmt_while_fields(node: &ast::StmtWhile) -> StmtWhileFields<'_> {
-    let ast::StmtWhile {
+fn stmt_while_fields(node: ast::StmtWhile<'_>) -> StmtWhileFields<'_> {
+    let ast::StmtWhileFields {
         test,
         body,
         orelse,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     StmtWhileFields {
         test: test.into(),
         body: ComparableSlice::new(body),
@@ -1957,17 +1895,17 @@ fn stmt_while_fields(node: &ast::StmtWhile) -> StmtWhileFields<'_> {
 struct StmtIfFields<'a> {
     test: ComparableExpr<'a>,
     body: ComparableStmtSlice<'a>,
-    elif_else_clauses: ComparableSlice<'a, ast::ElifElseClause, ComparableElifElseClause<'a>>,
+    elif_else_clauses: ComparableSlice<'a, ast::kind::ElifElseClause, ComparableElifElseClause<'a>>,
 }
 
-fn stmt_if_fields(node: &ast::StmtIf) -> StmtIfFields<'_> {
-    let ast::StmtIf {
+fn stmt_if_fields(node: ast::StmtIf<'_>) -> StmtIfFields<'_> {
+    let ast::StmtIfFields {
         test,
         body,
         elif_else_clauses,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     StmtIfFields {
         test: test.into(),
         body: ComparableSlice::new(body),
@@ -1978,20 +1916,20 @@ fn stmt_if_fields(node: &ast::StmtIf) -> StmtIfFields<'_> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtWithFields<'a> {
     is_async: bool,
-    items: ComparableSlice<'a, ast::WithItem, ComparableWithItem<'a>>,
+    items: ComparableSlice<'a, ast::kind::WithItem, ComparableWithItem<'a>>,
     body: ComparableStmtSlice<'a>,
 }
 
-fn stmt_with_fields(node: &ast::StmtWith) -> StmtWithFields<'_> {
-    let ast::StmtWith {
+fn stmt_with_fields(node: ast::StmtWith<'_>) -> StmtWithFields<'_> {
+    let ast::StmtWithFields {
         is_async,
         items,
         body,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     StmtWithFields {
-        is_async: *is_async,
+        is_async,
         items: ComparableSlice::new(items),
         body: ComparableSlice::new(body),
     }
@@ -2000,16 +1938,16 @@ fn stmt_with_fields(node: &ast::StmtWith) -> StmtWithFields<'_> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtMatchFields<'a> {
     subject: ComparableExpr<'a>,
-    cases: ComparableSlice<'a, ast::MatchCase, ComparableMatchCase<'a>>,
+    cases: ComparableSlice<'a, ast::kind::MatchCase, ComparableMatchCase<'a>>,
 }
 
-fn stmt_match_fields(node: &ast::StmtMatch) -> StmtMatchFields<'_> {
-    let ast::StmtMatch {
+fn stmt_match_fields(node: ast::StmtMatch<'_>) -> StmtMatchFields<'_> {
+    let ast::StmtMatchFields {
         subject,
         cases,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     StmtMatchFields {
         subject: subject.into(),
         cases: ComparableSlice::new(cases),
@@ -2022,44 +1960,44 @@ struct StmtRaiseFields<'a> {
     cause: Option<ComparableExpr<'a>>,
 }
 
-fn stmt_raise_fields(node: &ast::StmtRaise) -> StmtRaiseFields<'_> {
-    let ast::StmtRaise {
+fn stmt_raise_fields(node: ast::StmtRaise<'_>) -> StmtRaiseFields<'_> {
+    let ast::StmtRaiseFields {
         exc,
         cause,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     StmtRaiseFields {
-        exc: exc.as_ref().map(Into::into),
-        cause: cause.as_ref().map(Into::into),
+        exc: exc.map(Into::into),
+        cause: cause.map(Into::into),
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtTryFields<'a> {
     body: ComparableStmtSlice<'a>,
-    handlers: ComparableSlice<'a, ast::ExceptHandler, ComparableExceptHandler<'a>>,
+    handlers: ComparableSlice<'a, ast::kind::ExceptHandler, ComparableExceptHandler<'a>>,
     orelse: ComparableStmtSlice<'a>,
     finalbody: ComparableStmtSlice<'a>,
     is_star: bool,
 }
 
-fn stmt_try_fields(node: &ast::StmtTry) -> StmtTryFields<'_> {
-    let ast::StmtTry {
+fn stmt_try_fields(node: ast::StmtTry<'_>) -> StmtTryFields<'_> {
+    let ast::StmtTryFields {
         body,
         handlers,
         orelse,
         finalbody,
         is_star,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     StmtTryFields {
         body: ComparableSlice::new(body),
         handlers: ComparableSlice::new(handlers),
         orelse: ComparableSlice::new(orelse),
         finalbody: ComparableSlice::new(finalbody),
-        is_star: *is_star,
+        is_star,
     }
 }
 
@@ -2069,133 +2007,141 @@ struct StmtAssertFields<'a> {
     msg: Option<ComparableExpr<'a>>,
 }
 
-fn stmt_assert_fields(node: &ast::StmtAssert) -> StmtAssertFields<'_> {
-    let ast::StmtAssert {
+fn stmt_assert_fields(node: ast::StmtAssert<'_>) -> StmtAssertFields<'_> {
+    let ast::StmtAssertFields {
         test,
         msg,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     StmtAssertFields {
         test: test.into(),
-        msg: msg.as_ref().map(Into::into),
+        msg: msg.map(Into::into),
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtImportFields<'a> {
-    names: ComparableSlice<'a, ast::Alias, ComparableAlias<'a>>,
+    names: ComparableSlice<'a, ast::kind::Alias, ComparableAlias<'a>>,
     is_lazy: bool,
 }
 
-fn stmt_import_fields(node: &ast::StmtImport) -> StmtImportFields<'_> {
-    let ast::StmtImport {
+fn stmt_import_fields(node: ast::StmtImport<'_>) -> StmtImportFields<'_> {
+    let ast::StmtImportFields {
         names,
         is_lazy,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     StmtImportFields {
         names: ComparableSlice::new(names),
-        is_lazy: *is_lazy,
+        is_lazy,
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct StmtImportFromFields<'a> {
     module: Option<&'a str>,
-    names: ComparableSlice<'a, ast::Alias, ComparableAlias<'a>>,
+    names: ComparableSlice<'a, ast::kind::Alias, ComparableAlias<'a>>,
     level: u32,
     is_lazy: bool,
 }
 
-fn stmt_import_from_fields(node: &ast::StmtImportFrom) -> StmtImportFromFields<'_> {
-    let ast::StmtImportFrom {
+fn stmt_import_from_fields(node: ast::StmtImportFrom<'_>) -> StmtImportFromFields<'_> {
+    let ast::StmtImportFromFields {
         module,
         names,
         level,
         is_lazy,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     StmtImportFromFields {
-        module: module.as_deref(),
+        module: module.map(ast::Identifier::as_str),
         names: ComparableSlice::new(names),
-        level: *level,
-        is_lazy: *is_lazy,
+        level,
+        is_lazy,
     }
 }
 
 fn stmt_global_fields(
-    node: &ast::StmtGlobal,
-) -> ComparableSlice<'_, ast::Identifier, ComparableText<'_>> {
-    let ast::StmtGlobal {
+    node: ast::StmtGlobal<'_>,
+) -> ComparableSlice<'_, ast::kind::Identifier, ComparableText<'_>> {
+    let ast::StmtGlobalFields {
         names,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     ComparableSlice::new(names)
 }
 
 fn stmt_nonlocal_fields(
-    node: &ast::StmtNonlocal,
-) -> ComparableSlice<'_, ast::Identifier, ComparableText<'_>> {
-    let ast::StmtNonlocal {
+    node: ast::StmtNonlocal<'_>,
+) -> ComparableSlice<'_, ast::kind::Identifier, ComparableText<'_>> {
+    let ast::StmtNonlocalFields {
         names,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     ComparableSlice::new(names)
 }
 
-fn stmt_ipy_escape_command_fields(node: &ast::StmtIpyEscapeCommand) -> IpyEscapeCommandFields<'_> {
-    let ast::StmtIpyEscapeCommand {
+fn stmt_ipy_escape_command_fields(
+    node: ast::StmtIpyEscapeCommand<'_>,
+) -> IpyEscapeCommandFields<'_> {
+    let ast::StmtIpyEscapeCommandFields {
         kind,
         value,
         range: _,
-        node_index: _,
-    } = node;
-    IpyEscapeCommandFields { kind: *kind, value }
+        node: _,
+    } = node.fields();
+    IpyEscapeCommandFields { kind, value }
 }
 
-fn stmt_expr_fields(node: &ast::StmtExpr) -> ComparableExpr<'_> {
-    let ast::StmtExpr {
+fn stmt_expr_fields(node: ast::StmtExpr<'_>) -> ComparableExpr<'_> {
+    let ast::StmtExprFields {
         value,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     value.into()
 }
 
 #[derive(Clone, Copy)]
-pub struct ComparableMod<'a>(&'a ast::Mod);
+pub struct ComparableMod<'a>(ast::Mod<'a>);
 
-impl<'a> From<&'a ast::Mod> for ComparableMod<'a> {
-    fn from(node: &'a ast::Mod) -> Self {
+impl<'a> From<ast::ModModule<'a>> for ComparableMod<'a> {
+    fn from(node: ast::ModModule<'a>) -> Self {
+        Self(node.into())
+    }
+}
+
+impl<'a> From<ast::Mod<'a>> for ComparableMod<'a> {
+    fn from(node: ast::Mod<'a>) -> Self {
         Self(node)
     }
 }
 
-compare_enum!(ComparableMod(Mod) {
+compare_enum!(ComparableMod(ModKind, classify) {
     Module => mod_module_fields,
     Expression => mod_expression_fields,
 });
 
-fn mod_module_fields(node: &ast::ModModule) -> ComparableStmtSlice<'_> {
-    let ast::ModModule {
+fn mod_module_fields(node: ast::ModModule<'_>) -> ComparableStmtSlice<'_> {
+    let ast::ModModuleFields {
         body,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     ComparableSlice::new(body)
 }
 
-fn mod_expression_fields(node: &ast::ModExpression) -> ComparableExpr<'_> {
-    let ast::ModExpression {
+fn mod_expression_fields(node: ast::ModExpression<'_>) -> ComparableExpr<'_> {
+    let ast::ModExpressionFields {
         body,
         range: _,
-        node_index: _,
-    } = node;
+        node: _,
+    } = node.fields();
     body.into()
 }
 
@@ -2305,33 +2251,34 @@ impl HashableReal {
 // `2^64`, the exclusive upper bound for values representable as a `u64`.
 const U64_EXCLUSIVE_UPPER_BOUND: f64 = 18_446_744_073_709_551_616.0;
 
-impl<'a> From<&'a Expr> for HashableExpr<'a> {
-    fn from(expr: &'a Expr) -> Self {
+impl<'a> From<Expr<'a>> for HashableExpr<'a> {
+    fn from(expr: Expr<'a>) -> Self {
         /// Returns a version of the given expression that can be hashed and compared according to
         /// Python  semantics.
-        fn as_hashable(expr: &Expr) -> HashableExprKind<'_> {
+        fn as_hashable(expr: Expr<'_>) -> HashableExprKind<'_> {
             if let Some(constant) = as_hashable_constant(expr) {
                 return constant;
             }
 
-            match expr {
-                Expr::Named(named) => HashableExprKind::NamedExpr {
-                    target: ComparableExpr::from(&named.target),
-                    value: Box::new(as_hashable(&named.value)),
+            match expr.classify() {
+                ast::ExprKind::Named(named) => HashableExprKind::NamedExpr {
+                    target: ComparableExpr::from(named.target()),
+                    value: Box::new(as_hashable(named.value())),
                 },
                 _ => HashableExprKind::Comparable(ComparableExpr::from(expr)),
             }
         }
 
         /// Returns a hashable representation if the expression's value is statically known.
-        fn as_hashable_constant(expr: &Expr) -> Option<HashableExprKind<'_>> {
+        fn as_hashable_constant(expr: Expr<'_>) -> Option<HashableExprKind<'_>> {
             if let Some(number) = as_number(expr) {
                 return Some(HashableExprKind::Number(number));
             }
 
-            let kind = match expr {
-                Expr::Tuple(tuple) => HashableExprKind::Tuple(
+            let kind = match expr.classify() {
+                ast::ExprKind::Tuple(tuple) => HashableExprKind::Tuple(
                     tuple
+                        .elts()
                         .iter()
                         .map(as_hashable_constant)
                         .collect::<Option<_>>()?,
@@ -2345,12 +2292,18 @@ impl<'a> From<&'a Expr> for HashableExpr<'a> {
             Some(kind)
         }
 
-        fn as_number(expr: &Expr) -> Option<HashableNumber> {
-            match expr {
-                Expr::BooleanLiteral(boolean) => Some(HashableNumber::real(HashableReal::Integer(
-                    i128::from(u8::from(boolean.value)),
-                ))),
-                Expr::NumberLiteral(number) => match &number.value {
+        fn as_number(expr: Expr<'_>) -> Option<HashableNumber> {
+            match expr.fields() {
+                ast::ExprFields::BooleanLiteral(ast::ExprBooleanLiteralFields {
+                    node: boolean,
+                    ..
+                }) => Some(HashableNumber::real(HashableReal::Integer(i128::from(
+                    u8::from(boolean.value()),
+                )))),
+                ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+                    node: number,
+                    ..
+                }) => match &number.value() {
                     Number::Int(int) => HashableReal::from_int(int).map(HashableNumber::real),
                     Number::Float(float) => {
                         Some(HashableNumber::real(HashableReal::from_float(*float)))
@@ -2360,26 +2313,26 @@ impl<'a> From<&'a Expr> for HashableExpr<'a> {
                         HashableReal::from_float(*imag),
                     )),
                 },
-                Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) => match op {
+                ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields { op, operand, .. }) => match op {
                     ast::UnaryOp::UAdd => as_number(operand),
                     ast::UnaryOp::USub => as_number(operand).map(HashableNumber::negate),
                     ast::UnaryOp::Invert | ast::UnaryOp::Not => None,
                 },
-                Expr::BinOp(ast::ExprBinOp {
+                ast::ExprFields::BinOp(ast::ExprBinOpFields {
                     left,
                     op: op @ (ast::Operator::Add | ast::Operator::Sub),
                     right,
                     ..
                 }) => {
                     let real = as_number(left)?.into_real()?.into_float();
-                    let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
                         value:
                             Number::Complex {
                                 real: complex_real,
                                 imag,
                             },
                         ..
-                    }) = right.as_ref()
+                    }) = right.fields()
                     else {
                         return None;
                     };
