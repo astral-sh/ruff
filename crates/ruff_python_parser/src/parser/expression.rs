@@ -735,6 +735,7 @@ impl<'src> Parser<'src> {
         let keywords_snapshot = self.keyword_scratch.snapshot();
         let mut seen_keyword_argument = false; // foo = 1
         let mut seen_keyword_unpacking = false; // **foo
+        let mut seen_bare_generator = false;
 
         let has_trailing_comma =
             self.parse_comma_separated_list(RecoveryContextKind::Arguments, |parser| {
@@ -757,6 +758,7 @@ impl<'src> Parser<'src> {
 
                     match parser.current_token_kind() {
                         TokenKind::Async | TokenKind::For => {
+                            seen_bare_generator = true;
                             if parsed_expr.is_unparenthesized_starred_expr() {
                                 parser.add_unsupported_syntax_error(
                                     UnsupportedSyntaxErrorKind::UnpackingInComprehension(
@@ -867,7 +869,9 @@ impl<'src> Parser<'src> {
             keywords,
         };
 
-        self.validate_arguments(&arguments, has_trailing_comma, context);
+        if seen_bare_generator {
+            self.validate_generator_arguments(&arguments, has_trailing_comma, context);
+        }
 
         arguments
     }
@@ -2981,9 +2985,8 @@ impl<'src> Parser<'src> {
         command
     }
 
-    /// Performs the following validations on the arguments:
-    /// - Generator expressions are parenthesized when required by the argument context.
-    fn validate_arguments(
+    /// Check whether bare generator expressions require parentheses in this argument list.
+    fn validate_generator_arguments(
         &mut self,
         arguments: &ast::Arguments,
         has_trailing_comma: bool,
