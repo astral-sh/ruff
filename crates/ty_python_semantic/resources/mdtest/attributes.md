@@ -490,19 +490,30 @@ reveal_type(Dynamic().value)  # revealed: Start
 reveal_type(Derived().value)  # revealed: Before | After | Start
 ```
 
-A classmethod can get its first operand from the metaclass.
+A classmethod can get its first operand from the metaclass. If the operator then stores a class
+object, the next update uses that object's metaclass to find the operator.
 
 ```py
+class StoredMeta(type):
+    def __iadd__(cls, other: int) -> After:
+        return After()
+
+class Stored(metaclass=StoredMeta): ...
+
+class Initial:
+    def __iadd__(self, other: int) -> type[Stored]:
+        return Stored
+
 class Meta(type):
-    def __getattr__(cls, name: str) -> Start:
-        return Start()
+    def __getattr__(cls, name: str) -> Initial:
+        return Initial()
 
 class DynamicClass(metaclass=Meta):
     @classmethod
     def update(cls) -> None:
         cls.value += 1
 
-reveal_type(DynamicClass.value)  # revealed: Before | After | Start
+reveal_type(DynamicClass.value)  # revealed: type[Stored] | After | Initial
 ```
 
 Repeated updates can widen a literal supplied by the hook or select another overload on the same

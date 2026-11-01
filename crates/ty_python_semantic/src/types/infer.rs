@@ -293,6 +293,15 @@ fn non_expanding_receiver<'db>(
     if current == previous {
         return true;
     }
+    // For class objects, compare the specializations of the classes they represent.
+    let shape = |ty: Type<'db>| match ty {
+        Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+            ty.to_instance_approximation(db, env).unwrap_or(ty)
+        }
+        ty => ty,
+    };
+    let current = shape(current);
+    let previous = shape(previous);
     let Type::NominalInstance(_) = current else {
         return false;
     };
@@ -375,6 +384,13 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
     };
     let class_of = |ty: Type<'db>| {
         ty.nominal_class(db, &env)
+            .or_else(|| {
+                // Class objects dispatch on their metaclasses. Other non-instance values,
+                // such as functions, can also be operands of a reflected operator.
+                ty.to_meta_type(db, &env)
+                    .to_instance_approximation(db, &env)?
+                    .nominal_class(db, &env)
+            })
             .map(|class| class.class_literal(db))
     };
     let mut writes = UnionBuilder::new(db, &env);
