@@ -164,6 +164,7 @@ u32 at 0 => expr_yield_from_value, set_expr_yield_from_value;
     ExprCompare {
 u64 at 0 => expr_compare_operands, set_expr_compare_operands;
 u32 at 8 => expr_compare_ops, set_expr_compare_ops;
+u8 at 12 => expr_compare_single_op, set_expr_compare_single_op;
 }
     ExprCall {
 u32 at 0 => expr_call_func, set_expr_call_func;
