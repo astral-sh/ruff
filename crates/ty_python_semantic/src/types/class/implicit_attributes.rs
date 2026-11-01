@@ -405,12 +405,13 @@ impl<'db> AugmentedAttributeWrites<'db> {
     /// independently of them. A method can return a different receiver class for a later update.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| AugmentedAttributeTypes { read: Type::divergent(id), write: Type::divergent(id) },
+        cycle_initial=|_, id, _| AugmentedAttributeTypes::exact(Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &AugmentedAttributeTypes<'db>, result: AugmentedAttributeTypes<'db>, bindings: AugmentedAttributeWrites<'db>| {
             let env = ProgramEnvironment::from_definition(bindings.definitions(db)[0].0);
             AugmentedAttributeTypes {
                 read: result.read.cycle_normalized(db, &env, previous.read, cycle),
                 write: result.write.cycle_normalized(db, &env, previous.write, cycle),
+                operands: result.operands.cycle_normalized(db, &env, previous.operands, cycle),
             }
         },
         heap_size=ruff_memory_usage::heap_size

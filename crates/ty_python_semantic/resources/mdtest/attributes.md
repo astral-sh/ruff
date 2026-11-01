@@ -668,8 +668,8 @@ reveal_type(Other().value)  # revealed: Start
 
 #### Dynamically initialized attributes with custom setters
 
-An operator result can become the next operand only if the setter stores it. A fresh instance
-still reads through `__getattr__`.
+An operator result can become the next operand only if the setter stores it. A fresh instance still
+reads through `__getattr__`.
 
 ```py
 from typing_extensions import Never
@@ -776,11 +776,12 @@ def write(counter: InitializedCounter) -> None:
 #### Augmented assignments that permute type arguments
 
 Rotating four type arguments and swapping the first two can produce all 24 permutations. Inference
-bounds the number of writes it follows even though the types never grow in depth.
+bounds the number of writes it follows even though the types never grow in depth. The stable `int`
+tag still selects the first overload on every rotation.
 
 ```py
 from __future__ import annotations
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, overload
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -792,8 +793,12 @@ class Box(Generic[Tag, A, B, C, D]):
     def tag(self) -> Tag:
         raise NotImplementedError
 
-    def __iadd__(self, n: int) -> Box[Tag, B, C, D, A]:
-        return Box()
+    @overload
+    def __iadd__(self: Box[int, A, B, C, D], n: int) -> Box[int, B, C, D, A]: ...
+    @overload
+    def __iadd__(self: Box[str, A, B, C, D], n: int) -> str: ...
+    def __iadd__(self, n: int) -> object:
+        raise NotImplementedError
 
     def __imul__(self, n: int) -> Box[Tag, B, A, C, D]:
         return Box()
@@ -826,8 +831,8 @@ def check(counter: Counter) -> None:
 python-version = "3.12"
 ```
 
-A metaclass operator can return successively more deeply nested class objects. Every stored value
-is still a class.
+A metaclass operator can return successively more deeply nested class objects. Every stored value is
+still a class.
 
 ```py
 from __future__ import annotations
@@ -881,6 +886,35 @@ def read(once: Once) -> None:
     value = once.value
     if isinstance(value, Value):
         value.item.upper()  # error: [unresolved-attribute]
+```
+
+A reflected operator can return a different class after the last update that fits in the budget. Its
+catch-all overload alone cannot establish that every read has an `item` attribute.
+
+```py
+from typing import Any, overload
+
+class Advance:
+    @overload
+    def __radd__(self, left: Value[list[list[tuple[*Block]]]]) -> str: ...
+    @overload
+    def __radd__[T](self, left: Value[T]) -> Value[list[T]]: ...
+    @overload
+    def __radd__(self, left: str) -> str: ...
+    def __radd__(self, left: object) -> object:
+        raise NotImplementedError
+
+class Many:
+    def __init__(self, value: Value[tuple[*Block]]) -> None:
+        self.value = value
+
+    def advance(self) -> None:
+        self.value += Advance()
+
+def read_many(many: Many) -> Value[Any] | str:
+    many.value.item  # error: [unresolved-attribute]
+    many.value = 42  # error: [invalid-assignment]
+    return many.value
 ```
 
 #### Augmented assignments with expanding tuple results

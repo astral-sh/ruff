@@ -1384,6 +1384,9 @@ bitflags! {
         /// Resolve receiver storage for assignment. A write can create storage that a read
         /// can only observe after an earlier method call.
         const WRITE_TARGET = 1 << 8;
+
+        /// Read an operand at an augmented assignment that defines this attribute.
+        const AUGMENTED_OPERAND = 1 << 9;
     }
 }
 

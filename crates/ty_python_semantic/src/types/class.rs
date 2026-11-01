@@ -3055,6 +3055,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 .inferred_types(db);
         let inferred_ty = if policy.contains(MemberLookupPolicy::WRITE_TARGET) {
             inferred.write
+        } else if policy.contains(MemberLookupPolicy::AUGMENTED_OPERAND) {
+            inferred.operands
         } else {
             inferred.read
         }

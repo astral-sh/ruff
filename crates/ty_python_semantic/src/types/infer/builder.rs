@@ -227,10 +227,14 @@ const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
 enum AttributeRead<'db> {
     /// Resolve the attribute normally, including all inferred writes.
     Normal,
+    /// Check a defining augmented assignment against the operands used to infer its writes.
+    AugmentedOperand,
     /// Read before any augmented assignment has run.
     Initial,
     /// Apply narrowing to a value stored by a previous augmented assignment.
     Stored(Type<'db>),
+    /// Check all alternatives of a proposed bound, including ones on which the operator fails.
+    Verify(Type<'db>),
 }
 
 /// Builder to infer all types in a region.
@@ -5162,7 +5166,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ) {
                         Ok(ty) => ty,
                         // Only successful alternatives can write to inferred instance storage.
-                        Err(_) if !matches!(read, AttributeRead::Normal) => Type::Never,
+                        Err(_)
+                            if matches!(
+                                read,
+                                AttributeRead::Initial | AttributeRead::Stored(_)
+                            ) =>
+                        {
+                            Type::Never
+                        }
                         Err(recovery_ty) => {
                             operation_failed = true;
                             recovery_ty
@@ -5272,6 +5283,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: &ast::StmtAugAssign,
         receiver: Option<Type<'db>>,
         stored: Option<Type<'db>>,
+        read_bound: Option<Type<'db>>,
     ) -> (Type<'db>, Option<Type<'db>>) {
         // The ordinary assignment checks the operator and the write against the inferred member.
         self.context.suppress_diagnostics();
@@ -5285,14 +5297,96 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let first = method.parameters.iter_non_variadic_params().next()?;
             Some((self.index.expect_single_definition(first), receiver))
         });
-        let read = stored.map_or(AttributeRead::Initial, AttributeRead::Stored);
+        let read = match (stored, read_bound) {
+            (Some(ty), Some(_)) => AttributeRead::Verify(ty),
+            (Some(ty), None) => AttributeRead::Stored(ty),
+            (None, _) => AttributeRead::Initial,
+        };
         let written = self.infer_augment_assignment(assignment, read).ok();
         let before = self.expression_type(&assignment.target);
+        let written = written.and_then(|written| {
+            if let Some(bound) = read_bound
+                && !before.is_never()
+            {
+                self.augmented_overload_results(assignment, before, written, bound)
+            } else {
+                Some(written)
+            }
+        });
         let written = written.map(|after| {
             UnionType::widen_growing_tuples(self.db(), self.program_environment(), before, after)
                 .unwrap_or(after)
         });
         (before, written)
+    }
+
+    /// A broad operand can select a catch-all overload while a later specialization
+    /// selects an earlier overload returning a different class. Include those possible
+    /// results when proving a bound on future reads.
+    fn augmented_overload_results(
+        &self,
+        assignment: &ast::StmtAugAssign,
+        before: Type<'db>,
+        selected: Type<'db>,
+        bound: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+        let op = assignment.op;
+        let right = self.expression_type(&assignment.value);
+        let inplace = before.class_member(db, env, op.in_place_dunder()).place;
+        let fallback = (!inplace.is_definitely_bound()).then(|| {
+            [
+                (
+                    before.class_member(db, env, op.dunder()).place,
+                    before,
+                    right,
+                ),
+                (
+                    right.class_member(db, env, op.reflected_dunder()).place,
+                    right,
+                    before,
+                ),
+            ]
+        });
+        let mut returns = Vec::new();
+        for (method, receiver, other) in
+            std::iter::once((inplace, before, right)).chain(fallback.into_iter().flatten())
+        {
+            if let Some(method) = method.ignore_possibly_undefined() {
+                let callables = method.try_upcast_to_callable(db, env)?;
+                let plain_method = method
+                    .as_function_literal()
+                    .is_some_and(|f| !f.is_staticmethod(db) && !f.is_classmethod(db));
+                returns.extend(
+                    callables
+                        .signatures(db)
+                        .filter(|sig| {
+                            !plain_method
+                                || [receiver, other]
+                                    .into_iter()
+                                    .zip(sig.parameters().positional())
+                                    .all(|(arg, parameter)| {
+                                        !arg.is_disjoint_from(db, env, parameter.annotated_type())
+                                    })
+                        })
+                        .map(|sig| sig.return_ty),
+                );
+            }
+        }
+        if returns.len() <= 1 {
+            return Some(selected);
+        }
+        Some(UnionType::from_elements(
+            db,
+            env,
+            std::iter::once(selected).chain(
+                returns
+                    .into_iter()
+                    .map(|ty| ty.top_materialization(db, env))
+                    .filter(|ty| !ty.is_subtype_of(db, env, bound)),
+            ),
+        ))
     }
 
     fn infer_augment_assignment(
@@ -5309,6 +5403,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = assignment;
 
         // Resolve the target type, assuming a load context.
+        let read = if matches!(read, AttributeRead::Normal)
+            && let ast::Expr::Attribute(attr) = &**target
+            && self.is_instance_attribute_assignment(attr)
+        {
+            AttributeRead::AugmentedOperand
+        } else {
+            read
+        };
         let target_result = match &**target {
             ast::Expr::Name(name) => {
                 let previous_value = self.infer_name_load(name);
@@ -11189,7 +11291,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Result<TypeAndQualifiers<'db>, TypeAndQualifiers<'db>> {
         let value_type =
             self.infer_maybe_standalone_expression(&attribute.value, TypeContext::default());
-        if !matches!(read, AttributeRead::Normal) && value_type.is_never() {
+        if matches!(
+            read,
+            AttributeRead::Initial | AttributeRead::Stored(_) | AttributeRead::Verify(_)
+        ) && value_type.is_never()
+        {
             return Err(TypeAndQualifiers::new(
                 Type::Never,
                 TypeOrigin::Inferred,
@@ -11289,8 +11395,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         let policy = match read {
             AttributeRead::Normal => MemberLookupPolicy::default(),
+            AttributeRead::AugmentedOperand => MemberLookupPolicy::AUGMENTED_OPERAND,
             AttributeRead::Initial => MemberLookupPolicy::NO_AUGMENTED_BINDINGS,
-            AttributeRead::Stored(ty) => {
+            AttributeRead::Stored(ty) | AttributeRead::Verify(ty) => {
                 return Ok(assigned_type.unwrap_or_else(|| {
                     TypeAndQualifiers::new(
                         self.narrow_expr_with_applicable_constraints(

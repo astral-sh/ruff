@@ -60,13 +60,15 @@ use crate::types::context::InferContextResult;
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType, SetattrValue};
 use crate::types::generics::Specialization;
+use crate::types::typevar::{BindingContext, TypeVarNonce};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
-    CallArguments, ClassLiteral, ClassType, KnownClass, RecursiveType, StaticClassLiteral, Type,
-    TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType,
+    BoundTypeVarInstance, CallArguments, ClassLiteral, ClassType, KnownClass, RecursiveType,
+    StaticClassLiteral, SubclassOfType, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder,
+    UnionType, any_over_type,
 };
-use crate::{Db, FxIndexSet};
+use crate::{Db, FxIndexMap, FxIndexSet};
 
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
@@ -290,7 +292,14 @@ struct AugmentedOperandBudget<'a, 'db> {
     remaining: Cell<usize>,
 }
 
-impl<'db> AugmentedOperandBudget<'_, 'db> {
+impl<'a, 'db> AugmentedOperandBudget<'a, 'db> {
+    fn new(env: &'a ProgramEnvironment<'db>) -> Self {
+        Self {
+            env,
+            remaining: Cell::new(128),
+        }
+    }
+
     fn accepts(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
         self.visit_type(db, ty);
         self.remaining.get() > 0
@@ -317,11 +326,124 @@ impl<'db> TypeVisitor<'db> for AugmentedOperandBudget<'_, 'db> {
     }
 }
 
-/// The values found by bounded inference and the results of updating those values.
+/// A public read must cover future values. A write needs evidence that the attribute accepts
+/// it. The defining augmented assignments check the transitions between the observed operands.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct AugmentedAttributeTypes<'db> {
     pub(super) read: Type<'db>,
     pub(super) write: Type<'db>,
+    pub(super) operands: Type<'db>,
+}
+
+impl<'db> AugmentedAttributeTypes<'db> {
+    pub(super) const fn exact(ty: Type<'db>) -> Self {
+        Self {
+            read: ty,
+            write: ty,
+            operands: ty,
+        }
+    }
+}
+
+/// Group instances and class objects separately. For example, `Packet[int]` and
+/// `type[Packet[int]]` need different upper bounds even when they share a specialization.
+fn augmented_operand_class<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> Option<(ClassType<'db>, bool)> {
+    let ty = ty.resolve_type_alias(db);
+    if let Some(class) = ty.nominal_class(db, env) {
+        return Some((class, false));
+    }
+    let is_class = matches!(
+        ty,
+        Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
+    );
+    let meta = if is_class {
+        ty
+    } else {
+        ty.to_meta_type(db, env)
+    };
+    Some((
+        meta.to_instance_approximation(db, env)?
+            .nominal_class(db, env)?,
+        is_class,
+    ))
+}
+
+/// Keep shared type arguments and take a fully static upper bound of the others. For example,
+/// `Box[int, str]` and `Box[int, list[str]]` both fit `Top[Box[int, Unknown]]`. Reading its
+/// second argument yields `object`; using it as a string still requires a check.
+fn augmented_read_bound<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    operands: &[Type<'db>],
+) -> (Type<'db>, Type<'db>) {
+    let (class, is_class) =
+        augmented_operand_class(db, env, operands[0]).expect("grouped by class");
+    let (origin, specialization) = class.class_literal_and_specialization(db);
+    let (public, symbolic) = if let Some(specialization) = specialization {
+        let mut args: Vec<_> = specialization.types(db).iter().copied().map(Some).collect();
+        for &ty in &operands[1..] {
+            let (class, _) = augmented_operand_class(db, env, ty).expect("grouped by class");
+            let Some(other) = class.class_literal_and_specialization(db).1 else {
+                args.fill(None);
+                break;
+            };
+            for (arg, other) in args.iter_mut().zip(other.types(db)) {
+                if *arg != Some(*other) {
+                    *arg = None;
+                }
+            }
+        }
+        let class = |symbolic| {
+            origin.apply_specialization(db, |context| {
+                let args: Vec<_> = args
+                    .iter()
+                    .zip(context.variables(db))
+                    .map(|(arg, var)| {
+                        arg.unwrap_or_else(|| {
+                            if symbolic {
+                                // Keep the representative independent of type parameters captured
+                                // in an unchanged argument, as in Box[T, list[T]].
+                                Type::TypeVar(BoundTypeVarInstance::new(
+                                    db,
+                                    var.typevar(db),
+                                    BindingContext::Synthetic(env.program(db)),
+                                    var.paramspec_attr(db),
+                                    TypeVarNonce::NONE,
+                                ))
+                            } else {
+                                Type::unknown()
+                            }
+                        })
+                    })
+                    .collect();
+                context.specialize(db, args)
+            })
+        };
+        (class(false), class(true))
+    } else {
+        (class, class)
+    };
+    let as_type = |class| {
+        if is_class {
+            SubclassOfType::from(db, env, class)
+        } else {
+            Type::instance(db, env, class)
+        }
+    };
+    let bound = as_type(public).top_materialization(db, env);
+    if operands.iter().all(|ty| {
+        ty.top_materialization(db, env)
+            .is_subtype_of(db, env, bound)
+    }) {
+        (bound, as_type(symbolic))
+    } else {
+        let object = KnownClass::Object.to_instance(db, env);
+        (object, object)
+    }
 }
 
 /// Which stored results can become the operand of a later update?
@@ -342,7 +464,16 @@ impl<'db> SetattrValue<'db> {
         receiver: Type<'db>,
         name: Type<'db>,
         value: Type<'db>,
+        abstract_operand: bool,
     ) -> Option<Type<'db>> {
+        // An abstract operand can include both accepted and rejected values. Its upper bound
+        // must cover everything that an accepted call could store.
+        if abstract_operand {
+            return Some(match self {
+                Self::Argument => value,
+                Self::Expression(expr) => expr.bind_self_typevars(db, env, receiver),
+            });
+        }
         let bindings = receiver
             .try_call_dunder(
                 db,
@@ -410,7 +541,7 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
         Type::Union(union) => Either::Left(union.elements(db).iter().copied()),
         ty => Either::Right(std::iter::once(ty)),
     };
-    let write = |(definition, owner): (Definition<'db>, ClassType<'db>), stored| {
+    let write = |(definition, owner): (Definition<'db>, ClassType<'db>), stored, read_bound| {
         let (_, specialization) = owner.class_literal_and_specialization(db);
         // In its own unspecialized class, the method's ordinary self already has the right
         // type. Reuse its expression queries, including their recovery for recursive reads.
@@ -424,7 +555,7 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
         };
         let assignment = assignment.node(&module);
         let (before, after) = TypeInferenceBuilder::for_definition(db, &env, definition, &module)
-            .finish_augmented_attribute_write(assignment, specialized_receiver, stored);
+            .finish_augmented_attribute_write(assignment, specialized_receiver, stored, read_bound);
         let after = after.map(|ty| ty.apply_optional_specialization(db, specialization));
         let after = if let AugmentedStorage::Setter(value) = storage {
             let attr = assignment
@@ -437,7 +568,7 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
                     db,
                     &env,
                     alternatives(after).filter_map(|ty| {
-                        value.stored_type(db, &env, receiver, name, ty)
+                        value.stored_type(db, &env, receiver, name, ty, read_bound.is_some())
                     }),
                 )
             })
@@ -449,30 +580,15 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
             after,
         )
     };
-    let class_of = |ty: Type<'db>| {
-        ty.nominal_class(db, &env)
-            .or_else(|| {
-                // Class objects dispatch on their metaclasses. Other non-instance values,
-                // such as functions, can also be operands of a reflected operator.
-                ty.to_meta_type(db, &env)
-                    .to_instance_approximation(db, &env)?
-                    .nominal_class(db, &env)
-            })
-            .map(|class| class.class_literal(db))
+    let class_of = |ty| {
+        augmented_operand_class(db, &env, ty)
+            .map(|(class, is_class)| (class.class_literal(db), is_class))
     };
     let mut writes = UnionBuilder::new(db, &env);
     let mut assignments = Vec::with_capacity(definitions.len());
-    let new_history = || {
-        (
-            FxIndexSet::default(),
-            AugmentedOperandBudget {
-                env: &env,
-                remaining: Cell::new(128),
-            },
-        )
-    };
+    let new_history = || (FxIndexSet::default(), AugmentedOperandBudget::new(&env));
     for &binding in definitions {
-        let (before, after) = write(binding, None);
+        let (before, after) = write(binding, None, None);
         let mut seen = FxHashMap::default();
         for ty in alternatives(before) {
             if let Some(class) = class_of(ty) {
@@ -486,13 +602,11 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
     }
     let mut frontier = writes.build();
     if storage == AugmentedStorage::InterceptedRead {
-        return AugmentedAttributeTypes {
-            read: frontier,
-            write: frontier,
-        };
+        return AugmentedAttributeTypes::exact(frontier);
     }
     let mut result = frontier;
     let mut boundary = UnionBuilder::new(db, &env);
+    let mut truncated = FxIndexSet::default();
     loop {
         let mut next = UnionBuilder::new(db, &env);
         for (binding, seen) in &mut assignments {
@@ -504,14 +618,15 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
                 if !previous.insert(ty) {
                     continue;
                 }
-                if let (_, Some(written)) = write(*binding, Some(ty)) {
+                if let (_, Some(written)) = write(*binding, Some(ty), None) {
                     if budget.accepts(db, ty) {
                         next.add_in_place(written);
-                    } else {
+                    } else if !written.is_never() {
                         // `self.box += item` must accept the result for every operand we
                         // expose on a read. Record this last step without exploring its
                         // successors or discarding the type arguments of a known write.
                         boundary.add_in_place(written);
+                        truncated.insert(class);
                     }
                 }
             }
@@ -522,9 +637,90 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
         frontier = next.build();
         result = UnionType::from_two_elements(db, &env, result, frontier);
     }
+    let boundary = boundary.build();
+    if boundary.is_never() {
+        return AugmentedAttributeTypes::exact(result);
+    }
+    let stored = UnionType::from_two_elements(db, &env, result, boundary);
+    let explored = |seen: &FxHashMap<_, (FxIndexSet<_>, AugmentedOperandBudget<'_, '_>)>, ty| {
+        class_of(ty)
+            .and_then(|class| seen.get(&class))
+            .is_some_and(|(previous, _)| previous.contains(&ty))
+    };
+    // A narrower specialization can select a different reflected overload even when the
+    // observed union already covers it. Only an operand we actually explored closes a cycle.
+    if alternatives(boundary).all(|ty| assignments.iter().all(|(_, seen)| explored(seen, ty))) {
+        return AugmentedAttributeTypes::exact(stored);
+    }
+
+    // The observed prefix alone cannot rule out a later overload returning a different class.
+    // Propose a static read bound, then check that one more update stays inside it.
+    let mut read = UnionBuilder::new(db, &env);
+    let mut groups = FxIndexMap::<_, Vec<_>>::default();
+    for ty in alternatives(stored) {
+        if let Some(class) = class_of(ty)
+            && truncated.contains(&class)
+        {
+            groups.entry(class).or_default().push(ty);
+        } else {
+            read.add_in_place(ty);
+        }
+    }
+    let mut representatives = FxHashMap::default();
+    for group in groups.values() {
+        let (bound, representative) = augmented_read_bound(db, &env, group);
+        read.add_in_place(bound);
+        representatives.insert(bound, representative);
+    }
+    let mut read = read.build();
+    let mut pending: Vec<_> = alternatives(read).collect();
+    let proof_budget = AugmentedOperandBudget::new(&env);
+    let closed = 'verify: {
+        while let Some(operand) = pending.pop() {
+            let representative = representatives.get(&operand).copied().unwrap_or(operand);
+            if !proof_budget.accepts(db, representative) {
+                break 'verify false;
+            }
+            for (binding, seen) in &assignments {
+                if explored(seen, operand) {
+                    continue;
+                }
+                let (before, after) = write(*binding, Some(representative), Some(read));
+                if before.is_never() {
+                    continue;
+                }
+                let Some(after) = after else {
+                    break 'verify false;
+                };
+                for ty in alternatives(after) {
+                    let ty = ty.top_materialization(db, &env);
+                    if ty.is_subtype_of(db, &env, read) {
+                        continue;
+                    }
+                    // A return annotation can name a new class (e.g. Done). Explore that class
+                    // too, but never expose a type parameter local to the proof or an overload.
+                    if any_over_type(db, &env, ty, false, |ty| matches!(ty, Type::TypeVar(_))) {
+                        break 'verify false;
+                    }
+                    read = UnionType::from_two_elements(db, &env, read, ty);
+                    pending.push(ty);
+                }
+            }
+        }
+        true
+    };
+    let (read, operands) = if closed {
+        (read, result)
+    } else {
+        // A later call may also read the unverified state. Checking only the observed
+        // operands here could hide an unsupported operator in the defining method itself.
+        let object = KnownClass::Object.to_instance(db, &env);
+        (object, object)
+    };
     AugmentedAttributeTypes {
-        read: result,
-        write: UnionType::from_two_elements(db, &env, result, boundary.build()),
+        read,
+        write: stored,
+        operands,
     }
 }
 
