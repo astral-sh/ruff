@@ -1019,8 +1019,7 @@ class C:
         return 42
 
 instance = C()
-# TODO: This shouldn't be an error
-instance.method()  # error: [missing-argument]
+instance.method()
 ```
 
 Calling `method` on the class object itself is also possible:
