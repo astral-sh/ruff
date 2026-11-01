@@ -1195,7 +1195,7 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
         ),
         (
             next_descendant,
-            "fn next_descendant<'a>(&'a self, node: SyntaxNode<'a>, stack: &mut Pending) -> u32",
+            "fn next_descendant<'a>(&'a self, node: SyntaxNode<'a>, stack: &mut Pending<'a>) -> u32",
         ),
         (
             enter_statement_node,
