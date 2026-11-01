@@ -6614,9 +6614,17 @@ impl<'db> CallInference<'_, 'db> {
                 .parameters()
                 .iter()
                 .any(Parameter::has_starred_annotation)
-            || context
-                .variables(self.db)
-                .any(|v| v.is_paramspec(self.db) || v.is_typevartuple(self.db))
+            || context.variables(self.db).any(|variable| {
+                let typevar = variable.typevar(self.db);
+                let kind = typevar.kind(self.db);
+                // An explicit bound can fail during inference or require the seeded constraint
+                // builder during validation. Solve these calls once in their original builder.
+                // The implicit receiver bound on `Self` still permits sharing.
+                kind.is_paramspec()
+                    || kind.is_typevartuple()
+                    || (!matches!(kind, TypeVarKind::TypingSelf { .. })
+                        && typevar.has_bound_or_constraints(self.db))
+            })
         {
             return None;
         }

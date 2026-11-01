@@ -590,15 +590,19 @@ reordered.
 ```py
 from typing import Literal, TypeVar
 
-T = TypeVar("T", bound=str)
+T = TypeVar("T")
+S = TypeVar("S", bound=str)
 
 def tagged(value: T, *, tag: Literal["text"]) -> T:
+    return value
+
+def bounded(value: S, *, tag: Literal["text"]) -> S:
     return value
 
 def use(text: str, number: int) -> None:
     reveal_type(tagged(text, tag="text"))  # revealed: str
     tagged(text, tag="other")  # error: [invalid-argument-type]
-    tagged(
+    bounded(
         tag="text",
         value=number,  # error: [invalid-argument-type]
     )
