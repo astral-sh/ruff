@@ -1320,44 +1320,19 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     );
                 }
             }
-            ast::Pattern::MatchMapping(pattern_mapping) => {
-                // `**rest` can appear before or after the key-value pairs
-                // (the parser can produce either AST, but emits an
-                // invalid-syntax error for the former).
-                let rest_before_keys = pattern_mapping.rest.as_ref().filter(|rest| {
-                    pattern_mapping
-                        .keys
-                        .first()
-                        .is_some_and(|key| rest.start() < key.start())
-                });
-                let rest_after_keys = pattern_mapping.rest.as_ref().filter(|rest| {
-                    pattern_mapping
-                        .keys
-                        .first()
-                        .is_none_or(|key| rest.start() >= key.start())
-                });
-
-                if let Some(rest_name) = rest_before_keys {
-                    self.add_token(
-                        rest_name.range(),
-                        SemanticTokenType::Variable,
-                        SemanticTokenModifier::empty(),
-                    );
-                }
-
-                for (key, nested_pattern) in
-                    pattern_mapping.keys.iter().zip(&pattern_mapping.patterns)
-                {
-                    self.visit_expr(key);
-                    self.visit_pattern(nested_pattern);
-                }
-
-                if let Some(rest_name) = rest_after_keys {
-                    self.add_token(
-                        rest_name.range(),
-                        SemanticTokenType::Variable,
-                        SemanticTokenModifier::empty(),
-                    );
+            ast::Pattern::MatchMapping(mapping) => {
+                for item in &mapping.items {
+                    match item {
+                        ast::MappingPatternItem::Entry { key, pattern } => {
+                            self.visit_expr(key);
+                            self.visit_pattern(pattern);
+                        }
+                        ast::MappingPatternItem::Rest(name) => self.add_token(
+                            name.range(),
+                            SemanticTokenType::Variable,
+                            SemanticTokenModifier::empty(),
+                        ),
+                    }
                 }
             }
             ast::Pattern::MatchStar(pattern_star) => {
