@@ -71,11 +71,11 @@ pub(crate) fn import_shadowed_by_loop_var(checker: &Checker, scope_id: ScopeId, 
                 continue;
             }
 
-            // If the bindings are in different forks, abort.
+            // If the import does not execute on every path to the loop variable, abort.
             if shadowed.source.is_none_or(|left| {
                 binding
                     .source
-                    .is_none_or(|right| !checker.semantic().same_branch(left, right))
+                    .is_none_or(|right| !checker.semantic().dominates(left, right))
             }) {
                 continue;
             }
