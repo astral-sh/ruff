@@ -316,6 +316,13 @@ impl<'db> TypeVisitor<'db> for AugmentedOperandBudget<'_, 'db> {
     }
 }
 
+/// The values found by bounded inference and the results of updating those values.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct AugmentedAttributeTypes<'db> {
+    pub(super) read: Type<'db>,
+    pub(super) write: Type<'db>,
+}
+
 /// Infer the storage shared by augmented writes to one attribute along the receiver's MRO.
 ///
 /// Start with the independent read at each assignment. A later call can read a value stored
@@ -343,7 +350,7 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
     receiver: Type<'db>,
     definitions: &[(Definition<'db>, ClassType<'db>)],
     reads_storage: bool,
-) -> Type<'db> {
+) -> AugmentedAttributeTypes<'db> {
     let env = ProgramEnvironment::from_definition(definitions[0].0);
     let lookup_class = receiver.nominal_class(db, &env).or_else(|| {
         receiver
@@ -411,10 +418,13 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
     }
     let mut frontier = writes.build();
     if !reads_storage {
-        return frontier;
+        return AugmentedAttributeTypes {
+            read: frontier,
+            write: frontier,
+        };
     }
     let mut result = frontier;
-    let mut widened = FxHashMap::default();
+    let mut boundary = UnionBuilder::new(db, &env);
     loop {
         let mut next = UnionBuilder::new(db, &env);
         for (binding, seen) in &mut assignments {
@@ -424,19 +434,7 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
                 if previous.contains(&ty) {
                     continue;
                 }
-                let operand = if let Some(&wide) = widened.get(&class) {
-                    wide
-                } else if !budget.accepts(db, ty) {
-                    // Rotating and swapping Box[A, B, ...] can reach every permutation. A
-                    // Box[Unknown, ...] covers the rest and can still select an operator
-                    // that returns a different class. Do the same for growing type arguments.
-                    if !matches!(ty, Type::NominalInstance(_)) {
-                        return Type::unknown();
-                    }
-                    let wide = Type::instance(db, &env, class.unknown_specialization(db));
-                    widened.insert(class, wide);
-                    wide
-                } else if let Type::LiteralValue(literal) = ty
+                let operand = if let Type::LiteralValue(literal) = ty
                     && !previous.is_empty()
                 {
                     // Repeated arithmetic can produce arbitrarily many distinct literals.
@@ -449,7 +447,14 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
                 }
                 previous.push(operand);
                 if let (_, Some(written)) = write(*binding, Some(operand)) {
-                    next.add_in_place(written);
+                    if budget.accepts(db, operand) {
+                        next.add_in_place(written);
+                    } else {
+                        // `self.box += item` must accept the result for every operand we
+                        // expose on a read. Record this last step without exploring its
+                        // successors or discarding the type arguments of a known write.
+                        boundary.add_in_place(written);
+                    }
                 }
             }
         }
@@ -459,18 +464,10 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
         frontier = next.build();
         result = UnionType::from_two_elements(db, &env, result, frontier);
     }
-    if widened.is_empty() {
-        return result;
+    AugmentedAttributeTypes {
+        read: result,
+        write: UnionType::from_two_elements(db, &env, result, boundary.build()),
     }
-    UnionType::from_elements(
-        db,
-        &env,
-        alternatives(result).map(|ty| {
-            class_of(ty)
-                .and_then(|class| widened.get(&class).copied())
-                .unwrap_or(ty)
-        }),
-    )
 }
 
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.

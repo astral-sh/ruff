@@ -10,7 +10,7 @@ use crate::{
     types::{
         KnownClass, Truthiness, Type, TypeContext, UnionBuilder, definition_expression_type,
         function::{is_implicit_classmethod, is_implicit_staticmethod},
-        infer::{infer_augmented_attribute_writes, infer_unpack_types},
+        infer::{AugmentedAttributeTypes, infer_augmented_attribute_writes, infer_unpack_types},
         infer_expression_type, inferred_declaration,
         member::Member,
     },
@@ -402,14 +402,17 @@ impl<'db> AugmentedAttributeWrites<'db> {
     /// independently of them. A method can return a different receiver class for a later update.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, bindings: AugmentedAttributeWrites<'db>| {
+        cycle_initial=|_, id, _| AugmentedAttributeTypes { read: Type::divergent(id), write: Type::divergent(id) },
+        cycle_fn=|db, cycle, previous: &AugmentedAttributeTypes<'db>, result: AugmentedAttributeTypes<'db>, bindings: AugmentedAttributeWrites<'db>| {
             let env = ProgramEnvironment::from_definition(bindings.definitions(db)[0].0);
-            result.cycle_normalized(db, &env, *previous, cycle)
+            AugmentedAttributeTypes {
+                read: result.read.cycle_normalized(db, &env, previous.read, cycle),
+                write: result.write.cycle_normalized(db, &env, previous.write, cycle),
+            }
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(super) fn inferred_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn inferred_types(self, db: &'db dyn Db) -> AugmentedAttributeTypes<'db> {
         infer_augmented_attribute_writes(
             db,
             self.receiver(db),

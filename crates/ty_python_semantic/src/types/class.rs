@@ -3039,6 +3039,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         receiver: Type<'db>,
         bindings: &[(ClassType<'db>, AugmentedBindings<'db>)],
         reads_storage: bool,
+        policy: MemberLookupPolicy,
     ) -> (Type<'db>, Provenance<'db>) {
         let mut definitions = Vec::new();
         let mut provenance = Provenance::Unknown;
@@ -3048,13 +3049,18 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 provenance = provenance.or(Provenance::SingleDefinition(definition));
             }
         }
-        let inferred_ty = AugmentedAttributeWrites::new(
+        let inferred = AugmentedAttributeWrites::new(
             db,
             receiver,
             reads_storage,
             definitions.into_boxed_slice(),
         )
-        .inferred_type(db)
+        .inferred_types(db);
+        let inferred_ty = if policy.contains(MemberLookupPolicy::WRITE_TARGET) {
+            inferred.write
+        } else {
+            inferred.read
+        }
         .promote(db, env)
         .promote_singletons(db, env);
         let inferred_ty = if let Some(elements) =
@@ -3118,7 +3124,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             return None;
         }
         let (ty, provenance) =
-            Self::infer_augmented_bindings(db, env, receiver, bindings, reads_storage);
+            Self::infer_augmented_bindings(db, env, receiver, bindings, reads_storage, policy);
         (!ty.is_never()).then_some(DefinedPlace {
             ty,
             origin: TypeOrigin::Inferred,
@@ -3219,6 +3225,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 receiver(),
                                 &pending_augmented_bindings,
                                 true,
+                                policy,
                             );
                             defined.ty = UnionType::from_two_elements(
                                 db,
@@ -3371,6 +3378,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 receiver(),
                                 &pending_augmented_bindings,
                                 true,
+                                policy,
                             );
                             union = union.add(inferred_ty);
                             provenance = provenance.or(inferred_provenance);
@@ -3415,6 +3423,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 receiver(),
                                 &pending_augmented_bindings,
                                 true,
+                                policy,
                             );
                             union = union.add(inferred_ty);
                             provenance = provenance.or(inferred_provenance);

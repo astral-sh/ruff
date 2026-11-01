@@ -671,7 +671,8 @@ class Counter:
     def update(self) -> None:
         self.value += 1  # error: [invalid-assignment]
 
-reveal_type(Counter().value)  # revealed: Grow[int] | Grow[Unknown]
+def wrong(counter: Counter) -> None:
+    counter.value = Grow[str]()  # error: [invalid-assignment]
 ```
 
 An independently initialized attribute must also converge when an operator duplicates its type
@@ -685,7 +686,9 @@ class InitializedCounter:
     def update(self) -> None:
         self.value *= 2
 
-reveal_type(InitializedCounter().value)  # revealed: Grow[int] | Grow[Unknown]
+def write(counter: InitializedCounter) -> None:
+    counter.value = Grow[tuple[int, int, int, int]]()
+    counter.value = Grow[str]()  # error: [invalid-assignment]
 ```
 
 #### Augmented assignments that permute type arguments
@@ -701,12 +704,16 @@ A = TypeVar("A")
 B = TypeVar("B")
 C = TypeVar("C")
 D = TypeVar("D")
+Tag = TypeVar("Tag")
 
-class Box(Generic[A, B, C, D]):
-    def __iadd__(self, n: int) -> Box[B, C, D, A]:
+class Box(Generic[Tag, A, B, C, D]):
+    def tag(self) -> Tag:
+        raise NotImplementedError
+
+    def __iadd__(self, n: int) -> Box[Tag, B, C, D, A]:
         return Box()
 
-    def __imul__(self, n: int) -> Box[B, A, C, D]:
+    def __imul__(self, n: int) -> Box[Tag, B, A, C, D]:
         return Box()
 
 class Red: ...
@@ -716,7 +723,7 @@ class White: ...
 
 class Counter:
     def __init__(self) -> None:
-        self.value = Box[Red, Green, Blue, White]()
+        self.value = Box[int, Red, Green, Blue, White]()
 
     def rotate(self) -> None:
         self.value += 1
@@ -724,7 +731,74 @@ class Counter:
     def swap(self) -> None:
         self.value *= 1
 
-reveal_type(Counter().value)  # revealed: Box[Red, Green, Blue, White] | Box[Unknown, Unknown, Unknown, Unknown]
+def check(counter: Counter) -> None:
+    reveal_type(counter.value.tag())  # revealed: int
+    counter.value = Box[int, Green, Blue, White, Red]()
+    counter.value = Box[str, Red, Green, Blue, White]()  # error: [invalid-assignment]
+```
+
+#### Large augmented results retain their types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A metaclass operator can return successively more deeply nested class objects. Every stored value
+is still a class.
+
+```py
+from __future__ import annotations
+from typing import final
+
+class Meta(type):
+    def __add__[T](cls: type[Packet[T]], n: int) -> type[Packet[list[T]]]:
+        return type("Next", (Packet,), {})
+
+class Packet[T](metaclass=Meta): ...
+class First(Packet[int]): ...
+
+class Holder:
+    def __init__(self) -> None:
+        self.value = First
+
+    def advance(self) -> None:
+        self.value += 1
+
+def check(holder: Holder) -> None:
+    holder.value()
+    holder.value = 42  # error: [invalid-assignment]
+```
+
+A guard can make an update run only once. The tuple in its result is large enough to exhaust the
+budget by itself, but the operator has already told us its exact type.
+
+```py
+type Eight = tuple[int, int, int, int, int, int, int, int]
+type Block = tuple[*Eight, *Eight, *Eight, *Eight, *Eight, *Eight, *Eight, *Eight]
+
+@final
+class Value[T]:
+    def __init__(self, item: T) -> None:
+        self.item = item
+
+@final
+class Start:
+    def __iadd__(self, n: int) -> Value[tuple[*Block]]:
+        raise NotImplementedError
+
+class Once:
+    def __init__(self) -> None:
+        self.value = Start()
+
+    def advance(self) -> None:
+        if isinstance(self.value, Start):
+            self.value += 1
+
+def read(once: Once) -> None:
+    value = once.value
+    if isinstance(value, Value):
+        value.item.upper()  # error: [unresolved-attribute]
 ```
 
 #### Augmented assignments with expanding tuple results
