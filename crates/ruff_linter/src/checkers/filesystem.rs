@@ -10,7 +10,7 @@ use crate::preview::is_allow_nested_roots_enabled;
 use crate::registry::Rule;
 use crate::rules::flake8_builtins::rules::stdlib_module_shadowing;
 use crate::rules::flake8_no_pep420::rules::implicit_namespace_package;
-use crate::rules::pep8_naming::rules::invalid_module_name;
+use crate::rules::pep8_naming::rules::{invalid_module_name, non_snake_case_module_name};
 use crate::settings::LinterSettings;
 
 pub(crate) fn check_file_path(
@@ -40,6 +40,9 @@ pub(crate) fn check_file_path(
     // pep8-naming
     if context.is_rule_enabled(Rule::InvalidModuleName) {
         invalid_module_name(path, package, &settings.pep8_naming.ignore_names, context);
+    }
+    if context.is_rule_enabled(Rule::NonSnakeCaseModuleName) {
+        non_snake_case_module_name(path, package, &settings.pep8_naming.ignore_names, context);
     }
 
     // flake8-builtins
