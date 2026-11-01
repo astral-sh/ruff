@@ -1779,7 +1779,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
+        SemanticSyntaxChecker::check_expr(expr, self);
 
         // Step 0: Pre-processing
         if self.source_type.is_stub()

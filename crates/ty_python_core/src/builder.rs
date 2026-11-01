@@ -3492,7 +3492,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn visit_expr_with_context(&mut self, expr: &'ast ast::Expr, context: ExpressionContext) {
-        self.with_semantic_checker(|semantic, builder| semantic.visit_expr(expr, builder));
+        SemanticSyntaxChecker::check_expr(expr, self);
 
         self.scopes_by_expression
             .record_expression(expr, self.current_scope());

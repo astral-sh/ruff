@@ -761,7 +761,7 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
     }
 
     fn visit_expr(&mut self, expr: &ast::Expr) {
-        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
+        SemanticSyntaxChecker::check_expr(expr, self);
         match expr {
             ast::Expr::Lambda(_) => {
                 self.scopes.push(Scope::Function { is_async: false });

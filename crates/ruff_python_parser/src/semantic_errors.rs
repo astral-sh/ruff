@@ -1,7 +1,7 @@
 //! [`SemanticSyntaxChecker`] for AST-based syntax errors.
 //!
 //! This checker is not responsible for traversing the AST itself. Instead, its
-//! [`SemanticSyntaxChecker::visit_stmt`] and [`SemanticSyntaxChecker::visit_expr`] methods should
+//! [`SemanticSyntaxChecker::visit_stmt`] and [`SemanticSyntaxChecker::check_expr`] methods should
 //! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
 
 use ruff_python_ast::{
@@ -911,7 +911,7 @@ impl SemanticSyntaxChecker {
     }
 
     /// Check `expr` for semantic syntax errors and update the checker's internal state.
-    pub fn visit_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
+    pub fn check_expr<Ctx: SemanticSyntaxContext>(expr: &Expr, ctx: &Ctx) {
         match expr {
             Expr::ListComp(ast::ExprListComp {
                 elt, generators, ..
