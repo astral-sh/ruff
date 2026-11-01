@@ -308,6 +308,8 @@ Module(
                                                     range: 201..210,
                                                     items: [
                                                         DictItem {
+                                                            range: 202..209,
+                                                            node_index: NodeIndex(None),
                                                             key: Some(
                                                                 BooleanLiteral(
                                                                     ExprBooleanLiteral {
@@ -825,6 +827,8 @@ Module(
                                                     range: 534..543,
                                                     items: [
                                                         DictItem {
+                                                            range: 535..542,
+                                                            node_index: NodeIndex(None),
                                                             key: Some(
                                                                 BooleanLiteral(
                                                                     ExprBooleanLiteral {

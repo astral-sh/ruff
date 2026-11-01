@@ -1550,10 +1550,7 @@ impl<'m> ContextCursor<'m> {
             ast::AnyNodeRef::ExprList(expr) => expr.elts.iter().any(contains),
             ast::AnyNodeRef::ExprTuple(expr) => expr.elts.iter().any(contains),
             ast::AnyNodeRef::ExprSet(expr) => expr.elts.iter().any(contains),
-            ast::AnyNodeRef::ExprDict(expr) => expr
-                .items
-                .iter()
-                .any(|item| item.range().contains_range(self.range)),
+            ast::AnyNodeRef::DictItem(_) => true,
 
             // with_item := expression
             ast::AnyNodeRef::WithItem(item) => contains(&item.context_expr),

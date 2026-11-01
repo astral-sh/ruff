@@ -914,23 +914,17 @@ impl<'a> LocalReferencesFinder<'a> {
 
         // The string is either a direct element of a tuple/list/set, or a key
         // of a dict. Skip the immediate container node.
-        match ancestors.next()? {
-            AnyNodeRef::ExprStringLiteral(_) => {}
-            _ => return None,
-        }
-        let container = *ancestors.next()?;
-        match container {
-            AnyNodeRef::ExprTuple(_) | AnyNodeRef::ExprList(_) | AnyNodeRef::ExprSet(_) => {}
-            // For a dict, both keys and values have the `ExprDict` as their
-            // direct parent, so `is_dict_key` checks that this string is one of
-            // the keys before we treat it as a slot name.
-            AnyNodeRef::ExprDict(dict) => {
-                if !self.is_dict_key(dict) {
-                    return None;
-                }
+        let string @ AnyNodeRef::ExprStringLiteral(_) = *ancestors.next()? else {
+            return None;
+        };
+        let parent = *ancestors.next()?;
+        let container = match parent {
+            AnyNodeRef::ExprTuple(_) | AnyNodeRef::ExprList(_) | AnyNodeRef::ExprSet(_) => parent,
+            AnyNodeRef::DictItem(item) if AnyNodeRef::from(item.key.as_ref()?).ptr_eq(string) => {
+                *ancestors.next()?
             }
             _ => return None,
-        }
+        };
 
         // The container must be the value of an assignment to `__slots__`.
         let assignment = ancestors.next()?;
@@ -943,19 +937,6 @@ impl<'a> LocalReferencesFinder<'a> {
             AnyNodeRef::StmtClassDef(class) => Some(class),
             _ => None,
         }
-    }
-
-    /// Returns whether the string literal currently being visited is a *key*
-    /// of `dict`, as opposed to one of its values.
-    fn is_dict_key(&self, dict: &'a ast::ExprDict) -> bool {
-        let Some(AnyNodeRef::ExprStringLiteral(string_expr)) = self.ancestors.last() else {
-            return false;
-        };
-        dict.items.iter().any(|item| {
-            item.key
-                .as_ref()
-                .is_some_and(|key| key.range() == string_expr.range())
-        })
     }
 
     /// Returns whether any of the rename target's definitions is an instance attribute of `class`.
