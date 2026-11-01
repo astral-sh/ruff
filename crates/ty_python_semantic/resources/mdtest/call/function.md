@@ -1571,6 +1571,45 @@ def _(values: list[int]) -> None:
     f(*values, "text", b=1, c=1, enabled="yes")  # error: [invalid-argument-type]
 ```
 
+### Unpacked positional arguments with a variadic keyword parameter
+
+The positional arguments can fill the named parameters while an extra keyword argument goes to
+`**options`:
+
+```py
+def f(a: int, text: str, b: int, **options: bool) -> None: ...
+def _(before: list[int], after: list[int]) -> None:
+    f(*before, "text", *after, enabled=True)  # no diagnostic
+```
+
+The extra keyword argument must have a compatible type:
+
+```py
+def _(values: list[int]) -> None:
+    f(*values, "text", b=1, enabled="yes")  # error: [invalid-argument-type]
+```
+
+### Positional-only parameter names in variadic keywords
+
+A keyword matching a positional-only parameter's name goes to `**options`. The positional argument
+still fills the positional-only parameter:
+
+```py
+def f(a: int, text: str, b: int, /, **options: bool) -> None: ...
+def _(before: list[int], after: list[int]) -> None:
+    f(*before, "text", *after, a=True)  # no diagnostic
+```
+
+### Required keyword-only parameters with variadic keywords
+
+An extra keyword argument does not satisfy a required keyword-only parameter:
+
+```py
+def f(a: int, text: str, b: int, *, enabled: bool, **options: bool) -> None: ...
+def _(values: list[int]) -> None:
+    f(*values, "text", b=1, extra=True)  # error: [missing-argument]
+```
+
 ### Callbacks between unpacked arguments
 
 An annotated callback can match the middle parameter:
