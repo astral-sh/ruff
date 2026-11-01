@@ -1194,6 +1194,22 @@ pub enum ClassType<'db> {
     Generic(GenericAlias<'db>),
 }
 
+/// A concrete MRO entry with the origin used by class relation checks.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+enum RelationMroEntry<'db> {
+    NonGeneric(ClassLiteral<'db>),
+    Generic(StaticClassLiteral<'db>, GenericAlias<'db>),
+}
+
+impl<'db> RelationMroEntry<'db> {
+    fn new(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+        match class {
+            ClassType::NonGeneric(literal) => Self::NonGeneric(literal),
+            ClassType::Generic(alias) => Self::Generic(alias.origin(db), alias),
+        }
+    }
+}
+
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
     /// Return a `ClassType` representing the class `builtins.object`
@@ -1485,11 +1501,11 @@ impl<'db> ClassType<'db> {
         cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn relation_mro(self, db: &'db dyn Db) -> Option<Box<[(ClassLiteral<'db>, ClassType<'db>)]>> {
+    fn relation_mro(self, db: &'db dyn Db) -> Option<Box<[RelationMroEntry<'db>]>> {
         let mut classes = Vec::new();
         for base in self.iter_mro(db) {
             match base {
-                ClassBase::Class(class) => classes.push((class.class_literal(db), class)),
+                ClassBase::Class(class) => classes.push(RelationMroEntry::new(db, class)),
                 ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => {}
                 ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => return None,
             }
@@ -2723,12 +2739,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         // Fast path: if source and target are the same class (possibly with different
         // specializations), we can compare them directly without walking the MRO.
-        match (source, target) {
-            (ClassType::NonGeneric(source), ClassType::NonGeneric(target)) if source == target => {
+        let target_entry = RelationMroEntry::new(db, target);
+        match (source, target_entry) {
+            (ClassType::NonGeneric(source), RelationMroEntry::NonGeneric(target))
+                if source == target =>
+            {
                 return self.always();
             }
-            (ClassType::Generic(source_alias), ClassType::Generic(target_alias))
-                if source_alias.origin(db) == target_alias.origin(db) =>
+            (ClassType::Generic(source_alias), RelationMroEntry::Generic(origin, target_alias))
+                if source_alias.origin(db) == origin =>
             {
                 return self.check_specialization_pair(
                     db,
@@ -2740,11 +2759,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         let mut generic_target = None;
-        let target_literal = target.class_literal(db);
         let bases = match source.relation_mro(db) {
-            Some(classes) => Either::Left(classes.iter().filter_map(|&(origin, base)| {
-                (origin == target_literal).then_some(ClassBase::Class(base))
-            })),
+            Some(classes) => {
+                let RelationMroEntry::Generic(target_origin, _) = target_entry else {
+                    return ConstraintSet::from_bool(
+                        self.constraints,
+                        classes.contains(&target_entry),
+                    );
+                };
+                Either::Left(classes.iter().filter_map(move |&entry| match entry {
+                    RelationMroEntry::Generic(origin, alias) if origin == target_origin => {
+                        Some(ClassBase::Class(ClassType::Generic(alias)))
+                    }
+                    _ => None,
+                }))
+            }
             None => Either::Right(source.iter_mro(db)),
         };
         let result = bases.when_any(db, self.constraints, |base| {
@@ -2765,18 +2794,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // Protocol, Generic, and TypedDict are special bases that don't match ClassType.
                 ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict(_) => self.never(),
 
-                ClassBase::Class(source) => match (source, target) {
+                ClassBase::Class(source) => match (source, target_entry) {
                     // Two non-generic classes match if they have the same class literal.
                     (
                         ClassType::NonGeneric(source_literal),
-                        ClassType::NonGeneric(target_literal),
+                        RelationMroEntry::NonGeneric(target_literal),
                     ) => {
                         ConstraintSet::from_bool(self.constraints, source_literal == target_literal)
                     }
 
                     // Two generic classes match if they have the same origin and compatible specializations.
-                    (ClassType::Generic(source), ClassType::Generic(target))
-                        if source.origin(db) == target.origin(db) =>
+                    (ClassType::Generic(source), RelationMroEntry::Generic(origin, target))
+                        if source.origin(db) == origin =>
                     {
                         generic_target = Some(target);
                         self.check_specialization_pair(
@@ -2787,8 +2816,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
 
                     // Different generic origins, or generic and non-generic classes, don't match.
-                    (ClassType::Generic(_), ClassType::Generic(_) | ClassType::NonGeneric(_))
-                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => self.never(),
+                    _ => self.never(),
                 },
             }
         });
