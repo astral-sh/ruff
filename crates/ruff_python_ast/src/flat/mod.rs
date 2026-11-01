@@ -603,6 +603,7 @@ pub struct Builder {
     ast: Ast,
     scratch: Vec<u32>,
     name_ids: HashTable<u32>,
+    recent_names: [u32; 32],
 }
 
 /// The index of an identifier spelling in one builder's name pool.
@@ -829,6 +830,18 @@ impl Builder {
 
     pub fn intern_name(&mut self, text: &str) -> NameId {
         let names = &mut self.ast.names;
+        let bytes = text.as_bytes();
+        let first = usize::from(bytes.first().copied().unwrap_or(0));
+        let last = usize::from(bytes.last().copied().unwrap_or(0));
+        let slot = (first ^ last.wrapping_mul(7) ^ bytes.len().wrapping_mul(13)) & 31;
+        let recent = &mut self.recent_names[slot];
+        // A speculative parse may have rewound the pool since this entry was cached.
+        if names
+            .get(*recent as usize)
+            .is_some_and(|name| name.as_str() == text)
+        {
+            return NameId(*recent);
+        }
         let index = match self.name_ids.entry(
             FxBuildHasher.hash_one(text),
             |&index| names[index as usize].as_str() == text,
@@ -842,6 +855,7 @@ impl Builder {
                 index
             }
         };
+        *recent = index;
         NameId(index)
     }
 
