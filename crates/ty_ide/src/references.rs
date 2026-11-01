@@ -654,7 +654,7 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                 }
             }
             AnyNodeRef::PatternMatchMapping(pattern_mapping) => {
-                if let Some(rest_name) = &pattern_mapping.rest {
+                if let Some(rest_name) = pattern_mapping.rest() {
                     self.check_binding_identifier(rest_name);
                 }
             }
