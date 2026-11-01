@@ -68,7 +68,10 @@ impl TypingReference {
                 continue;
             }
 
-            if reference.in_typing_only_annotation() || reference.in_string_type_definition() {
+            if reference.in_typing_only_annotation()
+                || reference.in_string_type_definition()
+                || (settings.preview.is_enabled() && reference.in_type_param_definition())
+            {
                 kind = kind.combine(Self::TypingOnly);
                 continue;
             }
