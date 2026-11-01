@@ -15,8 +15,8 @@ use crate::{
     lint::LintMetadata,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
-        ClassBase, ClassType, InstanceFallbackShadowsNonDataDescriptor, IntersectionType,
-        KnownInstanceType, MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers,
+        ClassBase, ClassType, IntersectionType, KnownInstanceType, MemberLookupPolicy,
+        ReceiverMemberShadowsNonDataDescriptor, StaticClassLiteral, Type, TypeQualifiers,
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
         class::CodeGeneratorKind,
         context::InferContext,
@@ -278,7 +278,7 @@ fn bind_attribute<'db>(
             class_member,
             receiver,
             instance_member.into(),
-            InstanceFallbackShadowsNonDataDescriptor::No,
+            ReceiverMemberShadowsNonDataDescriptor::No,
         )
         .ok()?
         .member(db)
