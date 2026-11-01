@@ -1,4 +1,4 @@
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, ArgOrKeyword};
 use ruff_text_size::Ranged;
 use smallvec::{SmallVec, smallvec};
 
@@ -33,8 +33,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// infers its type with the supplied context. If the assignment is invalid, emit diagnostics.
     pub(super) fn validate_attribute_assignment(
         &mut self,
-        target: &ast::ExprAttribute,
-        value: &ast::Expr,
+        target: ast::ExprAttribute<'_>,
+        value: ast::Expr<'_>,
         object_ty: Type<'db>,
         attribute: &str,
         infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
@@ -204,8 +204,8 @@ impl<'db> AttributeDeprecation<'db> {
 
 struct AssignmentAttributeWriteEvaluator<'a, 'db, 'ast, 'infer> {
     builder: &'a mut TypeInferenceBuilder<'db, 'ast>,
-    target: &'a ast::ExprAttribute,
-    value: &'a ast::Expr,
+    target: ast::ExprAttribute<'a>,
+    value: ast::Expr<'a>,
     object_ty: Type<'db>,
     attribute: &'a str,
     infer_value_ty: MultiInferenceGuard<'db, 'ast, 'infer>,
@@ -247,8 +247,8 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         let db = self.builder.db();
         let name_ty = Type::string_literal(db, self.attribute);
         let ast_arguments = [
-            ast::ArgOrKeyword::Arg(self.target.value.as_ref()),
-            ast::ArgOrKeyword::Arg(self.value),
+            ArgOrKeyword::Arg(self.target.value()),
+            ArgOrKeyword::Arg(self.value),
         ];
         let mut call_arguments = CallArguments::positional([name_ty, Type::unknown()]);
         let setattr_result = self.builder.infer_and_try_call_dunder_member(

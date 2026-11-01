@@ -1,5 +1,6 @@
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast::ExprKind;
+use ruff_python_ast::name::Name;
 use tracing::trace;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::scope::NodeWithScopeKind;
@@ -57,8 +58,8 @@ pub(crate) fn lexical_name_path_component_for_node(
             // This is just implicit, so has no component
             return Ok(None);
         }
-        NodeWithScopeKind::Class(class) => class.node(parsed).name.id.clone(),
-        NodeWithScopeKind::Function(func) => func.node(parsed).name.id.clone(),
+        NodeWithScopeKind::Class(class) => class.node(parsed).name().id().clone(),
+        NodeWithScopeKind::Function(func) => func.node(parsed).name().id().clone(),
         NodeWithScopeKind::TypeAlias(_)
         | NodeWithScopeKind::ClassTypeParameters(_)
         | NodeWithScopeKind::FunctionTypeParameters(_)
@@ -84,19 +85,19 @@ fn lexical_name_path_component_for_leaf(
     definition: Definition,
 ) -> Result<Name, ()> {
     let component = match definition.kind(db) {
-        DefinitionKind::Function(func) => func.node(parsed).name.id.clone(),
-        DefinitionKind::Class(class) => class.node(parsed).name.id.clone(),
+        DefinitionKind::Function(func) => func.node(parsed).name().id().clone(),
+        DefinitionKind::Class(class) => class.node(parsed).name().id().clone(),
         DefinitionKind::Assignment(assignment) => {
-            let ast::Expr::Name(name) = assignment.target(parsed) else {
+            let ExprKind::Name(name) = assignment.target(parsed).classify() else {
                 return Err(());
             };
-            name.id.clone()
+            name.id().clone()
         }
         DefinitionKind::AnnotatedAssignment(assignment) => {
-            let ast::Expr::Name(name) = assignment.target(parsed) else {
+            let ExprKind::Name(name) = assignment.target(parsed).classify() else {
                 return Err(());
             };
-            name.id.clone()
+            name.id().clone()
         }
         DefinitionKind::TypeAlias(_)
         | DefinitionKind::Import(_)

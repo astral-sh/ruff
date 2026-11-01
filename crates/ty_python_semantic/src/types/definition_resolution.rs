@@ -4,6 +4,7 @@
 //! lookup takes an already-inferred receiver type. Neither lookup obtains use-site types
 //! through `SemanticModel` or requests completed inference of the caller's scope.
 
+use ruff_text_size::Ranged;
 use std::collections::VecDeque;
 
 use indexmap::IndexSet;
@@ -638,13 +639,14 @@ fn resolve_definition_recursive<'db>(
             let module = parsed_module(db, file.python_file(db)).load(db);
             let alias = import_def.alias(&module);
 
-            if alias.asname.is_some() && alias_resolution == ImportAliasResolution::PreserveAliases
+            if alias.asname().is_some()
+                && alias_resolution == ImportAliasResolution::PreserveAliases
             {
                 return vec![ResolvedDefinition::Definition(definition)];
             }
 
             // Get the full module name being imported
-            let Some(module_name) = ModuleName::new(&alias.name) else {
+            let Some(module_name) = ModuleName::new(alias.name().as_str()) else {
                 return Vec::new(); // Invalid module name, return empty list
             };
 
@@ -670,7 +672,8 @@ fn resolve_definition_recursive<'db>(
             let import_node = import_from_def.import(&module);
             let alias = import_from_def.alias(&module);
 
-            if alias.asname.is_some() && alias_resolution == ImportAliasResolution::PreserveAliases
+            if alias.asname().is_some()
+                && alias_resolution == ImportAliasResolution::PreserveAliases
             {
                 return vec![ResolvedDefinition::Definition(definition)];
             }
@@ -682,7 +685,7 @@ fn resolve_definition_recursive<'db>(
                 env,
                 ImportingFile::File(file.file(db), env.resolver_environment(db)),
                 import_node,
-                &alias.name,
+                alias.name().as_str(),
                 visited,
                 alias_resolution,
             )
@@ -721,18 +724,18 @@ pub(crate) fn resolve_from_import_definitions<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     importing_file: ImportingFile<'db>,
-    import_node: &ast::StmtImportFrom,
+    import_node: ast::StmtImportFrom<'_>,
     symbol_name: &str,
     visited: &mut FxHashSet<Definition<'db>>,
     alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
     if alias_resolution == ImportAliasResolution::PreserveAliases {
-        for alias in &import_node.names {
-            if let Some(asname) = &alias.asname {
+        for alias in import_node.names() {
+            if let Some(asname) = alias.asname() {
                 if asname.as_str() == symbol_name {
                     return vec![ResolvedDefinition::FileWithRange(FileRange::new(
                         importing_file.file(db),
-                        asname.range,
+                        asname.range(),
                     ))];
                 }
             }

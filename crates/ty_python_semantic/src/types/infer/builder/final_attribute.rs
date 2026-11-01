@@ -95,7 +95,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn invalid_assignment_to_final_attribute(
         &self,
         object_ty: Type<'db>,
-        target: &ast::ExprAttribute,
+        target: ast::ExprAttribute<'_>,
         attribute: &str,
         qualifiers: TypeQualifiers,
     ) -> bool {
@@ -109,9 +109,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // TODO: Use the full assignment statement range for these diagnostics instead of
         // just the attribute target range.
 
-        let is_in_allowed_initializer = self
-            .current_function_definition()
-            .is_some_and(|func| func.name.id == "__init__" || func.name.id == "__post_init__");
+        let is_in_allowed_initializer = self.current_function_definition().is_some_and(|func| {
+            func.name().id() == "__init__" || func.name().id() == "__post_init__"
+        });
 
         let report_not_in_init = || {
             let is_dataclass_like = object_ty
@@ -201,7 +201,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn invalid_deletion_of_final_attribute(
         &self,
         object_ty: Type<'db>,
-        target: &ast::ExprAttribute,
+        target: ast::ExprAttribute<'_>,
         attribute: &str,
         qualifiers: TypeQualifiers,
         emit_diagnostics: bool,
@@ -234,7 +234,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     pub(super) fn validate_final_attribute_assignment(
         &mut self,
-        target: &ast::ExprAttribute,
+        target: ast::ExprAttribute<'_>,
         object_ty: Type<'db>,
         attribute: &str,
     ) -> bool {
@@ -279,7 +279,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     pub(super) fn validate_final_attribute_deletion(
         &self,
-        target: &ast::ExprAttribute,
+        target: ast::ExprAttribute<'_>,
         object_ty: Type<'db>,
         attribute: &str,
         emit_diagnostics: bool,

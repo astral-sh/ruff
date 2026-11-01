@@ -10,19 +10,19 @@ use crate::types::infer::{infer_definition_types, nearest_enclosing_function};
 /// Returns whether a variable annotation is allowed on this assignment target.
 /// Names and attributes of an implicit method receiver (such as `self.x` or `cls.x`) can
 /// introduce a declaration.
-pub fn is_valid_annotation_target(db: &dyn Db, file: ProgramFile, target: &ast::Expr) -> bool {
-    let ast::Expr::Attribute(attribute) = target else {
+pub fn is_valid_annotation_target(db: &dyn Db, file: ProgramFile, target: ast::Expr<'_>) -> bool {
+    let Some(attribute) = target.as_attribute_expr() else {
         return target.is_name_expr();
     };
     let index = semantic_index(db, file);
-    let scope_id = index.expression_scope_id(target);
+    let scope_id = index.expression_scope_id(&target);
     let scope = scope_id.to_scope_id(db, file);
     if is_instance_attribute_assignment(db, index, scope, attribute) {
         return true;
     }
 
     // A nested function can also annotate an attribute on a captured method receiver.
-    attribute.value.as_name_expr().is_some_and(|receiver| {
+    attribute.value().as_name_expr().is_some_and(|receiver| {
         receiver_method_scope(db, index, scope, receiver)
             .is_some_and(|receiver_scope_id| receiver_scope_id != scope_id)
     })
@@ -35,7 +35,7 @@ pub(super) fn is_instance_attribute_assignment(
     db: &dyn Db,
     index: &SemanticIndex,
     scope: ScopeId,
-    target: &ast::ExprAttribute,
+    target: ast::ExprAttribute<'_>,
 ) -> bool {
     let Some(place_expr) = PlaceExpr::try_from_expr(target) else {
         return false;
@@ -64,9 +64,9 @@ pub(super) fn receiver_method_scope(
     db: &dyn Db,
     index: &SemanticIndex,
     scope: ScopeId,
-    receiver: &ast::ExprName,
+    receiver: ast::ExprName<'_>,
 ) -> Option<FileScopeId> {
-    let receiver_name = receiver.id.as_str();
+    let receiver_name = receiver.id().as_str();
     let (receiver_scope_id, receiver_scope, receiver_symbol) = index
         .visible_ancestor_scopes(scope.file_scope_id(db))
         .find_map(|(scope_id, scope)| {
@@ -84,7 +84,7 @@ pub(super) fn receiver_method_scope(
     let module = parsed_module(db, scope.python_file(db)).load(db);
     let first_parameter = function
         .node(&module)
-        .parameters
+        .parameters()
         .iter_non_variadic_params()
         .next()?;
     if first_parameter.name() != receiver_name {

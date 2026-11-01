@@ -2,7 +2,9 @@ use crate::ProgramEnvironment;
 use char_str::CharStr;
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::source_text;
-use ruff_python_ast::{ArgOrKeyword, Arguments, Expr, ExprCall, ExprDict, Keyword, name::Name};
+use ruff_python_ast::{
+    ArgOrKeyword, Arguments, Expr, ExprCall, ExprDict, ExprKind, Keyword, name::Name,
+};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::{
@@ -158,17 +160,17 @@ impl<'db> FieldMetadata<'db> {
         let kind = definition.kind(db);
         let mut annotation = match &kind {
             DefinitionKind::AnnotatedAssignment(assignment) => assignment.annotation(&module),
-            DefinitionKind::TypeAlias(alias) => &alias.node(&module).value,
+            DefinitionKind::TypeAlias(alias) => alias.node(&module).value(),
             _ => return,
         };
         // Capture the scope before unwrapping quotes. A `type` alias evaluates its value
         // in its own scope, which also applies to names inside a quoted annotation.
         let file = definition.program_file(db);
         let scope = semantic_index(db, file)
-            .expression_scope_id(annotation)
+            .expression_scope_id(&annotation)
             .to_scope_id(db, file);
         let mut parsed;
-        while let Expr::StringLiteral(string) = annotation {
+        while let Some(string) = annotation.as_string_literal_expr() {
             let is_string_annotation = if scope == definition.scope(db) {
                 infer_definition_types(db, definition).is_string_annotation(annotation)
             } else {
@@ -196,10 +198,10 @@ impl<'db> FieldMetadata<'db> {
             return;
         }
 
-        let name = match annotation {
-            Expr::Name(name) => name,
-            Expr::Subscript(subscript) => {
-                let Expr::Name(name) = subscript.value.as_ref() else {
+        let name = match annotation.classify() {
+            ExprKind::Name(name) => name,
+            ExprKind::Subscript(subscript) => {
+                let ExprKind::Name(name) = subscript.value().classify() else {
                     return;
                 };
                 name
@@ -214,7 +216,7 @@ impl<'db> FieldMetadata<'db> {
         let Some(alias_definition) = definitions_for_name(
             db,
             scope,
-            name.id.as_str(),
+            name.id().as_str(),
             ImportAliasResolution::ResolveAliases,
         )
         .into_iter()
@@ -247,21 +249,21 @@ impl<'db> FieldMetadata<'db> {
         &mut self,
         db: &'db dyn Db,
         definition: ScopedDefinition<'db>,
-        annotation: &Expr,
+        annotation: Expr<'_>,
         specialization: Option<Specialization<'db>>,
     ) -> bool {
         let Some(subscript) = annotation.as_subscript_expr() else {
             return false;
         };
-        if field_expression_type(db, definition, &subscript.value)
+        if field_expression_type(db, definition, subscript.value())
             != Type::SpecialForm(SpecialFormType::Annotated)
         {
             return false;
         }
         let Some(arguments) = subscript
-            .slice
+            .slice()
             .as_tuple_expr()
-            .and_then(|tuple| tuple.elts.get(1..))
+            .and_then(|tuple| tuple.elts().get_range(1..))
         else {
             return false;
         };
@@ -270,13 +272,13 @@ impl<'db> FieldMetadata<'db> {
             let Some(call) = metadata.as_call_expr() else {
                 continue;
             };
-            let callee = field_expression_type(db, definition, &call.func);
+            let callee = field_expression_type(db, definition, call.func());
 
             if callee
                 .as_class_literal()
                 .is_some_and(|class| class.is_known(db, KnownClass::PydanticStrict))
             {
-                let strict = call.arguments.find_argument_value("strict", 0).map_or(
+                let strict = call.arguments().find_argument_value("strict", 0).map_or(
                     ConfigBoolean::Enabled,
                     |strict| {
                         ConfigBoolean::from_type(field_expression_type(db, definition, strict))
@@ -329,62 +331,45 @@ impl<'db> FieldMetadata<'db> {
         &mut self,
         db: &'db dyn Db,
         definition: ScopedDefinition<'db>,
-        call: &ExprCall,
+        call: ExprCall<'_>,
         call_type: Type<'db>,
         specialization: Option<Specialization<'db>>,
     ) {
-        let arguments = &call.arguments;
-        let [
-            default,
-            default_factory,
-            init,
-            validation_alias,
-            alias,
-            strict,
-            frozen,
-        ] = arguments.find_keywords([
-            "default",
-            "default_factory",
-            "init",
-            "validation_alias",
-            "alias",
-            "strict",
-            "frozen",
-        ]);
-        if let Some(default) = default
-            .map(|kw| kw.value.as_ref())
-            .or_else(|| arguments.find_positional(0))
-        {
+        if let Some(default) = call.arguments().find_argument_value("default", 0) {
             let default_type = field_expression_type(db, definition, default);
             if !default_type.is_instance_of(db, KnownClass::EllipsisType) {
                 self.default_ty =
                     Some(default_type.apply_optional_specialization(db, specialization));
             }
-        } else if default_factory.is_some() {
+        } else if call.arguments().find_keyword("default_factory").is_some() {
             self.default_ty = Some(call_type.apply_optional_specialization(db, specialization));
         }
 
-        if let Some(init) = init {
-            let init = field_expression_type(db, definition, &init.value);
+        if let Some(init) = call.arguments().find_keyword("init") {
+            let init = field_expression_type(db, definition, init.value());
             let env = ProgramEnvironment::from_scope(definition.scope);
             self.init &= !init.bool(db, &env).is_always_false();
         }
 
-        if let Some(alias) = validation_alias.or(alias) {
-            self.alias = field_expression_type(db, definition, &alias.value)
+        if let Some(alias) = call
+            .arguments()
+            .find_keyword("validation_alias")
+            .or_else(|| call.arguments().find_keyword("alias"))
+        {
+            self.alias = field_expression_type(db, definition, alias.value())
                 .as_string_literal()
                 .map(|literal| Box::from(literal.value(db)));
         }
 
-        if let Some(strict) = strict {
-            let strict = field_expression_type(db, definition, &strict.value);
+        if let Some(strict) = call.arguments().find_keyword("strict") {
+            let strict = field_expression_type(db, definition, strict.value());
             if !strict.is_none(db) {
                 self.merge_strict(ConfigBoolean::from_type(strict));
             }
         }
 
-        if let Some(frozen) = frozen {
-            let frozen = field_expression_type(db, definition, &frozen.value);
+        if let Some(frozen) = call.arguments().find_keyword("frozen") {
+            let frozen = field_expression_type(db, definition, frozen.value());
             self.frozen = if frozen.is_none(db) {
                 ConfigBoolean::Disabled
             } else {
@@ -405,7 +390,7 @@ struct ScopedDefinition<'db> {
 fn field_expression_type<'db>(
     db: &'db dyn Db,
     definition: ScopedDefinition<'db>,
-    expression: &Expr,
+    expression: Expr<'_>,
 ) -> Type<'db> {
     definition_expression_type_in_scope(db, definition.id, expression, definition.scope)
 }
@@ -583,10 +568,10 @@ impl ConfigBoolean {
 fn config_boolean(
     db: &dyn Db,
     definition: Definition<'_>,
-    keyword: Option<&Keyword>,
+    keyword: Option<Keyword<'_>>,
 ) -> ConfigBoolean {
     keyword.map_or(ConfigBoolean::Unspecified, |keyword| {
-        ConfigBoolean::from_type(definition_expression_type(db, definition, &keyword.value))
+        ConfigBoolean::from_type(definition_expression_type(db, definition, keyword.value()))
     })
 }
 
@@ -836,7 +821,7 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
     let Some(call) = value.as_call_expr() else {
         return Some(ModelConfig::unknown());
     };
-    let callee = definition_expression_type(db, definition, &call.func);
+    let callee = definition_expression_type(db, definition, call.func());
     if !callee.as_class_literal().is_some_and(|class| {
         class.is_known(db, KnownClass::Dict)
             || class
@@ -850,26 +835,78 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
         return Some(ModelConfig::unknown());
     }
 
-    Some(model_config_from_keywords(db, definition, &call.arguments))
+    if call
+        .arguments()
+        .keywords()
+        .iter()
+        .any(|keyword| keyword.arg().is_none())
+    {
+        return Some(ModelConfig::unknown());
+    }
+
+    // Keep this list of recognized options in sync with `model_config_from_dict` and
+    // `class_keyword_config`.
+    let extra = call.arguments().find_keyword("extra").map(|extra| {
+        let extra = definition_expression_type(db, definition, extra.value())
+            .as_string_literal()
+            .map(|literal| literal.value(db));
+        ExtraBehavior::from_value(extra)
+    });
+    let strict = config_boolean(db, definition, call.arguments().find_keyword("strict"));
+    let from_attributes = config_boolean(
+        db,
+        definition,
+        call.arguments().find_keyword("from_attributes"),
+    );
+    let frozen = config_boolean(db, definition, call.arguments().find_keyword("frozen"));
+    let validate_by_alias = config_boolean(
+        db,
+        definition,
+        call.arguments().find_keyword("validate_by_alias"),
+    );
+    let validate_by_name = config_boolean(
+        db,
+        definition,
+        call.arguments().find_keyword("validate_by_name"),
+    );
+    let populate_by_name = config_boolean(
+        db,
+        definition,
+        call.arguments().find_keyword("populate_by_name"),
+    );
+
+    Some(ModelConfig {
+        extra,
+        strict,
+        from_attributes,
+        frozen,
+        validate_by_alias,
+        validate_by_name,
+        populate_by_name,
+    })
 }
 
-fn model_config_from_dict(db: &dyn Db, definition: Definition<'_>, dict: &ExprDict) -> ModelConfig {
+fn model_config_from_dict(
+    db: &dyn Db,
+    definition: Definition<'_>,
+    dict: ExprDict<'_>,
+) -> ModelConfig {
     let mut config = ModelConfig::default();
 
     for item in dict {
         let Some(key) = item
-            .key
-            .as_ref()
-            .and_then(|key| key.as_string_literal_expr())
+            .key()
+            .and_then(ruff_python_ast::Expr::as_string_literal_expr)
         else {
             // A dynamic key or dictionary unpacking can override any recognized option. Ignoring
             // it could incorrectly preserve a lower-precedence configuration value.
             return ModelConfig::unknown();
         };
-        let value = definition_expression_type(db, definition, &item.value);
+        let value = definition_expression_type(db, definition, item.value());
 
-        // Keep this match in sync with the options in `model_config_from_keywords`.
-        match key.value.to_str() {
+        // Keep this match in sync with the options recognized for `ConfigDict` calls in
+        // `own_model_config` and for class keywords in `class_keyword_config`.
+        match key.value().to_str() {
             "extra" => {
                 config.extra = Some(ExtraBehavior::from_value(
                     value.as_string_literal().map(|literal| literal.value(db)),
@@ -896,46 +933,20 @@ fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConf
         return ModelConfig::default();
     };
     let class_node = class.node(&module);
-    let Some(arguments) = class_node.arguments.as_ref() else {
+    let Some(arguments) = class_node.arguments() else {
         return ModelConfig::default();
     };
-    model_config_from_keywords(db, definition, arguments)
-}
-
-fn model_config_from_keywords(
-    db: &dyn Db,
-    definition: Definition<'_>,
-    arguments: &Arguments,
-) -> ModelConfig {
-    let [
-        mut extra,
-        mut strict,
-        mut from_attributes,
-        mut frozen,
-        mut validate_by_alias,
-        mut validate_by_name,
-        mut populate_by_name,
-    ] = [None; 7];
-    for keyword in arguments.keywords() {
-        let Some(name) = keyword.arg.as_ref() else {
-            // A mapping unpacking can override any option, including one seen earlier.
-            return ModelConfig::unknown();
-        };
-        let slot = match name.as_str() {
-            "extra" => &mut extra,
-            "strict" => &mut strict,
-            "from_attributes" => &mut from_attributes,
-            "frozen" => &mut frozen,
-            "validate_by_alias" => &mut validate_by_alias,
-            "validate_by_name" => &mut validate_by_name,
-            "populate_by_name" => &mut populate_by_name,
-            _ => continue,
-        };
-        // On a recovered duplicate, use the first explicit keyword, like argument lookup.
-        slot.get_or_insert(keyword);
+    if arguments
+        .keywords()
+        .iter()
+        .any(|keyword| keyword.arg().is_none())
+    {
+        return ModelConfig::unknown();
     }
-    let extra = extra.map(|extra| {
-        let extra = definition_expression_type(db, definition, &extra.value)
+    // Keep this list of recognized options in sync with `own_model_config` and
+    // `model_config_from_dict`.
+    let extra = arguments.find_keyword("extra").map(|extra| {
+        let extra = definition_expression_type(db, definition, extra.value())
             .as_string_literal()
             .map(|literal| literal.value(db));
         ExtraBehavior::from_value(extra)
@@ -1033,35 +1044,34 @@ fn function_has_before_or_plain_field_validator<'db>(
     };
     let module = parsed_module(db, definition.python_file(db)).load(db);
     let function_node = function.node(&module);
-    if function_node.decorator_list.is_empty() {
+    if function_node.decorator_list().is_empty() {
         return false;
     }
     let decorators = function_known_decorators(db, definition);
 
-    function_node.decorator_list.iter().any(|decorator| {
-        let Some(call) = decorator.expression.as_call_expr() else {
+    function_node.decorator_list().iter().any(|decorator| {
+        let Some(call) = decorator.expression().as_call_expr() else {
             return false;
         };
-        let Some(Type::FunctionLiteral(function)) = decorators.expression_type(call.func.as_ref())
-        else {
+        let Some(Type::FunctionLiteral(function)) = decorators.expression_type(call.func()) else {
             return false;
         };
         if !function.is_known(db, KnownFunction::PydanticFieldValidator) {
             return false;
         }
 
-        let Some(mode) = call.arguments.find_keyword("mode") else {
+        let Some(mode) = call.arguments().find_keyword("mode") else {
             return false;
         };
         if decorators
-            .expression_type(&mode.value)
+            .expression_type(mode.value())
             .and_then(Type::as_string_literal)
             .is_none_or(|mode| !matches!(mode.value(db), "before" | "plain"))
         {
             return false;
         }
 
-        call.arguments.args().any(|field| {
+        call.arguments().args().iter().any(|field| {
             decorators
                 .expression_type(field)
                 .and_then(Type::as_string_literal)
@@ -1450,7 +1460,7 @@ fn model_init_discards_extra(
 pub(in crate::types) fn report_discarded_extra_arguments<'db>(
     context: &InferContext<'db, '_>,
     class: ClassType<'db>,
-    arguments: &Arguments,
+    arguments: Arguments<'_>,
     bindings: &Bindings<'db>,
 ) {
     if !context.is_lint_enabled(&PYDANTIC_DISCARDED_EXTRA_ARGUMENT) {
@@ -1477,7 +1487,7 @@ pub(in crate::types) fn report_discarded_extra_arguments<'db>(
             let ArgOrKeyword::Keyword(keyword) = argument else {
                 return None;
             };
-            let name = keyword.arg.as_ref()?;
+            let name = keyword.arg()?;
             bindings
                 .constructor_init_argument_matches_keyword_variadic(argument_index)
                 .then_some(name)

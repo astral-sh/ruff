@@ -7,7 +7,7 @@ use crate::scope::{FileScopeId, ScopeId};
 use crate::{Program, ProgramFile};
 use ruff_db::PythonFile;
 use ruff_db::files::File;
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 use salsa;
 
 /// An independently type-inferable statement.
@@ -50,7 +50,7 @@ pub struct StatementInner<'db> {
     #[no_eq]
     #[tracked]
     #[returns(ref)]
-    pub node_ref: AstNodeRef<ast::Stmt>,
+    pub node_ref: AstNodeRef<ast::kind::Stmt>,
 }
 
 // The Salsa heap is tracked separately.
@@ -77,8 +77,8 @@ impl<'db> StatementInner<'db> {
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct StatementNodeKey(NodeKey);
 
-impl From<&ast::Stmt> for StatementNodeKey {
-    fn from(node: &ast::Stmt) -> Self {
+impl From<ast::Stmt<'_>> for StatementNodeKey {
+    fn from(node: ast::Stmt<'_>) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
