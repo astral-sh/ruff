@@ -666,6 +666,68 @@ reveal_type(Matching().value)  # revealed: int | Start
 reveal_type(Other().value)  # revealed: Start
 ```
 
+#### Dynamically initialized attributes with custom setters
+
+An operator result can become the next operand only if the setter stores it. A fresh instance
+still reads through `__getattr__`.
+
+```py
+from typing_extensions import Never
+
+class Seed:
+    def __iadd__(self, n: int) -> int:
+        return n
+
+class ReadSeed:
+    def __getattr__(self, name: str) -> Seed:
+        return Seed()
+
+store = object.__setattr__
+
+class Forward(ReadSeed):
+    def __setattr__(self, name: str, value: int) -> None:
+        store(self, name, value)
+
+    def bump(self) -> None:
+        self.value += 1
+
+class Transform(ReadSeed):
+    def __setattr__(self, name: str, value: int) -> None:
+        object.__setattr__(self, name, Seed())
+
+    def bump(self) -> None:
+        self.value += 1
+
+class Rebind(ReadSeed):
+    def __setattr__(self, name: str, value: object) -> None:
+        value = "normalized"
+        store(self, name, value)
+
+    def bump(self) -> None:
+        if isinstance(self.value, Seed):
+            self.value += 1
+
+class Reject(ReadSeed):
+    def __setattr__(self, name: str, value: str) -> None:
+        store(self, name, value)
+
+    def bump(self) -> None:
+        self.value += 1  # error: [invalid-assignment]
+
+class Frozen(ReadSeed):
+    def __setattr__(self, name: str, value: object) -> Never:
+        raise AttributeError(name)
+
+    def bump(self) -> None:
+        self.value += 1  # error: [invalid-assignment]
+
+reveal_type(Forward().value)  # revealed: int | Seed
+reveal_type(Transform().value)  # revealed: Seed
+reveal_type(Rebind().value)  # revealed: str | Seed
+reveal_type(Reject().value)  # revealed: Seed
+reveal_type(Frozen().value)  # revealed: Seed
+```
+
 #### Augmented assignments with expanding generic results
 
 An augmented assignment can repeatedly expand a generic attribute's type arguments. Inference must

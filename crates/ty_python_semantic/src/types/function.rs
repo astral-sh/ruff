@@ -1175,6 +1175,13 @@ impl<'db> UpdatedFunctionSignatures<'db> {
     }
 }
 
+/// The value a setter passes to built-in attribute storage.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) enum SetattrValue<'db> {
+    Argument,
+    Expression(Type<'db>),
+}
+
 /// Represents a function type, which might be a non-generic function, or a specialization of a
 /// generic function.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
@@ -1667,6 +1674,75 @@ impl<'db> FunctionType<'db> {
         self.literal(db).has_trivial_body(db)
     }
 
+    /// Identify the value stored by a direct call to Python's built-in setter.
+    ///
+    /// `object.__setattr__(self, name, value)` stores the argument, whereas
+    /// `object.__setattr__(self, name, Seed())` stores a `Seed`. Resolve the callee and
+    /// the parameter bindings so aliases of the built-in work and rebound names stay distinct.
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    pub(super) fn setattr_storage(self, db: &'db dyn Db) -> Option<SetattrValue<'db>> {
+        let implementation = self.overloads_and_implementation(db).1?;
+        let definition = implementation.definition(db);
+        let file = definition.program_file(db);
+        let module = parsed_module(db, file.python_file(db)).load(db);
+        let node = implementation.node(db, file.file(db), &module);
+        let call = match node.body.last()? {
+            ast::Stmt::Expr(stmt) => stmt.value.as_call_expr()?,
+            ast::Stmt::Return(stmt) => stmt.value.as_ref()?.as_call_expr()?,
+            _ => return None,
+        };
+        let [receiver, name, value] = call.arguments.args.as_ref() else {
+            return None;
+        };
+        if !call.arguments.keywords.is_empty() {
+            return None;
+        }
+        let index = semantic_index(db, file);
+        let scope = implementation.body_scope(db).file_scope_id(db);
+        let use_def = index.use_def_map(scope);
+        let mut parameters = node.parameters.iter_non_variadic_params();
+        let mut original = |arg: &ast::Expr| {
+            let parameter = index.expect_single_definition(parameters.next()?);
+            let use_id = index.try_expression_use_id(arg.into())?;
+            Some(
+                use_def
+                    .bindings_at_use(use_id)
+                    .map(|binding| binding.binding)
+                    .eq([ty_python_core::definition::DefinitionState::Defined(
+                        parameter,
+                    )]),
+            )
+        };
+        if !original(receiver)?
+            || !original(name)?
+            || !crate::reachability::is_range_reachable(db, index, scope, call.range())
+        {
+            return None;
+        }
+        let env = ProgramEnvironment::from_file(file);
+        let callee = definition_expression_type(db, definition, &call.func);
+        if ![KnownClass::Object, KnownClass::Type]
+            .into_iter()
+            .any(|class| {
+                class
+                    .to_class_literal(db, &env)
+                    .member(db, &env, "__setattr__")
+                    .place
+                    .ignore_possibly_undefined()
+                    == Some(callee)
+            })
+        {
+            return None;
+        }
+        Some(if original(value) == Some(true) {
+            SetattrValue::Argument
+        } else {
+            SetattrValue::Expression(
+                definition_expression_type(db, definition, value)
+                    .apply_optional_specialization(db, self.class_specialization(db)),
+            )
+        })
+    }
     /// Returns `true` if any overload or implementation has an explicit return annotation.
     ///
     /// This distinguishes untyped decorators that infer an unknown return from decorators that

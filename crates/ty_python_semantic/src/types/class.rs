@@ -22,6 +22,7 @@ pub(super) use self::typed_dict::{
 };
 use super::dedicated::pydantic;
 use super::display;
+use super::infer::AugmentedStorage;
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
     SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
@@ -3038,7 +3039,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         env: &ProgramEnvironment<'db>,
         receiver: Type<'db>,
         bindings: &[(ClassType<'db>, AugmentedBindings<'db>)],
-        reads_storage: bool,
+        storage: AugmentedStorage<'db>,
         policy: MemberLookupPolicy,
     ) -> (Type<'db>, Provenance<'db>) {
         let mut definitions = Vec::new();
@@ -3049,13 +3050,9 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 provenance = provenance.or(Provenance::SingleDefinition(definition));
             }
         }
-        let inferred = AugmentedAttributeWrites::new(
-            db,
-            receiver,
-            reads_storage,
-            definitions.into_boxed_slice(),
-        )
-        .inferred_types(db);
+        let inferred =
+            AugmentedAttributeWrites::new(db, receiver, storage, definitions.into_boxed_slice())
+                .inferred_types(db);
         let inferred_ty = if policy.contains(MemberLookupPolicy::WRITE_TARGET) {
             inferred.write
         } else {
@@ -3112,19 +3109,29 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 .class_member_with_policy(db, env, name, hook_policy)
                 .place
         };
-        if write && !hook("__setattr__").is_undefined() {
-            // A custom setter can require a str even when `self.value += 1` would store an int.
-            // Leave the write to the usual setter validation.
-            return None;
-        }
         // An overriding getter can keep returning Seed after the dictionary receives an int.
         // If the getter is only conditionally defined, ordinary reads can still see the int.
         let reads_storage = !hook("__getattribute__").is_definitely_bound();
         if !write && !reads_storage {
             return None;
         }
+        let setter = hook("__setattr__");
+        if write && !setter.is_undefined() {
+            // The setter's signature governs writes, including external assignments.
+            return None;
+        }
+        let storage = if setter.is_definitely_bound() {
+            // `self.value += 1` calls the setter with the operator result. A setter may
+            // discard it or store Seed() instead. Use the value passed to ordinary storage.
+            let function = setter.ignore_possibly_undefined()?.as_function_literal()?;
+            AugmentedStorage::Setter(function.setattr_storage(db)?)
+        } else if reads_storage {
+            AugmentedStorage::Ordinary
+        } else {
+            AugmentedStorage::InterceptedRead
+        };
         let (ty, provenance) =
-            Self::infer_augmented_bindings(db, env, receiver, bindings, reads_storage, policy);
+            Self::infer_augmented_bindings(db, env, receiver, bindings, storage, policy);
         (!ty.is_never()).then_some(DefinedPlace {
             ty,
             origin: TypeOrigin::Inferred,
@@ -3224,7 +3231,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 &self.env,
                                 receiver(),
                                 &pending_augmented_bindings,
-                                true,
+                                AugmentedStorage::Ordinary,
                                 policy,
                             );
                             defined.ty = UnionType::from_two_elements(
@@ -3377,7 +3384,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 &self.env,
                                 receiver(),
                                 &pending_augmented_bindings,
-                                true,
+                                AugmentedStorage::Ordinary,
                                 policy,
                             );
                             union = union.add(inferred_ty);
@@ -3422,7 +3429,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 &self.env,
                                 receiver(),
                                 &pending_augmented_bindings,
-                                true,
+                                AugmentedStorage::Ordinary,
                                 policy,
                             );
                             union = union.add(inferred_ty);

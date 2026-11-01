@@ -55,14 +55,15 @@ use std::borrow::Cow;
 use std::cell::Cell;
 pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 
+use crate::types::call::bind::CallableBinding;
 use crate::types::context::InferContextResult;
 use crate::types::diagnostic::TypeCheckDiagnostics;
-use crate::types::function::{FunctionDecorators, FunctionType};
+use crate::types::function::{FunctionDecorators, FunctionType, SetattrValue};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
-    ClassLiteral, ClassType, KnownClass, RecursiveType, StaticClassLiteral, Type,
+    CallArguments, ClassLiteral, ClassType, KnownClass, RecursiveType, StaticClassLiteral, Type,
     TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType,
 };
 use crate::{Db, FxIndexSet};
@@ -323,6 +324,54 @@ pub(super) struct AugmentedAttributeTypes<'db> {
     pub(super) write: Type<'db>,
 }
 
+/// Which stored results can become the operand of a later update?
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) enum AugmentedStorage<'db> {
+    Ordinary,
+    InterceptedRead,
+    Setter(SetattrValue<'db>),
+}
+
+impl<'db> SetattrValue<'db> {
+    /// Apply the setter to an operator result. A setter accepting only `str` cannot store
+    /// the `int` from `self.value += 1`. A setter can also store a different expression.
+    fn stored_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver: Type<'db>,
+        name: Type<'db>,
+        value: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let bindings = receiver
+            .try_call_dunder(
+                db,
+                env,
+                "__setattr__",
+                CallArguments::positional([name, value]),
+                TypeContext::default(),
+            )
+            .ok()?;
+        if bindings.return_type(db, env).is_never() {
+            return None;
+        }
+        Some(match self {
+            Self::Argument => value,
+            Self::Expression(expr) => UnionType::from_elements(
+                db,
+                env,
+                bindings
+                    .iter_flat()
+                    .flat_map(CallableBinding::matching_overloads)
+                    .map(|(_, overload)| {
+                        expr.apply_optional_specialization(db, overload.merged_specialization(db))
+                            .bind_self_typevars(db, env, receiver)
+                    }),
+            ),
+        })
+    }
+}
+
 /// Infer the storage shared by augmented writes to one attribute along the receiver's MRO.
 ///
 /// Start with the independent read at each assignment. A later call can read a value stored
@@ -349,7 +398,7 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
     db: &'db dyn Db,
     receiver: Type<'db>,
     definitions: &[(Definition<'db>, ClassType<'db>)],
-    reads_storage: bool,
+    storage: AugmentedStorage<'db>,
 ) -> AugmentedAttributeTypes<'db> {
     let env = ProgramEnvironment::from_definition(definitions[0].0);
     let lookup_class = receiver.nominal_class(db, &env).or_else(|| {
@@ -357,11 +406,15 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
             .to_instance_approximation(db, &env)?
             .nominal_class(db, &env)
     });
+    let alternatives = |ty: Type<'db>| match ty {
+        Type::Union(union) => Either::Left(union.elements(db).iter().copied()),
+        ty => Either::Right(std::iter::once(ty)),
+    };
     let write = |(definition, owner): (Definition<'db>, ClassType<'db>), stored| {
         let (_, specialization) = owner.class_literal_and_specialization(db);
         // In its own unspecialized class, the method's ordinary self already has the right
         // type. Reuse its expression queries, including their recovery for recursive reads.
-        let receiver =
+        let specialized_receiver =
             (lookup_class != Some(owner) || specialization.is_some()).then_some(receiver);
         let file = definition.program_file(db);
         let env = ProgramEnvironment::from_file(file);
@@ -371,15 +424,30 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
         };
         let assignment = assignment.node(&module);
         let (before, after) = TypeInferenceBuilder::for_definition(db, &env, definition, &module)
-            .finish_augmented_attribute_write(assignment, receiver, stored);
+            .finish_augmented_attribute_write(assignment, specialized_receiver, stored);
+        let after = after.map(|ty| ty.apply_optional_specialization(db, specialization));
+        let after = if let AugmentedStorage::Setter(value) = storage {
+            let attr = assignment
+                .target
+                .as_attribute_expr()
+                .expect("attribute binding");
+            let name = Type::string_literal(db, attr.attr.as_str());
+            after.map(|after| {
+                UnionType::from_elements(
+                    db,
+                    &env,
+                    alternatives(after).filter_map(|ty| {
+                        value.stored_type(db, &env, receiver, name, ty)
+                    }),
+                )
+            })
+        } else {
+            after
+        };
         (
             before.apply_optional_specialization(db, specialization),
-            after.map(|ty| ty.apply_optional_specialization(db, specialization)),
+            after,
         )
-    };
-    let alternatives = |ty: Type<'db>| match ty {
-        Type::Union(union) => Either::Left(union.elements(db).iter().copied()),
-        ty => Either::Right(std::iter::once(ty)),
     };
     let class_of = |ty: Type<'db>| {
         ty.nominal_class(db, &env)
@@ -417,7 +485,7 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
         }
     }
     let mut frontier = writes.build();
-    if !reads_storage {
+    if storage == AugmentedStorage::InterceptedRead {
         return AugmentedAttributeTypes {
             read: frontier,
             write: frontier,

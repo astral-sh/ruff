@@ -10,7 +10,10 @@ use crate::{
     types::{
         KnownClass, Truthiness, Type, TypeContext, UnionBuilder, definition_expression_type,
         function::{is_implicit_classmethod, is_implicit_staticmethod},
-        infer::{AugmentedAttributeTypes, infer_augmented_attribute_writes, infer_unpack_types},
+        infer::{
+            AugmentedAttributeTypes, AugmentedStorage, infer_augmented_attribute_writes,
+            infer_unpack_types,
+        },
         infer_expression_type, inferred_declaration,
         member::Member,
     },
@@ -388,7 +391,7 @@ pub(super) struct AugmentedAttributeWrites<'db> {
     #[returns(copy)]
     pub(super) receiver: Type<'db>,
     #[returns(copy)]
-    pub(super) reads_storage: bool,
+    pub(super) storage: AugmentedStorage<'db>,
     #[returns(deref)]
     pub(super) definitions: Box<[(Definition<'db>, ClassType<'db>)]>,
 }
@@ -417,7 +420,7 @@ impl<'db> AugmentedAttributeWrites<'db> {
             db,
             self.receiver(db),
             self.definitions(db),
-            self.reads_storage(db),
+            self.storage(db),
         )
     }
 }
