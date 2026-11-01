@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/join_implicit_concatenated_string.py
 ---
 ## Input
 ```python
@@ -825,11 +824,13 @@ LEEEEEEEEEEEEEEEEEEEEEEFT = RRRRRRRRIIIIIIIIIIIIGGGGGHHHT | {
 # Ensure that flipping between Multiline and BestFit layout results in stable formatting
 # when using IfBreaksParenthesized layout.
 assert False, "Implicit concatenated stringuses {} layout on {} format".format(
-    "Multiline", "first"
+    "Multiline",
+    "first",
 )
 
 assert False, await "Implicit concatenated stringuses {} layout on {} format".format(
-    "Multiline", "first"
+    "Multiline",
+    "first",
 )
 
 assert False, "Implicit concatenated stringuses {} layout on {} format"[
@@ -837,7 +838,8 @@ assert False, "Implicit concatenated stringuses {} layout on {} format"[
 ]
 
 assert False, +"Implicit concatenated stringuses {} layout on {} format".format(
-    "Multiline", "first"
+    "Multiline",
+    "first",
 )
 
 
