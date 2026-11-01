@@ -87,7 +87,7 @@ use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
 use ty_python_core::definition::Definition;
-use ty_python_core::{ProgramFile, semantic_index};
+use ty_python_core::{Program, ProgramFile, semantic_index};
 
 pub(crate) use self::constructor::ConstructorCallableKind;
 
@@ -5911,6 +5911,50 @@ fn enumerate_argument_types<'a, 'db>(
     })
 }
 
+/// The inputs to parameter specialization when the expected return type supplies no bindings.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype)]
+enum ParameterContextKey<'db> {
+    Uninferred(GenericContext<'db>),
+    Inferred(TypeVarInference<'db>),
+    Explicit(ExplicitParameterContext<'db>),
+}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct ExplicitParameterContext<'db> {
+    #[returns(copy)]
+    generic_context: GenericContext<'db>,
+    #[returns(copy)]
+    program: Program<'db>,
+    #[returns(copy)]
+    inference: TypeVarInference<'db>,
+}
+
+impl<'db> ParameterContextKey<'db> {
+    fn new(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        generic_context: GenericContext<'db>,
+        inference: Option<TypeVarInference<'db>>,
+    ) -> Self {
+        let Some(inference) = inference else {
+            return Self::Uninferred(generic_context);
+        };
+        let program = env.program(db);
+        if inference.generic_context(db) == generic_context
+            && generic_context.program(db) == program
+        {
+            Self::Inferred(inference)
+        } else {
+            Self::Explicit(ExplicitParameterContext::new(
+                db,
+                generic_context,
+                program,
+                inference,
+            ))
+        }
+    }
+}
+
 /// Combines the expected return type and the type arguments inferred so far
 /// into the context for the next argument-inference pass.
 fn parameter_context_specialization<'db>(
@@ -8631,20 +8675,33 @@ impl<'db> Binding<'db> {
         /// with the same generic context and inferred arguments has the same parameter context.
         #[salsa::tracked(
             returns(copy),
-            cycle_initial = |_, _, _, _, _| None,
+            cycle_initial = |_, _, _| None,
             heap_size = ruff_memory_usage::heap_size,
         )]
         fn inferred_parameter_context<'db>(
             db: &'db dyn Db,
-            generic_context: GenericContext<'db>,
-            program: ty_python_core::Program<'db>,
-            inference: Option<TypeVarInference<'db>>,
+            key: ParameterContextKey<'db>,
         ) -> Option<Specialization<'db>> {
+            let (generic_context, program, inference) = match key {
+                ParameterContextKey::Uninferred(context) => {
+                    return Some(context.repeat_specialization(
+                        db,
+                        Type::Dynamic(DynamicType::UnspecializedTypeVar),
+                    ));
+                }
+                ParameterContextKey::Inferred(inference) => {
+                    let context = inference.generic_context(db);
+                    (context, context.program(db), inference)
+                }
+                ParameterContextKey::Explicit(key) => {
+                    (key.generic_context(db), key.program(db), key.inference(db))
+                }
+            };
             Some(parameter_context_specialization(
                 db,
                 &ProgramEnvironment::from_program(program),
                 generic_context,
-                inference,
+                Some(inference),
                 &FxHashMap::default(),
             ))
         }
@@ -8689,8 +8746,10 @@ impl<'db> Binding<'db> {
         }
 
         if return_type_solutions.is_empty()
-            && let Some(specialization) =
-                inferred_parameter_context(db, generic_context, env.program(db), self.inference)
+            && let Some(specialization) = inferred_parameter_context(
+                db,
+                ParameterContextKey::new(db, env, generic_context, self.inference),
+            )
         {
             return Some(specialization);
         }
