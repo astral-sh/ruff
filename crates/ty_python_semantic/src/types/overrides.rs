@@ -26,9 +26,7 @@ use crate::{
         MemberLookupPolicy, Parameter, Parameters, Signature, StaticClassLiteral, Type,
         TypeContext, TypeQualifiers, UnionType,
         call::CallArguments,
-        class::{
-            CodeGeneratorKind, FieldKind, MethodDecorator, implicit_attribute_definition_names,
-        },
+        class::{CodeGeneratorKind, FieldKind, MethodDecorator},
         constraints::ConstraintSetBuilder,
         context::InferContext,
         diagnostic::{
@@ -149,7 +147,7 @@ pub(super) fn check_class<'db>(
         scope,
         kind: CodeGeneratorKind::from_class(db, class.into()),
         enum_info: enum_metadata(db, class.into()),
-        receiver_written_names: implicit_attribute_definition_names(db, scope),
+        receiver_written_names: class.implicit_attribute_definition_names(db),
         bases,
         named_tuple_bases,
     };

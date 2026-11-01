@@ -68,8 +68,15 @@ pub(super) struct ClassBodyDeclaration<'db> {
 /// Infer the public type of a class member/symbol (its type as seen from outside its scope) in the given
 /// `scope`.
 pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Member<'db> {
-    place_table(db, scope)
-        .symbol_id(name)
+    class_member_with_symbol(db, scope, place_table(db, scope).symbol_id(name))
+}
+
+pub(super) fn class_member_with_symbol<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    symbol: Option<ScopedSymbolId>,
+) -> Member<'db> {
+    symbol
         .map(|symbol_id| {
             let mut place_and_quals = place_by_id(
                 db,
