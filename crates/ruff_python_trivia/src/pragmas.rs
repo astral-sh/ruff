@@ -63,3 +63,36 @@ pub fn find_trailing_pragma_offset(comment: &str) -> Option<usize> {
         }
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{find_trailing_pragma_offset, is_pragma_comment};
+
+    #[test]
+    fn pragma_comments() {
+        for pragma in [
+            "# type: ignore",
+            "# noqa: F401",
+            "# noqa",
+            "# NoQA",
+            "# nosec",
+            "# nosec B602, B607",
+            "# isort: off",
+            "# isort: skip",
+            "# pyrefly: ignore[missing-attribute]",
+        ] {
+            assert!(is_pragma_comment(pragma), "{pragma}");
+            assert_eq!(find_trailing_pragma_offset(pragma), Some(0), "{pragma}");
+        }
+    }
+
+    #[test]
+    fn trailing_pragma() {
+        assert_eq!(
+            find_trailing_pragma_offset("# some comment # noqa: F401"),
+            Some(15)
+        );
+        assert_eq!(find_trailing_pragma_offset("## noqa: F401"), Some(1));
+        assert_eq!(find_trailing_pragma_offset("# just a comment"), None);
+    }
+}

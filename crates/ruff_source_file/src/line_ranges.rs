@@ -394,3 +394,62 @@ impl LineRanges for str {
         &self[self.full_lines_range(range)]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{LineRanges, TextRange, TextSize};
+
+    #[test]
+    fn line_starts() {
+        let text = "First line\nsecond line\rthird line";
+        for (offset, start) in [(0, 0), (4, 0), (14, 11), (28, 23)] {
+            assert_eq!(text.line_start(offset.into()), TextSize::from(start));
+        }
+    }
+
+    #[test]
+    fn single_line_ranges() {
+        let text = "First line\nsecond line\r\nthird line";
+        for (offset, start, end, full_end) in [(3, 0, 10, 11), (14, 11, 22, 24), (28, 24, 34, 34)] {
+            let offset = TextSize::from(offset);
+            let line = TextRange::new(start.into(), end.into());
+            let full_line = TextRange::new(start.into(), full_end.into());
+
+            assert_eq!(text.line_end(offset), line.end());
+            assert_eq!(text.full_line_end(offset), full_line.end());
+            assert_eq!(text.line_range(offset), line);
+            assert_eq!(text.full_line_range(offset), full_line);
+            assert_eq!(text.line_str(offset), &text[line]);
+            assert_eq!(text.full_line_str(offset), &text[full_line]);
+        }
+    }
+
+    #[test]
+    fn lines_covering_range() {
+        let text = "First line\nsecond line\r\nthird line";
+        for (end, line_end, full_line_end, has_break) in [(5, 10, 11, false), (14, 22, 24, true)] {
+            let range = TextRange::new(3.into(), end.into());
+            let lines = TextRange::up_to(line_end.into());
+            let full_lines = TextRange::up_to(full_line_end.into());
+
+            assert_eq!(text.lines_range(range), lines);
+            assert_eq!(text.full_lines_range(range), full_lines);
+            assert_eq!(text.lines_str(range), &text[lines]);
+            assert_eq!(text.full_lines_str(range), &text[full_lines]);
+            assert_eq!(text.contains_line_break(range), has_break);
+        }
+    }
+
+    #[test]
+    fn count_lines() {
+        let text = "a\nb\r\nc";
+        for (end, count) in [(1, 0), (3, 1), (4, 2), (5, 2)] {
+            assert_eq!(text.count_lines(TextRange::up_to(end.into())), count);
+        }
+        assert_eq!("Single line".count_lines(TextRange::up_to(13.into())), 0);
+        assert_eq!(
+            "out\nof\nbounds end".count_lines(TextRange::up_to(55.into())),
+            2
+        );
+    }
+}

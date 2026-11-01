@@ -174,6 +174,7 @@ impl RuleSet {
     ///     RuleSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::BadQuotesInlineString]).len(),
     ///     2
     /// );
+    /// ```
     pub const fn len(&self) -> usize {
         let mut len: u32 = 0;
 
@@ -398,6 +399,47 @@ mod tests {
         let all_rules: Vec<_> = all_rules_set.iter().collect();
         let expected_rules: Vec<_> = Rule::iter().collect();
         assert_eq!(all_rules, expected_rules);
+    }
+
+    #[test]
+    fn set_operations() {
+        let left = RuleSet::from_rules(&[Rule::AmbiguousFunctionName, Rule::AnyType]);
+        let right = RuleSet::from_rules(&[
+            Rule::BadQuotesInlineString,
+            Rule::BooleanPositionalValueInCall,
+        ]);
+        assert!(!left.intersects(&right));
+
+        let union = left.clone().union(&right);
+        assert_eq!(union.len(), 4);
+        assert!(left.intersects(&union));
+        assert!(right.intersects(&union));
+        assert_eq!(union.clone().subtract(&right), left);
+        assert_eq!(union.subtract(&left), right);
+    }
+
+    #[test]
+    fn insert_and_remove() {
+        let mut set = RuleSet::empty();
+        assert!(set.is_empty());
+        assert_eq!(set.len(), 0);
+        assert!(!set.contains(Rule::AnyType));
+
+        set.insert(Rule::AmbiguousFunctionName);
+        set.insert(Rule::AnyType);
+        assert!(!set.is_empty());
+        assert_eq!(set.len(), 2);
+        assert!(set.contains(Rule::AmbiguousFunctionName));
+        assert!(set.contains(Rule::AnyType));
+        assert!(!set.contains(Rule::BreakOutsideLoop));
+        assert_eq!(
+            set.iter().collect::<Vec<_>>(),
+            [Rule::AnyType, Rule::AmbiguousFunctionName]
+        );
+
+        set.remove(Rule::AmbiguousFunctionName);
+        assert!(set.contains(Rule::AnyType));
+        assert!(!set.contains(Rule::AmbiguousFunctionName));
     }
 
     #[test]

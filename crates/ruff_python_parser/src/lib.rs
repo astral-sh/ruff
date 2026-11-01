@@ -182,6 +182,7 @@ pub fn parse_expression_range(
 ///
 /// let parsed = parse_parenthesized_expression_range("'''\n int | str'''", TextRange::new(TextSize::new(3), TextSize::new(14)));
 /// assert!(parsed.is_ok());
+/// ```
 pub fn parse_parenthesized_expression_range(
     source: &str,
     range: TextRange,
