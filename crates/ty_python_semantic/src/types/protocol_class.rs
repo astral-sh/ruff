@@ -130,7 +130,11 @@ impl<'db> ProtocolClass<'db> {
                 if !seen_members.insert(name.clone()) {
                     return;
                 }
-                let candidate = candidate.apply_specialization(db, specialization);
+                let candidate = candidate.apply_specialization(
+                    db,
+                    visitor.program_environment(),
+                    specialization,
+                );
                 candidate.walk_recursive_member_types(db, visitor);
             },
         );
@@ -3428,9 +3432,13 @@ impl<'db> ProtocolMemberCandidate<'db> {
     fn apply_specialization(
         mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Self {
-        self.ty = self.ty.apply_optional_specialization(db, specialization);
+        self.ty = self
+            .ty
+            .freshen_member_for_owner_specialization(db, env, specialization)
+            .apply_optional_owner_specialization_to_member(db, specialization);
         self
     }
 
@@ -3582,7 +3590,7 @@ fn cached_protocol_interface<'db>(
 
         let specialization =
             specialization.map(|specialization| specialization.with_typevar_bounds(db));
-        let candidate = candidate.apply_specialization(db, specialization);
+        let candidate = candidate.apply_specialization(db, &env, specialization);
         let ProtocolMemberCandidate {
             ty,
             definition,

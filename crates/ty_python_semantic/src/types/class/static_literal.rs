@@ -1606,6 +1606,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         let body_scope = self.body_scope(db);
         let member = class_member(db, body_scope, name).map_type(|ty| {
+            let ty = ty.freshen_member_for_owner_specialization(db, env, specialization);
             let ty = if name.starts_with("__") && name.ends_with("__") {
                 into_dunder_paramspec_callable(db, env, ty)
             } else {
