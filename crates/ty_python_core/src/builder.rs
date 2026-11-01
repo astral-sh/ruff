@@ -29,7 +29,7 @@ use ty_module_resolver::{
 use crate::HasTrackedScope;
 use crate::ProgramFile;
 use crate::ast_ids::node_key::ExpressionNodeKey;
-use crate::ast_ids::{AstIdsBuilder, ScopedUseId};
+use crate::ast_ids::{AstIdsBuilder, FileUseId, ScopedUseId};
 use crate::ast_node_ref::AstNodeRef;
 use crate::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef, BindingsOwner,
@@ -1423,12 +1423,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_place_table_mut().symbol_mut(id).mark_used();
     }
 
-    fn record_place_use(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
+    fn record_place_use(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) -> ScopedUseId {
         if let ScopedPlaceId::Symbol(symbol_id) = place_id {
             self.mark_symbol_used(symbol_id);
         }
         let use_id = self.current_ast_ids_mut().record_use(expr);
         self.current_use_def_map_mut().record_use(place_id, use_id);
+        use_id
+    }
+
+    fn record_declarations_at_use(&mut self, name: &ast::ExprName, use_id: ScopedUseId) {
+        let use_id = FileUseId {
+            scope: self.current_scope(),
+            id: use_id,
+        };
+        // A class body sees the enclosing declarations now; a nested function can run later.
+        for (scope, ancestor) in VisibleAncestorsIter::new(&self.scopes, use_id.scope) {
+            let places = &self.place_tables[scope];
+            if let Some(symbol) = places.symbol_id(&name.id)
+                && places.symbol(symbol).is_declared()
+            {
+                self.use_def_maps[scope].record_declarations_at_use(use_id, symbol);
+            }
+            if !ancestor.is_eager() {
+                break;
+            }
+        }
     }
 
     fn record_place_definition(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
@@ -3492,6 +3512,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn visit_expr_with_context(&mut self, expr: &'ast ast::Expr, context: ExpressionContext) {
+        self.visit_expr_impl(expr, context, false);
+    }
+
+    fn visit_expr_impl(
+        &mut self,
+        expr: &'ast ast::Expr,
+        context: ExpressionContext,
+        retain_declarations: bool,
+    ) {
         self.with_semantic_checker(|semantic, builder| semantic.visit_expr(expr, builder));
 
         self.scopes_by_expression
@@ -3549,7 +3578,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     deferred_effects = Some((place_expr, is_use, is_definition));
                 }
 
-                walk_expr(self, expr);
+                if let ast::Expr::Subscript(subscript) = expr
+                    && (retain_declarations
+                        || (*ctx == ast::ExprContext::Store && deferred_effects.is_some()))
+                {
+                    // In `d["first"]["second"] = value`, only the read of `d` needs its
+                    // declaration. Index expressions are ordinary reads.
+                    self.visit_expr_impl(&subscript.value, ExpressionContext::Value, true);
+                    self.visit_expr(&subscript.slice);
+                    self.visit_expr_context(&subscript.ctx);
+                } else {
+                    walk_expr(self, expr);
+                }
 
                 let is_use = deferred_effects
                     .as_ref()
@@ -3561,7 +3601,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     let place_id = self.add_place(place_expr);
 
                     if is_use {
-                        self.record_place_use(place_id, expr);
+                        let use_id = self.record_place_use(place_id, expr);
+                        if retain_declarations && let ast::Expr::Name(name) = expr {
+                            self.record_declarations_at_use(name, use_id);
+                        }
 
                         // Keep track of any uses of unannotated collection initializers.
                         if let Some(collection_def) =
