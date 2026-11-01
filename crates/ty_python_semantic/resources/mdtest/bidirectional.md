@@ -1651,13 +1651,13 @@ reveal_type(factory())  # revealed: list[Factory]
 reveal_type(explicit_factory())  # revealed: list[ExplicitFactory]
 ```
 
-## Narrow union declared type for generic calls
+## Generic call narrowing
 
 When a generic call is checked against a union declared type, the union is narrowed to the first
 compatible element:
 
 ```py
-from typing import reveal_type, Any, Callable, TypedDict
+from typing import Any, Callable, reveal_type
 
 def identity[T](x: T) -> T:
     return x
@@ -1675,10 +1675,20 @@ def _(narrow: list[str], target: Target):
 def _(narrow: Callable[[str], None], target: Target):
     target = identity(narrow)
     reveal_type(target)  # revealed: (str, /) -> None
+```
 
-def _(narrow: list[str] | dict[str, str], target: Target):
-    target = identity(narrow)
+If the call cannot be narrowed to a specific member, it is inferred against the entire union:
+
+```py
+def _(wide: list[str] | dict[str, str], target: Target):
+    target = identity(wide)
     reveal_type(target)  # revealed: list[str] | dict[str, str]
+```
+
+The narrowed union element is used as type context when inferring the call:
+
+```py
+from typing import TypedDict
 
 class TD(TypedDict):
     x: int
@@ -1701,10 +1711,10 @@ def _(target: TargetWithTD):
     reveal_type(target)  # revealed: (TD, /) -> None
 ```
 
-```py
-def identity[T](x: T) -> T:
-    return x
+The declared type of a collection literal is also narrowed to the first matching union member,
+maintaining consistency with generic calls:
 
+```py
 def lst[T](x: T) -> list[T]:
     return [x]
 
@@ -1716,6 +1726,7 @@ def _(i: int):
     reveal_type(x2)  # revealed: int
     reveal_type(x3)  # revealed: int
 
+def _(i: int):
     x1: list[int | None] | None = [i]
     x2: list[int | None] | None = identity([i])
     x3: list[int | None] | int | None = identity([i])
@@ -1723,6 +1734,7 @@ def _(i: int):
     reveal_type(x2)  # revealed: list[int | None]
     reveal_type(x3)  # revealed: list[int | None]
 
+def _(i: int):
     x1: list[int | None] | None = [i]
     x2: list[int | None] | None = lst(i)
     x3: list[int | None] | int | None = lst(i)
@@ -1730,54 +1742,56 @@ def _(i: int):
     reveal_type(x2)  # revealed: list[int | None]
     reveal_type(x3)  # revealed: list[int | None]
 
+def _():
     x1: list | None = []  # error: [missing-type-argument]
     x2: list | None = identity([])  # error: [missing-type-argument]
     x3: list | int | None = identity([])  # error: [missing-type-argument]
     reveal_type(x1)  # revealed: list[Unknown]
     reveal_type(x2)  # revealed: list[Unknown]
     reveal_type(x3)  # revealed: list[Unknown]
+```
 
-def f[T](x: list[T]) -> T:
+The narrowing behavior prevents nested generic calls from being unnecessarily widened, despite
+invariance:
+
+```py
+def head[T](x: list[T]) -> T:
     return x[0]
 
 def _(a: int, b: str, c: int | str):
-    x1: int = f(lst(a))
+    x1: int = head(lst(a))
     reveal_type(x1)  # revealed: int
 
-    x2: int | str = f(lst(a))
+    x2: int | str = head(lst(a))
     reveal_type(x2)  # revealed: int
 
-    x3: int | None = f(lst(a))
+    x3: int | None = head(lst(a))
     reveal_type(x3)  # revealed: int
 
-    x4: str = f(lst(b))
+    x4: str = head(lst(b))
     reveal_type(x4)  # revealed: str
 
-    x5: int | str = f(lst(b))
+    x5: int | str = head(lst(b))
     reveal_type(x5)  # revealed: str
 
-    x6: str | int = f(lst(b))
+    x6: str | int = head(lst(b))
     reveal_type(x6)  # revealed: str
 
-    x7: str | None = f(lst(b))
+    x7: str | None = head(lst(b))
     reveal_type(x7)  # revealed: str
 
-    x8: int | str = f(lst(c))
+    x8: int | str = head(lst(c))
     reveal_type(x8)  # revealed: int | str
-
-    x9: int | str = f(lst(c))
-    reveal_type(x9)  # revealed: int | str
 
     # TODO: Ideally this would reveal `int | str`. This is a known limitation of our
     # call inference solver, and would require an extra inference attempt without type
     # context, or with type context of subsets of the union, both of which are impractical
     # for performance reasons.
-    x10: int | str | None = f(lst(c))
-    reveal_type(x10)  # revealed: int | str | None
+    x9: int | str | None = head(lst(c))
+    reveal_type(x9)  # revealed: int | str | None
 ```
 
-This applies to built-in collection constructors as well, mirroring the behavior of collection
-literals:
+Built-in collection constructors similarly narrow their declared type:
 
 ```py
 from typing import Mapping, Sequence
@@ -1807,6 +1821,28 @@ reveal_type(x7)  # revealed: list[int | None]
 
 x8: EitherList = list(("1", "2", "3"))
 reveal_type(x8)  # revealed: list[int | str]
+```
+
+Generic calls are never narrowed to a singleton or dynamic type, which can lead to overly narrow
+results in the presence of dynamic types. Instead, the full declared union is preferred over a
+singleton or dynamic member:
+
+```py
+def head_or[T, U](values: list[T], default: U) -> T | U:
+    return values[0] if values else default
+
+def _(values: list[Any]):
+    result: str | None = reveal_type(head_or(list(values), default=None))  # revealed: str | None
+    result: str | Any = reveal_type(head_or(list(values), default=0))  # revealed: str | Any | Literal[0]
+```
+
+We fallback to inferring against the full declared type when narrowing to a specific member depends
+on the materialization of a gradual argument type.
+
+```py
+def _(values: list[Any]):
+    # TOOD: This should preserve `str | int`.
+    result: str | int = reveal_type(head_or(list(values), default=0))  # revealed: int
 ```
 
 ## Literal union context for generic calls
