@@ -53,6 +53,35 @@ impl Row {
         self.span = span;
     }
 
+    /// Borrows adjacent child handles in source order. An absent optional endpoint
+    /// is stored as zero. Inline integers use little-endian byte order.
+    #[inline]
+    fn inline_children<
+        const START: usize,
+        const LEN: usize,
+        const OPTIONAL_FIRST: bool,
+        const OPTIONAL_LAST: bool,
+    >(
+        &self,
+    ) -> &[u32] {
+        const { assert!(START + LEN <= 3) };
+        // SAFETY: Row construction initializes every byte of the payload. Each union
+        // setter writes one integer field, and every bit pattern is valid for u32.
+        #[expect(unsafe_code)]
+        let words = unsafe { &self.payload.words };
+        let words = &words[START..START + LEN];
+        let words = if OPTIONAL_FIRST {
+            words.strip_prefix(&[0]).unwrap_or(words)
+        } else {
+            words
+        };
+        if OPTIONAL_LAST {
+            words.strip_suffix(&[0]).unwrap_or(words)
+        } else {
+            words
+        }
+    }
+
     /// Reads a field shared by several layouts in the generated descendant or string-part walk.
     #[inline]
     fn inline_word<const OFFSET: usize, const WIDTH: usize>(&self) -> u64 {
@@ -96,6 +125,7 @@ macro_rules! node_payloads {
         #[repr(C, align(8))]
         union Payload {
             raw: TaggedBytes,
+            words: [u32; 3],
             $($arm: $kind,)+
         }
 

@@ -16,9 +16,9 @@ pub struct Children<'a> {
 
 enum ChildSource<'a> {
     Empty,
-    One(Option<AstNodeId<crate::kind::Any>>),
-    Two([Option<AstNodeId<crate::kind::Any>>; 2]),
     Rows(slice::Iter<'a, u32>),
+    #[cfg(target_endian = "big")]
+    InlineWords(&'a [u32]),
     Sequence {
         first: Option<AstNodeId<crate::kind::Any>>,
         rows: slice::Iter<'a, u32>,
@@ -63,22 +63,14 @@ impl<'a> Children<'a> {
         }
     }
 
-    pub(super) fn one(ast: &'a Ast, first: Option<AstNodeId<crate::kind::Any>>) -> Self {
-        Self {
-            ast,
-            source: ChildSource::One(first),
-        }
-    }
-
-    pub(super) fn two(
-        ast: &'a Ast,
-        first: Option<AstNodeId<crate::kind::Any>>,
-        second: Option<AstNodeId<crate::kind::Any>>,
-    ) -> Self {
-        Self {
-            ast,
-            source: ChildSource::Two([first, second]),
-        }
+    /// Inline fields use little-endian integers. Lists in the extra buffer use native integers.
+    #[inline]
+    pub(super) fn inline(ast: &'a Ast, words: &'a [u32]) -> Self {
+        #[cfg(target_endian = "little")]
+        let source = ChildSource::Rows(words.iter());
+        #[cfg(target_endian = "big")]
+        let source = ChildSource::InlineWords(words);
+        Self { ast, source }
     }
 
     pub(super) fn sequence(
@@ -126,8 +118,10 @@ impl<'a> Iterator for Children<'a> {
         let handle = match &mut self.source {
             ChildSource::Empty => return None,
             ChildSource::Rows(words) => AstNodeId::from_word(*words.next()?),
-            ChildSource::One(child) => child.take()?,
-            ChildSource::Two([first, second]) => first.take().or_else(|| second.take())?,
+            #[cfg(target_endian = "big")]
+            ChildSource::InlineWords(words) => {
+                AstNodeId::from_word(u32::from_le(*words.split_off_first()?))
+            }
             ChildSource::Sequence { first, rows, last } => first
                 .take()
                 .or_else(|| rows.next().copied().map(AstNodeId::from_word))
@@ -373,13 +367,16 @@ impl<'a> Pending<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::ptr;
+
     use ruff_text_size::TextRange;
 
+    use super::ChildSource;
     use crate::flat::{AstNode, BuildId, Builder, Emit, build};
     use crate::{AstNodeId, NodeKind, Operator};
 
     #[test]
-    fn binary_children_follow_source_order() {
+    fn children_borrow_inline_operands() {
         let range = TextRange::default();
         let mut builder = Builder::default();
         let (left, ..) = build::ExprNoneLiteral { range }.emit(&mut builder);
@@ -405,6 +402,16 @@ mod tests {
             format!("{binary:#?}")
         );
         let mut children = binary.children();
+        let words = match &children.source {
+            ChildSource::Rows(rows) => Some(rows.as_slice()),
+            #[cfg(target_endian = "big")]
+            ChildSource::InlineWords(words) => Some(*words),
+            _ => None,
+        };
+        assert_eq!(
+            words.map(<[u32]>::as_ptr),
+            Some(ptr::from_ref(binary.syntax_node().row).cast())
+        );
         assert_eq!(children.next(), Some(binary.left().syntax_node()));
         assert_eq!(children.next(), Some(binary.right().syntax_node()));
         assert!(children.next().is_none());
