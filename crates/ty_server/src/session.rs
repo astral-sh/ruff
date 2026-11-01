@@ -654,27 +654,25 @@ impl Session {
         //
         // Note that this is a divergence from previous behavior:
         // https://github.com/astral-sh/ruff/pull/19614
-        let mut global_options: Option<GlobalOptions> = None;
+
+        // Resolve global settings before workspace initialization, which can publish diagnostics.
+        if let Some((_, options)) = workspace_folders.last() {
+            let global_options = self
+                .initialization_options
+                .options
+                .global
+                .clone()
+                .combine(options.global.clone());
+            self.global_settings = Arc::new(global_options.into_settings());
+        }
 
         for (uri, options) in workspace_folders {
-            // Last setting wins.
-            global_options = Some(
-                self.initialization_options
-                    .options
-                    .global
-                    .clone()
-                    .combine(options.global),
-            );
             if !options.unknown.is_empty() {
                 warn_about_unknown_options(client, Some(&uri), &options.unknown);
             }
             self.initialize_workspace_folder(client, &uri, options.workspace);
         }
 
-        if let Some(global_options) = global_options {
-            let global_settings = global_options.into_settings();
-            self.global_settings = Arc::new(global_settings);
-        }
         if let Some(check_mode) = self.global_settings.diagnostic_mode().to_check_mode() {
             for project in self.projects.values_mut() {
                 project.db.set_check_mode(check_mode);
@@ -1021,10 +1019,30 @@ impl Session {
         // See: https://github.com/astral-sh/ruff/pull/22953#discussion_r2745255350
 
         // Remove the associated project database.
-        if let Some(project_state) = self.projects.remove(&workspace_path) {
-            // Clear diagnostics for any files that had pushed diagnostics in this project.
-            for file_uri in project_state.untracked_files_with_pushed_diagnostics {
-                self.clear_diagnostics(client, &file_uri);
+        if let Some(removed_uris) = self
+            .projects
+            .remove(&workspace_path)
+            .map(|state| state.untracked_files_with_pushed_diagnostics)
+            && !removed_uris.is_empty()
+        {
+            for file_uri in &removed_uris {
+                self.clear_diagnostics(client, file_uri);
+            }
+
+            // A configuration file can belong to more than one workspace. Clearing the removed
+            // workspace's diagnostics also clears any diagnostics another workspace sent for it.
+            let affected_roots: Vec<_> = self
+                .projects
+                .iter()
+                .filter(|(_, state)| {
+                    removed_uris
+                        .iter()
+                        .any(|uri| state.untracked_files_with_pushed_diagnostics.contains(uri))
+                })
+                .map(|(root, _)| root.clone())
+                .collect();
+            for root in affected_roots {
+                publish_settings_diagnostics(self, client, root);
             }
         }
 
@@ -1058,11 +1076,23 @@ impl Session {
         document: &OpenDocumentHandle,
         client: &Client,
     ) {
+        if self.has_project_diagnostics(document.uri()) {
+            return;
+        }
         if self.client_capabilities().supports_pull_diagnostics() && !document.is_cell_or_notebook()
         {
             return;
         }
         self.clear_diagnostics(client, document.uri());
+    }
+
+    /// Returns whether a project has published diagnostics for this URI.
+    ///
+    /// These diagnostics remain associated with the project when the document is opened.
+    pub(crate) fn has_project_diagnostics(&self, uri: &Uri) -> bool {
+        self.projects
+            .values()
+            .any(|state| state.untracked_files_with_pushed_diagnostics.contains(uri))
     }
 
     /// Clears the diagnostics for the document identified by `uri`.
