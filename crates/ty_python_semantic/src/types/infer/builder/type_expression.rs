@@ -1687,12 +1687,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     );
                     // Determine if this element unpacks a tuple: either `*expr` or `Unpack[expr]`
                     let is_unpack = matches!(element.classify(), ExprKind::Starred(_))
-                        || matches!(
-                            element.fields(),
-                            ast::ExprFields::Subscript(ast::ExprSubscriptFields { value, .. })
-                                if self.expression_type(value)
-                                    == Type::SpecialForm(SpecialFormType::Unpack)
-                        );
+                        || element.as_subscript_expr().is_some_and(|subscript| {
+                            self.expression_type(subscript.value())
+                                == Type::SpecialForm(SpecialFormType::Unpack)
+                        });
 
                     if is_unpack {
                         let mut report_too_many_unpacked_tuples = || {
@@ -1786,12 +1784,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return TupleType::homogeneous(db, env, Type::unknown());
                 }
                 let single_element_is_unpack = slice.is_starred_expr()
-                    || matches!(
-                        slice.fields(),
-                        ast::ExprFields::Subscript(ast::ExprSubscriptFields { value, .. })
-                            if self.expression_type(value)
-                                == Type::SpecialForm(SpecialFormType::Unpack)
-                    );
+                    || slice.as_subscript_expr().is_some_and(|subscript| {
+                        self.expression_type(subscript.value())
+                            == Type::SpecialForm(SpecialFormType::Unpack)
+                    });
                 if single_element_is_unpack {
                     if let Some(inner_tuple) =
                         single_element_ty.exact_tuple_instance_spec(self.db())
@@ -3210,13 +3206,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 operand,
                 ..
             }) if matches!(op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
-                && matches!(
-                    operand.fields(),
-                    ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                        value: ast::Number::Int(_),
-                        ..
-                    })
-                ) =>
+                && operand.as_int_literal().is_some() =>
             {
                 let ty = self.infer_unary_expression(unary);
                 self.store_expression_type(parameters, ty);

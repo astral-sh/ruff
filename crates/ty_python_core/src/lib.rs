@@ -1200,7 +1200,6 @@ mod tests {
         files::{File, system_path_to_file},
         parsed::ParsedModuleRef,
     };
-    use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
     use test_case::test_case;
 
@@ -2043,11 +2042,7 @@ class C[T]:
         let DefinitionKind::Assignment(assignment) = binding.kind(&db) else {
             panic!("should be an assignment definition")
         };
-        let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-            value: ast::Number::Int(num),
-            ..
-        }) = assignment.value(&module).fields()
-        else {
+        let Some(num) = assignment.value(&module).as_int_literal() else {
             panic!("should be a number literal")
         };
         assert_eq!(*num, 1);
