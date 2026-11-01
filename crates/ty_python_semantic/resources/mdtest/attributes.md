@@ -443,6 +443,291 @@ class C:
 reveal_type(C().value)  # revealed: Before | After | FallbackAfter | Fallback
 ```
 
+When the default is absent, the first append can add an integer to a tuple of strings.
+
+```py
+class Tuples:
+    if flag():
+        values = ()
+
+    def __getattr__(self, name: str) -> tuple[str, ...]:
+        return ("fallback",)
+
+    def append(self, item: int) -> None:
+        # error: [invalid-assignment]
+        # error: [possibly-missing-attribute]
+        self.values += (item,)
+
+reveal_type(Tuples().values)  # revealed: tuple[str | int, ...]
+```
+
+`__getattr__` can also provide the first operand when there is no default. A later call reads the
+value that the previous call stored. Here the subclass's first write makes the base method's update
+reachable.
+
+```py
+from typing import final
+
+@final
+class Start:
+    def __iadd__(self, other: int) -> Before:
+        return Before()
+
+class Dynamic:
+    def __getattr__(self, name: str) -> Start:
+        return Start()
+
+    def again(self) -> None:
+        if isinstance(self.value, Before):
+            self.value += 1
+
+class Derived(Dynamic):
+    def first(self) -> None:
+        if isinstance(self.value, Start):
+            self.value += 1
+
+reveal_type(Dynamic().value)  # revealed: Start
+reveal_type(Derived().value)  # revealed: Before | After | Start
+```
+
+A classmethod can get its first operand from the metaclass. If the operator then stores a class
+object, the next update uses that object's metaclass to find the operator.
+
+```py
+class StoredMeta(type):
+    def __iadd__(cls, other: int) -> After:
+        return After()
+
+class Stored(metaclass=StoredMeta): ...
+
+class Initial:
+    def __iadd__(self, other: int) -> type[Stored]:
+        return Stored
+
+class Meta(type):
+    def __getattr__(cls, name: str) -> Initial:
+        return Initial()
+
+class DynamicClass(metaclass=Meta):
+    @classmethod
+    def update(cls) -> None:
+        cls.value += 1
+
+reveal_type(DynamicClass.value)  # revealed: type[Stored] | After | Initial
+```
+
+Repeated updates can widen a literal supplied by the hook or select another overload on the same
+generic class.
+
+```py
+from typing import Generic, Literal, TypeVar, overload
+
+class Count:
+    def __getattr__(self, name: str) -> Literal[0]:
+        return 0
+
+    def bump(self) -> None:
+        self.value += 1
+
+reveal_type(Count().value)  # revealed: int
+
+class Toggle:
+    @overload
+    def __radd__(self, left: Literal[0]) -> Literal[1]: ...
+    @overload
+    def __radd__(self, left: Literal[1]) -> Literal[0]: ...
+    @overload
+    def __radd__(self, left: int) -> object: ...
+    def __radd__(self, left: int) -> object:
+        return 1 - left
+
+class Switch:
+    def __getattr__(self, name: str) -> Literal[0]:
+        return 0
+
+    def flip(self) -> None:
+        self.value += Toggle()
+
+def read(switch: Switch) -> Literal[0, 1]:
+    return switch.value
+
+T = TypeVar("T")
+
+class Step(Generic[T]):
+    @overload
+    def __iadd__(self: "Step[int]", n: int) -> "Step[list[int]]": ...
+    @overload
+    def __iadd__(self: "Step[list[int]]", n: int) -> After: ...
+    def __iadd__(self, n: int) -> "Step[list[int]] | After":
+        raise NotImplementedError
+
+class Steps:
+    def __getattr__(self, name: str) -> Step[int]:
+        return Step()
+
+    def bump(self) -> None:
+        self.value += 1
+
+reveal_type(Steps().value)  # revealed: Step[list[int]] | After | Step[int]
+```
+
+A reflected operator can distinguish successive specializations of the left operand too.
+
+```py
+class Left(Generic[T]): ...
+class Done: ...
+
+class Right:
+    @overload
+    def __radd__(self, other: Left[int]) -> Left[list[int]]: ...
+    @overload
+    def __radd__(self, other: Left[list[int]]) -> Left[list[list[int]]]: ...
+    @overload
+    def __radd__(self, other: Left[list[list[int]]] | Done) -> Done: ...
+    def __radd__(self, other: object) -> object:
+        raise NotImplementedError
+
+class ReflectedSteps:
+    def __getattr__(self, name: str) -> Left[int]:
+        return Left()
+
+    def bump(self) -> None:
+        self.value += Right()
+
+reveal_type(ReflectedSteps().value)  # revealed: Left[list[int]] | Left[list[list[int]]] | Done | Left[int]
+```
+
+#### Inherited augmented writes use the receiver's type
+
+The inherited method reads through the subclass's override of `__getattr__`. Its operator returns
+that same object, preserving the subclass's type argument.
+
+```py
+from typing import Generic, TypeVar, final
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class Seed:
+    def __iadd__(self, n: int) -> Self:
+        return self
+
+    def __imul__(self, other: T) -> T:
+        return other
+
+class SpecialSeed(Seed, Generic[T]): ...
+
+class Base:
+    def __getattr__(self, name: str) -> Seed:
+        return Seed()
+
+    def bump(self) -> None:
+        self.value += 1
+
+    def replace(self) -> None:
+        self.value *= self.seed()
+
+    def seed(self) -> Seed:
+        return Seed()
+
+class Child(Base, Generic[T]):
+    def __getattr__(self, name: str) -> SpecialSeed[T]:
+        return SpecialSeed()
+
+    def seed(self) -> SpecialSeed[T]:
+        return SpecialSeed()
+
+reveal_type(Base().value)  # revealed: Seed
+reveal_type(Child[str]().value)  # revealed: SpecialSeed[str]
+```
+
+A guard on `self` can also rule out the write for a sibling class.
+
+```py
+class Start:
+    def __iadd__(self, n: int) -> int:
+        return n
+
+class Guarded:
+    def __getattr__(self, name: str) -> Start:
+        return Start()
+
+    def bump(self) -> None:
+        if isinstance(self, Matching):
+            self.value += 1
+
+@final
+class Matching(Guarded): ...
+
+@final
+class Other(Guarded): ...
+
+reveal_type(Matching().value)  # revealed: int | Start
+reveal_type(Other().value)  # revealed: Start
+```
+
+#### Dynamically initialized attributes with custom setters
+
+An operator result can become the next operand only if the setter stores it. A fresh instance still
+reads through `__getattr__`.
+
+```py
+from typing_extensions import Never
+
+class Seed:
+    def __iadd__(self, n: int) -> int:
+        return n
+
+class ReadSeed:
+    def __getattr__(self, name: str) -> Seed:
+        return Seed()
+
+store = object.__setattr__
+
+class Forward(ReadSeed):
+    def __setattr__(self, name: str, value: int) -> None:
+        store(self, name, value)
+
+    def bump(self) -> None:
+        self.value += 1
+
+class Transform(ReadSeed):
+    def __setattr__(self, name: str, value: int) -> None:
+        object.__setattr__(self, name, Seed())
+
+    def bump(self) -> None:
+        self.value += 1
+
+class Rebind(ReadSeed):
+    def __setattr__(self, name: str, value: object) -> None:
+        value = "normalized"
+        store(self, name, value)
+
+    def bump(self) -> None:
+        if isinstance(self.value, Seed):
+            self.value += 1
+
+class Reject(ReadSeed):
+    def __setattr__(self, name: str, value: str) -> None:
+        store(self, name, value)
+
+    def bump(self) -> None:
+        self.value += 1  # error: [invalid-assignment]
+
+class Frozen(ReadSeed):
+    def __setattr__(self, name: str, value: object) -> Never:
+        raise AttributeError(name)
+
+    def bump(self) -> None:
+        self.value += 1  # error: [invalid-assignment]
+
+reveal_type(Forward().value)  # revealed: int | Seed
+reveal_type(Transform().value)  # revealed: Seed
+reveal_type(Rebind().value)  # revealed: str | Seed
+reveal_type(Reject().value)  # revealed: Seed
+reveal_type(Frozen().value)  # revealed: Seed
+```
+
 #### Augmented assignments with expanding generic results
 
 An augmented assignment can repeatedly expand a generic attribute's type arguments. Inference must
@@ -459,16 +744,21 @@ class Grow(Generic[T]):
     def __iadd__(self, other: int) -> Grow[list[T]]:
         raise NotImplementedError
 
+    def __imul__(self, other: int) -> Grow[tuple[T, T, T, T]]:
+        raise NotImplementedError
+
 class Counter:
     value = Grow[int]()
 
     def update(self) -> None:
         self.value += 1  # error: [invalid-assignment]
 
-reveal_type(Counter().value)  # revealed: Grow[int] | Grow[list[int]]
+def wrong(counter: Counter) -> None:
+    counter.value = Grow[str]()  # error: [invalid-assignment]
 ```
 
-An independently initialized attribute must use the same bounded cycle recovery.
+An independently initialized attribute must also converge when an operator duplicates its type
+arguments on every call.
 
 ```py
 class InitializedCounter:
@@ -476,9 +766,155 @@ class InitializedCounter:
         self.value = Grow[int]()
 
     def update(self) -> None:
-        self.value += 1  # error: [invalid-assignment]
+        self.value *= 2
 
-reveal_type(InitializedCounter().value)  # revealed: Grow[int] | Grow[list[int]]
+def write(counter: InitializedCounter) -> None:
+    counter.value = Grow[tuple[int, int, int, int]]()
+    counter.value = Grow[str]()  # error: [invalid-assignment]
+```
+
+#### Augmented assignments that permute type arguments
+
+Rotating four type arguments and swapping the first two can produce all 24 permutations. Inference
+bounds the number of writes it follows even though the types never grow in depth. The stable `int`
+tag still selects the first overload on every rotation.
+
+```py
+from __future__ import annotations
+from typing import Generic, TypeVar, overload
+
+A = TypeVar("A")
+B = TypeVar("B")
+C = TypeVar("C")
+D = TypeVar("D")
+Tag = TypeVar("Tag")
+
+class Box(Generic[Tag, A, B, C, D]):
+    def tag(self) -> Tag:
+        raise NotImplementedError
+
+    @overload
+    def __iadd__(self: Box[int, A, B, C, D], n: int) -> Box[int, B, C, D, A]: ...
+    @overload
+    def __iadd__(self: Box[str, A, B, C, D], n: int) -> str: ...
+    def __iadd__(self, n: int) -> object:
+        raise NotImplementedError
+
+    def __imul__(self, n: int) -> Box[Tag, B, A, C, D]:
+        return Box()
+
+class Red: ...
+class Green: ...
+class Blue: ...
+class White: ...
+
+class Counter:
+    def __init__(self) -> None:
+        self.value = Box[int, Red, Green, Blue, White]()
+
+    def rotate(self) -> None:
+        self.value += 1
+
+    def swap(self) -> None:
+        self.value *= 1
+
+def check(counter: Counter) -> None:
+    reveal_type(counter.value.tag())  # revealed: int
+    counter.value = Box[int, Green, Blue, White, Red]()
+    counter.value = Box[str, Red, Green, Blue, White]()  # error: [invalid-assignment]
+```
+
+#### Large augmented results retain their types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A metaclass operator can return successively more deeply nested class objects. Every stored value is
+still a class.
+
+```py
+from __future__ import annotations
+from typing import final
+
+class Meta(type):
+    def __add__[T](cls: type[Packet[T]], n: int) -> type[Packet[list[T]]]:
+        return type("Next", (Packet,), {})
+
+class Packet[T](metaclass=Meta): ...
+class First(Packet[int]): ...
+
+class Holder:
+    def __init__(self) -> None:
+        self.value = First
+
+    def advance(self) -> None:
+        self.value += 1
+
+def check(holder: Holder) -> None:
+    holder.value()
+    holder.value = 42  # error: [invalid-assignment]
+```
+
+A guard can make an update run only once. The tuple in its result is large enough to exhaust the
+budget by itself, but the operator has already told us its exact type.
+
+```py
+type Eight = tuple[int, int, int, int, int, int, int, int]
+type Block = tuple[*Eight, *Eight, *Eight, *Eight, *Eight, *Eight, *Eight, *Eight]
+
+@final
+class Value[T]:
+    def __init__(self, item: T) -> None:
+        self.item = item
+
+@final
+class Start:
+    def __iadd__(self, n: int) -> Value[tuple[*Block]]:
+        raise NotImplementedError
+
+class Once:
+    def __init__(self) -> None:
+        self.value = Start()
+
+    def advance(self) -> None:
+        if isinstance(self.value, Start):
+            self.value += 1
+
+def read(once: Once) -> None:
+    value = once.value
+    if isinstance(value, Value):
+        value.item.upper()  # error: [unresolved-attribute]
+```
+
+A reflected operator can return a different class after the last update that fits in the budget. Its
+catch-all overload alone cannot establish that every read has an `item` attribute.
+
+```py
+from typing import Any, overload
+
+class Advance:
+    @overload
+    def __radd__(self, left: Value[list[list[tuple[*Block]]]]) -> str: ...
+    @overload
+    def __radd__[T](self, left: Value[T]) -> Value[list[T]]: ...
+    @overload
+    def __radd__(self, left: str) -> str: ...
+    def __radd__(self, left: object) -> object:
+        raise NotImplementedError
+
+class Many:
+    def __init__(self, value: Value[tuple[*Block]]) -> None:
+        self.value = value
+
+    def advance(self) -> None:
+        self.value += Advance()
+
+def read_many(many: Many) -> Value[Any] | str:
+    many.value.item  # error: [unresolved-attribute]
+    many.value = 42  # error: [invalid-assignment]
+    return many.value
 ```
 
 #### Augmented assignments with expanding tuple results
@@ -520,6 +956,47 @@ class Child(Base):
         self.value += 1
 
 reveal_type(Child().value)  # revealed: Before | After
+```
+
+#### Repeated updates to an inherited tuple
+
+An instance starts with the empty tuple set by its base class. On later calls to `add`, `before`
+includes items appended by earlier calls. Writing to the same name on another object has no effect.
+
+```py
+class Base:
+    def __init__(self) -> None:
+        self.values = ()
+
+class Other:
+    values: tuple[int, ...]
+
+class Entries(Base):
+    @staticmethod
+    def clear(other: Other) -> None:
+        other.values = ()
+
+    def add(self, item: int) -> tuple[()]:
+        before = self.values
+        self.values += (item,)  # ok
+        return before  # error: [invalid-return-type]
+
+class Nested(Base):
+    def nest(self) -> None:
+        self.values += (self.values,)  # ok
+```
+
+An explicit empty-tuple annotation still constrains the write.
+
+```py
+class AnnotatedBase:
+    def __init__(self) -> None:
+        self.values: tuple[()] = ()
+
+class Limited(AnnotatedBase):
+    def add(self, item: int) -> None:
+        self.values += (item,)  # error: [invalid-assignment]
+        reveal_type(self.values)  # revealed: tuple[()]
 ```
 
 #### Augmented assignments preserve inherited instance bindings beneath class defaults

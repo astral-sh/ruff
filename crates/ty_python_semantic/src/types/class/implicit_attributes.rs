@@ -2,7 +2,7 @@
 
 use std::{convert::Infallible, ops::ControlFlow, sync::Arc};
 
-use super::{MethodDecorator, static_literal::StaticClassLiteral};
+use super::{ClassType, MethodDecorator, static_literal::StaticClassLiteral};
 use crate::{
     Db, ProgramEnvironment, TypeQualifiers, attribute_assignments, attribute_declarations,
     place::{Place, Provenance},
@@ -10,7 +10,10 @@ use crate::{
     types::{
         KnownClass, Truthiness, Type, TypeContext, UnionBuilder, definition_expression_type,
         function::{is_implicit_classmethod, is_implicit_staticmethod},
-        infer::infer_unpack_types,
+        infer::{
+            AugmentedAttributeTypes, AugmentedStorage, infer_augmented_attribute_writes,
+            infer_unpack_types,
+        },
         infer_expression_type, inferred_declaration,
         member::Member,
     },
@@ -35,8 +38,8 @@ impl<'db> StaticClassLiteral<'db> {
     ///         self.value += 1
     /// ```
     ///
-    /// Here, `value` remains undefined until MRO lookup finds an independent class or instance
-    /// attribute. The same rule applies to `cls.value` in a classmethod.
+    /// Here, `value` remains undefined unless a class member, an instance binding, or a dynamic
+    /// attribute hook supplies its first value. The same rule applies to `cls.value`.
     pub(super) fn implicit_attribute_bindings(
         self,
         db: &'db dyn Db,
@@ -352,7 +355,7 @@ pub(super) struct ImplicitAttribute<'db> {
     pub(super) augmented_bindings: Option<AugmentedBindings<'db>>,
 }
 
-/// Augmented assignments deferred until MRO lookup finds the attribute they read.
+/// A nonempty group of augmented assignments to the same attribute in one class.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(super) struct AugmentedBindings<'db> {
     #[returns(deref)]
@@ -361,6 +364,47 @@ pub(super) struct AugmentedBindings<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for AugmentedBindings<'_> {}
+
+/// The augmented assignments that share storage along an MRO, specialized for that receiver.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(super) struct AugmentedAttributeWrites<'db> {
+    #[returns(copy)]
+    pub(super) receiver: Type<'db>,
+    #[returns(copy)]
+    pub(super) storage: AugmentedStorage<'db>,
+    #[returns(deref)]
+    pub(super) definitions: Box<[(Definition<'db>, ClassType<'db>)]>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for AugmentedAttributeWrites<'_> {}
+
+#[salsa::tracked]
+impl<'db> AugmentedAttributeWrites<'db> {
+    /// Infer the values these methods can write, starting with the attribute established
+    /// independently of them. A method can return a different receiver class for a later update.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, id, _| AugmentedAttributeTypes::exact(Type::divergent(id)),
+        cycle_fn=|db, cycle, previous: &AugmentedAttributeTypes<'db>, result: AugmentedAttributeTypes<'db>, bindings: AugmentedAttributeWrites<'db>| {
+            let env = ProgramEnvironment::from_definition(bindings.definitions(db)[0].0);
+            AugmentedAttributeTypes {
+                read: result.read.cycle_normalized(db, &env, previous.read, cycle),
+                write: result.write.cycle_normalized(db, &env, previous.write, cycle),
+                operands: result.operands.cycle_normalized(db, &env, previous.operands, cycle),
+            }
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    pub(super) fn inferred_types(self, db: &'db dyn Db) -> AugmentedAttributeTypes<'db> {
+        infer_augmented_attribute_writes(
+            db,
+            self.receiver(db),
+            self.definitions(db),
+            self.storage(db),
+        )
+    }
+}
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct ImplicitAttributeName<'db> {

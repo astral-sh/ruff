@@ -5,7 +5,7 @@ pub(crate) use self::dynamic_literal::{
     DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict, dynamic_class_bases_argument,
 };
 pub(super) use self::enum_literal::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec};
-use self::implicit_attributes::{AugmentedBindings, ImplicitAttribute};
+use self::implicit_attributes::{AugmentedAttributeWrites, AugmentedBindings, ImplicitAttribute};
 pub use self::known::KnownClass;
 use self::named_tuple::synthesize_namedtuple_class_member;
 pub(super) use self::named_tuple::{
@@ -21,6 +21,7 @@ pub(super) use self::typed_dict::{
 };
 use super::dedicated::pydantic;
 use super::display;
+use super::infer::AugmentedStorage;
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
     SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
@@ -34,7 +35,6 @@ use crate::types::constraints::{
 use crate::types::enums::enum_metadata;
 use crate::types::function::DataclassTransformerParams;
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
-use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::{ClassBodyDeclaration, Member, inherited_class_body_declaration};
 use crate::types::mro::{Mro, StaticMroError};
@@ -763,36 +763,6 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Look up a class-level member using a provided MRO iterator.
-    ///
-    /// This is used by `super()` to start the MRO lookup after the pivot class.
-    pub(super) fn class_member_from_mro(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        name: &str,
-        policy: MemberLookupPolicy,
-        mro_iter: impl Iterator<Item = ClassBase<'db>>,
-    ) -> PlaceAndQualifiers<'db> {
-        match self {
-            Self::Static(class) => class.class_member_from_mro(db, env, name, policy, mro_iter),
-            Self::Dynamic(_)
-            | Self::DynamicNamedTuple(_)
-            | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => {
-                // Dynamic classes don't have inherited generic context and are never `object`.
-                let result =
-                    MroLookup::new(db, env, mro_iter).class_member(name, policy, None, false);
-                match result {
-                    ClassMemberResult::Done(result) => result.finalize(db, env),
-                    ClassMemberResult::TypedDict(module) => {
-                        typed_dict::typed_dict_fallback_class_member(db, env, module, policy, name)
-                    }
-                }
-            }
-        }
-    }
-
     /// Returns whether this is a known class.
     pub(crate) fn is_known(self, db: &'db dyn Db, known: KnownClass) -> bool {
         self.known(db) == Some(known)
@@ -1076,8 +1046,12 @@ impl<'db> ClassLiteral<'db> {
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
         match self {
-            Self::Static(class) => class.instance_member(db, env, specialization, name),
-            Self::Dynamic(class) => class.instance_member(db, env, name),
+            Self::Static(class) => {
+                class.instance_member(db, env, specialization, name, MemberLookupPolicy::default())
+            }
+            Self::Dynamic(class) => {
+                class.instance_member(db, env, name, MemberLookupPolicy::default())
+            }
             Self::DynamicNamedTuple(namedtuple) => namedtuple.instance_member(db, env, name),
             Self::DynamicTypedDict(_) => PlaceAndQualifiers::default(),
             Self::DynamicEnum(enum_lit) => enum_lit.instance_member(db, env, name),
@@ -1196,6 +1170,44 @@ pub enum ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
+    /// Look up a class-level member using a provided MRO iterator.
+    ///
+    /// This is used by `super()` to start the MRO lookup after the pivot class.
+    pub(super) fn class_member_from_mro(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+        policy: MemberLookupPolicy,
+        mro_iter: impl Iterator<Item = ClassBase<'db>>,
+    ) -> PlaceAndQualifiers<'db> {
+        let (class, specialization) = self.class_literal_and_specialization(db);
+        match class {
+            ClassLiteral::Static(class) => {
+                class.class_member_from_mro(db, env, specialization, name, policy, mro_iter)
+            }
+            ClassLiteral::Dynamic(_)
+            | ClassLiteral::DynamicNamedTuple(_)
+            | ClassLiteral::DynamicTypedDict(_)
+            | ClassLiteral::DynamicEnum(_) => {
+                // Dynamic classes don't have inherited generic context and are never `object`.
+                let result = MroLookup::new(db, env, mro_iter).class_member(
+                    || Type::from(self),
+                    name,
+                    policy,
+                    None,
+                    false,
+                );
+                match result {
+                    ClassMemberResult::Done(result) => result.finalize(db, env),
+                    ClassMemberResult::TypedDict(module) => {
+                        typed_dict::typed_dict_fallback_class_member(db, env, module, policy, name)
+                    }
+                }
+            }
+        }
+    }
+
     /// Return a `ClassType` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
         ClassType::NonGeneric(ClassLiteral::object(db, env))
@@ -2252,8 +2264,20 @@ impl<'db> ClassType<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
+        self.instance_member_with_policy(db, env, name, MemberLookupPolicy::default())
+    }
+
+    pub(super) fn instance_member_with_policy(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
         match self {
-            Self::NonGeneric(ClassLiteral::Dynamic(class)) => class.instance_member(db, env, name),
+            Self::NonGeneric(ClassLiteral::Dynamic(class)) => {
+                class.instance_member(db, env, name, policy)
+            }
             Self::NonGeneric(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
                 namedtuple.instance_member(db, env, name)
             }
@@ -2265,7 +2289,7 @@ impl<'db> ClassType<'db> {
                 if class.is_typed_dict(db) {
                     return Place::Undefined.into();
                 }
-                class.instance_member(db, env, None, name)
+                class.instance_member(db, env, None, name, policy)
             }
             Self::Generic(generic) => {
                 let class_literal = generic.origin(db);
@@ -2279,7 +2303,7 @@ impl<'db> ClassType<'db> {
                 // Applying the receiver's specialization again would also substitute type
                 // variables inside the replacement types. For example, applying `T -> list[T]`
                 // twice changes an attribute's type from `list[T]` to `list[list[T]]`.
-                class_literal.instance_member(db, env, specialization, name)
+                class_literal.instance_member(db, env, specialization, name, policy)
             }
         }
     }
@@ -2371,7 +2395,14 @@ impl<'db> ClassType<'db> {
         member: Member<'db>,
         name: &str,
         target_method_decorator: MethodDecorator,
+        policy: MemberLookupPolicy,
     ) -> ImplicitAttribute<'db> {
+        if policy.contains(MemberLookupPolicy::NO_AUGMENTED_BINDINGS) {
+            return ImplicitAttribute {
+                member,
+                augmented_bindings: None,
+            };
+        }
         let augmented_bindings = self
             .static_class_literal(db)
             .map(|(class, _)| class.implicit_attribute_bindings(db, name, target_method_decorator))
@@ -3006,24 +3037,31 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     fn infer_augmented_bindings(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        receiver: Type<'db>,
         bindings: &[(ClassType<'db>, AugmentedBindings<'db>)],
+        storage: AugmentedStorage<'db>,
+        policy: MemberLookupPolicy,
     ) -> (Type<'db>, Provenance<'db>) {
-        let mut union = UnionBuilder::new(db, env);
+        let mut definitions = Vec::new();
         let mut provenance = Provenance::Unknown;
-
-        for (class, bindings) in bindings {
-            let (_, specialization) = class.class_literal_and_specialization(db);
-
-            for definition in bindings.definitions(db) {
-                let inferred_ty = infer_definition_types(db, *definition)
-                    .binding_type(*definition)
-                    .apply_optional_specialization(db, specialization);
-                union = union.add(inferred_ty);
-                provenance = provenance.or(Provenance::SingleDefinition(*definition));
+        for (class, group) in bindings {
+            for &definition in group.definitions(db) {
+                definitions.push((definition, *class));
+                provenance = provenance.or(Provenance::SingleDefinition(definition));
             }
         }
-
-        let inferred_ty = union.build().promote(db, env).promote_singletons(db, env);
+        let inferred =
+            AugmentedAttributeWrites::new(db, receiver, storage, definitions.into_boxed_slice())
+                .inferred_types(db);
+        let inferred_ty = if policy.contains(MemberLookupPolicy::WRITE_TARGET) {
+            inferred.write
+        } else if policy.contains(MemberLookupPolicy::AUGMENTED_OPERAND) {
+            inferred.operands
+        } else {
+            inferred.read
+        }
+        .promote(db, env)
+        .promote_singletons(db, env);
         let inferred_ty = if let Some(elements) =
             inferred_ty.as_union().map(|union| union.elements(db))
             && elements.iter().any(Type::is_divergent)
@@ -3039,6 +3077,74 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         };
 
         (inferred_ty, provenance)
+    }
+
+    /// Infer storage created by an augmented assignment whose first read uses a dynamic hook.
+    ///
+    /// ```python
+    /// class Counter:
+    ///     def __getattr__(self, name: str) -> int:
+    ///         return 0
+    ///     def increment(self):
+    ///         self.count += 1
+    /// ```
+    ///
+    /// On the first call, `self.count` reads `0` through `__getattr__` and the assignment
+    /// creates an instance attribute. A fresh instance still reads `0` through the hook.
+    fn dynamically_initialized_member(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver: impl FnOnce() -> Type<'db>,
+        bindings: &[(ClassType<'db>, AugmentedBindings<'db>)],
+        policy: MemberLookupPolicy,
+    ) -> Option<DefinedPlace<'db>> {
+        if bindings.is_empty() {
+            return None;
+        }
+        let receiver = receiver();
+        let write = policy.contains(MemberLookupPolicy::WRITE_TARGET);
+        let hook_policy = MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+            | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK
+            | MemberLookupPolicy::NO_AUGMENTED_BINDINGS;
+        let hook = |name| {
+            receiver
+                .class_member_with_policy(db, env, name, hook_policy)
+                .place
+        };
+        // An overriding getter can keep returning Seed after the dictionary receives an int.
+        // If the getter is only conditionally defined, ordinary reads can still see the int.
+        let reads_storage = !hook("__getattribute__").is_definitely_bound();
+        if !write && !reads_storage {
+            return None;
+        }
+        let setter = hook("__setattr__");
+        if write && !setter.is_undefined() {
+            // The setter's signature governs writes, including external assignments.
+            return None;
+        }
+        let storage = if setter.is_definitely_bound() {
+            // `self.value += 1` calls the setter with the operator result. A setter may
+            // discard it or store Seed() instead. Use the value passed to ordinary storage.
+            let function = setter.ignore_possibly_undefined()?.as_function_literal()?;
+            AugmentedStorage::Setter(function.setattr_storage(db)?)
+        } else if reads_storage {
+            AugmentedStorage::Ordinary
+        } else {
+            AugmentedStorage::InterceptedRead
+        };
+        let (ty, provenance) =
+            Self::infer_augmented_bindings(db, env, receiver, bindings, storage, policy);
+        (!ty.is_never()).then_some(DefinedPlace {
+            ty,
+            origin: TypeOrigin::Inferred,
+            definedness: if write {
+                Definedness::AlwaysDefined
+            } else {
+                Definedness::PossiblyUndefined
+            },
+            public_type_policy: PublicTypePolicy::Raw,
+            provenance,
+        })
     }
 
     /// Look up a class member by iterating through the MRO.
@@ -3057,6 +3163,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// 2. Intersect it with the type from non-dynamic MRO members.
     fn class_member(
         self,
+        receiver: impl Fn() -> Type<'db>,
         name: &str,
         policy: MemberLookupPolicy,
         inherited_generic_context: Option<GenericContext<'db>>,
@@ -3110,6 +3217,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         class.own_class_member(db, &self.env, inherited_generic_context, name),
                         name,
                         MethodDecorator::ClassMethod,
+                        policy,
                     );
                     if let Some(bindings) = implicit.augmented_bindings {
                         pending_augmented_bindings.push((class, bindings));
@@ -3123,7 +3231,10 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                             let (inferred_ty, inferred_provenance) = Self::infer_augmented_bindings(
                                 db,
                                 &self.env,
+                                receiver(),
                                 &pending_augmented_bindings,
+                                AugmentedStorage::Ordinary,
+                                policy,
                             );
                             defined.ty = UnionType::from_two_elements(
                                 db,
@@ -3150,6 +3261,17 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             }
         }
 
+        if let Some(place) = Self::dynamically_initialized_member(
+            db,
+            &self.env,
+            receiver,
+            &pending_augmented_bindings,
+            policy,
+        ) {
+            lookup_result = lookup_result.or_else(|error| {
+                error.or_fall_back_to(db, &self.env, Place::Defined(place).into())
+            });
+        }
         ClassMemberResult::Done(CompletedMemberLookup {
             lookup_result,
             dynamic_type,
@@ -3165,7 +3287,12 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     ///
     /// Returns `InstanceMemberResult::TypedDict` if a `TypedDict` base is encountered,
     /// allowing the caller to handle this case specially.
-    fn instance_member(self, name: &str) -> InstanceMemberResult<'db> {
+    fn instance_member(
+        self,
+        receiver: impl Fn() -> Type<'db>,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> InstanceMemberResult<'db> {
         let db = self.db;
         let mut union = UnionBuilder::new(db, &self.env);
         let mut union_qualifiers = TypeQualifiers::empty();
@@ -3216,6 +3343,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         member,
                         name,
                         MethodDecorator::None,
+                        policy,
                     );
                     if let Some(bindings) = implicit.augmented_bindings {
                         pending_augmented_bindings.push((class, bindings));
@@ -3256,7 +3384,10 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                             let (inferred_ty, inferred_provenance) = Self::infer_augmented_bindings(
                                 db,
                                 &self.env,
+                                receiver(),
                                 &pending_augmented_bindings,
+                                AugmentedStorage::Ordinary,
+                                policy,
                             );
                             union = union.add(inferred_ty);
                             provenance = provenance.or(inferred_provenance);
@@ -3298,7 +3429,10 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                             let (inferred_ty, inferred_provenance) = Self::infer_augmented_bindings(
                                 db,
                                 &self.env,
+                                receiver(),
                                 &pending_augmented_bindings,
+                                AugmentedStorage::Ordinary,
+                                policy,
                             );
                             union = union.add(inferred_ty);
                             provenance = provenance.or(inferred_provenance);
@@ -3317,6 +3451,20 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             }
         }
 
+        if let Some(place) = Self::dynamically_initialized_member(
+            db,
+            &self.env,
+            receiver,
+            &pending_augmented_bindings,
+            policy,
+        ) {
+            union = union.add(place.ty);
+            provenance = provenance.or(place.provenance);
+            union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
+            if place.definedness == Definedness::AlwaysDefined {
+                definitely_bound_member = Some(Place::Defined(place).into());
+            }
+        }
         let result = if union.is_empty() {
             Place::Undefined.with_qualifiers(TypeQualifiers::empty())
         } else {
