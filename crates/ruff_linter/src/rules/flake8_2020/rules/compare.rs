@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::registry::Rule;
 
-use crate::rules::flake8_2020::helpers::is_sys;
+use crate::rules::flake8_2020::helpers::{integer_literal, is_sys};
 
 /// ## What it does
 /// Checks for comparisons that test `sys.version` against string literals,
@@ -243,69 +243,51 @@ pub(crate) fn compare(checker: &Checker, compare: ast::ExprCompare<'_>) {
         return;
     };
 
-    match (op, left.classify(), right.fields()) {
-        (
-            _,
-            ExprKind::Subscript(subscript),
-            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                value: ast::Number::Int(number),
-                ..
-            }),
-        ) => {
-            let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                value: ast::Number::Int(index),
-                ..
-            }) = subscript.slice().fields()
-            else {
-                return;
-            };
-
-            match op {
-                CmpOp::Eq | CmpOp::NotEq
-                    if *index == 0
-                        && *number == 3
-                        && checker.is_rule_enabled(Rule::SysVersionInfo0Eq3)
-                        && is_sys(subscript.value(), "version_info", checker.semantic()) =>
-                {
-                    checker.report_diagnostic(
-                        SysVersionInfo0Eq3 {
-                            eq: op == CmpOp::Eq,
-                        },
-                        left.range(),
-                    );
-                }
-                CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE
-                    if *index == 1
-                        && is_sys(subscript.value(), "version_info", checker.semantic()) =>
-                {
-                    checker.report_diagnostic_if_enabled(SysVersionInfo1CmpInt, left.range());
-                }
-                _ => {}
-            }
-        }
-        (
-            CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE,
-            ExprKind::Attribute(attribute),
-            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                value: ast::Number::Int(_),
-                ..
-            }),
-        ) if attribute.attr() == "minor"
-            && is_sys(attribute.value(), "version_info", checker.semantic()) =>
+    match op {
+        CmpOp::Eq | CmpOp::NotEq
+            if checker.is_rule_enabled(Rule::SysVersionInfo0Eq3)
+                && integer_literal(right).is_some_and(|number| *number == 3)
+                && let Some(subscript) = left.as_subscript_expr()
+                && integer_literal(subscript.slice()).is_some_and(|index| *index == 0)
+                && is_sys(subscript.value(), "version_info", checker.semantic()) =>
         {
-            checker.report_diagnostic_if_enabled(SysVersionInfoMinorCmpInt, left.range());
+            checker.report_diagnostic(
+                SysVersionInfo0Eq3 {
+                    eq: op == CmpOp::Eq,
+                },
+                left.range(),
+            );
         }
-        (
-            CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE,
-            _,
-            ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { value, .. }),
-        ) if is_sys(left, "version", checker.semantic()) => {
-            if value.len() == 1 {
-                checker.report_diagnostic_if_enabled(SysVersionCmpStr10, left.range());
-            } else {
-                checker.report_diagnostic_if_enabled(SysVersionCmpStr3, left.range());
+
+        CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE => {
+            if integer_literal(right).is_some() {
+                match left.classify() {
+                    ExprKind::Subscript(subscript)
+                        if integer_literal(subscript.slice()).is_some_and(|index| *index == 1)
+                            && is_sys(subscript.value(), "version_info", checker.semantic()) =>
+                    {
+                        checker.report_diagnostic_if_enabled(SysVersionInfo1CmpInt, left.range());
+                    }
+                    ExprKind::Attribute(attribute)
+                        if attribute.attr() == "minor"
+                            && is_sys(attribute.value(), "version_info", checker.semantic()) =>
+                    {
+                        checker
+                            .report_diagnostic_if_enabled(SysVersionInfoMinorCmpInt, left.range());
+                    }
+                    _ => {}
+                }
+            } else if let Some(literal) = right.as_string_literal_expr()
+                && is_sys(left, "version", checker.semantic())
+            {
+                if literal.value().len() == 1 {
+                    checker.report_diagnostic_if_enabled(SysVersionCmpStr10, left.range());
+                } else {
+                    checker.report_diagnostic_if_enabled(SysVersionCmpStr3, left.range());
+                }
             }
         }
+
         _ => {}
     }
 }
