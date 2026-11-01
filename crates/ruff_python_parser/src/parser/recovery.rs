@@ -1,6 +1,9 @@
 use ruff_python_ast::name::Name;
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, Expr, ExprContext, Pattern};
 use ruff_text_size::{Ranged, TextLen, TextRange};
+
+use crate::token_source::TokenSource;
 
 /// Convert the given [`Pattern`] to an [`Expr`].
 ///
@@ -25,7 +28,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 /// This function returns an invalid [`ast::ExprName`] if the given pattern is a [`Pattern::MatchAs`]
 /// with both the pattern and name present. This is because it cannot be converted to an expression
 /// without dropping one of them as there's no way to represent `x as y` as a valid expression.
-pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
+pub(super) fn pattern_to_expr(pattern: Pattern, tokens: &TokenSource<'_>) -> Expr {
     match pattern {
         Pattern::MatchSingleton(ast::PatternMatchSingleton {
             range,
@@ -51,7 +54,10 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
             node_index,
             patterns,
         }) => Expr::List(ast::ExprList {
-            elts: patterns.into_iter().map(pattern_to_expr).collect(),
+            elts: patterns
+                .into_iter()
+                .map(|pattern| pattern_to_expr(pattern, tokens))
+                .collect(),
             ctx: ExprContext::Store,
             range,
             node_index,
@@ -67,18 +73,31 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                 .into_iter()
                 .zip(patterns)
                 .map(|(key, pattern)| ast::DictItem {
+                    range: TextRange::new(key.start(), pattern.end()),
+                    node_index: ast::AtomicNodeIndex::NONE,
                     key: Some(key),
-                    value: pattern_to_expr(pattern),
+                    value: pattern_to_expr(pattern, tokens),
                 })
                 .collect();
             if let Some(rest) = rest {
+                // The recovered entry also covers the unpacking operator and any trivia
+                // before the captured name.
+                let range = tokens
+                    .previous_non_trivia(rest.start())
+                    .filter(|token| token.kind() == TokenKind::DoubleStar)
+                    .map_or(rest.range, |stars| stars.range().cover(rest.range));
                 let value = Expr::Name(ast::ExprName {
                     range: rest.range,
                     node_index: node_index.clone(),
                     id: rest.id,
                     ctx: ExprContext::Store,
                 });
-                items.push(ast::DictItem { key: None, value });
+                items.push(ast::DictItem {
+                    range,
+                    node_index: ast::AtomicNodeIndex::NONE,
+                    key: None,
+                    value,
+                });
             }
             items.shrink_to_fit();
 
@@ -106,7 +125,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                     args: arguments
                         .patterns
                         .into_iter()
-                        .map(pattern_to_expr)
+                        .map(|pattern| pattern_to_expr(pattern, tokens))
                         .collect(),
                     keywords: arguments
                         .keywords
@@ -115,7 +134,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                             range: keyword_pattern.range,
                             node_index: node_index.clone(),
                             arg: Some(keyword_pattern.attr),
-                            value: pattern_to_expr(keyword_pattern.pattern),
+                            value: pattern_to_expr(keyword_pattern.pattern, tokens),
                         })
                         .collect(),
                 },
@@ -164,7 +183,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                 id: Name::empty(),
                 ctx: ExprContext::Invalid,
             }),
-            (Some(pattern), None) => pattern_to_expr(*pattern),
+            (Some(pattern), None) => pattern_to_expr(*pattern, tokens),
             (None, Some(name)) => Expr::Name(ast::ExprName {
                 range: name.range,
                 node_index,
@@ -185,9 +204,9 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
         }) => {
             let to_bin_expr = |left: Pattern, right: Pattern| ast::ExprBinOp {
                 range: TextRange::new(left.start(), right.end()),
-                left: Box::new(pattern_to_expr(left)),
+                left: Box::new(pattern_to_expr(left, tokens)),
                 op: ast::Operator::BitOr,
-                right: Box::new(pattern_to_expr(right)),
+                right: Box::new(pattern_to_expr(right, tokens)),
                 node_index: node_index.clone(),
             };
 
@@ -200,7 +219,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                             range: TextRange::new(expr_bin_op.start(), pattern.end()),
                             left: Box::new(Expr::BinOp(expr_bin_op)),
                             op: ast::Operator::BitOr,
-                            right: Box::new(pattern_to_expr(pattern)),
+                            right: Box::new(pattern_to_expr(pattern, tokens)),
                             node_index: node_index.clone(),
                         }
                     }))

@@ -294,6 +294,7 @@ const fn is_valid_enclosing_node(node: AnyNodeRef) -> bool {
         | AnyNodeRef::ExprLambda(_)
         | AnyNodeRef::ExprIf(_)
         | AnyNodeRef::ExprDict(_)
+        | AnyNodeRef::DictItem(_)
         | AnyNodeRef::ExprSet(_)
         | AnyNodeRef::ExprListComp(_)
         | AnyNodeRef::ExprSetComp(_)

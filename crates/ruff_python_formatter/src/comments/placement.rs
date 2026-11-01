@@ -232,8 +232,8 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::ExprUnaryOp(unary_op) => handle_unary_op_comment(comment, unary_op, source),
         AnyNodeRef::ExprNamed(_) => handle_named_expr_comment(comment, source),
         AnyNodeRef::ExprLambda(lambda) => handle_lambda_comment(comment, lambda, source),
-        AnyNodeRef::ExprDict(_) => handle_dict_unpacking_comment(comment, source)
-            .or_else(|comment| handle_bracketed_end_of_line_comment(comment, source))
+        AnyNodeRef::ExprDict(_) => handle_bracketed_end_of_line_comment(comment, source),
+        AnyNodeRef::DictItem(_) => handle_dict_unpacking_comment(comment, source)
             .or_else(|comment| handle_key_value_comment(comment, source)),
         AnyNodeRef::ExprDictComp(_) => handle_dict_unpacking_comment(comment, source)
             .or_else(|comment| handle_key_value_comment(comment, source))
@@ -1321,7 +1321,7 @@ fn handle_dict_unpacking_comment<'a>(
 ) -> CommentPlacement<'a> {
     debug_assert_matches!(
         comment.enclosing_node(),
-        AnyNodeRef::ExprDict(_) | AnyNodeRef::ExprDictComp(_)
+        AnyNodeRef::DictItem(_) | AnyNodeRef::ExprDictComp(_)
     );
 
     // no node after our comment so we can't be between `**` and the name (node)
@@ -1364,7 +1364,7 @@ fn handle_key_value_comment<'a>(
 ) -> CommentPlacement<'a> {
     debug_assert_matches!(
         comment.enclosing_node(),
-        AnyNodeRef::ExprDict(_) | AnyNodeRef::ExprDictComp(_)
+        AnyNodeRef::DictItem(_) | AnyNodeRef::ExprDictComp(_)
     );
 
     let (Some(following), Some(preceding)) = (comment.following_node(), comment.preceding_node())

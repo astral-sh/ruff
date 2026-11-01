@@ -307,7 +307,7 @@ where
                 items,
                 range: _,
                 node_index: _,
-            }) => items.iter().any(|ast::DictItem { key, value }| {
+            }) => items.iter().any(|ast::DictItem { key, value, .. }| {
                 any_over_expr(value, &mut *func)
                     || key
                         .as_ref()
