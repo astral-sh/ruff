@@ -576,22 +576,6 @@ reason = "TextSize intentionally provides both checked and saturating arithmetic
 
 [[override]]
 lint = "hawk::dead_public"
-crate = "ruff_text_size"
-item = "size::TextSize::saturating_sub"
-kind = "inherent_method"
-level = "expect"
-reason = "TextSize intentionally provides both checked and saturating arithmetic"
-
-[[override]]
-lint = "hawk::dead_public"
-crate = "ruff_python_ast"
-item = "expression::StringLikePart::<'a>::as_string_literal"
-kind = "inherent_method"
-level = "expect"
-reason = "string-like AST parts intentionally expose consistent typed accessors"
-
-[[override]]
-lint = "hawk::dead_public"
 crate = "ruff_python_ast"
 item = "name::Name::join"
 kind = "inherent_method"
@@ -1227,6 +1211,11 @@ reason = "generated from crates/ruff_python_ast/ast.toml"
 
 [[exclude]]
 crate = "ruff_python_ast"
+file = "crates/ruff_python_ast/src/flat/generated.rs"
+reason = "generated from crates/ruff_python_ast/ast.toml"
+
+[[exclude]]
+crate = "ruff_python_ast"
 file = "crates/ruff_python_ast/src/nodes.rs"
 reason = "AST node APIs intentionally provide a consistent interface across node types"
 
@@ -1237,7 +1226,17 @@ reason = "the comparable AST intentionally mirrors the full AST hierarchy"
 
 [[exclude]]
 crate = "ruff_python_ast"
-file = "crates/ruff_python_ast/src/statement_visitor.rs"
+file = "crates/ruff_python_ast/src/flat/statement_visitor.rs"
+reason = "AST walk functions intentionally provide a consistent interface across node types"
+
+[[exclude]]
+crate = "ruff_python_ast"
+file = "crates/ruff_python_ast/src/flat/visitor.rs"
+reason = "AST walk functions intentionally provide a consistent interface across node types"
+
+[[exclude]]
+crate = "ruff_python_ast"
+file = "crates/ruff_python_ast/src/flat/visitor/source_order.rs"
 reason = "AST walk functions intentionally provide a consistent interface across node types"
 
 [[exclude]]

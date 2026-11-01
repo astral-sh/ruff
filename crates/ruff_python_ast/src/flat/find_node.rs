@@ -1,8 +1,7 @@
-use crate::AnyNodeRef;
-use crate::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_node};
+use super::AstNode;
+use super::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
 use ruff_text_size::{Ranged, TextRange};
-use std::fmt;
-use std::fmt::Formatter;
+use std::fmt::{self, Formatter};
 
 /// Returns the node with a minimal range that fully contains `range`.
 ///
@@ -11,15 +10,15 @@ use std::fmt::Formatter;
 ///
 /// ## Panics
 /// Panics if `range` is not contained within `root`.
-pub fn covering_node(root: AnyNodeRef, range: TextRange) -> CoveringNode {
+pub fn covering_node(root: crate::SyntaxNode<'_>, range: TextRange) -> CoveringNode<'_> {
     struct Visitor<'a> {
         range: TextRange,
         found: bool,
-        ancestors: Vec<AnyNodeRef<'a>>,
+        ancestors: Vec<crate::SyntaxNode<'a>>,
     }
 
     impl<'a> SourceOrderVisitor<'a> for Visitor<'a> {
-        fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+        fn enter_node(&mut self, node: crate::SyntaxNode<'a>) -> TraversalSignal {
             // If the node fully contains the range, than it is a possible match but traverse into its children
             // to see if there's a node with a narrower range.
             if !self.found && node.range().contains_range(self.range) {
@@ -30,8 +29,13 @@ pub fn covering_node(root: AnyNodeRef, range: TextRange) -> CoveringNode {
             }
         }
 
-        fn leave_node(&mut self, node: AnyNodeRef<'a>) {
-            if !self.found && self.ancestors.last() == Some(&node) {
+        fn leave_node(&mut self, node: crate::SyntaxNode<'a>) {
+            if !self.found
+                && self
+                    .ancestors
+                    .last()
+                    .is_some_and(|last| last.is_same_node(node))
+            {
                 self.found = true;
             }
         }
@@ -48,7 +52,7 @@ pub fn covering_node(root: AnyNodeRef, range: TextRange) -> CoveringNode {
         ancestors: Vec::new(),
     };
 
-    walk_node(&mut visitor, root);
+    super::visitor::source_order::walk_node(&mut visitor, root);
     CoveringNode::from_ancestors(visitor.ancestors)
 }
 
@@ -58,18 +62,18 @@ pub struct CoveringNode<'a> {
     /// root. The root is always the first element and the covering
     /// node found is always the last node. This sequence is guaranteed
     /// to be non-empty.
-    nodes: Vec<AnyNodeRef<'a>>,
+    nodes: Vec<crate::SyntaxNode<'a>>,
 }
 
 impl<'a> CoveringNode<'a> {
     /// Creates a new `CoveringNode` from a list of ancestor nodes.
     /// The ancestors should be ordered from root to the covering node.
-    pub fn from_ancestors(ancestors: Vec<AnyNodeRef<'a>>) -> Self {
+    pub fn from_ancestors(ancestors: Vec<crate::SyntaxNode<'a>>) -> Self {
         Self { nodes: ancestors }
     }
 
     /// Returns the covering node found.
-    pub fn node(&self) -> AnyNodeRef<'a> {
+    pub fn node(&self) -> crate::SyntaxNode<'a> {
         *self
             .nodes
             .last()
@@ -77,7 +81,7 @@ impl<'a> CoveringNode<'a> {
     }
 
     /// Returns the node's parent.
-    pub fn parent(&self) -> Option<AnyNodeRef<'a>> {
+    pub fn parent(&self) -> Option<crate::SyntaxNode<'a>> {
         let penultimate = self.nodes.len().checked_sub(2)?;
         self.nodes.get(penultimate).copied()
     }
@@ -87,7 +91,7 @@ impl<'a> CoveringNode<'a> {
     ///
     /// The "first" here means that the node closest to a leaf is
     /// returned.
-    pub fn find_first(mut self, f: impl Fn(AnyNodeRef<'a>) -> bool) -> Result<Self, Self> {
+    pub fn find_first(mut self, f: impl Fn(crate::SyntaxNode<'a>) -> bool) -> Result<Self, Self> {
         let Some(index) = self.find_first_index(f) else {
             return Err(self);
         };
@@ -102,7 +106,7 @@ impl<'a> CoveringNode<'a> {
     /// the highest ancestor found satisfying the given predicate is
     /// returned. Note that this is *not* the same as finding the node
     /// closest to the root that satisfies the given predicate.
-    pub fn find_last(mut self, f: impl Fn(AnyNodeRef<'a>) -> bool) -> Result<Self, Self> {
+    pub fn find_last(mut self, f: impl Fn(crate::SyntaxNode<'a>) -> bool) -> Result<Self, Self> {
         let Some(mut index) = self.find_first_index(&f) else {
             return Err(self);
         };
@@ -115,7 +119,7 @@ impl<'a> CoveringNode<'a> {
 
     /// Returns an iterator over the ancestor nodes, starting with the node itself
     /// and walking towards the root.
-    pub fn ancestors(&self) -> impl DoubleEndedIterator<Item = AnyNodeRef<'a>> + '_ {
+    pub fn ancestors(&self) -> impl DoubleEndedIterator<Item = crate::SyntaxNode<'a>> + '_ {
         self.nodes.iter().copied().rev()
     }
 
@@ -124,7 +128,7 @@ impl<'a> CoveringNode<'a> {
     ///
     /// If there are no nodes matching the given predicate, then
     /// `None` is returned.
-    fn find_first_index(&self, f: impl Fn(AnyNodeRef<'a>) -> bool) -> Option<usize> {
+    fn find_first_index(&self, f: impl Fn(crate::SyntaxNode<'a>) -> bool) -> Option<usize> {
         self.nodes.iter().rposition(|node| f(*node))
     }
 }

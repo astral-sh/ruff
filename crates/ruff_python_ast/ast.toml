@@ -1,83 +1,30 @@
-# This file is used by generate.py to autogenerate our Python AST data model.
+# This schema defines Python AST node kinds, typed field accessors, and row constructors.
 #
-# We have defined a Rust struct for each syntax node in `src/nodes.rs`.  Many of
-# these nodes belong to groups. For instance, there is a `Stmt` group
-# consisting of all of the syntax nodes that represent valid Python statements.
+# Each [Group.nodes.Name] entry declares a node. Types in a group share a view such
+# as Expr or Stmt. The ungrouped section declares nodes such as Arguments and Keyword.
 #
-# There is a special group named `ungrouped` that contains syntax nodes that do
-# not belong to any group.
+# A field type names another node or a scalar value. A trailing ? makes the field
+# optional. A trailing * makes it a list. The arena stores child handles and list
+# intervals. Literal text and numbers live in the arena's corresponding value tables.
 #
-# Each group is defined by two sections below. The `[GROUP]` section defines
-# options that control the auto-generation for that group. The `[GROUP.nodes]`
-# section defines which syntax nodes belong to that group. The name of each
-# entry in the nodes section must match the name of the corresponding Rust
-# struct. The value of each entry defines options that control the
-# auto-generation for that syntax node.
-#
-# The following group options are available:
-#
-# add_suffix_to_is_methods: [true/false]
-#   Controls the name of the is_foo methods of the group's enums.  If false (the
-#   default), these methods will use the variant name in snake_case.  If true,
-#   then the group prefix will be moved to the end before snake_casing.  (That
-#   is, `StmtIf` will become `if_stmt`.)
-#
-# anynode_is_label: foo_bar
-#   Controls the name of the AnyNodeRef::is_foo_bar method.  The default is the
-#   group name in snake_case.
-#
-# doc:
-#   A doc comment that is added to the group's enums.
-#
-# The following syntax node options are available:
-#
-# doc:
-#  A doc comment that is added to the syntax node struct.
-#
-# derives:
-# List of derives to add to the syntax node struct. Clone, Debug, PartialEq are added by default.
-#
-# custom_source_order:
-# A boolean that specifies if this node has a custom source order visitor implementation.
-# generation of visit_source_order will be skipped for this node.
-#
-# fields:
-# List of fields in the syntax node struct. Each field is a table with the
-# following keys:
-# * name - The name of the field.
-# * type - The type of the field.  This can be a simple type name, or a type
-#   type field uses a special syntax to describe the rust type:
-#    * `Expr` - A single expression.
-#    * `Expr?` - Option type.
-#    * `Expr*` - A vector of Expr, shorthand for `Vec<Expr>`.
-#    * `Vec<Expr>` - A vector of Expr.
-#    * `Box<[Expr]>` - A boxed slice of Expr.
-#    * `ThinVec<Expr>` - A thin vector of Expr.
-#    These properties cannot be nested, for example we cannot create a vector of option types.
-# * is_annotation - If this field is a type annotation.
-#
-# source_order:
-# Defines in what order the fields appear in source
-#
-# variant:
-#   The name of the enum variant for this syntax node.  Defaults to the node
-#   name with the group prefix removed.  (That is, `StmtIf` becomes `If`.)
+# Fields appear in declaration order unless source_order specifies a different order
+# for traversal. Set is_annotation on an expression field to call the visitor's
+# annotation hook. A node's variant defaults to its name with the group prefix removed.
+# Groups can add a suffix to generated kind checks, as in is_if_stmt.
 
 [Mod]
-anynode_is_label = "module"
 doc = "See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)"
 
 [Mod.nodes.ModModule]
 doc = "See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)"
-fields = [{ name = "body", type = "ThinVec<Stmt>" }]
+fields = [{ name = "body", type = "Stmt*" }]
 
 [Mod.nodes.ModExpression]
 doc = "See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)"
-fields = [{ name = "body", type = "Box<Expr>" }]
+fields = [{ name = "body", type = "Expr" }]
 
 [Stmt]
 add_suffix_to_is_methods = true
-anynode_is_label = "statement"
 doc = "See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)"
 
 [Stmt.nodes.StmtFunctionDef]
@@ -87,22 +34,22 @@ and [AsyncFunctionDef](https://docs.python.org/3/library/ast.html#ast.AsyncFunct
 This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type."""
 fields = [
   { name = "is_async", type = "bool" },
-  { name = "decorator_list", type = "ThinVec<Decorator>" },
+  { name = "decorator_list", type = "Decorator*" },
   { name = "name", type = "Identifier" },
-  { name = "type_params", type = "Box<crate::TypeParams>?" },
-  { name = "parameters", type = "Box<crate::Parameters>" },
+  { name = "type_params", type = "TypeParams?" },
+  { name = "parameters", type = "Parameters" },
   { name = "returns", type = "Expr?", is_annotation = true },
-  { name = "body", type = "ThinVec<Stmt>" },
+  { name = "body", type = "Stmt*" },
 ]
 
 [Stmt.nodes.StmtClassDef]
 doc = "See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)"
 fields = [
-  { name = "decorator_list", type = "ThinVec<Decorator>" },
+  { name = "decorator_list", type = "Decorator*" },
   { name = "name", type = "Identifier" },
-  { name = "type_params", type = "Box<crate::TypeParams>?" },
-  { name = "arguments", type = "Box<crate::Arguments>?" },
-  { name = "body", type = "ThinVec<Stmt>" },
+  { name = "type_params", type = "TypeParams?" },
+  { name = "arguments", type = "Arguments?" },
+  { name = "body", type = "Stmt*" },
 ]
 
 [Stmt.nodes.StmtReturn]
@@ -117,7 +64,7 @@ fields = [{ name = "targets", type = "Expr*" }]
 doc = "See also [TypeAlias](https://docs.python.org/3/library/ast.html#ast.TypeAlias)"
 fields = [
   { name = "name", type = "Expr" },
-  { name = "type_params", type = "Box<crate::TypeParams>?" },
+  { name = "type_params", type = "TypeParams?" },
   { name = "value", type = "Expr" },
 ]
 
@@ -154,8 +101,8 @@ fields = [
   { name = "is_async", type = "bool" },
   { name = "target", type = "Expr" },
   { name = "iter", type = "Expr" },
-  { name = "body", type = "ThinVec<Stmt>" },
-  { name = "orelse", type = "ThinVec<Stmt>" },
+  { name = "body", type = "Stmt*" },
+  { name = "orelse", type = "Stmt*" },
 ]
 
 [Stmt.nodes.StmtWhile]
@@ -163,8 +110,8 @@ doc = """See also [While](https://docs.python.org/3/library/ast.html#ast.While)
 and [AsyncWhile](https://docs.python.org/3/library/ast.html#ast.AsyncWhile)."""
 fields = [
   { name = "test", type = "Expr" },
-  { name = "body", type = "ThinVec<Stmt>" },
-  { name = "orelse", type = "ThinVec<Stmt>" },
+  { name = "body", type = "Stmt*" },
+  { name = "orelse", type = "Stmt*" },
 ]
 
 [Stmt.nodes.StmtIf]
@@ -172,7 +119,7 @@ doc = "See also [If](https://docs.python.org/3/library/ast.html#ast.If)"
 fields = [
 
   { name = "test", type = "Expr" },
-  { name = "body", type = "ThinVec<Stmt>" },
+  { name = "body", type = "Stmt*" },
   { name = "elif_else_clauses", type = "ElifElseClause*" },
 ]
 
@@ -184,7 +131,7 @@ This type differs from the original Python AST, as it collapses the synchronous 
 fields = [
   { name = "is_async", type = "bool" },
   { name = "items", type = "WithItem*" },
-  { name = "body", type = "ThinVec<Stmt>" },
+  { name = "body", type = "Stmt*" },
 ]
 
 [Stmt.nodes.StmtMatch]
@@ -202,10 +149,10 @@ fields = [{ name = "exc", type = "Expr?" }, { name = "cause", type = "Expr?" }]
 doc = """See also [Try](https://docs.python.org/3/library/ast.html#ast.Try)
 and [TryStar](https://docs.python.org/3/library/ast.html#ast.TryStar)"""
 fields = [
-  { name = "body", type = "ThinVec<Stmt>" },
+  { name = "body", type = "Stmt*" },
   { name = "handlers", type = "ExceptHandler*" },
-  { name = "orelse", type = "ThinVec<Stmt>" },
-  { name = "finalbody", type = "ThinVec<Stmt>" },
+  { name = "orelse", type = "Stmt*" },
+  { name = "finalbody", type = "Stmt*" },
   { name = "is_star", type = "bool" },
 ]
 
@@ -311,18 +258,16 @@ The final syntax is the combined version of the above two. For example, `%matplo
 """
 fields = [
   { name = "kind", type = "IpyEscapeKind" },
-  { name = "value", type = "Box<str>" },
+  { name = "value", type = "str" },
 ]
 
 [Expr]
 add_suffix_to_is_methods = true
-anynode_is_label = "expression"
 doc = "See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)"
 
 [Expr.nodes.ExprBoolOp]
 doc = "See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)"
 fields = [{ name = "op", type = "BoolOp" }, { name = "values", type = "Expr*" }]
-custom_source_order = true
 
 [Expr.nodes.ExprNamed]
 doc = "See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)"
@@ -346,7 +291,7 @@ fields = [
 [Expr.nodes.ExprLambda]
 doc = "See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)"
 fields = [
-  { name = "parameters", type = "Box<crate::Parameters>?" },
+  { name = "parameters", type = "Parameters?" },
   { name = "body", type = "Expr" },
 ]
 
@@ -386,7 +331,7 @@ doc = "See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictCo
 fields = [
   { name = "key", type = "Expr?" },
   { name = "value", type = "Expr" },
-  { name = "generators", type = "Box<[Comprehension]>" },
+  { name = "generators", type = "Comprehension*" },
 ]
 
 [Expr.nodes.ExprGenerator]
@@ -418,11 +363,10 @@ There is at least one operator, and `operands.len() == ops.len() + 1`.
 
 See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)."""
 fields = [
-  { name = "ops", type = "Box<[CmpOp]>" },
-  { name = "operands", type = "Box<[Expr]>" },
+  { name = "ops", type = "CmpOp*" },
+  { name = "operands", type = "Expr*" },
 ]
 # The fields must be visited simultaneously
-custom_source_order = true
 
 [Expr.nodes.ExprCall]
 doc = """A call expression whose end offset is derived from its arguments.
@@ -431,10 +375,7 @@ The parser and error-recovery code must ensure that the call and its arguments
 end at the same offset.
 
 See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)"""
-custom_debug = true
-custom_range = true
 fields = [
-  { name = "range_start", type = "ruff_text_size::TextSize", skip_visit = true },
   { name = "func", type = "Expr" },
   { name = "arguments", type = "Arguments" },
 ]
@@ -449,7 +390,6 @@ it keeps them separate and provide various methods to access the parts.
 
 See also [JoinedStr](https://docs.python.org/3/library/ast.html#ast.JoinedStr)"""
 fields = [{ name = "value", type = "FStringValue" }]
-custom_source_order = true
 
 [Expr.nodes.ExprTString]
 doc = """An AST node that represents either a single-part t-string literal
@@ -461,36 +401,30 @@ it keeps them separate and provide various methods to access the parts.
 
 See also [TemplateStr](https://docs.python.org/3/library/ast.html#ast.TemplateStr)"""
 fields = [{ name = "value", type = "TStringValue" }]
-custom_source_order = true
 
 [Expr.nodes.ExprStringLiteral]
 doc = """An AST node that represents either a single-part string literal
 or an implicitly concatenated string literal."""
-fields = [{ name = "value", type = "StringLiteralValue" }]
+fields = [{ name = "value", type = "StringValue" }]
 # Because StringLiteralValue type is an iterator and it's not clear from the type
-custom_source_order = true
 
 [Expr.nodes.ExprBytesLiteral]
 doc = """An AST node that represents either a single-part bytestring literal
 or an implicitly concatenated bytestring literal."""
-fields = [{ name = "value", type = "BytesLiteralValue" }]
+fields = [{ name = "value", type = "BytesValue" }]
 # Because BytesLiteralValue type is an iterator and it's not clear from the type
-custom_source_order = true
 
 [Expr.nodes.ExprNumberLiteral]
 fields = [{ name = "value", type = "Number" }]
 
 [Expr.nodes.ExprBooleanLiteral]
 fields = [{ name = "value", type = "bool" }]
-derives = ["Default"]
 
 [Expr.nodes.ExprNoneLiteral]
 fields = []
-derives = ["Default"]
 
 [Expr.nodes.ExprEllipsisLiteral]
 fields = []
-derives = ["Default"]
 
 [Expr.nodes.ExprAttribute]
 doc = "See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)"
@@ -560,26 +494,43 @@ see [`StmtIpyEscapeCommand`]."""
 
 fields = [
   { name = "kind", type = "IpyEscapeKind" },
-  { name = "value", type = "Box<str>" },
+  { name = "value", type = "str" },
 ]
 
 [ExceptHandler]
 doc = "See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)"
 
-[ExceptHandler.nodes]
-ExceptHandlerExceptHandler = {}
+[ExceptHandler.nodes.ExceptHandlerExceptHandler]
+doc = "See also [ExceptHandler](https://docs.python.org/3/library/ast.html#ast.ExceptHandler)"
+fields = [
+  { name = "type_", type = "Expr?" },
+  { name = "name", type = "Identifier?" },
+  { name = "body", type = "Stmt*" },
+]
 
-[InterpolatedStringElement.nodes]
-InterpolatedElement = { variant = "Interpolation" }
-InterpolatedStringLiteralElement = { variant = "Literal" }
+[InterpolatedStringElement.nodes.InterpolatedElement]
+doc = "See also [FormattedValue](https://docs.python.org/3/library/ast.html#ast.FormattedValue)"
+variant = "Interpolation"
+fields = [
+  { name = "expression", type = "Expr" },
+  { name = "debug_text", type = "DebugText?" },
+  { name = "conversion", type = "ConversionFlag" },
+  { name = "format_spec", type = "InterpolatedStringFormatSpec?" },
+]
 
+[InterpolatedStringElement.nodes.InterpolatedStringLiteralElement]
+doc = "An `FStringLiteralElement` with an empty `value` is an invalid f-string element."
+variant = "Literal"
+fields = [
+  { name = "value", type = "LiteralText" },
+]
 
 [Pattern]
 doc = "See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)"
 
 [Pattern.nodes.PatternMatchValue]
 doc = "See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)"
-fields = [{ name = "value", type = "Box<Expr>" }]
+fields = [{ name = "value", type = "Expr" }]
 
 [Pattern.nodes.PatternMatchSingleton]
 doc = "See also [MatchSingleton](https://docs.python.org/3/library/ast.html#ast.MatchSingleton)"
@@ -592,12 +543,11 @@ fields = [{ name = "patterns", type = "Pattern*" }]
 [Pattern.nodes.PatternMatchMapping]
 doc = "See also [MatchMapping](https://docs.python.org/3/library/ast.html#ast.MatchMapping)"
 fields = [{ name = "items", type = "MappingPatternItems" }]
-custom_source_order = true
 
 [Pattern.nodes.PatternMatchClass]
 doc = "See also [MatchClass](https://docs.python.org/3/library/ast.html#ast.MatchClass)"
 fields = [
-  { name = "cls", type = "Box<Expr>" },
+  { name = "cls", type = "Expr" },
   { name = "arguments", type = "PatternArguments" },
 ]
 
@@ -608,7 +558,7 @@ fields = [{ name = "name", type = "Identifier?" }]
 [Pattern.nodes.PatternMatchAs]
 doc = "See also [MatchAs](https://docs.python.org/3/library/ast.html#ast.MatchAs)"
 fields = [
-  { name = "pattern", type = "Box<Pattern>?" },
+  { name = "pattern", type = "Pattern?" },
   { name = "name", type = "Identifier?" },
 ]
 
@@ -623,43 +573,183 @@ doc = "See also [type_param](https://docs.python.org/3/library/ast.html#ast.type
 doc = "See also [TypeVar](https://docs.python.org/3/library/ast.html#ast.TypeVar)"
 fields = [
   { name = "name", type = "Identifier" },
-  { name = "bound", type = "Box<Expr>?" },
-  { name = "default", type = "Box<Expr>?" },
+  { name = "bound", type = "Expr?" },
+  { name = "default", type = "Expr?" },
 ]
 
 [TypeParam.nodes.TypeParamTypeVarTuple]
 doc = "See also [TypeVarTuple](https://docs.python.org/3/library/ast.html#ast.TypeVarTuple)"
 fields = [
   { name = "name", type = "Identifier" },
-  { name = "default", type = "Box<Expr>?" },
+  { name = "default", type = "Expr?" },
 ]
 
 [TypeParam.nodes.TypeParamParamSpec]
 doc = "See also [ParamSpec](https://docs.python.org/3/library/ast.html#ast.ParamSpec)"
 fields = [
   { name = "name", type = "Identifier" },
-  { name = "default", type = "Box<Expr>?" },
+  { name = "default", type = "Expr?" },
 ]
 
-[ungrouped.nodes]
-InterpolatedStringFormatSpec = {}
-PatternArguments = {}
-PatternKeyword = {}
-Comprehension = {}
-Arguments = {}
-Parameters = {}
-Parameter = {}
-ParameterWithDefault = {}
-DictItem = {}
-Keyword = {}
-Alias = {}
-WithItem = {}
-MatchCase = {}
-Decorator = {}
-ElifElseClause = {}
-TypeParams = {}
-FString = {}
-TString = {}
-StringLiteral = {}
-BytesLiteral = {}
-Identifier = {}
+[ungrouped.nodes.InterpolatedStringFormatSpec]
+fields = [
+  { name = "elements", type = "InterpolatedStringElement*" },
+]
+
+[ungrouped.nodes.PatternArguments]
+doc = "The parenthesized arguments of a class pattern, as in `case Point(1, x=0, y=0)`."
+fields = [
+  { name = "patterns", type = "Pattern*" },
+  { name = "keywords", type = "PatternKeyword*" },
+]
+
+[ungrouped.nodes.PatternKeyword]
+doc = """
+An AST node to represent the keyword arguments to a [`crate::PatternMatchClass`], i.e., the
+`x=0` and `y=0` in `case Point(x=0, y=0)`.
+
+Like [`Keyword`], but for [`crate::PatternMatchClass`].
+"""
+fields = [
+  { name = "attr", type = "Identifier" },
+  { name = "pattern", type = "Pattern" },
+]
+
+[ungrouped.nodes.Comprehension]
+doc = "See also [comprehension](https://docs.python.org/3/library/ast.html#ast.comprehension)"
+fields = [
+  { name = "target", type = "Expr" },
+  { name = "iter", type = "Expr" },
+  { name = "ifs", type = "Expr*" },
+  { name = "is_async", type = "bool" },
+]
+
+[ungrouped.nodes.Arguments]
+fields = [
+  { name = "args", type = "Expr*" },
+  { name = "keywords", type = "Keyword*" },
+]
+
+[ungrouped.nodes.Parameters]
+fields = [
+  { name = "posonlyargs", type = "ParameterWithDefault*" },
+  { name = "args", type = "ParameterWithDefault*" },
+  { name = "vararg", type = "Parameter?" },
+  { name = "kwonlyargs", type = "ParameterWithDefault*" },
+  { name = "kwarg", type = "Parameter?" },
+]
+
+[ungrouped.nodes.Parameter]
+doc = "See also [arg](https://docs.python.org/3/library/ast.html#ast.arg)"
+fields = [
+  { name = "name", type = "Identifier" },
+  { name = "annotation", type = "Expr?", is_annotation = true },
+]
+
+[ungrouped.nodes.ParameterWithDefault]
+doc = "A positional or keyword-only parameter and its optional default value. Variadic parameters use [`Parameter`] directly."
+fields = [
+  { name = "parameter", type = "Parameter" },
+  { name = "default", type = "Expr?" },
+]
+
+[ungrouped.nodes.DictItem]
+doc = "A dictionary display entry. A missing key represents `**mapping`."
+fields = [
+  { name = "key", type = "Expr?" },
+  { name = "value", type = "Expr" },
+]
+
+[ungrouped.nodes.Keyword]
+doc = "See also [keyword](https://docs.python.org/3/library/ast.html#ast.keyword)"
+fields = [
+  { name = "arg", type = "Identifier?" },
+  { name = "value", type = "Expr" },
+]
+
+[ungrouped.nodes.Alias]
+doc = "See also [alias](https://docs.python.org/3/library/ast.html#ast.alias)"
+fields = [
+  { name = "name", type = "Identifier" },
+  { name = "asname", type = "Identifier?" },
+]
+
+[ungrouped.nodes.WithItem]
+doc = "See also [withitem](https://docs.python.org/3/library/ast.html#ast.withitem)"
+fields = [
+  { name = "context_expr", type = "Expr" },
+  { name = "optional_vars", type = "Expr?" },
+]
+
+[ungrouped.nodes.MatchCase]
+doc = "See also [match_case](https://docs.python.org/3/library/ast.html#ast.match_case)"
+fields = [
+  { name = "pattern", type = "Pattern" },
+  { name = "guard", type = "Expr?" },
+  { name = "body", type = "Stmt*" },
+]
+
+[ungrouped.nodes.Decorator]
+doc = "See also [decorator](https://docs.python.org/3/library/ast.html#ast.decorator)"
+fields = [
+  { name = "expression", type = "Expr" },
+]
+
+[ungrouped.nodes.ElifElseClause]
+fields = [
+  { name = "test", type = "Expr?" },
+  { name = "body", type = "Stmt*" },
+]
+
+[ungrouped.nodes.TypeParams]
+fields = [
+  { name = "type_params", type = "TypeParam*" },
+]
+
+[ungrouped.nodes.FString]
+doc = "An AST node that represents a single f-string which is part of an [`ExprFString`]."
+fields = [
+  { name = "elements", type = "InterpolatedStringElement*" },
+  { name = "flags", type = "FStringFlags" },
+]
+
+[ungrouped.nodes.TString]
+doc = "An AST node that represents a single t-string which is part of an [`ExprTString`]."
+fields = [
+  { name = "elements", type = "InterpolatedStringElement*" },
+  { name = "flags", type = "TStringFlags" },
+]
+
+[ungrouped.nodes.StringLiteral]
+doc = """
+An AST node that represents a single string literal which is part of an
+[`ExprStringLiteral`].
+"""
+fields = [
+  { name = "value", type = "LiteralText" },
+  { name = "flags", type = "StringLiteralFlags" },
+]
+
+[ungrouped.nodes.BytesLiteral]
+doc = """
+An AST node that represents a single bytes literal which is part of an
+[`ExprBytesLiteral`].
+"""
+fields = [
+  { name = "value", type = "LiteralBytes" },
+  { name = "flags", type = "BytesLiteralFlags" },
+]
+
+[ungrouped.nodes.Identifier]
+doc = """
+Parser recovery represents an invalid name with an empty `id`. For example,
+the function name in the following definition has an empty identifier.
+
+```python
+def 1():
+    ...
+```
+"""
+fields = [
+  { name = "id", type = "Name" },
+]

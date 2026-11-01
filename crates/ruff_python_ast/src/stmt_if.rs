@@ -1,13 +1,14 @@
+use crate::flat;
 use std::iter;
 
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{ElifElseClause, Expr, Stmt, StmtIf};
+use crate::{ElifElseClause, Expr, StmtIf};
 
 /// Return the `Range` of the first `Elif` or `Else` token in an `If` statement.
-pub fn elif_else_range(clause: &ElifElseClause, contents: &str) -> Option<TextRange> {
-    let token = SimpleTokenizer::new(contents, clause.range)
+pub fn elif_else_range(clause: ElifElseClause<'_>, contents: &str) -> Option<TextRange> {
+    let token = SimpleTokenizer::new(contents, clause.range())
         .skip_trivia()
         .next()?;
     matches!(token.kind, SimpleTokenKind::Elif | SimpleTokenKind::Else).then_some(token.range())
@@ -22,8 +23,8 @@ pub enum BranchKind {
 #[derive(Debug)]
 pub struct IfElifBranch<'a> {
     pub kind: BranchKind,
-    pub test: &'a Expr,
-    pub body: &'a [Stmt],
+    pub test: Expr<'a>,
+    pub body: flat::Suite<'a>,
     range: TextRange,
 }
 
@@ -33,19 +34,19 @@ impl Ranged for IfElifBranch<'_> {
     }
 }
 
-pub fn if_elif_branches(stmt_if: &StmtIf) -> impl Iterator<Item = IfElifBranch<'_>> {
+pub fn if_elif_branches(stmt_if: StmtIf<'_>) -> impl Iterator<Item = IfElifBranch<'_>> {
     iter::once(IfElifBranch {
         kind: BranchKind::If,
-        test: stmt_if.test.as_ref(),
-        body: stmt_if.body.as_slice(),
-        range: TextRange::new(stmt_if.start(), stmt_if.body.last().unwrap().end()),
+        test: stmt_if.test(),
+        body: stmt_if.body(),
+        range: TextRange::new(stmt_if.start(), stmt_if.body().last().unwrap().end()),
     })
-    .chain(stmt_if.elif_else_clauses.iter().filter_map(|clause| {
+    .chain(stmt_if.elif_else_clauses().iter().filter_map(|clause| {
         Some(IfElifBranch {
             kind: BranchKind::Elif,
-            test: clause.test.as_ref()?,
-            body: clause.body.as_slice(),
-            range: clause.range,
+            test: clause.test()?,
+            body: clause.body(),
+            range: clause.range(),
         })
     }))
 }
