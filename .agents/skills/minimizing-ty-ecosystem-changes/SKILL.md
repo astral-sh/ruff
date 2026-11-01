@@ -5,6 +5,8 @@ description: Use when a user says "minimize this ty ecosystem change", "reproduc
 
 # Minimizing Ty Ecosystem Changes
 
+Before collecting evidence or preparing binaries, follow the [repro isolation requirements](../../references/repro-isolation.md) for the exact PR revision, project, dependencies, helpers, and commands. Use collection and reproduction helpers from a trusted checkout. A CI artifact or a successful Actions run does not establish that a binary is safe to execute on the host.
+
 ## Invariants
 
 1. Use the exact Ruff revisions, user-level PR config, dependency cutoff, mypy-primer revision, project Python version, checker environment and deadline, effective target platform, and strictness settings from the Actions run. Match its execution platform when dependency installation or runtime behavior depends on it.
@@ -49,22 +51,27 @@ The current analyzer uses a 30-second checker deadline with `--profile profiling
 
 Install the copied ecosystem config as user-level configuration so project settings and original command-line arguments retain their precedence. Fill a missing `environment.python-platform` in that copy with the verified CI default before publishing it, as described below. For example, a Linux default must not override a project's explicit `win32` or `all` setting. When moving a minimized example outside its original project configuration, preserve that project's effective target platform as well.
 
-Choose the execution environment before building binaries or installing dependencies. A ty target-platform option affects type analysis; it does not make uv resolve Linux dependency markers, install Linux wheels, or run Linux build steps on macOS. When platform-dependent dependencies, native extensions, installation commands, or PEP 723 script environments affect the result, run project setup and both compatible ty binaries in an environment matching the selected runner's OS and architecture, such as a container or remote host. Create its virtualenvs there instead of copying virtualenvs from another platform. Local native binaries are suitable when these differences do not affect the reproduction; still preserve the effective checker target and verify the reported difference exactly. Report an unavailable matching environment as a reproduction limitation rather than claiming equivalence.
+Choose the execution environment before building binaries or installing dependencies. A ty target-platform option affects type analysis; it does not make uv resolve Linux dependency markers, install Linux wheels, or run Linux build steps on macOS. When platform-dependent dependencies, native extensions, installation commands, or PEP 723 script environments affect the result, run project setup and both compatible ty binaries in an environment matching the selected runner's OS and architecture, using disposable Docker on that host whenever isolation is required. Create its virtualenvs there instead of copying virtualenvs from another platform. Local native binaries are suitable when the isolation requirements permit host execution and these differences do not affect the reproduction; still preserve the effective checker target and verify the reported difference exactly. Report an unavailable matching environment as a reproduction limitation rather than claiming equivalence.
 
 ## Prepare ty
 
 If a primary agent supplied freshly copied base and PR profiling binaries plus the PR ecosystem config, preserve their absolute paths as `TY_ECOSYSTEM_BASE_BINARY` and `TY_ECOSYSTEM_PR_BINARY`, verify they exist, and reuse them. Do not rebuild those binaries, switch shared Ruff refs, or overwrite the shared artifacts. If an exact-revision debug binary is needed to identify an ambiguous internal type, request it from the primary agent; the profiling binaries remain the behavioral oracle.
 
-Otherwise, require a clean working tree, remember its original ref, and build both exact revisions before assigning any subagent work. Reuse the checkout's existing Cargo target directory, copy the profiling binaries and PR ecosystem config to `target/ty-ecosystem-bins`, and restore the original ref when finished:
+Otherwise, require a clean working tree, remember its original ref, and build both exact revisions before assigning any subagent work. When Docker is required, use a disposable writable checkout and target directory inside the container. Copy the profiling binaries and PR ecosystem config to `target/ty-ecosystem-bins` and restore the original ref when finished.
 
 Fetch the PR revision explicitly because pull-request runs usually use a synthetic GitHub merge commit that a normal clone does not contain:
+
+```bash
+GH_TELEMETRY=false git fetch https://github.com/astral-sh/ruff.git <pr-revision>
+```
+
+Inspect the fetched code and obtain the exact dependency artifacts before building. When isolation is required, make those inputs available offline and disable the container's network before running the following commands:
 
 ```bash
 set -euo pipefail
 
 test -z "$(git status --short)" || { git status --short; exit 1; }
 original_ref="$(git symbolic-ref --quiet --short HEAD || git rev-parse HEAD)"
-GH_TELEMETRY=false git fetch https://github.com/astral-sh/ruff.git <pr-revision>
 mkdir -p target/ty-ecosystem-bins
 trap 'git checkout "$original_ref"' EXIT
 
@@ -88,7 +95,7 @@ Before using or publishing the copied `target/ty-ecosystem-bins/ty-ecosystem.tom
 
 ## Reproduce
 
-Create a unique temporary directory for each project and use its absolute path. Read its Python version and the pinned mypy-primer revision from the shared manifest. Obtain the project revision from the `/blob/<commit>/` component of the original diagnostic's source permalink, and check that links for the same project agree. If no diagnostic permalink exists, inspect the matching diagnostics shard or Actions logs; if the exact revision cannot be recovered, explicitly report that limitation. Then bypass the adjacent script lockfile:
+Create a unique temporary directory for each project and use its absolute path. Read its Python version and the pinned mypy-primer revision from the shared manifest. Obtain the project revision from the `/blob/<commit>/` component of the original diagnostic's source permalink, and check that links for the same project agree. If no diagnostic permalink exists, inspect the matching diagnostics shard or Actions logs; if the exact revision cannot be recovered, explicitly report that limitation. The command below bypasses the adjacent script lockfile. It fetches the project and may execute a project-specific install command. Use it as written only when all inputs are trusted for host execution. When isolation is required, fetch the pinned sources, submodules, and dependency artifacts for static inspection without executing them. Reproduce the same setup from those vetted local inputs in the offline container. If the setup cannot be reproduced offline, report which step is blocked.
 
 ```bash
 GH_TELEMETRY=false uv run \
