@@ -70,9 +70,10 @@ const fn split_words(field: u64) -> [u32; 2] {
     [field as u32, (field >> 32) as u32]
 }
 
-/// The one-based index of a node of type `T` within its AST.
+/// The nonzero slot of a node of type `T` within its AST.
 ///
-/// Use [`Ast::view`] to borrow the node. Zero represents an absent child. This also lets `Option<AstNodeId<T>>` fit in four bytes.
+/// The physical slot of a node of type `T` in one AST. Use [`Ast::view`] to borrow the node.
+/// Slot zero represents an absent child. This also lets `Option<AstNodeId<T>>` fit in four bytes.
 #[repr(transparent)]
 pub struct AstNodeId<T> {
     slot: NonZeroU32,
@@ -123,7 +124,7 @@ impl<T> AstNodeId<T> {
     }
 
     const fn slot(self) -> usize {
-        self.row_number() as usize
+        self.slot.get() as usize
     }
 
     /// Zero-based allocation index for dense per-node tables of size [`Ast::len`].
@@ -146,8 +147,8 @@ const _: () = {
 
 /// A child slot used while constructing a tree.
 ///
-/// The builder stores the physical row index plus one. Keeping it as a plain `u32`
-/// avoids validating it on every parser reduction.
+/// The builder reserves slot zero before emitting any nodes. Keeping the slot as a plain
+/// `u32` avoids validating it on every parser reduction.
 #[repr(transparent)]
 pub struct BuildId<T> {
     slot: u32,
@@ -177,7 +178,7 @@ impl<T> BuildId<T> {
     }
 
     const fn slot(self) -> usize {
-        (self.slot - 1) as usize
+        self.slot as usize
     }
 
     const fn cast<U>(self) -> BuildId<U> {
@@ -229,11 +230,11 @@ pub trait AstNode<'ast>: sealed::FromSyntax<'ast> + Copy + fmt::Debug + PartialE
 
     /// Recovers the slot for use in another field of the same builder.
     fn build_id(self) -> BuildId<Self::Kind> {
-        BuildId::new(self.syntax_node().slot() + 1)
+        BuildId::new(self.syntax_node().slot())
     }
 
     fn node_id(self) -> AstNodeId<Self::Kind> {
-        AstNodeId::from_word(self.syntax_node().slot() + 1)
+        AstNodeId::from_word(self.syntax_node().slot())
     }
 
     fn is_same_node<'other>(self, other: impl AstNode<'other>) -> bool {
@@ -265,6 +266,7 @@ pub trait AstNode<'ast>: sealed::FromSyntax<'ast> + Copy + fmt::Debug + PartialE
 impl<'ast> SyntaxNode<'ast> {
     #[inline]
     fn from_slot(ast: &'ast Ast, slot: usize) -> Self {
+        debug_assert_ne!(slot, 0);
         Self {
             ast,
             row: &ast.rows[slot],
@@ -278,7 +280,7 @@ impl<'ast> SyntaxNode<'ast> {
     )]
     fn slot(self) -> u32 {
         // SAFETY: The row belongs to this AST. Its distance from the beginning of the
-        // allocation is its zero-based physical row.
+        // allocation is the slot used by IDs and by child fields.
         #[expect(unsafe_code)]
         let slot =
             unsafe { std::ptr::from_ref(self.row).offset_from_unsigned(self.ast.rows.as_ptr()) };
@@ -547,7 +549,7 @@ impl Ast {
     pub fn row(&self, index: u32) -> Option<SyntaxNode<'_>> {
         Some(SyntaxNode {
             ast: self,
-            row: self.rows.get(index as usize)?,
+            row: self.rows.get((index as usize).checked_add(1)?)?,
         })
     }
 
@@ -557,9 +559,9 @@ impl Ast {
         Some(self.at(row))
     }
 
-    /// Number of stored nodes.
+    /// Number of stored nodes, excluding the reserved slot.
     pub fn len(&self) -> usize {
-        self.rows.len()
+        self.rows.len().saturating_sub(1)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -570,6 +572,7 @@ impl Ast {
     pub fn any_node<'ast>(&'ast self, predicate: impl FnMut(SyntaxNode<'ast>) -> bool) -> bool {
         self.rows
             .iter()
+            .skip(1)
             .map(|row| SyntaxNode { ast: self, row })
             .any(predicate)
     }
@@ -579,7 +582,7 @@ impl Ast {
     }
 
     fn child<'ast, N: AstNode<'ast>>(&'ast self, field: u64) -> N {
-        SyntaxNode::from_slot(self, (split_words(field)[0] - 1) as usize).retype()
+        SyntaxNode::from_slot(self, split_words(field)[0] as usize).retype()
     }
 
     fn optional_child<'ast, N: AstNode<'ast>>(&'ast self, field: u64) -> Option<N> {
@@ -643,10 +646,13 @@ impl Builder {
         } else {
             estimated.min(128)
         };
+        let mut rows = Vec::with_capacity(estimated_rows + 1);
+        // No view can refer to this row. Its presence makes every child slot a nonzero index.
+        rows.push(Row::new(NodeKind::ModModule, TextRange::default()));
         Self {
             source,
             ast: Ast {
-                rows: Vec::with_capacity(estimated_rows),
+                rows,
                 extra: Vec::with_capacity(estimated + estimated / 8),
                 names: Vec::with_capacity(estimated / 8),
                 ..Ast::default()
@@ -707,7 +713,7 @@ impl Builder {
     }
 
     pub fn node_count(&self) -> usize {
-        self.ast.rows.len()
+        self.ast.rows.len() - 1
     }
 
     pub fn finish_tree<T>(self, root: BuildId<T>) -> Tree<T> {
@@ -804,7 +810,7 @@ impl Builder {
 
     #[inline]
     fn push<T: NodeType>(&mut self, row: Row) -> BuildId<T> {
-        let index = offset(self.ast.rows.len() + 1);
+        let index = offset(self.ast.rows.len());
         if self.ast.rows.len() < self.ast.rows.capacity() {
             self.ast.rows.push(row);
         } else {
