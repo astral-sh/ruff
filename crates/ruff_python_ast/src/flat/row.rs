@@ -146,13 +146,15 @@ mod tests {
     use super::{NodeKind, Row, TextRange};
 
     #[test]
-    fn updating_a_function_flag_preserves_the_name_and_kind() {
+    fn updating_a_function_body_preserves_the_adjacent_flag_and_kind() {
         let mut row = Row::new(NodeKind::StmtFunctionDef, TextRange::default());
         row.set_stmt_function_def_name(42);
         row.set_stmt_function_def_is_async(1);
+        row.set_stmt_function_def_body_row_count(u16::MAX);
 
         assert_eq!(row.kind(), NodeKind::StmtFunctionDef);
         assert_eq!(row.stmt_function_def_is_async(), 1);
         assert_eq!(row.stmt_function_def_name(), 42);
+        assert_eq!(row.stmt_function_def_body_row_count(), u16::MAX);
     }
 }

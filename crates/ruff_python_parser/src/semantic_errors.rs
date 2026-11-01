@@ -912,7 +912,7 @@ impl SemanticSyntaxChecker {
                 let is_async = stmt_function_def.is_async();
                 let body = stmt_function_def.body();
 
-                if is_async {
+                if is_async && stmt_function_def.body_may_contain_yield() {
                     let mut visitor = ReturnVisitor::default();
                     visitor.visit_body(body);
 

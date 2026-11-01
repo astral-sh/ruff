@@ -674,7 +674,7 @@ mod tests {
     use ruff_python_ast::helpers::ReturnStatementVisitor;
     use ruff_python_ast::kind;
     use ruff_python_ast::{
-        Ast, AstNode, BuildId, Builder, CmpOp, DictItem, Expr, NodeIndex, NodeKind,
+        Ast, AstNode, BuildId, Builder, CmpOp, DictItem, Emit, Expr, NodeIndex, NodeKind,
         PySourceType, Rewriter, StringLiteral, build,
     };
     use ruff_text_size::Ranged;
@@ -933,6 +933,75 @@ mod tests {
             Some(["a", "b", "c"])
         );
         Ok(())
+    }
+
+    #[test]
+    fn function_body_rows_exclude_headers_and_siblings() {
+        let parsed = parse_module(
+            "def outer():\n    def regular(x=(yield 1)):\n        return x\n    def generator():\n        yield from ()\n    def last():\n        pass\n",
+        )
+        .unwrap();
+        let outer = parsed
+            .suite()
+            .first()
+            .unwrap()
+            .as_function_def_stmt()
+            .unwrap();
+        let functions: Vec<_> = outer
+            .body()
+            .iter()
+            .filter_map(ruff_python_ast::Stmt::as_function_def_stmt)
+            .collect();
+        assert!(outer.body_may_contain_yield());
+        assert_eq!(
+            functions
+                .iter()
+                .map(|function| function.body_may_contain_yield())
+                .collect::<Vec<_>>(),
+            [false, true, false]
+        );
+
+        let mut builder = Builder::default();
+        let copied = builder.copy_node(functions[0]);
+        assert!(builder.get(copied).body_may_contain_yield());
+    }
+
+    #[test]
+    fn rewinding_a_yield_restores_the_body_row_bound() {
+        let parsed = parse_module("def f(): pass").unwrap();
+        let function = parsed
+            .suite()
+            .first()
+            .unwrap()
+            .as_function_def_stmt()
+            .unwrap();
+        let mut builder = Builder::default();
+        // Only parsing records the interval of arena rows occupied by a function body.
+        let root = builder.copy_node(function);
+        let checkpoint = builder.checkpoint();
+        build::ExprYield {
+            range: function.range(),
+            value: None,
+        }
+        .emit(&mut builder);
+        builder.rewind(checkpoint);
+        assert!(!builder.finish_tree(root).root().body_may_contain_yield());
+    }
+
+    #[test]
+    fn long_function_uses_the_scope_aware_walk() {
+        let mut source = String::from("def f():\n    yield 1\n");
+        for _ in 0..=u16::MAX {
+            source.push_str("    pass\n");
+        }
+        let parsed = parse_module(&source).unwrap();
+        let function = parsed
+            .suite()
+            .first()
+            .unwrap()
+            .as_function_def_stmt()
+            .unwrap();
+        assert!(function.body_may_contain_yield());
     }
 
     #[test]

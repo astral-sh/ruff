@@ -14,7 +14,7 @@ use crate::flat::statement_visitor::StatementVisitor;
 use crate::flat::visitor::Visitor;
 use crate::name::{QualifiedName, QualifiedNameBuilder};
 use crate::token::{Tokens, parenthesized_range};
-use crate::{self as ast, CmpOp, Expr, InterpolatedStringElement, Stmt};
+use crate::{self as ast, CmpOp, Expr, InterpolatedStringElement, NodeKind, Stmt};
 
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
 pub fn is_compound_statement(stmt: Stmt<'_>) -> bool {
@@ -593,21 +593,35 @@ pub struct ReturnStatementVisitor<'a> {
 }
 
 impl<'a> ReturnStatementVisitor<'a> {
-    /// Collect returns in this function and determine whether it yields.
+    /// Collect returns in the current scope and determine whether it yields. The body row
+    /// range can rule out both kinds of node before following any child handles.
     pub fn for_function(function: ast::StmtFunctionDef<'a>) -> Self {
         let mut visitor = Self::default();
-        Visitor::visit_body(&mut visitor, function.body());
+        if function.body_may_contain_yield() {
+            Visitor::visit_body(&mut visitor, function.body());
+        } else if function
+            .body_row_kinds()
+            .is_none_or(|mut kinds| kinds.any(|kind| kind == NodeKind::StmtReturn))
+        {
+            StatementVisitor::visit_body(&mut visitor, function.body());
+        }
         visitor
+    }
+
+    fn collect_stmt(&mut self, stmt: Stmt<'a>, walk: impl FnOnce(&mut Self, Stmt<'a>)) {
+        match stmt.classify() {
+            flat::StmtKind::FunctionDef(_) | flat::StmtKind::ClassDef(_) => {
+                // Don't recurse.
+            }
+            flat::StmtKind::Return(stmt) => self.returns.push(stmt),
+            _ => walk(self, stmt),
+        }
     }
 }
 
 impl<'a> Visitor<'a> for ReturnStatementVisitor<'a> {
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
-        match stmt.classify() {
-            flat::StmtKind::Return(stmt) => self.returns.push(stmt),
-            flat::StmtKind::FunctionDef(_) | flat::StmtKind::ClassDef(_) => {}
-            _ => crate::flat::visitor::walk_stmt(self, stmt),
-        }
+        self.collect_stmt(stmt, crate::flat::visitor::walk_stmt);
     }
 
     fn visit_expr(&mut self, expr: Expr<'a>) {
@@ -616,6 +630,12 @@ impl<'a> Visitor<'a> for ReturnStatementVisitor<'a> {
         } else {
             crate::flat::visitor::walk_expr(self, expr);
         }
+    }
+}
+
+impl<'a> StatementVisitor<'a> for ReturnStatementVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: Stmt<'a>) {
+        self.collect_stmt(stmt, crate::flat::statement_visitor::walk_stmt);
     }
 }
 

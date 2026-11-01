@@ -2526,7 +2526,9 @@ impl Builder {
     ) -> BuildId<crate::kind::ExprYield> {
         let mut row = Row::new(NodeKind::ExprYield, range);
         row.set_expr_yield_value(split_words(value)[0]);
-        self.push(row)
+        let node = self.push(row);
+        self.ast.yield_rows_end = node.slot + 1;
+        node
     }
 }
 impl<'a> crate::ExprYield<'a> {
@@ -2564,7 +2566,9 @@ impl Builder {
     ) -> BuildId<crate::kind::ExprYieldFrom> {
         let mut row = Row::new(NodeKind::ExprYieldFrom, range);
         row.set_expr_yield_from_value(split_words(value)[0]);
-        self.push(row)
+        let node = self.push(row);
+        self.ast.yield_rows_end = node.slot + 1;
+        node
     }
 }
 impl<'a> crate::ExprYieldFrom<'a> {

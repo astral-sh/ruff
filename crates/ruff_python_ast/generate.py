@@ -376,6 +376,7 @@ CACHED_FIELDS = {
         InlineField("text_offset", 8, 4),
         InlineField("text_len", 12, 2),
     ],
+    "StmtFunctionDef": [InlineField("body_row_count", 12, 2)],
 }
 
 
@@ -1049,7 +1050,13 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
                     if field.width == 8:
                         words.append(f"split_words({field.name})[1]")
             out.append("self.ast.extra.extend([" + ", ".join(words) + "]);")
-        out.append("self.push(row) } }")
+        if n.name in {"ExprYield", "ExprYieldFrom"}:
+            out.append(
+                "let node = self.push(row);"
+                "self.ast.yield_rows_end = node.slot + 1; node } }"
+            )
+        else:
+            out.append("self.push(row) } }")
         if fields:
             generics, lifetime = (
                 ("<'a>", "'a") if any("'a" in f.result for f in fields) else ("", "'_")

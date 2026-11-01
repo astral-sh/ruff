@@ -187,6 +187,10 @@ impl<T> BuildId<T> {
         self.slot as usize
     }
 
+    const fn index(self) -> usize {
+        (self.slot - 1) as usize
+    }
+
     const fn cast<U>(self) -> BuildId<U> {
         BuildId::new(self.slot)
     }
@@ -535,6 +539,49 @@ pub struct Ast {
     numbers: Vec<Number>,
     debug_text: Vec<DebugText>,
     keys: RowKeys,
+    /// One past the last yield expression's row, or zero if the tree has none.
+    yield_rows_end: u32,
+}
+
+impl<'a> crate::StmtFunctionDef<'a> {
+    /// Tests the arena rows emitted while parsing the body, including nested scopes.
+    /// A positive result still requires a scope-aware walk.
+    pub fn body_may_contain_yield(self) -> bool {
+        let yield_end = self.syntax.ast.yield_rows_end as usize;
+        if yield_end == 0 {
+            return false;
+        }
+        let Some(body) = self.body_row_range() else {
+            return true;
+        };
+        if yield_end <= body.start {
+            return false;
+        }
+        if yield_end <= body.end {
+            return true;
+        }
+        self.syntax.ast.rows[body]
+            .iter()
+            .any(|row| matches!(row.kind(), NodeKind::ExprYield | NodeKind::ExprYieldFrom))
+    }
+
+    /// Includes nested scopes and any rows discarded by parser recovery.
+    pub(super) fn body_row_kinds(self) -> Option<impl Iterator<Item = NodeKind> + 'a> {
+        Some(
+            self.syntax.ast.rows[self.body_row_range()?]
+                .iter()
+                .map(Row::kind),
+        )
+    }
+
+    fn body_row_range(self) -> Option<std::ops::Range<usize>> {
+        let count = usize::from(self.syntax.row.stmt_function_def_body_row_count());
+        if count == 0 {
+            return None;
+        }
+        let end = self.node_id().slot();
+        Some(end - count..end)
+    }
 }
 
 impl Ast {
@@ -639,6 +686,7 @@ pub struct Checkpoint {
     bytes: usize,
     numbers: usize,
     debug_text: usize,
+    yield_rows_end: u32,
 }
 
 impl Default for Builder {
@@ -697,6 +745,7 @@ impl Builder {
             bytes: self.ast.bytes.len(),
             numbers: self.ast.numbers.len(),
             debug_text: self.ast.debug_text.len(),
+            yield_rows_end: self.ast.yield_rows_end,
         }
     }
 
@@ -707,6 +756,7 @@ impl Builder {
     )]
     pub fn rewind(&mut self, checkpoint: Checkpoint) {
         self.ast.rows.truncate(checkpoint.rows);
+        self.ast.yield_rows_end = checkpoint.yield_rows_end;
         self.ast.extra.truncate(checkpoint.extra);
         self.ast.text.truncate(checkpoint.text);
         for (i, name) in self.ast.names.drain(checkpoint.names..).enumerate() {
@@ -725,6 +775,18 @@ impl Builder {
 
     pub fn node_count(&self) -> usize {
         self.ast.rows.len() - 1
+    }
+
+    /// Records the interval of rows emitted between entering the function body and emitting its
+    /// definition. The two remaining payload bytes can describe up to 65,535 rows.
+    pub fn record_function_body(
+        &mut self,
+        function: BuildId<crate::kind::StmtFunctionDef>,
+        start: usize,
+    ) {
+        let end = function.index();
+        let count = u16::try_from(end.saturating_sub(start)).unwrap_or(0);
+        self.ast.rows[function.slot()].set_stmt_function_def_body_row_count(count);
     }
 
     pub fn finish_tree<T>(self, root: BuildId<T>) -> Tree<T> {

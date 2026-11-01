@@ -10,7 +10,8 @@ node_payloads! {
         extra_offset: u32 at 0 => stmt_function_def_extra_offset, set_stmt_function_def_extra_offset;
         name: u32 at 4 => stmt_function_def_name, set_stmt_function_def_name;
         type_params: u32 at 8 => stmt_function_def_type_params, set_stmt_function_def_type_params;
-        is_async: u8 at 12 => stmt_function_def_is_async, set_stmt_function_def_is_async;
+        body_row_count: u16 at 12 => stmt_function_def_body_row_count, set_stmt_function_def_body_row_count;
+        is_async: u8 at 14 => stmt_function_def_is_async, set_stmt_function_def_is_async;
     }
     StmtClassDef(stmt_class_def) {
         extra_offset: u32 at 0 => stmt_class_def_extra_offset, set_stmt_class_def_extra_offset;
