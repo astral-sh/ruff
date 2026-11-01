@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+assertion_line: 260
 ---
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:16:1
@@ -570,8 +571,12 @@ help: Replace with augmented assignment
    |
 67 | test4 = []
    - test4 = test4 + ( e
-68 + test4 += ( e
+68 + test4 += (( e
 69 |                   for e in
+70 |                   range(10)
+   -                   )
+71 +                   ))
+72 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
