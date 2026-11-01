@@ -160,6 +160,8 @@ pub(super) type LiveDeclarationsIterator<'a> = std::slice::Iter<'a, LiveDeclarat
 pub(crate) enum PreviousDefinitions {
     AreShadowed,
     AreKept,
+    /// Fill paths where the place has never been bound, preserving existing bindings and deletions.
+    OnlyUnboundAreShadowed,
 }
 
 /// What will happen to a definition if/when a when a new binding of the same place is added later.
@@ -470,6 +472,11 @@ impl Bindings {
         if previous_definitions.are_shadowed() {
             self.live_bindings
                 .retain(|b| b.can_be_shadowed() == FutureDefinitions::DontShadowThisOne);
+        } else if matches!(
+            previous_definitions,
+            PreviousDefinitions::OnlyUnboundAreShadowed
+        ) {
+            self.live_bindings.retain(|b| !b.binding().is_unbound());
         }
         self.live_bindings.push(LiveBinding::new(
             binding,
