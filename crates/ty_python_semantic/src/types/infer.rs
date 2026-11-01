@@ -52,6 +52,7 @@ use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
 use std::borrow::Cow;
+use std::cell::Cell;
 pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 
 use crate::types::context::InferContextResult;
@@ -59,9 +60,10 @@ use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
+use crate::types::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
-    ClassLiteral, KnownClass, MemberLookupPolicy, RecursiveType, StaticClassLiteral, Type,
-    TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType,
+    ClassLiteral, KnownClass, RecursiveType, StaticClassLiteral, Type, TypeAndQualifiers,
+    TypeQualifiers, UnionBuilder, UnionType,
 };
 use crate::{Db, FxIndexSet};
 
@@ -279,96 +281,47 @@ pub(crate) fn infer_definition_types<'db>(
         .finish_definition(definition)
 }
 
-/// Can another call use this specialization without expanding the type arguments recursively?
-///
-/// Different arguments can select different overloads, as in `Step[int] -> Step[str] -> Done`.
-/// Allow substitutions at the leaves and reductions in nesting. Repeatedly instantiating
-/// `Grow[T] -> Grow[list[T]]` would otherwise have no fixed point.
-fn non_expanding_receiver<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    current: Type<'db>,
-    previous: Type<'db>,
-) -> bool {
-    if current == previous {
-        return true;
-    }
-    // For class objects, compare the specializations of the classes they represent.
-    let shape = |ty: Type<'db>| match ty {
-        Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
-            ty.to_instance_approximation(db, env).unwrap_or(ty)
-        }
-        ty => ty,
-    };
-    let current = shape(current);
-    let previous = shape(previous);
-    let Type::NominalInstance(_) = current else {
-        return false;
-    };
-    let Some((_, current_args)) = current.class_specialization(db, env) else {
-        return true;
-    };
-    // Tuple length changes have already been widened by the assignment.
-    if current_args.tuple(db).is_some() {
-        return false;
-    }
-    previous
-        .class_specialization(db, env)
-        .is_some_and(|(_, previous_args)| {
-            let current = current_args.types(db);
-            let previous = previous_args.types(db);
-            current.len() <= previous.len()
-                && current
-                    .iter()
-                    .zip(previous)
-                    .all(|(&current, &previous)| non_expanding_receiver(db, env, current, previous))
-        })
+/// Bound the work spent on successive operands of the same class. Count repeated type
+/// arguments separately. `Grow[T] -> Grow[tuple[T, T, T, T]]` can quadruple the size of
+/// an operand in one call, even if the four arguments share an interned representation.
+struct AugmentedOperandBudget<'a, 'db> {
+    env: &'a ProgramEnvironment<'db>,
+    remaining: Cell<usize>,
 }
 
-/// An operator's explicit receiver annotation can distinguish this specialization even if its
-/// type arguments grow. The finite set of declared receivers bounds this part of the search.
-///
-/// ```python
-/// from typing import overload
-///
-/// class Step[T]:
-///     @overload
-///     def __iadd__(self: Step[int], n: int) -> Step[list[int]]: ...
-///     @overload
-///     def __iadd__(self: Step[list[int]], n: int) -> int: ...
-/// ```
-///
-/// Starting with `Step[int]`, the second `+=` produces an `int` only if we try the
-/// explicitly declared `Step[list[int]]` receiver.
-fn is_declared_operator_receiver<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    class: ClassLiteral<'db>,
-    op: ast::Operator,
-    receiver: Type<'db>,
-) -> bool {
-    [op.in_place_dunder(), op.dunder()].into_iter().any(|name| {
-        let member = class.class_member(db, env, name, MemberLookupPolicy::NO_AUGMENTED_BINDINGS);
-        let Some(Type::FunctionLiteral(function)) = member.place.ignore_possibly_undefined() else {
-            return false;
+impl<'db> AugmentedOperandBudget<'_, 'db> {
+    fn accepts(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        self.visit_type(db, ty);
+        self.remaining.get() > 0
+    }
+}
+
+impl<'db> TypeVisitor<'db> for AugmentedOperandBudget<'_, 'db> {
+    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        self.env
+    }
+
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        let Some(remaining) = self.remaining.get().checked_sub(1) else {
+            return;
         };
-        function
-            .without_updated_signatures(db)
-            .signature(db)
-            .iter()
-            .any(|signature| {
-                signature
-                    .parameters()
-                    .get(0)
-                    .is_some_and(|parameter| parameter.annotated_type() == receiver)
-            })
-    })
+        self.remaining.set(remaining);
+        if let TypeKind::NonAtomic(inner) = TypeKind::from(ty) {
+            walk_non_atomic_type(db, inner, self);
+        }
+    }
 }
 
 /// Infer the storage shared by augmented writes to one attribute along the receiver's MRO.
 ///
 /// Start with the independent read at each assignment. A later call can read a value stored
 /// by any of these assignments, subject to the narrowing at that call site.
+/// Run normal operator inference at each step. For example, after `left += right` stores a
+/// `Left[list[int]]`, the next call can select a different overload of `right.__radd__`.
 ///
 /// ```python
 /// class Counter:
@@ -389,8 +342,6 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
     db: &'db dyn Db,
     definitions: &[(Definition<'db>, Option<Specialization<'db>>)],
 ) -> Type<'db> {
-    const MAX_RECEIVERS_PER_CLASS: usize = 16;
-
     let env = ProgramEnvironment::from_definition(definitions[0].0);
     let write = |(definition, specialization): (Definition<'db>, Option<Specialization<'db>>),
                  stored| {
@@ -406,7 +357,6 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
         (
             before.apply_optional_specialization(db, specialization),
             after.map(|ty| ty.apply_optional_specialization(db, specialization)),
-            assignment.op,
         )
     };
     let alternatives = |ty: Type<'db>| match ty {
@@ -425,55 +375,66 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
             .map(|class| class.class_literal(db))
     };
     let mut writes = UnionBuilder::new(db, &env);
-    let mut receivers = Vec::with_capacity(definitions.len());
+    let mut assignments = Vec::with_capacity(definitions.len());
+    let new_history = || {
+        (
+            Vec::new(),
+            AugmentedOperandBudget {
+                env: &env,
+                remaining: Cell::new(128),
+            },
+        )
+    };
     for &binding in definitions {
-        let (before, after, op) = write(binding, None);
+        let (before, after) = write(binding, None);
         let mut seen = FxHashMap::default();
         for ty in alternatives(before) {
             if let Some(class) = class_of(ty) {
-                seen.entry(class).or_insert_with(Vec::new).push(ty);
+                seen.entry(class).or_insert_with(new_history).0.push(ty);
             }
         }
-        receivers.push((binding, op, seen));
+        assignments.push((binding, seen));
         if let Some(after) = after {
             writes.add_in_place(after);
         }
     }
     let mut frontier = writes.build();
     let mut result = frontier;
+    let mut widened = FxHashMap::default();
     loop {
         let mut next = UnionBuilder::new(db, &env);
-        for (binding, op, seen) in &mut receivers {
+        for (binding, seen) in &mut assignments {
             for ty in alternatives(frontier) {
                 let Some(class) = class_of(ty) else { continue };
-                let previous = seen.entry(class).or_default();
+                let (previous, budget) = seen.entry(class).or_insert_with(new_history);
                 if previous.contains(&ty) {
                     continue;
                 }
-                // Rotating and swapping the arguments of Box[A, B, ...] can visit every
-                // permutation without ever nesting an argument more deeply. Once the set of
-                // possible operands gets too large, the remaining writes are unknown.
-                if previous.len() >= MAX_RECEIVERS_PER_CLASS {
-                    return Type::unknown();
-                }
-                // Repeated arithmetic on distinct literals can produce arbitrarily many values.
-                let receiver = match ty {
-                    Type::LiteralValue(literal) if !previous.is_empty() => {
-                        literal.fallback_instance(db, &env)
+                let operand = if let Some(&wide) = widened.get(&class) {
+                    wide
+                } else if !budget.accepts(db, ty) {
+                    // Rotating and swapping Box[A, B, ...] can reach every permutation. A
+                    // Box[Unknown, ...] covers the rest and can still select an operator
+                    // that returns a different class. Do the same for growing type arguments.
+                    if !matches!(ty, Type::NominalInstance(_)) {
+                        return Type::unknown();
                     }
-                    ty => ty,
-                };
-                if previous.contains(&receiver)
-                    || (!previous.is_empty()
-                        && !previous
-                            .iter()
-                            .any(|&before| non_expanding_receiver(db, &env, receiver, before))
-                        && !is_declared_operator_receiver(db, &env, class, *op, receiver))
+                    let wide = Type::instance(db, &env, class.unknown_specialization(db));
+                    widened.insert(class, wide);
+                    wide
+                } else if let Type::LiteralValue(literal) = ty
+                    && !previous.is_empty()
                 {
+                    // Repeated arithmetic can produce arbitrarily many distinct literals.
+                    literal.fallback_instance(db, &env)
+                } else {
+                    ty
+                };
+                if previous.contains(&operand) {
                     continue;
                 }
-                previous.push(receiver);
-                if let (_, Some(written), _) = write(*binding, Some(receiver)) {
+                previous.push(operand);
+                if let (_, Some(written)) = write(*binding, Some(operand)) {
                     next.add_in_place(written);
                 }
             }
@@ -484,7 +445,18 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
         frontier = next.build();
         result = UnionType::from_two_elements(db, &env, result, frontier);
     }
-    result
+    if widened.is_empty() {
+        return result;
+    }
+    UnionType::from_elements(
+        db,
+        &env,
+        alternatives(result).map(|ty| {
+            class_of(ty)
+                .and_then(|class| widened.get(&class).copied())
+                .unwrap_or(ty)
+        }),
+    )
 }
 
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.

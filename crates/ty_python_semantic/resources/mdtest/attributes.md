@@ -551,6 +551,32 @@ class Steps:
 reveal_type(Steps().value)  # revealed: Step[list[int]] | After | Step[int]
 ```
 
+A reflected operator can distinguish successive specializations of the left operand too.
+
+```py
+class Left(Generic[T]): ...
+class Done: ...
+
+class Right:
+    @overload
+    def __radd__(self, other: Left[int]) -> Left[list[int]]: ...
+    @overload
+    def __radd__(self, other: Left[list[int]]) -> Left[list[list[int]]]: ...
+    @overload
+    def __radd__(self, other: Left[list[list[int]]] | Done) -> Done: ...
+    def __radd__(self, other: object) -> object:
+        raise NotImplementedError
+
+class ReflectedSteps:
+    def __getattr__(self, name: str) -> Left[int]:
+        return Left()
+
+    def bump(self) -> None:
+        self.value += Right()
+
+reveal_type(ReflectedSteps().value)  # revealed: Left[list[int]] | Left[list[list[int]]] | Done | Left[int]
+```
+
 #### Augmented assignments with expanding generic results
 
 An augmented assignment can repeatedly expand a generic attribute's type arguments. Inference must
@@ -567,16 +593,20 @@ class Grow(Generic[T]):
     def __iadd__(self, other: int) -> Grow[list[T]]:
         raise NotImplementedError
 
+    def __imul__(self, other: int) -> Grow[tuple[T, T, T, T]]:
+        raise NotImplementedError
+
 class Counter:
     value = Grow[int]()
 
     def update(self) -> None:
         self.value += 1  # error: [invalid-assignment]
 
-reveal_type(Counter().value)  # revealed: Grow[int] | Grow[list[int]]
+reveal_type(Counter().value)  # revealed: Grow[int] | Grow[Unknown]
 ```
 
-An independently initialized attribute must use the same bounded cycle recovery.
+An independently initialized attribute must also converge when an operator duplicates its type
+arguments on every call.
 
 ```py
 class InitializedCounter:
@@ -584,9 +614,9 @@ class InitializedCounter:
         self.value = Grow[int]()
 
     def update(self) -> None:
-        self.value += 1  # error: [invalid-assignment]
+        self.value *= 2
 
-reveal_type(InitializedCounter().value)  # revealed: Grow[int] | Grow[list[int]]
+reveal_type(InitializedCounter().value)  # revealed: Grow[int] | Grow[Unknown]
 ```
 
 #### Augmented assignments that permute type arguments
@@ -625,7 +655,7 @@ class Counter:
     def swap(self) -> None:
         self.value *= 1
 
-reveal_type(Counter().value)  # revealed: Box[Red, Green, Blue, White] | Unknown
+reveal_type(Counter().value)  # revealed: Box[Red, Green, Blue, White] | Box[Unknown, Unknown, Unknown, Unknown]
 ```
 
 #### Augmented assignments with expanding tuple results
