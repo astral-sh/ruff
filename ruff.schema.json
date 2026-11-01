@@ -4766,6 +4766,7 @@
         "complex-if-statement-in-stub",
         "complex-structure",
         "complexity",
+        "conditional-global-or-nonlocal",
         "constant-imported-as-non-constant",
         "context-manager-iterator",
         "continue-in-finally",

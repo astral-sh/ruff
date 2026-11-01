@@ -1373,6 +1373,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         () => rules::ruff::rules::PytestFixtureAutouse,
         () => rules::ruff::rules::SharedClockMock,
         () => rules::ruff::rules::UnnecessaryRegularExpressionCompile,
+        () => rules::ruff::rules::ConditionalGlobalOrNonlocal,
 
         _ => return None,
     })
