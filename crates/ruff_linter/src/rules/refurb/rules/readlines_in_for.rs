@@ -64,8 +64,8 @@ impl AlwaysFixableViolation for ReadlinesInFor {
 }
 
 /// FURB129
-pub(crate) fn readlines_in_for(checker: &Checker, for_stmt: &ast::StmtForFields<'_>) {
-    readlines_in_iter(checker, for_stmt.iter);
+pub(crate) fn readlines_in_for(checker: &Checker, for_stmt: ast::StmtFor<'_>) {
+    readlines_in_iter(checker, for_stmt.iter());
 }
 
 /// FURB129

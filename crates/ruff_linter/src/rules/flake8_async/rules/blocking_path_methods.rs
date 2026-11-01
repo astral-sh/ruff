@@ -78,7 +78,7 @@ impl Violation for BlockingPathMethodInAsyncFunction {
 }
 
 /// ASYNC240
-pub(crate) fn blocking_os_path(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+pub(crate) fn blocking_os_path(checker: &Checker, call: ast::ExprCall<'_>) {
     let semantic = checker.semantic();
     if !semantic.in_async_context() {
         return;
@@ -87,7 +87,7 @@ pub(crate) fn blocking_os_path(checker: &Checker, call: &ast::ExprCallFields<'_>
     // Check if an expression is calling I/O related os.path method.
     // Just initializing pathlib.Path object is OK, we can return
     // early in that scenario.
-    if let Some(qualified_name) = semantic.resolve_qualified_name(call.func) {
+    if let Some(qualified_name) = semantic.resolve_qualified_name(call.func()) {
         let segments = qualified_name.segments();
         if !matches!(segments, ["os", "path", _]) {
             return;
@@ -102,14 +102,14 @@ pub(crate) fn blocking_os_path(checker: &Checker, call: &ast::ExprCallFields<'_>
                 BlockingPathMethodInAsyncFunction {
                     path_library: "os.path".to_string(),
                 },
-                call.func.range(),
+                call.func().range(),
             );
         }
         return;
     }
 
     let Some(ast::ExprAttributeFields { value, attr, .. }) = call
-        .func
+        .func()
         .as_attribute_expr()
         .map(ruff_python_ast::ExprAttribute::fields)
     else {
@@ -127,7 +127,7 @@ pub(crate) fn blocking_os_path(checker: &Checker, call: &ast::ExprCallFields<'_>
             BlockingPathMethodInAsyncFunction {
                 path_library: "pathlib.Path".to_string(),
             },
-            call.func.range(),
+            call.func().range(),
         );
         return;
     }
@@ -147,7 +147,7 @@ pub(crate) fn blocking_os_path(checker: &Checker, call: &ast::ExprCallFields<'_>
             BlockingPathMethodInAsyncFunction {
                 path_library: "pathlib.Path".to_string(),
             },
-            call.func.range(),
+            call.func().range(),
         );
     }
 }

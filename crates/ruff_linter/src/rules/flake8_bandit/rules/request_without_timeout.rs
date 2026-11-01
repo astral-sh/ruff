@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCallFields;
+use ruff_python_ast::ExprCall;
 
 use ruff_text_size::Ranged;
 
@@ -57,10 +57,10 @@ impl Violation for RequestWithoutTimeout {
 }
 
 /// S113
-pub(crate) fn request_without_timeout(checker: &Checker, call: &ExprCallFields<'_>) {
+pub(crate) fn request_without_timeout(checker: &Checker, call: ExprCall<'_>) {
     if let Some(module) = checker
         .semantic()
-        .resolve_qualified_name(call.func)
+        .resolve_qualified_name(call.func())
         .and_then(|qualified_name| match qualified_name.segments() {
             [
                 "requests",
@@ -74,7 +74,7 @@ pub(crate) fn request_without_timeout(checker: &Checker, call: &ExprCallFields<'
             _ => None,
         })
     {
-        if let Some(keyword) = call.arguments.find_keyword("timeout") {
+        if let Some(keyword) = call.arguments().find_keyword("timeout") {
             if keyword.value().is_none_literal_expr() {
                 checker.report_diagnostic(
                     RequestWithoutTimeout {
@@ -90,7 +90,7 @@ pub(crate) fn request_without_timeout(checker: &Checker, call: &ExprCallFields<'
                     implicit: true,
                     module: module.to_string(),
                 },
-                call.func.range(),
+                call.func().range(),
             );
         }
     }

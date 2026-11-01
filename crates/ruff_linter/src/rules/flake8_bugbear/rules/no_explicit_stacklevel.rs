@@ -62,10 +62,10 @@ impl AlwaysFixableViolation for NoExplicitStacklevel {
 }
 
 /// B028
-pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: ast::ExprCall<'_>) {
     if !checker
         .semantic()
-        .resolve_qualified_name(call.func)
+        .resolve_qualified_name(call.func())
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["warnings", "warn"]))
     {
         return;
@@ -79,22 +79,26 @@ pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCallFiel
     // warnings.warn(message, category=None, stacklevel=1, source=None, *, skip_file_prefixes=())
     // ```
     if call
-        .arguments
+        .arguments()
         .find_argument_value("stacklevel", 2)
         .is_some()
-        || is_skip_file_prefixes_param_set(call.arguments)
-        || call.arguments.args().iter().any(ast::Expr::is_starred_expr)
+        || is_skip_file_prefixes_param_set(call.arguments())
         || call
-            .arguments
+            .arguments()
+            .args()
+            .iter()
+            .any(ast::Expr::is_starred_expr)
+        || call
+            .arguments()
             .keywords()
             .iter()
             .any(|keyword| keyword.arg().is_none())
     {
         return;
     }
-    let mut diagnostic = checker.report_diagnostic(NoExplicitStacklevel, call.func.range());
+    let mut diagnostic = checker.report_diagnostic(NoExplicitStacklevel, call.func().range());
 
-    let edit = add_argument("stacklevel=2", call.arguments, checker.tokens());
+    let edit = add_argument("stacklevel=2", call.arguments(), checker.tokens());
 
     diagnostic.set_fix(Fix::unsafe_edit(edit));
 }

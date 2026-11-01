@@ -89,11 +89,10 @@ pub(crate) fn mutable_contextvar_default(checker: &Checker, call: &ast::ExprCall
         .collect();
 
     if (is_mutable_expr(default, checker.semantic())
-        || matches!(
-            default.fields(),
-            ast::ExprFields::Call(ast::ExprCallFields { func, .. })
-                if !is_mutable_func(func, checker.semantic())
-                    && !is_immutable_func(func, checker.semantic(), &extend_immutable_calls)))
+        || default.as_call_expr().is_some_and(|call| {
+            !is_mutable_func(call.func(), checker.semantic())
+                && !is_immutable_func(call.func(), checker.semantic(), &extend_immutable_calls)
+        }))
         && checker
             .semantic()
             .resolve_qualified_name(map_subscript(call.func))

@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_python_ast::{Builder, ExprBoolOpFields, ExprKind, build};
+use ruff_python_ast::{Builder, ExprBoolOp, ExprKind, build};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -88,12 +88,12 @@ impl AlwaysFixableViolation for RepeatedEqualityComparison {
 }
 
 /// PLR1714
-pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ExprBoolOpFields<'_>) {
+pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: ExprBoolOp<'_>) {
     let mut value_to_comparators: FxHashMap<ComparableExpr, _> =
-        FxHashMap::with_capacity_and_hasher(bool_op.values.len() * 2, FxBuildHasher);
+        FxHashMap::with_capacity_and_hasher(bool_op.values().len() * 2, FxBuildHasher);
 
-    for (i, value) in bool_op.values.iter().enumerate() {
-        let Some((left, right)) = to_allowed_value(bool_op.op, value, checker.semantic()) else {
+    for (i, value) in bool_op.values().iter().enumerate() {
+        let Some((left, right)) = to_allowed_value(bool_op.op(), value, checker.semantic()) else {
             continue;
         };
 
@@ -164,14 +164,14 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ExprBool
                 RepeatedEqualityComparison {
                     expression: SourceCodeSnippet::new(merged_membership_test(
                         expr,
-                        bool_op.op,
+                        bool_op.op(),
                         &comparators,
                         checker.locator(),
                         all_hashable,
                     )),
                     all_hashable,
                 },
-                bool_op.range,
+                bool_op.range(),
             );
 
             // Grab the remaining comparisons.
@@ -192,35 +192,35 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ExprBool
             };
             let left = builder.copy_node(expr);
             let operands = builder.list([left, comparator]);
-            let ops = builder.list([match bool_op.op {
+            let ops = builder.list([match bool_op.op() {
                 BoolOp::Or => CmpOp::In,
                 BoolOp::And => CmpOp::NotIn,
             }]);
             let membership = builder
                 .add(build::ExprCompare {
-                    range: bool_op.range,
+                    range: bool_op.range(),
                     operands,
                     ops,
                 })
                 .into();
             let values = builder.map_list(
-                (0..=*first).chain(last + 1..bool_op.values.len()),
+                (0..=*first).chain(last + 1..bool_op.values().len()),
                 |builder, index| {
                     if index == *first {
                         membership
                     } else {
-                        builder.copy_node(bool_op.values.at(index))
+                        builder.copy_node(bool_op.values().at(index))
                     }
                 },
             );
             let expression = builder.add(build::ExprBoolOp {
-                range: bool_op.range,
-                op: bool_op.op,
+                range: bool_op.range(),
+                op: bool_op.op(),
                 values,
             });
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.generator().expr(builder.get(expression).into()),
-                bool_op.range,
+                bool_op.range(),
             )));
         }
     }

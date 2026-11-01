@@ -66,11 +66,11 @@ impl AlwaysFixableViolation for IncorrectlyParenthesizedTupleInSubscript {
 /// RUF031
 pub(crate) fn subscript_with_parenthesized_tuple(
     checker: &Checker,
-    subscript: &ast::ExprSubscriptFields<'_>,
+    subscript: ast::ExprSubscript<'_>,
 ) {
     let prefer_parentheses = checker.settings().ruff.parenthesize_tuple_in_subscript;
 
-    let ExprKind::Tuple(tuple_subscript) = subscript.slice.classify() else {
+    let ExprKind::Tuple(tuple_subscript) = subscript.slice().classify() else {
         return;
     };
 
@@ -114,7 +114,7 @@ pub(crate) fn subscript_with_parenthesized_tuple(
     }
 
     let locator = checker.locator();
-    let source_range = subscript.slice.range();
+    let source_range = subscript.slice().range();
     let new_source = if prefer_parentheses {
         format!("({})", locator.slice(source_range))
     } else {

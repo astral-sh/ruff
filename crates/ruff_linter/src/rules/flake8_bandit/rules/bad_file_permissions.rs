@@ -70,16 +70,16 @@ enum Reason {
 }
 
 /// S103
-pub(crate) fn bad_file_permissions(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+pub(crate) fn bad_file_permissions(checker: &Checker, call: ast::ExprCall<'_>) {
     if !checker.semantic().seen_module(Modules::OS) {
         return;
     }
 
     if checker
         .semantic()
-        .resolve_qualified_name(call.func)
+        .resolve_qualified_name(call.func())
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["os", "chmod"]))
-        && let Some(mode_arg) = call.arguments.find_argument_value("mode", 1)
+        && let Some(mode_arg) = call.arguments().find_argument_value("mode", 1)
     {
         let known = parse_mask(mode_arg, checker.semantic());
         let dangerous = if is_s103_extended_dangerous_bits_enabled(checker.settings()) {

@@ -179,15 +179,7 @@ pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: ast::StmtFor<'_
                 // If the `start` argument is set to something other than the `range` default,
                 // there's no clear fix.
                 let start = arguments.find_argument_value("start", 1);
-                if start.is_none_or(|start| {
-                    matches!(
-                        start.fields(),
-                        ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                            value: ast::Number::Int(Int::ZERO),
-                            ..
-                        })
-                    )
-                }) {
+                if start.is_none_or(|start| start.as_int_literal() == Some(&Int::ZERO)) {
                     let replace_iter = Edit::range_replacement(
                         generate_range_len_call(sequence.id(), checker.generator()),
                         stmt_for.iter().range(),

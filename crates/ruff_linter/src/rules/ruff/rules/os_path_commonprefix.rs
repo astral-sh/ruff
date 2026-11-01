@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCallFields;
+use ruff_python_ast::ExprCall;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -85,24 +85,20 @@ impl Violation for OsPathCommonprefix {
 }
 
 /// RUF071
-pub(crate) fn os_path_commonprefix(
-    checker: &Checker,
-    call: &ExprCallFields<'_>,
-    segments: &[&str],
-) {
+pub(crate) fn os_path_commonprefix(checker: &Checker, call: ExprCall<'_>, segments: &[&str]) {
     if segments != ["os", "path", "commonprefix"] {
         return;
     }
-    let mut diagnostic = checker.report_diagnostic(OsPathCommonprefix, call.func.range());
+    let mut diagnostic = checker.report_diagnostic(OsPathCommonprefix, call.func().range());
     diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
 
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import_from("os.path", "commonpath"),
-            call.func.start(),
+            call.func().start(),
             checker.semantic(),
         )?;
-        let reference_edit = Edit::range_replacement(binding, call.func.range());
+        let reference_edit = Edit::range_replacement(binding, call.func().range());
         Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
     });
 }

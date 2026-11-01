@@ -93,14 +93,14 @@ impl AlwaysFixableViolation for NonAugmentedAssignment {
 }
 
 /// PLR6104
-pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssignFields<'_>) {
+pub(crate) fn non_augmented_assignment(checker: &Checker, assign: ast::StmtAssign<'_>) {
     // Ignore multiple assignment targets.
-    let Some([target]) = assign.targets.as_array() else {
+    let Some([target]) = assign.targets().as_array() else {
         return;
     };
 
     // Match, e.g., `x = x + 1`.
-    let ExprKind::BinOp(value) = assign.value.classify() else {
+    let ExprKind::BinOp(value) = assign.value().classify() else {
         return;
     };
 
@@ -109,14 +109,14 @@ pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssi
     // Match, e.g., `x = x + 1`.
     if ComparableExpr::from(target) == ComparableExpr::from(value.left()) {
         let mut diagnostic =
-            checker.report_diagnostic(NonAugmentedAssignment { operator }, assign.range);
+            checker.report_diagnostic(NonAugmentedAssignment { operator }, assign.range());
         diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
             checker,
             target,
             operator,
             value.right(),
             value,
-            assign.range,
+            assign.range(),
         )));
 
         return;
@@ -128,14 +128,14 @@ pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssi
         && ComparableExpr::from(target) == ComparableExpr::from(value.right())
     {
         let mut diagnostic =
-            checker.report_diagnostic(NonAugmentedAssignment { operator }, assign.range);
+            checker.report_diagnostic(NonAugmentedAssignment { operator }, assign.range());
         diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
             checker,
             target,
             operator,
             value.left(),
             value,
-            assign.range,
+            assign.range(),
         )));
     }
 }

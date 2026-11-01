@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Int, Number};
+use ruff_python_ast::{self as ast, Int};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -43,10 +43,10 @@ impl Violation for SnmpInsecureVersion {
 }
 
 /// S508
-pub(crate) fn snmp_insecure_version(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+pub(crate) fn snmp_insecure_version(checker: &Checker, call: ast::ExprCall<'_>) {
     if checker
         .semantic()
-        .resolve_qualified_name(call.func)
+        .resolve_qualified_name(call.func())
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
@@ -54,13 +54,10 @@ pub(crate) fn snmp_insecure_version(checker: &Checker, call: &ast::ExprCallField
             )
         })
     {
-        if let Some(keyword) = call.arguments.find_keyword("mpModel") {
+        if let Some(keyword) = call.arguments().find_keyword("mpModel") {
             if matches!(
-                keyword.value().fields(),
-                ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                    value: Number::Int(Int::ZERO | Int::ONE),
-                    ..
-                })
+                keyword.value().as_int_literal(),
+                Some(&Int::ZERO | &Int::ONE)
             ) {
                 checker.report_diagnostic(SnmpInsecureVersion, keyword.range());
             }

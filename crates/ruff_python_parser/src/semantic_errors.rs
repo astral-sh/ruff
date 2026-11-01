@@ -742,16 +742,7 @@ impl SemanticSyntaxChecker {
     ) {
         let mut seen_default = false;
         for type_param in type_params {
-            let has_default = match type_param.fields() {
-                ast::TypeParamFields::TypeVar(ast::TypeParamTypeVarFields { default, .. })
-                | ast::TypeParamFields::TypeVarTuple(ast::TypeParamTypeVarTupleFields {
-                    default,
-                    ..
-                })
-                | ast::TypeParamFields::ParamSpec(ast::TypeParamParamSpecFields {
-                    default, ..
-                }) => default.is_some(),
-            };
+            let has_default = type_param.default().is_some();
 
             if seen_default && !has_default {
                 // test_err type_parameter_default_order

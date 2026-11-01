@@ -1,6 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::StmtClassDefFields;
+use ruff_python_ast::StmtClassDef;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -46,8 +46,8 @@ impl AlwaysFixableViolation for UnnecessaryClassParentheses {
 }
 
 /// UP039
-pub(crate) fn unnecessary_class_parentheses(checker: &Checker, class_def: &StmtClassDefFields<'_>) {
-    let Some(arguments) = class_def.arguments else {
+pub(crate) fn unnecessary_class_parentheses(checker: &Checker, class_def: StmtClassDef<'_>) {
+    let Some(arguments) = class_def.arguments() else {
         return;
     };
 

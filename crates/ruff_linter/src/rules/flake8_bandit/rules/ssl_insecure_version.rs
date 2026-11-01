@@ -50,10 +50,10 @@ impl Violation for SslInsecureVersion {
 }
 
 /// S502
-pub(crate) fn ssl_insecure_version(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+pub(crate) fn ssl_insecure_version(checker: &Checker, call: ast::ExprCall<'_>) {
     let Some(keyword) = checker
         .semantic()
-        .resolve_qualified_name(call.func)
+        .resolve_qualified_name(call.func())
         .and_then(|qualified_name| match qualified_name.segments() {
             ["ssl", "wrap_socket"] => Some("ssl_version"),
             ["OpenSSL", "SSL", "Context"] => Some("method"),
@@ -63,7 +63,7 @@ pub(crate) fn ssl_insecure_version(checker: &Checker, call: &ast::ExprCallFields
         return;
     };
 
-    let Some(keyword) = call.arguments.find_keyword(keyword) else {
+    let Some(keyword) = call.arguments().find_keyword(keyword) else {
         return;
     };
 

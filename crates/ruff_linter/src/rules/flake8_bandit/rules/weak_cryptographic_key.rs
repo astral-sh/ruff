@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, ExprCall, Number};
+use ruff_python_ast::ExprCall;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
@@ -161,12 +161,6 @@ fn extract_int_argument(
     position: usize,
 ) -> Option<(u16, TextRange)> {
     let argument = call.arguments().find_argument_value(name, position)?;
-    let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-        value: Number::Int(i),
-        ..
-    }) = argument.fields()
-    else {
-        return None;
-    };
+    let i = argument.as_int_literal()?;
     Some((i.as_u16()?, argument.range()))
 }

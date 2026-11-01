@@ -51,15 +51,15 @@ fn is_blocking_sleep(qualified_name: &QualifiedName) -> bool {
 }
 
 /// ASYNC251
-pub(crate) fn blocking_sleep(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+pub(crate) fn blocking_sleep(checker: &Checker, call: ast::ExprCall<'_>) {
     if checker.semantic().in_async_context() {
         if checker
             .semantic()
-            .resolve_qualified_name(call.func)
+            .resolve_qualified_name(call.func())
             .as_ref()
             .is_some_and(is_blocking_sleep)
         {
-            checker.report_diagnostic(BlockingSleepInAsyncFunction, call.func.range());
+            checker.report_diagnostic(BlockingSleepInAsyncFunction, call.func().range());
         }
     }
 }

@@ -53,16 +53,16 @@ impl Violation for HashlibDigestHex {
 }
 
 /// FURB181
-pub(crate) fn hashlib_digest_hex(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+pub(crate) fn hashlib_digest_hex(checker: &Checker, call: ast::ExprCall<'_>) {
     if !checker.semantic().seen_module(Modules::HASHLIB) {
         return;
     }
 
-    if !call.arguments.is_empty() {
+    if !call.arguments().is_empty() {
         return;
     }
 
-    let ExprKind::Attribute(attribute) = call.func.classify() else {
+    let ExprKind::Attribute(attribute) = call.func().classify() else {
         return;
     };
     let attr = attribute.attr();
@@ -119,9 +119,9 @@ pub(crate) fn hashlib_digest_hex(checker: &Checker, call: &ast::ExprCallFields<'
             )
         })
     {
-        let mut diagnostic = checker.report_diagnostic(HashlibDigestHex, call.range);
+        let mut diagnostic = checker.report_diagnostic(HashlibDigestHex, call.range());
         if arguments.is_empty() {
-            let replacement_range = TextRange::new(value.end(), call.func.end());
+            let replacement_range = TextRange::new(value.end(), call.func().end());
 
             let applicability = if checker.comment_ranges().intersects(replacement_range) {
                 Applicability::Unsafe

@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, StmtImportFromFields};
+use ruff_python_ast::{Expr, StmtImportFrom};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -81,9 +81,9 @@ pub(crate) fn bytestring_attribute(checker: &Checker, &attribute: &Expr<'_>) {
 }
 
 /// PYI057
-pub(crate) fn bytestring_import(checker: &Checker, import_from: &StmtImportFromFields<'_>) {
-    let names = import_from.names;
-    let module = import_from.module;
+pub(crate) fn bytestring_import(checker: &Checker, import_from: StmtImportFrom<'_>) {
+    let names = import_from.names();
+    let module = import_from.module();
 
     let module_id = match module {
         Some(module) => module.id().as_str(),

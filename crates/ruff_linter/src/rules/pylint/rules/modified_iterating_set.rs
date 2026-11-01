@@ -66,8 +66,8 @@ impl AlwaysFixableViolation for ModifiedIteratingSet {
 }
 
 /// PLE4703
-pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &ast::StmtForFields<'_>) {
-    let Some(name) = for_stmt.iter.as_name_expr() else {
+pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: ast::StmtFor<'_>) {
+    let Some(name) = for_stmt.iter().as_name_expr() else {
         return;
     };
 
@@ -78,7 +78,7 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &ast::StmtForF
         return;
     }
 
-    let is_modified = any_over_body(for_stmt.body, |expr| {
+    let is_modified = any_over_body(for_stmt.body(), |expr| {
         let Some(func) = expr.as_call_expr().map(ruff_python_ast::ExprCall::func) else {
             return false;
         };
@@ -105,7 +105,7 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: &ast::StmtForF
             ModifiedIteratingSet {
                 name: name.id().clone(),
             },
-            for_stmt.range,
+            for_stmt.range(),
         );
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             format!("{}.copy()", checker.locator().slice(name)),

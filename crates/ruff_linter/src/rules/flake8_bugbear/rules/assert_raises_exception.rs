@@ -63,10 +63,9 @@ fn detect_blind_exception(
     func: Expr<'_>,
     arguments: Arguments<'_>,
 ) -> Option<ExceptionKind> {
-    let is_assert_raises = matches!(
-        func.fields(),
-        ast::ExprFields::Attribute(ast::ExprAttributeFields { attr, .. }) if attr.as_str() == "assertRaises"
-    );
+    let is_assert_raises = func
+        .as_attribute_expr()
+        .is_some_and(|attribute| attribute.attr().as_str() == "assertRaises");
 
     let is_pytest_raises = semantic
         .resolve_qualified_name(func)
@@ -130,9 +129,9 @@ pub(crate) fn assert_raises_exception(
 }
 
 /// B017 (call form)
-pub(crate) fn assert_raises_exception_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
-    let func = call.func;
-    let arguments = call.arguments;
+pub(crate) fn assert_raises_exception_call(checker: &Checker, call: ast::ExprCall<'_>) {
+    let func = call.func();
+    let arguments = call.arguments();
     let semantic = checker.semantic();
 
     if arguments.args().len() < 2 && arguments.find_argument("func", 1).is_none() {
@@ -140,6 +139,6 @@ pub(crate) fn assert_raises_exception_call(checker: &Checker, call: &ast::ExprCa
     }
 
     if let Some(exception) = detect_blind_exception(semantic, func, arguments) {
-        checker.report_diagnostic(AssertRaisesException { exception }, call.range);
+        checker.report_diagnostic(AssertRaisesException { exception }, call.range());
     }
 }

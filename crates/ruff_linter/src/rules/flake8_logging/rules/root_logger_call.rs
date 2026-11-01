@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_semantic::Modules;
+use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -47,14 +48,14 @@ impl Violation for RootLoggerCall {
 }
 
 /// LOG015
-pub(crate) fn root_logger_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+pub(crate) fn root_logger_call(checker: &Checker, call: ast::ExprCall<'_>) {
     let semantic = checker.semantic();
 
     if !semantic.seen_module(Modules::LOGGING) {
         return;
     }
 
-    let Some(qualified_name) = semantic.resolve_qualified_name(call.func) else {
+    let Some(qualified_name) = semantic.resolve_qualified_name(call.func()) else {
         return;
     };
 
@@ -66,5 +67,5 @@ pub(crate) fn root_logger_call(checker: &Checker, call: &ast::ExprCallFields<'_>
     let kind = RootLoggerCall {
         attr: (*attr).to_string(),
     };
-    checker.report_diagnostic(kind, call.range);
+    checker.report_diagnostic(kind, call.range());
 }

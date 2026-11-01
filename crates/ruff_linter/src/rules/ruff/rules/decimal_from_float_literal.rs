@@ -50,15 +50,15 @@ impl AlwaysFixableViolation for DecimalFromFloatLiteral {
 }
 
 /// RUF032: `Decimal()` called with float literal argument
-pub(crate) fn decimal_from_float_literal_syntax(checker: &Checker, call: &ast::ExprCallFields<'_>) {
-    let Some(arg) = call.arguments.args().first() else {
+pub(crate) fn decimal_from_float_literal_syntax(checker: &Checker, call: ast::ExprCall<'_>) {
+    let Some(arg) = call.arguments().args().first() else {
         return;
     };
 
     if let Some(float) = extract_float_literal(arg, Sign::Positive) {
         if checker
             .semantic()
-            .resolve_qualified_name(call.func)
+            .resolve_qualified_name(call.func())
             .is_some_and(|qualified_name| {
                 matches!(qualified_name.segments(), ["decimal", "Decimal"])
             })

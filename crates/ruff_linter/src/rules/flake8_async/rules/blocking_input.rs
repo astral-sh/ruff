@@ -45,10 +45,10 @@ impl Violation for BlockingInputInAsyncFunction {
 }
 
 /// ASYNC250
-pub(crate) fn blocking_input(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+pub(crate) fn blocking_input(checker: &Checker, call: ast::ExprCall<'_>) {
     if checker.semantic().in_async_context() {
-        if checker.semantic().match_builtin_expr(call.func, "input") {
-            checker.report_diagnostic(BlockingInputInAsyncFunction, call.func.range());
+        if checker.semantic().match_builtin_expr(call.func(), "input") {
+            checker.report_diagnostic(BlockingInputInAsyncFunction, call.func().range());
         }
     }
 }

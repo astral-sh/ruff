@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::registry::Rule;
 
-use crate::rules::flake8_2020::helpers::{integer_literal, is_sys};
+use crate::rules::flake8_2020::helpers::is_sys;
 
 /// ## What it does
 /// Checks for comparisons that test `sys.version` against string literals,
@@ -247,10 +247,10 @@ pub(crate) fn compare(checker: &Checker, compare: ast::ExprCompare<'_>) {
         ExprKind::Subscript(expr_subscript)
             if is_sys(expr_subscript.value(), "version_info", checker.semantic()) =>
         {
-            if let Some(index) = integer_literal(expr_subscript.slice()) {
+            if let Some(index) = expr_subscript.slice().as_int_literal() {
                 if *index == 0
                     && matches!(op, CmpOp::Eq | CmpOp::NotEq)
-                    && integer_literal(right).is_some_and(|number| *number == 3)
+                    && right.as_int_literal().is_some_and(|number| *number == 3)
                     && checker.is_rule_enabled(Rule::SysVersionInfo0Eq3)
                 {
                     checker.report_diagnostic(
@@ -261,7 +261,7 @@ pub(crate) fn compare(checker: &Checker, compare: ast::ExprCompare<'_>) {
                     );
                 } else if *index == 1
                     && matches!(op, CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE)
-                    && integer_literal(right).is_some()
+                    && right.as_int_literal().is_some()
                 {
                     checker.report_diagnostic_if_enabled(SysVersionInfo1CmpInt, left.range());
                 }
@@ -272,7 +272,7 @@ pub(crate) fn compare(checker: &Checker, compare: ast::ExprCompare<'_>) {
             if is_sys(expr_attribute.value(), "version_info", checker.semantic())
                 && expr_attribute.attr() == "minor"
                 && matches!(op, CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE)
-                && integer_literal(right).is_some() =>
+                && right.as_int_literal().is_some() =>
         {
             checker.report_diagnostic_if_enabled(SysVersionInfoMinorCmpInt, left.range());
         }

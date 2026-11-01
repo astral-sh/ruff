@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCallFields;
+use ruff_python_ast::ExprCall;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -60,26 +61,26 @@ impl AlwaysFixableViolation for MapWithoutExplicitStrict {
 }
 
 /// B912
-pub(crate) fn map_without_explicit_strict(checker: &Checker, call: &ExprCallFields<'_>) {
+pub(crate) fn map_without_explicit_strict(checker: &Checker, call: ExprCall<'_>) {
     let semantic = checker.semantic();
 
-    if semantic.match_builtin_expr(call.func, "map")
-        && call.arguments.find_keyword("strict").is_none()
+    if semantic.match_builtin_expr(call.func(), "map")
+        && call.arguments().find_keyword("strict").is_none()
         && (
             // at least 2 iterables (+ 1 function), or a starred argument.
-            call.arguments.args().len() >= 3
+            call.arguments().args().len() >= 3
                 || call
-                    .arguments
+                    .arguments()
                     .args()
                     .iter()
                     .any(ruff_python_ast::Expr::is_starred_expr)
         )
-        && !any_infinite_iterables(call.arguments.args().iter().skip(1), semantic)
+        && !any_infinite_iterables(call.arguments().args().iter().skip(1), semantic)
     {
         checker
-            .report_diagnostic(MapWithoutExplicitStrict, call.range)
+            .report_diagnostic(MapWithoutExplicitStrict, call.range())
             .set_fix(Fix::applicable_edit(
-                add_argument("strict=False", call.arguments, checker.tokens()),
+                add_argument("strict=False", call.arguments(), checker.tokens()),
                 Applicability::Unsafe,
             ));
     }

@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCallFields;
+use ruff_python_ast::ExprCall;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -50,13 +50,13 @@ impl Violation for TarfileUnsafeMembers {
 }
 
 /// S202
-pub(crate) fn tarfile_unsafe_members(checker: &Checker, call: &ExprCallFields<'_>) {
+pub(crate) fn tarfile_unsafe_members(checker: &Checker, call: ExprCall<'_>) {
     if !checker.semantic().seen_module(Modules::TARFILE) {
         return;
     }
 
     if call
-        .func
+        .func()
         .as_attribute_expr()
         .is_none_or(|attr| attr.attr().as_str() != "extractall")
     {
@@ -64,7 +64,7 @@ pub(crate) fn tarfile_unsafe_members(checker: &Checker, call: &ExprCallFields<'_
     }
 
     if call
-        .arguments
+        .arguments()
         .find_keyword("filter")
         .and_then(|keyword| keyword.value().as_string_literal_expr())
         .is_some_and(|value| matches!(value.value().to_str(), "data" | "tar"))
@@ -72,5 +72,5 @@ pub(crate) fn tarfile_unsafe_members(checker: &Checker, call: &ExprCallFields<'_
         return;
     }
 
-    checker.report_diagnostic(TarfileUnsafeMembers, call.func.range());
+    checker.report_diagnostic(TarfileUnsafeMembers, call.func().range());
 }

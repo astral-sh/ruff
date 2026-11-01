@@ -1,6 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::StmtClassDefFields;
+use ruff_python_ast::StmtClassDef;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -51,8 +51,8 @@ impl AlwaysFixableViolation for UselessObjectInheritance {
 }
 
 /// UP004
-pub(crate) fn useless_object_inheritance(checker: &Checker, class_def: &StmtClassDefFields<'_>) {
-    let Some(arguments) = class_def.arguments else {
+pub(crate) fn useless_object_inheritance(checker: &Checker, class_def: StmtClassDef<'_>) {
+    let Some(arguments) = class_def.arguments() else {
         return;
     };
 
@@ -63,7 +63,7 @@ pub(crate) fn useless_object_inheritance(checker: &Checker, class_def: &StmtClas
 
         let mut diagnostic = checker.report_diagnostic(
             UselessObjectInheritance {
-                name: class_def.name.to_string(),
+                name: class_def.name().to_string(),
             },
             base.range(),
         );

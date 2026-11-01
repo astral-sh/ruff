@@ -157,16 +157,14 @@ impl Truthiness {
 }
 pub fn is_empty_f_string(expr: ExprFString<'_>) -> bool {
     fn inner(expr: Expr<'_>) -> bool {
-        match expr.fields() {
-            ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { value, .. }) => {
-                value.is_empty()
-            }
+        match expr.classify() {
+            ast::ExprKind::StringLiteral(string) => string.value().is_empty(),
             // Confusingly, `bool(f"{b""}") == True` even though
             // `bool(b"") == False`. This is because `f"{b""}"`
             // evaluates as the string `'b""'` of length 3.
-            ast::ExprFields::BytesLiteral(_) => false,
-            ast::ExprFields::FString(ast::ExprFStringFields { value, .. }) => {
-                is_empty_interpolated_elements(value.elements())
+            ast::ExprKind::BytesLiteral(_) => false,
+            ast::ExprKind::FString(fstring) => {
+                is_empty_interpolated_elements(fstring.value().elements())
             }
             _ => false,
         }
@@ -175,13 +173,9 @@ pub fn is_empty_f_string(expr: ExprFString<'_>) -> bool {
     fn is_empty_interpolated_elements<'a>(
         mut elements: impl Iterator<Item = InterpolatedStringElement<'a>>,
     ) -> bool {
-        elements.all(|element| match element.fields() {
-            ast::InterpolatedStringElementFields::Literal(
-                ast::InterpolatedStringLiteralElementFields { value, .. },
-            ) => value.is_empty(),
-            ast::InterpolatedStringElementFields::Interpolation(
-                ast::InterpolatedElementFields { node: f_string, .. },
-            ) => {
+        elements.all(|element| match element.classify() {
+            ast::InterpolatedStringElementKind::Literal(literal) => literal.value().is_empty(),
+            ast::InterpolatedStringElementKind::Interpolation(f_string) => {
                 f_string.debug_text().is_none()
                     && f_string.conversion().is_none()
                     && f_string.format_spec().is_none()
@@ -200,57 +194,51 @@ pub fn is_empty_f_string(expr: ExprFString<'_>) -> bool {
 
 fn is_non_empty_f_string(expr: ExprFString<'_>) -> bool {
     fn inner(expr: Expr<'_>) -> bool {
-        match expr.fields() {
+        match expr.classify() {
             // When stringified, these expressions are always non-empty.
-            ast::ExprFields::Lambda(_) => true,
-            ast::ExprFields::Dict(_) => true,
-            ast::ExprFields::Set(_) => true,
-            ast::ExprFields::ListComp(_) => true,
-            ast::ExprFields::SetComp(_) => true,
-            ast::ExprFields::DictComp(_) => true,
-            ast::ExprFields::NumberLiteral(_) => true,
-            ast::ExprFields::BooleanLiteral(_) => true,
-            ast::ExprFields::NoneLiteral(_) => true,
-            ast::ExprFields::EllipsisLiteral(_) => true,
-            ast::ExprFields::List(_) => true,
-            ast::ExprFields::Tuple(_) => true,
-            ast::ExprFields::TString(_) => true,
+            ast::ExprKind::Lambda(_) => true,
+            ast::ExprKind::Dict(_) => true,
+            ast::ExprKind::Set(_) => true,
+            ast::ExprKind::ListComp(_) => true,
+            ast::ExprKind::SetComp(_) => true,
+            ast::ExprKind::DictComp(_) => true,
+            ast::ExprKind::NumberLiteral(_) => true,
+            ast::ExprKind::BooleanLiteral(_) => true,
+            ast::ExprKind::NoneLiteral(_) => true,
+            ast::ExprKind::EllipsisLiteral(_) => true,
+            ast::ExprKind::List(_) => true,
+            ast::ExprKind::Tuple(_) => true,
+            ast::ExprKind::TString(_) => true,
 
             // These expressions must resolve to the inner expression.
-            ast::ExprFields::If(ast::ExprIfFields { body, orelse, .. }) => {
-                inner(body) && inner(orelse)
-            }
-            ast::ExprFields::Named(ast::ExprNamedFields { value, .. }) => inner(value),
+            ast::ExprKind::If(if_expr) => inner(if_expr.body()) && inner(if_expr.orelse()),
+            ast::ExprKind::Named(named) => inner(named.value()),
 
             // These expressions are complex. We can't determine whether they're empty or not.
-            ast::ExprFields::BoolOp(ast::ExprBoolOpFields { .. }) => false,
-            ast::ExprFields::BinOp(ast::ExprBinOpFields { .. }) => false,
-            ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields { .. }) => false,
+            ast::ExprKind::BoolOp(_) => false,
+            ast::ExprKind::BinOp(_) => false,
+            ast::ExprKind::UnaryOp(_) => false,
             // Rich comparison methods can return arbitrary objects.
-            ast::ExprFields::Compare(_) => false,
-            ast::ExprFields::Generator(_) => false,
-            ast::ExprFields::Await(_) => false,
-            ast::ExprFields::Yield(_) => false,
-            ast::ExprFields::YieldFrom(_) => false,
-            ast::ExprFields::Call(_) => false,
-            ast::ExprFields::Attribute(_) => false,
-            ast::ExprFields::Subscript(_) => false,
-            ast::ExprFields::Starred(_) => false,
-            ast::ExprFields::Name(_) => false,
-            ast::ExprFields::Slice(_) => false,
-            ast::ExprFields::IpyEscapeCommand(_) => false,
+            ast::ExprKind::Compare(_) => false,
+            ast::ExprKind::Generator(_) => false,
+            ast::ExprKind::Await(_) => false,
+            ast::ExprKind::Yield(_) => false,
+            ast::ExprKind::YieldFrom(_) => false,
+            ast::ExprKind::Call(_) => false,
+            ast::ExprKind::Attribute(_) => false,
+            ast::ExprKind::Subscript(_) => false,
+            ast::ExprKind::Starred(_) => false,
+            ast::ExprKind::Name(_) => false,
+            ast::ExprKind::Slice(_) => false,
+            ast::ExprKind::IpyEscapeCommand(_) => false,
 
             // These literals may or may not be empty.
-            ast::ExprFields::FString(ast::ExprFStringFields { node: f_string, .. }) => {
-                is_non_empty_f_string(f_string)
-            }
+            ast::ExprKind::FString(f_string) => is_non_empty_f_string(f_string),
             // These literals may or may not be empty.
-            ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { value, .. }) => {
-                !value.is_empty()
-            }
+            ast::ExprKind::StringLiteral(string) => !string.value().is_empty(),
             // Confusingly, f"{b""}" renders as the string 'b""', which is non-empty.
             // Therefore, any bytes interpolation is guaranteed non-empty when stringified.
-            ast::ExprFields::BytesLiteral(_) => true,
+            ast::ExprKind::BytesLiteral(_) => true,
         }
     }
 
@@ -275,9 +263,9 @@ fn is_non_empty_f_string(expr: ExprFString<'_>) -> bool {
 }
 
 pub fn is_dotted_name(expr: Expr<'_>) -> bool {
-    match expr.fields() {
-        ast::ExprFields::Name(_) => true,
-        ast::ExprFields::Attribute(ast::ExprAttributeFields { value, .. }) => is_dotted_name(value),
+    match expr.classify() {
+        ast::ExprKind::Name(_) => true,
+        ast::ExprKind::Attribute(attribute) => is_dotted_name(attribute.value()),
         _ => false,
     }
 }

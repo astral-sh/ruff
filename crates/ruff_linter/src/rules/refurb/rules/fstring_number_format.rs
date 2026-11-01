@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprKind, Number, PythonVersion, UnaryOp};
 use ruff_source_file::find_newline;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -70,23 +71,19 @@ impl Violation for FStringNumberFormat {
 }
 
 /// FURB116
-pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubscriptFields<'_>) {
+pub(crate) fn fstring_number_format(checker: &Checker, subscript: ast::ExprSubscript<'_>) {
     // The slice must be exactly `[2:]`.
     let ast::ExprFields::Slice(ast::ExprSliceFields {
         lower: Some(lower),
         upper: None,
         step: None,
         ..
-    }) = subscript.slice.fields()
+    }) = subscript.slice().fields()
     else {
         return;
     };
 
-    let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-        value: Number::Int(int),
-        ..
-    }) = lower.fields()
-    else {
+    let Some(int) = lower.as_int_literal() else {
         return;
     };
 
@@ -95,7 +92,7 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
     }
 
     // The call must be exactly `hex(...)`, `bin(...)`, or `oct(...)`.
-    let ExprKind::Call(call_node) = subscript.value.classify() else {
+    let ExprKind::Call(call_node) = subscript.value().classify() else {
         return;
     };
     let func = call_node.func();
@@ -118,13 +115,10 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
     };
 
     // float and complex numbers are false positives, ignore them.
-    if matches!(
-        arg.fields(),
-        ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-            value: Number::Float(_) | Number::Complex { .. },
-            ..
-        })
-    ) {
+    if arg
+        .as_number_literal_expr()
+        .is_some_and(|number| matches!(number.value(), Number::Float(_) | Number::Complex { .. }))
+    {
         return;
     }
 
@@ -139,7 +133,7 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
     };
 
     let applicability = if matches!(maybe_number.classify(), ExprKind::NumberLiteral(_)) {
-        if checker.comment_ranges().intersects(subscript.range) {
+        if checker.comment_ranges().intersects(subscript.range()) {
             Applicability::Unsafe
         } else {
             Applicability::Safe
@@ -155,11 +149,11 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
             replacement: replacement.as_deref().map(SourceCodeSnippet::from_str),
             base,
         },
-        subscript.range,
+        subscript.range(),
     );
 
     if let Some(replacement) = replacement {
-        let edit = Edit::range_replacement(replacement, subscript.range);
+        let edit = Edit::range_replacement(replacement, subscript.range());
         diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
     }
 }

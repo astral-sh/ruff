@@ -6,7 +6,7 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::registry::Rule;
-use crate::rules::flake8_2020::helpers::{integer_literal, is_sys};
+use crate::rules::flake8_2020::helpers::is_sys;
 
 /// ## What it does
 /// Checks for uses of `sys.version[:3]`.
@@ -177,7 +177,7 @@ pub(crate) fn subscript(checker: &Checker, value: Expr<'_>, slice: Expr<'_>) {
     if is_sys(value, "version", checker.semantic()) {
         match slice.classify() {
             ExprKind::Slice(slice) if slice.lower().is_none() && slice.step().is_none() => {
-                if let Some(i) = slice.upper().and_then(integer_literal) {
+                if let Some(i) = slice.upper().and_then(Expr::as_int_literal) {
                     if *i == 1 && checker.is_rule_enabled(Rule::SysVersionSlice1) {
                         checker.report_diagnostic(SysVersionSlice1, value.range());
                     } else if *i == 3 && checker.is_rule_enabled(Rule::SysVersionSlice3) {

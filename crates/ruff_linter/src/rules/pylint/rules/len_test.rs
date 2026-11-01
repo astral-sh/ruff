@@ -81,9 +81,9 @@ impl AlwaysFixableViolation for LenTest {
 }
 
 /// PLC1802
-pub(crate) fn len_test(checker: &Checker, call: &ast::ExprCallFields<'_>) {
-    let func = call.func;
-    let arguments = call.arguments;
+pub(crate) fn len_test(checker: &Checker, call: ast::ExprCall<'_>) {
+    let func = call.func();
+    let arguments = call.arguments();
     let semantic = checker.semantic();
 
     if !semantic.in_boolean_test() {
@@ -114,14 +114,14 @@ pub(crate) fn len_test(checker: &Checker, call: &ast::ExprCallFields<'_>) {
             LenTest {
                 expression: SourceCodeSnippet::new(replacement.clone()),
             },
-            call.range,
+            call.range(),
         )
         .set_fix(Fix::applicable_edit(
             Edit::range_replacement(
-                edits::pad(replacement, call.range, checker.locator()),
-                call.range,
+                edits::pad(replacement, call.range(), checker.locator()),
+                call.range(),
             ),
-            if checker.comment_ranges().intersects(call.range) {
+            if checker.comment_ranges().intersects(call.range()) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe

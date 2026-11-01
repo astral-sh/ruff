@@ -58,12 +58,12 @@ impl Violation for Airflow3DagDynamicValue {
 }
 
 /// AIR304
-pub(crate) fn airflow_3_dag_dynamic_value(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+pub(crate) fn airflow_3_dag_dynamic_value(checker: &Checker, call: ast::ExprCall<'_>) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
 
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func) else {
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func()) else {
         return;
     };
 
@@ -71,7 +71,7 @@ pub(crate) fn airflow_3_dag_dynamic_value(checker: &Checker, call: &ast::ExprCal
         return;
     }
 
-    for keyword in call.arguments.keywords() {
+    for keyword in call.arguments().keywords() {
         if let Some((expr, name)) = find_runtime_varying_call(keyword.value(), checker.semantic()) {
             checker.report_diagnostic(
                 Airflow3DagDynamicValue {

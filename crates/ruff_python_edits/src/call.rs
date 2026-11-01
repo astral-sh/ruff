@@ -42,15 +42,7 @@ pub fn unwrapped_call_argument(
     let needs_boundary_parens = adjacent_before.is_some_and(|token| {
         token.kind().is_keyword() || (token.kind().is_lbrace() && argument_source.starts_with('{'))
     }) || adjacent_after.is_some_and(|token| {
-        token.kind().is_keyword()
-            || (token.kind().is_dot()
-                && matches!(
-                    argument.fields(),
-                    ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                        value: ast::Number::Int(_),
-                        ..
-                    })
-                ))
+        token.kind().is_keyword() || (token.kind().is_dot() && argument.as_int_literal().is_some())
     });
 
     // These positions accept a complete expression. A callee still needs grouping:

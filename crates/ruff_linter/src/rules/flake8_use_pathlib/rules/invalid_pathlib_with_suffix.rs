@@ -86,8 +86,8 @@ impl Violation for InvalidPathlibWithSuffix {
 }
 
 /// PTH210
-pub(crate) fn invalid_pathlib_with_suffix(checker: &Checker, call: &ast::ExprCallFields<'_>) {
-    let (func, arguments) = (call.func, call.arguments);
+pub(crate) fn invalid_pathlib_with_suffix(checker: &Checker, call: ast::ExprCall<'_>) {
+    let (func, arguments) = (call.func(), call.arguments());
 
     if !is_path_with_suffix_call(checker.semantic(), func) {
         return;
@@ -127,7 +127,7 @@ pub(crate) fn invalid_pathlib_with_suffix(checker: &Checker, call: &ast::ExprCal
     }
 
     let mut diagnostic =
-        checker.report_diagnostic(InvalidPathlibWithSuffix { single_dot }, call.range);
+        checker.report_diagnostic(InvalidPathlibWithSuffix { single_dot }, call.range());
     if !single_dot {
         let after_leading_quote = string.start() + first_part.flags().opener_len();
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(

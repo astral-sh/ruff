@@ -60,8 +60,8 @@ impl Violation for SingleStringSlots {
 }
 
 /// PLC0205
-pub(crate) fn single_string_slots(checker: &Checker, class: &ast::StmtClassDefFields<'_>) {
-    for stmt in class.body {
+pub(crate) fn single_string_slots(checker: &Checker, class: ast::StmtClassDef<'_>) {
+    for stmt in class.body() {
         match stmt.classify() {
             StmtKind::Assign(stmt_assign) => {
                 let targets = stmt_assign.targets();

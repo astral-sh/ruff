@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, ArgOrKeyword, ExprCall};
+use ruff_python_ast::ExprBooleanLiteral;
+use ruff_python_ast::{ArgOrKeyword, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -95,10 +96,9 @@ pub(crate) fn builtin_open(checker: &Checker, call: ExprCall<'_>, segments: &[&s
         .arguments()
         .find_argument_value("closefd", 6)
         .is_some_and(|expr| {
-            !matches!(
-                expr.fields(),
-                ast::ExprFields::BooleanLiteral(ast::ExprBooleanLiteralFields { value: true, .. })
-            )
+            !expr
+                .as_boolean_literal_expr()
+                .is_some_and(ExprBooleanLiteral::value)
         })
         || is_argument_non_default(call.arguments(), "opener", 7)
         || file_arg.is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))

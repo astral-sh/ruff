@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{ExprKind, StmtKind, StmtWhileFields};
+use ruff_python_ast::{ExprKind, StmtKind, StmtWhile};
+use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -61,9 +62,9 @@ impl Violation for AsyncBusyWait {
 }
 
 /// ASYNC110
-pub(crate) fn async_busy_wait(checker: &Checker, while_stmt: &StmtWhileFields<'_>) {
+pub(crate) fn async_busy_wait(checker: &Checker, while_stmt: StmtWhile<'_>) {
     // The body should be a single `await` call.
-    let Some([stmt]) = while_stmt.body.as_array() else {
+    let Some([stmt]) = while_stmt.body().as_array() else {
         return;
     };
     let StmtKind::Expr(expr) = stmt.classify() else {
@@ -91,7 +92,7 @@ pub(crate) fn async_busy_wait(checker: &Checker, while_stmt: &StmtWhileFields<'_
             AsyncBusyWait {
                 module: AsyncModule::try_from(&qualified_name).unwrap(),
             },
-            while_stmt.range,
+            while_stmt.range(),
         );
     }
 }

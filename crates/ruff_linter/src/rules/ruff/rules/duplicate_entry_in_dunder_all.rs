@@ -67,12 +67,9 @@ impl Violation for DuplicateEntryInDunderAll {
 }
 
 /// Apply RUF068 to `StmtAssign` AST node. For example: `__all__ = ["a", "b", "a"]`.
-pub(crate) fn duplicate_entry_in_dunder_all_assign(
-    checker: &Checker,
-    stmt: &ast::StmtAssignFields<'_>,
-) {
-    let value = stmt.value;
-    if let Some([expr]) = stmt.targets.as_array() {
+pub(crate) fn duplicate_entry_in_dunder_all_assign(checker: &Checker, stmt: ast::StmtAssign<'_>) {
+    let value = stmt.value();
+    if let Some([expr]) = stmt.targets().as_array() {
         duplicate_entry_in_dunder_all(checker, expr, value);
     }
 }
@@ -90,12 +87,12 @@ pub(crate) fn duplicate_entry_in_dunder_all_aug_assign(
 /// Apply RUF068 to `__all__.extend()`.
 pub(crate) fn duplicate_entry_in_dunder_all_extend_call(
     checker: &Checker,
-    call: &ast::ExprCallFields<'_>,
+    call: ast::ExprCall<'_>,
 ) {
-    let func = call.func;
+    let func = call.func();
     let (Some([value_passed]), true) = (
-        call.arguments.args().as_array(),
-        call.arguments.keywords().is_empty(),
+        call.arguments().args().as_array(),
+        call.arguments().keywords().is_empty(),
     ) else {
         return;
     };
@@ -113,10 +110,10 @@ pub(crate) fn duplicate_entry_in_dunder_all_extend_call(
 /// For example: `__all__: list[str] = ["a", "b", "a"]`.
 pub(crate) fn duplicate_entry_in_dunder_all_ann_assign(
     checker: &Checker,
-    node: &ast::StmtAnnAssignFields<'_>,
+    node: ast::StmtAnnAssign<'_>,
 ) {
-    if let Some(value) = node.value {
-        duplicate_entry_in_dunder_all(checker, node.target, value);
+    if let Some(value) = node.value() {
+        duplicate_entry_in_dunder_all(checker, node.target(), value);
     }
 }
 

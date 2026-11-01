@@ -83,12 +83,12 @@ impl AlwaysFixableViolation for FromisoformatReplaceZ {
 }
 
 /// FURB162
-pub(crate) fn fromisoformat_replace_z(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+pub(crate) fn fromisoformat_replace_z(checker: &Checker, call: ast::ExprCall<'_>) {
     if checker.target_version() < PythonVersion::PY311 {
         return;
     }
 
-    let (func, arguments) = (call.func, call.arguments);
+    let (func, arguments) = (call.func(), call.arguments());
 
     if !arguments.keywords().is_empty() {
         return;

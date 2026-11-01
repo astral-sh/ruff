@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprKind, Operator};
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -50,9 +51,9 @@ impl Violation for IsinstanceTypeNone {
 }
 
 /// FURB168
-pub(crate) fn isinstance_type_none(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+pub(crate) fn isinstance_type_none(checker: &Checker, call: ast::ExprCall<'_>) {
     let semantic = checker.semantic();
-    let (func, arguments) = (call.func, call.arguments);
+    let (func, arguments) = (call.func(), call.arguments());
 
     if !arguments.keywords().is_empty() {
         return;
@@ -70,9 +71,9 @@ pub(crate) fn isinstance_type_none(checker: &Checker, call: &ast::ExprCallFields
         return;
     }
 
-    let fix = replace_with_identity_check(expr, call.range, false, checker);
+    let fix = replace_with_identity_check(expr, call.range(), false, checker);
     checker
-        .report_diagnostic(IsinstanceTypeNone, call.range)
+        .report_diagnostic(IsinstanceTypeNone, call.range())
         .set_fix(fix);
 }
 

@@ -62,18 +62,18 @@ impl Violation for LongSleepNotForever {
 }
 
 /// ASYNC116
-pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+pub(crate) fn long_sleep_not_forever(checker: &Checker, call: ast::ExprCall<'_>) {
     if !(checker.semantic().seen_module(Modules::TRIO)
         || checker.semantic().seen_module(Modules::ANYIO))
     {
         return;
     }
 
-    if call.arguments.len() != 1 {
+    if call.arguments().len() != 1 {
         return;
     }
 
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func) else {
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func()) else {
         return;
     };
 
@@ -88,7 +88,7 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ast::ExprCallFiel
         AsyncModule::AsyncIo => return,
     };
 
-    let Some(arg) = call.arguments.find_argument_value(arg_name, 0) else {
+    let Some(arg) = call.arguments().find_argument_value(arg_name, 0) else {
         return;
     };
 
@@ -114,7 +114,7 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ast::ExprCallFiel
         Number::Complex { .. } => return,
     }
 
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func) else {
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func()) else {
         return;
     };
 
@@ -130,16 +130,16 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ast::ExprCallFiel
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(LongSleepNotForever { module }, call.range);
+    let mut diagnostic = checker.report_diagnostic(LongSleepNotForever { module }, call.range());
     let replacement_function = "sleep_forever";
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import_from(&module.to_string(), replacement_function),
-            call.func.start(),
+            call.func().start(),
             checker.semantic(),
         )?;
-        let reference_edit = Edit::range_replacement(binding, call.func.range());
-        let arg_edit = Edit::range_replacement("()".to_string(), call.arguments.range());
+        let reference_edit = Edit::range_replacement(binding, call.func().range());
+        let arg_edit = Edit::range_replacement("()".to_string(), call.arguments().range());
         Ok(Fix::unsafe_edits(import_edit, [reference_edit, arg_edit]))
     });
 }

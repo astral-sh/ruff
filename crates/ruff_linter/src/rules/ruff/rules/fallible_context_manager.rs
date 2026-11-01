@@ -276,10 +276,11 @@ impl YieldFinallyVisitor<'_, '_> {
 
     /// Returns `true` if the statement is an expression statement containing a `yield` or `yield from`.
     fn is_yield_statement(stmt: Stmt<'_>) -> bool {
-        matches!(
-            stmt.fields(),
-            ast::StmtFields::Expr(ast::StmtExprFields { value, .. })
-                if matches!(value.classify(), ExprKind::Yield(_) | ExprKind::YieldFrom(_))
-        )
+        stmt.as_expr_stmt().is_some_and(|statement| {
+            matches!(
+                statement.value().classify(),
+                ExprKind::Yield(_) | ExprKind::YieldFrom(_)
+            )
+        })
     }
 }

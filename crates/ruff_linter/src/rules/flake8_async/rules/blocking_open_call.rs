@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprCallFields, ExprKind};
+use ruff_python_ast::{Expr, ExprCall, ExprKind};
 use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_text_size::Ranged;
 
@@ -46,15 +46,15 @@ impl Violation for BlockingOpenCallInAsyncFunction {
 }
 
 /// ASYNC230
-pub(crate) fn blocking_open_call(checker: &Checker, call: &ExprCallFields<'_>) {
+pub(crate) fn blocking_open_call(checker: &Checker, call: ExprCall<'_>) {
     if !checker.semantic().in_async_context() {
         return;
     }
 
-    if is_open_call(call.func, checker.semantic())
-        || is_open_call_from_pathlib(call.func, checker.semantic())
+    if is_open_call(call.func(), checker.semantic())
+        || is_open_call_from_pathlib(call.func(), checker.semantic())
     {
-        checker.report_diagnostic(BlockingOpenCallInAsyncFunction, call.func.range());
+        checker.report_diagnostic(BlockingOpenCallInAsyncFunction, call.func().range());
     }
 }
 

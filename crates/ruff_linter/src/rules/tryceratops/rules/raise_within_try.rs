@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, NodeList, Stmt, StmtKind, Suite};
+use ruff_python_ast::StmtRaise;
+use ruff_python_ast::{NodeList, Stmt, StmtKind, Suite};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
@@ -103,11 +104,7 @@ pub(crate) fn raise_within_try(
         .collect();
 
     for stmt in raises {
-        let ast::StmtFields::Raise(ast::StmtRaiseFields {
-            exc: Some(exception),
-            ..
-        }) = stmt.fields()
-        else {
+        let Some(exception) = stmt.as_raise_stmt().and_then(StmtRaise::exc) else {
             continue;
         };
 

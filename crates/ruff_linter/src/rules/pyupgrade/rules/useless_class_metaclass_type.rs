@@ -50,11 +50,8 @@ impl Violation for UselessClassMetaclassType {
 }
 
 /// UP050
-pub(crate) fn useless_class_metaclass_type(
-    checker: &Checker,
-    class_def: &ast::StmtClassDefFields<'_>,
-) {
-    let Some(arguments) = class_def.arguments else {
+pub(crate) fn useless_class_metaclass_type(checker: &Checker, class_def: ast::StmtClassDef<'_>) {
+    let Some(arguments) = class_def.arguments() else {
         return;
     };
 
@@ -66,7 +63,7 @@ pub(crate) fn useless_class_metaclass_type(
             if checker.semantic().match_builtin_expr(expr, "type") {
                 let mut diagnostic = checker.report_diagnostic(
                     UselessClassMetaclassType {
-                        name: class_def.name.to_string(),
+                        name: class_def.name().to_string(),
                     },
                     keyword.range(),
                 );

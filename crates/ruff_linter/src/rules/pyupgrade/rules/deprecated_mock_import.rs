@@ -4,7 +4,7 @@ use libcst_native::{
     NameOrAttribute, ParenthesizableWhitespace,
 };
 use log::debug;
-use ruff_python_ast::{ExprAttributeFields, StmtKind};
+use ruff_python_ast::{ExprAttribute, StmtKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
@@ -262,24 +262,24 @@ fn format_import_from(
 }
 
 /// UP026
-pub(crate) fn deprecated_mock_attribute(checker: &Checker, &attribute: &ExprAttributeFields<'_>) {
+pub(crate) fn deprecated_mock_attribute(checker: &Checker, attribute: ExprAttribute<'_>) {
     if !checker.semantic().seen_module(Modules::MOCK) {
         return;
     }
 
-    if UnqualifiedName::from_expr(attribute.value)
+    if UnqualifiedName::from_expr(attribute.value())
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["mock", "mock"]))
     {
         let mut diagnostic = checker.report_diagnostic(
             DeprecatedMockImport {
                 reference_type: MockReference::Attribute,
             },
-            attribute.value.range(),
+            attribute.value().range(),
         );
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             "mock".to_string(),
-            attribute.value.range(),
+            attribute.value().range(),
         )));
     }
 }

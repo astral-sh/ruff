@@ -1,6 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprFStringFields;
+use ruff_python_ast::ExprFString;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Locator;
@@ -74,8 +74,8 @@ impl AlwaysFixableViolation for FStringMissingPlaceholders {
 }
 
 /// F541
-pub(crate) fn f_string_missing_placeholders(checker: &Checker, expr: &ExprFStringFields<'_>) {
-    if expr.value.f_strings().any(|f_string| {
+pub(crate) fn f_string_missing_placeholders(checker: &Checker, expr: ExprFString<'_>) {
+    if expr.value().f_strings().any(|f_string| {
         f_string
             .elements()
             .iter()
@@ -84,13 +84,13 @@ pub(crate) fn f_string_missing_placeholders(checker: &Checker, expr: &ExprFStrin
         return;
     }
 
-    let applicability = if checker.in_docstring_position(expr.range) {
+    let applicability = if checker.in_docstring_position(expr.range()) {
         Applicability::Unsafe
     } else {
         Applicability::Safe
     };
 
-    for f_string in expr.value.f_strings() {
+    for f_string in expr.value().f_strings() {
         let first_char = checker
             .locator()
             .slice(TextRange::at(f_string.start(), TextSize::new(1)));

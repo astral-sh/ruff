@@ -335,12 +335,12 @@ fn is_trusted_input(arg: Expr<'_>, semantic: &SemanticModel) -> bool {
 }
 
 /// S602, S603, S604, S605, S606, S607, S609
-pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCallFields<'_>) {
-    let call_kind = get_call_kind(call.func, checker.semantic());
-    let shell_keyword = find_shell_keyword(call.arguments, checker.semantic());
+pub(crate) fn shell_injection(checker: &Checker, call: ast::ExprCall<'_>) {
+    let call_kind = get_call_kind(call.func(), checker.semantic());
+    let shell_keyword = find_shell_keyword(call.arguments(), checker.semantic());
     let command_argument = match call_kind {
-        Some(CallKind::Subprocess) => find_subprocess_argument(call.arguments),
-        Some(CallKind::Shell | CallKind::NoShell) => call.arguments.args().first(),
+        Some(CallKind::Subprocess) => find_subprocess_argument(call.arguments()),
+        Some(CallKind::Shell | CallKind::NoShell) => call.arguments().args().first(),
         None => None,
     };
 
@@ -356,7 +356,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCallFields<'_>)
                             safety: Safety::from(arg),
                             is_exact: matches!(truthiness, Truthiness::True),
                         },
-                        call.func.range(),
+                        call.func().range(),
                     );
                 }
                 // S603
@@ -364,7 +364,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCallFields<'_>)
                     if !is_trusted_input(arg, checker.semantic()) {
                         checker.report_diagnostic_if_enabled(
                             SubprocessWithoutShellEqualsTrue,
-                            call.func.range(),
+                            call.func().range(),
                         );
                     }
                 }
@@ -379,19 +379,19 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCallFields<'_>)
             CallWithShellEqualsTrue {
                 is_exact: matches!(truthiness, Truthiness::True),
             },
-            call.func.range(),
+            call.func().range(),
         );
     }
 
     // S605
     if checker.is_rule_enabled(Rule::StartProcessWithAShell) {
         if matches!(call_kind, Some(CallKind::Shell)) {
-            if let Some(arg) = call.arguments.args().first() {
+            if let Some(arg) = call.arguments().args().first() {
                 checker.report_diagnostic(
                     StartProcessWithAShell {
                         safety: Safety::from(arg),
                     },
-                    call.func.range(),
+                    call.func().range(),
                 );
             }
         }
@@ -400,7 +400,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCallFields<'_>)
     // S606
     if checker.is_rule_enabled(Rule::StartProcessWithNoShell) {
         if matches!(call_kind, Some(CallKind::NoShell)) {
-            checker.report_diagnostic(StartProcessWithNoShell, call.func.range());
+            checker.report_diagnostic(StartProcessWithNoShell, call.func().range());
         }
     }
 

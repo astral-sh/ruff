@@ -51,8 +51,8 @@ impl Violation for FlaskDebugTrue {
 }
 
 /// S201
-pub(crate) fn flask_debug_true(checker: &Checker, call: &ast::ExprCallFields<'_>) {
-    let ExprKind::Attribute(attribute) = call.func.classify() else {
+pub(crate) fn flask_debug_true(checker: &Checker, call: ast::ExprCall<'_>) {
+    let ExprKind::Attribute(attribute) = call.func().classify() else {
         return;
     };
     let attr = attribute.attr();
@@ -62,7 +62,7 @@ pub(crate) fn flask_debug_true(checker: &Checker, call: &ast::ExprCallFields<'_>
         return;
     }
 
-    let Some(debug_argument) = call.arguments.find_keyword("debug") else {
+    let Some(debug_argument) = call.arguments().find_keyword("debug") else {
         return;
     };
 

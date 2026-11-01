@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, ExprKind, Number, UnaryOp};
+use ruff_python_ast::{self as ast, ExprKind, UnaryOp};
+use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -41,8 +42,8 @@ impl Violation for UnnecessarySubscriptReversal {
 }
 
 /// C415
-pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: &ast::ExprCallFields<'_>) {
-    let Some(first_arg) = call.arguments.args().first() else {
+pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: ast::ExprCall<'_>) {
+    let Some(first_arg) = call.arguments().args().first() else {
         return;
     };
     let ExprKind::Subscript(subscript_node) = first_arg.classify() else {
@@ -70,17 +71,13 @@ pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: &ast::Expr
     else {
         return;
     };
-    let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-        value: Number::Int(val),
-        ..
-    }) = operand.fields()
-    else {
+    let Some(val) = operand.as_int_literal() else {
         return;
     };
     if *val != 1 {
         return;
     }
-    let Some(function_name) = checker.semantic().resolve_builtin_symbol(call.func) else {
+    let Some(function_name) = checker.semantic().resolve_builtin_symbol(call.func()) else {
         return;
     };
     if !matches!(function_name, "reversed" | "set" | "sorted") {
@@ -90,6 +87,6 @@ pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: &ast::Expr
         UnnecessarySubscriptReversal {
             func: function_name.to_string(),
         },
-        call.range,
+        call.range(),
     );
 }
