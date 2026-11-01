@@ -612,9 +612,7 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 499..501,
-                                    keys: [],
-                                    patterns: [],
-                                    rest: None,
+                                    items: [],
                                 },
                             ),
                             guard: None,
@@ -673,67 +671,64 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 564..579,
-                                    keys: [
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 565..566,
-                                                value: Int(
-                                                    0,
-                                                ),
-                                            },
-                                        ),
+                                    items: [
+                                        Entry {
+                                            key: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 565..566,
+                                                    value: Int(
+                                                        0,
+                                                    ),
+                                                },
+                                            ),
+                                            pattern: MatchSequence(
+                                                PatternMatchSequence {
+                                                    node_index: NodeIndex(None),
+                                                    range: 568..578,
+                                                    patterns: [
+                                                        MatchValue(
+                                                            PatternMatchValue {
+                                                                node_index: NodeIndex(None),
+                                                                range: 569..570,
+                                                                value: NumberLiteral(
+                                                                    ExprNumberLiteral {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 569..570,
+                                                                        value: Int(
+                                                                            1,
+                                                                        ),
+                                                                    },
+                                                                ),
+                                                            },
+                                                        ),
+                                                        MatchValue(
+                                                            PatternMatchValue {
+                                                                node_index: NodeIndex(None),
+                                                                range: 572..573,
+                                                                value: NumberLiteral(
+                                                                    ExprNumberLiteral {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 572..573,
+                                                                        value: Int(
+                                                                            2,
+                                                                        ),
+                                                                    },
+                                                                ),
+                                                            },
+                                                        ),
+                                                        MatchMapping(
+                                                            PatternMatchMapping {
+                                                                node_index: NodeIndex(None),
+                                                                range: 575..577,
+                                                                items: [],
+                                                            },
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                        },
                                     ],
-                                    patterns: [
-                                        MatchSequence(
-                                            PatternMatchSequence {
-                                                node_index: NodeIndex(None),
-                                                range: 568..578,
-                                                patterns: [
-                                                    MatchValue(
-                                                        PatternMatchValue {
-                                                            node_index: NodeIndex(None),
-                                                            range: 569..570,
-                                                            value: NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 569..570,
-                                                                    value: Int(
-                                                                        1,
-                                                                    ),
-                                                                },
-                                                            ),
-                                                        },
-                                                    ),
-                                                    MatchValue(
-                                                        PatternMatchValue {
-                                                            node_index: NodeIndex(None),
-                                                            range: 572..573,
-                                                            value: NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 572..573,
-                                                                    value: Int(
-                                                                        2,
-                                                                    ),
-                                                                },
-                                                            ),
-                                                        },
-                                                    ),
-                                                    MatchMapping(
-                                                        PatternMatchMapping {
-                                                            node_index: NodeIndex(None),
-                                                            range: 575..577,
-                                                            keys: [],
-                                                            patterns: [],
-                                                            rest: None,
-                                                        },
-                                                    ),
-                                                ],
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
                                 },
                             ),
                             guard: None,
@@ -777,184 +772,177 @@ Module(
                                             PatternMatchMapping {
                                                 node_index: NodeIndex(None),
                                                 range: 604..626,
-                                                keys: [
-                                                    NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            node_index: NodeIndex(None),
-                                                            range: 605..606,
-                                                            value: Int(
-                                                                0,
-                                                            ),
-                                                        },
-                                                    ),
-                                                ],
-                                                patterns: [
-                                                    MatchOr(
-                                                        PatternMatchOr {
-                                                            node_index: NodeIndex(None),
-                                                            range: 608..625,
-                                                            patterns: [
-                                                                MatchSequence(
-                                                                    PatternMatchSequence {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 608..618,
-                                                                        patterns: [
-                                                                            MatchValue(
-                                                                                PatternMatchValue {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 609..610,
-                                                                                    value: NumberLiteral(
-                                                                                        ExprNumberLiteral {
-                                                                                            node_index: NodeIndex(None),
-                                                                                            range: 609..610,
-                                                                                            value: Int(
-                                                                                                1,
-                                                                                            ),
-                                                                                        },
-                                                                                    ),
-                                                                                },
-                                                                            ),
-                                                                            MatchValue(
-                                                                                PatternMatchValue {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 612..613,
-                                                                                    value: NumberLiteral(
-                                                                                        ExprNumberLiteral {
-                                                                                            node_index: NodeIndex(None),
-                                                                                            range: 612..613,
-                                                                                            value: Int(
-                                                                                                2,
-                                                                                            ),
-                                                                                        },
-                                                                                    ),
-                                                                                },
-                                                                            ),
-                                                                            MatchMapping(
-                                                                                PatternMatchMapping {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 615..617,
-                                                                                    keys: [],
-                                                                                    patterns: [],
-                                                                                    rest: None,
-                                                                                },
-                                                                            ),
-                                                                        ],
-                                                                    },
+                                                items: [
+                                                    Entry {
+                                                        key: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 605..606,
+                                                                value: Int(
+                                                                    0,
                                                                 ),
-                                                                MatchSingleton(
-                                                                    PatternMatchSingleton {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 621..625,
-                                                                        value: True,
-                                                                    },
-                                                                ),
-                                                            ],
-                                                        },
-                                                    ),
+                                                            },
+                                                        ),
+                                                        pattern: MatchOr(
+                                                            PatternMatchOr {
+                                                                node_index: NodeIndex(None),
+                                                                range: 608..625,
+                                                                patterns: [
+                                                                    MatchSequence(
+                                                                        PatternMatchSequence {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 608..618,
+                                                                            patterns: [
+                                                                                MatchValue(
+                                                                                    PatternMatchValue {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 609..610,
+                                                                                        value: NumberLiteral(
+                                                                                            ExprNumberLiteral {
+                                                                                                node_index: NodeIndex(None),
+                                                                                                range: 609..610,
+                                                                                                value: Int(
+                                                                                                    1,
+                                                                                                ),
+                                                                                            },
+                                                                                        ),
+                                                                                    },
+                                                                                ),
+                                                                                MatchValue(
+                                                                                    PatternMatchValue {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 612..613,
+                                                                                        value: NumberLiteral(
+                                                                                            ExprNumberLiteral {
+                                                                                                node_index: NodeIndex(None),
+                                                                                                range: 612..613,
+                                                                                                value: Int(
+                                                                                                    2,
+                                                                                                ),
+                                                                                            },
+                                                                                        ),
+                                                                                    },
+                                                                                ),
+                                                                                MatchMapping(
+                                                                                    PatternMatchMapping {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 615..617,
+                                                                                        items: [],
+                                                                                    },
+                                                                                ),
+                                                                            ],
+                                                                        },
+                                                                    ),
+                                                                    MatchSingleton(
+                                                                        PatternMatchSingleton {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 621..625,
+                                                                            value: True,
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
                                                 ],
-                                                rest: None,
                                             },
                                         ),
                                         MatchMapping(
                                             PatternMatchMapping {
                                                 node_index: NodeIndex(None),
                                                 range: 629..638,
-                                                keys: [
-                                                    NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            node_index: NodeIndex(None),
-                                                            range: 630..631,
-                                                            value: Int(
-                                                                1,
-                                                            ),
-                                                        },
-                                                    ),
-                                                ],
-                                                patterns: [
-                                                    MatchSequence(
-                                                        PatternMatchSequence {
-                                                            node_index: NodeIndex(None),
-                                                            range: 633..637,
-                                                            patterns: [
-                                                                MatchSequence(
-                                                                    PatternMatchSequence {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 634..636,
-                                                                        patterns: [],
-                                                                    },
+                                                items: [
+                                                    Entry {
+                                                        key: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 630..631,
+                                                                value: Int(
+                                                                    1,
                                                                 ),
-                                                            ],
-                                                        },
-                                                    ),
+                                                            },
+                                                        ),
+                                                        pattern: MatchSequence(
+                                                            PatternMatchSequence {
+                                                                node_index: NodeIndex(None),
+                                                                range: 633..637,
+                                                                patterns: [
+                                                                    MatchSequence(
+                                                                        PatternMatchSequence {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 634..636,
+                                                                            patterns: [],
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
                                                 ],
-                                                rest: None,
                                             },
                                         ),
                                         MatchMapping(
                                             PatternMatchMapping {
                                                 node_index: NodeIndex(None),
                                                 range: 641..656,
-                                                keys: [
-                                                    NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            node_index: NodeIndex(None),
-                                                            range: 642..643,
-                                                            value: Int(
-                                                                0,
-                                                            ),
-                                                        },
-                                                    ),
+                                                items: [
+                                                    Entry {
+                                                        key: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 642..643,
+                                                                value: Int(
+                                                                    0,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        pattern: MatchSequence(
+                                                            PatternMatchSequence {
+                                                                node_index: NodeIndex(None),
+                                                                range: 645..655,
+                                                                patterns: [
+                                                                    MatchValue(
+                                                                        PatternMatchValue {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 646..647,
+                                                                            value: NumberLiteral(
+                                                                                ExprNumberLiteral {
+                                                                                    node_index: NodeIndex(None),
+                                                                                    range: 646..647,
+                                                                                    value: Int(
+                                                                                        1,
+                                                                                    ),
+                                                                                },
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                    MatchValue(
+                                                                        PatternMatchValue {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 649..650,
+                                                                            value: NumberLiteral(
+                                                                                ExprNumberLiteral {
+                                                                                    node_index: NodeIndex(None),
+                                                                                    range: 649..650,
+                                                                                    value: Int(
+                                                                                        2,
+                                                                                    ),
+                                                                                },
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                    MatchMapping(
+                                                                        PatternMatchMapping {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 652..654,
+                                                                            items: [],
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
                                                 ],
-                                                patterns: [
-                                                    MatchSequence(
-                                                        PatternMatchSequence {
-                                                            node_index: NodeIndex(None),
-                                                            range: 645..655,
-                                                            patterns: [
-                                                                MatchValue(
-                                                                    PatternMatchValue {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 646..647,
-                                                                        value: NumberLiteral(
-                                                                            ExprNumberLiteral {
-                                                                                node_index: NodeIndex(None),
-                                                                                range: 646..647,
-                                                                                value: Int(
-                                                                                    1,
-                                                                                ),
-                                                                            },
-                                                                        ),
-                                                                    },
-                                                                ),
-                                                                MatchValue(
-                                                                    PatternMatchValue {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 649..650,
-                                                                        value: NumberLiteral(
-                                                                            ExprNumberLiteral {
-                                                                                node_index: NodeIndex(None),
-                                                                                range: 649..650,
-                                                                                value: Int(
-                                                                                    2,
-                                                                                ),
-                                                                            },
-                                                                        ),
-                                                                    },
-                                                                ),
-                                                                MatchMapping(
-                                                                    PatternMatchMapping {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 652..654,
-                                                                        keys: [],
-                                                                        patterns: [],
-                                                                        rest: None,
-                                                                    },
-                                                                ),
-                                                            ],
-                                                        },
-                                                    ),
-                                                ],
-                                                rest: None,
                                             },
                                         ),
                                         MatchSequence(
@@ -995,9 +983,7 @@ Module(
                                             PatternMatchMapping {
                                                 node_index: NodeIndex(None),
                                                 range: 670..672,
-                                                keys: [],
-                                                patterns: [],
-                                                rest: None,
+                                                items: [],
                                             },
                                         ),
                                     ],
@@ -1432,35 +1418,34 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 1016..1022,
-                                    keys: [
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 1017..1018,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                            },
-                                        ),
+                                    items: [
+                                        Entry {
+                                            key: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 1017..1018,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                            pattern: MatchValue(
+                                                PatternMatchValue {
+                                                    node_index: NodeIndex(None),
+                                                    range: 1020..1021,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 1020..1021,
+                                                            value: Int(
+                                                                0,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        },
                                     ],
-                                    patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 1020..1021,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 1020..1021,
-                                                        value: Int(
-                                                            0,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
                                 },
                             ),
                             guard: None,
@@ -1499,35 +1484,34 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 1047..1053,
-                                    keys: [
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 1048..1049,
-                                                value: Int(
-                                                    0,
-                                                ),
-                                            },
-                                        ),
+                                    items: [
+                                        Entry {
+                                            key: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 1048..1049,
+                                                    value: Int(
+                                                        0,
+                                                    ),
+                                                },
+                                            ),
+                                            pattern: MatchValue(
+                                                PatternMatchValue {
+                                                    node_index: NodeIndex(None),
+                                                    range: 1051..1052,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 1051..1052,
+                                                            value: Int(
+                                                                0,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        },
                                     ],
-                                    patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 1051..1052,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 1051..1052,
-                                                        value: Int(
-                                                            0,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
                                 },
                             ),
                             guard: None,
@@ -1566,15 +1550,15 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 1078..1083,
-                                    keys: [],
-                                    patterns: [],
-                                    rest: Some(
-                                        Identifier {
-                                            id: Name("z"),
-                                            range: 1081..1082,
-                                            node_index: NodeIndex(None),
-                                        },
-                                    ),
+                                    items: [
+                                        Rest(
+                                            Identifier {
+                                                id: Name("z"),
+                                                range: 1081..1082,
+                                                node_index: NodeIndex(None),
+                                            },
+                                        ),
+                                    ],
                                 },
                             ),
                             guard: None,
@@ -1814,46 +1798,45 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 1286..1298,
-                                    keys: [
-                                        StringLiteral(
-                                            ExprStringLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 1287..1292,
-                                                value: StringLiteralValue {
-                                                    inner: Single(
-                                                        StringLiteral {
-                                                            range: 1287..1292,
-                                                            node_index: NodeIndex(None),
-                                                            value: "foo",
-                                                            flags: StringLiteralFlags {
-                                                                quote_style: Double,
-                                                                prefix: Empty,
-                                                                triple_quoted: false,
-                                                                unclosed: false,
+                                    items: [
+                                        Entry {
+                                            key: StringLiteral(
+                                                ExprStringLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 1287..1292,
+                                                    value: StringLiteralValue {
+                                                        inner: Single(
+                                                            StringLiteral {
+                                                                range: 1287..1292,
+                                                                node_index: NodeIndex(None),
+                                                                value: "foo",
+                                                                flags: StringLiteralFlags {
+                                                                    quote_style: Double,
+                                                                    prefix: Empty,
+                                                                    triple_quoted: false,
+                                                                    unclosed: false,
+                                                                },
                                                             },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
+                                            pattern: MatchAs(
+                                                PatternMatchAs {
+                                                    node_index: NodeIndex(None),
+                                                    range: 1294..1297,
+                                                    pattern: None,
+                                                    name: Some(
+                                                        Identifier {
+                                                            id: Name("bar"),
+                                                            range: 1294..1297,
+                                                            node_index: NodeIndex(None),
                                                         },
                                                     ),
                                                 },
-                                            },
-                                        ),
+                                            ),
+                                        },
                                     ],
-                                    patterns: [
-                                        MatchAs(
-                                            PatternMatchAs {
-                                                node_index: NodeIndex(None),
-                                                range: 1294..1297,
-                                                pattern: None,
-                                                name: Some(
-                                                    Identifier {
-                                                        id: Name("bar"),
-                                                        range: 1294..1297,
-                                                        node_index: NodeIndex(None),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
                                 },
                             ),
                             guard: None,
@@ -3369,67 +3352,64 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 2348..2363,
-                                    keys: [
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 2349..2350,
-                                                value: Int(
-                                                    0,
-                                                ),
-                                            },
-                                        ),
+                                    items: [
+                                        Entry {
+                                            key: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 2349..2350,
+                                                    value: Int(
+                                                        0,
+                                                    ),
+                                                },
+                                            ),
+                                            pattern: MatchSequence(
+                                                PatternMatchSequence {
+                                                    node_index: NodeIndex(None),
+                                                    range: 2352..2362,
+                                                    patterns: [
+                                                        MatchValue(
+                                                            PatternMatchValue {
+                                                                node_index: NodeIndex(None),
+                                                                range: 2353..2354,
+                                                                value: NumberLiteral(
+                                                                    ExprNumberLiteral {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 2353..2354,
+                                                                        value: Int(
+                                                                            1,
+                                                                        ),
+                                                                    },
+                                                                ),
+                                                            },
+                                                        ),
+                                                        MatchValue(
+                                                            PatternMatchValue {
+                                                                node_index: NodeIndex(None),
+                                                                range: 2356..2357,
+                                                                value: NumberLiteral(
+                                                                    ExprNumberLiteral {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 2356..2357,
+                                                                        value: Int(
+                                                                            2,
+                                                                        ),
+                                                                    },
+                                                                ),
+                                                            },
+                                                        ),
+                                                        MatchMapping(
+                                                            PatternMatchMapping {
+                                                                node_index: NodeIndex(None),
+                                                                range: 2359..2361,
+                                                                items: [],
+                                                            },
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                        },
                                     ],
-                                    patterns: [
-                                        MatchSequence(
-                                            PatternMatchSequence {
-                                                node_index: NodeIndex(None),
-                                                range: 2352..2362,
-                                                patterns: [
-                                                    MatchValue(
-                                                        PatternMatchValue {
-                                                            node_index: NodeIndex(None),
-                                                            range: 2353..2354,
-                                                            value: NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 2353..2354,
-                                                                    value: Int(
-                                                                        1,
-                                                                    ),
-                                                                },
-                                                            ),
-                                                        },
-                                                    ),
-                                                    MatchValue(
-                                                        PatternMatchValue {
-                                                            node_index: NodeIndex(None),
-                                                            range: 2356..2357,
-                                                            value: NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 2356..2357,
-                                                                    value: Int(
-                                                                        2,
-                                                                    ),
-                                                                },
-                                                            ),
-                                                        },
-                                                    ),
-                                                    MatchMapping(
-                                                        PatternMatchMapping {
-                                                            node_index: NodeIndex(None),
-                                                            range: 2359..2361,
-                                                            keys: [],
-                                                            patterns: [],
-                                                            rest: None,
-                                                        },
-                                                    ),
-                                                ],
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
                                 },
                             ),
                             guard: None,
@@ -3473,184 +3453,177 @@ Module(
                                             PatternMatchMapping {
                                                 node_index: NodeIndex(None),
                                                 range: 2388..2411,
-                                                keys: [
-                                                    NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            node_index: NodeIndex(None),
-                                                            range: 2389..2390,
-                                                            value: Int(
-                                                                0,
-                                                            ),
-                                                        },
-                                                    ),
-                                                ],
-                                                patterns: [
-                                                    MatchOr(
-                                                        PatternMatchOr {
-                                                            node_index: NodeIndex(None),
-                                                            range: 2392..2410,
-                                                            patterns: [
-                                                                MatchSequence(
-                                                                    PatternMatchSequence {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 2392..2402,
-                                                                        patterns: [
-                                                                            MatchValue(
-                                                                                PatternMatchValue {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 2393..2394,
-                                                                                    value: NumberLiteral(
-                                                                                        ExprNumberLiteral {
-                                                                                            node_index: NodeIndex(None),
-                                                                                            range: 2393..2394,
-                                                                                            value: Int(
-                                                                                                1,
-                                                                                            ),
-                                                                                        },
-                                                                                    ),
-                                                                                },
-                                                                            ),
-                                                                            MatchValue(
-                                                                                PatternMatchValue {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 2396..2397,
-                                                                                    value: NumberLiteral(
-                                                                                        ExprNumberLiteral {
-                                                                                            node_index: NodeIndex(None),
-                                                                                            range: 2396..2397,
-                                                                                            value: Int(
-                                                                                                2,
-                                                                                            ),
-                                                                                        },
-                                                                                    ),
-                                                                                },
-                                                                            ),
-                                                                            MatchMapping(
-                                                                                PatternMatchMapping {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 2399..2401,
-                                                                                    keys: [],
-                                                                                    patterns: [],
-                                                                                    rest: None,
-                                                                                },
-                                                                            ),
-                                                                        ],
-                                                                    },
+                                                items: [
+                                                    Entry {
+                                                        key: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 2389..2390,
+                                                                value: Int(
+                                                                    0,
                                                                 ),
-                                                                MatchSingleton(
-                                                                    PatternMatchSingleton {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 2405..2410,
-                                                                        value: False,
-                                                                    },
-                                                                ),
-                                                            ],
-                                                        },
-                                                    ),
+                                                            },
+                                                        ),
+                                                        pattern: MatchOr(
+                                                            PatternMatchOr {
+                                                                node_index: NodeIndex(None),
+                                                                range: 2392..2410,
+                                                                patterns: [
+                                                                    MatchSequence(
+                                                                        PatternMatchSequence {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 2392..2402,
+                                                                            patterns: [
+                                                                                MatchValue(
+                                                                                    PatternMatchValue {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 2393..2394,
+                                                                                        value: NumberLiteral(
+                                                                                            ExprNumberLiteral {
+                                                                                                node_index: NodeIndex(None),
+                                                                                                range: 2393..2394,
+                                                                                                value: Int(
+                                                                                                    1,
+                                                                                                ),
+                                                                                            },
+                                                                                        ),
+                                                                                    },
+                                                                                ),
+                                                                                MatchValue(
+                                                                                    PatternMatchValue {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 2396..2397,
+                                                                                        value: NumberLiteral(
+                                                                                            ExprNumberLiteral {
+                                                                                                node_index: NodeIndex(None),
+                                                                                                range: 2396..2397,
+                                                                                                value: Int(
+                                                                                                    2,
+                                                                                                ),
+                                                                                            },
+                                                                                        ),
+                                                                                    },
+                                                                                ),
+                                                                                MatchMapping(
+                                                                                    PatternMatchMapping {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 2399..2401,
+                                                                                        items: [],
+                                                                                    },
+                                                                                ),
+                                                                            ],
+                                                                        },
+                                                                    ),
+                                                                    MatchSingleton(
+                                                                        PatternMatchSingleton {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 2405..2410,
+                                                                            value: False,
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
                                                 ],
-                                                rest: None,
                                             },
                                         ),
                                         MatchMapping(
                                             PatternMatchMapping {
                                                 node_index: NodeIndex(None),
                                                 range: 2414..2423,
-                                                keys: [
-                                                    NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            node_index: NodeIndex(None),
-                                                            range: 2415..2416,
-                                                            value: Int(
-                                                                1,
-                                                            ),
-                                                        },
-                                                    ),
-                                                ],
-                                                patterns: [
-                                                    MatchSequence(
-                                                        PatternMatchSequence {
-                                                            node_index: NodeIndex(None),
-                                                            range: 2418..2422,
-                                                            patterns: [
-                                                                MatchSequence(
-                                                                    PatternMatchSequence {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 2419..2421,
-                                                                        patterns: [],
-                                                                    },
+                                                items: [
+                                                    Entry {
+                                                        key: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 2415..2416,
+                                                                value: Int(
+                                                                    1,
                                                                 ),
-                                                            ],
-                                                        },
-                                                    ),
+                                                            },
+                                                        ),
+                                                        pattern: MatchSequence(
+                                                            PatternMatchSequence {
+                                                                node_index: NodeIndex(None),
+                                                                range: 2418..2422,
+                                                                patterns: [
+                                                                    MatchSequence(
+                                                                        PatternMatchSequence {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 2419..2421,
+                                                                            patterns: [],
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
                                                 ],
-                                                rest: None,
                                             },
                                         ),
                                         MatchMapping(
                                             PatternMatchMapping {
                                                 node_index: NodeIndex(None),
                                                 range: 2426..2441,
-                                                keys: [
-                                                    NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            node_index: NodeIndex(None),
-                                                            range: 2427..2428,
-                                                            value: Int(
-                                                                0,
-                                                            ),
-                                                        },
-                                                    ),
+                                                items: [
+                                                    Entry {
+                                                        key: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 2427..2428,
+                                                                value: Int(
+                                                                    0,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        pattern: MatchSequence(
+                                                            PatternMatchSequence {
+                                                                node_index: NodeIndex(None),
+                                                                range: 2430..2440,
+                                                                patterns: [
+                                                                    MatchValue(
+                                                                        PatternMatchValue {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 2431..2432,
+                                                                            value: NumberLiteral(
+                                                                                ExprNumberLiteral {
+                                                                                    node_index: NodeIndex(None),
+                                                                                    range: 2431..2432,
+                                                                                    value: Int(
+                                                                                        1,
+                                                                                    ),
+                                                                                },
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                    MatchValue(
+                                                                        PatternMatchValue {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 2434..2435,
+                                                                            value: NumberLiteral(
+                                                                                ExprNumberLiteral {
+                                                                                    node_index: NodeIndex(None),
+                                                                                    range: 2434..2435,
+                                                                                    value: Int(
+                                                                                        2,
+                                                                                    ),
+                                                                                },
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                    MatchMapping(
+                                                                        PatternMatchMapping {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 2437..2439,
+                                                                            items: [],
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
                                                 ],
-                                                patterns: [
-                                                    MatchSequence(
-                                                        PatternMatchSequence {
-                                                            node_index: NodeIndex(None),
-                                                            range: 2430..2440,
-                                                            patterns: [
-                                                                MatchValue(
-                                                                    PatternMatchValue {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 2431..2432,
-                                                                        value: NumberLiteral(
-                                                                            ExprNumberLiteral {
-                                                                                node_index: NodeIndex(None),
-                                                                                range: 2431..2432,
-                                                                                value: Int(
-                                                                                    1,
-                                                                                ),
-                                                                            },
-                                                                        ),
-                                                                    },
-                                                                ),
-                                                                MatchValue(
-                                                                    PatternMatchValue {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 2434..2435,
-                                                                        value: NumberLiteral(
-                                                                            ExprNumberLiteral {
-                                                                                node_index: NodeIndex(None),
-                                                                                range: 2434..2435,
-                                                                                value: Int(
-                                                                                    2,
-                                                                                ),
-                                                                            },
-                                                                        ),
-                                                                    },
-                                                                ),
-                                                                MatchMapping(
-                                                                    PatternMatchMapping {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 2437..2439,
-                                                                        keys: [],
-                                                                        patterns: [],
-                                                                        rest: None,
-                                                                    },
-                                                                ),
-                                                            ],
-                                                        },
-                                                    ),
-                                                ],
-                                                rest: None,
                                             },
                                         ),
                                         MatchSequence(
@@ -3691,9 +3664,7 @@ Module(
                                             PatternMatchMapping {
                                                 node_index: NodeIndex(None),
                                                 range: 2455..2457,
-                                                keys: [],
-                                                patterns: [],
-                                                rest: None,
+                                                items: [],
                                             },
                                         ),
                                     ],
@@ -4417,15 +4388,15 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 2981..3004,
-                                    keys: [],
-                                    patterns: [],
-                                    rest: Some(
-                                        Identifier {
-                                            id: Name("rest"),
-                                            range: 2993..2997,
-                                            node_index: NodeIndex(None),
-                                        },
-                                    ),
+                                    items: [
+                                        Rest(
+                                            Identifier {
+                                                id: Name("rest"),
+                                                range: 2993..2997,
+                                                node_index: NodeIndex(None),
+                                            },
+                                        ),
+                                    ],
                                 },
                             ),
                             guard: None,
@@ -4538,82 +4509,81 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 3060..3107,
-                                    keys: [
-                                        StringLiteral(
-                                            ExprStringLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 3070..3077,
-                                                value: StringLiteralValue {
-                                                    inner: Single(
-                                                        StringLiteral {
-                                                            range: 3070..3077,
-                                                            node_index: NodeIndex(None),
-                                                            value: "label",
-                                                            flags: StringLiteralFlags {
-                                                                quote_style: Double,
-                                                                prefix: Empty,
-                                                                triple_quoted: false,
-                                                                unclosed: false,
+                                    items: [
+                                        Entry {
+                                            key: StringLiteral(
+                                                ExprStringLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 3070..3077,
+                                                    value: StringLiteralValue {
+                                                        inner: Single(
+                                                            StringLiteral {
+                                                                range: 3070..3077,
+                                                                node_index: NodeIndex(None),
+                                                                value: "label",
+                                                                flags: StringLiteralFlags {
+                                                                    quote_style: Double,
+                                                                    prefix: Empty,
+                                                                    triple_quoted: false,
+                                                                    unclosed: false,
+                                                                },
                                                             },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
+                                            pattern: MatchAs(
+                                                PatternMatchAs {
+                                                    node_index: NodeIndex(None),
+                                                    range: 3079..3100,
+                                                    pattern: Some(
+                                                        MatchOr(
+                                                            PatternMatchOr {
+                                                                node_index: NodeIndex(None),
+                                                                range: 3079..3091,
+                                                                patterns: [
+                                                                    MatchClass(
+                                                                        PatternMatchClass {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 3079..3084,
+                                                                            cls: Name(
+                                                                                ExprName {
+                                                                                    node_index: NodeIndex(None),
+                                                                                    range: 3079..3082,
+                                                                                    id: Name("str"),
+                                                                                    ctx: Load,
+                                                                                },
+                                                                            ),
+                                                                            arguments: PatternArguments {
+                                                                                range: 3082..3084,
+                                                                                node_index: NodeIndex(None),
+                                                                                patterns: [],
+                                                                                keywords: [],
+                                                                            },
+                                                                        },
+                                                                    ),
+                                                                    MatchSingleton(
+                                                                        PatternMatchSingleton {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 3087..3091,
+                                                                            value: None,
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    ),
+                                                    name: Some(
+                                                        Identifier {
+                                                            id: Name("label"),
+                                                            range: 3095..3100,
+                                                            node_index: NodeIndex(None),
                                                         },
                                                     ),
                                                 },
-                                            },
-                                        ),
+                                            ),
+                                        },
                                     ],
-                                    patterns: [
-                                        MatchAs(
-                                            PatternMatchAs {
-                                                node_index: NodeIndex(None),
-                                                range: 3079..3100,
-                                                pattern: Some(
-                                                    MatchOr(
-                                                        PatternMatchOr {
-                                                            node_index: NodeIndex(None),
-                                                            range: 3079..3091,
-                                                            patterns: [
-                                                                MatchClass(
-                                                                    PatternMatchClass {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 3079..3084,
-                                                                        cls: Name(
-                                                                            ExprName {
-                                                                                node_index: NodeIndex(None),
-                                                                                range: 3079..3082,
-                                                                                id: Name("str"),
-                                                                                ctx: Load,
-                                                                            },
-                                                                        ),
-                                                                        arguments: PatternArguments {
-                                                                            range: 3082..3084,
-                                                                            node_index: NodeIndex(None),
-                                                                            patterns: [],
-                                                                            keywords: [],
-                                                                        },
-                                                                    },
-                                                                ),
-                                                                MatchSingleton(
-                                                                    PatternMatchSingleton {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 3087..3091,
-                                                                        value: None,
-                                                                    },
-                                                                ),
-                                                            ],
-                                                        },
-                                                    ),
-                                                ),
-                                                name: Some(
-                                                    Identifier {
-                                                        id: Name("label"),
-                                                        range: 3095..3100,
-                                                        node_index: NodeIndex(None),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
                                 },
                             ),
                             guard: None,
@@ -7700,28 +7670,27 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 4957..4963,
-                                    keys: [
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 4958..4959,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                            },
-                                        ),
+                                    items: [
+                                        Entry {
+                                            key: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 4958..4959,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                            pattern: MatchAs(
+                                                PatternMatchAs {
+                                                    node_index: NodeIndex(None),
+                                                    range: 4961..4962,
+                                                    pattern: None,
+                                                    name: None,
+                                                },
+                                            ),
+                                        },
                                     ],
-                                    patterns: [
-                                        MatchAs(
-                                            PatternMatchAs {
-                                                node_index: NodeIndex(None),
-                                                range: 4961..4962,
-                                                pattern: None,
-                                                name: None,
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
                                 },
                             ),
                             guard: None,
@@ -7747,96 +7716,98 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 4986..5015,
-                                    keys: [
-                                        StringLiteral(
-                                            ExprStringLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 4987..4989,
-                                                value: StringLiteralValue {
-                                                    inner: Single(
-                                                        StringLiteral {
-                                                            range: 4987..4989,
-                                                            node_index: NodeIndex(None),
-                                                            value: "",
-                                                            flags: StringLiteralFlags {
-                                                                quote_style: Single,
-                                                                prefix: Empty,
-                                                                triple_quoted: false,
-                                                                unclosed: false,
+                                    items: [
+                                        Entry {
+                                            key: StringLiteral(
+                                                ExprStringLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 4987..4989,
+                                                    value: StringLiteralValue {
+                                                        inner: Single(
+                                                            StringLiteral {
+                                                                range: 4987..4989,
+                                                                node_index: NodeIndex(None),
+                                                                value: "",
+                                                                flags: StringLiteralFlags {
+                                                                    quote_style: Single,
+                                                                    prefix: Empty,
+                                                                    triple_quoted: false,
+                                                                    unclosed: false,
+                                                                },
                                                             },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
+                                            pattern: MatchAs(
+                                                PatternMatchAs {
+                                                    node_index: NodeIndex(None),
+                                                    range: 4991..4992,
+                                                    pattern: None,
+                                                    name: Some(
+                                                        Identifier {
+                                                            id: Name("a"),
+                                                            range: 4991..4992,
+                                                            node_index: NodeIndex(None),
                                                         },
                                                     ),
                                                 },
-                                            },
-                                        ),
-                                        NoneLiteral(
-                                            ExprNoneLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 4994..4998,
-                                            },
-                                        ),
-                                    ],
-                                    patterns: [
-                                        MatchAs(
-                                            PatternMatchAs {
-                                                node_index: NodeIndex(None),
-                                                range: 4991..4992,
-                                                pattern: None,
-                                                name: Some(
-                                                    Identifier {
-                                                        id: Name("a"),
-                                                        range: 4991..4992,
-                                                        node_index: NodeIndex(None),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                        MatchSequence(
-                                            PatternMatchSequence {
-                                                node_index: NodeIndex(None),
-                                                range: 5000..5006,
-                                                patterns: [
-                                                    MatchValue(
-                                                        PatternMatchValue {
-                                                            node_index: NodeIndex(None),
-                                                            range: 5001..5002,
-                                                            value: NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 5001..5002,
-                                                                    value: Int(
-                                                                        1,
-                                                                    ),
-                                                                },
-                                                            ),
-                                                        },
-                                                    ),
-                                                    MatchValue(
-                                                        PatternMatchValue {
-                                                            node_index: NodeIndex(None),
-                                                            range: 5004..5005,
-                                                            value: NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 5004..5005,
-                                                                    value: Int(
-                                                                        2,
-                                                                    ),
-                                                                },
-                                                            ),
-                                                        },
-                                                    ),
-                                                ],
-                                            },
-                                        ),
-                                    ],
-                                    rest: Some(
-                                        Identifier {
-                                            id: Name("rest"),
-                                            range: 5010..5014,
-                                            node_index: NodeIndex(None),
+                                            ),
                                         },
-                                    ),
+                                        Entry {
+                                            key: NoneLiteral(
+                                                ExprNoneLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 4994..4998,
+                                                },
+                                            ),
+                                            pattern: MatchSequence(
+                                                PatternMatchSequence {
+                                                    node_index: NodeIndex(None),
+                                                    range: 5000..5006,
+                                                    patterns: [
+                                                        MatchValue(
+                                                            PatternMatchValue {
+                                                                node_index: NodeIndex(None),
+                                                                range: 5001..5002,
+                                                                value: NumberLiteral(
+                                                                    ExprNumberLiteral {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 5001..5002,
+                                                                        value: Int(
+                                                                            1,
+                                                                        ),
+                                                                    },
+                                                                ),
+                                                            },
+                                                        ),
+                                                        MatchValue(
+                                                            PatternMatchValue {
+                                                                node_index: NodeIndex(None),
+                                                                range: 5004..5005,
+                                                                value: NumberLiteral(
+                                                                    ExprNumberLiteral {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 5004..5005,
+                                                                        value: Int(
+                                                                            2,
+                                                                        ),
+                                                                    },
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                        },
+                                        Rest(
+                                            Identifier {
+                                                id: Name("rest"),
+                                                range: 5010..5014,
+                                                node_index: NodeIndex(None),
+                                            },
+                                        ),
+                                    ],
                                 },
                             ),
                             guard: None,

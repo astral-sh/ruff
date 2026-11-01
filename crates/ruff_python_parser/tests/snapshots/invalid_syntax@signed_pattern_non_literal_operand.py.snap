@@ -250,51 +250,50 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 148..158,
-                                    keys: [
-                                        UnaryOp(
-                                            ExprUnaryOp {
-                                                node_index: NodeIndex(None),
-                                                range: 149..154,
-                                                op: UAdd,
-                                                operand: BinOp(
-                                                    ExprBinOp {
-                                                        node_index: NodeIndex(None),
-                                                        range: 150..154,
-                                                        left: NumberLiteral(
-                                                            ExprNumberLiteral {
-                                                                node_index: NodeIndex(None),
-                                                                range: 150..151,
-                                                                value: Int(
-                                                                    1,
-                                                                ),
-                                                            },
-                                                        ),
-                                                        op: Pow,
-                                                        right: NumberLiteral(
-                                                            ExprNumberLiteral {
-                                                                node_index: NodeIndex(None),
-                                                                range: 153..154,
-                                                                value: Int(
-                                                                    2,
-                                                                ),
-                                                            },
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
+                                    items: [
+                                        Entry {
+                                            key: UnaryOp(
+                                                ExprUnaryOp {
+                                                    node_index: NodeIndex(None),
+                                                    range: 149..154,
+                                                    op: UAdd,
+                                                    operand: BinOp(
+                                                        ExprBinOp {
+                                                            node_index: NodeIndex(None),
+                                                            range: 150..154,
+                                                            left: NumberLiteral(
+                                                                ExprNumberLiteral {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 150..151,
+                                                                    value: Int(
+                                                                        1,
+                                                                    ),
+                                                                },
+                                                            ),
+                                                            op: Pow,
+                                                            right: NumberLiteral(
+                                                                ExprNumberLiteral {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 153..154,
+                                                                    value: Int(
+                                                                        2,
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                            pattern: MatchAs(
+                                                PatternMatchAs {
+                                                    node_index: NodeIndex(None),
+                                                    range: 156..157,
+                                                    pattern: None,
+                                                    name: None,
+                                                },
+                                            ),
+                                        },
                                     ],
-                                    patterns: [
-                                        MatchAs(
-                                            PatternMatchAs {
-                                                node_index: NodeIndex(None),
-                                                range: 156..157,
-                                                pattern: None,
-                                                name: None,
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
                                 },
                             ),
                             guard: None,

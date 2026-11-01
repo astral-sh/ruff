@@ -722,16 +722,14 @@ impl GotoTarget<'_> {
 
             // Patterns are glorified assignments but we have to look them up by ident
             // because they're not expressions
-            GotoTarget::PatternMatchRest(pattern_mapping) => {
-                pattern_mapping.rest.as_ref().map(|name| {
-                    definitions_for_name(
-                        model,
-                        name.as_str(),
-                        AnyNodeRef::Identifier(name),
-                        alias_resolution,
-                    )
-                })
-            }
+            GotoTarget::PatternMatchRest(pattern_mapping) => pattern_mapping.rest().map(|name| {
+                definitions_for_name(
+                    model,
+                    name.as_str(),
+                    AnyNodeRef::Identifier(name),
+                    alias_resolution,
+                )
+            }),
 
             GotoTarget::PatternMatchAsName(pattern_as) => pattern_as.name.as_ref().map(|name| {
                 definitions_for_name(
@@ -932,7 +930,7 @@ impl GotoTarget<'_> {
             GotoTarget::KeywordArgument { keyword, .. } => {
                 Some(Cow::Borrowed(keyword.arg.as_ref()?.as_str()))
             }
-            GotoTarget::PatternMatchRest(rest) => Some(Cow::Borrowed(rest.rest.as_ref()?.as_str())),
+            GotoTarget::PatternMatchRest(rest) => Some(Cow::Borrowed(rest.rest()?.as_str())),
             GotoTarget::PatternKeywordArgument(keyword) => {
                 Some(Cow::Borrowed(keyword.attr.as_str()))
             }
@@ -1344,7 +1342,7 @@ impl Ranged for GotoTarget<'_> {
                 .as_ref()
                 .map_or(except.range(), |name| name.range),
             GotoTarget::KeywordArgument { keyword, .. } => keyword.arg.as_ref().unwrap().range,
-            GotoTarget::PatternMatchRest(rest) => rest.rest.as_ref().unwrap().range,
+            GotoTarget::PatternMatchRest(rest) => rest.rest().unwrap().range,
             GotoTarget::PatternKeywordArgument(keyword) => keyword.attr.range,
             GotoTarget::PatternMatchStarName(star) => star.name.as_ref().unwrap().range,
             GotoTarget::PatternMatchAsName(as_name) => as_name.name.as_ref().unwrap().range,

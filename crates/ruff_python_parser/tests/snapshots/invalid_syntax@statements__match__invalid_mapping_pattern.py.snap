@@ -30,40 +30,39 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 85..91,
-                                    keys: [
-                                        Starred(
-                                            ExprStarred {
-                                                node_index: NodeIndex(None),
-                                                range: 86..90,
-                                                value: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 87..90,
-                                                        id: Name("key"),
-                                                        ctx: Store,
-                                                    },
-                                                ),
-                                                ctx: Store,
-                                            },
-                                        ),
+                                    items: [
+                                        Entry {
+                                            key: Starred(
+                                                ExprStarred {
+                                                    node_index: NodeIndex(None),
+                                                    range: 86..90,
+                                                    value: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 87..90,
+                                                            id: Name("key"),
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                            pattern: MatchValue(
+                                                PatternMatchValue {
+                                                    node_index: NodeIndex(None),
+                                                    range: 90..90,
+                                                    value: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 90..90,
+                                                            id: Name(""),
+                                                            ctx: Invalid,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        },
                                     ],
-                                    patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 90..90,
-                                                value: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 90..90,
-                                                        id: Name(""),
-                                                        ctx: Invalid,
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
                                 },
                             ),
                             guard: None,
@@ -83,41 +82,40 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 115..124,
-                                    keys: [
-                                        Starred(
-                                            ExprStarred {
-                                                node_index: NodeIndex(None),
-                                                range: 116..120,
-                                                value: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 117..120,
-                                                        id: Name("key"),
-                                                        ctx: Store,
-                                                    },
-                                                ),
-                                                ctx: Store,
-                                            },
-                                        ),
+                                    items: [
+                                        Entry {
+                                            key: Starred(
+                                                ExprStarred {
+                                                    node_index: NodeIndex(None),
+                                                    range: 116..120,
+                                                    value: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 117..120,
+                                                            id: Name("key"),
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                            pattern: MatchValue(
+                                                PatternMatchValue {
+                                                    node_index: NodeIndex(None),
+                                                    range: 122..123,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 122..123,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        },
                                     ],
-                                    patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 122..123,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 122..123,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
                                 },
                             ),
                             guard: None,
@@ -137,41 +135,40 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 148..156,
-                                    keys: [
-                                        Starred(
-                                            ExprStarred {
-                                                node_index: NodeIndex(None),
-                                                range: 149..153,
-                                                value: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 150..153,
-                                                        id: Name("key"),
-                                                        ctx: Store,
-                                                    },
-                                                ),
-                                                ctx: Store,
-                                            },
-                                        ),
+                                    items: [
+                                        Entry {
+                                            key: Starred(
+                                                ExprStarred {
+                                                    node_index: NodeIndex(None),
+                                                    range: 149..153,
+                                                    value: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 150..153,
+                                                            id: Name("key"),
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                            pattern: MatchValue(
+                                                PatternMatchValue {
+                                                    node_index: NodeIndex(None),
+                                                    range: 154..155,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 154..155,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        },
                                     ],
-                                    patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 154..155,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 154..155,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
                                 },
                             ),
                             guard: None,
@@ -191,61 +188,62 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 180..195,
-                                    keys: [
-                                        Starred(
-                                            ExprStarred {
-                                                node_index: NodeIndex(None),
-                                                range: 181..185,
-                                                value: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 182..185,
-                                                        id: Name("key"),
-                                                        ctx: Store,
-                                                    },
-                                                ),
-                                                ctx: Store,
-                                            },
-                                        ),
-                                        NoneLiteral(
-                                            ExprNoneLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 187..191,
-                                            },
-                                        ),
+                                    items: [
+                                        Entry {
+                                            key: Starred(
+                                                ExprStarred {
+                                                    node_index: NodeIndex(None),
+                                                    range: 181..185,
+                                                    value: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 182..185,
+                                                            id: Name("key"),
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    ctx: Store,
+                                                },
+                                            ),
+                                            pattern: MatchValue(
+                                                PatternMatchValue {
+                                                    node_index: NodeIndex(None),
+                                                    range: 185..185,
+                                                    value: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 185..185,
+                                                            id: Name(""),
+                                                            ctx: Invalid,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                        Entry {
+                                            key: NoneLiteral(
+                                                ExprNoneLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 187..191,
+                                                },
+                                            ),
+                                            pattern: MatchValue(
+                                                PatternMatchValue {
+                                                    node_index: NodeIndex(None),
+                                                    range: 193..194,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 193..194,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        },
                                     ],
-                                    patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 185..185,
-                                                value: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 185..185,
-                                                        id: Name(""),
-                                                        ctx: Invalid,
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 193..194,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 193..194,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
                                 },
                             ),
                             guard: None,
@@ -281,38 +279,38 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 329..346,
-                                    keys: [
-                                        NoneLiteral(
-                                            ExprNoneLiteral {
+                                    items: [
+                                        Rest(
+                                            Identifier {
+                                                id: Name("rest"),
+                                                range: 332..336,
                                                 node_index: NodeIndex(None),
-                                                range: 338..342,
                                             },
                                         ),
-                                    ],
-                                    patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 344..345,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 344..345,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    rest: Some(
-                                        Identifier {
-                                            id: Name("rest"),
-                                            range: 332..336,
-                                            node_index: NodeIndex(None),
+                                        Entry {
+                                            key: NoneLiteral(
+                                                ExprNoneLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 338..342,
+                                                },
+                                            ),
+                                            pattern: MatchValue(
+                                                PatternMatchValue {
+                                                    node_index: NodeIndex(None),
+                                                    range: 344..345,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 344..345,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
                                         },
-                                    ),
+                                    ],
                                 },
                             ),
                             guard: None,
@@ -332,38 +330,45 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 370..397,
-                                    keys: [
-                                        NoneLiteral(
-                                            ExprNoneLiteral {
+                                    items: [
+                                        Rest(
+                                            Identifier {
+                                                id: Name("rest1"),
+                                                range: 373..378,
                                                 node_index: NodeIndex(None),
-                                                range: 389..393,
                                             },
                                         ),
-                                    ],
-                                    patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
+                                        Rest(
+                                            Identifier {
+                                                id: Name("rest2"),
+                                                range: 382..387,
                                                 node_index: NodeIndex(None),
-                                                range: 395..396,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 395..396,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
                                             },
                                         ),
-                                    ],
-                                    rest: Some(
-                                        Identifier {
-                                            id: Name("rest2"),
-                                            range: 382..387,
-                                            node_index: NodeIndex(None),
+                                        Entry {
+                                            key: NoneLiteral(
+                                                ExprNoneLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 389..393,
+                                                },
+                                            ),
+                                            pattern: MatchValue(
+                                                PatternMatchValue {
+                                                    node_index: NodeIndex(None),
+                                                    range: 395..396,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 395..396,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
                                         },
-                                    ),
+                                    ],
                                 },
                             ),
                             guard: None,
@@ -383,38 +388,45 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 421..448,
-                                    keys: [
-                                        NoneLiteral(
-                                            ExprNoneLiteral {
+                                    items: [
+                                        Rest(
+                                            Identifier {
+                                                id: Name("rest1"),
+                                                range: 424..429,
                                                 node_index: NodeIndex(None),
-                                                range: 431..435,
                                             },
                                         ),
-                                    ],
-                                    patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 437..438,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 437..438,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    rest: Some(
-                                        Identifier {
-                                            id: Name("rest2"),
-                                            range: 442..447,
-                                            node_index: NodeIndex(None),
+                                        Entry {
+                                            key: NoneLiteral(
+                                                ExprNoneLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 431..435,
+                                                },
+                                            ),
+                                            pattern: MatchValue(
+                                                PatternMatchValue {
+                                                    node_index: NodeIndex(None),
+                                                    range: 437..438,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 437..438,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
                                         },
-                                    ),
+                                        Rest(
+                                            Identifier {
+                                                id: Name("rest2"),
+                                                range: 442..447,
+                                                node_index: NodeIndex(None),
+                                            },
+                                        ),
+                                    ],
                                 },
                             ),
                             guard: None,
@@ -450,55 +462,54 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 488..504,
-                                    keys: [
-                                        Call(
-                                            ExprCall {
-                                                node_index: NodeIndex(None),
-                                                range: 489..500,
-                                                func: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 489..492,
-                                                        id: Name("Foo"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                                arguments: Arguments {
-                                                    range: 492..500,
+                                    items: [
+                                        Entry {
+                                            key: Call(
+                                                ExprCall {
                                                     node_index: NodeIndex(None),
-                                                    args: [
-                                                        Name(
-                                                            ExprName {
-                                                                node_index: NodeIndex(None),
-                                                                range: 493..499,
-                                                                id: Name(""),
-                                                                ctx: Invalid,
-                                                            },
-                                                        ),
-                                                    ],
-                                                    keywords: [],
-                                                },
-                                            },
-                                        ),
-                                    ],
-                                    patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 502..503,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
+                                                    range: 489..500,
+                                                    func: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 489..492,
+                                                            id: Name("Foo"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    arguments: Arguments {
+                                                        range: 492..500,
                                                         node_index: NodeIndex(None),
-                                                        range: 502..503,
-                                                        value: Int(
-                                                            1,
-                                                        ),
+                                                        args: [
+                                                            Name(
+                                                                ExprName {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 493..499,
+                                                                    id: Name(""),
+                                                                    ctx: Invalid,
+                                                                },
+                                                            ),
+                                                        ],
+                                                        keywords: [],
                                                     },
-                                                ),
-                                            },
-                                        ),
+                                                },
+                                            ),
+                                            pattern: MatchValue(
+                                                PatternMatchValue {
+                                                    node_index: NodeIndex(None),
+                                                    range: 502..503,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 502..503,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        },
                                     ],
-                                    rest: None,
                                 },
                             ),
                             guard: None,

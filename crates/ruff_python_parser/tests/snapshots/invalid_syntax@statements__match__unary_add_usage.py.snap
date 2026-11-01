@@ -321,69 +321,70 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 210..231,
-                                    keys: [
-                                        BooleanLiteral(
-                                            ExprBooleanLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 211..215,
-                                                value: true,
-                                            },
-                                        ),
-                                        BooleanLiteral(
-                                            ExprBooleanLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 221..226,
-                                                value: false,
-                                            },
-                                        ),
+                                    items: [
+                                        Entry {
+                                            key: BooleanLiteral(
+                                                ExprBooleanLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 211..215,
+                                                    value: true,
+                                                },
+                                            ),
+                                            pattern: MatchValue(
+                                                PatternMatchValue {
+                                                    node_index: NodeIndex(None),
+                                                    range: 217..219,
+                                                    value: UnaryOp(
+                                                        ExprUnaryOp {
+                                                            node_index: NodeIndex(None),
+                                                            range: 217..219,
+                                                            op: UAdd,
+                                                            operand: NumberLiteral(
+                                                                ExprNumberLiteral {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 218..219,
+                                                                    value: Int(
+                                                                        1,
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                        Entry {
+                                            key: BooleanLiteral(
+                                                ExprBooleanLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 221..226,
+                                                    value: false,
+                                                },
+                                            ),
+                                            pattern: MatchValue(
+                                                PatternMatchValue {
+                                                    node_index: NodeIndex(None),
+                                                    range: 228..230,
+                                                    value: UnaryOp(
+                                                        ExprUnaryOp {
+                                                            node_index: NodeIndex(None),
+                                                            range: 228..230,
+                                                            op: USub,
+                                                            operand: NumberLiteral(
+                                                                ExprNumberLiteral {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 229..230,
+                                                                    value: Int(
+                                                                        2,
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        },
                                     ],
-                                    patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 217..219,
-                                                value: UnaryOp(
-                                                    ExprUnaryOp {
-                                                        node_index: NodeIndex(None),
-                                                        range: 217..219,
-                                                        op: UAdd,
-                                                        operand: NumberLiteral(
-                                                            ExprNumberLiteral {
-                                                                node_index: NodeIndex(None),
-                                                                range: 218..219,
-                                                                value: Int(
-                                                                    1,
-                                                                ),
-                                                            },
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 228..230,
-                                                value: UnaryOp(
-                                                    ExprUnaryOp {
-                                                        node_index: NodeIndex(None),
-                                                        range: 228..230,
-                                                        op: USub,
-                                                        operand: NumberLiteral(
-                                                            ExprNumberLiteral {
-                                                                node_index: NodeIndex(None),
-                                                                range: 229..230,
-                                                                value: Int(
-                                                                    2,
-                                                                ),
-                                                            },
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
                                 },
                             ),
                             guard: None,

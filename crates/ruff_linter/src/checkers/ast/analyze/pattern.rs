@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Identifier, Pattern};
+use ruff_python_ast::{Identifier, Pattern};
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 
@@ -8,20 +8,15 @@ use crate::rules::pep8_naming;
 
 /// Run lint rules over a [`Pattern`] syntax node.
 pub(crate) fn pattern(pattern: &Pattern, checker: &Checker) {
-    let (Pattern::MatchAs(ast::PatternMatchAs {
-        name: Some(name), ..
-    })
-    | Pattern::MatchStar(ast::PatternMatchStar {
-        name: Some(name), ..
-    })
-    | Pattern::MatchMapping(ast::PatternMatchMapping {
-        rest: Some(name), ..
-    })) = pattern
-    else {
-        return;
+    let name = match pattern {
+        Pattern::MatchAs(pattern) => pattern.name.as_ref(),
+        Pattern::MatchStar(pattern) => pattern.name.as_ref(),
+        Pattern::MatchMapping(mapping) => mapping.rest(),
+        _ => None,
     };
-
-    check_pattern_name(checker, name);
+    if let Some(name) = name {
+        check_pattern_name(checker, name);
+    }
 }
 
 fn check_pattern_name(checker: &Checker, name: &Identifier) {

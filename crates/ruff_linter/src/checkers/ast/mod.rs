@@ -2517,18 +2517,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
     fn visit_pattern(&mut self, pattern: &'a Pattern) {
         // Step 1: Binding
-        if let Pattern::MatchAs(ast::PatternMatchAs {
-            name: Some(name), ..
-        })
-        | Pattern::MatchStar(ast::PatternMatchStar {
-            name: Some(name),
-            range: _,
-            node_index: _,
-        })
-        | Pattern::MatchMapping(ast::PatternMatchMapping {
-            rest: Some(name), ..
-        }) = pattern
-        {
+        let name = match pattern {
+            Pattern::MatchAs(pattern) => pattern.name.as_ref(),
+            Pattern::MatchStar(pattern) => pattern.name.as_ref(),
+            Pattern::MatchMapping(mapping) => mapping.rest(),
+            _ => None,
+        };
+        if let Some(name) = name {
             self.add_binding(
                 name,
                 name.range(),
