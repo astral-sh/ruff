@@ -49,6 +49,10 @@ struct OrderedUnionInput<'db> {
 }
 
 impl<'db> OrderedUnionInput<'db> {
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None while the normalization query is resolving a cycle"
+    )]
     fn normalize(self, db: &'db dyn Db) -> Type<'db> {
         fn build<'db>(db: &'db dyn Db, input: OrderedUnionInput<'db>) -> Type<'db> {
             let env = ProgramEnvironment::from_program(input.program(db));
