@@ -905,6 +905,11 @@ impl Builder {
     fn reserve_rows(&mut self, end: TextSize) {
         // A module can start with a long docstring or a license header. Allow its remaining
         // source to be denser than the prefix, and leave some room for variation after it.
+        // Conversely, a dense prefix followed by a long comment needs few more rows. Limit
+        // speculative reservations to one MiB per buffer. Once a large row buffer fills,
+        // keep growing it geometrically so repeated reallocations stay amortized.
+        const MAX_SPECULATIVE_BYTES: usize = 1 << 20;
+
         let rows = self.node_count();
         let consumed = end.saturating_sub(self.source.start()).to_usize();
         let remaining = self.source.end().saturating_sub(end).to_usize();
@@ -915,10 +920,13 @@ impl Builder {
                 .unwrap_or(0)
                 .max(remaining / 10),
         );
+        let minimum_growth = rows.div_ceil(4).max(4);
         let additional = estimate
             .saturating_add(estimate / 8)
             .saturating_sub(rows)
-            .clamp(rows.div_ceil(4).max(4), rows.saturating_mul(128).max(4));
+            .min(rows.saturating_mul(128))
+            .min(MAX_SPECULATIVE_BYTES / size_of::<Row>())
+            .max(minimum_growth);
         self.ast.rows.reserve_exact(additional);
         let extra = self
             .ast
@@ -926,7 +934,8 @@ impl Builder {
             .len()
             .saturating_mul(additional)
             .checked_div(rows)
-            .unwrap_or(0);
+            .unwrap_or(0)
+            .min(MAX_SPECULATIVE_BYTES / size_of::<u32>());
         self.ast.extra.reserve_exact(extra);
     }
 
@@ -1170,4 +1179,25 @@ fn offset(len: usize) -> u32 {
         .ok()
         .filter(|n| *n != ABSENT)
         .expect("Python AST exceeds the 32-bit storage limit")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Builder, NodeKind, Row, TextRange, TextSize};
+
+    #[test]
+    fn dense_prefix_bounds_speculative_reservations() {
+        let source = TextRange::up_to(TextSize::new(8 << 20));
+        let mut builder = Builder::for_source(source);
+        builder.ast.rows.resize_with(16_385, || {
+            Row::new(NodeKind::StmtPass, TextRange::default())
+        });
+        builder.ast.extra.resize(128 << 10, 0);
+
+        builder.reserve_rows(TextSize::new(32 << 10));
+        let rows = &builder.ast.rows;
+        let extra = &builder.ast.extra;
+        assert!((rows.capacity() - rows.len()) * size_of::<Row>() <= 1 << 20);
+        assert!((extra.capacity() - extra.len()) * size_of::<u32>() <= 1 << 20);
+    }
 }
