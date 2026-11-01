@@ -642,7 +642,11 @@ pub(in crate::types) fn extend_settings_constructor_parameters<'db>(
     else {
         return;
     };
-    let Some(signature) = init.signature(db).iter().next() else {
+    let Some(signature) = init
+        .signature_without_inferred_return_type(db)
+        .iter()
+        .next()
+    else {
         return;
     };
 
@@ -1326,7 +1330,7 @@ fn model_init_behavior(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelInitB
                 .ignore_possibly_undefined()
                 .and_then(Type::as_function_literal)
                 .is_some_and(|init| {
-                    init.signature(db)
+                    init.signature_without_inferred_return_type(db)
                         .iter()
                         .any(|signature| signature.parameters().keyword_variadic().is_some())
                 }) {

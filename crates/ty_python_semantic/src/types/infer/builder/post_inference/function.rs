@@ -170,7 +170,9 @@ fn check_method_typevar_variance<'db>(
     let env = context.program_environment();
     let last_definition = function.literal(db).last_definition;
     let signatures = match member.read_ty {
-        Type::FunctionLiteral(function) => Some(function.signature(db)),
+        Type::FunctionLiteral(function) => {
+            Some(function.signature_without_inferred_return_type(db))
+        }
         Type::BoundMethod(method) => method.bound_signatures(db),
         Type::Callable(callable) => Some(callable.signatures(db)),
         _ => None,

@@ -52,7 +52,7 @@ pub fn inlay_hint_return_type<'db>(
     let db = model.db();
     let definition = function.definition(model);
     let function_type = infer_definition_types(db, definition).function_type(definition)?;
-    let signature = function_type.signature_with_inferred_return_type(db);
+    let signature = function_type.signature(db);
     let [overload] = signature.overloads.as_slice() else {
         return None;
     };
