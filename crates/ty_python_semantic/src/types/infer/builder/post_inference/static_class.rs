@@ -2,7 +2,8 @@ use crate::Db;
 use itertools::{Either, Itertools};
 use ruff_db::{diagnostic::Annotation, source::source_text};
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::{self as ast, PythonVersion, name::Name};
+use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast, ExprKind, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
@@ -142,9 +143,9 @@ fn check_class_slots<'db>(
 pub(crate) fn check_static_class_definitions<'db>(
     context: &InferContext<'db, '_>,
     ty: Type<'db>,
-    class_node: &ast::StmtClassDef,
+    class_node: ast::StmtClassDef<'_>,
     index: &SemanticIndex<'db>,
-    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+    file_expression_type: &impl Fn(ast::Expr<'_>) -> Type<'db>,
 ) {
     let db = context.db();
 
@@ -240,8 +241,8 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     let is_protocol = class.is_protocol(db);
 
-    if let Some(disjoint_base_decorator) = class_node.decorator_list.iter().find(|decorator| {
-        file_expression_type(&decorator.expression)
+    if let Some(disjoint_base_decorator) = class_node.decorator_list().iter().find(|decorator| {
+        file_expression_type(decorator.expression())
             .as_function_literal()
             .is_some_and(|function| function.is_known(db, KnownFunction::DisjointBase))
     }) {
@@ -305,7 +306,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     let mut disjoint_bases = IncompatibleBases::default();
-    let mut protocol_base_with_generic_context: Option<(&ast::Expr, _)> = None;
+    let mut protocol_base_with_generic_context: Option<(ast::Expr<'_>, _)> = None;
     let mut direct_typed_dict_bases = vec![];
 
     let class_definition = index.expect_single_definition(class_node);
@@ -359,12 +360,12 @@ pub(crate) fn check_static_class_definitions<'db>(
                     "Cannot both inherit from subscripted `Protocol` \
                                 and subscripted `Generic`",
                 );
-                if let ast::Expr::Subscript(previous_node) = previous_node
+                if let ExprKind::Subscript(previous_node) = previous_node.classify()
                     && new_context == previous_context
                 {
                     diagnostic.help("Remove the type parameters from the `Protocol` base");
                     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
-                        previous_node.value.end(),
+                        previous_node.value().end(),
                         previous_node.end(),
                     ))));
                 }
@@ -374,7 +375,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             // this does not lead to the class creation failing at runtime,
             // but it is semantically invalid.
             Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(generic_context)) => {
-                if let Some(type_params) = class_node.type_params.as_deref() {
+                if let Some(type_params) = class_node.type_params() {
                     let node = source_node;
                     let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, node) else {
                         continue;
@@ -383,16 +384,16 @@ pub(crate) fn check_static_class_definitions<'db>(
                         "Cannot both inherit from subscripted `Protocol` \
                             and use PEP 695 type variables",
                     );
-                    if let ast::Expr::Subscript(node) = node {
+                    if let ExprKind::Subscript(node) = node.classify() {
                         let source = source_text(db, context.file());
                         // The parser can recover a type parameter list without a closing bracket.
                         if let Some(type_params) = source[type_params.range()].strip_prefix('[')
                             && let Some(type_params) = type_params.strip_suffix(']')
-                            && type_params == &source[node.slice.range()]
+                            && type_params == &source[node.slice().range()]
                         {
                             diagnostic.help("Remove the type parameters from the `Protocol` base");
                             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(
-                                TextRange::new(node.value.end(), node.end()),
+                                TextRange::new(node.value().end(), node.end()),
                             )));
                         }
                     }
@@ -527,8 +528,8 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // Check for starred variable-length tuples that cannot be unpacked
     for base in class_node.bases() {
-        if let ast::Expr::Starred(starred) = base
-            && let starred_ty = definition_expression_type(db, class_definition, &starred.value)
+        if let ExprKind::Starred(starred) = base.classify()
+            && let starred_ty = definition_expression_type(db, class_definition, starred.value())
             && let Some(tuple_spec) = starred_ty.tuple_instance_spec(db, env)
             && !matches!(tuple_spec.as_ref(), Tuple::Fixed(_))
         {
@@ -571,10 +572,11 @@ pub(crate) fn check_static_class_definitions<'db>(
                         && !class_node.bases().iter().any(ast::Expr::is_starred_expr);
                     if can_rewrite_bases
                         && let Some(index) = *generic_index
-                        && let [first_base, .., last_base] = class_node.bases()
+                        && let Some((first_base, rest)) = class_node.bases().split_first()
+                        && let Some(last_base) = rest.last()
                     {
                         let source = source_text(db, context.file());
-                        let generic_base = &source[class_node.bases()[index].range()];
+                        let generic_base = &source[class_node.bases().at(index).range()];
                         diagnostic.help(format_args!(
                             "Move `{generic_base}` to the end of the bases list"
                         ));
@@ -639,8 +641,8 @@ pub(crate) fn check_static_class_definitions<'db>(
     // Check that `@total_ordering` has a valid ordering method in the MRO
     if class.total_ordering(db) && !class.has_ordering_method_in_mro(db, None) {
         // Find the `@total_ordering` decorator to report the diagnostic at its location
-        if let Some(decorator) = class_node.decorator_list.iter().find(|decorator| {
-            file_expression_type(&decorator.expression)
+        if let Some(decorator) = class_node.decorator_list().iter().find(|decorator| {
+            file_expression_type(decorator.expression())
                 .as_function_literal()
                 .is_some_and(|function| function.is_known(db, KnownFunction::TotalOrdering))
         }) {
@@ -651,10 +653,9 @@ pub(crate) fn check_static_class_definitions<'db>(
     // Check that the class's metaclass can be determined without error.
     if let Err(metaclass_error) = class.try_metaclass(db) {
         let invalid_metaclass_range = class_node
-            .arguments
-            .as_ref()
+            .arguments()
             .and_then(|arguments| arguments.find_keyword("metaclass"))
-            .map(Ranged::range)
+            .map(|node| node.range())
             .unwrap_or_else(|| class.header_range(db));
         match metaclass_error.reason() {
             MetaclassErrorKind::Cycle => {
@@ -744,15 +745,16 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // Check that the class arguments matches the arguments of the
     // base class `__init_subclass__` method.
-    if let Some(args) = class_node.arguments.as_deref() {
+    if let Some(args) = class_node.arguments() {
         if class_kind == Some(CodeGeneratorKind::TypedDict) {
             let supports_pep_728 = context.in_stub()
                 || class.typed_dict_module(db) == Some(TypingModule::TypingExtensions)
                 || env.python_version(db) >= PythonVersion::PY315;
 
-            for keyword in &args.keywords {
+            for keyword in args.keywords() {
                 if !supports_pep_728
-                    && let Some(arg_name @ ("closed" | "extra_items")) = keyword.arg.as_deref()
+                    && let Some(arg_name @ ("closed" | "extra_items")) =
+                        keyword.arg().map(ast::Identifier::as_str)
                     && let Some(builder) = context.report_lint(&UNKNOWN_ARGUMENT, keyword)
                 {
                     builder.into_diagnostic(format_args!(
@@ -760,10 +762,10 @@ pub(crate) fn check_static_class_definitions<'db>(
                     ));
                 }
 
-                match keyword.arg.as_deref() {
+                match keyword.arg().map(ast::Identifier::as_str) {
                     Some(arg_name @ ("total" | "closed")) => {
-                        let passed_type = file_expression_type(&keyword.value);
-                        if !keyword.value.is_boolean_literal_expr()
+                        let passed_type = file_expression_type(keyword.value());
+                        if !keyword.value().is_boolean_literal_expr()
                             && let Some(builder) =
                                 context.report_lint(&INVALID_ARGUMENT_TYPE, keyword)
                         {
@@ -811,17 +813,17 @@ pub(crate) fn check_static_class_definitions<'db>(
             }
         } else {
             let call_args: CallArguments = args
-                .keywords
+                .keywords()
                 .iter()
-                .filter_map(|keyword| match keyword.arg.as_ref() {
+                .filter_map(|keyword| match keyword.arg() {
                     // We mimic the runtime behaviour and discard the metaclass argument
-                    Some(name) if name.id.as_str() == "metaclass" => None,
+                    Some(name) if name.id().as_str() == "metaclass" => None,
                     Some(name) => {
-                        let ty = file_expression_type(&keyword.value);
-                        Some((Argument::Keyword(name.id.as_str()), Some(ty)))
+                        let ty = file_expression_type(keyword.value());
+                        Some((Argument::Keyword(name.id().as_str()), Some(ty)))
                     }
                     None => {
-                        let ty = file_expression_type(&keyword.value);
+                        let ty = file_expression_type(keyword.value());
                         Some((Argument::Keywords, Some(ty)))
                     }
                 })
@@ -881,11 +883,11 @@ pub(crate) fn check_static_class_definitions<'db>(
     // Check that no type parameter with a default follows a TypeVarTuple.
     // This is prohibited by the typing spec because a TypeVarTuple consumes
     // all remaining positional type arguments.
-    if let Some(type_params) = class_node.type_params.as_deref() {
+    if let Some(type_params) = class_node.type_params() {
         super::type_param_validation::check_single_typevar_tuple_pep695(
             context,
             type_params,
-            super::type_param_validation::TypeParameterOwner::GenericClass(&class_node.name.id),
+            super::type_param_validation::TypeParameterOwner::GenericClass(class_node.name().id()),
         );
         super::type_param_validation::check_no_default_after_typevar_tuple_pep695(
             context,
@@ -986,7 +988,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                                 context,
                                 name,
                                 "class",
-                                &class_node.name.id,
+                                class_node.name().id(),
                                 class.header_range(db),
                                 self_typevar.kind(db),
                                 other_typevar,
@@ -1006,7 +1008,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                             context,
                             typevar.name(db),
                             "class",
-                            &class_node.name.id,
+                            class_node.name().id(),
                             class.header_range(db),
                             base_typevar.kind(db),
                             other_typevar,
@@ -1059,7 +1061,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
         if kw_only_sentinel_fields.len() > 1 {
             // TODO: The fields should be displayed in a subdiagnostic.
-            if let Some(builder) = context.report_lint(&DUPLICATE_KW_ONLY, &class_node.name) {
+            if let Some(builder) = context.report_lint(&DUPLICATE_KW_ONLY, class_node.name()) {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Dataclass has more than one field annotated with `KW_ONLY`"
                 ));
@@ -1105,7 +1107,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 };
 
                 if !own_fields.contains_key(name) {
-                    report(class_node.name.range());
+                    report(class_node.name().range());
                     continue;
                 }
 
@@ -1396,7 +1398,7 @@ fn ordered_dataclass_base_class<'db>(
 fn check_final_class_abstract_methods<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
-    class_node: &ast::StmtClassDef,
+    class_node: ast::StmtClassDef<'_>,
 ) {
     let db = context.db();
     // Only check if the class is final.
@@ -1422,7 +1424,7 @@ fn check_final_class_abstract_methods<'db>(
         return;
     };
 
-    let Some(builder) = context.report_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS, &class_node.name)
+    let Some(builder) = context.report_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS, class_node.name())
     else {
         return;
     };
@@ -1438,11 +1440,11 @@ fn check_final_class_abstract_methods<'db>(
     if let Some(class_node) = class.body_scope(db).node(db).as_class()
         && let Some(decorator) = class_node
             .node(context.module())
-            .decorator_list
+            .decorator_list()
             .iter()
             .find(|decorator| {
                 definition_types
-                    .expression_type(&decorator.expression)
+                    .expression_type(decorator.expression())
                     .as_function_literal()
                     .is_some_and(|function| function.is_known(db, KnownFunction::Final))
             })
@@ -1550,7 +1552,7 @@ fn has_binding_in_init<'db>(
             .scope(scope_id)
             .node()
             .as_function()
-            .is_some_and(|f| f.node(context.module()).name.id == "__init__");
+            .is_some_and(|f| f.node(context.module()).name().id() == "__init__");
         is_init
             && bindings
                 .into_iter()

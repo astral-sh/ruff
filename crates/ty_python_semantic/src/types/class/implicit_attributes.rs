@@ -149,9 +149,9 @@ impl<'db> StaticClassLiteral<'db> {
             let mut is_classmethod = false;
             let mut is_staticmethod = false;
 
-            for decorator in &function_node.decorator_list {
+            for decorator in function_node.decorator_list() {
                 let decorator_ty =
-                    definition_expression_type(db, definition, &decorator.expression);
+                    definition_expression_type(db, definition, decorator.expression());
                 if let Type::ClassLiteral(class) = decorator_ty {
                     match class.known(db) {
                         Some(KnownClass::Classmethod) => is_classmethod = true,
@@ -162,7 +162,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
 
             // Also check for implicit classmethods/staticmethods based on method name
-            let method_name = function_node.name.as_str();
+            let method_name = function_node.name().as_str();
             if is_implicit_classmethod(method_name) {
                 is_classmethod = true;
             }
@@ -273,7 +273,7 @@ impl<'db> StaticClassLiteral<'db> {
                 if let Some(method_def) = scope_for_reachability_analysis.node().as_function() {
                     let method = index.expect_single_definition(method_def);
                     let method_place = class_table
-                        .symbol_id(&method_def.node(&module).name)
+                        .symbol_id(method_def.node(&module).name().as_str())
                         .unwrap();
                     class_map
                         .reachable_symbol_bindings(method_place)

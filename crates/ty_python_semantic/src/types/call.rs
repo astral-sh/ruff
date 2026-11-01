@@ -6,7 +6,7 @@ use crate::types::call::bind::BindingError;
 use crate::types::function::OverloadLiteral;
 use crate::types::{MemberLookupPolicy, PropertyInstanceType};
 use crate::{Program, ProgramEnvironment};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, SyntaxNode};
 
 mod ambiguous;
 mod arguments;
@@ -425,7 +425,7 @@ impl<'db> CallError<'db> {
     pub(crate) fn report_diagnostics_with_override(
         &self,
         context: &InferContext<'db, '_>,
-        node: ast::AnyNodeRef,
+        node: SyntaxNode,
         overrides: &CallDiagnosticOverride<'_>,
     ) {
         self.1

@@ -1,6 +1,7 @@
 use crate::ProgramEnvironment;
 use ruff_db::{diagnostic::Span, parsed::parsed_module};
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast};
 use ruff_text_size::TextRange;
 
 use crate::{
@@ -153,13 +154,13 @@ impl get_size2::GetSize for DynamicClassLiteral<'_> {}
 ///
 /// Dynamic class constructors accept `bases` either as the second positional argument or as a
 /// `bases=` keyword argument.
-pub(crate) fn dynamic_class_bases_argument(arguments: &ast::Arguments) -> Option<&ast::Expr> {
-    arguments.args.get(1).or_else(|| {
+pub(crate) fn dynamic_class_bases_argument(arguments: ast::Arguments<'_>) -> Option<ast::Expr<'_>> {
+    arguments.args().get(1).or_else(|| {
         arguments
-            .keywords
+            .keywords()
             .iter()
-            .find(|kw| kw.arg.as_deref() == Some("bases"))
-            .map(|kw| &kw.value)
+            .find(|kw| kw.arg().map(ast::Identifier::as_str) == Some("bases"))
+            .map(ast::Keyword::value)
     })
 }
 
@@ -215,7 +216,7 @@ impl<'db> DynamicClassLiteral<'db> {
                 .as_call_expr()
                 .expect("Definition value should be a call expression");
 
-            let Some(bases_arg) = dynamic_class_bases_argument(&call_expr.arguments) else {
+            let Some(bases_arg) = dynamic_class_bases_argument(call_expr.arguments()) else {
                 return Box::default();
             };
 

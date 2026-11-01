@@ -2,7 +2,7 @@ use crate::Program;
 use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::{self as ast, SyntaxNode};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Db;
@@ -46,7 +46,7 @@ pub struct Unpack<'db> {
     #[no_eq]
     #[tracked]
     #[returns(ref)]
-    pub(crate) _target: AstNodeRef<ast::Expr>,
+    pub(crate) _target: AstNodeRef<ast::kind::Expr>,
 
     /// The ingredient representing the value expression of the unpacking. For example, in
     /// `(a, b) = (1, 2)`, the value expression is `(1, 2)`.
@@ -66,7 +66,7 @@ impl<'db> Unpack<'db> {
         self.program_file(db).python_file(db)
     }
 
-    pub fn target<'ast>(self, db: &'db dyn Db, parsed: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+    pub fn target<'ast>(self, db: &'db dyn Db, parsed: &'ast ParsedModuleRef) -> ast::Expr<'ast> {
         self._target(db).node(parsed)
     }
 
@@ -105,12 +105,12 @@ impl<'db> UnpackValue<'db> {
         self.expression
     }
 
-    /// Returns the expression as an [`AnyNodeRef`].
+    /// Returns the syntax of the expression being unpacked.
     pub fn as_any_node_ref<'ast>(
         self,
         db: &'db dyn Db,
         module: &'ast ParsedModuleRef,
-    ) -> AnyNodeRef<'ast> {
+    ) -> SyntaxNode<'ast> {
         self.expression().node_ref(db).node(module).into()
     }
 

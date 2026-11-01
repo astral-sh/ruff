@@ -13,8 +13,7 @@ use crate::{
         known_instance::DeprecatedInstance,
     },
 };
-use ruff_python_ast as ast;
-use ruff_python_ast::PythonVersion;
+use ruff_python_ast::{self as ast, PythonVersion};
 use rustc_hash::FxHashSet;
 use std::{
     borrow::Cow,
@@ -2057,7 +2056,7 @@ impl KnownClass {
         context: &InferContext<'db, '_>,
         index: &SemanticIndex<'db>,
         overload: &mut Binding<'db>,
-        call_expression: &ast::ExprCall,
+        call_expression: ast::ExprCall<'_>,
     ) {
         let db = context.db();
         let scope = context.scope();
@@ -2100,14 +2099,13 @@ impl KnownClass {
                         // `None` if the scope is not function-like, or has no parameters.
                         let first_param = match scope.node(db) {
                             NodeWithScopeKind::Function(f) => {
-                                f.node(module).parameters.iter().next()
+                                f.node(module).parameters().iter().next()
                             }
                             NodeWithScopeKind::Lambda(l) => l
                                 .node(module)
-                                .parameters
-                                .as_ref()
+                                .parameters()
                                 .into_iter()
-                                .flatten()
+                                .flat_map(ast::Parameters::iter)
                                 .next(),
                             _ => None,
                         };

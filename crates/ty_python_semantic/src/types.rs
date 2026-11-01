@@ -1,6 +1,7 @@
 use compact_str::{CompactString, ToCompactString};
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
+use ruff_python_ast::SyntaxNode;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use smallvec::SmallVec;
@@ -366,19 +367,21 @@ pub(crate) fn may_exist_at_runtime<'db>(db: &'db dyn Db, definition: Definition<
     // Treat only unambiguous union, `Literal`, and `Annotated` expressions as implicit aliases.
     // Other expressions may also be aliases, but a false negative is preferable to incorrectly
     // hiding a value that exists at runtime.
-    match (ty, assignment.value(&module)) {
+    match (ty, assignment.value(&module).fields()) {
         (
             Type::KnownInstance(KnownInstanceType::UnionType(_)),
-            ast::Expr::BinOp(ast::ExprBinOp {
+            ast::ExprFields::BinOp(ast::ExprBinOpFields {
                 op: ast::Operator::BitOr,
                 ..
             }),
         ) => false,
         (
             Type::KnownInstance(KnownInstanceType::Literal(_) | KnownInstanceType::Annotated(_)),
-            ast::Expr::Subscript(subscript),
+            ast::ExprFields::Subscript(ast::ExprSubscriptFields {
+                node: subscript, ..
+            }),
         ) => !matches!(
-            subscript.value.inferred_type(&model),
+            subscript.value().inferred_type(&model),
             Some(Type::SpecialForm(_) | Type::ClassLiteral(_) | Type::GenericAlias(_))
         ),
         _ => true,
@@ -403,11 +406,11 @@ pub(crate) fn inferred_declaration<'db>(
 fn definition_expression_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    expression: &ast::Expr,
+    expression: ast::Expr<'_>,
 ) -> Type<'db> {
     let file = definition.program_file(db);
     let index = semantic_index(db, file);
-    let file_scope = index.expression_scope_id(expression);
+    let file_scope = index.expression_scope_id(&expression);
     let scope = file_scope.to_scope_id(db, file);
     definition_expression_type_in_scope(db, definition, expression, scope)
 }
@@ -420,7 +423,7 @@ fn definition_expression_type<'db>(
 fn definition_expression_type_in_scope<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    expression: &ast::Expr,
+    expression: ast::Expr<'_>,
     scope: ScopeId<'db>,
 ) -> Type<'db> {
     if scope == definition.scope(db) {
@@ -451,11 +454,11 @@ fn definition_expression_type_in_scope<'db>(
 fn definition_expression_annotation<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    expression: &ast::Expr,
+    expression: ast::Expr<'_>,
 ) -> TypeAndQualifiers<'db> {
     let file = definition.program_file(db);
     let index = semantic_index(db, file);
-    let file_scope = index.expression_scope_id(expression);
+    let file_scope = index.expression_scope_id(&expression);
     let scope = file_scope.to_scope_id(db, file);
     if scope == definition.scope(db) {
         let inference = infer_deferred_types(db, definition);
@@ -932,10 +935,10 @@ impl<'db> MemberLookupError<'db> {
         self,
         context: &InferContext<'db, '_>,
         object_type: Type<'db>,
-        target: &ast::ExprAttribute,
+        target: ast::ExprAttribute<'_>,
         assigned_type: Option<Type<'db>>,
     ) {
-        if matches!(target.ctx, ast::ExprContext::Del) {
+        if matches!(target.ctx(), ast::ExprContext::Del) {
             return;
         }
 
@@ -1015,7 +1018,7 @@ impl<'db> MemberLookupError<'db> {
         self,
         context: &InferContext<'db, '_>,
         module: ModuleLiteralType<'db>,
-        target: &ast::Alias,
+        target: ast::Alias<'_>,
         name: &str,
     ) {
         if let Some(failure) =
@@ -12225,7 +12228,7 @@ impl<'db> AwaitError<'db> {
         &self,
         context: &InferContext<'db, '_>,
         context_expression_type: Type<'db>,
-        context_expression_node: ast::AnyNodeRef,
+        context_expression_node: SyntaxNode,
     ) {
         let Some(builder) = context.report_lint(&INVALID_AWAIT, context_expression_node) else {
             return;

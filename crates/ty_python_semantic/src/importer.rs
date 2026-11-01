@@ -6,10 +6,11 @@ Both of them use the lower-level `ruff_python_importer::Insertion` primitive.
 The main differences here are:
 
 1. This works with ty's semantic model instead of ruff's.
-2. This finds top-level imports for diagnostic fixes, completions, and inlay hints.
+2. It collects top-level imports for diagnostic fixes, completions, and inlay hints.
 3. It doesn't have as many facilities as `ruff_linter`'s importer.
 */
 
+use ruff_python_ast::{StmtKind, SyntaxNode};
 use rustc_hash::FxHashMap;
 
 use ruff_db::PythonFile;
@@ -45,8 +46,8 @@ pub struct Importer<'a> {
     source: SourceText,
     /// The cached source style for formatting inserted code.
     stylist: &'a Stylist<'static>,
-    /// The list of visited, top-level runtime imports in the Python AST.
-    imports: &'a [AstNodeRef<ast::Stmt>],
+    /// Top-level imports in source order.
+    imports: &'a [AstNodeRef<ast::kind::Stmt>],
 }
 
 impl<'a> Importer<'a> {
@@ -92,11 +93,7 @@ impl<'a> Importer<'a> {
     /// This API is designed with completions in mind. That is, we might have
     /// many possible candidates to add as an import while the position we want
     /// to insert them remains invariant.
-    pub fn members_in_scope_at(
-        &self,
-        node: ast::AnyNodeRef<'_>,
-        at: TextSize,
-    ) -> MembersInScope<'a> {
+    pub fn members_in_scope_at(&self, node: SyntaxNode<'_>, at: TextSize) -> MembersInScope<'a> {
         MembersInScope::new(self.db, self.file, self.parsed, node, at)
     }
 
@@ -172,7 +169,7 @@ impl<'a> Importer<'a> {
         };
         match response.kind {
             ImportResponseKind::Unqualified { alias } => {
-                let member = alias.asname.as_ref().unwrap_or(&alias.name).as_str();
+                let member = alias.asname().unwrap_or(alias.name()).as_str();
                 // As long as it's not a wildcard import, we use whatever name
                 // the member is imported as when inserting the symbol.
                 if member != "*" {
@@ -184,7 +181,7 @@ impl<'a> Importer<'a> {
                 }
             }
             ImportResponseKind::Qualified { alias } => {
-                let module = alias.asname.as_ref().unwrap_or(&alias.name).as_str();
+                let module = alias.asname().unwrap_or(alias.name()).as_str();
                 ImportAction {
                     import: None,
                     symbol_text: format!("{module}.{symbol_text}").into(),
@@ -386,7 +383,7 @@ impl<'a> Importer<'a> {
                     && match import.satisfies(self.db, importing_file, &request) {
                         Some(ImportResponseKind::Qualified { .. }) => true,
                         Some(ImportResponseKind::Unqualified { alias }) => {
-                            Some(alias.name.as_str()) == request.member
+                            Some(alias.name().as_str()) == request.member
                         }
                         _ => false,
                     };
@@ -483,7 +480,9 @@ impl<'a> Importer<'a> {
                     .stmt
                     .as_import_from_stmt()
                     .is_some_and(|import_from| {
-                        !import_from.is_lazy && import_from.module.as_deref() == Some("__future__")
+                        !import_from.is_lazy()
+                            && import_from.module().map(ast::Identifier::as_str)
+                                == Some("__future__")
                     })
             })
             .last()
@@ -492,9 +491,9 @@ impl<'a> Importer<'a> {
     fn imports(&self) -> impl Iterator<Item = AstImport<'a>> {
         self.imports.iter().filter_map(|import| {
             let stmt = import.node(self.parsed);
-            let kind = match stmt {
-                ast::Stmt::Import(node) => AstImportKind::Import(node),
-                ast::Stmt::ImportFrom(node) => AstImportKind::ImportFrom(node),
+            let kind = match stmt.classify() {
+                StmtKind::Import(node) => AstImportKind::Import(node),
+                StmtKind::ImportFrom(node) => AstImportKind::ImportFrom(node),
                 _ => return None,
             };
             Some(AstImport { stmt, kind })
@@ -511,14 +510,14 @@ fn stylist(db: &dyn Db, file: PythonFile<'_>) -> Stylist<'static> {
 }
 
 #[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size)]
-fn top_level_imports(db: &dyn Db, file: PythonFile<'_>) -> Box<[AstNodeRef<ast::Stmt>]> {
+fn top_level_imports(db: &dyn Db, file: PythonFile<'_>) -> Box<[AstNodeRef<ast::kind::Stmt>]> {
     let parsed = parsed_module(db, file).load(db);
     // Imports inside an `if` or `try` suite may never execute.
     parsed
         .suite()
         .iter()
-        .filter(|stmt| matches!(stmt, ast::Stmt::Import(_) | ast::Stmt::ImportFrom(_)))
-        .map(|stmt| AstNodeRef::new(&parsed, stmt))
+        .filter(|stmt| stmt.is_import_stmt() || stmt.is_import_from_stmt())
+        .map(|stmt| AstNodeRef::from_view(&parsed, stmt))
         .collect()
 }
 
@@ -554,7 +553,7 @@ impl<'ast> MembersInScope<'ast> {
         db: &'ast dyn Db,
         file: ProgramFile<'ast>,
         parsed: &'ast ParsedModuleRef,
-        node: ast::AnyNodeRef<'_>,
+        node: SyntaxNode<'_>,
         at: TextSize,
     ) -> MembersInScope<'ast> {
         let model = SemanticModel::new(db, file);
@@ -674,7 +673,7 @@ impl ImportAction {
 #[derive(Debug, Clone, Copy)]
 struct AstImport<'ast> {
     /// The original AST statement containing the import.
-    stmt: &'ast ast::Stmt,
+    stmt: ast::Stmt<'ast>,
     /// The specific type of import.
     ///
     /// Storing this means we can do exhaustive case analysis
@@ -704,8 +703,8 @@ impl<'ast> AstImport<'ast> {
 /// The specific kind of import.
 #[derive(Debug, Clone, Copy)]
 enum AstImportKind<'ast> {
-    Import(&'ast ast::StmtImport),
-    ImportFrom(&'ast ast::StmtImportFrom),
+    Import(ast::StmtImport<'ast>),
+    ImportFrom(ast::StmtImportFrom<'ast>),
 }
 
 impl<'ast> AstImportKind<'ast> {
@@ -732,9 +731,9 @@ impl<'ast> AstImportKind<'ast> {
                     return None;
                 }
                 let alias = ast
-                    .names
+                    .names()
                     .iter()
-                    .find(|alias| alias.name.as_str() == request.module)?;
+                    .find(|alias| alias.name().as_str() == request.module)?;
                 Some(ImportResponseKind::Qualified { alias })
             }
             AstImportKind::ImportFrom(ast) => {
@@ -758,9 +757,9 @@ impl<'ast> AstImportKind<'ast> {
                     return None;
                 }
                 let kind = ast
-                    .names
+                    .names()
                     .iter()
-                    .find(|alias| alias.name.as_str() == "*" || alias.name.as_str() == member)
+                    .find(|alias| alias.name().as_str() == "*" || alias.name().as_str() == member)
                     .map(|alias| ImportResponseKind::Unqualified { alias })
                     .unwrap_or(ImportResponseKind::Partial);
                 Some(kind)
@@ -955,7 +954,7 @@ enum ImportResponseKind<'ast> {
     Unqualified {
         /// The specific alias in the `from <...> import <...>`
         /// statement that satisfied the request's `member`.
-        alias: &'ast ast::Alias,
+        alias: ast::Alias<'ast>,
     },
     /// The necessary module is imported, but the symbol itself is not
     /// in scope. The symbol can be used via `module.symbol`.
@@ -964,7 +963,7 @@ enum ImportResponseKind<'ast> {
     Qualified {
         /// The specific alias in the import statement that
         /// satisfied the request's `module`.
-        alias: &'ast ast::Alias,
+        alias: ast::Alias<'ast>,
     },
     /// The necessary module is imported via `from module import ...`,
     /// but the desired symbol is not listed in `...`.

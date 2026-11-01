@@ -51,7 +51,9 @@ use ruff_db::{
 use ruff_diagnostics::{Edit, Fix, IsolationLevel};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parentheses_iterator;
-use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, PythonVersion, StringFlags};
+use ruff_python_ast::{
+    self as ast, AnyKind, AstNode, NodeList, PythonVersion, StringFlags, SyntaxNode,
+};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -847,7 +849,7 @@ declare_lint! {
 pub(super) fn report_missing_type_arguments<'db>(
     context: &InferContext<'db, '_>,
     ty: Type<'db>,
-    annotation: &ast::Expr,
+    annotation: ast::Expr<'_>,
 ) {
     match ty {
         Type::ClassLiteral(class) => {
@@ -1591,7 +1593,7 @@ impl<'a> IntoIterator for &'a TypeCheckDiagnostics {
 pub(super) fn report_index_out_of_bounds(
     context: &InferContext,
     kind: &'static str,
-    node: AnyNodeRef,
+    node: SyntaxNode,
     tuple_ty: Type,
     length: impl std::fmt::Display,
     index: i64,
@@ -1610,7 +1612,7 @@ pub(super) fn report_index_out_of_bounds(
 /// Emit a diagnostic declaring that a type does not support subscripting.
 pub(super) fn report_not_subscriptable(
     context: &InferContext,
-    node: &ast::ExprSubscript,
+    node: ast::ExprSubscript<'_>,
     not_subscriptable_ty: Type,
     method: &str,
 ) {
@@ -1632,7 +1634,7 @@ pub(super) fn report_not_subscriptable(
     }
 }
 
-pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeRef) {
+pub(super) fn report_slice_step_size_zero(context: &InferContext, node: SyntaxNode) {
     let Some(builder) = context.report_lint(&ZERO_STEPSIZE_IN_SLICE, node) else {
         return;
     };
@@ -1645,13 +1647,13 @@ pub(crate) fn is_invalid_typed_dict_literal<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     target_ty: Type<'db>,
-    source: AnyNodeRef<'_>,
+    source: SyntaxNode<'_>,
 ) -> bool {
     target_ty
         .filter_union(db, env, Type::is_typed_dict)
         .as_typed_dict()
         .is_some()
-        && matches!(source, AnyNodeRef::ExprDict(_))
+        && matches!(source.classify(), AnyKind::ExprDict(_))
 }
 
 fn report_invalid_assignment_with_message<'db, 'env: 'db, T: Ranged>(
@@ -1856,23 +1858,20 @@ fn assignment_declaration_annotation<'db>(
         )),
         DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => parameter
             .node(context.module())
-            .parameter
-            .annotation
-            .as_deref()
+            .parameter()
+            .annotation()
             .map(|annotation| (annotation, DeclarationKind::Regular)),
         DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicPositionalParameter(
             parameter,
         )) => parameter
             .node(context.module())
-            .annotation
-            .as_deref()
+            .annotation()
             .map(|annotation| (annotation, DeclarationKind::VariadicParameter)),
         DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicKeywordParameter(
             parameter,
         )) => parameter
             .node(context.module())
-            .annotation
-            .as_deref()
+            .annotation()
             .map(|annotation| (annotation, DeclarationKind::KeywordVariadicParameter)),
         DefinitionKind::Import(_)
         | DefinitionKind::ImportFrom(_)
@@ -1914,7 +1913,7 @@ enum AssignmentDiagnosticKind {
 fn assignment_value_node<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     definition_kind: &DefinitionKind<'db>,
-) -> Option<&'ast ast::Expr> {
+) -> Option<ast::Expr<'ast>> {
     match definition_kind {
         DefinitionKind::Assignment(assignment) if let Some(unpack) = assignment.unpack() => {
             let module = context.module();
@@ -1933,7 +1932,7 @@ fn assignment_value_node<'db, 'ast>(
             definition_kind.value(context.module())
         }
         DefinitionKind::NamedExpression(assignment) => {
-            Some(&*assignment.node(context.module()).value)
+            Some(assignment.node(context.module()).value())
         }
         DefinitionKind::Import(_)
         | DefinitionKind::ImportFrom(_)
@@ -1962,8 +1961,8 @@ fn assignment_value_node<'db, 'ast>(
 /// Return the range of an assignment's value, including any surrounding parentheses.
 fn assignment_diagnostic_range(
     context: &InferContext,
-    target_node: AnyNodeRef,
-    value_node: Option<&ast::Expr>,
+    target_node: SyntaxNode,
+    value_node: Option<ast::Expr<'_>>,
     starred_element: Option<&StarredAssignmentElement>,
 ) -> TextRange {
     if let Some(starred_element) = starred_element {
@@ -1979,7 +1978,7 @@ fn assignment_diagnostic_range(
             //     1 + 2 + 3
             // )  # ty: ignore <- or here
             // ```
-            parentheses_iterator(value_node.into(), None, context.module().tokens())
+            parentheses_iterator(value_node, None, context.module().tokens())
                 .last()
                 .unwrap_or(value_node.range())
         })
@@ -2058,7 +2057,7 @@ fn starred_assignment_element<'db>(
 fn annotate_unpacked_assignment_target(
     context: &InferContext,
     diagnostic: &mut LintDiagnosticGuard,
-    target: AnyNodeRef,
+    target: SyntaxNode,
     definition_kind: &DefinitionKind,
 ) {
     if let DefinitionKind::Assignment(assignment) = definition_kind
@@ -2076,7 +2075,7 @@ fn annotate_unpacked_assignment_target(
 fn set_assignment_primary_annotation(
     diagnostic: &mut LintDiagnosticGuard,
     definition_kind: &DefinitionKind,
-    value_node: Option<&ast::Expr>,
+    value_node: Option<ast::Expr<'_>>,
     value_type_display: impl fmt::Display,
     diagnostic_kind: AssignmentDiagnosticKind,
 ) -> bool {
@@ -2104,7 +2103,7 @@ fn set_assignment_primary_annotation(
 
 pub(super) fn report_invalid_assignment<'db>(
     context: &InferContext<'db, '_>,
-    target_node: AnyNodeRef,
+    target_node: SyntaxNode,
     definition: Definition<'db>,
     declaration: Option<Definition<'db>>,
     target_ty: Type,
@@ -2151,7 +2150,7 @@ pub(super) fn report_invalid_assignment<'db>(
         return;
     };
 
-    if matches!(target_node, AnyNodeRef::ExprName(_)) {
+    if matches!(target_node.classify(), AnyKind::ExprName(_)) {
         match target_ty {
             Type::ClassLiteral(class) => {
                 diag.info(format_args!(
@@ -2225,12 +2224,12 @@ pub(super) fn report_invalid_assignment<'db>(
 /// Report an assignment whose value is not a subtype of its declared type.
 pub(super) fn report_unsound_assignment<'db>(
     context: &InferContext<'db, '_>,
-    target_node: AnyNodeRef,
+    target_node: SyntaxNode,
     definition: Definition<'db>,
     declaration: Option<Definition<'db>>,
     target_ty: Type<'db>,
     value_ty: Type<'db>,
-    expression_type: impl FnOnce(&ast::Expr) -> Type<'db>,
+    expression_type: impl FnOnce(ast::Expr<'_>) -> Type<'db>,
 ) {
     let db = context.db();
     let env = context.program_environment();
@@ -2239,8 +2238,8 @@ pub(super) fn report_unsound_assignment<'db>(
         if let DefinitionKind::AugmentedAssignment(assignment) = definition_kind {
             let assignment = assignment.node(context.module());
 
-            if expression_type(&assignment.value).is_equivalent_to(db, env, value_ty) {
-                (target_node, Some(assignment.value.as_ref()))
+            if expression_type(assignment.value()).is_equivalent_to(db, env, value_ty) {
+                (target_node, Some(assignment.value()))
             } else {
                 (assignment.into(), None)
             }
@@ -2348,11 +2347,11 @@ pub(super) fn report_bad_dunder_get_call<'db>(
     failure: &CallError<'db>,
     object_type: Type<'db>,
     descriptor_type: Type<'db>,
-    target: &ast::ExprAttribute,
+    target: ast::ExprAttribute<'_>,
 ) {
     let db = context.db();
     let env = &context.program_environment();
-    let attribute = target.attr.as_str();
+    let attribute = target.attr().as_str();
     if let Some(property) = failure.as_attempt_to_get_property_with_no_getter() {
         let Some(builder) = context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target) else {
             return;
@@ -2394,7 +2393,11 @@ pub(super) fn report_bad_dunder_get_call<'db>(
                     "This access implicitly calls `__get__` on a descriptor of type `{}`",
                     descriptor_type.display(db, env),
                 ),
-                argument_ranges: &[target.range(), target.value.range(), target.value.range()],
+                argument_ranges: &[
+                    target.range(),
+                    target.value().range(),
+                    target.value().range(),
+                ],
             },
         );
     }
@@ -2430,12 +2433,12 @@ pub(super) fn report_bad_attribute_access_call<'db>(
     context: &InferContext<'db, '_>,
     failure: &CallError<'db>,
     object_type: Type<'db>,
-    target: &ast::ExprAttribute,
+    target: ast::ExprAttribute<'_>,
     method: AttributeAccessMethod,
 ) {
     let db = context.db();
     let env = &context.program_environment();
-    let attribute = target.attr.as_str();
+    let attribute = target.attr().as_str();
 
     failure.report_diagnostics_with_override(
         context,
@@ -2461,7 +2464,7 @@ pub(super) fn report_bad_import_call<'db>(
     context: &InferContext<'db, '_>,
     failure: &CallError<'db>,
     module: ModuleLiteralType<'db>,
-    target: &ast::Alias,
+    target: ast::Alias<'_>,
     name: &str,
 ) {
     let db = context.db();
@@ -2486,12 +2489,12 @@ pub(super) fn report_bad_dunder_set_call<'db>(
     dunder_set_failure: &CallError<'db>,
     object_type: Type<'db>,
     descriptor_type: Type<'db>,
-    target: &ast::ExprAttribute,
-    value: &ast::Expr,
+    target: ast::ExprAttribute<'_>,
+    value: ast::Expr<'_>,
 ) {
     let db = context.db();
     let env = &context.program_environment();
-    let attribute = target.attr.as_str();
+    let attribute = target.attr().as_str();
     if let Some(property) = dunder_set_failure.as_attempt_to_set_property_with_no_setter() {
         let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
             return;
@@ -2513,7 +2516,7 @@ pub(super) fn report_bad_dunder_set_call<'db>(
             ));
         }
     } else {
-        let argument_ranges = &[target.value.range(), value.range()];
+        let argument_ranges = &[target.value().range(), value.range()];
         dunder_set_failure.report_diagnostics_with_override(
             context,
             target.into(),
@@ -2538,7 +2541,7 @@ pub(super) fn report_bad_dunder_delete_call<'db>(
     dunder_delete_failure: &CallError<'db>,
     attribute: &str,
     object_type: Type<'db>,
-    target: &ast::ExprAttribute,
+    target: ast::ExprAttribute<'_>,
 ) {
     let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
         return;
@@ -2580,7 +2583,7 @@ pub(super) fn report_bad_dunder_delattr_call(
     context: &InferContext<'_, '_>,
     attribute: &str,
     object_type: Type,
-    target: &ast::ExprAttribute,
+    target: ast::ExprAttribute<'_>,
     binding_error: bool,
 ) {
     let db = context.db();
@@ -2607,10 +2610,10 @@ pub(super) fn report_bad_dunder_delattr_call(
 
 pub(super) fn report_dynamic_function_decorator_return<'db>(
     context: &InferContext<'db, '_>,
-    decorator: &ast::Decorator,
+    decorator: ast::Decorator<'_>,
     decorated_ty: Type<'db>,
     decorator_bindings: &Bindings<'db>,
-    decorated_function: &ast::StmtFunctionDef,
+    decorated_function: ast::StmtFunctionDef<'_>,
     return_ty: Type<'db>,
 ) {
     let Some(builder) = context.report_lint(&DYNAMIC_FUNCTION_DECORATOR_RETURN, decorator) else {
@@ -2623,7 +2626,7 @@ pub(super) fn report_dynamic_function_decorator_return<'db>(
 
     let mut diagnostic = builder.into_diagnostic(format_args!("Decorator returns `{returned}`"));
 
-    let mut secondary_annotation = context.secondary(&decorated_function.name);
+    let mut secondary_annotation = context.secondary(decorated_function.name());
 
     // A function literal is already known to be callable. Resolving its signature here can
     // create a cycle if an annotation refers back to the decorated name, as in
@@ -2633,12 +2636,12 @@ pub(super) fn report_dynamic_function_decorator_return<'db>(
     {
         secondary_annotation.message(format_args!(
             "Signature of `{}` will be obscured by the decorator",
-            decorated_function.name.id
+            decorated_function.name().id()
         ))
     } else {
         secondary_annotation.message(format_args!(
             "Previous type of `{}` will be obscured by the decorator",
-            decorated_function.name.id
+            decorated_function.name().id()
         ))
     };
 
@@ -3088,7 +3091,7 @@ pub(super) fn report_implicit_return_type(
     }
 }
 
-pub(super) fn report_invalid_type_checking_constant(context: &InferContext, node: AnyNodeRef) {
+pub(super) fn report_invalid_type_checking_constant(context: &InferContext, node: SyntaxNode) {
     let Some(builder) = context.report_lint(&INVALID_TYPE_CHECKING_CONSTANT, node) else {
         return;
     };
@@ -3099,19 +3102,19 @@ pub(super) fn report_invalid_type_checking_constant(context: &InferContext, node
 
 pub(super) fn report_possibly_unresolved_reference(
     context: &InferContext,
-    expr_name_node: &ast::ExprName,
+    expr_name_node: ast::ExprName<'_>,
 ) {
     let Some(builder) = context.report_lint(&POSSIBLY_UNRESOLVED_REFERENCE, expr_name_node) else {
         return;
     };
 
-    let ast::ExprName { id, .. } = expr_name_node;
+    let id = expr_name_node.id();
     builder.into_diagnostic(format_args!("Name `{id}` used when possibly not defined"));
 }
 
 pub(super) fn report_possibly_missing_attribute(
     context: &InferContext,
-    target: &ast::ExprAttribute,
+    target: ast::ExprAttribute<'_>,
     attribute: &str,
     object_ty: Type,
 ) {
@@ -3215,7 +3218,7 @@ pub(super) fn autofix_with_literal(
     ));
 }
 
-pub(super) fn report_undefined_reveal(context: &InferContext, name: &ast::ExprName) {
+pub(super) fn report_undefined_reveal(context: &InferContext, name: ast::ExprName<'_>) {
     let Some(builder) = context.report_lint(&UNDEFINED_REVEAL, name) else {
         return;
     };
@@ -3243,7 +3246,7 @@ pub(super) fn report_undefined_reveal(context: &InferContext, name: &ast::ExprNa
 pub(crate) fn autofix_with_notimplementederror(
     context: &InferContext,
     diagnostic: &mut Diagnostic,
-    node: &ast::Expr,
+    node: ast::Expr<'_>,
 ) {
     if SemanticModel::new(context.db(), context.program_file())
         .definitely_has_builtin_binding("NotImplementedError", node.into())
@@ -3258,9 +3261,9 @@ pub(crate) fn autofix_with_notimplementederror(
 
 pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
-    node: &'ast ast::ExprTuple,
+    node: ast::ExprTuple<'ast>,
     node_type: Type<'db>,
-    invalid_tuple_nodes: impl IntoIterator<Item = (&'ast ast::Expr, Type<'db>)>,
+    invalid_tuple_nodes: impl IntoIterator<Item = (ast::Expr<'ast>, Type<'db>)>,
 ) {
     let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_EXCEPTION_CAUGHT, node) else {
@@ -3293,7 +3296,11 @@ pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
     );
 }
 
-pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast::Expr, ty: Type) {
+pub(super) fn report_invalid_exception_caught(
+    context: &InferContext,
+    node: ast::Expr<'_>,
+    ty: Type,
+) {
     let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_EXCEPTION_CAUGHT, node) else {
         return;
@@ -3329,7 +3336,7 @@ pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast
 
 pub(crate) fn report_invalid_exception_raised(
     context: &InferContext,
-    raised_node: &ast::Expr,
+    raised_node: ast::Expr<'_>,
     raise_type: Type,
 ) {
     let db = context.db();
@@ -3351,7 +3358,11 @@ pub(crate) fn report_invalid_exception_raised(
     }
 }
 
-pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast::Expr, ty: Type) {
+pub(crate) fn report_invalid_exception_cause(
+    context: &InferContext,
+    node: ast::Expr<'_>,
+    ty: Type,
+) {
     let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_RAISE, node) else {
         return;
@@ -3379,7 +3390,7 @@ pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast:
 pub(crate) fn report_instance_layout_conflict(
     context: &InferContext,
     header_range: TextRange,
-    base_nodes: Option<&[ast::Expr]>,
+    base_nodes: Option<NodeList<'_, ast::kind::Expr>>,
     disjoint_bases: &IncompatibleBases,
 ) {
     debug_assert!(disjoint_bases.len() > 1);
@@ -3473,7 +3484,7 @@ pub(crate) fn report_instance_layout_conflict(
 /// are inherited from base classes.
 pub(super) fn report_conflicting_metaclass_from_bases(
     context: &InferContext,
-    node: AnyNodeRef,
+    node: SyntaxNode,
     class_name: &str,
     metaclass1: ClassType,
     base1: impl std::fmt::Display,
@@ -3583,7 +3594,7 @@ pub(super) struct IncompatibleBaseInfo<'db> {
 
 pub(crate) fn report_invalid_arguments_to_annotated(
     context: &InferContext,
-    subscript: &ast::ExprSubscript,
+    subscript: ast::ExprSubscript<'_>,
 ) {
     let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, subscript) else {
         return;
@@ -3596,7 +3607,7 @@ pub(crate) fn report_invalid_arguments_to_annotated(
 
 pub(crate) fn report_invalid_argument_number_to_special_form(
     context: &InferContext,
-    subscript: &ast::ExprSubscript,
+    subscript: ast::ExprSubscript<'_>,
     special_form: impl Into<SpecialFormType>,
     received_arguments: usize,
     expected_arguments: u8,
@@ -3638,7 +3649,7 @@ pub(super) fn report_invalid_runtime_checkable(
 
 pub(crate) fn report_bad_argument_to_get_protocol_members(
     context: &InferContext,
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     class: ClassLiteral,
 ) {
     let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
@@ -3673,7 +3684,7 @@ pub(crate) fn report_bad_argument_to_get_protocol_members(
 
 pub(crate) fn report_bad_argument_to_protocol_interface(
     context: &InferContext,
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     param_type: Type,
 ) {
     let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
@@ -3709,7 +3720,7 @@ pub(crate) fn report_bad_argument_to_protocol_interface(
 
 pub(crate) fn report_invalid_arguments_to_callable(
     context: &InferContext,
-    subscript: &ast::ExprSubscript,
+    subscript: ast::ExprSubscript<'_>,
 ) {
     let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, subscript) else {
         return;
@@ -3782,7 +3793,7 @@ pub(crate) fn add_type_expression_reference_link<'db, 'env>(
 
 pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
     context: &InferContext,
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     protocol: ProtocolClass,
     function: KnownFunction,
 ) {
@@ -3807,7 +3818,7 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
 
 pub(crate) fn report_issubclass_check_against_protocol_with_non_method_members<'db>(
     context: &'db InferContext<'db, '_>,
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     protocol: ProtocolClass<'db>,
     non_method_members: &[ProtocolMember<'db, 'db>],
 ) {
@@ -3868,7 +3879,7 @@ pub(crate) fn report_issubclass_check_against_protocol_with_non_method_members<'
 
 pub(crate) fn report_runtime_check_against_typed_dict(
     context: &InferContext,
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     class: ClassLiteral,
     function: KnownFunction,
 ) {
@@ -3945,7 +3956,7 @@ fn add_non_runtime_checkable_protocol_context<'db>(
 
 pub(crate) fn report_attempted_protocol_instantiation(
     context: &InferContext,
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     protocol: ProtocolClass,
 ) {
     let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, call) else {
@@ -3970,7 +3981,7 @@ pub(crate) fn report_attempted_protocol_instantiation(
 
 pub(crate) fn report_call_to_abstract_method(
     context: &InferContext,
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     function: FunctionType,
     method_kind: &str,
 ) {
@@ -3995,7 +4006,7 @@ pub(crate) fn report_call_to_abstract_method(
 
 pub(crate) fn report_attempted_instantiation_of_abstract_class<'db>(
     context: &InferContext<'db, '_>,
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     class: ClassType<'db>,
     abstract_methods: &AbstractMethods<'db>,
 ) {
@@ -4050,12 +4061,12 @@ pub(super) fn abstract_method_span<'db>(
     let source_text = source_text(db, file);
 
     if policy == AbstractMethodAnnotationPolicy::ExcludeVerboseBody
-        && source_text.line_start(node.name.end()) != source_text.line_start(node.end())
+        && source_text.line_start(node.name().end()) != source_text.line_start(node.end())
     {
         return implementation.spans(db).decorators_and_header;
     }
 
-    if let [single_stmt] = &*node.body
+    if let Some([single_stmt]) = node.body().as_array()
         && source_text.line_start(single_stmt.start()) == source_text.line_start(single_stmt.end())
     {
         Span::from(file).with_range(node.range())
@@ -4158,7 +4169,7 @@ pub(crate) fn report_undeclared_protocol_member(
 
 pub(crate) fn report_undeclared_protocol_attribute(
     context: &InferContext,
-    target: &ast::ExprAttribute,
+    target: ast::ExprAttribute<'_>,
     protocol_class: ProtocolClass,
 ) {
     let db = context.db();
@@ -4166,7 +4177,7 @@ pub(crate) fn report_undeclared_protocol_attribute(
         return;
     };
 
-    let symbol_name = target.attr.as_str();
+    let symbol_name = target.attr().as_str();
     let mut diagnostic =
         builder.into_diagnostic("Cannot assign to an undeclared attribute in a protocol method");
     diagnostic.set_primary_annotation_message(format_args!(
@@ -4249,7 +4260,7 @@ pub(crate) fn report_duplicate_bases(
 
 pub(crate) fn report_invalid_or_unsupported_base(
     context: &InferContext,
-    base_node: &ast::Expr,
+    base_node: ast::Expr<'_>,
     base_type: Type,
     class: StaticClassLiteral,
 ) {
@@ -4374,7 +4385,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
 
 pub(crate) fn report_unsupported_base(
     context: &InferContext,
-    base_node: &ast::Expr,
+    base_node: ast::Expr<'_>,
     base_type: Type,
     class: StaticClassLiteral,
 ) {
@@ -4400,7 +4411,7 @@ pub(crate) fn report_unsupported_base(
 
 fn report_invalid_base<'env, 'db>(
     context: &'env InferContext<'db, '_>,
-    base_node: &ast::Expr,
+    base_node: ast::Expr<'_>,
     base_type: Type<'db>,
     class: StaticClassLiteral<'db>,
 ) -> Option<LintDiagnosticGuard<'env, 'db>> {
@@ -4420,8 +4431,8 @@ fn report_invalid_base<'env, 'db>(
 
 pub(crate) fn report_invalid_key_on_typed_dict<'db>(
     context: &InferContext<'db, '_>,
-    typed_dict_node: AnyNodeRef,
-    key_node: AnyNodeRef,
+    typed_dict_node: SyntaxNode,
+    key_node: SyntaxNode,
     typed_dict_ty: Type<'db>,
     full_object_ty: Option<Type<'db>>,
     key_ty: Type<'db>,
@@ -4460,10 +4471,10 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                 if !matches!(full_object_ty, Some(Type::Union(_) | Type::Intersection(_)))
                     && let Some(suggestion) = did_you_mean(existing_keys, key)
                 {
-                    if let AnyNodeRef::ExprStringLiteral(literal) = key_node {
+                    if let AnyKind::ExprStringLiteral(literal) = key_node.classify() {
                         let quoted_suggestion = format!(
                             "{quote}{suggestion}{quote}",
-                            quote = literal.value.first_literal_flags().quote_str()
+                            quote = literal.value().first_literal_flags().quote_str()
                         );
                         diagnostic.set_primary_annotation_message(format_args!(
                             "Did you mean {quoted_suggestion}?"
@@ -4628,7 +4639,7 @@ pub(super) fn report_invalid_named_tuple_field_qualifier<'db>(
 
 pub(crate) fn report_missing_typed_dict_key<'db>(
     context: &InferContext<'db, '_>,
-    constructor_node: AnyNodeRef,
+    constructor_node: SyntaxNode,
     typed_dict_ty: Type<'db>,
     missing_field: &str,
 ) {
@@ -4644,7 +4655,7 @@ pub(crate) fn report_missing_typed_dict_key<'db>(
 
 pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
     context: &InferContext<'db, '_>,
-    key_node: AnyNodeRef,
+    key_node: SyntaxNode,
     typed_dict_ty: Type<'db>,
     field_name: &str,
 ) {
@@ -4673,7 +4684,7 @@ pub(crate) enum TypedDictDeleteErrorKind {
 
 pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
     context: &InferContext<'db, '_>,
-    key_node: AnyNodeRef,
+    key_node: SyntaxNode,
     typed_dict_ty: TypedDictType<'db>,
     field_name: &str,
     field: Option<&crate::types::typed_dict::TypedDictField<'db>>,
@@ -4748,7 +4759,7 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
 pub(crate) fn report_invalid_type_param_order<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
-    node: &ast::StmtClassDef,
+    node: ast::StmtClassDef<'_>,
     typevar_with_default: TypeVarInstance<'db>,
     invalid_later_typevars: &[TypeVarInstance<'db>],
 ) {
@@ -4772,11 +4783,11 @@ pub(crate) fn report_invalid_type_param_order<'db>(
             not inherit from `Protocol[]` or `Generic[]`",
         );
 
-    let base_node = &node.bases()[base_index];
+    let base_node = node.bases().at(base_index);
 
     let primary_diagnostic_range = base_node
         .as_subscript_expr()
-        .map(|subscript| &*subscript.slice)
+        .map(ast::ExprSubscript::slice)
         .unwrap_or(base_node)
         .range();
 
@@ -4909,7 +4920,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
     context: &InferContext<'db, '_>,
     header_range: TextRange,
     explicit_bases: &[Type<'db>],
-    base_nodes: Option<&[ast::Expr]>,
+    base_nodes: Option<NodeList<'_, ast::kind::Expr>>,
 ) -> bool {
     let db = context.db();
     let env = &context.program_environment();
@@ -5104,7 +5115,7 @@ pub(super) fn report_invalid_method_override<'db>(
             .unwrap_or_else(|| {
                 subclass_function
                     .node(db, context.file(), context.module())
-                    .range
+                    .range()
             })
     } else {
         subclass_definition.full_range(db, context.module()).range()
@@ -5437,7 +5448,7 @@ pub(super) fn report_overridden_final_method<'db>(
 
         let (overloads, implementation) = function.overloads_and_implementation(db);
         let overload_count = overloads.len() + usize::from(implementation.is_some());
-        let is_only = overload_count >= class_node.body.len();
+        let is_only = overload_count >= class_node.body().len();
 
         let overload_deletion = |overload: &OverloadLiteral<'db>| {
             let range = overload.node(db, context.file(), context.module()).range();
@@ -5454,16 +5465,15 @@ pub(super) fn report_overridden_final_method<'db>(
             .chain(implementation)
             .all(|overload| {
                 class_node
-                    .body
+                    .body()
                     .iter()
                     .filter_map(ast::Stmt::as_function_def_stmt)
-                    .contains(overload.node(db, context.file(), context.module()))
+                    .contains(&overload.node(db, context.file(), context.module()))
             });
 
         let isolate = IsolationLevel::Group(
             class_node
                 .node_index()
-                .load()
                 .as_u32()
                 .expect("`parsed_module` should have assigned a node index"),
         );
@@ -5572,8 +5582,8 @@ pub(super) fn report_unsupported_comparison<'db>(
     context: &InferContext<'db, '_>,
     error: &UnsupportedComparisonError<'db>,
     range: TextRange,
-    left: &ast::Expr,
-    right: &ast::Expr,
+    left: ast::Expr<'_>,
+    right: ast::Expr<'_>,
     left_ty: Type<'db>,
     right_ty: Type<'db>,
 ) {
@@ -5683,19 +5693,19 @@ pub(super) fn report_unsupported_comparison<'db>(
 
 pub(super) fn report_unsupported_augmented_assignment<'db>(
     context: &InferContext<'db, '_>,
-    stmt: &ast::StmtAugAssign,
+    stmt: ast::StmtAugAssign<'_>,
     left_ty: Type<'db>,
     right_ty: Type<'db>,
 ) {
     report_unsupported_binary_operation_impl(
         context,
         stmt.range(),
-        &stmt.target,
-        &stmt.value,
+        stmt.target(),
+        stmt.value(),
         left_ty,
         right_ty,
         OperatorDisplay {
-            operator: stmt.op,
+            operator: stmt.op(),
             is_augmented_assignment: true,
         },
     );
@@ -5703,7 +5713,7 @@ pub(super) fn report_unsupported_augmented_assignment<'db>(
 
 pub(super) fn report_unsupported_binary_operation<'db>(
     context: &InferContext<'db, '_>,
-    binary_expression: &ast::ExprBinOp,
+    binary_expression: ast::ExprBinOp<'_>,
     left_ty: Type<'db>,
     right_ty: Type<'db>,
     operator: ast::Operator,
@@ -5711,8 +5721,8 @@ pub(super) fn report_unsupported_binary_operation<'db>(
     report_unsupported_binary_operation_impl(
         context,
         binary_expression.range(),
-        &binary_expression.left,
-        &binary_expression.right,
+        binary_expression.left(),
+        binary_expression.right(),
         left_ty,
         right_ty,
         OperatorDisplay {
@@ -5741,8 +5751,8 @@ impl std::fmt::Display for OperatorDisplay {
 fn report_unsupported_binary_operation_impl<'a>(
     context: &'a InferContext<'a, 'a>,
     range: TextRange,
-    left: &ast::Expr,
-    right: &ast::Expr,
+    left: ast::Expr<'_>,
+    right: ast::Expr<'_>,
     left_ty: Type<'a>,
     right_ty: Type<'a>,
     operator: OperatorDisplay,
@@ -5787,9 +5797,9 @@ fn report_unsupported_binary_operation_impl<'a>(
 pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
-    class_node: &ast::StmtClassDef,
+    class_node: ast::StmtClassDef<'_>,
     base_class: StaticClassLiteral<'db>,
-    base_class_node: &ast::Expr,
+    base_class_node: ast::Expr<'_>,
     base_is_frozen: bool,
 ) {
     let db = context.db();
@@ -5834,7 +5844,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
     if let Some(position) = class.find_dataclass_decorator_position(db) {
         diagnostic.annotate(
             context
-                .secondary(&class_node.decorator_list[position])
+                .secondary(class_node.decorator_list().at(position))
                 .message(format_args!("`{}` dataclass parameters", class.name(db))),
         );
     }
@@ -5858,7 +5868,8 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
             .node(db)
             .expect_class()
             .node(&module)
-            .decorator_list[decorator_position]
+            .decorator_list()
+            .at(decorator_position)
             .range();
 
         sub.annotate(
@@ -5874,7 +5885,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
 pub(super) fn report_invalid_total_ordering(
     context: &InferContext<'_, '_>,
     class: ClassLiteral<'_>,
-    decorator: &ast::Decorator,
+    decorator: ast::Decorator<'_>,
 ) {
     let db = context.db();
 
@@ -5898,7 +5909,7 @@ pub(super) fn report_invalid_total_ordering(
 pub(super) fn report_invalid_total_ordering_call(
     context: &InferContext<'_, '_>,
     class: ClassLiteral<'_>,
-    call_expression: &ast::ExprCall,
+    call_expression: ast::ExprCall<'_>,
 ) {
     let db = context.db();
 
@@ -6031,7 +6042,7 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
 
 pub(super) fn report_invalid_concatenate_last_arg<'db>(
     context: &InferContext<'db, '_>,
-    last_arg: &ast::Expr,
+    last_arg: ast::Expr<'_>,
     last_arg_type: Type<'db>,
 ) {
     let db = context.db();
@@ -6052,7 +6063,7 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
     context: &InferContext<'db, '_>,
     call_error: CallError<'db>,
     class: StaticClassLiteral<'db>,
-    class_node: &ast::StmtClassDef,
+    class_node: ast::StmtClassDef<'_>,
 ) {
     let db = context.db();
     let CallError(err_kind, bindings) = call_error;

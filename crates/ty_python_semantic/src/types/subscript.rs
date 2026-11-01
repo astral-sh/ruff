@@ -265,10 +265,10 @@ impl<'db> SubscriptError<'db> {
     pub(crate) fn report_diagnostics(
         &self,
         context: &InferContext<'db, '_>,
-        subscript: &ast::ExprSubscript,
+        subscript: ast::ExprSubscript<'_>,
     ) {
-        let value_node = subscript.value.as_ref();
-        let slice_node = subscript.slice.as_ref();
+        let value_node = subscript.value();
+        let slice_node = subscript.slice();
         for error in &self.errors {
             error.report_diagnostic(context, subscript, value_node, slice_node);
         }
@@ -294,9 +294,9 @@ impl<'db> SubscriptErrorKind<'db> {
     fn report_diagnostic(
         &self,
         context: &InferContext<'db, '_>,
-        subscript: &ast::ExprSubscript,
-        value_node: &ast::Expr,
-        slice_node: &ast::Expr,
+        subscript: ast::ExprSubscript<'_>,
+        value_node: ast::Expr<'_>,
+        slice_node: ast::Expr<'_>,
     ) {
         let db = context.db();
         let env = context.program_environment();
@@ -327,7 +327,7 @@ impl<'db> SubscriptErrorKind<'db> {
                     ));
                     let value_type = alias.raw_value_type(db);
                     if value_type.is_specialized_generic(db) {
-                        diagnostic.annotate(context.secondary(&*subscript.value).message(
+                        diagnostic.annotate(context.secondary(subscript.value()).message(
                             format_args!(
                                 "Alias to `{}`, which is already specialized",
                                 value_type.display(db, env)

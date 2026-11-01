@@ -1210,7 +1210,7 @@ impl Rules {
                 }
             };
 
-            // Handle "all" as a special case - apply the level to all rules
+            // AstNodeId "all" as a special case - apply the level to all rules
             if rule_name.as_str() == "all" {
                 for lint in registry.lints() {
                     set_lint_level(*lint);
