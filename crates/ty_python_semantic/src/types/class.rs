@@ -3091,7 +3091,26 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         if bindings.is_empty() {
             return None;
         }
-        let (ty, provenance) = Self::infer_augmented_bindings(db, env, receiver(), bindings);
+        let receiver = receiver();
+        if policy.contains(MemberLookupPolicy::WRITE_TARGET)
+            && !receiver
+                .class_member_with_policy(
+                    db,
+                    env,
+                    "__setattr__",
+                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                        | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK
+                        | MemberLookupPolicy::NO_AUGMENTED_BINDINGS,
+                )
+                .place
+                .is_undefined()
+        {
+            // The hook decides which values can be assigned to this name. Inferring an
+            // instance dictionary entry from `self.count += 1` cannot give `self.count = 1`
+            // permission to bypass a setter that accepts only strings.
+            return None;
+        }
+        let (ty, provenance) = Self::infer_augmented_bindings(db, env, receiver, bindings);
         (!ty.is_never()).then_some(DefinedPlace {
             ty,
             origin: TypeOrigin::Inferred,

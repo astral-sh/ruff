@@ -468,6 +468,24 @@ class DynamicCounter:
 reveal_type(DynamicCounter().value)  # revealed: int
 ```
 
+A custom setter still checks every write, including the write back after `+=`.
+
+```py
+class StringsOnly:
+    def __getattr__(self, name: str) -> int:
+        return 0
+
+    def __setattr__(self, name: str, value: str) -> None:
+        object.__setattr__(self, name, value.upper())
+
+    def increment(self) -> None:
+        self.value += 1  # error: [invalid-assignment]
+
+def write(obj: StringsOnly) -> None:
+    obj.value = 1  # error: [invalid-assignment]
+    obj.value = "ok"
+```
+
 The same behavior applies when the attribute is provided by `__getattribute__`.
 
 ```py
