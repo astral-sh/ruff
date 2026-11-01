@@ -555,7 +555,7 @@ impl<'a> Importer<'a> {
 
         body.take_while(|stmt| {
             stmt.as_import_from_stmt().is_some_and(|import_from| {
-                !import_from.is_lazy && import_from.module.as_deref() == Some("__future__")
+                !import_from.is_lazy && import_from.level == 0 && import_from.module.as_deref() == Some("__future__")
             })
         })
         .last()

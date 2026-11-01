@@ -823,7 +823,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             for alias in names {
-                if module != Some("__future__") && &alias.name == "*" {
+                if !(level == 0 && module == Some("__future__")) && &alias.name == "*" {
                     // F403
                     checker.report_diagnostic_if_enabled(
                         pyflakes::rules::UndefinedLocalWithImportStar {
