@@ -24,6 +24,7 @@ use crate::{
 mod children;
 mod generated;
 mod list;
+mod literal;
 mod nodes;
 mod ordered;
 mod rewrite;
@@ -43,6 +44,7 @@ pub use list::{
     FStringPartId, FStringPartView, Iter as ListIter, List, ListId, ListItem, MappingPatternItemId,
     MappingPatternItems, MappingPatternItemsId,
 };
+pub use literal::LiteralWriter;
 pub use nodes::{
     AnyParameter, ArgOrKeyword, ArgumentsSourceOrder, BytesValue, FStringValue, LiteralExpression,
     StringValue, TStringValue,

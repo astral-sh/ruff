@@ -12,6 +12,11 @@ pub(crate) struct Node<T> {
     pub(crate) range: TextRange,
     pub(crate) kind: NodeKind,
 }
+impl<T> From<ast::EmittedNode<T>> for Node<T> {
+    fn from((id, range, kind): ast::EmittedNode<T>) -> Self {
+        Self { id, range, kind }
+    }
+}
 impl<T> Copy for Node<T> {}
 impl<T> Clone for Node<T> {
     fn clone(&self) -> Self {
@@ -38,8 +43,7 @@ impl<T: ast::NodeType> Node<T> {
 
 pub(crate) trait Construct: Emit + Sized {
     fn parsed(self, builder: &mut Builder) -> Node<Self::Output> {
-        let (id, range, kind) = self.emit(builder);
-        Node { id, range, kind }
+        self.emit(builder).into()
     }
 }
 impl<T: Emit> Construct for T {}

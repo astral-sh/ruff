@@ -119,10 +119,12 @@ zero. UTF-8 text and arbitrary byte strings have separate buffers, so a bytes li
 any byte without affecting text decoding. Number
 values and interpolation debug text have their own side tables. Identifiers with the same spelling
 share a four-byte index into the parse's name table. Each distinct spelling is a `Name` backed
-by `CharStr`, which stores short names inline. The parser copies unescaped literal text directly
-from the source into the text buffer. A string literal expression stores both its list of tokens
-and the range of its decoded text. The text offset and a two-byte length fit beside the list in
-the row. Lengths of 65,535 bytes or more use a full range in the extra-data column. A semantic
+by `CharStr`, which stores short names inline. The parser copies unescaped literals from the
+source and decodes escaped literals directly into the text or bytes buffer. It reserves room for
+the source length before decoding and discards a partial value if decoding fails.
+A string literal expression stores both its list of tokens and the range of its decoded text.
+The text offset and a two-byte length fit beside the list in the row. Lengths of 65,535 bytes
+or more use a full range in the extra-data column. A semantic
 check can borrow the decoded text directly, including for implicitly concatenated literals.
 
 Strings, bytes, f-strings, and t-strings all store their parts as lists of row IDs at the same

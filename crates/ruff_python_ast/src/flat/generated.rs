@@ -3514,7 +3514,7 @@ impl std::fmt::Debug for crate::InterpolatedStringLiteralElement<'_> {
 }
 impl Builder {
     #[inline]
-    fn push_interpolated_string_literal_element(
+    pub(super) fn push_interpolated_string_literal_element(
         &mut self,
         range: ruff_text_size::TextRange,
         [value]: [u64; 1],
@@ -4913,7 +4913,7 @@ impl std::fmt::Debug for crate::StringLiteral<'_> {
 }
 impl Builder {
     #[inline]
-    fn push_string_literal(
+    pub(super) fn push_string_literal(
         &mut self,
         range: ruff_text_size::TextRange,
         [value, flags]: [u64; 2],
@@ -4961,7 +4961,7 @@ impl std::fmt::Debug for crate::BytesLiteral<'_> {
 }
 impl Builder {
     #[inline]
-    fn push_bytes_literal(
+    pub(super) fn push_bytes_literal(
         &mut self,
         range: ruff_text_size::TextRange,
         [value, flags]: [u64; 2],
