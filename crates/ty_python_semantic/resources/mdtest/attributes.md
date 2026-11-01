@@ -531,6 +531,26 @@ class Count:
 
 reveal_type(Count().value)  # revealed: int
 
+class Toggle:
+    @overload
+    def __radd__(self, left: Literal[0]) -> Literal[1]: ...
+    @overload
+    def __radd__(self, left: Literal[1]) -> Literal[0]: ...
+    @overload
+    def __radd__(self, left: int) -> object: ...
+    def __radd__(self, left: int) -> object:
+        return 1 - left
+
+class Switch:
+    def __getattr__(self, name: str) -> Literal[0]:
+        return 0
+
+    def flip(self) -> None:
+        self.value += Toggle()
+
+def read(switch: Switch) -> Literal[0, 1]:
+    return switch.value
+
 T = TypeVar("T")
 
 class Step(Generic[T]):

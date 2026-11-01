@@ -396,7 +396,7 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
     let mut assignments = Vec::with_capacity(definitions.len());
     let new_history = || {
         (
-            Vec::new(),
+            FxIndexSet::default(),
             AugmentedOperandBudget {
                 env: &env,
                 remaining: Cell::new(128),
@@ -408,7 +408,7 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
         let mut seen = FxHashMap::default();
         for ty in alternatives(before) {
             if let Some(class) = class_of(ty) {
-                seen.entry(class).or_insert_with(new_history).0.push(ty);
+                seen.entry(class).or_insert_with(new_history).0.insert(ty);
             }
         }
         assignments.push((binding, seen));
@@ -431,23 +431,13 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
             for ty in alternatives(frontier) {
                 let Some(class) = class_of(ty) else { continue };
                 let (previous, budget) = seen.entry(class).or_insert_with(new_history);
-                if previous.contains(&ty) {
+                // Overloads can toggle between Literal[0] and Literal[1]. Use the same
+                // bound as other operands so the second call sees the actual literal.
+                if !previous.insert(ty) {
                     continue;
                 }
-                let operand = if let Type::LiteralValue(literal) = ty
-                    && !previous.is_empty()
-                {
-                    // Repeated arithmetic can produce arbitrarily many distinct literals.
-                    literal.fallback_instance(db, &env)
-                } else {
-                    ty
-                };
-                if previous.contains(&operand) {
-                    continue;
-                }
-                previous.push(operand);
-                if let (_, Some(written)) = write(*binding, Some(operand)) {
-                    if budget.accepts(db, operand) {
+                if let (_, Some(written)) = write(*binding, Some(ty)) {
+                    if budget.accepts(db, ty) {
                         next.add_in_place(written);
                     } else {
                         // `self.box += item` must accept the result for every operand we
