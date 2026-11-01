@@ -3414,8 +3414,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
         semantic_syntax_errors.shrink_to_fit();
-        // Node indices follow source order, while semantic visitation may not.
-        self.annotations.sort_unstable();
+        self.annotations
+            .sort_unstable_by_key(|&row| self.module.get_by_index(row).start());
         let uses_by_collection = FrozenMap::from_entries(
             self.uses_by_collection
                 .into_iter()
@@ -3454,6 +3454,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             })
             .collect();
 
+        let scopes_by_expression = self.scopes_by_expression.build(&mut self.scopes);
         SemanticIndex {
             place_tables,
             scopes: self.scopes.into(),
@@ -3463,7 +3464,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             statements_by_node: self.statements_by_node,
             scope_ids_by_scope: self.scope_ids_by_scope.into(),
             ast_ids,
-            scopes_by_expression: self.scopes_by_expression.build(),
+            scopes_by_expression,
             scopes_by_node: self.scopes_by_node,
             use_def_maps: self
                 .use_def_maps
@@ -6149,15 +6150,8 @@ fn is_direct_range_call(expr: Expr<'_>) -> bool {
         .is_some_and(|name| name.id() == "range")
 }
 
-/// Builds an interval-map that matches expressions (by their node index) to their enclosing scopes.
-///
-/// The interval map is built in a two-step process because the expression ids are assigned in source order,
-/// but we visit the expressions in semantic order. Few expressions are registered out of order.
-///
-/// 1. build a point vector that maps node indices to their corresponding file scopes.
-/// 2. Sort the expressions by their starting id. Then condense the point vector into an interval map
-///    by collapsing adjacent node indices with the same scope
-///    into a single interval.
+/// Groups consecutive arena row keys belonging to the same scope. Semantic visitation
+/// can visit siblings in a different order from the parser that allocated their rows.
 struct ExpressionsScopeMapBuilder {
     module: Vec<Option<FileScopeId>>,
     annotations: Vec<(NodeIndex, FileScopeId)>,
@@ -6184,9 +6178,8 @@ impl ExpressionsScopeMapBuilder {
         }
     }
 
-    fn build(mut self) -> ExpressionsScopeMap {
-        // Module indices already give source order. String annotations use sparse
-        // indices above the module, so only those entries need sorting.
+    fn build(mut self, scopes: &mut IndexVec<FileScopeId, Scope>) -> ExpressionsScopeMap {
+        // Module entries are already in row order. Annotation keys occupy separate ranges.
         self.annotations.sort_unstable_by_key(|(index, _)| *index);
         let mut iter = (0_u32..)
             .zip(self.module)
@@ -6197,6 +6190,10 @@ impl ExpressionsScopeMapBuilder {
         };
 
         let mut interval_map = Vec::new();
+        let mut push_range = |range: std::ops::RangeInclusive<NodeIndex>, scope: FileScopeId| {
+            scopes[scope].record_first_expression_row(*range.start());
+            interval_map.push((range, scope));
+        };
 
         let mut current_scope = first.1;
         let mut range = first.0..=first.0;
@@ -6207,13 +6204,13 @@ impl ExpressionsScopeMapBuilder {
                 continue;
             }
 
-            interval_map.push((range, current_scope));
+            push_range(range, current_scope);
 
             current_scope = scope;
             range = index..=index;
         }
 
-        interval_map.push((range, current_scope));
+        push_range(range, current_scope);
 
         ExpressionsScopeMap(interval_map.into_boxed_slice())
     }

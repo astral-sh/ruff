@@ -132,6 +132,12 @@ impl<T> AstNodeId<T> {
         self.row_number() as usize
     }
 
+    /// The key of this row when its arena is a cached module.
+    /// Use the view's node index for a quoted annotation, which has its own namespace.
+    pub fn module_index(self) -> NodeIndex {
+        NodeIndex::from(self.row_number())
+    }
+
     const fn cast<U>(self) -> AstNodeId<U> {
         AstNodeId {
             slot: self.slot,
@@ -488,20 +494,31 @@ impl NodeType for crate::kind::Any {
     }
 }
 
-/// Source-order keys for reachable nodes in a cached parse.
+/// Translates a zero-based allocation index to a module or string-annotation key.
 #[derive(Clone, Default, Debug)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-struct RowKeys {
-    by_row: Box<[NodeIndex]>,
-    module_order: Box<[AstNodeId<crate::kind::Any>]>,
+enum RowKeys {
+    #[default]
+    Unindexed,
+    Direct(u32),
+    /// Only needed when auxiliary rows would exhaust a quoted annotation's reserved keys.
+    Annotation {
+        first: u32,
+        rows: Box<[u32]>,
+    },
 }
 
 impl RowKeys {
     fn key(&self, row: u32) -> NodeIndex {
-        self.by_row
-            .get(row as usize)
-            .copied()
-            .unwrap_or(NodeIndex::NONE)
+        match self {
+            Self::Unindexed => NodeIndex::NONE,
+            Self::Direct(first) => NodeIndex::from(first + row),
+            Self::Annotation { first, rows } => {
+                rows.binary_search(&row).map_or(NodeIndex::NONE, |slot| {
+                    NodeIndex::from(first + offset(slot))
+                })
+            }
+        }
     }
 }
 
@@ -551,12 +568,6 @@ impl Ast {
             ast: self,
             row: self.rows.get((index as usize).checked_add(1)?)?,
         })
-    }
-
-    /// Resolves a source-order index in a cached module.
-    pub fn node_by_index(&self, index: NodeIndex) -> Option<SyntaxNode<'_>> {
-        let row = *self.keys.module_order.get(index.as_u32()? as usize)?;
-        Some(self.at(row))
     }
 
     /// Number of stored nodes, excluding the reserved slot.
@@ -1007,34 +1018,22 @@ impl<T> Tree<T> {
         self.ast.debug_text.shrink_to_fit();
     }
 
-    /// Assigns consecutive source-order indices to reachable nodes below the root.
-    fn index_source_order(
-        &mut self,
-        first: u32,
-        last: u32,
-    ) -> Option<Box<[AstNodeId<crate::kind::Any>]>>
-    where
-        T: NodeType,
-    {
-        let mut order = Vec::with_capacity(self.ast.len().saturating_sub(1));
-        let mut by_row = vec![NodeIndex::NONE; self.ast.len()].into_boxed_slice();
-        let mut available = first..=last;
-        for node in self.root().syntax_node().descendants().skip(1) {
-            let id = node.node_id();
-            by_row[id.index()] = NodeIndex::from(available.next()?);
-            order.push(id);
-        }
-        self.ast.keys.by_row = by_row;
-        Some(order.into_boxed_slice())
+    fn required_node_indices(&self) -> usize {
+        let count = self.ast.rows.len() - 1;
+        // The module or expression wrapper has no NodeIndex. Its row can be omitted
+        // from the index range when it comes after every indexed row.
+        count - usize::from(self.root.index() + 1 == count)
     }
 }
 
 impl Tree<crate::kind::ModModule> {
-    /// Indexes the module's reachable nodes in source order.
+    /// Uses each node's zero-based allocation index as its module-wide [`NodeIndex`].
     pub fn index_module(&mut self) {
-        self.ast.keys.module_order = self
-            .index_source_order(0, MAX_REAL_INDEX)
-            .expect("module exceeds the supported number of nodes");
+        assert!(
+            self.required_node_indices() <= MAX_REAL_INDEX as usize + 1,
+            "module exceeds the supported number of rows"
+        );
+        self.ast.keys = RowKeys::Direct(0);
     }
 }
 
@@ -1043,15 +1042,34 @@ impl Tree<crate::kind::ModExpression> {
     pub fn index_string_annotation(&mut self, parent: NodeIndex) -> Result<(), NodeIndexError> {
         let parent = parent.as_u32().ok_or(NodeIndexError::NoParent)?;
         let (first, last) = sub_indices(parent)?;
-        self.index_source_order(first, last)
-            .map(|_| ())
-            .ok_or_else(|| {
-                if sub_ast_level(parent) == 0 {
-                    NodeIndexError::ExhaustedSubIndices
-                } else {
-                    NodeIndexError::ExhaustedSubSubIndices
-                }
-            })
+        let capacity = (last - first + 1) as usize;
+        if self.required_node_indices() <= capacity {
+            self.ast.keys = RowKeys::Direct(first);
+            return Ok(());
+        }
+
+        // An f-string's format spec has an arena row, but source-order traversal visits
+        // its contents directly. Only reachable syntax needs an index in the annotation.
+        let mut rows: Vec<u32> = self
+            .root()
+            .descendants()
+            .skip(1)
+            .take(capacity + 1)
+            .map(|node| node.node_id().row_number())
+            .collect();
+        if rows.len() > capacity {
+            return Err(if sub_ast_level(parent) == 0 {
+                NodeIndexError::ExhaustedSubIndices
+            } else {
+                NodeIndexError::ExhaustedSubSubIndices
+            });
+        }
+        rows.sort_unstable();
+        self.ast.keys = RowKeys::Annotation {
+            first,
+            rows: rows.into_boxed_slice(),
+        };
+        Ok(())
     }
 
     /// Recovered coordinates of expressions inside a decoded string annotation refer to

@@ -133,6 +133,9 @@ pub struct Scope {
 
     /// The range of [`FileScopeId`]s that are descendants of this scope.
     descendants: Range<FileScopeId>,
+
+    /// First module expression row in this scope. A scope's own row can follow its body.
+    first_expression_row: Option<NodeIndex>,
 }
 
 impl Scope {
@@ -145,7 +148,20 @@ impl Scope {
             parent,
             node,
             descendants,
+            first_expression_row: None,
         }
+    }
+
+    pub(super) fn record_first_expression_row(&mut self, row: NodeIndex) {
+        self.first_expression_row.get_or_insert(row);
+    }
+
+    /// The first module expression row belonging to this scope, or zero if it has no module expressions.
+    pub fn first_expression_row(&self) -> u32 {
+        self.first_expression_row
+            .and_then(NodeIndex::as_u32)
+            .filter(|&row| row <= ast::MAX_REAL_INDEX)
+            .unwrap_or(0)
     }
 
     pub fn parent(&self) -> Option<FileScopeId> {
@@ -446,27 +462,6 @@ impl NodeWithScopeKind {
 
     pub fn expect_type_alias(&self) -> &AstNodeRef<ast::kind::StmtTypeAlias> {
         self.as_type_alias().expect("expected type alias")
-    }
-
-    /// Returns the anchor node index for this scope, or `None` for the module scope.
-    ///
-    /// This is used to compute relative node indices for expressions within the scope,
-    /// providing a stable anchor that only changes when the scope-introducing node changes.
-    pub fn node_index(&self) -> Option<NodeIndex> {
-        match self {
-            Self::Module => None,
-            Self::Class(class) => Some(class.index()),
-            Self::ClassTypeParameters(class) => Some(class.index()),
-            Self::Function(function) => Some(function.index()),
-            Self::FunctionTypeParameters(function) => Some(function.index()),
-            Self::TypeAlias(type_alias) => Some(type_alias.index()),
-            Self::TypeAliasTypeParameters(type_alias) => Some(type_alias.index()),
-            Self::Lambda(lambda) => Some(lambda.index()),
-            Self::ListComprehension(comp) => Some(comp.index()),
-            Self::SetComprehension(comp) => Some(comp.index()),
-            Self::DictComprehension(comp) => Some(comp.index()),
-            Self::GeneratorExpression(generator) => Some(generator.index()),
-        }
     }
 }
 
