@@ -927,13 +927,17 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.module.qualified_name(),
                 );
             }
-            if checker.is_rule_enabled(Rule::BannedImportFrom) {
-                flake8_import_conventions::rules::banned_import_from(
-                    checker,
-                    stmt,
-                    &helpers::format_import_from(level, module),
-                    &checker.settings().flake8_import_conventions.banned_from,
-                );
+            if checker.is_rule_enabled(Rule::BannedImportFrom)
+                && checker
+                    .settings()
+                    .flake8_import_conventions
+                    .banned_from
+                    .contains(helpers::format_import_from(level, module).as_ref())
+            {
+                checker
+                    .analyze
+                    .import_forms
+                    .push(checker.semantic.snapshot());
             }
             if checker.is_rule_enabled(Rule::ByteStringUsage) {
                 flake8_pyi::rules::bytestring_import(checker, import_from);
