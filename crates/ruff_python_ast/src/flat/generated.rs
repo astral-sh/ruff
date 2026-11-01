@@ -4274,59 +4274,82 @@ impl Builder {
         [posonlyargs, args, vararg, kwonlyargs, kwarg]: [u64; 5],
     ) -> BuildId<crate::kind::Parameters> {
         let mut row = Row::new(NodeKind::Parameters, range);
-        row.set_parameters_vararg(split_words(vararg)[0]);
-        row.set_parameters_kwarg(split_words(kwarg)[0]);
-        row.set_parameters_extra_offset(offset(self.ast.extra.len()));
-        self.ast.extra.extend([
-            split_words(posonlyargs)[0],
-            split_words(posonlyargs)[1],
-            split_words(args)[0],
-            split_words(args)[1],
-            split_words(kwonlyargs)[0],
-            split_words(kwonlyargs)[1],
-        ]);
+        row.set_parameters_args(args);
+        if split_words(posonlyargs)[1] == 0
+            && split_words(kwonlyargs)[1] == 0
+            && vararg == 0
+            && kwarg == 0
+        {
+            row.set_parameters_extra_offset(ABSENT);
+        } else {
+            row.set_parameters_extra_offset(offset(self.ast.extra.len()));
+            self.ast.extra.extend([
+                split_words(posonlyargs)[0],
+                split_words(posonlyargs)[1],
+                split_words(vararg)[0],
+                split_words(kwonlyargs)[0],
+                split_words(kwonlyargs)[1],
+                split_words(kwarg)[0],
+            ]);
+        }
         self.push(row)
     }
 }
 impl<'a> crate::Parameters<'a> {
     pub(super) fn has_only_regular_args(self) -> bool {
-        self.posonlyargs().is_empty()
-            && self.kwonlyargs().is_empty()
-            && self.vararg().is_none()
-            && self.kwarg().is_none()
+        self.syntax.row.parameters_extra_offset() == ABSENT
     }
     #[inline]
     pub fn posonlyargs(self) -> NodeList<'a, crate::kind::ParameterWithDefault> {
         let word = {
             let base = self.syntax.row.parameters_extra_offset() as usize;
-            self.syntax.ast.extra_word::<true>(base)
+            if base == ABSENT as usize {
+                0
+            } else {
+                self.syntax.ast.extra_word::<true>(base)
+            }
         };
         List::new(self.syntax.ast, word)
     }
     #[inline]
     pub fn args(self) -> NodeList<'a, crate::kind::ParameterWithDefault> {
-        let word = {
-            let base = self.syntax.row.parameters_extra_offset() as usize;
-            self.syntax.ast.extra_word::<true>(base + 2)
-        };
+        let word = self.syntax.row.parameters_args();
         List::new(self.syntax.ast, word)
     }
     #[inline]
     pub fn vararg(self) -> Option<crate::Parameter<'a>> {
-        let word = u64::from(self.syntax.row.parameters_vararg());
+        let word = {
+            let base = self.syntax.row.parameters_extra_offset() as usize;
+            if base == ABSENT as usize {
+                0
+            } else {
+                self.syntax.ast.extra_word::<false>(base + 2)
+            }
+        };
         self.syntax.ast.optional_child(word)
     }
     #[inline]
     pub fn kwonlyargs(self) -> NodeList<'a, crate::kind::ParameterWithDefault> {
         let word = {
             let base = self.syntax.row.parameters_extra_offset() as usize;
-            self.syntax.ast.extra_word::<true>(base + 4)
+            if base == ABSENT as usize {
+                0
+            } else {
+                self.syntax.ast.extra_word::<true>(base + 3)
+            }
         };
         List::new(self.syntax.ast, word)
     }
     #[inline]
     pub fn kwarg(self) -> Option<crate::Parameter<'a>> {
-        let word = u64::from(self.syntax.row.parameters_kwarg());
+        let word = {
+            let base = self.syntax.row.parameters_extra_offset() as usize;
+            if base == ABSENT as usize {
+                0
+            } else {
+                self.syntax.ast.extra_word::<false>(base + 5)
+            }
+        };
         self.syntax.ast.optional_child(word)
     }
 }

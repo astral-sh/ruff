@@ -419,7 +419,10 @@ def layout(
     if (complete := place(fields, None)) is not None:
         return complete, {}, None
     kept: list[WireField] = []
-    for field in sorted(fields, key=lambda field: field.width):
+    preferred = "args" if node == "Parameters" else None
+    for field in sorted(
+        fields, key=lambda field: (field.name != preferred, field.width)
+    ):
         if with_extra([*kept, field]) is not None:
             kept.append(field)
     placed = with_extra(kept)
@@ -1042,6 +1045,13 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
                 "row.set_expr_string_literal_text_offset(start); row.set_expr_string_literal_text_len(len);"
             )
         if spills:
+            if n.name == "Parameters":
+                # Ordinary positional-or-keyword parameters fit in the row.
+                out.append(
+                    "if split_words(posonlyargs)[1] == 0 && split_words(kwonlyargs)[1] == 0 "
+                    "&& vararg == 0 && kwarg == 0 { "
+                    "row.set_parameters_extra_offset(ABSENT); } else {"
+                )
             out.append(f"row.set_{arm}_extra_offset(offset(self.ast.extra.len()));")
             words = []
             for field in fields:
@@ -1050,6 +1060,8 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
                     if field.width == 8:
                         words.append(f"split_words({field.name})[1]")
             out.append("self.ast.extra.extend([" + ", ".join(words) + "]);")
+            if n.name == "Parameters":
+                out.append("}")
         if n.name in {"ExprYield", "ExprYieldFrom"}:
             out.append(
                 "let node = self.push(row);"
@@ -1080,7 +1092,7 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
                     """
                 )
             if n.name == "Parameters":
-                out.append("pub(super) fn has_only_regular_args(self) -> bool { self.posonlyargs().is_empty() && self.kwonlyargs().is_empty() && self.vararg().is_none() && self.kwarg().is_none() }")
+                out.append("pub(super) fn has_only_regular_args(self) -> bool { self.syntax.row.parameters_extra_offset() == ABSENT }")
             for f in fields:
                 if f.name in offsets:
                     raw = f"self.syntax.row.{arm}_{f.name}()"
@@ -1096,6 +1108,8 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
                     shared_base = f"split_words(record.inline_word::<{extra_offset}, 4>())[0] as usize"
                     index = "base" if not spills[f.name] else f"base + {spills[f.name]}"
                     read = f"self.syntax.ast.extra_word::<{str(f.width == 8).lower()}>({index})"
+                    if n.name == "Parameters":
+                        read = f"if base == ABSENT as usize {{ 0 }} else {{ {read} }}"
                     raw = f"{{ let base = {base}; {read} }}"
                     shared = f"{{ let base = {shared_base}; {read} }}"
                 if f.result == "&'a crate::name::Name":
