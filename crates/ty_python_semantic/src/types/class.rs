@@ -3060,9 +3060,18 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         (inferred_ty, provenance)
     }
 
-    /// An augmented assignment can establish storage when a dynamic hook supplies its first
-    /// operand. Until the method is called, a read can still fall through to that hook. A write
-    /// can create the storage even on the first call.
+    /// Infer storage created by an augmented assignment whose first read uses a dynamic hook.
+    ///
+    /// ```python
+    /// class Counter:
+    ///     def __getattr__(self, name: str) -> int:
+    ///         return 0
+    ///     def increment(self):
+    ///         self.count += 1
+    /// ```
+    ///
+    /// On the first call, `self.count` reads `0` through `__getattr__` and the assignment
+    /// creates an instance attribute. A fresh instance still reads `0` through the hook.
     fn dynamically_initialized_member(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

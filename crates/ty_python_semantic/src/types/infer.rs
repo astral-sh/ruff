@@ -327,6 +327,19 @@ fn non_expanding_receiver<'db>(
 
 /// An operator's explicit receiver annotation can distinguish this specialization even if its
 /// type arguments grow. The finite set of declared receivers bounds this part of the search.
+///
+/// ```python
+/// from typing import overload
+///
+/// class Step[T]:
+///     @overload
+///     def __iadd__(self: Step[int], n: int) -> Step[list[int]]: ...
+///     @overload
+///     def __iadd__(self: Step[list[int]], n: int) -> int: ...
+/// ```
+///
+/// Starting with `Step[int]`, the second `+=` produces an `int` only if we try the
+/// explicitly declared `Step[list[int]]` receiver.
 fn is_declared_operator_receiver<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -356,6 +369,22 @@ fn is_declared_operator_receiver<'db>(
 ///
 /// Start with the independent read at each assignment. A later call can read a value stored
 /// by any of these assignments, subject to the narrowing at that call site.
+///
+/// ```python
+/// class Counter:
+///     def __init__(self):
+///         self.value = 0
+///     def rotate(self):
+///         if isinstance(self.value, float):
+///             self.value *= 1j
+///
+/// class HalfCounter(Counter):
+///     def halve(self):
+///         self.value *= 0.5
+/// ```
+///
+/// On a fresh `HalfCounter`, `rotate` does nothing. After `halve` stores a `float`,
+/// a call to `rotate` can store a `complex`. Revisit the base method with that new operand.
 pub(super) fn infer_augmented_attribute_writes<'db>(
     db: &'db dyn Db,
     definitions: &[(Definition<'db>, Option<Specialization<'db>>)],
