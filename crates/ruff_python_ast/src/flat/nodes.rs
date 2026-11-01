@@ -79,6 +79,12 @@ impl<'a> LiteralExpression<'a> {
 }
 
 impl<'a> Expr<'a> {
+    /// Returns the value of an integer literal.
+    #[inline]
+    pub fn as_int_literal(self) -> Option<&'a crate::Int> {
+        self.as_number_literal_expr()?.value().as_int()
+    }
+
     pub fn as_literal_expr(self) -> Option<LiteralExpression<'a>> {
         Some(match self.classify() {
             ExprKind::StringLiteral(node) => LiteralExpression::StringLiteral(node),

@@ -158,19 +158,19 @@ pub(crate) fn shared_clock_mock(checker: &Checker, call: ExprCall<'_>) {
 }
 
 /// `shared-clock-mock`
-pub(crate) fn shared_clock_attribute(checker: &Checker, &attribute: &ast::ExprAttributeFields<'_>) {
+pub(crate) fn shared_clock_attribute(checker: &Checker, attribute: ast::ExprAttribute<'_>) {
     // An annotation without a value does not write to the attribute.
     if let StmtKind::AnnAssign(assignment) = checker.semantic().current_statement().classify()
         && assignment.value().is_none()
-        && assignment.target().range() == attribute.range
+        && assignment.target().range() == attribute.range()
     {
         return;
     }
     report_shared_clock(
         checker,
-        clock_module(checker, attribute.value),
-        attribute.attr.as_str(),
-        attribute.range,
+        clock_module(checker, attribute.value()),
+        attribute.attr().as_str(),
+        attribute.range(),
     );
 }
 

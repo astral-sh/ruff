@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprIfFields;
+use ruff_python_ast::ExprIf;
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -34,10 +35,10 @@ impl Violation for UselessIfElse {
 }
 
 /// RUF034
-pub(crate) fn useless_if_else(checker: &Checker, if_expr: &ExprIfFields<'_>) {
-    let body = if_expr.body;
-    let orelse = if_expr.orelse;
-    let range = if_expr.range;
+pub(crate) fn useless_if_else(checker: &Checker, if_expr: ExprIf<'_>) {
+    let body = if_expr.body();
+    let orelse = if_expr.orelse();
+    let range = if_expr.range();
 
     // Skip if the `body` and `orelse` are not the same.
     if ComparableExpr::from(body) != ComparableExpr::from(orelse) {

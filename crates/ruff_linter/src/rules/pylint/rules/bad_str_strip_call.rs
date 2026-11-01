@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_python_ast::{BytesValue, Expr, ExprCallFields, ExprKind, StringValue};
+use ruff_python_ast::{BytesValue, Expr, ExprCall, ExprKind, StringValue};
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -168,8 +168,8 @@ fn has_duplicate(mut chars: impl Iterator<Item = char>) -> bool {
 }
 
 /// PLE1310
-pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ExprCallFields<'_>) {
-    let (func, arguments) = (call.func, call.arguments);
+pub(crate) fn bad_str_strip_call(checker: &Checker, call: ExprCall<'_>) {
+    let (func, arguments) = (call.func(), call.arguments());
 
     let ExprKind::Attribute(attribute) = func.classify() else {
         return;

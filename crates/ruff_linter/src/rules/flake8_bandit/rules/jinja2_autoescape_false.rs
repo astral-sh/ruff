@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{ExprCallFields, ExprKind};
+use ruff_python_ast::{ExprCall, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -61,11 +61,11 @@ impl Violation for Jinja2AutoescapeFalse {
 /// S701
 pub(crate) fn jinja2_autoescape_false(
     checker: &Checker,
-    call: &ExprCallFields<'_>,
+    call: ExprCall<'_>,
     qualified_name: &QualifiedName,
 ) {
     if matches!(qualified_name.segments(), ["jinja2", "Environment"]) {
-        if let Some(keyword) = call.arguments.find_keyword("autoescape") {
+        if let Some(keyword) = call.arguments().find_keyword("autoescape") {
             match keyword.value().classify() {
                 ExprKind::BooleanLiteral(expr_boolean_literal) if expr_boolean_literal.value() => {}
                 ExprKind::Call(expr_call) => {
@@ -87,7 +87,7 @@ pub(crate) fn jinja2_autoescape_false(
                 }
             }
         } else {
-            checker.report_diagnostic(Jinja2AutoescapeFalse { value: false }, call.func.range());
+            checker.report_diagnostic(Jinja2AutoescapeFalse { value: false }, call.func().range());
         }
     }
 }

@@ -562,9 +562,7 @@ impl Violation for StringDotFormatMixingAutomatic {
 }
 
 fn has_star_star_kwargs(keywords: NodeList<'_, ruff_python_ast::kind::Keyword>) -> bool {
-    keywords
-        .iter()
-        .any(|keyword| matches!(keyword.fields(), ast::KeywordFields { arg: None, .. }))
+    keywords.iter().any(|keyword| keyword.arg().is_none())
 }
 
 fn has_star_args(args: NodeList<'_, ruff_python_ast::kind::Expr>) -> bool {
@@ -952,7 +950,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
 /// F524
 pub(crate) fn string_dot_format_missing_argument(
     checker: &Checker,
-    call: &ast::ExprCallFields<'_>,
+    call: ast::ExprCall<'_>,
     summary: &FormatSummary,
     args: NodeList<'_, ruff_python_ast::kind::Expr>,
     keywords: NodeList<'_, ruff_python_ast::kind::Keyword>,
@@ -985,17 +983,17 @@ pub(crate) fn string_dot_format_missing_argument(
         .collect();
 
     if !missing.is_empty() {
-        checker.report_diagnostic(StringDotFormatMissingArguments { missing }, call.range);
+        checker.report_diagnostic(StringDotFormatMissingArguments { missing }, call.range());
     }
 }
 
 /// F525
 pub(crate) fn string_dot_format_mixing_automatic(
     checker: &Checker,
-    call: &ast::ExprCallFields<'_>,
+    call: ast::ExprCall<'_>,
     summary: &FormatSummary,
 ) {
     if !(summary.autos.is_empty() || summary.indices.is_empty()) {
-        checker.report_diagnostic(StringDotFormatMixingAutomatic, call.range);
+        checker.report_diagnostic(StringDotFormatMixingAutomatic, call.range());
     }
 }

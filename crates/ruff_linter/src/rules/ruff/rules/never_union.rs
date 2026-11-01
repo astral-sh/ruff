@@ -1,6 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Builder, Expr, ExprBinOpFields, ExprFields, ExprKind, Operator};
+use ruff_python_ast::{Builder, Expr, ExprKind, Operator};
 use ruff_python_semantic::{SemanticModel, analyze::typing::traverse_union};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
@@ -245,13 +245,8 @@ fn is_pep604_union_with_bare_none(semantic: &SemanticModel) -> bool {
         .current_expressions()
         .skip(1)
         .take_while(|expr| {
-            matches!(
-                expr.fields(),
-                ExprFields::BinOp(ExprBinOpFields {
-                    op: Operator::BitOr,
-                    ..
-                })
-            )
+            expr.as_bin_op_expr()
+                .is_some_and(|binary| binary.op() == Operator::BitOr)
         })
         .last();
 

@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCallFields;
+use ruff_python_ast::ExprCall;
 use ruff_python_ast::helpers::is_const_false;
 use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
@@ -51,7 +51,7 @@ impl Violation for RequestWithNoCertValidation {
 /// S501
 pub(crate) fn request_with_no_cert_validation(
     checker: &Checker,
-    call: &ExprCallFields<'_>,
+    call: ExprCall<'_>,
     qualified_name: &QualifiedName,
 ) {
     let target = match qualified_name.segments() {
@@ -67,7 +67,7 @@ pub(crate) fn request_with_no_cert_validation(
         _ => return,
     };
 
-    if let Some(keyword) = call.arguments.find_keyword("verify")
+    if let Some(keyword) = call.arguments().find_keyword("verify")
         && is_const_false(keyword.value())
     {
         checker.report_diagnostic(

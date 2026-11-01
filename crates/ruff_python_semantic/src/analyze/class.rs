@@ -493,13 +493,11 @@ fn is_known_typevar(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
 }
 
 fn expr_might_be_old_style_typevar_like(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
-    match expr.fields() {
-        ast::ExprFields::Attribute(..) => true,
-        ast::ExprFields::Name(ast::ExprNameFields { node: name, .. }) => {
-            might_be_old_style_typevar_like(name, semantic)
-        }
-        ast::ExprFields::Starred(ast::ExprStarredFields { value, .. }) => {
-            expr_might_be_old_style_typevar_like(value, semantic)
+    match expr.classify() {
+        ast::ExprKind::Attribute(_) => true,
+        ast::ExprKind::Name(name) => might_be_old_style_typevar_like(name, semantic),
+        ast::ExprKind::Starred(starred) => {
+            expr_might_be_old_style_typevar_like(starred.value(), semantic)
         }
         _ => false,
     }

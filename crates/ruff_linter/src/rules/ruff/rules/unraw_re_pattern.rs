@@ -131,18 +131,18 @@ enum PatternKind {
 }
 
 /// RUF039
-pub(crate) fn unraw_re_pattern(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+pub(crate) fn unraw_re_pattern(checker: &Checker, call: ast::ExprCall<'_>) {
     let semantic = checker.semantic();
 
     if !semantic.seen_module(Modules::RE) && !semantic.seen_module(Modules::REGEX) {
         return;
     }
 
-    let Some((module, func)) = regex_module_and_func(semantic, call.func) else {
+    let Some((module, func)) = regex_module_and_func(semantic, call.func()) else {
         return;
     };
 
-    match call.arguments.args().first().map(Expr::fields) {
+    match call.arguments().args().first().map(Expr::fields) {
         Some(ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { value, .. })) => {
             value
                 .iter()

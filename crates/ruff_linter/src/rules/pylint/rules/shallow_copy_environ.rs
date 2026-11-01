@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCallFields;
+use ruff_python_ast::ExprCall;
 use ruff_python_semantic::Modules;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -58,7 +59,7 @@ impl AlwaysFixableViolation for ShallowCopyEnviron {
 }
 
 /// PLW1507
-pub(crate) fn shallow_copy_environ(checker: &Checker, call: &ExprCallFields<'_>) {
+pub(crate) fn shallow_copy_environ(checker: &Checker, call: ExprCall<'_>) {
     if !(checker.semantic().seen_module(Modules::OS)
         && checker.semantic().seen_module(Modules::COPY))
     {
@@ -67,17 +68,17 @@ pub(crate) fn shallow_copy_environ(checker: &Checker, call: &ExprCallFields<'_>)
 
     if !checker
         .semantic()
-        .resolve_qualified_name(call.func)
+        .resolve_qualified_name(call.func())
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["copy", "copy"]))
     {
         return;
     }
 
-    if !call.arguments.keywords().is_empty() {
+    if !call.arguments().keywords().is_empty() {
         return;
     }
 
-    let Some([arg]) = call.arguments.args().as_array() else {
+    let Some([arg]) = call.arguments().args().as_array() else {
         return;
     };
 
@@ -89,9 +90,9 @@ pub(crate) fn shallow_copy_environ(checker: &Checker, call: &ExprCallFields<'_>)
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(ShallowCopyEnviron, call.range);
+    let mut diagnostic = checker.report_diagnostic(ShallowCopyEnviron, call.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         format!("{}.copy()", checker.locator().slice(arg)),
-        call.range,
+        call.range(),
     )));
 }

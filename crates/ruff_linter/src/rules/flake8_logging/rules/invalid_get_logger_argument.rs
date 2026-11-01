@@ -64,13 +64,13 @@ impl Violation for InvalidGetLoggerArgument {
 }
 
 /// LOG002
-pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: ast::ExprCall<'_>) {
     if !checker.semantic().seen_module(Modules::LOGGING) {
         return;
     }
 
     let Some(ast::ExprFields::Name(ast::ExprNameFields { node: expr, id, .. })) = call
-        .arguments
+        .arguments()
         .find_argument_value("name", 0)
         .map(Expr::fields)
     else {
@@ -87,7 +87,7 @@ pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: &ast::ExprCal
 
     if !checker
         .semantic()
-        .resolve_qualified_name(call.func)
+        .resolve_qualified_name(call.func())
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["logging", "getLogger"]))
     {
         return;

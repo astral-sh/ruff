@@ -2494,20 +2494,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
     fn visit_type_param(&mut self, type_param: ast::TypeParam<'a>) {
         // Step 1: Binding
-        match type_param.fields() {
-            ast::TypeParamFields::TypeVar(ast::TypeParamTypeVarFields { name, .. })
-            | ast::TypeParamFields::TypeVarTuple(ast::TypeParamTypeVarTupleFields {
-                name, ..
-            })
-            | ast::TypeParamFields::ParamSpec(ast::TypeParamParamSpecFields { name, .. }) => {
-                self.add_binding(
-                    name.as_str(),
-                    name.range(),
-                    BindingKind::TypeParam,
-                    BindingFlags::empty(),
-                );
-            }
-        }
+        let name = type_param.name();
+        self.add_binding(
+            name.as_str(),
+            name.range(),
+            BindingKind::TypeParam,
+            BindingFlags::empty(),
+        );
         // Step 2: Traversal
         match type_param.classify() {
             TypeParamKind::TypeVar(type_param_type_var) => {
