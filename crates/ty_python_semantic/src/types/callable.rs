@@ -20,6 +20,7 @@ use crate::{
     },
 };
 use ty_python_core::definition::Definition;
+use ty_python_core::scope::ScopeId;
 
 impl<'db> Type<'db> {
     pub(super) fn function_like_kind(self, db: &'db dyn Db) -> Option<CallableTypeKind> {
@@ -713,6 +714,29 @@ pub struct CallableType<'db> {
     /// for diagnostic names, source annotations, and deduplication, independently of binding kind.
     #[returns(copy)]
     pub(crate) deprecated: Option<OverloadLiteral<'db>>,
+
+    /// The source of an inferred, call-forwarding lambda. Two passes over its body can yield
+    /// different provisional return types for the same Python function.
+    #[returns(copy)]
+    forwarding_lambda: Option<ScopeId<'db>>,
+}
+
+/// Callable-valued returns can recursively construct another approximation of the enclosing
+/// lambda. Leave those, and any unresolved nested return, to ordinary cycle normalization.
+fn is_resolved_forwarded_return<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
+    !visitor::any_over_type(db, env, ty, false, |part| {
+        matches!(
+            part,
+            Type::Divergent(_)
+                | Type::Callable(_)
+                | Type::FunctionLiteral(_)
+                | Type::BoundMethod(_)
+        )
+    })
 }
 
 pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -734,11 +758,17 @@ impl<'db> CallableType<'db> {
         S: salsa::Lookup<CallableSignature<'db>> + std::hash::Hash,
         CallableSignature<'db>: salsa::HashEqLike<S>,
     {
-        Self::new_internal(db, signatures, kind, None)
+        Self::new_internal(db, signatures, kind, None, None)
     }
 
     pub(crate) fn with_deprecated(self, db: &'db dyn Db, deprecated: OverloadLiteral<'db>) -> Self {
-        Self::new_internal(db, self.signatures(db), self.kind(db), Some(deprecated))
+        Self::new_internal(
+            db,
+            self.signatures(db),
+            self.kind(db),
+            Some(deprecated),
+            self.forwarding_lambda(db),
+        )
     }
 
     /// Replace the signatures without losing binding behavior or deprecation metadata.
@@ -747,11 +777,70 @@ impl<'db> CallableType<'db> {
         S: salsa::Lookup<CallableSignature<'db>> + std::hash::Hash,
         CallableSignature<'db>: salsa::HashEqLike<S>,
     {
-        Self::new_internal(db, signatures, self.kind(db), self.deprecated(db))
+        Self::new_internal(
+            db,
+            signatures,
+            self.kind(db),
+            self.deprecated(db),
+            self.forwarding_lambda(db),
+        )
     }
 
     pub(crate) fn with_kind(self, db: &'db dyn Db, kind: CallableTypeKind) -> Self {
-        Self::new_internal(db, self.signatures(db), kind, self.deprecated(db))
+        Self::new_internal(
+            db,
+            self.signatures(db),
+            kind,
+            self.deprecated(db),
+            self.forwarding_lambda(db),
+        )
+    }
+
+    pub(super) fn from_lambda(
+        db: &'db dyn Db,
+        signature: Signature<'db>,
+        forwarding_lambda: Option<ScopeId<'db>>,
+    ) -> Self {
+        Self::new_internal(
+            db,
+            CallableSignature::single(signature),
+            CallableTypeKind::FunctionLike,
+            None,
+            forwarding_lambda,
+        )
+    }
+
+    /// During fixed-point iteration, a resolved return supersedes a placeholder from the
+    /// same lambda. Other callables with identical parameters can still be independent.
+    pub(super) fn merge_forwarded_return(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Self,
+    ) -> Option<Self> {
+        let origin = self.forwarding_lambda(db)?;
+        if other.forwarding_lambda(db) != Some(origin)
+            || self.kind(db) != other.kind(db)
+            || self.deprecated(db) != other.deprecated(db)
+        {
+            return None;
+        }
+        let ([left], [right]) = (
+            self.signatures(db).overloads.as_slice(),
+            other.signatures(db).overloads.as_slice(),
+        ) else {
+            return None;
+        };
+        let (resolved, signature, provisional) = if left.return_ty.is_value_cycle_placeholder() {
+            (other, right, left)
+        } else if right.return_ty.is_value_cycle_placeholder() {
+            (self, left, right)
+        } else {
+            return None;
+        };
+        (provisional.clone().with_return_type(signature.return_ty) == *signature
+            && is_resolved_forwarded_return(db, env, signature.return_ty))
+        .then_some(resolved)
     }
 
     pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> CallableType<'db> {
@@ -922,6 +1011,7 @@ impl<'db> CallableType<'db> {
                 .bind_method_receiver(db, env, receiver_type, typing_self_type),
             CallableTypeKind::Regular,
             self.deprecated(db),
+            self.forwarding_lambda(db),
         )
     }
 
@@ -962,13 +1052,26 @@ impl<'db> CallableType<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        Some(
-            self.with_signatures(
-                db,
-                self.signatures(db)
-                    .recursive_type_normalized_impl(db, env, div, nested)?,
-            ),
-        )
+        let original = self.signatures(db);
+        let mut normalized = original.recursive_type_normalized_impl(db, env, div, nested)?;
+        if !nested
+            && self.forwarding_lambda(db).is_some()
+            && let ([before], [after]) = (
+                original.overloads.as_slice(),
+                normalized.overloads.as_mut_slice(),
+            )
+            && after.return_ty == div
+            && let Type::Union(returns) = before.return_ty
+            && returns.elements(db).contains(&div)
+        {
+            // For a forwarding call, R = T | R has the productive return T. Preserve markers
+            // from other cycles and markers below a constructor, which bound recursive growth.
+            let forwarded = returns.filter(db, |ty| *ty != div);
+            if !forwarded.is_never() && is_resolved_forwarded_return(db, env, forwarded) {
+                after.return_ty = forwarded;
+            }
+        }
+        Some(self.with_signatures(db, normalized))
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(

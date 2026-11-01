@@ -9076,10 +9076,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.extend_scope(inference);
 
         let return_ty = inference.expression_type(lambda_expression.body.as_ref());
-        Type::Callable(CallableType::new(
-            self.db(),
-            CallableSignature::single(Signature::new(parameters, return_ty)),
-            CallableTypeKind::FunctionLike,
+        // A call can forward this same lambda's return through another binding. Returning a
+        // reference to the lambda instead constructs a recursive callable and needs its cycle guard.
+        let forwarding_lambda = (return_tcx.annotation.is_none()
+            && lambda_expression.body.is_call_expr())
+        .then_some(scope);
+        Type::Callable(CallableType::from_lambda(
+            db,
+            Signature::new(parameters, return_ty),
+            forwarding_lambda,
         ))
     }
 

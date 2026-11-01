@@ -22,6 +22,31 @@ if not (lambda: f):  # error: [redundant-condition] "always truthy"
     f = 0
 ```
 
+## Forwarding calls with independent recursive returns
+
+Different lambda expressions keep their own return types, even when their parameters match. A
+forwarding call can also return the lambda itself or a value from an unrelated recursive call.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+def inspect(flag: bool):
+    first = lambda: first()
+    second = lambda: identity(1)
+    reveal_type(first if flag else second)  # revealed: (() -> Divergent) | (() -> Literal[1])
+
+    alias = lambda: identity(alias)
+    reveal_type(alias)  # revealed: () -> Divergent
+
+    forwarded = lambda: identity(1 if flag else first())
+    reveal_type(forwarded)  # revealed: () -> Literal[1] | Divergent
+```
+
 ## Function signature
 
 Deferred annotations can result in cycles in resolving a function signature:

@@ -2470,6 +2470,12 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// An unmaterialized value-inference back-edge, distinct from an alias or pending narrowing.
+    const fn is_value_cycle_placeholder(self) -> bool {
+        matches!(self, Self::Divergent(marker) if matches!(marker.origin, DivergentOrigin::Recursive(_))
+            && marker.flags.is_empty() && marker.materialization.is_none())
+    }
+
     const fn is_divergent(&self) -> bool {
         matches!(self, Type::Divergent(_))
     }

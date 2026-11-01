@@ -1162,6 +1162,15 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
+            if self.cycle_recovery
+                && let (Type::Callable(left), Type::Callable(right)) = (ty, element_type)
+                && let Some(refined) = left.merge_forwarded_return(db, &self.env, right)
+            {
+                to_remove.push(i);
+                ty = Type::Callable(refined);
+                continue;
+            }
+
             // `object` already contains every possible union element.
             if !self.cycle_recovery && element_type == Type::object() {
                 return;

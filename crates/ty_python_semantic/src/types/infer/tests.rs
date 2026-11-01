@@ -92,6 +92,62 @@ fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
 }
 
 #[test]
+fn recursive_lambda_replacing_an_inherited_method() -> anyhow::Result<()> {
+    for check_frame_first in [true, false] {
+        let mut db = setup_db();
+        db.write_dedented(
+            "src/frame.py",
+            r#"
+            class Base:
+                def count(self, axis: int = 0) -> int:
+                    return 0
+
+            class Frame(Base):
+                def info(self):
+                    try:
+                        saved = self.count
+                        self.count = lambda: saved()  # type: ignore
+                        return
+                    finally:
+                        self.count = saved  # type: ignore
+            "#,
+        )?;
+        db.write_dedented(
+            "src/call.py",
+            r#"
+            from typing import reveal_type
+            from frame import Frame
+
+            def use(frame: Frame):
+                reveal_type(frame.count)
+                frame.count(axis=0)
+            "#,
+        )?;
+
+        if check_frame_first {
+            let frame = system_path_to_file(&db, "src/frame.py")?;
+            check_types(&db, program_file(&db, frame));
+        }
+        let caller = system_path_to_file(&db, "src/call.py")?;
+        let diagnostics = check_types(&db, program_file(&db, caller));
+        assert_diagnostic_messages(
+            &diagnostics,
+            &[
+                "Revealed type",
+                "Argument `axis` does not match any known parameter",
+            ],
+        );
+        assert_eq!(
+            diagnostics[0]
+                .primary_annotation()
+                .and_then(|annotation| annotation.get_message()),
+            Some("`((axis: int = 0) -> int) | (() -> int)`"),
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn same_file_at_different_python_versions() -> anyhow::Result<()> {
     let mut db = TestDbBuilder::new()
         .with_python_version(PythonVersion::PY311)
