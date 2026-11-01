@@ -78,7 +78,7 @@ node. Use the node’s generated accessor when only one field is needed.
 ## Row layout
 
 Each row occupies 24 bytes, with 16 bytes for fields and the kind followed by an eight-byte source span. The
-first 15 bytes hold integer fields for the node's kind. The last byte holds
+first 15 bytes hold naturally aligned integer fields for the node's kind. The last byte holds
 the kind itself. A visitor can read the kind and span from the row it already borrows.
 The parser appends each completed node in one operation.
 

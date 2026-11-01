@@ -13,7 +13,7 @@ use super::{AstNodeId, List, NodeList, SyntaxNode, split_words};
 
 #[derive(Copy, Clone)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-#[repr(C)]
+#[repr(C, align(8))]
 pub(super) struct Row {
     fields: [u8; 15],
     kind: NodeKind,
@@ -95,7 +95,7 @@ include!("row/generated.rs");
 
 const _: () = {
     assert!(size_of::<NodeKind>() == 1 && offset_of!(Row, kind) == 15);
-    assert!(offset_of!(Row, span) == 16 && size_of::<Row>() == 24 && align_of::<Row>() == 4);
+    assert!(offset_of!(Row, span) == 16 && size_of::<Row>() == 24 && align_of::<Row>() == 8);
 };
 
 #[cfg(test)]
