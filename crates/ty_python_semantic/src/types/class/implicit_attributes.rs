@@ -2,7 +2,7 @@
 
 use std::{convert::Infallible, ops::ControlFlow};
 
-use super::{MethodDecorator, static_literal::StaticClassLiteral};
+use super::{ClassType, MethodDecorator, static_literal::StaticClassLiteral};
 use crate::{
     Db, ProgramEnvironment, TypeQualifiers, attribute_assignments, attribute_declarations,
     place::{Place, Provenance},
@@ -10,7 +10,6 @@ use crate::{
     types::{
         KnownClass, Truthiness, Type, TypeContext, UnionBuilder, definition_expression_type,
         function::{is_implicit_classmethod, is_implicit_staticmethod},
-        generics::Specialization,
         infer::{infer_augmented_attribute_writes, infer_unpack_types},
         infer_expression_type, inferred_declaration,
         member::Member,
@@ -386,8 +385,10 @@ impl get_size2::GetSize for AugmentedBindings<'_> {}
 /// The augmented assignments that share storage along an MRO, specialized for that receiver.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(super) struct AugmentedAttributeWrites<'db> {
+    #[returns(copy)]
+    pub(super) receiver: Type<'db>,
     #[returns(deref)]
-    pub(super) definitions: Box<[(Definition<'db>, Option<Specialization<'db>>)]>,
+    pub(super) definitions: Box<[(Definition<'db>, ClassType<'db>)]>,
 }
 
 // The Salsa heap is tracked separately.
@@ -407,7 +408,7 @@ impl<'db> AugmentedAttributeWrites<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(super) fn inferred_type(self, db: &'db dyn Db) -> Type<'db> {
-        infer_augmented_attribute_writes(db, self.definitions(db))
+        infer_augmented_attribute_writes(db, self.receiver(db), self.definitions(db))
     }
 }
 

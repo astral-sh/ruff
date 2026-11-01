@@ -1429,6 +1429,16 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        let lookup = |specialization| {
+            self.class_member_from_mro(
+                db,
+                env,
+                specialization,
+                name,
+                policy,
+                self.iter_mro(db, specialization),
+            )
+        };
         // An unspecialized MRO retains mappings such as `Parent[T@Child]`, so ordinary members
         // accessed through `Child` must use its default arguments. Constructor methods are different:
         // we add their class's type variables to the callable's generic context, so those variables
@@ -1440,18 +1450,10 @@ impl<'db> StaticClassLiteral<'db> {
                 "__new__" | "__init__" => {
                     // Specifically apply the identity specialization; otherwise `iter_mro` will
                     // apply the default specialization for us.
-                    let specialization = generic_context.identity_specialization(db);
-                    self.class_member_from_mro(
-                        db,
-                        env,
-                        name,
-                        policy,
-                        self.iter_mro(db, Some(specialization)),
-                    )
+                    lookup(Some(generic_context.identity_specialization(db)))
                 }
                 _ => {
-                    let member =
-                        self.class_member_from_mro(db, env, name, policy, self.iter_mro(db, None));
+                    let member = lookup(None);
                     let specialization = generic_context.default_specialization(db, self.known(db));
                     // An inherited method's `Self` bound can still contain this class's type
                     // variables, so the default arguments must also specialize that bound.
@@ -1461,7 +1463,7 @@ impl<'db> StaticClassLiteral<'db> {
                 }
             }
         } else {
-            self.class_member_from_mro(db, env, name, policy, self.iter_mro(db, specialization))
+            lookup(specialization)
         }
     }
 
@@ -1469,6 +1471,7 @@ impl<'db> StaticClassLiteral<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        specialization: Option<Specialization<'db>>,
         name: &str,
         policy: MemberLookupPolicy,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
@@ -1501,6 +1504,7 @@ impl<'db> StaticClassLiteral<'db> {
             self.inherited_generic_context(db)
         };
         let result = MroLookup::new(db, env, mro_iter).class_member(
+            || Type::from(self.apply_optional_specialization(db, specialization)),
             name,
             policy,
             inherited_generic_context,
@@ -2934,9 +2938,17 @@ impl<'db> StaticClassLiteral<'db> {
             return Place::Undefined.into();
         }
 
-        match MroLookup::new(db, env, self.iter_mro(db, specialization))
-            .instance_member(name, policy)
-        {
+        match MroLookup::new(db, env, self.iter_mro(db, specialization)).instance_member(
+            || {
+                Type::instance(
+                    db,
+                    env,
+                    self.apply_optional_specialization(db, specialization),
+                )
+            },
+            name,
+            policy,
+        ) {
             InstanceMemberResult::Done(result) => result,
             InstanceMemberResult::TypedDict => KnownClass::TypedDictFallback
                 .to_instance(db, env)

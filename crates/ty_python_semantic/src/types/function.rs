@@ -1865,7 +1865,7 @@ impl<'db> FunctionType<'db> {
         )?;
 
         for base_class in class.iter_mro(db).skip(1) {
-            let member = class.class_member_from_mro(
+            let member = class.identity_specialization(db).class_member_from_mro(
                 db,
                 &env,
                 self.name(db),

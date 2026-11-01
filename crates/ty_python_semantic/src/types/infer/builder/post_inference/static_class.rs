@@ -831,6 +831,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 .class_member_from_mro(
                     db,
                     env,
+                    None,
                     "__init_subclass__",
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                     // skip(1) to skip the current class and only consider base classes.

@@ -980,9 +980,7 @@ impl<'db> BoundSuperType<'db> {
         };
 
         let mut mro_after_pivot = self.skip_until_after_pivot(db, env, owner.iter_mro(db, env));
-        let class_literal = class.class_literal(db);
-        let result =
-            class_literal.class_member_from_mro(db, env, name, policy, mro_after_pivot.clone());
+        let result = class.class_member_from_mro(db, env, name, policy, mro_after_pivot.clone());
 
         // TODO: Here we are hard-coding that __class_getitem__ is the only member defined in
         // typing._Generic in the typeshed, and we are hard-coding its signature. Ideally we would

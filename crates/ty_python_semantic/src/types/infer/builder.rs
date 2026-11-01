@@ -227,9 +227,9 @@ const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
 enum AttributeRead<'db> {
     /// Resolve the attribute normally, including all inferred writes.
     Normal,
-    /// Read the value available before any augmented assignment has run.
+    /// Read before any augmented assignment has run.
     Initial,
-    /// Apply the use site's narrowing to a value stored by an earlier augmented assignment.
+    /// Apply narrowing to a value stored by a previous augmented assignment.
     Stored(Type<'db>),
 }
 
@@ -382,6 +382,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     /// Whether we are in a context that binds unbound typevars.
     typevar_binding_context: Option<Definition<'db>>,
+    /// Bind the method's first parameter when inferring an augmented write for a specific receiver.
+    augmented_receiver: Option<(Definition<'db>, Type<'db>)>,
 
     /// The deferred state of inferring types of certain expressions within the region.
     ///
@@ -555,6 +557,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings: VecMap::default(),
             declarations: VecMap::default(),
             typevar_binding_context: None,
+            augmented_receiver: None,
             deferred: VecSet::default(),
             undecorated_type: None,
             deferred_decorator_calls: Vec::new(),
@@ -5267,11 +5270,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn finish_augmented_attribute_write(
         mut self,
         assignment: &ast::StmtAugAssign,
+        receiver: Option<Type<'db>>,
         stored: Option<Type<'db>>,
     ) -> (Type<'db>, Option<Type<'db>>) {
         // The ordinary assignment checks the operator and the write against the inferred member.
         self.context.suppress_diagnostics();
         self.context.defuse();
+        self.augmented_receiver = receiver.and_then(|receiver| {
+            let method = self
+                .scope()
+                .node(self.db())
+                .as_function()?
+                .node(self.module());
+            let first = method.parameters.iter_non_variadic_params().next()?;
+            Some((self.index.expect_single_definition(first), receiver))
+        });
         let read = stored.map_or(AttributeRead::Initial, AttributeRead::Stored);
         let written = self.infer_augment_assignment(assignment, read).ok();
         let before = self.expression_type(&assignment.target);
@@ -6788,7 +6801,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         standalone_expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let types = infer_expression_types(self.db(), standalone_expression, tcx);
+        let local;
+        let types = if self.augmented_receiver.is_some()
+            && standalone_expression.scope(self.db()) == self.scope()
+        {
+            // A separately cached callee such as self.step has the defining method's receiver.
+            // Infer it in the same context as the rest of this augmented assignment.
+            let mut builder = self.speculate();
+            builder.region = InferenceRegion::Expression(standalone_expression, tcx);
+            builder.context.suppress_diagnostics();
+            local = builder.finish_expression();
+            &local
+        } else {
+            infer_expression_types(self.db(), standalone_expression, tcx)
+        };
         self.extend_expression(types);
 
         // Instead of calling `self.expression_type(expr)` after extending here, we get
@@ -10786,7 +10812,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         });
 
-        (ty.inner_type(), definition)
+        let mut ty = ty.inner_type();
+        if let Some((parameter, receiver)) = self.augmented_receiver
+            && Some(parameter) == definition
+        {
+            // Both sides of an inherited operation such as self.value += self.step()
+            // dispatch on the same receiver. Keep the narrowing at this use of self:
+            // under isinstance(self, Child), a final sibling cannot reach the write.
+            let instance = receiver
+                .to_instance_approximation(db, env)
+                .unwrap_or(receiver);
+            ty = IntersectionType::from_two_elements(
+                db,
+                env,
+                receiver,
+                ty.bind_self_typevars(db, env, instance),
+            );
+        }
+        (ty, definition)
     }
 
     /// Infer the type of a place expression from its ordered load sources.
@@ -11146,6 +11189,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Result<TypeAndQualifiers<'db>, TypeAndQualifiers<'db>> {
         let value_type =
             self.infer_maybe_standalone_expression(&attribute.value, TypeContext::default());
+        if !matches!(read, AttributeRead::Normal) && value_type.is_never() {
+            return Err(TypeAndQualifiers::new(
+                Type::Never,
+                TypeOrigin::Inferred,
+                TypeQualifiers::empty(),
+            ));
+        }
         self.infer_attribute_load_impl(attribute, value_type, read)
     }
 
@@ -12214,6 +12264,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expression_cache: _,
             reachability_cache: _,
             typevar_binding_context: _,
+            augmented_receiver: _,
             deferred_state: _,
             called_functions,
             index: _,
@@ -12281,6 +12332,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
+            augmented_receiver: _,
             deferred_state: _,
             index: _,
             region: _,
@@ -12413,6 +12465,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_decorator_calls: _,
             discards_dict_key_assignments: _,
             typevar_binding_context: _,
+            augmented_receiver: _,
             deferred_state: _,
             index: _,
             region: _,
@@ -12470,6 +12523,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
+            augmented_receiver: _,
             deferred_state: _,
             index: _,
             region: _,
@@ -12671,6 +12725,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
+            augmented_receiver: _,
             deferred_state: _,
             called_functions: _,
             index: _,
@@ -12728,6 +12783,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             cycle_recovery,
             deferred_state,
             typevar_binding_context,
+            augmented_receiver,
             ref expression_cache,
             ref reachability_cache,
             ref return_types_and_ranges,
@@ -12771,6 +12827,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         builder.cycle_recovery = cycle_recovery;
         builder.deferred_state = deferred_state;
         builder.typevar_binding_context = typevar_binding_context;
+        builder.augmented_receiver = augmented_receiver;
         builder.context.inference_flags = self.inference_flags();
         if self.context.is_type_expression_explanation() {
             builder.context.collect_type_expression_diagnostics();
@@ -12825,6 +12882,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expression_cache: _,
             reachability_cache: _,
             typevar_binding_context: _,
+            augmented_receiver: _,
             deferred_state: _,
             called_functions,
             index: _,

@@ -577,6 +577,75 @@ class ReflectedSteps:
 reveal_type(ReflectedSteps().value)  # revealed: Left[list[int]] | Left[list[list[int]]] | Done | Left[int]
 ```
 
+#### Inherited augmented writes use the receiver's type
+
+The inherited method reads through the subclass's override of `__getattr__`. Its operator returns
+that same object, preserving the subclass's type argument.
+
+```py
+from typing import Generic, TypeVar, final
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class Seed:
+    def __iadd__(self, n: int) -> Self:
+        return self
+
+    def __imul__(self, other: T) -> T:
+        return other
+
+class SpecialSeed(Seed, Generic[T]): ...
+
+class Base:
+    def __getattr__(self, name: str) -> Seed:
+        return Seed()
+
+    def bump(self) -> None:
+        self.value += 1
+
+    def replace(self) -> None:
+        self.value *= self.seed()
+
+    def seed(self) -> Seed:
+        return Seed()
+
+class Child(Base, Generic[T]):
+    def __getattr__(self, name: str) -> SpecialSeed[T]:
+        return SpecialSeed()
+
+    def seed(self) -> SpecialSeed[T]:
+        return SpecialSeed()
+
+reveal_type(Base().value)  # revealed: Seed
+reveal_type(Child[str]().value)  # revealed: SpecialSeed[str]
+```
+
+A guard on `self` can also rule out the write for a sibling class.
+
+```py
+class Start:
+    def __iadd__(self, n: int) -> int:
+        return n
+
+class Guarded:
+    def __getattr__(self, name: str) -> Start:
+        return Start()
+
+    def bump(self) -> None:
+        if isinstance(self, Matching):
+            self.value += 1
+
+@final
+class Matching(Guarded): ...
+
+@final
+class Other(Guarded): ...
+
+reveal_type(Matching().value)  # revealed: int | Start
+reveal_type(Other().value)  # revealed: Start
+```
+
 #### Augmented assignments with expanding generic results
 
 An augmented assignment can repeatedly expand a generic attribute's type arguments. Inference must

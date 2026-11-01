@@ -62,8 +62,8 @@ use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
-    ClassLiteral, KnownClass, RecursiveType, StaticClassLiteral, Type, TypeAndQualifiers,
-    TypeQualifiers, UnionBuilder, UnionType,
+    ClassLiteral, ClassType, KnownClass, RecursiveType, StaticClassLiteral, Type,
+    TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType,
 };
 use crate::{Db, FxIndexSet};
 
@@ -340,11 +340,21 @@ impl<'db> TypeVisitor<'db> for AugmentedOperandBudget<'_, 'db> {
 /// a call to `rotate` can store a `complex`. Revisit the base method with that new operand.
 pub(super) fn infer_augmented_attribute_writes<'db>(
     db: &'db dyn Db,
-    definitions: &[(Definition<'db>, Option<Specialization<'db>>)],
+    receiver: Type<'db>,
+    definitions: &[(Definition<'db>, ClassType<'db>)],
 ) -> Type<'db> {
     let env = ProgramEnvironment::from_definition(definitions[0].0);
-    let write = |(definition, specialization): (Definition<'db>, Option<Specialization<'db>>),
-                 stored| {
+    let lookup_class = receiver.nominal_class(db, &env).or_else(|| {
+        receiver
+            .to_instance_approximation(db, &env)?
+            .nominal_class(db, &env)
+    });
+    let write = |(definition, owner): (Definition<'db>, ClassType<'db>), stored| {
+        let (_, specialization) = owner.class_literal_and_specialization(db);
+        // In its own unspecialized class, the method's ordinary self already has the right
+        // type. Reuse its expression queries, including their recovery for recursive reads.
+        let receiver =
+            (lookup_class != Some(owner) || specialization.is_some()).then_some(receiver);
         let file = definition.program_file(db);
         let env = ProgramEnvironment::from_file(file);
         let module = parsed_module(db, file.python_file(db)).load(db);
@@ -353,7 +363,7 @@ pub(super) fn infer_augmented_attribute_writes<'db>(
         };
         let assignment = assignment.node(&module);
         let (before, after) = TypeInferenceBuilder::for_definition(db, &env, definition, &module)
-            .finish_augmented_attribute_write(assignment, stored);
+            .finish_augmented_attribute_write(assignment, receiver, stored);
         (
             before.apply_optional_specialization(db, specialization),
             after.map(|ty| ty.apply_optional_specialization(db, specialization)),

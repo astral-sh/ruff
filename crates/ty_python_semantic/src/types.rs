@@ -4758,13 +4758,8 @@ impl<'db> Type<'db> {
             .qualifiers
             .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE);
 
-        let own_class_member = class.class_literal(db).class_member_from_mro(
-            db,
-            env,
-            name,
-            policy,
-            class.iter_mro(db).take(1),
-        );
+        let own_class_member =
+            class.class_member_from_mro(db, env, name, policy, class.iter_mro(db).take(1));
         // A non-ClassVar declaration-only member describes instance storage but does not add a
         // value to the class namespace.
         let own_class_member = if !own_class_member.is_class_var()
@@ -4786,13 +4781,8 @@ impl<'db> Type<'db> {
         } else {
             own_class_member
         };
-        let inherited_class_member = class.class_literal(db).class_member_from_mro(
-            db,
-            env,
-            name,
-            policy,
-            class.iter_mro(db).skip(1),
-        );
+        let inherited_class_member =
+            class.class_member_from_mro(db, env, name, policy, class.iter_mro(db).skip(1));
 
         let metaclass_member = if metaclass_member_is_implicit {
             Self::with_definedness(metaclass_member, Definedness::PossiblyUndefined)

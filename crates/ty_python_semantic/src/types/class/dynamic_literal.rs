@@ -393,7 +393,11 @@ impl<'db> DynamicClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        match MroLookup::new(db, env, self.iter_mro(db)).instance_member(name, policy) {
+        match MroLookup::new(db, env, self.iter_mro(db)).instance_member(
+            || Type::instance(db, env, ClassType::NonGeneric(self.into())),
+            name,
+            policy,
+        ) {
             InstanceMemberResult::Done(result) => result,
             InstanceMemberResult::TypedDict => {
                 // Simplified `TypedDict` handling without type mapping.
@@ -438,7 +442,10 @@ impl<'db> DynamicClassLiteral<'db> {
         }
 
         let result = MroLookup::new(db, env, self.iter_mro(db)).class_member(
-            name, policy, None,  // No inherited generic context.
+            || Type::from(self),
+            name,
+            policy,
+            None,  // No inherited generic context.
             false, // Dynamic classes are never `object`.
         );
 
