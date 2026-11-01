@@ -322,7 +322,7 @@ pub fn parse_cells_unchecked(
     );
 
     let mut body = Vec::new();
-    let mut storage = ParserStorage::default();
+    let mut storage = ParserStorage::for_source(TextRange::up_to(source.text_len()));
     let mut tokens = Vec::new();
     let mut errors = Vec::new();
     let mut unsupported_syntax_errors = Vec::new();
