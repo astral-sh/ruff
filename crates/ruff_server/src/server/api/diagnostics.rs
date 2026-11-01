@@ -1,9 +1,35 @@
 use crate::{
     lint::DiagnosticsMap,
-    session::{Client, DocumentQuery, DocumentSnapshot},
+    session::{Client, DocumentQuery, DocumentSnapshot, Session},
 };
 
 use super::LSPResult;
+
+pub(in crate::server) fn refresh_diagnostics(
+    session: &Session,
+    client: &Client,
+) -> crate::server::Result<()> {
+    if session.resolved_client_capabilities().workspace_refresh {
+        client
+            .send_request::<lsp_types::DiagnosticRefreshRequest>(session, (), |_, ()| ())
+            .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+    } else {
+        for uri in session.text_document_uris() {
+            let snapshot = session
+                .take_snapshot(uri.clone())
+                .expect("snapshot should be available");
+            publish_diagnostics_for_document(&snapshot, client)?;
+        }
+    }
+    // Notebooks always use push diagnostics.
+    for uri in session.notebook_document_uris() {
+        let snapshot = session
+            .take_snapshot(uri.clone())
+            .expect("snapshot should be available");
+        publish_diagnostics_for_document(&snapshot, client)?;
+    }
+    Ok(())
+}
 
 pub(super) fn generate_diagnostics(snapshot: &DocumentSnapshot) -> DiagnosticsMap {
     if snapshot.client_settings().lint() {
