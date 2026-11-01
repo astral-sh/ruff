@@ -4,7 +4,7 @@ use ruff_db::files::File;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ty_combine::Combine;
 use ty_python_semantic::AnalysisSettings;
-use ty_python_semantic::lint::RuleSelection;
+use ty_python_semantic::lint::{LintId, RuleSelection};
 
 use crate::metadata::options::{InnerOverrideOptions, OutputFormat};
 use crate::script::Script;
@@ -42,6 +42,15 @@ pub struct Settings {
 impl Settings {
     pub fn baseline(&self) -> Option<&SystemPath> {
         self.baseline.as_deref()
+    }
+
+    /// Whether the lint is enabled globally or in a file override.
+    pub(crate) fn enables_lint(&self, lint: LintId) -> bool {
+        self.rules.is_enabled(lint)
+            || self
+                .overrides
+                .iter()
+                .any(|ov| ov.settings.rules.is_enabled(lint))
     }
 
     fn rules(&self) -> &RuleSelection {
