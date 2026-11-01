@@ -369,9 +369,13 @@ node_payloads! {
 
 impl super::Ast {
     #[inline]
-    pub(super) fn direct_children<'a>(&'a self, node: SyntaxNode<'a>) -> Children<'a> {
+    pub(super) fn direct_children<'a>(
+        &'a self,
+        node: SyntaxNode<'a>,
+        kind: NodeKind,
+    ) -> Children<'a> {
         let record = node.row;
-        match record.kind() {
+        match kind {
             NodeKind::ModModule
             | NodeKind::StmtDelete
             | NodeKind::StmtImport
