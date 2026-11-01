@@ -227,17 +227,28 @@ fn check_inherited_conflicts<'db>(
         //
         // class Conflict(Ordered, AcceptsObject): ...
         // ```
-        let mut owners_by_name: FxHashMap<&Name, smallvec::SmallVec<[usize; 4]>> =
-            FxHashMap::default();
-        for (other_index, &other) in contracts.iter().enumerate() {
-            if other_index == index {
-                continue;
+        let candidates = inherited_member_candidates(db, literal);
+        // An empty base, or one whose names were all overridden, needs no pairwise lookups.
+        let mut owners_by_name = LazyCell::new(|| {
+            let mut owners: FxHashMap<&Name, smallvec::SmallVec<[usize; 4]>> = FxHashMap::default();
+            for (other_index, &other) in contracts.iter().enumerate() {
+                if index == other_index {
+                    continue;
+                }
+                let mut add = |name| owners.entry(name).or_default().push(other_index);
+                // Bound the number of cached pairs per base by the number of names it contributes.
+                // Otherwise a wide hierarchy of single-member mixins can cache mostly empty lists.
+                if candidates.len() >= contracts.len() - 1 {
+                    shared_inherited_names(db, env.program(db), literal, other)
+                        .iter()
+                        .for_each(add);
+                } else {
+                    visit_shared_inherited_names(db, env, candidates, other, &mut add);
+                }
             }
-            for name in shared_inherited_names(db, env.program(db), literal, other) {
-                owners_by_name.entry(name).or_default().push(other_index);
-            }
-        }
-        for (name, &definition) in inherited_member_candidates(db, literal) {
+            owners
+        });
+        for (name, &definition) in candidates {
             if is_mangled_private(name) || name == "__hash__" || !seen.insert(name.clone()) {
                 continue;
             }
@@ -540,16 +551,34 @@ fn shared_inherited_names<'db>(
     source: StaticClassLiteral<'db>,
     other: ClassType<'db>,
 ) -> Box<[Name]> {
+    let mut names = Vec::new();
+    visit_shared_inherited_names(
+        db,
+        &ProgramEnvironment::from_program(program),
+        inherited_member_candidates(db, source),
+        other,
+        |name| names.push(name.clone()),
+    );
+    names.into_boxed_slice()
+}
+
+/// Collect the same candidate names for cached and uncached base pairs.
+fn visit_shared_inherited_names<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    candidates: &'db FxIndexMap<Name, Option<Definition<'db>>>,
+    other: ClassType<'db>,
+    visit: impl FnMut(&'db Name),
+) {
     let Some((literal, specialization)) = other.static_class_literal(db) else {
         // All the MRO entries are static. Extra specializations only supply attribute contracts,
         // which require a static class literal.
-        return Box::default();
+        return;
     };
-    let env = ProgramEnvironment::from_program(program);
     let listed = inherited_member_candidates(db, literal);
     let table = place_table(db, literal.body_scope(db));
     let specialization = specialization.map(|s| s.tuple_runtime_element_specialization(db));
-    inherited_member_candidates(db, source)
+    candidates
         .keys()
         .filter(|name| !is_mangled_private(name) && *name != "__hash__")
         .filter(|name| {
@@ -560,14 +589,13 @@ fn shared_inherited_names<'db>(
             // has no symbol either, a non-dunder can only come from member synthesis.
             if !is_dunder(name) && table.symbol_id(name).is_none() {
                 return literal
-                    .own_synthesized_member(db, &env, specialization, None, name)
+                    .own_synthesized_member(db, env, specialization, None, name)
                     .is_some();
             }
-            !other.own_class_member(db, &env, None, name).is_undefined()
-                || !other.own_instance_member(db, &env, name).is_undefined()
+            !other.own_class_member(db, env, None, name).is_undefined()
+                || !other.own_instance_member(db, env, name).is_undefined()
         })
-        .cloned()
-        .collect()
+        .for_each(visit);
 }
 
 /// Returns a source-defined method bound to the class whose MRO is being checked.
