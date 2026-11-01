@@ -32,6 +32,11 @@ impl<T> ScratchBuffer<T> {
     }
 
     #[inline]
+    pub(super) fn len_since(&self, snapshot: &ScratchSnapshot) -> usize {
+        self.buffer.len() - snapshot.len
+    }
+
+    #[inline]
     pub(super) fn snapshot(&self) -> ScratchSnapshot {
         ScratchSnapshot {
             len: self.buffer.len(),

@@ -3381,10 +3381,11 @@ impl<'src> Parser<'src> {
         // the parser will drop the previous ones. Another thing is the vararg and kwarg
         // uses `Parameter` (not `ParameterWithDefault`) which means that the parser cannot
         // recover well from `*args=(1, 2)`.
-        let mut parameters = build::Parameters::default();
+        let mut vararg = None;
+        let mut kwarg = None;
         let parameters_snapshot = self.parameter_scratch.snapshot();
-        let mut args_snapshot = None;
-        let mut kwonlyargs_snapshot = None;
+        let mut args_start = None;
+        let mut kwonlyargs_start = None;
 
         let mut seen_default_param = false; // `a=10`
         let mut seen_positional_only_separator = false; // `/`
@@ -3397,7 +3398,7 @@ impl<'src> Parser<'src> {
         self.parse_comma_separated_list(RecoveryContextKind::Parameters(function_kind), |parser| {
             let param_start = parser.node_start();
 
-            if parameters.kwarg.is_some() {
+            if kwarg.is_some() {
                 // test_err params_follows_var_keyword_param
                 // def foo(**kwargs, a, /, b=10, *, *args): ...
                 parser.add_error(
@@ -3411,7 +3412,9 @@ impl<'src> Parser<'src> {
                     let star_range = parser.current_token_range();
                     parser.bump(TokenKind::Star);
 
-                    kwonlyargs_snapshot.get_or_insert_with(|| parser.parameter_scratch.snapshot());
+                    kwonlyargs_start.get_or_insert_with(|| {
+                        parser.parameter_scratch.len_since(&parameters_snapshot)
+                    });
 
                     if parser.at_identifier_or_soft_keyword() {
                         let param = parser.parse_parameter(
@@ -3430,7 +3433,7 @@ impl<'src> Parser<'src> {
                             );
                         }
 
-                        if seen_keyword_only_separator || parameters.vararg.is_some() {
+                        if seen_keyword_only_separator || vararg.is_some() {
                             // test_err params_multiple_varargs
                             // def foo(a, *, *args, b): ...
                             // # def foo(a, *, b, c, *args): ...
@@ -3446,8 +3449,8 @@ impl<'src> Parser<'src> {
 
                         // TODO(dhruvmanila): The AST doesn't allow multiple `vararg`, so let's
                         // choose to keep the first one so that the parameters remain in preorder.
-                        if parameters.vararg.is_none() {
-                            parameters.vararg = Some(param.id);
+                        if vararg.is_none() {
+                            vararg = Some(param.id);
                         }
 
                         last_keyword_only_separator_range = None;
@@ -3464,7 +3467,7 @@ impl<'src> Parser<'src> {
                             );
                         }
 
-                        if parameters.vararg.is_some() {
+                        if vararg.is_some() {
                             // test_err params_star_separator_after_star_param
                             // def foo(a, *args, *, b): ...
                             // def foo(a, *args, b, c, *): ...
@@ -3490,7 +3493,7 @@ impl<'src> Parser<'src> {
                         parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::No);
                     let param_double_star_range = parser.node_range(double_star_range.start());
 
-                    if parameters.kwarg.is_some() {
+                    if kwarg.is_some() {
                         // test_err params_multiple_kwargs
                         // def foo(a, **kwargs1, **kwargs2): ...
                         parser.add_error(
@@ -3523,7 +3526,7 @@ impl<'src> Parser<'src> {
                         );
                     }
 
-                    parameters.kwarg = Some(param.id);
+                    kwarg = Some(param.id);
                     last_keyword_only_separator_range = None;
                 }
                 TokenKind::Slash => {
@@ -3531,8 +3534,8 @@ impl<'src> Parser<'src> {
                     parser.bump(TokenKind::Slash);
 
                     if parser.parameter_scratch.is_empty(&parameters_snapshot)
-                        && parameters.vararg.is_none()
-                        && parameters.kwarg.is_none()
+                        && vararg.is_none()
+                        && kwarg.is_none()
                     {
                         // test_err params_no_arg_before_slash
                         // def foo(/): ...
@@ -3558,7 +3561,7 @@ impl<'src> Parser<'src> {
                         );
                     }
 
-                    if seen_keyword_only_separator || parameters.vararg.is_some() {
+                    if seen_keyword_only_separator || vararg.is_some() {
                         // test_err params_star_after_slash
                         // def foo(*a, /): ...
                         // def foo(a, *args, b, /): ...
@@ -3575,8 +3578,9 @@ impl<'src> Parser<'src> {
                     if !seen_positional_only_separator {
                         // We should only split if we're seeing the separator for the
                         // first time, otherwise it's a user error.
-                        if kwonlyargs_snapshot.is_none() {
-                            args_snapshot = Some(parser.parameter_scratch.snapshot());
+                        if kwonlyargs_start.is_none() {
+                            args_start =
+                                Some(parser.parameter_scratch.len_since(&parameters_snapshot));
                         }
                         seen_positional_only_separator = true;
 
@@ -3606,7 +3610,7 @@ impl<'src> Parser<'src> {
                     if param.view(&parser.storage).default().is_none()
                         && seen_default_param
                         && !seen_keyword_only_separator
-                        && parameters.vararg.is_none()
+                        && vararg.is_none()
                     {
                         // test_ok params_non_default_after_star
                         // def foo(a=10, *, b, c=11, d): ...
@@ -3647,31 +3651,24 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Rpar);
         }
 
-        if let Some(kwonlyargs_snapshot) = kwonlyargs_snapshot {
-            parameters.kwonlyargs = self
-                .parameter_scratch
-                .take_range(kwonlyargs_snapshot, &mut self.storage);
+        let range = self.node_range(start);
+        let id = self
+            .parameter_scratch
+            .take(parameters_snapshot, |ordinary| {
+                let end = kwonlyargs_start.unwrap_or(ordinary.len());
+                let start = args_start.unwrap_or(if seen_positional_only_separator {
+                    end
+                } else {
+                    0
+                });
+                self.storage
+                    .parameters_from_slice(range, ordinary, start..end, vararg, kwarg)
+            });
+        id::Parameters {
+            id,
+            range,
+            kind: ast::NodeKind::Parameters,
         }
-        if let Some(args_snapshot) = args_snapshot {
-            parameters.args = self
-                .parameter_scratch
-                .take_range(args_snapshot, &mut self.storage);
-            parameters.posonlyargs = self
-                .parameter_scratch
-                .take_range(parameters_snapshot, &mut self.storage);
-        } else if seen_positional_only_separator {
-            parameters.posonlyargs = self
-                .parameter_scratch
-                .take_range(parameters_snapshot, &mut self.storage);
-        } else {
-            parameters.args = self
-                .parameter_scratch
-                .take_range(parameters_snapshot, &mut self.storage);
-        }
-
-        parameters.range = self.node_range(start);
-
-        parameters.parsed(&mut self.storage)
     }
 
     /// Try to parse a type parameter list. If the parser is not at the start of a
