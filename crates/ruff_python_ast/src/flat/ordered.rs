@@ -4,7 +4,100 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::{NodeKind, Parameters};
 
-use super::{ABSENT, BuildId, Builder, Interval, Row, offset, split_words};
+use super::{ABSENT, AstNode, BuildId, Builder, Interval, NodeList, Row, offset, split_words};
+
+impl Builder {
+    /// The two typed groups form the source list unless a positional argument follows a keyword.
+    #[inline]
+    pub(super) fn ordered_argument_lists(&mut self, first: u64, second: u64) -> (u64, u32, bool) {
+        let [first_len, second] = Interval::pack_pair(&mut self.ast.extra, [first, second]);
+        let positional = split_words(first_len)[0];
+        let [boundary, keywords] = split_words(second);
+        if positional != 0 && keywords != 0 {
+            let middle = boundary as usize;
+            let extra = &self.ast.extra;
+            let rows = &self.ast.rows;
+            if rows[extra[middle - 1] as usize].start() > rows[extra[middle] as usize].start() {
+                let keyword_group =
+                    self.store_interleaved_arguments(middle, positional, keywords, |rows, a, b| {
+                        rows[a as usize].start() <= rows[b as usize].start()
+                    });
+                return (keyword_group, positional, true);
+            }
+        }
+        (second, positional, false)
+    }
+
+    /// Copying can relocate a child or replace it with synthetic syntax. Its new range
+    /// cannot tell us where that argument appeared in the original list.
+    pub(super) fn copy_argument_order(
+        &mut self,
+        first: u64,
+        second: u64,
+        template: Option<NodeList<'_, crate::kind::Any>>,
+        keyword_kind: NodeKind,
+    ) -> (u64, u32, bool) {
+        let [first_len, second] = Interval::pack_pair(&mut self.ast.extra, [first, second]);
+        let positional = split_words(first_len)[0];
+        let Some(items) = template else {
+            return (second, positional, false);
+        };
+        let [boundary, keywords] = split_words(second);
+        let mut original = items.iter();
+        let group =
+            self.store_interleaved_arguments(boundary as usize, positional, keywords, |_, _, _| {
+                original
+                    .next()
+                    .is_some_and(|child| child.node_kind() != keyword_kind)
+            });
+        (group, positional, true)
+    }
+
+    /// Interleaved calls keep their grouped projection immediately before the source list.
+    fn store_interleaved_arguments(
+        &mut self,
+        middle: usize,
+        positional: u32,
+        keywords: u32,
+        mut take_positional: impl FnMut(&[Row], u32, u32) -> bool,
+    ) -> u64 {
+        let start = middle - positional as usize;
+        let end = middle + keywords as usize;
+        let extra = &mut self.ast.extra;
+        let rows = &self.ast.rows;
+        if end != extra.len() {
+            extra.extend_from_within(start..end);
+        }
+        let source_start = extra.len();
+        let (mut left, mut right) = (start, middle);
+        extra.reserve(end - start);
+        while left < middle && right < end {
+            let a = extra[left];
+            let b = extra[right];
+            if take_positional(rows, a, b) {
+                extra.push(a);
+                left += 1;
+            } else {
+                extra.push(b);
+                right += 1;
+            }
+        }
+        extra.extend_from_within(left..middle);
+        extra.extend_from_within(right..end);
+        Interval::new(source_start - keywords as usize, keywords as usize).encode()
+    }
+}
+
+#[inline]
+pub(super) fn argument_items(keywords: u64, positional: u32, interleaved: u8) -> u64 {
+    let [boundary, keyword_count] = split_words(keywords);
+    let start = if interleaved == 0 {
+        boundary - positional
+    } else {
+        boundary + keyword_count
+    };
+    Interval::new(start as usize, (positional + keyword_count) as usize).encode()
+}
 
 #[derive(Clone, Copy)]
 struct ParameterGroups {

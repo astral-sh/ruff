@@ -456,7 +456,7 @@ def child_sources(
     """The source-ordered fields, each containing a handle or a list."""
     if not fields:
         return []
-    if node.name == "Parameters":
+    if node.name in {"Arguments", "Parameters"}:
         return [("list", f"{view}.ordered_items().words()")]
     result = []
     for field in fields:
@@ -517,7 +517,7 @@ def simple_children(sources: list[tuple[str, str]]) -> str | None:
 def child_field(
     node: Node, nodes: set[str], words: dict[str, str], _schema: list[InlineField]
 ) -> str:
-    if node.name in {"Arguments", "PatternArguments"}:
+    if node.name == "PatternArguments":
         return "Field::One(None)"
     sources = child_sources(
         node, child_fields(node, nodes), words, f"node.retype::<crate::{node.name}>()"
@@ -531,9 +531,8 @@ def child_field(
 def direct_children(
     node: Node, nodes: set[str], words: dict[str, str], _schema: list[InlineField]
 ) -> str:
-    if node.name in {"Arguments", "PatternArguments"}:
-        field = "args" if node.name == "Arguments" else "patterns"
-        return f"let group = node.retype::<crate::{node.name}>(); Children::merged(self, group.{field}().words(), group.keywords().words())"
+    if node.name == "PatternArguments":
+        return "let group = node.retype::<crate::PatternArguments>(); Children::merged(self, group.patterns().words(), group.keywords().words())"
     view = f"node.retype::<crate::{node.name}>()"
     sources = child_sources(node, child_fields(node, nodes), words, view)
     return (
@@ -545,9 +544,8 @@ def direct_children(
 def next_descendant(
     node: Node, nodes: set[str], words: dict[str, str], _schema: list[InlineField]
 ) -> str:
-    if node.name in {"Arguments", "PatternArguments"}:
-        field = "args" if node.name == "Arguments" else "patterns"
-        return f"let group = node.retype::<crate::{node.name}>(); stack.descend_merged(self, group.{field}().words(), group.keywords().words())"
+    if node.name == "PatternArguments":
+        return "let group = node.retype::<crate::PatternArguments>(); stack.descend_merged(self, group.patterns().words(), group.keywords().words())"
     sources = child_sources(
         node, child_fields(node, nodes), words, f"node.retype::<crate::{node.name}>()"
     )
@@ -949,7 +947,7 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
         out.append('_ => unreachable!("typed node belongs to this group"), } } }')
     for n in ast.all_nodes:
         fields = [field_codec(f, nodes) for f in n.fields]
-        paired_lists = n.name in {"ExprCompare", "Arguments", "PatternArguments"}
+        paired_lists = n.name in {"ExprCompare", "PatternArguments"}
         if paired_lists:
             first, second = fields
             fields = [replace(first, width=4), second]
@@ -1032,6 +1030,40 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
                 out.append(
                     f"#[inline] pub fn {f.name}(self) -> {f.result} {{ let word = self.{read}(); {f.read} }}"
                 )
+            out.append("}")
+            continue
+        if n.name == "Arguments":
+            schemas[n.name] = [
+                InlineField("keyword_group", 0, 8),
+                InlineField("positional_len", 8, 4),
+                InlineField("interleaved", 12, 1),
+            ]
+            first, second = fields
+            out.append(f"""
+                let groups = self.ordered_argument_lists({parameters});
+                self.{method}_parts(range, groups)
+                }}
+                #[inline] fn {method}_parts(&mut self, range: ruff_text_size::TextRange, (keywords, positional, interleaved): (u64, u32, bool)) -> BuildId<crate::kind::{n.name}> {{
+                let mut row = Row::new(NodeKind::{n.name}, range);
+                row.set_{arm}_keyword_group(keywords);
+                row.set_{arm}_positional_len(positional);
+                row.set_{arm}_interleaved(u8::from(interleaved));
+                self.push(row) }} }}
+                impl<'a> crate::{n.name}<'a> {{
+                #[inline] pub(super) fn ordered_items(self) -> NodeList<'a, crate::kind::Any> {{
+                    List::new(self.syntax.ast, super::ordered::argument_items(self.syntax.row.{arm}_keyword_group(), self.syntax.row.{arm}_positional_len(), self.syntax.row.{arm}_interleaved()))
+                }}""")
+            for f, raw in [
+                (
+                    first,
+                    f"super::list::Interval::preceding(self.syntax.row.{arm}_keyword_group(), u64::from(self.syntax.row.{arm}_positional_len()))",
+                ),
+                (second, f"self.syntax.row.{arm}_keyword_group()"),
+            ]:
+                out.append(f"""#[inline] pub fn {f.name}(self) -> {f.result} {{
+                    let word = {raw};
+                    {f.read}
+                }}""")
             out.append("}")
             continue
         mutable = "mut " if fields else ""
@@ -1203,6 +1235,18 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
         "impl Builder { pub(super) fn copy_any<R: super::Rewriter + ?Sized>(&mut self, node: super::SyntaxNode<'_>, rewriter: &mut R) -> BuildId<crate::kind::Any> { match node.classify() {"
     )
     for node in ast.all_nodes:
+        if node.name == "Arguments":
+            arm = to_snake_case(node.name)
+            first, second = node.fields
+            keyword_kind = "Keyword" if node.name == "Arguments" else "PatternKeyword"
+            out.append(f"""AnyKind::{node.name}(node) => {{
+                let first = {copy_field(first, nodes)};
+                let second = {copy_field(second, nodes)};
+                let template = (node.syntax.row.{arm}_interleaved() != 0).then(|| node.ordered_items());
+                let groups = self.copy_argument_order(first.word(), second.word(), template, NodeKind::{keyword_kind});
+                self.push_{arm}_parts(node.range(), groups).cast()
+            }},""")
+            continue
         fields = [f"{field.name}: {copy_field(field, nodes)}," for field in node.fields]
         out.append(
             f"AnyKind::{node.name}(node) => build::{node.name} {{ range: node.range(), "
