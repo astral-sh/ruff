@@ -99,6 +99,11 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let color = TerminalColor::resolve(args.color, || std::env::var_os(EnvVars::FORCE_COLOR));
     if let Some(color_override) = color.as_override() {
         colored::control::set_override(color_override);
+
+        // indicatif bars styled while hidden use the stdout setting (`set_colors_enabled`)
+        // even when later drawn on stderr. Bars styled after attachment to stderr use its setting.
+        console::set_colors_enabled(color_override);
+        console::set_colors_enabled_stderr(color_override);
     }
 
     let verbosity = args.verbosity.level();

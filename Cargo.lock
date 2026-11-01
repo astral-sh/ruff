@@ -4690,6 +4690,7 @@ dependencies = [
  "clap_complete_command",
  "clearscreen",
  "colored",
+ "console",
  "crossbeam",
  "ctrlc",
  "dunce",
