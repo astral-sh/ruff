@@ -1956,6 +1956,7 @@ impl PendingReachability {
         // Consecutive places often share their last applied reachability node, so their
         // merged path constraint can be reused even when they have distinct place states.
         let mut last_merged_reachability = None;
+        let mut last_singleton_merge = None;
         let mut branch_states = branch_states.into_iter();
         for current in current_states {
             let Some(mut branch_state) = branch_states.next() else {
@@ -2023,6 +2024,30 @@ impl PendingReachability {
                 continue;
             }
 
+            // Distinct definitions can carry the same path constraints. When both branches
+            // retain the same binding and declaration for a place, only these constraints
+            // change. Reuse an earlier eager merge with identical inputs and pending paths.
+            let inputs = current
+                .state
+                .singleton_merge_inputs(&branch_state.state)
+                .map(|constraints| {
+                    (
+                        current.reachability,
+                        current.narrowing,
+                        branch_state.reachability,
+                        branch_state.narrowing,
+                        constraints,
+                    )
+                });
+            if let (Some(inputs), Some((previous, merged))) = (inputs, last_singleton_merge)
+                && inputs == previous
+            {
+                Rc::make_mut(&mut current.state).set_singleton_constraints(merged);
+                current.reachability = self.current;
+                current.narrowing = self.current;
+                continue;
+            }
+
             self.materialize(
                 &mut branch_state,
                 branch,
@@ -2041,6 +2066,9 @@ impl PendingReachability {
                 narrowing_constraints,
                 reachability_constraints,
             );
+            if let Some(inputs) = inputs {
+                last_singleton_merge = Some((inputs, current.singleton_constraints()));
+            }
         }
     }
 }
