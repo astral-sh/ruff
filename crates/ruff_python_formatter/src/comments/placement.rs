@@ -2377,16 +2377,20 @@ fn are_parameters_parenthesized(parameters: &Parameters, contents: &str) -> bool
     contents[parameters.range()].starts_with('(')
 }
 
-/// Counts the number of empty lines in `contents`.
 /// Returns the number of empty lines between `comment` and `end`, like [`max_empty_lines`], without
 /// lexing the comments after `comment` again.
 fn empty_lines_after(comment: &DecoratedComment, end: TextSize, source: &str) -> u32 {
-    max_newlines(&source[comment.range_after(end)])
+    let empty_lines = max_newlines(&source[comment.range_after(end)])
         .max(comment.max_newlines_after(end))
-        .saturating_sub(1)
+        .saturating_sub(1);
+    debug_assert_eq!(
+        empty_lines,
+        max_empty_lines(&source[TextRange::new(comment.end(), end)])
+    );
+    empty_lines
 }
 
-#[cfg(test)]
+/// Counts the number of empty lines in `contents`.
 fn max_empty_lines(contents: &str) -> u32 {
     max_newlines(contents).saturating_sub(1)
 }
