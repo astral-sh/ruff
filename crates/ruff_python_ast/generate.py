@@ -967,7 +967,11 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
         if paired_lists:
             first, second = fields
             fields = [replace(first, width=4), second]
-        offsets, spills, extra_offset = layout(fields, n.name)
+        storage_fields = fields
+        if n.source_order is not None:
+            by_name = {field.name: field for field in fields}
+            storage_fields = [by_name[field.name] for field in source_order_fields(n)]
+        offsets, spills, extra_offset = layout(storage_fields, n.name)
         arm = to_snake_case(n.name)
         schemas[n.name] = [
             *(
