@@ -51,7 +51,7 @@ impl LazyWorkDoneProgress {
         client: &Client,
         request_token: Option<ProgressToken>,
         title: &str,
-        capabilities: ResolvedClientCapabilities,
+        capabilities: &ResolvedClientCapabilities,
     ) -> Self {
         Self::new_inner(
             client,
@@ -76,7 +76,7 @@ impl LazyWorkDoneProgress {
     pub(crate) fn new_on_main_loop(
         client: &Client,
         begin: WorkDoneProgressBegin,
-        capabilities: ResolvedClientCapabilities,
+        capabilities: &ResolvedClientCapabilities,
     ) -> Self {
         Self::new_inner(
             client,
@@ -91,7 +91,7 @@ impl LazyWorkDoneProgress {
         client: &Client,
         request_token: Option<ProgressToken>,
         begin: WorkDoneProgressBegin,
-        capabilities: ResolvedClientCapabilities,
+        capabilities: &ResolvedClientCapabilities,
         creation: ProgressCreation,
     ) -> Self {
         let work_done = Self {

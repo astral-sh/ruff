@@ -328,6 +328,7 @@ After.
             &mut output,
             normalized_source,
             parsed_sections(normalized_source),
+            &[],
         );
         output
     }

@@ -910,6 +910,40 @@ fn documentation_supports_only_plain_text() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn markdown_completion_preserves_advertised_html_tags() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let path = SystemPath::new("src/foo.py");
+    let source = "\
+def foo_with_documentation():
+    \"\"\"<p>Use <code>name</code> and <scheme>.</p>\"\"\"
+
+foo_
+";
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(path, source)?
+        .with_completion_documentation_format(vec![MarkupKind::Markdown])
+        .with_allowed_html_tags(&["p", "code"])
+        .build()
+        .wait_until_workspaces_are_initialized();
+    server.open_text_document(path, source, 1);
+
+    let completion = server
+        .completion_request(&server.file_uri(path), Position::new(3, 4))
+        .into_iter()
+        .find(|completion| completion.label == "foo_with_documentation")
+        .expect("completion");
+    let Some(Documentation::MarkupContent(markup)) = completion.documentation else {
+        panic!("Expected markup documentation");
+    };
+    assert_eq!(
+        markup.value,
+        "<p>Use <code>name</code> and &lt;scheme&gt;.</p>"
+    );
+    Ok(())
+}
+
 fn documentation_format(formats: Vec<MarkupKind>) -> Result<MarkupKind> {
     let workspace_root = SystemPath::new("src");
     let document_path = SystemPath::new("src/foo.py");
