@@ -425,6 +425,7 @@ impl ReachabilityConstraintsBuilder {
     }
 
     /// Adds a new reachability constraint that is the ternary OR of two existing ones.
+    #[inline]
     pub(crate) fn add_or_constraint(
         &mut self,
         a: ScopedReachabilityConstraintId,
@@ -443,6 +444,14 @@ impl ReachabilityConstraintsBuilder {
             return *cached;
         }
 
+        self.or_uncached(a, b)
+    }
+
+    fn or_uncached(
+        &mut self,
+        a: ScopedReachabilityConstraintId,
+        b: ScopedReachabilityConstraintId,
+    ) -> ScopedReachabilityConstraintId {
         if self.interiors.len() >= MAX_INTERIOR_NODES {
             return AMBIGUOUS;
         }
@@ -495,6 +504,7 @@ impl ReachabilityConstraintsBuilder {
     }
 
     /// Adds a new reachability constraint that is the ternary AND of two existing ones.
+    #[inline]
     pub(crate) fn add_and_constraint(
         &mut self,
         a: ScopedReachabilityConstraintId,
@@ -513,6 +523,14 @@ impl ReachabilityConstraintsBuilder {
             return *cached;
         }
 
+        self.and_uncached(a, b)
+    }
+
+    fn and_uncached(
+        &mut self,
+        a: ScopedReachabilityConstraintId,
+        b: ScopedReachabilityConstraintId,
+    ) -> ScopedReachabilityConstraintId {
         if self.interiors.len() >= MAX_INTERIOR_NODES {
             return AMBIGUOUS;
         }

@@ -291,6 +291,7 @@ impl NarrowingConstraintsBuilder {
         self.add_interior(node)
     }
 
+    #[inline]
     pub(crate) fn add_or_constraint(
         &mut self,
         a: ScopedNarrowingConstraint,
@@ -307,6 +308,14 @@ impl NarrowingConstraintsBuilder {
         if let Some(cached) = self.or_cache.get(&(a, b)) {
             return *cached;
         }
+        self.or_uncached(a, b)
+    }
+
+    fn or_uncached(
+        &mut self,
+        a: ScopedNarrowingConstraint,
+        b: ScopedNarrowingConstraint,
+    ) -> ScopedNarrowingConstraint {
         if self.interiors.len() >= MAX_INTERIOR_NODES {
             return ALWAYS_TRUE;
         }
@@ -348,6 +357,7 @@ impl NarrowingConstraintsBuilder {
         result
     }
 
+    #[inline]
     pub(crate) fn add_and_constraint(
         &mut self,
         a: ScopedNarrowingConstraint,
@@ -364,6 +374,14 @@ impl NarrowingConstraintsBuilder {
         if let Some(cached) = self.and_cache.get(&(a, b)) {
             return *cached;
         }
+        self.and_uncached(a, b)
+    }
+
+    fn and_uncached(
+        &mut self,
+        a: ScopedNarrowingConstraint,
+        b: ScopedNarrowingConstraint,
+    ) -> ScopedNarrowingConstraint {
         if self.interiors.len() >= MAX_INTERIOR_NODES {
             return ALWAYS_TRUE;
         }
