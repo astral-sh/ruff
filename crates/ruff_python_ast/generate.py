@@ -1213,7 +1213,7 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
     for generate_step, signature in [
         (
             direct_children,
-            "fn direct_children<'a>(&'a self, node: SyntaxNode<'a>) -> Children<'a>",
+            "fn direct_children<'a>(&'a self, node: SyntaxNode<'a>, kind: NodeKind) -> Children<'a>",
         ),
         (
             child_field,
@@ -1240,8 +1240,9 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
             del steps["None"]
         if generate_step != child_field:
             row_code.append("#[inline]")
+        kind = "kind" if generate_step == direct_children else "record.kind()"
         row_code.append(
-            f"pub(super) {signature} {{ let record = node.row; match record.kind() {{"
+            f"pub(super) {signature} {{ let record = node.row; match {kind} {{"
         )
         for step, kinds in steps.items():
             row_code.append(f"{' | '.join(kinds)} => {{ {step} }}")
