@@ -6,7 +6,7 @@ use bstr::ByteSlice;
 use std::fmt;
 
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{AnyStringFlags, StringFlags};
+use ruff_python_ast::{AnyStringFlags, LiteralWriter, StringFlags};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::error::{LexicalError, LexicalErrorType};
@@ -270,11 +270,11 @@ impl<'src> StringParser<'src> {
     }
 
     fn parse_interpolated_string_middle(
-        mut self,
+        self,
         storage: &mut ParserStorage,
     ) -> Result<id::InterpolatedStringLiteralElement, LexicalError> {
         // Fast-path: if the f-string or t-string doesn't contain any escape sequences, return the literal.
-        let Some(mut index) = memchr::memchr3(b'{', b'}', b'\\', self.source.as_bytes()) else {
+        let Some(index) = memchr::memchr3(b'{', b'}', b'\\', self.source.as_bytes()) else {
             return Ok(build::InterpolatedStringLiteralElement {
                 value: self.source,
                 range: self.range,
@@ -282,7 +282,18 @@ impl<'src> StringParser<'src> {
             .parsed(storage));
         };
 
-        let mut value = String::with_capacity(self.source.len());
+        storage
+            .try_interpolated_string_literal_element(self.range, |value| {
+                self.decode_interpolated_string_middle(index, value)
+            })
+            .map(Into::into)
+    }
+
+    fn decode_interpolated_string_middle(
+        mut self,
+        mut index: usize,
+        value: &mut LiteralWriter<'_, String>,
+    ) -> Result<(), LexicalError> {
         loop {
             // Add the characters before the escape sequence (or curly brace) to the string.
             let before_with_slash_or_brace = self.skip_bytes(index + 1);
@@ -358,15 +369,10 @@ impl<'src> StringParser<'src> {
 
             index = next_index;
         }
-
-        Ok(build::InterpolatedStringLiteralElement {
-            value: &value,
-            range: self.range,
-        }
-        .parsed(storage))
+        Ok(())
     }
 
-    fn parse_bytes(mut self, storage: &mut ParserStorage) -> Result<StringType, LexicalError> {
+    fn parse_bytes(self, storage: &mut ParserStorage) -> Result<StringType, LexicalError> {
         if let Some(index) = self.source.as_bytes().find_non_ascii_byte() {
             let ch = self.source.chars().nth(index).unwrap();
             return Err(LexicalError::new(
@@ -390,7 +396,7 @@ impl<'src> StringParser<'src> {
             ));
         }
 
-        let Some(mut escape) = memchr::memchr(b'\\', self.source.as_bytes()) else {
+        let Some(escape) = memchr::memchr(b'\\', self.source.as_bytes()) else {
             // Without escape sequences, the source already contains the decoded value.
             return Ok(StringType::Bytes(
                 build::BytesLiteral {
@@ -403,7 +409,18 @@ impl<'src> StringParser<'src> {
         };
 
         // If the string contains escape sequences, we need to parse them.
-        let mut value = Vec::with_capacity(self.source.len());
+        storage
+            .try_bytes_literal(self.range, self.flags.into(), |value| {
+                self.decode_bytes(escape, value)
+            })
+            .map(|node| StringType::Bytes(node.into()))
+    }
+
+    fn decode_bytes(
+        mut self,
+        mut escape: usize,
+        value: &mut LiteralWriter<'_, Vec<u8>>,
+    ) -> Result<(), LexicalError> {
         loop {
             // Add the characters before the escape sequence to the string.
             let before_with_slash = self.skip_bytes(escape + 1);
@@ -431,18 +448,10 @@ impl<'src> StringParser<'src> {
             // Update the position of the next escape sequence.
             escape = next_escape;
         }
-
-        Ok(StringType::Bytes(
-            build::BytesLiteral {
-                value: &value,
-                range: self.range,
-                flags: self.flags.into(),
-            }
-            .parsed(storage),
-        ))
+        Ok(())
     }
 
-    fn parse_string(mut self, storage: &mut ParserStorage) -> Result<StringType, LexicalError> {
+    fn parse_string(self, storage: &mut ParserStorage) -> Result<StringType, LexicalError> {
         if self.flags.is_raw_string() {
             // For raw strings, no escaping is necessary.
             return Ok(StringType::Str(
@@ -455,7 +464,7 @@ impl<'src> StringParser<'src> {
             ));
         }
 
-        let Some(mut escape) = memchr::memchr(b'\\', self.source.as_bytes()) else {
+        let Some(escape) = memchr::memchr(b'\\', self.source.as_bytes()) else {
             // Without escape sequences, the source already contains the decoded value.
             return Ok(StringType::Str(
                 build::StringLiteral {
@@ -468,8 +477,18 @@ impl<'src> StringParser<'src> {
         };
 
         // If the string contains escape sequences, we need to parse them.
-        let mut value = String::with_capacity(self.source.len());
+        storage
+            .try_string_literal(self.range, self.flags.into(), |value| {
+                self.decode_string(escape, value)
+            })
+            .map(|node| StringType::Str(node.into()))
+    }
 
+    fn decode_string(
+        mut self,
+        mut escape: usize,
+        value: &mut LiteralWriter<'_, String>,
+    ) -> Result<(), LexicalError> {
         loop {
             // Add the characters before the escape sequence to the string.
             let before_with_slash = self.skip_bytes(escape + 1);
@@ -496,15 +515,7 @@ impl<'src> StringParser<'src> {
             // Update the position of the next escape sequence.
             escape = next_escape;
         }
-
-        Ok(StringType::Str(
-            build::StringLiteral {
-                value: &value,
-                range: self.range,
-                flags: self.flags.into(),
-            }
-            .parsed(storage),
-        ))
+        Ok(())
     }
 
     fn parse(self, storage: &mut ParserStorage) -> Result<StringType, LexicalError> {

@@ -1009,13 +1009,14 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
         }}""")
         method = f"push_{to_snake_case(n.name)}"
         parameters = ", ".join(f.name for f in fields)
-        out.append(
-            f"impl Builder {{ #[inline] fn {method}(&mut self, range: ruff_text_size::TextRange, [{parameters}]: [u64; {len(fields)}]) -> BuildId<crate::kind::{n.name}> {{"
-        )
-        default = ", Default" if n.name == "Parameters" else ""
         borrows_literal = any(
             field.ty in {"LiteralText", "LiteralBytes"} for field in n.fields
         )
+        visibility = "pub(super) " if borrows_literal else ""
+        out.append(
+            f"impl Builder {{ #[inline] {visibility}fn {method}(&mut self, range: ruff_text_size::TextRange, [{parameters}]: [u64; {len(fields)}]) -> BuildId<crate::kind::{n.name}> {{"
+        )
+        default = ", Default" if n.name == "Parameters" else ""
         lifetime = "<'a>" if borrows_literal else ""
         constructor = n.name + ("<'_>" if borrows_literal else "")
         initializers.append(
