@@ -79,16 +79,13 @@ impl Violation for ClassWithMixedTypeVars {
 }
 
 /// RUF053
-pub(crate) fn class_with_mixed_type_vars(
-    checker: &Checker,
-    class_def: &ast::StmtClassDefFields<'_>,
-) {
+pub(crate) fn class_with_mixed_type_vars(checker: &Checker, class_def: ast::StmtClassDef<'_>) {
     if checker.target_version() < PythonVersion::PY312 {
         return;
     }
 
-    let type_params = class_def.type_params;
-    let arguments = class_def.arguments;
+    let type_params = class_def.type_params();
+    let arguments = class_def.arguments();
 
     let Some(type_params) = type_params else {
         return;

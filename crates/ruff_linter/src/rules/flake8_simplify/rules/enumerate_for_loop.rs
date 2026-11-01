@@ -2,7 +2,7 @@ use crate::codes::Category;
 use crate::preview::is_enumerate_for_loop_int_index_enabled;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
-use ruff_python_ast::{self as ast, ExprName, Int, Number, Operator, Stmt, StmtFor, StmtKind};
+use ruff_python_ast::{self as ast, ExprName, Int, Operator, Stmt, StmtFor, StmtKind};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
@@ -95,16 +95,11 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: StmtFor<'_>) {
             else {
                 continue;
             };
-            if !(matches!(
-                value.fields(),
-                ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                    value: Number::Int(Int::ZERO),
-                    ..
-                })
-            ) || matches!(
-                ResolvedPythonType::from(value),
-                ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
-            ) && is_enumerate_for_loop_int_index_enabled(checker.settings()))
+            if !(value.as_int_literal() == Some(&Int::ZERO)
+                || matches!(
+                    ResolvedPythonType::from(value),
+                    ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
+                ) && is_enumerate_for_loop_int_index_enabled(checker.settings()))
             {
                 continue;
             }
@@ -182,13 +177,7 @@ fn match_index_increment(stmt: Stmt<'_>) -> Option<ExprName<'_>> {
 
     let name = target.as_name_expr()?;
 
-    if matches!(
-        value.fields(),
-        ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-            value: Number::Int(Int::ONE),
-            ..
-        })
-    ) {
+    if value.as_int_literal() == Some(&Int::ONE) {
         return Some(name);
     }
 

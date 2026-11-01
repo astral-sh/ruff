@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprKind, Int, Number};
+use ruff_python_ast::{self as ast, Expr, ExprKind, Int};
 use ruff_text_size::Ranged;
 
 use crate::codes::Category;
@@ -85,27 +85,14 @@ fn match_slice_info(expr: Expr<'_>) -> Option<SliceInfo> {
 
     // Avoid false positives for slices with a step.
     if let Some(step) = step {
-        if !matches!(
-            step.fields(),
-            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                value: Number::Int(Int::ONE),
-                ..
-            })
-        ) {
+        if step.as_int_literal() != Some(&Int::ONE) {
             return None;
         }
     }
 
     // If the slice start is a non-constant, we can't be sure that it's successive.
     let slice_start = if let Some(lower) = lower {
-        let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-            value: Number::Int(int),
-            range: _,
-            node: _,
-        }) = lower.fields()
-        else {
-            return None;
-        };
+        let int = lower.as_int_literal()?;
         Some(int.as_i32()?)
     } else {
         None
@@ -118,9 +105,9 @@ fn match_slice_info(expr: Expr<'_>) -> Option<SliceInfo> {
 }
 
 /// RUF007
-pub(crate) fn zip_instead_of_pairwise(checker: &Checker, call: &ast::ExprCallFields<'_>) {
-    let func = call.func;
-    let arguments = call.arguments;
+pub(crate) fn zip_instead_of_pairwise(checker: &Checker, call: ast::ExprCall<'_>) {
+    let func = call.func();
+    let arguments = call.arguments();
     let args = arguments.args();
 
     // Require exactly two positional arguments.
@@ -176,7 +163,7 @@ pub(crate) fn zip_instead_of_pairwise(checker: &Checker, call: &ast::ExprCallFie
             checker.semantic(),
         )?;
         let reference_edit =
-            Edit::range_replacement(format!("{binding}({})", first_arg_info.id), call.range);
+            Edit::range_replacement(format!("{binding}({})", first_arg_info.id), call.range());
         Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
     });
 }

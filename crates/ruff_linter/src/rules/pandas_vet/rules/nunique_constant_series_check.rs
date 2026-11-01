@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, CmpOp, ExprCompare, ExprKind, Int, Number};
+use ruff_python_ast::{CmpOp, ExprCompare, ExprKind, Int};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -78,14 +78,7 @@ pub(crate) fn nunique_constant_series_check(checker: &Checker, compare: ExprComp
     }
 
     // Right should be the integer 1.
-    if !matches!(
-        right.fields(),
-        ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-            value: Number::Int(Int::ONE),
-            range: _,
-            node: _,
-        })
-    ) {
+    if right.as_int_literal() != Some(&Int::ONE) {
         return;
     }
 

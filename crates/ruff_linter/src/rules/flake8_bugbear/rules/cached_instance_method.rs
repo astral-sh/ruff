@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::{Expr, StmtFunctionDefFields};
+use ruff_python_ast::{Expr, StmtFunctionDef};
 use ruff_python_semantic::analyze::{class, function_type};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_text_size::Ranged;
@@ -84,7 +84,7 @@ impl Violation for CachedInstanceMethod {
 }
 
 /// B019
-pub(crate) fn cached_instance_method(checker: &Checker, function_def: &StmtFunctionDefFields<'_>) {
+pub(crate) fn cached_instance_method(checker: &Checker, function_def: StmtFunctionDef<'_>) {
     let scope = checker.semantic().current_scope();
 
     // Parent scope _must_ be a class.
@@ -94,8 +94,8 @@ pub(crate) fn cached_instance_method(checker: &Checker, function_def: &StmtFunct
 
     // The function must be an _instance_ method.
     let type_ = function_type::classify(
-        function_def.name.as_str(),
-        function_def.decorator_list,
+        function_def.name().as_str(),
+        function_def.decorator_list(),
         scope,
         checker.semantic(),
         &checker.settings().pep8_naming.classmethod_decorators,
@@ -105,7 +105,7 @@ pub(crate) fn cached_instance_method(checker: &Checker, function_def: &StmtFunct
         return;
     }
 
-    for decorator in function_def.decorator_list {
+    for decorator in function_def.decorator_list() {
         if is_cache_func(map_callable(decorator.expression()), checker.semantic()) {
             // If we found a cached instance method, validate (lazily) that the class is not an enum.
             if class::is_enumeration(class_def, checker.semantic()) {

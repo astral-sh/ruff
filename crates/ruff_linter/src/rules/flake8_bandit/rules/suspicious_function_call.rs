@@ -975,8 +975,8 @@ impl Violation for SuspiciousFTPLibUsage {
     }
 }
 
-pub(crate) fn suspicious_function_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
-    suspicious_function(checker, call.func, Some(call.arguments), call.range);
+pub(crate) fn suspicious_function_call(checker: &Checker, call: ast::ExprCall<'_>) {
+    suspicious_function(checker, call.func(), Some(call.arguments()), call.range());
 }
 
 pub(crate) fn suspicious_function_reference(checker: &Checker, &func: &Expr<'_>) {

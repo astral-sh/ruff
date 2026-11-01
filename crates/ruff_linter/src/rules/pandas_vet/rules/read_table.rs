@@ -50,7 +50,7 @@ impl Violation for PandasUseOfDotReadTable {
 /// PD012
 pub(crate) fn use_of_read_table(
     checker: &Checker,
-    call: &ast::ExprCallFields<'_>,
+    call: ast::ExprCall<'_>,
     qualified_name: &QualifiedName,
 ) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
@@ -59,12 +59,12 @@ pub(crate) fn use_of_read_table(
 
     if matches!(qualified_name.segments(), ["pandas", "read_table"])
         && let Some(ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { value, .. })) =
-            call.arguments
+            call.arguments()
                 .find_keyword("sep")
                 .map(Keyword::value)
                 .map(Expr::fields)
         && value == ","
     {
-        checker.report_diagnostic(PandasUseOfDotReadTable, call.func.range());
+        checker.report_diagnostic(PandasUseOfDotReadTable, call.func().range());
     }
 }

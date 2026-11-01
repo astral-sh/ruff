@@ -174,18 +174,18 @@ fn is_non_trivial_with_body(body: Suite<'_>) -> bool {
 }
 
 /// PT029, PT030
-pub(crate) fn warns_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
-    if is_pytest_warns(call.func, checker.semantic()) {
+pub(crate) fn warns_call(checker: &Checker, call: ast::ExprCall<'_>) {
+    if is_pytest_warns(call.func(), checker.semantic()) {
         if checker.is_rule_enabled(Rule::PytestWarnsWithoutWarning) {
-            if call.arguments.is_empty() {
-                checker.report_diagnostic(PytestWarnsWithoutWarning, call.func.range());
+            if call.arguments().is_empty() {
+                checker.report_diagnostic(PytestWarnsWithoutWarning, call.func().range());
             }
         }
 
         if checker.is_rule_enabled(Rule::PytestWarnsTooBroad) {
-            if let Some(warning) = call.arguments.find_argument_value("expected_warning", 0) {
+            if let Some(warning) = call.arguments().find_argument_value("expected_warning", 0) {
                 if call
-                    .arguments
+                    .arguments()
                     .find_keyword("match")
                     .is_none_or(|k| is_empty_or_null_string(k.value()))
                 {

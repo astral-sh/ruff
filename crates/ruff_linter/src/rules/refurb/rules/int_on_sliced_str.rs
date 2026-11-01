@@ -67,14 +67,14 @@ impl AlwaysFixableViolation for IntOnSlicedStr {
 }
 
 /// FURB166
-pub(crate) fn int_on_sliced_str(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+pub(crate) fn int_on_sliced_str(checker: &Checker, call: ast::ExprCall<'_>) {
     // Verify that the function is `int`.
-    if !checker.semantic().match_builtin_expr(call.func, "int") {
+    if !checker.semantic().match_builtin_expr(call.func(), "int") {
         return;
     }
 
     // There must be exactly two arguments (e.g., `int(num[2:], 16)`).
-    let (expression, base) = match (call.arguments.args(), call.arguments.keywords()) {
+    let (expression, base) = match (call.arguments().args(), call.arguments().keywords()) {
         (args, keywords)
             if let Some([expression]) = args.as_array()
                 && let Some([base]) = keywords.as_array()
@@ -124,7 +124,7 @@ pub(crate) fn int_on_sliced_str(checker: &Checker, call: &ast::ExprCallFields<'_
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(IntOnSlicedStr { base: base_u8 }, call.range);
+    let mut diagnostic = checker.report_diagnostic(IntOnSlicedStr { base: base_u8 }, call.range());
     diagnostic.set_fix(Fix::unsafe_edits(
         Edit::range_replacement(
             checker.locator().slice(expr_subscript.value()).to_string(),

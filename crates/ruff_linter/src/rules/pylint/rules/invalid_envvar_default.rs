@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCallFields;
+use ruff_python_ast::ExprCall;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::Modules;
 use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
@@ -48,7 +48,7 @@ impl Violation for InvalidEnvvarDefault {
 /// PLW1508
 pub(crate) fn invalid_envvar_default(
     checker: &Checker,
-    call: &ExprCallFields<'_>,
+    call: ExprCall<'_>,
     qualified_name: &QualifiedName,
 ) {
     if !checker.semantic().seen_module(Modules::OS) {
@@ -60,7 +60,7 @@ pub(crate) fn invalid_envvar_default(
         ["os", "getenv"] | ["os", "environ", "get"]
     ) {
         // Find the `default` argument, if it exists.
-        let Some(expr) = call.arguments.find_argument_value("default", 1) else {
+        let Some(expr) = call.arguments().find_argument_value("default", 1) else {
             return;
         };
 

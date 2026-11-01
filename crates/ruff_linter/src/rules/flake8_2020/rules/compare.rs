@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::registry::Rule;
 
-use crate::rules::flake8_2020::helpers::{integer_literal, is_sys};
+use crate::rules::flake8_2020::helpers::is_sys;
 
 /// ## What it does
 /// Checks for comparisons that test `sys.version` against string literals,
@@ -246,9 +246,12 @@ pub(crate) fn compare(checker: &Checker, compare: ast::ExprCompare<'_>) {
     match op {
         CmpOp::Eq | CmpOp::NotEq
             if checker.is_rule_enabled(Rule::SysVersionInfo0Eq3)
-                && integer_literal(right).is_some_and(|number| *number == 3)
+                && right.as_int_literal().is_some_and(|number| *number == 3)
                 && let Some(subscript) = left.as_subscript_expr()
-                && integer_literal(subscript.slice()).is_some_and(|index| *index == 0)
+                && subscript
+                    .slice()
+                    .as_int_literal()
+                    .is_some_and(|index| *index == 0)
                 && is_sys(subscript.value(), "version_info", checker.semantic()) =>
         {
             checker.report_diagnostic(
@@ -260,10 +263,13 @@ pub(crate) fn compare(checker: &Checker, compare: ast::ExprCompare<'_>) {
         }
 
         CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE => {
-            if integer_literal(right).is_some() {
+            if right.as_int_literal().is_some() {
                 match left.classify() {
                     ExprKind::Subscript(subscript)
-                        if integer_literal(subscript.slice()).is_some_and(|index| *index == 1)
+                        if subscript
+                            .slice()
+                            .as_int_literal()
+                            .is_some_and(|index| *index == 1)
                             && is_sys(subscript.value(), "version_info", checker.semantic()) =>
                     {
                         checker.report_diagnostic_if_enabled(SysVersionInfo1CmpInt, left.range());

@@ -234,13 +234,10 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: ExprCall<'_>) 
             .is_some_and(|name| name.segments() == ["dataclasses", "dataclass"])
         {
             arguments.find_keyword("slots").is_some_and(|keyword| {
-                matches!(
-                    keyword.value().fields(),
-                    ast::ExprFields::BooleanLiteral(ast::ExprBooleanLiteralFields {
-                        value: true,
-                        ..
-                    })
-                )
+                keyword
+                    .value()
+                    .as_boolean_literal_expr()
+                    .is_some_and(ast::ExprBooleanLiteral::value)
             })
         } else {
             false

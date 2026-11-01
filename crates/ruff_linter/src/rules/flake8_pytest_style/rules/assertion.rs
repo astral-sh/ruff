@@ -679,13 +679,9 @@ fn is_composite_condition(test: Expr<'_>) -> CompositionKind {
             {
                 // Only split cases without mixed `and` and `or`.
                 return if values.iter().all(|expr| {
-                    !matches!(
-                        expr.fields(),
-                        ast::ExprFields::BoolOp(ast::ExprBoolOpFields {
-                            op: BoolOp::And,
-                            ..
-                        })
-                    )
+                    !expr
+                        .as_bool_op_expr()
+                        .is_some_and(|boolean| boolean.op() == BoolOp::And)
                 }) {
                     CompositionKind::Simple
                 } else {

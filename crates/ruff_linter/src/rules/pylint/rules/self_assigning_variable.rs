@@ -39,7 +39,7 @@ impl Violation for SelfAssigningVariable {
 }
 
 /// PLW0127
-pub(crate) fn self_assignment(checker: &Checker, assign: &ast::StmtAssignFields<'_>) {
+pub(crate) fn self_assignment(checker: &Checker, assign: ast::StmtAssign<'_>) {
     // Assignments in class bodies are attributes (e.g., `x = x` assigns `x` to `self.x`, and thus
     // is not a self-assignment).
     if checker.semantic().current_scope().kind.is_class() {
@@ -47,9 +47,9 @@ pub(crate) fn self_assignment(checker: &Checker, assign: &ast::StmtAssignFields<
     }
 
     for [left, right] in assign
-        .targets
+        .targets()
         .iter()
-        .chain(std::iter::once(assign.value))
+        .chain(std::iter::once(assign.value()))
         .array_combinations()
     {
         visit_assignments(checker, left, right);
@@ -57,8 +57,8 @@ pub(crate) fn self_assignment(checker: &Checker, assign: &ast::StmtAssignFields<
 }
 
 /// PLW0127
-pub(crate) fn self_annotated_assignment(checker: &Checker, assign: &ast::StmtAnnAssignFields<'_>) {
-    let Some(value) = assign.value else {
+pub(crate) fn self_annotated_assignment(checker: &Checker, assign: ast::StmtAnnAssign<'_>) {
+    let Some(value) = assign.value() else {
         return;
     };
 
@@ -68,7 +68,7 @@ pub(crate) fn self_annotated_assignment(checker: &Checker, assign: &ast::StmtAnn
         return;
     }
 
-    visit_assignments(checker, assign.target, value);
+    visit_assignments(checker, assign.target(), value);
 }
 
 fn visit_assignments(checker: &Checker, left: Expr<'_>, right: Expr<'_>) {

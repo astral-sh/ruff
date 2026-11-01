@@ -116,17 +116,14 @@ pub(crate) fn task_branch_as_short_circuit(checker: &Checker, function_def: Stmt
 }
 
 /// AIR004 (operator form)
-pub(crate) fn branch_python_operator_as_short_circuit(
-    checker: &Checker,
-    call: &ast::ExprCallFields<'_>,
-) {
+pub(crate) fn branch_python_operator_as_short_circuit(checker: &Checker, call: ast::ExprCall<'_>) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
 
     let semantic = checker.semantic();
 
-    let Some(qualified_name) = semantic.resolve_qualified_name(call.func) else {
+    let Some(qualified_name) = semantic.resolve_qualified_name(call.func()) else {
         return;
     };
 
@@ -149,7 +146,7 @@ pub(crate) fn branch_python_operator_as_short_circuit(
         return;
     }
 
-    let Some(keyword) = call.arguments.find_keyword("python_callable") else {
+    let Some(keyword) = call.arguments().find_keyword("python_callable") else {
         return;
     };
 
@@ -174,7 +171,7 @@ pub(crate) fn branch_python_operator_as_short_circuit(
             AirflowTaskBranchAsShortCircuit {
                 kind: BranchKind::Operator,
             },
-            call.func.range(),
+            call.func().range(),
         );
     }
 }
@@ -190,9 +187,11 @@ fn could_be_short_circuit(function: StmtFunctionDef<'_>) -> bool {
     let non_empty_list_count = returns
         .iter()
         .filter(|ret| {
-            ret.value().is_some_and(
-                |value| matches!(value.fields(), ast::ExprFields::List(ast::ExprListFields { elts, .. }) if !elts.is_empty()),
-            )
+            ret.value().is_some_and(|value| {
+                value
+                    .as_list_expr()
+                    .is_some_and(|list| !list.elts().is_empty())
+            })
         })
         .count();
 

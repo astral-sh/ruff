@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, ExprCall, ExprKind, Keyword, Number};
+use ruff_python_ast::{Expr, ExprCall, ExprKind, Keyword};
 use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_text_size::Ranged;
 
@@ -105,11 +105,7 @@ pub(crate) fn non_octal_permissions(checker: &Checker, call: ExprCall<'_>) {
 }
 
 fn check_mode(checker: &Checker, mode_arg: Expr<'_>) {
-    let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-        value: Number::Int(int),
-        ..
-    }) = mode_arg.fields()
-    else {
+    let Some(int) = mode_arg.as_int_literal() else {
         return;
     };
 

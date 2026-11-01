@@ -44,8 +44,8 @@ impl Violation for TooManyBooleanExpressions {
 }
 
 /// PLR0916
-pub(crate) fn too_many_boolean_expressions(checker: &Checker, stmt: &ast::StmtIfFields<'_>) {
-    if let Some(bool_op) = stmt.test.as_bool_op_expr() {
+pub(crate) fn too_many_boolean_expressions(checker: &Checker, stmt: ast::StmtIf<'_>) {
+    if let Some(bool_op) = stmt.test().as_bool_op_expr() {
         let expressions = count_bools(bool_op);
         if expressions > checker.settings().pylint.max_bool_expr {
             checker.report_diagnostic(
@@ -58,7 +58,7 @@ pub(crate) fn too_many_boolean_expressions(checker: &Checker, stmt: &ast::StmtIf
         }
     }
 
-    for elif in stmt.elif_else_clauses {
+    for elif in stmt.elif_else_clauses() {
         if let Some(bool_op) = elif.test().and_then(ast::Expr::as_bool_op_expr) {
             let expressions = count_bools(bool_op);
             if expressions > checker.settings().pylint.max_bool_expr {

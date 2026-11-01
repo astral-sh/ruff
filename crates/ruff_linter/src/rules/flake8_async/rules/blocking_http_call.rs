@@ -71,15 +71,15 @@ fn is_blocking_http_call(qualified_name: &QualifiedName) -> bool {
 }
 
 /// ASYNC210
-pub(crate) fn blocking_http_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+pub(crate) fn blocking_http_call(checker: &Checker, call: ast::ExprCall<'_>) {
     if checker.semantic().in_async_context() {
         if checker
             .semantic()
-            .resolve_qualified_name(call.func)
+            .resolve_qualified_name(call.func())
             .as_ref()
             .is_some_and(is_blocking_http_call)
         {
-            checker.report_diagnostic(BlockingHttpCallInAsyncFunction, call.func.range());
+            checker.report_diagnostic(BlockingHttpCallInAsyncFunction, call.func().range());
         }
     }
 }

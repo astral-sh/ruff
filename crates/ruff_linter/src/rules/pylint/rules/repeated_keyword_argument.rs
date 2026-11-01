@@ -38,8 +38,8 @@ impl Violation for RepeatedKeywordArgument {
 }
 
 /// PLE1132
-pub(crate) fn repeated_keyword_argument(checker: &Checker, call: &ast::ExprCallFields<'_>) {
-    let arguments = call.arguments;
+pub(crate) fn repeated_keyword_argument(checker: &Checker, call: ast::ExprCall<'_>) {
+    let arguments = call.arguments();
 
     // Avoid allocating if there's only one non-unpacked keyword argument, or the unpacked value is
     // not a dict literal.

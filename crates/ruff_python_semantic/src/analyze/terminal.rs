@@ -133,9 +133,8 @@ impl Terminal {
                     terminal = terminal.and_then(Self::from_body(finalbody, semantic));
 
                     let branch_terminal = Terminal::branches(handlers.iter().map(|handler| {
-                        let ast::ExceptHandlerFields::ExceptHandler(
-                            ast::ExceptHandlerExceptHandlerFields { body, .. },
-                        ) = handler.fields();
+                        let ast::ExceptHandlerKind::ExceptHandler(handler) = handler.classify();
+                        let body = handler.body();
                         Self::from_body(body, semantic)
                     }));
 
@@ -334,9 +333,8 @@ fn sometimes_breaks(stmts: Suite<'_>, semantic: &SemanticModel) -> bool {
             StmtKind::Try(stmt_try)
                 if (sometimes_breaks(stmt_try.body(), semantic)
                     || stmt_try.handlers().iter().any(|handler| {
-                        let ast::ExceptHandlerFields::ExceptHandler(
-                            ast::ExceptHandlerExceptHandlerFields { body, .. },
-                        ) = handler.fields();
+                        let ast::ExceptHandlerKind::ExceptHandler(handler) = handler.classify();
+                        let body = handler.body();
                         sometimes_breaks(body, semantic)
                     })
                     || sometimes_breaks(stmt_try.orelse(), semantic)

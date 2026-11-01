@@ -82,15 +82,15 @@ impl Violation for PytestRaisesAmbiguousPattern {
 }
 
 /// RUF043
-pub(crate) fn pytest_raises_ambiguous_pattern(checker: &Checker, call: &ast::ExprCallFields<'_>) {
-    if !is_pytest_raises(call.func, checker.semantic()) {
+pub(crate) fn pytest_raises_ambiguous_pattern(checker: &Checker, call: ast::ExprCall<'_>) {
+    if !is_pytest_raises(call.func(), checker.semantic()) {
         return;
     }
 
     // It *can* be passed as a positional argument if you try very hard,
     // but pytest only documents it as a keyword argument, and it's quite hard pass it positionally
     let Some(ast::KeywordFields { value, .. }) =
-        call.arguments.find_keyword("match").map(Keyword::fields)
+        call.arguments().find_keyword("match").map(Keyword::fields)
     else {
         return;
     };

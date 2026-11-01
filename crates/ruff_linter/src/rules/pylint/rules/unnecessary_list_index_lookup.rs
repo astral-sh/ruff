@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, ExprKind, ExprName, Int, Number};
+use ruff_python_ast::{self as ast, Expr, ExprKind, ExprName, Int};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -152,15 +152,7 @@ fn enumerate_items<'a>(
     // If the `enumerate` call has a non-zero `start`, don't omit.
     if !arguments
         .find_argument_value("start", 1)
-        .is_none_or(|expr| {
-            matches!(
-                expr.fields(),
-                ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
-                    value: Number::Int(Int::ZERO),
-                    ..
-                })
-            )
-        })
+        .is_none_or(|expr| expr.as_int_literal() == Some(&Int::ZERO))
     {
         return None;
     }

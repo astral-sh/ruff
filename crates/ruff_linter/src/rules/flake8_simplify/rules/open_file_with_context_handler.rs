@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, ExprCall, ExprKind, StmtKind};
+use ruff_python_ast::{ExprCall, ExprKind, StmtKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
@@ -276,11 +276,9 @@ pub(crate) fn open_file_with_context_handler(checker: &Checker, call: ExprCall<'
 
     // Ex) `def __enter__(self): ...`
     if let ScopeKind::Function(stmt_function_def) = &checker.semantic().current_scope().kind
-        && let ast::StmtFunctionDefFields { name, .. } = stmt_function_def.fields()
+        && stmt_function_def.name() == "__enter__"
     {
-        if name == "__enter__" {
-            return;
-        }
+        return;
     }
 
     checker.report_diagnostic(OpenFileWithContextHandler, call.func().range());
