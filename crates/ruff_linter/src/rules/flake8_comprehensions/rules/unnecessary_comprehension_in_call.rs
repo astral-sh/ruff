@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_ast::{self as ast, Expr, Keyword};
+use ruff_python_ast::{Expr, ExprKind, NodeList};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::FixAvailability;
@@ -92,10 +92,10 @@ impl Violation for UnnecessaryComprehensionInCall {
 /// C419
 pub(crate) fn unnecessary_comprehension_in_call(
     checker: &Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
+    &expr: &Expr<'_>,
+    func: Expr<'_>,
+    args: NodeList<'_, ruff_python_ast::kind::Expr>,
+    keywords: NodeList<'_, ruff_python_ast::kind::Keyword>,
 ) {
     if !keywords.is_empty() {
         return;
@@ -103,19 +103,18 @@ pub(crate) fn unnecessary_comprehension_in_call(
     let Some(arg) = args.first() else {
         return;
     };
-    let (Expr::ListComp(ast::ExprListComp {
-        elt, generators, ..
-    })
-    | Expr::SetComp(ast::ExprSetComp {
-        elt, generators, ..
-    })) = arg
-    else {
-        return;
+    let (elt, generators) = match arg.classify() {
+        ExprKind::ListComp(comp) => (comp.elt(), comp.generators()),
+        ExprKind::SetComp(comp) => (comp.elt(), comp.generators()),
+        _ => return,
     };
     if contains_await(elt) {
         return;
     }
-    if generators.iter().any(|generator| generator.is_async) {
+    if generators
+        .iter()
+        .any(ruff_python_ast::Comprehension::is_async)
+    {
         return;
     }
     let Some(Ok(builtin_function)) = checker
@@ -137,14 +136,14 @@ pub(crate) fn unnecessary_comprehension_in_call(
         return;
     }
 
-    let mut diagnostic = match (arg, builtin_function.duplication_variance()) {
-        (Expr::ListComp(_), _) => checker.report_diagnostic(
+    let mut diagnostic = match (arg.classify(), builtin_function.duplication_variance()) {
+        (ExprKind::ListComp(_), _) => checker.report_diagnostic(
             UnnecessaryComprehensionInCall {
                 comprehension_kind: ComprehensionKind::List,
             },
             arg.range(),
         ),
-        (Expr::SetComp(_), DuplicationVariance::Invariant) => checker.report_diagnostic(
+        (ExprKind::SetComp(_), DuplicationVariance::Invariant) => checker.report_diagnostic(
             UnnecessaryComprehensionInCall {
                 comprehension_kind: ComprehensionKind::Set,
             },
@@ -180,8 +179,8 @@ pub(crate) fn unnecessary_comprehension_in_call(
 }
 
 /// Return `true` if the [`Expr`] contains an `await` expression.
-fn contains_await(expr: &Expr) -> bool {
-    any_over_expr(expr, &Expr::is_await_expr)
+fn contains_await(expr: Expr<'_>) -> bool {
+    any_over_expr(expr, ruff_python_ast::Expr::is_await_expr)
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

@@ -2,7 +2,7 @@
 
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
+use ruff_python_ast::{PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Parsed;
@@ -19,7 +19,7 @@ use super::ast::LintContext;
 
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn check_imports(
-    parsed: &Parsed<ModModule>,
+    parsed: &Parsed<ruff_python_ast::kind::ModModule>,
     locator: &Locator,
     indexer: &Indexer,
     directives: &IsortDirectives,

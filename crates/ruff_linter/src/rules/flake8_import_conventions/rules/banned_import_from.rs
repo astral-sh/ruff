@@ -50,7 +50,7 @@ impl Violation for BannedImportFrom {
 /// ICN003
 pub(crate) fn banned_import_from(
     checker: &Checker,
-    stmt: &Stmt,
+    stmt: Stmt<'_>,
     name: &str,
     banned_conventions: &FxHashSet<String>,
 ) {

@@ -7,7 +7,7 @@ use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr, Keyword};
+use ruff_python_ast::{self as ast, Expr, ExprCall, ExprKind, Identifier, NodeList};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -561,32 +561,32 @@ impl Violation for StringDotFormatMixingAutomatic {
     }
 }
 
-fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
+fn has_star_star_kwargs(keywords: NodeList<'_, ruff_python_ast::kind::Keyword>) -> bool {
     keywords
         .iter()
-        .any(|keyword| matches!(keyword, Keyword { arg: None, .. }))
+        .any(|keyword| matches!(keyword.fields(), ast::KeywordFields { arg: None, .. }))
 }
 
-fn has_star_args(args: &[Expr]) -> bool {
-    args.iter().any(Expr::is_starred_expr)
+fn has_star_args(args: NodeList<'_, ruff_python_ast::kind::Expr>) -> bool {
+    args.iter().any(ruff_python_ast::Expr::is_starred_expr)
 }
 
 /// F502
 pub(crate) fn percent_format_expected_mapping(
     checker: &Checker,
     summary: &CFormatSummary,
-    right: &Expr,
+    right: Expr<'_>,
     location: TextRange,
 ) {
     if !summary.keywords.is_empty() {
         // Tuple, List, Set (+comprehensions)
-        match right {
-            Expr::List(_)
-            | Expr::Tuple(_)
-            | Expr::Set(_)
-            | Expr::ListComp(_)
-            | Expr::SetComp(_)
-            | Expr::Generator(_) => {
+        match right.classify() {
+            ExprKind::List(_)
+            | ExprKind::Tuple(_)
+            | ExprKind::Set(_)
+            | ExprKind::ListComp(_)
+            | ExprKind::SetComp(_)
+            | ExprKind::Generator(_) => {
                 checker.report_diagnostic(PercentFormatExpectedMapping, location);
             }
             _ => {}
@@ -598,10 +598,12 @@ pub(crate) fn percent_format_expected_mapping(
 pub(crate) fn percent_format_expected_sequence(
     checker: &Checker,
     summary: &CFormatSummary,
-    right: &Expr,
+    right: Expr<'_>,
     location: TextRange,
 ) {
-    if summary.num_positional > 1 && matches!(right, Expr::Dict(_) | Expr::DictComp(_)) {
+    if summary.num_positional > 1
+        && matches!(right.classify(), ExprKind::Dict(_) | ExprKind::DictComp(_))
+    {
         checker.report_diagnostic(PercentFormatExpectedSequence, location);
     }
 }
@@ -610,13 +612,13 @@ pub(crate) fn percent_format_expected_sequence(
 pub(crate) fn percent_format_extra_named_arguments(
     checker: &Checker,
     summary: &CFormatSummary,
-    right: &Expr,
+    right: Expr<'_>,
     location: TextRange,
 ) {
     if summary.num_positional > 0 {
         return;
     }
-    let Expr::Dict(dict) = &right else {
+    let ExprKind::Dict(dict) = right.classify() else {
         return;
     };
     // If any of the keys are spread, abort.
@@ -627,8 +629,10 @@ pub(crate) fn percent_format_extra_named_arguments(
     let missing: Vec<(usize, &str)> = dict
         .iter_keys()
         .enumerate()
-        .filter_map(|(index, key)| match key {
-            Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) => {
+        .filter_map(|(index, key)| match key.map(Expr::fields) {
+            Some(ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields {
+                value, ..
+            })) => {
                 if summary.keywords.contains(value.to_str()) {
                     None
                 } else {
@@ -676,14 +680,14 @@ pub(crate) fn percent_format_extra_named_arguments(
 pub(crate) fn percent_format_missing_arguments(
     checker: &Checker,
     summary: &CFormatSummary,
-    right: &Expr,
+    right: Expr<'_>,
     location: TextRange,
 ) {
     if summary.num_positional > 0 {
         return;
     }
 
-    let Expr::Dict(dict) = &right else {
+    let ExprKind::Dict(dict) = right.classify() else {
         return;
     };
 
@@ -693,8 +697,10 @@ pub(crate) fn percent_format_missing_arguments(
 
     let mut keywords = FxHashSet::default();
     for key in dict.iter_keys().flatten() {
-        match key {
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+        match key.classify() {
+            ExprKind::StringLiteral(expr_string_literal) => {
+                let value = expr_string_literal.value();
+
                 keywords.insert(value.to_str());
             }
             _ => {
@@ -734,14 +740,14 @@ pub(crate) fn percent_format_mixed_positional_and_named(
 pub(crate) fn percent_format_positional_count_mismatch(
     checker: &Checker,
     summary: &CFormatSummary,
-    right: &Expr,
+    right: Expr<'_>,
     location: TextRange,
 ) {
     if !summary.keywords.is_empty() {
         return;
     }
 
-    if let Expr::Tuple(tuple) = right {
+    if let ExprKind::Tuple(tuple) = right.classify() {
         let mut found = 0;
         for element in tuple {
             if element.is_starred_expr() {
@@ -788,12 +794,12 @@ pub(crate) fn percent_format_positional_count_mismatch(
 pub(crate) fn percent_format_star_requires_sequence(
     checker: &Checker,
     summary: &CFormatSummary,
-    right: &Expr,
+    right: Expr<'_>,
     location: TextRange,
 ) {
     if summary.starred {
-        match right {
-            Expr::Dict(_) | Expr::DictComp(_) => {
+        match right.classify() {
+            ExprKind::Dict(_) | ExprKind::DictComp(_) => {
                 checker.report_diagnostic(PercentFormatStarRequiresSequence, location);
             }
             _ => {}
@@ -804,18 +810,20 @@ pub(crate) fn percent_format_star_requires_sequence(
 /// F522
 pub(crate) fn string_dot_format_extra_named_arguments(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call: ExprCall<'_>,
     summary: &FormatSummary,
-    keywords: &[Keyword],
+    keywords: NodeList<'_, ruff_python_ast::kind::Keyword>,
 ) {
     // If there are any **kwargs, abort.
     if has_star_star_kwargs(keywords) {
         return;
     }
 
-    let keyword_names = keywords
-        .iter()
-        .filter_map(|Keyword { arg, value, .. }| Some((arg.as_ref()?, value)));
+    let keyword_names = keywords.iter().filter_map(|keyword| {
+        let arg = keyword.arg();
+        let value = keyword.value();
+        Some((arg?, value))
+    });
 
     let mut side_effects = false;
     let missing: Vec<(usize, &Name)> = keyword_names
@@ -826,7 +834,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
             } else {
                 side_effects |=
                     contains_effect(value, |id| checker.semantic().has_builtin_binding(id));
-                Some((index, &keyword.id))
+                Some((index, keyword.id()))
             }
         })
         .collect();
@@ -864,20 +872,20 @@ pub(crate) fn string_dot_format_extra_named_arguments(
 /// F523
 pub(crate) fn string_dot_format_extra_positional_arguments(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call: ExprCall<'_>,
     summary: &FormatSummary,
-    args: &[Expr],
+    args: NodeList<'_, ruff_python_ast::kind::Expr>,
 ) {
     // We can only fix if the positional arguments we're removing don't require re-indexing
     // the format string itself. For example, we can't fix `"{1}{2}".format(0, 1, 2)"`, since
     // this requires changing the format string to `"{0}{1}"`. But we can fix
     // `"{0}{1}".format(0, 1, 2)`, since this only requires modifying the call arguments.
-    fn is_contiguous_from_end<T>(indexes: &[usize], target: &[T]) -> bool {
+    fn is_contiguous_from_end(indexes: &[usize], target_len: usize) -> bool {
         if indexes.is_empty() {
             return true;
         }
 
-        let mut expected_index = target.len() - 1;
+        let mut expected_index = target_len - 1;
         for &index in indexes.iter().rev() {
             if index != expected_index {
                 return false;
@@ -920,7 +928,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         call.range(),
     );
 
-    if is_contiguous_from_end(&missing, args) {
+    if is_contiguous_from_end(&missing, args.len()) {
         diagnostic.try_set_fix(|| {
             let edit = remove_unused_positional_arguments_from_format_call(
                 &missing,
@@ -944,10 +952,10 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
 /// F524
 pub(crate) fn string_dot_format_missing_argument(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call: &ast::ExprCallFields<'_>,
     summary: &FormatSummary,
-    args: &[Expr],
-    keywords: &[Keyword],
+    args: NodeList<'_, ruff_python_ast::kind::Expr>,
+    keywords: NodeList<'_, ruff_python_ast::kind::Keyword>,
 ) {
     if has_star_args(args) || has_star_star_kwargs(keywords) {
         return;
@@ -956,8 +964,8 @@ pub(crate) fn string_dot_format_missing_argument(
     let keywords: FxHashSet<_> = keywords
         .iter()
         .filter_map(|k| {
-            let Keyword { arg, .. } = &k;
-            arg.as_ref().map(ruff_python_ast::Identifier::id)
+            let arg = k.arg();
+            arg.map(Identifier::id)
         })
         .collect();
 
@@ -977,17 +985,17 @@ pub(crate) fn string_dot_format_missing_argument(
         .collect();
 
     if !missing.is_empty() {
-        checker.report_diagnostic(StringDotFormatMissingArguments { missing }, call.range());
+        checker.report_diagnostic(StringDotFormatMissingArguments { missing }, call.range);
     }
 }
 
 /// F525
 pub(crate) fn string_dot_format_mixing_automatic(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call: &ast::ExprCallFields<'_>,
     summary: &FormatSummary,
 ) {
     if !(summary.autos.is_empty() || summary.indices.is_empty()) {
-        checker.report_diagnostic(StringDotFormatMixingAutomatic, call.range());
+        checker.report_diagnostic(StringDotFormatMixingAutomatic, call.range);
     }
 }

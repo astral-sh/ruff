@@ -1,7 +1,7 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprCall, ExprKind, Stmt, StmtKind};
 use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::{Ranged, TextSize};
 
@@ -70,7 +70,7 @@ impl Violation for SuperCallWithParameters {
 }
 
 /// UP008
-pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn super_call_with_parameters(checker: &Checker, call: ExprCall<'_>) {
     // Only bother going through the super check at all if we're in a `super` call.
     // (We check this in `super_args` too, so this is just an optimization.)
     if !is_super_call_with_arguments(call, checker) {
@@ -93,24 +93,22 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     // For a `super` invocation to be unnecessary, the first argument needs to match
     // the enclosing class, and the second argument needs to match the first
     // argument to the enclosing function.
-    let [first_arg, second_arg] = &*call.arguments.args else {
+    let Some([first_arg, second_arg]) = call.arguments().args().as_array() else {
         return;
     };
 
     // Find the enclosing callable and extract the name of its first parameter.
     let (parent_arg_name, has_local_dunder_class_var_ref) = match &callable_scope.kind {
         ScopeKind::Function(_) => {
-            let Some(
-                func_stmt @ Stmt::FunctionDef(ast::StmtFunctionDef {
-                    parameters: parent_parameters,
-                    ..
-                }),
-            ) = parents.find(|stmt| stmt.is_function_def_stmt())
-            else {
+            let Some(func_stmt @ stmt) = parents.find(|stmt| stmt.is_function_def_stmt()) else {
                 return;
             };
+            let StmtKind::FunctionDef(function_def) = stmt.classify() else {
+                return;
+            };
+            let parent_parameters = function_def.parameters();
 
-            let Some(parent_arg) = parent_parameters.args.first() else {
+            let Some(parent_arg) = parent_parameters.args().first() else {
                 return;
             };
 
@@ -121,12 +119,14 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
                 }),
             )
         }
-        ScopeKind::Lambda(ast::ExprLambda {
-            parameters: Some(parent_parameters),
-            body,
-            ..
-        }) => {
-            let Some(parent_arg) = parent_parameters.args.first() else {
+        ScopeKind::Lambda(expr_lambda)
+            if let ast::ExprLambdaFields {
+                parameters: Some(parent_parameters),
+                body,
+                ..
+            } = expr_lambda.fields() =>
+        {
+            let Some(parent_arg) = parent_parameters.args().first() else {
                 return;
             };
 
@@ -148,25 +148,23 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         let ScopeKind::Class(class_def) = &scope.kind else {
             return None;
         };
-        Some(*class_def)
+        Some(class_def)
     });
 
     // Find the enclosing class definition (if any).
-    let Some(ast::StmtClassDef {
+    let Some(ast::StmtClassDefFields {
         name: parent_name,
         decorator_list,
         ..
-    }) = enclosing_classes.next()
+    }) = enclosing_classes.next().map(|node| node.fields())
     else {
         return;
     };
 
-    let Expr::Name(ast::ExprName {
-        id: second_arg_id, ..
-    }) = second_arg
-    else {
+    let ExprKind::Name(name_node) = second_arg.classify() else {
         return;
     };
+    let second_arg_id = name_node.id();
 
     if second_arg_id != parent_arg_name {
         return;
@@ -175,8 +173,10 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     // Verify the first argument matches the enclosing class chain.
     // For `super(__class__, self)` or `super(ClassName, self)`, just check the immediate class.
     // For `super(Outer.Inner, self)`, verify each segment matches the enclosing class nesting.
-    match first_arg {
-        Expr::Name(ast::ExprName { id, .. }) => {
+    match first_arg.classify() {
+        ExprKind::Name(expr_name) => {
+            let id = expr_name.id();
+
             if callable_scope.has(id) {
                 return;
             }
@@ -189,7 +189,7 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
                 return;
             }
         }
-        Expr::Attribute(_) => {
+        ExprKind::Attribute(_) => {
             let chain = collect_attribute_chain(first_arg);
             // The innermost name must match the immediately enclosing class.
             if chain.last() != Some(&parent_name.as_str()) {
@@ -197,10 +197,10 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
             }
             // Each preceding name must match the next enclosing class.
             for name in chain.iter().rev().skip(1) {
-                let Some(ast::StmtClassDef {
+                let Some(ast::StmtClassDefFields {
                     name: enclosing_name,
                     ..
-                }) = enclosing_classes.next()
+                }) = enclosing_classes.next().map(|node| node.fields())
                 else {
                     return;
                 };
@@ -222,12 +222,11 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     //
     // See: https://docs.python.org/3/library/dataclasses.html#dataclasses.dataclass
     if decorator_list.iter().any(|decorator| {
-        let Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) = &decorator.expression
-        else {
+        let ExprKind::Call(call_node) = decorator.expression().classify() else {
             return false;
         };
+        let func = call_node.func();
+        let arguments = call_node.arguments();
 
         if checker
             .semantic()
@@ -236,8 +235,11 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         {
             arguments.find_keyword("slots").is_some_and(|keyword| {
                 matches!(
-                    keyword.value,
-                    Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. })
+                    keyword.value().fields(),
+                    ast::ExprFields::BooleanLiteral(ast::ExprBooleanLiteralFields {
+                        value: true,
+                        ..
+                    })
                 )
             })
         } else {
@@ -247,11 +249,15 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(SuperCallWithParameters, call.arguments.range());
+    let mut diagnostic =
+        checker.report_diagnostic(SuperCallWithParameters, call.arguments().range());
 
     // Only provide a fix if there are no keyword arguments, since super() doesn't accept keyword arguments
-    if call.arguments.keywords.is_empty() {
-        let applicability = if checker.comment_ranges().intersects(call.arguments.range()) {
+    if call.arguments().keywords().is_empty() {
+        let applicability = if checker
+            .comment_ranges()
+            .intersects(call.arguments().range())
+        {
             Applicability::Unsafe
         } else {
             Applicability::Safe
@@ -259,8 +265,8 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
 
         diagnostic.set_fix(Fix::applicable_edit(
             Edit::deletion(
-                call.arguments.start() + TextSize::new(1),
-                call.arguments.end() - TextSize::new(1),
+                call.arguments().start() + TextSize::new(1),
+                call.arguments().end() - TextSize::new(1),
             ),
             applicability,
         ));
@@ -270,16 +276,21 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
 /// Collects the chain of names from an attribute expression.
 ///
 /// For example, `A.B.C` returns `["A", "B", "C"]`.
-fn collect_attribute_chain(expr: &Expr) -> Vec<&str> {
+fn collect_attribute_chain(expr: Expr<'_>) -> Vec<&str> {
     let mut chain = Vec::new();
     let mut current = expr;
     loop {
-        match current {
-            Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
-                chain.push(attr.id.as_str());
+        match current.classify() {
+            ExprKind::Attribute(expr_attribute) => {
+                let value = expr_attribute.value();
+                let attr = expr_attribute.attr();
+
+                chain.push(attr.id().as_str());
                 current = value;
             }
-            Expr::Name(ast::ExprName { id, .. }) => {
+            ExprKind::Name(expr_name) => {
+                let id = expr_name.id();
+
                 chain.push(id.as_str());
                 break;
             }
@@ -291,8 +302,8 @@ fn collect_attribute_chain(expr: &Expr) -> Vec<&str> {
 }
 
 /// Returns `true` if a call is an argumented `super` invocation.
-fn is_super_call_with_arguments(call: &ast::ExprCall, checker: &Checker) -> bool {
-    checker.semantic().match_builtin_expr(&call.func, "super") && !call.arguments.is_empty()
+fn is_super_call_with_arguments(call: ExprCall<'_>, checker: &Checker) -> bool {
+    checker.semantic().match_builtin_expr(call.func(), "super") && !call.arguments().is_empty()
 }
 
 /// Returns `true` if the callable body contains load references to `__class__` or `super` without
@@ -316,9 +327,9 @@ fn has_local_dunder_class_var_ref(
 }
 
 /// Returns `true` if the call is to the built-in `builtins.super` function.
-fn is_builtins_super(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
+fn is_builtins_super(semantic: &SemanticModel, call: ExprCall<'_>) -> bool {
     semantic
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func())
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["builtins", "super"]))
 }
 
@@ -341,9 +352,9 @@ impl ClassCellReferenceFinder {
 }
 
 impl<'a> Visitor<'a> for ClassCellReferenceFinder {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::ClassDef(_) => {}
+    fn visit_stmt(&mut self, stmt: Stmt<'a>) {
+        match stmt.classify() {
+            StmtKind::ClassDef(_) => {}
             _ => {
                 if !self.has_class_cell {
                     walk_stmt(self, stmt);
@@ -352,9 +363,9 @@ impl<'a> Visitor<'a> for ClassCellReferenceFinder {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: Expr<'a>) {
         if expr.as_name_expr().is_some_and(|name| {
-            matches!(name.id.as_str(), "super" | "__class__") && name.ctx.is_load()
+            matches!(name.id().as_str(), "super" | "__class__") && name.ctx().is_load()
         }) {
             self.has_class_cell = true;
             return;

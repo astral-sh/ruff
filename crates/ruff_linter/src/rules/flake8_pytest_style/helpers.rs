@@ -1,7 +1,10 @@
 use std::fmt;
 
 use ruff_python_ast::helpers::{is_const_true, map_callable};
-use ruff_python_ast::{self as ast, Decorator, Expr, ExprCall, Keyword, Stmt, StmtFunctionDef};
+use ruff_python_ast::{
+    self as ast, Decorator, Expr, ExprCall, ExprKind, InterpolatedStringElementKind, Keyword,
+    NodeList, StmtFunctionDef, StmtKind,
+};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_python_trivia::PythonWhitespace;
@@ -10,11 +13,11 @@ use crate::checkers::ast::Checker;
 use crate::preview::is_pytest_asyncio_enabled;
 
 pub(super) fn get_mark_decorators<'a>(
-    decorators: &'a [Decorator],
+    decorators: NodeList<'a, ast::kind::Decorator>,
     semantic: &'a SemanticModel,
-) -> impl Iterator<Item = (&'a Decorator, &'a str)> + 'a {
+) -> impl Iterator<Item = (Decorator<'a>, &'a str)> + 'a {
     decorators.iter().filter_map(move |decorator| {
-        let expr = map_callable(&decorator.expression);
+        let expr = map_callable(decorator.expression());
         let qualified_name = semantic.resolve_qualified_name(expr)?;
         match qualified_name.segments() {
             ["pytest", "mark", marker] => Some((decorator, *marker)),
@@ -23,16 +26,16 @@ pub(super) fn get_mark_decorators<'a>(
     })
 }
 
-pub(super) fn is_pytest_fail(call: &Expr, semantic: &SemanticModel) -> bool {
+pub(super) fn is_pytest_fail(call: Expr<'_>, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(call)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "fail"]))
 }
 
-pub(crate) fn is_pytest_fixture(decorator: &Decorator, checker: &Checker) -> bool {
+pub(crate) fn is_pytest_fixture(decorator: Decorator<'_>, checker: &Checker) -> bool {
     checker
         .semantic()
-        .resolve_qualified_name(map_callable(&decorator.expression))
+        .resolve_qualified_name(map_callable(decorator.expression()))
         .is_some_and(|qualified_name| {
             matches!(qualified_name.segments(), ["pytest", "fixture"])
                 || matches!(
@@ -43,17 +46,17 @@ pub(crate) fn is_pytest_fixture(decorator: &Decorator, checker: &Checker) -> boo
         })
 }
 
-pub(super) fn is_pytest_yield_fixture(decorator: &Decorator, semantic: &SemanticModel) -> bool {
+pub(super) fn is_pytest_yield_fixture(decorator: Decorator<'_>, semantic: &SemanticModel) -> bool {
     semantic
-        .resolve_qualified_name(map_callable(&decorator.expression))
+        .resolve_qualified_name(map_callable(decorator.expression()))
         .is_some_and(|qualified_name| {
             matches!(qualified_name.segments(), ["pytest", "yield_fixture"])
         })
 }
 
-pub(super) fn is_pytest_parametrize(call: &ExprCall, semantic: &SemanticModel) -> bool {
+pub(super) fn is_pytest_parametrize(call: ExprCall<'_>, semantic: &SemanticModel) -> bool {
     semantic
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func())
         .is_some_and(|qualified_name| {
             matches!(qualified_name.segments(), ["pytest", "mark", "parametrize"])
         })
@@ -66,22 +69,25 @@ pub(super) fn is_pytest_parametrize(call: &ExprCall, semantic: &SemanticModel) -
 /// pytest hook wrapper protocol.
 ///
 /// See: <https://docs.pytest.org/en/stable/how-to/writing_hook_functions.html#hook-wrappers-executing-around-other-hooks>
-pub(crate) fn is_pytest_hookimpl_wrapper(decorator: &Decorator, semantic: &SemanticModel) -> bool {
-    let Expr::Call(call) = &decorator.expression else {
+pub(crate) fn is_pytest_hookimpl_wrapper(
+    decorator: Decorator<'_>,
+    semantic: &SemanticModel,
+) -> bool {
+    let ExprKind::Call(call) = decorator.expression().classify() else {
         return false;
     };
 
     // Check if it's pytest.hookimpl
     let is_hookimpl = semantic
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func())
         .is_some_and(|name| matches!(name.segments(), ["pytest", "hookimpl"]));
 
     if !is_hookimpl {
         return false;
     }
 
-    let wrapper = call.arguments.find_argument_value("wrapper", 6);
-    let hookwrapper = call.arguments.find_argument_value("hookwrapper", 1);
+    let wrapper = call.arguments().find_argument_value("wrapper", 6);
+    let hookwrapper = call.arguments().find_argument_value("hookwrapper", 1);
 
     wrapper.or(hookwrapper).is_some_and(is_const_true)
 }
@@ -99,10 +105,10 @@ pub(crate) fn is_pytest_hookimpl_wrapper(decorator: &Decorator, semantic: &Seman
 /// References:
 /// - [`pytest` documentation: Conventions for Python test discovery](https://docs.pytest.org/en/stable/explanation/goodpractices.html#conventions-for-python-test-discovery)
 /// - [`pytest` documentation: Changing naming conventions](https://docs.pytest.org/en/stable/example/pythoncollection.html#changing-naming-conventions)
-pub(crate) fn is_likely_pytest_test(func: &StmtFunctionDef, checker: &Checker) -> bool {
+pub(crate) fn is_likely_pytest_test(func: StmtFunctionDef<'_>, checker: &Checker) -> bool {
     let semantic = checker.semantic();
 
-    if !func.name.starts_with("test") {
+    if !func.name().starts_with("test") {
         return false;
     }
 
@@ -114,36 +120,43 @@ pub(crate) fn is_likely_pytest_test(func: &StmtFunctionDef, checker: &Checker) -
         return false;
     };
 
-    if !class.name.starts_with("Test") {
+    if !class.name().starts_with("Test") {
         return false;
     }
 
-    class.body.iter().all(|stmt| {
-        let Stmt::FunctionDef(function) = stmt else {
+    class.body().iter().all(|stmt| {
+        let StmtKind::FunctionDef(function) = stmt.classify() else {
             return true;
         };
 
-        !visibility::is_init(&function.name)
+        !visibility::is_init(function.name().as_str())
     })
 }
 
-pub(super) fn keyword_is_literal(keyword: &Keyword, literal: &str) -> bool {
-    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &keyword.value {
+pub(super) fn keyword_is_literal(keyword: Keyword<'_>, literal: &str) -> bool {
+    if let ExprKind::StringLiteral(string_literal) = keyword.value().classify() {
+        let value = string_literal.value();
         value == literal
     } else {
         false
     }
 }
 
-pub(super) fn is_empty_or_null_string(expr: &Expr) -> bool {
-    match expr {
-        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
-        Expr::NoneLiteral(_) => true,
-        Expr::FString(ast::ExprFString { value, .. }) => {
+pub(super) fn is_empty_or_null_string(expr: Expr<'_>) -> bool {
+    match expr.classify() {
+        ExprKind::StringLiteral(expr_string_literal) => {
+            let value = expr_string_literal.value();
+
+            value.is_empty()
+        }
+        ExprKind::NoneLiteral(_) => true,
+        ExprKind::FString(expr_f_string) => {
+            let value = expr_f_string.value();
+
             value.iter().all(|f_string_part| match f_string_part {
-                ast::FStringPartRef::Literal(literal) => literal.is_empty(),
-                ast::FStringPartRef::FString(f_string) => f_string
-                    .elements
+                ast::FStringPartView::Literal(literal) => literal.is_empty(),
+                ast::FStringPartView::FString(f_string) => f_string
+                    .elements()
                     .iter()
                     .all(is_empty_or_null_interpolated_string_element),
             })
@@ -152,16 +165,18 @@ pub(super) fn is_empty_or_null_string(expr: &Expr) -> bool {
     }
 }
 
-fn is_empty_or_null_interpolated_string_element(element: &ast::InterpolatedStringElement) -> bool {
-    match element {
-        ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
-            value,
-            ..
-        }) => value.is_empty(),
-        ast::InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
-            expression,
-            ..
-        }) => is_empty_or_null_string(expression),
+fn is_empty_or_null_interpolated_string_element(
+    element: ast::InterpolatedStringElement<'_>,
+) -> bool {
+    match element.classify() {
+        InterpolatedStringElementKind::Literal(interpolated_string_literal_element) => {
+            let value = interpolated_string_literal_element.value();
+            value.is_empty()
+        }
+        InterpolatedStringElementKind::Interpolation(interpolated_element) => {
+            let expression = interpolated_element.expression();
+            is_empty_or_null_string(expression)
+        }
     }
 }
 

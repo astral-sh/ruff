@@ -1,8 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{
-    DictItem, Expr, ExprAttribute, ExprCall, ExprDict, ExprNumberLiteral, ExprStringLiteral,
-    ExprSubscript, ExprUnaryOp, Keyword, Number, UnaryOp,
-};
+use ruff_python_ast::{self as ast, Expr, ExprKind, Number, UnaryOp};
 use ruff_python_semantic::{SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
 
@@ -75,8 +72,8 @@ impl AlwaysFixableViolation for MissingMaxsplitArg<'_> {
     }
 }
 
-fn is_string(expr: &Expr, semantic: &SemanticModel) -> bool {
-    if let Expr::Name(name) = expr {
+fn is_string(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
+    if let ExprKind::Name(name) = expr.classify() {
         semantic
             .only_binding(name)
             .is_some_and(|binding_id| typing::is_string(semantic.binding(binding_id), semantic))
@@ -88,27 +85,31 @@ fn is_string(expr: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// PLC0207
-pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr, expr: &Expr) {
+pub(crate) fn missing_maxsplit_arg(
+    checker: &Checker,
+    value: Expr<'_>,
+    slice: Expr<'_>,
+    &expr: &Expr<'_>,
+) {
     // Check the sliced expression is a function
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = value
-    else {
+    let ExprKind::Call(call_node) = value.classify() else {
         return;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
     // Check the slice index is either 0 or -1 (first or last value)
-    let index = match slice {
-        Expr::NumberLiteral(ExprNumberLiteral {
+    let index = match slice.fields() {
+        ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
             value: Number::Int(number_value),
             ..
         }) => number_value.as_i64(),
-        Expr::UnaryOp(ExprUnaryOp {
+        ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
             op: UnaryOp::USub,
             operand,
             ..
-        }) => match operand.as_ref() {
-            Expr::NumberLiteral(ExprNumberLiteral {
+        }) => match operand.fields() {
+            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
                 value: Number::Int(number_value),
                 ..
             }) => number_value.as_i64().map(|number| -number),
@@ -123,9 +124,11 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
         _ => return,
     };
 
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = func.as_ref() else {
+    let ExprKind::Attribute(attribute) = func.classify() else {
         return;
     };
+    let attr = attribute.attr();
+    let value = attribute.value();
 
     // Check the function is "split" or "rsplit"
     let actual_split_type = attr.as_str();
@@ -139,17 +142,18 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
     // split/rsplit calls to find the original string value, since
     // `str.split()` returns `list[str]` and subscripting that gives a `str`.
     loop {
-        match target_instance.as_ref() {
-            Expr::Subscript(ExprSubscript { value, .. }) => {
+        match target_instance.classify() {
+            ExprKind::Subscript(expr_subscript) => {
+                let value = expr_subscript.value();
+
                 target_instance = value;
             }
-            Expr::Call(ExprCall { func, .. }) => {
-                if let Expr::Attribute(ExprAttribute {
-                    attr,
-                    value: call_value,
-                    ..
-                }) = func.as_ref()
-                {
+            ExprKind::Call(expr_call) => {
+                let func = expr_call.func();
+
+                if let ExprKind::Attribute(attribute_node) = func.classify() {
+                    let attr = attribute_node.attr();
+                    let call_value = attribute_node.value();
                     if matches!(attr.as_str(), "split" | "rsplit") {
                         target_instance = call_value;
                         continue;
@@ -172,13 +176,17 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
     }
 
     // Check maxsplit kwarg not set via unpacked dict literal
-    for keyword in &*arguments.keywords {
-        let Keyword { value, .. } = keyword;
+    for keyword in arguments.keywords() {
+        let value = keyword.value();
 
-        if let Expr::Dict(ExprDict { items, .. }) = value {
+        if let ExprKind::Dict(dict_node) = value.classify() {
+            let items = dict_node.items();
             for item in items {
-                let DictItem { key, .. } = item;
-                if let Some(Expr::StringLiteral(ExprStringLiteral { value, .. })) = key {
+                if let Some(ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields {
+                    value,
+                    ..
+                })) = item.key().map(Expr::fields)
+                {
                     if value.to_str() == "maxsplit" {
                         return;
                     }
@@ -217,11 +225,14 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
         maxsplit_argument_edit,
         split_type_edit,
         // Mark the fix as unsafe, if there are `*args` or `**kwargs`
-        if arguments.args.iter().any(Expr::is_starred_expr)
+        if arguments
+            .args()
+            .iter()
+            .any(ruff_python_ast::Expr::is_starred_expr)
             || arguments
-                .keywords
+                .keywords()
                 .iter()
-                .any(|keyword| keyword.arg.is_none())
+                .any(|keyword| keyword.arg().is_none())
         {
             Applicability::Unsafe
         } else {

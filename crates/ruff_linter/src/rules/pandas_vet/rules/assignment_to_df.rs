@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{ExprKind, NodeList};
 use ruff_text_size::Ranged;
 
 use crate::{Violation, checkers::ast::Checker, codes::Category};
@@ -43,13 +43,17 @@ impl Violation for PandasDfVariableName {
 }
 
 /// PD901
-pub(crate) fn assignment_to_df(checker: &Checker, targets: &[Expr]) {
-    let [target] = targets else {
+pub(crate) fn assignment_to_df(
+    checker: &Checker,
+    targets: NodeList<'_, ruff_python_ast::kind::Expr>,
+) {
+    let Some([target]) = targets.as_array() else {
         return;
     };
-    let Expr::Name(ast::ExprName { id, .. }) = target else {
+    let ExprKind::Name(name_node) = target.classify() else {
         return;
     };
+    let id = name_node.id();
     if id != "df" {
         return;
     }

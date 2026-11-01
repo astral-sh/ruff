@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{ExprKind, NodeList};
 
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
@@ -50,21 +51,23 @@ impl Violation for NanComparison {
 }
 
 /// PLW0177
-pub(crate) fn nan_comparison(checker: &Checker, operands: &[Expr]) {
+pub(crate) fn nan_comparison(checker: &Checker, operands: NodeList<'_, ast::kind::Expr>) {
     nan_comparison_impl(checker, operands.iter());
 }
 
 /// PLW0177
-pub(crate) fn nan_comparison_match(checker: &Checker, cases: &[ast::MatchCase]) {
+pub(crate) fn nan_comparison_match(checker: &Checker, cases: NodeList<'_, ast::kind::MatchCase>) {
     nan_comparison_impl(
         checker,
-        cases
-            .iter()
-            .filter_map(|case| case.pattern.as_match_value().map(|pattern| &*pattern.value)),
+        cases.iter().filter_map(|case| {
+            case.pattern()
+                .as_match_value()
+                .map(ast::PatternMatchValue::value)
+        }),
     );
 }
 
-fn nan_comparison_impl<'a>(checker: &Checker, comparators: impl Iterator<Item = &'a Expr>) {
+fn nan_comparison_impl<'a>(checker: &Checker, comparators: impl Iterator<Item = Expr<'a>>) {
     for expr in comparators {
         if let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) {
             match qualified_name.segments() {
@@ -102,21 +105,20 @@ impl std::fmt::Display for Nan {
 }
 
 /// Returns `true` if the expression is a call to `float("NaN")`.
-fn is_nan_float(expr: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
-    }) = expr
-    else {
+fn is_nan_float(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
+    let ExprKind::Call(call_node) = expr.classify() else {
         return false;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
+    let args = arguments.args();
+    let keywords = arguments.keywords();
 
     if !keywords.is_empty() {
         return false;
     }
 
-    let [expr] = &**args else {
+    let Some([expr]) = args.as_array() else {
         return false;
     };
     if as_nan_float_string_literal(expr).is_none() {

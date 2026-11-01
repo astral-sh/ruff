@@ -1,13 +1,13 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, UnaryOp};
+use ruff_python_ast::{Builder, Expr, ExprKind, build};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
-use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parenthesized_range;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::fix::syntax;
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -152,10 +152,10 @@ impl AlwaysFixableViolation for IfExprWithTwistedArms {
 /// SIM210
 pub(crate) fn if_expr_with_true_false(
     checker: &Checker,
-    expr: &Expr,
-    test: &Expr,
-    body: &Expr,
-    orelse: &Expr,
+    &expr: &Expr<'_>,
+    test: Expr<'_>,
+    body: Expr<'_>,
+    orelse: Expr<'_>,
 ) {
     if !is_const_true(body) || !is_const_false(orelse) {
         return;
@@ -172,36 +172,18 @@ pub(crate) fn if_expr_with_true_false(
             checker
                 .locator()
                 .slice(
-                    parenthesized_range(test.into(), expr.into(), checker.tokens())
+                    parenthesized_range(test, expr.into(), checker.tokens())
                         .unwrap_or(test.range()),
                 )
                 .to_string(),
             expr.range(),
         )));
     } else if checker.semantic().has_builtin_binding("bool") {
+        let mut builder = Builder::default();
+        let args = builder.copy_nodes([test]);
+        let replacement = syntax::call_name(&mut builder, "bool", args);
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            checker.generator().expr(
-                &ast::ExprCall {
-                    func: Box::new(
-                        ast::ExprName {
-                            id: Name::new_static("bool"),
-                            ctx: ExprContext::Load,
-                            range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                        }
-                        .into(),
-                    ),
-                    arguments: Arguments {
-                        args: [test.clone()].into(),
-                        keywords: std::iter::empty().collect(),
-                        range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                    },
-                    range_start: ruff_text_size::TextSize::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                }
-                .into(),
-            ),
+            checker.generator().expr(builder.get(replacement)),
             expr.range(),
         )));
     }
@@ -210,26 +192,20 @@ pub(crate) fn if_expr_with_true_false(
 /// SIM211
 pub(crate) fn if_expr_with_false_true(
     checker: &Checker,
-    expr: &Expr,
-    test: &Expr,
-    body: &Expr,
-    orelse: &Expr,
+    &expr: &Expr<'_>,
+    test: Expr<'_>,
+    body: Expr<'_>,
+    orelse: Expr<'_>,
 ) {
     if !is_const_false(body) || !is_const_true(orelse) {
         return;
     }
 
     let mut diagnostic = checker.report_diagnostic(IfExprWithFalseTrue, expr.range());
+    let mut builder = Builder::default();
+    let replacement = syntax::not_expr(&mut builder, test);
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        checker.generator().expr(
-            &ast::ExprUnaryOp {
-                op: UnaryOp::Not,
-                operand: Box::new(test.clone()),
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            }
-            .into(),
-        ),
+        checker.generator().expr(builder.get(replacement)),
         expr.range(),
     )));
 }
@@ -237,31 +213,29 @@ pub(crate) fn if_expr_with_false_true(
 /// SIM212
 pub(crate) fn twisted_arms_in_ifexpr(
     checker: &Checker,
-    expr: &Expr,
-    test: &Expr,
-    body: &Expr,
-    orelse: &Expr,
+    &expr: &Expr<'_>,
+    test: Expr<'_>,
+    body: Expr<'_>,
+    orelse: Expr<'_>,
 ) {
-    let Expr::UnaryOp(ast::ExprUnaryOp {
-        op,
-        operand,
-        range: _,
-        node_index: _,
-    }) = &test
-    else {
+    let ExprKind::UnaryOp(unary_op) = test.classify() else {
         return;
     };
+    let op = unary_op.op();
+    let operand = unary_op.operand();
     if !op.is_not() {
         return;
     }
 
     // Check if the test operand and else branch use the same variable.
-    let Expr::Name(ast::ExprName { id: test_id, .. }) = operand.as_ref() else {
+    let ExprKind::Name(name_node) = operand.classify() else {
         return;
     };
-    let Expr::Name(ast::ExprName { id: orelse_id, .. }) = orelse else {
+    let test_id = name_node.id();
+    let ExprKind::Name(name_node) = orelse.classify() else {
         return;
     };
+    let orelse_id = name_node.id();
     if !test_id.eq(orelse_id) {
         return;
     }
@@ -273,18 +247,16 @@ pub(crate) fn twisted_arms_in_ifexpr(
         },
         expr.range(),
     );
-    let node = body.clone();
-    let node1 = orelse.clone();
-    let node2 = orelse.clone();
-    let node3 = ast::ExprIf {
-        test: Box::new(node2),
-        body: Box::new(node1),
-        orelse: Box::new(node),
+    let mut builder = Builder::default();
+    let replacement = build::ExprIf {
+        test: builder.copy_node(operand),
+        body: builder.copy_node(orelse),
+        orelse: builder.copy_node(body),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
+    let replacement = builder.add(replacement);
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-        checker.generator().expr(&node3.into()),
+        checker.generator().expr(builder.get(replacement).into()),
         expr.range(),
     )));
 }

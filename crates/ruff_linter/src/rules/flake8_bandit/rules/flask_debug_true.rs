@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_true;
-use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::{self as ast, ExprKind};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
@@ -51,10 +51,12 @@ impl Violation for FlaskDebugTrue {
 }
 
 /// S201
-pub(crate) fn flask_debug_true(checker: &Checker, call: &ExprCall) {
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
+pub(crate) fn flask_debug_true(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    let ExprKind::Attribute(attribute) = call.func.classify() else {
         return;
     };
+    let attr = attribute.attr();
+    let value = attribute.value();
 
     if attr.as_str() != "run" {
         return;
@@ -64,7 +66,7 @@ pub(crate) fn flask_debug_true(checker: &Checker, call: &ExprCall) {
         return;
     };
 
-    if !is_const_true(&debug_argument.value) {
+    if !is_const_true(debug_argument.value()) {
         return;
     }
 

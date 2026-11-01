@@ -58,8 +58,8 @@ impl Violation for CompareToEmptyString {
 }
 
 /// PLC1901
-pub(crate) fn compare_to_empty_string(checker: &Checker, compare: &ExprCompare) {
-    if !compare.operands.iter().any(is_empty_string) {
+pub(crate) fn compare_to_empty_string(checker: &Checker, compare: ExprCompare<'_>) {
+    if !compare.operands().iter().any(is_empty_string) {
         return;
     }
 
@@ -74,7 +74,7 @@ pub(crate) fn compare_to_empty_string(checker: &Checker, compare: &ExprCompare) 
 
     let mut first = true;
     for (lhs, op, rhs) in compare.iter() {
-        let Some(op) = EmptyStringCmpOp::from_operator(*op) else {
+        let Some(op) = EmptyStringCmpOp::from_operator(op) else {
             continue;
         };
         if std::mem::take(&mut first) && is_empty_string(lhs) {
@@ -106,8 +106,9 @@ pub(crate) fn compare_to_empty_string(checker: &Checker, compare: &ExprCompare) 
     }
 }
 
-fn is_empty_string(expr: &Expr) -> bool {
-    matches!(expr, Expr::StringLiteral(literal) if literal.value.is_empty())
+fn is_empty_string(expr: Expr<'_>) -> bool {
+    expr.as_string_literal_expr()
+        .is_some_and(|literal| literal.value().is_empty())
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]

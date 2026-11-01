@@ -66,7 +66,7 @@ impl Violation for OsPathGetmtime {
 }
 
 /// PTH204
-pub(crate) fn os_path_getmtime(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_path_getmtime(checker: &Checker, call: ExprCall<'_>, segments: &[&str]) {
     if segments != ["os", "path", "getmtime"] {
         return;
     }

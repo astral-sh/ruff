@@ -1,13 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, Keyword};
+use ruff_python_ast::{ExprCall, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::rules::flake8_comprehensions::fixes;
+use crate::rules::flake8_comprehensions::helpers::exactly_one_argument_with_matching_function;
 use crate::{AlwaysFixableViolation, Fix};
-
-use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for unnecessary list comprehensions.
@@ -45,32 +44,25 @@ impl AlwaysFixableViolation for UnnecessaryListComprehensionDict {
 }
 
 /// C404 (`dict([...])`)
-pub(crate) fn unnecessary_list_comprehension_dict(
-    checker: &Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
-    let Some(argument) =
-        helpers::exactly_one_argument_with_matching_function("dict", func, args, keywords)
-    else {
+pub(crate) fn unnecessary_list_comprehension_dict(checker: &Checker, call: ExprCall<'_>) {
+    let Some(argument) = exactly_one_argument_with_matching_function("dict", call) else {
         return;
     };
-    let Expr::ListComp(ast::ExprListComp { elt, .. }) = argument else {
+    let ExprKind::ListComp(list_comp) = argument.classify() else {
         return;
     };
-    let Expr::Tuple(tuple) = &**elt else {
+    let elt = list_comp.elt();
+    let ExprKind::Tuple(tuple) = elt.classify() else {
         return;
     };
-    if tuple.len() != 2 {
+    if tuple.elts().len() != 2 {
         return;
     }
     if !checker.semantic().has_builtin_binding("dict") {
         return;
     }
-    let mut diagnostic = checker.report_diagnostic(UnnecessaryListComprehensionDict, expr.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryListComprehensionDict, call.range());
     diagnostic.try_set_fix(|| {
-        fixes::fix_unnecessary_list_comprehension_dict(expr, checker).map(Fix::unsafe_edit)
+        fixes::fix_unnecessary_list_comprehension_dict(call.into(), checker).map(Fix::unsafe_edit)
     });
 }

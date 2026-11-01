@@ -1,14 +1,16 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, name::QualifiedName};
+use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::{self as ast, Builder, Expr, ExprKind};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits::add_argument;
+use crate::fix::syntax;
 use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
@@ -85,7 +87,7 @@ impl AlwaysFixableViolation for UnspecifiedEncoding {
 }
 
 /// PLW1514
-pub(crate) fn unspecified_encoding(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn unspecified_encoding(checker: &Checker, call: ast::ExprCall<'_>) {
     let Some((function_name, mode)) = Callee::try_from_call_expression(call, checker.semantic())
         .filter(|segments| is_violation(call, segments))
         .map(|segments| (segments.to_string(), segments.mode_argument()))
@@ -98,7 +100,7 @@ pub(crate) fn unspecified_encoding(checker: &Checker, call: &ast::ExprCall) {
             function_name,
             mode,
         },
-        call.func.range(),
+        call.func().range(),
     );
     diagnostic.set_fix(generate_keyword_fix(checker, call));
 }
@@ -113,8 +115,9 @@ enum Callee<'a> {
 }
 
 impl<'a> Callee<'a> {
-    fn is_pathlib_path_call(expr: &Expr, semantic: &SemanticModel) -> bool {
-        if let Expr::Call(ast::ExprCall { func, .. }) = expr {
+    fn is_pathlib_path_call(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
+        if let ExprKind::Call(call_node) = expr.classify() {
+            let func = call_node.func();
             semantic
                 .resolve_qualified_name(func)
                 .is_some_and(|qualified_name| {
@@ -126,26 +129,28 @@ impl<'a> Callee<'a> {
     }
 
     fn try_from_call_expression(
-        call: &'a ast::ExprCall,
+        call: ast::ExprCall<'a>,
         semantic: &'a SemanticModel,
     ) -> Option<Self> {
-        if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = call.func.as_ref() {
+        if let ExprKind::Attribute(attribute) = call.func().classify() {
+            let attr = attribute.attr();
+            let value = attribute.value();
             // Direct: Path(...).open()
             if Self::is_pathlib_path_call(value, semantic) {
-                return Some(Callee::Pathlib(attr));
+                return Some(Callee::Pathlib(attr.as_str()));
             }
             // Indirect: x.open() where x = Path(...)
-            else if let Expr::Name(name) = value.as_ref() {
+            else if let ExprKind::Name(name) = value.classify() {
                 if let Some(binding_id) = semantic.only_binding(name) {
                     let binding = semantic.binding(binding_id);
                     if typing::is_pathlib_path(binding, semantic) {
-                        return Some(Callee::Pathlib(attr));
+                        return Some(Callee::Pathlib(attr.as_str()));
                     }
                 }
             }
         }
 
-        if let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) {
+        if let Some(qualified_name) = semantic.resolve_qualified_name(call.func()) {
             return Some(Callee::Qualified(qualified_name));
         }
 
@@ -181,51 +186,53 @@ impl Display for Callee<'_> {
 }
 
 /// Generate an [`Edit`] to set `encoding="utf-8"`.
-fn generate_keyword_fix(checker: &Checker, call: &ast::ExprCall) -> Fix {
+fn generate_keyword_fix(checker: &Checker, call: ast::ExprCall<'_>) -> Fix {
+    let mut builder = Builder::default();
+    let encoding = syntax::string_literal(&mut builder, "utf-8", checker.default_string_flags());
     Fix::unsafe_edit(add_argument(
         &format!(
             "encoding={}",
-            checker.generator().expr(&Expr::from(ast::StringLiteral {
-                value: Box::from("utf-8"),
-                flags: checker.default_string_flags(),
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            }))
+            checker.generator().expr(builder.get(encoding))
         ),
-        &call.arguments,
+        call.arguments(),
         checker.tokens(),
     ))
 }
 
 /// Returns `true` if the given expression is a string literal containing a `b` character.
-fn is_binary_mode(expr: &Expr) -> Option<bool> {
+fn is_binary_mode(expr: Expr<'_>) -> Option<bool> {
     Some(
         expr.as_string_literal_expr()?
-            .value
+            .value()
             .chars()
             .any(|c| c == 'b'),
     )
 }
 
 /// Returns `true` if the given call lacks an explicit `encoding`.
-fn is_violation(call: &ast::ExprCall, qualified_name: &Callee) -> bool {
+fn is_violation(call: ast::ExprCall<'_>, qualified_name: &Callee) -> bool {
     // If we have something like `*args`, which might contain the encoding argument, abort.
-    if call.arguments.args.iter().any(Expr::is_starred_expr) {
+    if call
+        .arguments()
+        .args()
+        .iter()
+        .any(ast::Expr::is_starred_expr)
+    {
         return false;
     }
     // If we have something like `**kwargs`, which might contain the encoding argument, abort.
     if call
-        .arguments
-        .keywords
+        .arguments()
+        .keywords()
         .iter()
-        .any(|keyword| keyword.arg.is_none())
+        .any(|keyword| keyword.arg().is_none())
     {
         return false;
     }
     match qualified_name {
         Callee::Qualified(qualified_name) => match qualified_name.segments() {
             ["" | "builtins" | "codecs" | "_io", "open"] => {
-                if let Some(mode_arg) = call.arguments.find_argument_value("mode", 1) {
+                if let Some(mode_arg) = call.arguments().find_argument_value("mode", 1) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
                         // binary mode or unknown mode is no violation
                         return false;
@@ -240,7 +247,7 @@ fn is_violation(call: &ast::ExprCall, qualified_name: &Callee) -> bool {
                 };
 
                 // else mode not specified, defaults to text mode
-                call.arguments
+                call.arguments()
                     .find_argument_value("encoding", encoding_param_pos)
                     .is_none()
             }
@@ -249,7 +256,7 @@ fn is_violation(call: &ast::ExprCall, qualified_name: &Callee) -> bool {
                 tempfile_class @ ("TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile"),
             ] => {
                 let mode_pos = usize::from(*tempfile_class == "SpooledTemporaryFile");
-                if let Some(mode_arg) = call.arguments.find_argument_value("mode", mode_pos) {
+                if let Some(mode_arg) = call.arguments().find_argument_value("mode", mode_pos) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
                         // binary mode or unknown mode is no violation
                         return false;
@@ -258,28 +265,37 @@ fn is_violation(call: &ast::ExprCall, qualified_name: &Callee) -> bool {
                     // defaults to binary mode
                     return false;
                 }
-                call.arguments
+                call.arguments()
                     .find_argument_value("encoding", mode_pos + 2)
                     .is_none()
             }
-            ["io" | "_io", "TextIOWrapper"] => {
-                call.arguments.find_argument_value("encoding", 1).is_none()
-            }
+            ["io" | "_io", "TextIOWrapper"] => call
+                .arguments()
+                .find_argument_value("encoding", 1)
+                .is_none(),
             _ => false,
         },
         Callee::Pathlib(attr) => match *attr {
             "open" => {
-                if let Some(mode_arg) = call.arguments.find_argument_value("mode", 0) {
+                if let Some(mode_arg) = call.arguments().find_argument_value("mode", 0) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
                         // binary mode or unknown mode is no violation
                         return false;
                     }
                 }
                 // else mode not specified, defaults to text mode
-                call.arguments.find_argument_value("encoding", 2).is_none()
+                call.arguments()
+                    .find_argument_value("encoding", 2)
+                    .is_none()
             }
-            "read_text" => call.arguments.find_argument_value("encoding", 0).is_none(),
-            "write_text" => call.arguments.find_argument_value("encoding", 1).is_none(),
+            "read_text" => call
+                .arguments()
+                .find_argument_value("encoding", 0)
+                .is_none(),
+            "write_text" => call
+                .arguments()
+                .find_argument_value("encoding", 1)
+                .is_none(),
             _ => false,
         },
     }

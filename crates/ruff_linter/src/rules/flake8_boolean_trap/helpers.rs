@@ -1,6 +1,6 @@
 use ruff_db::diagnostic::Diagnostic;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, ExprKind, NodeList};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_subject_to_liskov_substitution_principle;
 
@@ -51,9 +51,9 @@ fn is_allowed_func_call(name: &str) -> bool {
 }
 
 /// Returns `true` if a call is semantically allowed to use a boolean trap.
-fn is_semantically_allowed_func_call(call: &ast::ExprCall, semantic: &SemanticModel) -> bool {
+fn is_semantically_allowed_func_call(call: ast::ExprCall<'_>, semantic: &SemanticModel) -> bool {
     semantic
-        .resolve_qualified_name(call.func.as_ref())
+        .resolve_qualified_name(call.func())
         .is_some_and(|qualified_name| {
             ["multiprocessing.Value"]
                 .iter()
@@ -64,12 +64,12 @@ fn is_semantically_allowed_func_call(call: &ast::ExprCall, semantic: &SemanticMo
 
 /// Returns `true` if a call is allowed by the user to use a boolean trap.
 fn is_user_allowed_func_call(
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     semantic: &SemanticModel,
     settings: &LinterSettings,
 ) -> bool {
     semantic
-        .resolve_qualified_name(call.func.as_ref())
+        .resolve_qualified_name(call.func())
         .is_some_and(|qualified_name| {
             settings
                 .flake8_boolean_trap
@@ -133,10 +133,16 @@ pub(super) fn is_allowed_func_def(name: &str) -> bool {
 /// Returns `true` if an argument is allowed to use a boolean trap. To return
 /// `true`, the function name must be explicitly allowed, and the argument must
 /// be either the first or second argument in the call.
-pub(super) fn allow_boolean_trap(call: &ast::ExprCall, checker: &Checker) -> bool {
-    let func_name = match call.func.as_ref() {
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr.as_str(),
-        Expr::Name(ast::ExprName { id, .. }) => id.as_str(),
+pub(super) fn allow_boolean_trap(call: ast::ExprCall<'_>, checker: &Checker) -> bool {
+    let func_name = match call.func().classify() {
+        ExprKind::Attribute(expr_attribute) => {
+            let attr = expr_attribute.attr();
+            attr.as_str()
+        }
+        ExprKind::Name(expr_name) => {
+            let id = expr_name.id();
+            id.as_str()
+        }
         _ => return false,
     };
 
@@ -149,7 +155,7 @@ pub(super) fn allow_boolean_trap(call: &ast::ExprCall, checker: &Checker) -> boo
     // If the function appears to be a setter (e.g., `set_visible` or `setVisible`), then the
     // boolean trap is allowed. We want to avoid raising a violation for cases in which the argument
     // is positional-only and third-party, and this tends to be the case for setters.
-    if call.arguments.args.len() == 1 {
+    if call.arguments().args().len() == 1 {
         // Ex) `foo.set(True)`
         if func_name == "set" {
             return true;
@@ -180,7 +186,7 @@ pub(super) fn allow_boolean_trap(call: &ast::ExprCall, checker: &Checker) -> boo
 pub(super) fn add_liskov_substitution_principle_help(
     diagnostic: &mut Diagnostic,
     function_name: &str,
-    decorator_list: &[ast::Decorator],
+    decorator_list: NodeList<'_, ast::kind::Decorator>,
     checker: &Checker,
 ) {
     let semantic = checker.semantic();

@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -51,17 +51,29 @@ impl Violation for HardcodedPasswordString {
     }
 }
 
-fn password_target(target: &Expr) -> Option<&str> {
-    let target_name = match target {
+fn password_target(target: Expr<'_>) -> Option<&str> {
+    let target_name = match target.classify() {
         // variable = "s3cr3t"
-        Expr::Name(ast::ExprName { id, .. }) => id.as_str(),
+        ExprKind::Name(expr_name) => {
+            let id = expr_name.id();
+            id.as_str()
+        }
         // d["password"] = "s3cr3t"
-        Expr::Subscript(ast::ExprSubscript { slice, .. }) => match slice.as_ref() {
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.to_str(),
-            _ => return None,
-        },
+        ExprKind::Subscript(expr_subscript) => {
+            let slice = expr_subscript.slice();
+            match slice.classify() {
+                ExprKind::StringLiteral(expr_string_literal) => {
+                    let value = expr_string_literal.value();
+                    value.to_str()
+                }
+                _ => return None,
+            }
+        }
         // obj.password = "s3cr3t"
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr,
+        ExprKind::Attribute(expr_attribute) => {
+            let attr = expr_attribute.attr();
+            attr.as_str()
+        }
         _ => return None,
     };
 
@@ -73,7 +85,10 @@ fn password_target(target: &Expr) -> Option<&str> {
 }
 
 /// S105
-pub(crate) fn compare_to_hardcoded_password_string(checker: &Checker, compare: &ast::ExprCompare) {
+pub(crate) fn compare_to_hardcoded_password_string(
+    checker: &Checker,
+    compare: ast::ExprCompare<'_>,
+) {
     for comp in compare.comparators() {
         if string_literal(comp).is_none_or(str::is_empty) {
             continue;
@@ -91,7 +106,11 @@ pub(crate) fn compare_to_hardcoded_password_string(checker: &Checker, compare: &
 }
 
 /// S105
-pub(crate) fn assign_hardcoded_password_string(checker: &Checker, value: &Expr, targets: &[Expr]) {
+pub(crate) fn assign_hardcoded_password_string<'a>(
+    checker: &Checker,
+    value: Expr<'_>,
+    targets: impl IntoIterator<Item = Expr<'a>>,
+) {
     if string_literal(value)
         .as_ref()
         .is_some_and(|string| !string.is_empty())

@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast as ast;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{ExprSubscript, StmtClassDef};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -152,7 +152,7 @@ impl Violation for NonPEP695GenericClass {
 }
 
 /// UP046
-pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassDef) {
+pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &ast::StmtClassDefFields<'_>) {
     // PEP-695 syntax is only available on Python 3.12+
     if checker.target_version() < PythonVersion::PY312 {
         return;
@@ -163,12 +163,9 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
         return;
     }
 
-    let StmtClassDef {
-        name,
-        type_params,
-        arguments,
-        ..
-    } = class_def;
+    let name = class_def.name;
+    let type_params = class_def.type_params;
+    let arguments = class_def.arguments;
 
     // it's a runtime error to mix type_params and Generic, so bail out early if we see existing
     // type_params
@@ -176,21 +173,23 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
         return;
     }
 
-    let Some(arguments) = arguments.as_ref() else {
+    let Some(arguments) = arguments else {
         return;
     };
 
-    let Some((generic_idx, generic_expr @ ExprSubscript { slice, range, .. })) =
+    let Some((generic_idx, generic_expr @ expr_subscript)) =
         find_generic(arguments, checker.semantic())
     else {
         return;
     };
+    let slice = expr_subscript.slice();
+    let range = expr_subscript.range();
 
     let mut diagnostic = checker.report_diagnostic(
         NonPEP695GenericClass {
             name: name.to_string(),
         },
-        *range,
+        range,
     );
 
     // only handle the case where Generic is at the end of the argument list, in line with PYI059
@@ -201,7 +200,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
     //
     // because `find_generic` also finds the *first* Generic argument, this has the additional
     // benefit of bailing out with a diagnostic if multiple Generic arguments are present
-    if generic_idx != arguments.args.len() - 1 {
+    if generic_idx != arguments.args().len() - 1 {
         return;
     }
 
@@ -246,7 +245,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
 
         diagnostic.try_set_fix(|| {
             let removal_edit = remove_argument(
-                generic_expr,
+                &generic_expr,
                 arguments,
                 Parentheses::Remove,
                 checker.source(),

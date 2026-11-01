@@ -10,7 +10,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, SecondaryCode};
 use ruff_notebook::Notebook;
-use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
+use ruff_python_ast::{PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseError, ParseOptions, Parsed, UnsupportedSyntaxError};
@@ -129,7 +129,7 @@ pub fn check_path(
     noqa: flags::Noqa,
     source_kind: &SourceKind,
     source_type: PySourceType,
-    parsed: &Parsed<ModModule>,
+    parsed: &Parsed<ruff_python_ast::kind::ModModule>,
     target_version: TargetVersion,
     suppressions: &Suppressions,
 ) -> Vec<Diagnostic> {
@@ -746,7 +746,7 @@ pub enum ParseSource {
     /// Parse the [`Parsed`] from the given source code.
     None,
     /// Use the precomputed [`Parsed`].
-    Precomputed(Parsed<ModModule>),
+    Precomputed(Parsed<ruff_python_ast::kind::ModModule>),
 }
 
 impl ParseSource {
@@ -757,7 +757,7 @@ impl ParseSource {
         source_kind: &SourceKind,
         source_type: PySourceType,
         target_version: PythonVersion,
-    ) -> Parsed<ModModule> {
+    ) -> Parsed<ruff_python_ast::kind::ModModule> {
         match self {
             ParseSource::None => parse_unchecked_source(source_kind, source_type, target_version),
             ParseSource::Precomputed(parsed) => parsed,
@@ -773,7 +773,7 @@ pub fn parse_unchecked_source(
     source_kind: &SourceKind,
     source_type: PySourceType,
     target_version: PythonVersion,
-) -> Parsed<ModModule> {
+) -> Parsed<ruff_python_ast::kind::ModModule> {
     let options = ParseOptions::from(source_type).with_target_version(target_version);
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`. See
     // `ruff_python_parser::parse_unchecked_source`. We use `parse_unchecked` (and thus

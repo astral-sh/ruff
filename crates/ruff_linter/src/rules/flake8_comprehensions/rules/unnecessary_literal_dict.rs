@@ -1,13 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, Keyword};
+use ruff_python_ast::{ExprCall, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::rules::flake8_comprehensions::fixes;
+use crate::rules::flake8_comprehensions::helpers::exactly_one_argument_with_matching_function;
 use crate::{AlwaysFixableViolation, Fix};
-
-use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for unnecessary list or tuple literals.
@@ -52,27 +51,26 @@ impl AlwaysFixableViolation for UnnecessaryLiteralDict {
 }
 
 /// C406 (`dict([(1, 2)])`)
-pub(crate) fn unnecessary_literal_dict(
-    checker: &Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
-    let Some(argument) =
-        helpers::exactly_one_argument_with_matching_function("dict", func, args, keywords)
-    else {
+pub(crate) fn unnecessary_literal_dict(checker: &Checker, call: ExprCall<'_>) {
+    let Some(argument) = exactly_one_argument_with_matching_function("dict", call) else {
         return;
     };
-    let (kind, elts) = match argument {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => (LiteralKind::Tuple, elts),
-        Expr::List(ast::ExprList { elts, .. }) => (LiteralKind::List, elts),
+    let (kind, elts) = match argument.classify() {
+        ExprKind::Tuple(expr_tuple) => {
+            let elts = expr_tuple.elts();
+
+            (LiteralKind::Tuple, elts)
+        }
+        ExprKind::List(expr_list) => {
+            let elts = expr_list.elts();
+            (LiteralKind::List, elts)
+        }
         _ => return,
     };
     // Accept `dict((1, 2), ...))` `dict([(1, 2), ...])`.
     if !elts
         .iter()
-        .all(|elt| matches!(&elt, Expr::Tuple(tuple) if tuple.len() == 2))
+        .all(|elt| matches!(elt.classify(), ExprKind::Tuple(tuple) if tuple.elts().len() == 2))
     {
         return;
     }
@@ -80,9 +78,10 @@ pub(crate) fn unnecessary_literal_dict(
         return;
     }
     let mut diagnostic =
-        checker.report_diagnostic(UnnecessaryLiteralDict { obj_type: kind }, expr.range());
-    diagnostic
-        .try_set_fix(|| fixes::fix_unnecessary_literal_dict(expr, checker).map(Fix::unsafe_edit));
+        checker.report_diagnostic(UnnecessaryLiteralDict { obj_type: kind }, call.range());
+    diagnostic.try_set_fix(|| {
+        fixes::fix_unnecessary_literal_dict(call.into(), checker).map(Fix::unsafe_edit)
+    });
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, CmpOp, Expr};
+use ruff_python_ast::{self as ast, CmpOp, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -238,24 +238,24 @@ impl Violation for SysVersionCmpStr10 {
 }
 
 /// YTT103, YTT201, YTT203, YTT204, YTT302
-pub(crate) fn compare(checker: &Checker, compare: &ast::ExprCompare) {
+pub(crate) fn compare(checker: &Checker, compare: ast::ExprCompare<'_>) {
     let Some((left, op, right)) = compare.as_single() else {
         return;
     };
 
-    match (op, left, right) {
+    match (op, left.classify(), right.fields()) {
         (
             _,
-            Expr::Subscript(ast::ExprSubscript { value, slice, .. }),
-            Expr::NumberLiteral(ast::ExprNumberLiteral {
+            ExprKind::Subscript(subscript),
+            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
                 value: ast::Number::Int(number),
                 ..
             }),
         ) => {
-            let Expr::NumberLiteral(ast::ExprNumberLiteral {
+            let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
                 value: ast::Number::Int(index),
                 ..
-            }) = slice.as_ref()
+            }) = subscript.slice().fields()
             else {
                 return;
             };
@@ -265,17 +265,18 @@ pub(crate) fn compare(checker: &Checker, compare: &ast::ExprCompare) {
                     if *index == 0
                         && *number == 3
                         && checker.is_rule_enabled(Rule::SysVersionInfo0Eq3)
-                        && is_sys(value, "version_info", checker.semantic()) =>
+                        && is_sys(subscript.value(), "version_info", checker.semantic()) =>
                 {
                     checker.report_diagnostic(
                         SysVersionInfo0Eq3 {
-                            eq: *op == CmpOp::Eq,
+                            eq: op == CmpOp::Eq,
                         },
                         left.range(),
                     );
                 }
                 CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE
-                    if *index == 1 && is_sys(value, "version_info", checker.semantic()) =>
+                    if *index == 1
+                        && is_sys(subscript.value(), "version_info", checker.semantic()) =>
                 {
                     checker.report_diagnostic_if_enabled(SysVersionInfo1CmpInt, left.range());
                 }
@@ -284,18 +285,20 @@ pub(crate) fn compare(checker: &Checker, compare: &ast::ExprCompare) {
         }
         (
             CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE,
-            Expr::Attribute(ast::ExprAttribute { value, attr, .. }),
-            Expr::NumberLiteral(ast::ExprNumberLiteral {
+            ExprKind::Attribute(attribute),
+            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
                 value: ast::Number::Int(_),
                 ..
             }),
-        ) if attr == "minor" && is_sys(value, "version_info", checker.semantic()) => {
+        ) if attribute.attr() == "minor"
+            && is_sys(attribute.value(), "version_info", checker.semantic()) =>
+        {
             checker.report_diagnostic_if_enabled(SysVersionInfoMinorCmpInt, left.range());
         }
         (
             CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE,
             _,
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }),
+            ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { value, .. }),
         ) if is_sys(left, "version", checker.semantic()) => {
             if value.len() == 1 {
                 checker.report_diagnostic_if_enabled(SysVersionCmpStr10, left.range());

@@ -1,7 +1,8 @@
 use itertools::Itertools;
+use ruff_python_ast::NodeList;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Alias, Stmt};
+use ruff_python_ast::Stmt;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::indentation_at_offset;
@@ -49,7 +50,11 @@ impl Violation for MultipleImportsOnOneLine {
 }
 
 /// E401
-pub(crate) fn multiple_imports_on_one_line(checker: &Checker, stmt: &Stmt, names: &[Alias]) {
+pub(crate) fn multiple_imports_on_one_line(
+    checker: &Checker,
+    stmt: Stmt<'_>,
+    names: NodeList<'_, ruff_python_ast::kind::Alias>,
+) {
     if names.len() > 1 {
         let mut diagnostic = checker.report_diagnostic(MultipleImportsOnOneLine, stmt.range());
         diagnostic.set_fix(split_imports(
@@ -64,8 +69,8 @@ pub(crate) fn multiple_imports_on_one_line(checker: &Checker, stmt: &Stmt, names
 
 /// Generate a [`Fix`] to split the imports across multiple statements.
 fn split_imports(
-    stmt: &Stmt,
-    names: &[Alias],
+    stmt: Stmt<'_>,
+    names: NodeList<'_, ruff_python_ast::kind::Alias>,
     locator: &Locator,
     indexer: &Indexer,
     stylist: &Stylist,
@@ -75,12 +80,8 @@ fn split_imports(
         let replacement = names
             .iter()
             .map(|alias| {
-                let Alias {
-                    range: _,
-                    node_index: _,
-                    name,
-                    asname,
-                } = alias;
+                let name = alias.name();
+                let asname = alias.asname();
 
                 if let Some(asname) = asname {
                     format!("import {name} as {asname}")
@@ -100,12 +101,8 @@ fn split_imports(
         let replacement = names
             .iter()
             .map(|alias| {
-                let Alias {
-                    range: _,
-                    node_index: _,
-                    name,
-                    asname,
-                } = alias;
+                let name = alias.name();
+                let asname = alias.asname();
 
                 if let Some(asname) = asname {
                     format!("{indentation}import {name} as {asname}")

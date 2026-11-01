@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, Stmt};
+use ruff_python_ast::{self as ast, ExprKind, NodeList, Stmt, StmtKind, StmtRaise};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
@@ -52,14 +52,17 @@ impl AlwaysFixableViolation for VerboseRaise {
 }
 
 /// TRY201
-pub(crate) fn verbose_raise(checker: &Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn verbose_raise(
+    checker: &Checker,
+    handlers: NodeList<'_, ruff_python_ast::kind::ExceptHandler>,
+) {
     for handler in handlers {
         // If the handler assigned a name to the exception...
-        if let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+        if let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
             name: Some(exception_name),
             body,
             ..
-        }) = handler
+        }) = handler.fields()
         {
             let raises = {
                 let mut visitor = RaiseStatementVisitor::default();
@@ -67,12 +70,13 @@ pub(crate) fn verbose_raise(checker: &Checker, handlers: &[ExceptHandler]) {
                 visitor.raises
             };
             for raise in raises {
-                if raise.cause.is_some() {
+                if raise.cause().is_some() {
                     continue;
                 }
-                if let Some(exc) = raise.exc.as_ref() {
+                if let Some(exc) = raise.exc() {
                     // ...and the raised object is bound to the same name...
-                    if let Expr::Name(ast::ExprName { id, .. }) = exc.as_ref() {
+                    if let ExprKind::Name(name_node) = exc.classify() {
+                        let id = name_node.id();
                         if id == exception_name.as_str() {
                             let mut diagnostic =
                                 checker.report_diagnostic(VerboseRaise, exc.range());
@@ -90,18 +94,19 @@ pub(crate) fn verbose_raise(checker: &Checker, handlers: &[ExceptHandler]) {
 
 #[derive(Default)]
 struct RaiseStatementVisitor<'a> {
-    raises: Vec<&'a ast::StmtRaise>,
+    raises: Vec<StmtRaise<'a>>,
 }
 
 impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::Raise(raise @ ast::StmtRaise { .. }) => {
+    fn visit_stmt(&mut self, stmt: Stmt<'a>) {
+        match stmt.classify() {
+            StmtKind::Raise(raise) => {
                 self.raises.push(raise);
             }
-            Stmt::Try(ast::StmtTry {
-                body, finalbody, ..
-            }) => {
+            StmtKind::Try(stmt_try) => {
+                let body = stmt_try.body();
+                let finalbody = stmt_try.finalbody();
+
                 for stmt in body.iter().chain(finalbody) {
                     walk_stmt(self, stmt);
                 }

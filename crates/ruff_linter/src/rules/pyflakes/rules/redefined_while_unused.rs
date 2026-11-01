@@ -1,7 +1,6 @@
 use rustc_hash::FxHashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Stmt;
 use ruff_python_semantic::{
     Binding, BindingKind, Imported, NodeId, Scope, ScopeId, SemanticModel, ShadowedBinding,
     analyze::{typing::is_type_checking_block, visibility},
@@ -164,7 +163,7 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
                         .statement(node_id)
                         .as_function_def_stmt()
                         .is_some_and(|function| {
-                            visibility::is_overload(&function.decorator_list, checker.semantic())
+                            visibility::is_overload(function.decorator_list(), checker.semantic())
                         })
                     {
                         continue;
@@ -301,7 +300,7 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
 fn is_annotated_assignment(binding: &Binding, semantic: &SemanticModel) -> bool {
     binding
         .statement(semantic)
-        .is_some_and(Stmt::is_ann_assign_stmt)
+        .is_some_and(ruff_python_ast::Stmt::is_ann_assign_stmt)
 }
 
 struct EntryInfo<'a> {

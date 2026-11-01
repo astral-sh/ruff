@@ -1,13 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, ExprKind};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
+use crate::rules::flake8_comprehensions::helpers::exactly_one_argument_with_matching_function;
 use crate::{AlwaysFixableViolation, Edit, Fix};
-
-use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for `set()` calls that take unnecessary list or tuple literals
@@ -53,13 +52,8 @@ impl AlwaysFixableViolation for UnnecessaryLiteralSet {
 }
 
 /// C405 (`set([1, 2])`)
-pub(crate) fn unnecessary_literal_set(checker: &Checker, call: &ast::ExprCall) {
-    let Some(argument) = helpers::exactly_one_argument_with_matching_function(
-        "set",
-        &call.func,
-        &call.arguments.args,
-        &call.arguments.keywords,
-    ) else {
+pub(crate) fn unnecessary_literal_set(checker: &Checker, call: ast::ExprCall<'_>) {
+    let Some(argument) = exactly_one_argument_with_matching_function("set", call) else {
         return;
     };
     let Some(kind) = UnnecessaryLiteral::try_from_expr(argument) else {
@@ -73,19 +67,20 @@ pub(crate) fn unnecessary_literal_set(checker: &Checker, call: &ast::ExprCall) {
 
     // Convert `set((1, 2))` to `{1, 2}`.
     diagnostic.set_fix({
-        let elts = match &argument {
-            Expr::List(ast::ExprList { elts, .. }) => elts,
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts,
+        let elts = match argument.classify() {
+            ExprKind::List(expr_list) => expr_list.elts(),
+            ExprKind::Tuple(expr_tuple) => expr_tuple.elts(),
             _ => unreachable!(),
         };
 
-        match elts.as_slice() {
+        match elts {
             // If the list or tuple is empty, replace the entire call with `set()`.
-            [] => Fix::unsafe_edit(Edit::range_replacement("set()".to_string(), call.range())),
+            args if args.is_empty() => {
+                Fix::unsafe_edit(Edit::range_replacement("set()".to_string(), call.range()))
+            }
             // If it's a single-element tuple (with no whitespace around it), remove the trailing
             // comma.
-            [elt]
-                if argument.is_tuple_expr()
+            args if let Some([elt]) = args.as_array() && argument.is_tuple_expr()
                     // The element must start right after the `(`.
                     && elt.start() == argument.start() + TextSize::new(1)
                     // The element must be followed by exactly one comma and a closing `)`.
@@ -135,10 +130,10 @@ enum UnnecessaryLiteral {
 }
 
 impl UnnecessaryLiteral {
-    const fn try_from_expr(expr: &Expr) -> Option<Self> {
-        match expr {
-            Expr::List(_) => Some(Self::List),
-            Expr::Tuple(_) => Some(Self::Tuple),
+    fn try_from_expr(expr: Expr<'_>) -> Option<Self> {
+        match expr.classify() {
+            ExprKind::List(_) => Some(Self::List),
+            ExprKind::Tuple(_) => Some(Self::Tuple),
             _ => None,
         }
     }

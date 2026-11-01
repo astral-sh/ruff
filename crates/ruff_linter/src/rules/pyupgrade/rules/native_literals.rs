@@ -1,13 +1,15 @@
+use ruff_python_ast::{BuildId, Builder, LiteralExpression, build};
 use std::fmt;
 use std::str::FromStr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, OperatorPrecedence, UnaryOp};
+use ruff_python_ast::{self as ast, Int, OperatorPrecedence, UnaryOp};
 use ruff_source_file::find_newline;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::fix::syntax;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -37,66 +39,60 @@ impl FromStr for LiteralType {
 }
 
 impl LiteralType {
-    fn as_zero_value_expr(self, checker: &Checker) -> Expr {
-        match self {
-            LiteralType::Str => ast::StringLiteral {
-                value: Box::default(),
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                flags: checker.default_string_flags(),
+    fn as_zero_value_expr(
+        self,
+        builder: &mut Builder,
+        checker: &Checker,
+    ) -> BuildId<ast::kind::Expr> {
+        let range = TextRange::default();
+        let value = match self {
+            Self::Str => {
+                return syntax::string_literal(builder, "", checker.default_string_flags());
             }
-            .into(),
-            LiteralType::Bytes => ast::BytesLiteral {
-                value: Box::default(),
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                flags: checker.default_bytes_flags(),
+            Self::Bytes => {
+                let part = builder.add(build::BytesLiteral {
+                    range,
+                    value: b"",
+                    flags: checker.default_bytes_flags(),
+                });
+                let value = builder.list([part]);
+                return builder.add(build::ExprBytesLiteral { range, value }).into();
             }
-            .into(),
-            LiteralType::Int => ast::ExprNumberLiteral {
-                value: ast::Number::Int(Int::from(0u8)),
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            Self::Bool => {
+                return builder
+                    .add(build::ExprBooleanLiteral {
+                        range,
+                        value: false,
+                    })
+                    .into();
             }
-            .into(),
-            LiteralType::Float => ast::ExprNumberLiteral {
-                value: ast::Number::Float(0.0),
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            }
-            .into(),
-            LiteralType::Bool => ast::ExprBooleanLiteral::default().into(),
-            LiteralType::Complex => ast::ExprNumberLiteral {
-                value: ast::Number::Complex {
-                    real: 0.0,
-                    imag: 0.0,
-                },
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            }
-            .into(),
-        }
+            Self::Int => ast::Number::Int(Int::ZERO),
+            Self::Float => ast::Number::Float(0.0),
+            Self::Complex => ast::Number::Complex {
+                real: 0.0,
+                imag: 0.0,
+            },
+        };
+        builder
+            .add(build::ExprNumberLiteral { range, value })
+            .into()
     }
 }
 
-impl TryFrom<LiteralExpressionRef<'_>> for LiteralType {
+impl TryFrom<LiteralExpression<'_>> for LiteralType {
     type Error = ();
 
-    fn try_from(literal_expr: LiteralExpressionRef<'_>) -> Result<Self, Self::Error> {
+    fn try_from(literal_expr: LiteralExpression<'_>) -> Result<Self, Self::Error> {
         match literal_expr {
-            LiteralExpressionRef::StringLiteral(_) => Ok(LiteralType::Str),
-            LiteralExpressionRef::BytesLiteral(_) => Ok(LiteralType::Bytes),
-            LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
-                match value {
-                    ast::Number::Int(_) => Ok(LiteralType::Int),
-                    ast::Number::Float(_) => Ok(LiteralType::Float),
-                    ast::Number::Complex { .. } => Ok(LiteralType::Complex),
-                }
-            }
-            LiteralExpressionRef::BooleanLiteral(_) => Ok(LiteralType::Bool),
-            LiteralExpressionRef::NoneLiteral(_) | LiteralExpressionRef::EllipsisLiteral(_) => {
-                Err(())
-            }
+            LiteralExpression::StringLiteral(_) => Ok(LiteralType::Str),
+            LiteralExpression::BytesLiteral(_) => Ok(LiteralType::Bytes),
+            LiteralExpression::NumberLiteral(number) => match number.value() {
+                ast::Number::Int(_) => Ok(LiteralType::Int),
+                ast::Number::Float(_) => Ok(LiteralType::Float),
+                ast::Number::Complex { .. } => Ok(LiteralType::Complex),
+            },
+            LiteralExpression::BooleanLiteral(_) => Ok(LiteralType::Bool),
+            LiteralExpression::NoneLiteral(_) | LiteralExpression::EllipsisLiteral(_) => Err(()),
         }
     }
 }
@@ -168,8 +164,8 @@ impl AlwaysFixableViolation for NativeLiterals {
 }
 
 /// Returns `true` if the keyword argument is redundant for the given builtin.
-fn is_redundant_keyword(builtin: &str, keyword: &ast::Keyword) -> bool {
-    let Some(arg) = keyword.arg.as_ref() else {
+fn is_redundant_keyword(builtin: &str, keyword: ast::Keyword<'_>) -> bool {
+    let Some(arg) = keyword.arg() else {
         return false;
     };
     match builtin {
@@ -185,21 +181,13 @@ fn is_redundant_keyword(builtin: &str, keyword: &ast::Keyword) -> bool {
 /// UP018
 pub(crate) fn native_literals(
     checker: &Checker,
-    call: &ast::ExprCall,
-    parent_expr: Option<&ast::Expr>,
+    call: ast::ExprCall<'_>,
+    parent_expr: Option<ast::Expr<'_>>,
 ) {
-    let ast::ExprCall {
-        func,
-        arguments:
-            ast::Arguments {
-                args,
-                keywords,
-                range: _,
-                node_index: _,
-            },
-        range_start: _,
-        node_index: _,
-    } = call;
+    let func = call.func();
+    let arguments = call.arguments();
+    let args = arguments.args();
+    let keywords = arguments.keywords();
 
     let semantic = checker.semantic();
 
@@ -207,10 +195,15 @@ pub(crate) fn native_literals(
         return;
     };
 
-    let call_arg = match (args.as_ref(), keywords.as_ref()) {
-        ([], []) => None,
-        ([arg], []) => Some(arg),
-        ([], [keyword]) if is_redundant_keyword(builtin, keyword) => Some(&keyword.value),
+    let call_arg = match (args.len(), keywords.len()) {
+        (0, 0) => None,
+        (1, 0) => args.first(),
+        (0, 1)
+            if let Some(keyword) = keywords.first()
+                && is_redundant_keyword(builtin, keyword) =>
+        {
+            Some(keyword.value())
+        }
         _ => return,
     };
 
@@ -237,12 +230,15 @@ pub(crate) fn native_literals(
             let mut diagnostic =
                 checker.report_diagnostic(NativeLiterals { literal_type }, call.range());
 
-            let expr = literal_type.as_zero_value_expr(checker);
-            let mut content = checker.generator().expr(&expr);
+            let mut builder = Builder::default();
+            let expr = literal_type.as_zero_value_expr(&mut builder, checker);
+            let mut content = checker.generator().expr(builder.get(expr));
 
             // Attribute access on an integer requires the integer to be parenthesized to disambiguate from a float
             // Ex) `(0).denominator` is valid but `0.denominator` is not
-            if literal_type == LiteralType::Int && matches!(parent_expr, Some(Expr::Attribute(_))) {
+            if literal_type == LiteralType::Int
+                && parent_expr.is_some_and(ast::Expr::is_attribute_expr)
+            {
                 content = format!("({content})");
             }
 
@@ -254,15 +250,15 @@ pub(crate) fn native_literals(
         Some(arg) => {
             let (has_unary_op, literal_expr) = if let Some(literal_expr) = arg.as_literal_expr() {
                 (false, literal_expr)
-            } else if let Expr::UnaryOp(ast::ExprUnaryOp {
+            } else if let ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
                 op: UnaryOp::UAdd | UnaryOp::USub,
                 operand,
                 ..
-            }) = arg
+            }) = arg.fields()
             {
                 if let Some(literal_expr) = operand
                     .as_literal_expr()
-                    .filter(|expr| matches!(expr, LiteralExpressionRef::NumberLiteral(_)))
+                    .filter(|expr| matches!(expr, LiteralExpression::NumberLiteral(_)))
                 {
                     (true, literal_expr)
                 } else {
@@ -313,7 +309,9 @@ pub(crate) fn native_literals(
                 // Ex) `(7).denominator` is valid but `7.denominator` is not
                 // Note that floats do not have this problem
                 // Ex) `(1.0).real` is valid and `1.0.real` is too
-                (Some(Expr::Attribute(_)), LiteralType::Int, _) => format!("({arg_code})"),
+                (Some(parent), LiteralType::Int, _) if parent.is_attribute_expr() => {
+                    format!("({arg_code})")
+                }
 
                 (Some(parent), _, _) => {
                     if OperatorPrecedence::from(parent) > OperatorPrecedence::from(arg) {

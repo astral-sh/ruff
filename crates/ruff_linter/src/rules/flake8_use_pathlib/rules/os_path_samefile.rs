@@ -66,13 +66,13 @@ impl Violation for OsPathSamefile {
 }
 
 /// PTH121
-pub(crate) fn os_path_samefile(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_path_samefile(checker: &Checker, call: ExprCall<'_>, segments: &[&str]) {
     if segments != ["os", "path", "samefile"] {
         return;
     }
 
     let fix_enabled = is_fix_os_path_samefile_enabled(checker.settings())
-        && !has_unknown_keywords_or_starred_expr(&call.arguments, &["f1", "f2"]);
+        && !has_unknown_keywords_or_starred_expr(call.arguments(), &["f1", "f2"]);
 
     check_os_pathlib_two_arg_calls(
         checker,

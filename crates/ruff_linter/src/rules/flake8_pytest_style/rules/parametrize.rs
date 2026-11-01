@@ -1,15 +1,17 @@
+use ruff_python_ast::{Builder, ExprFields, ExprKind, ExprListFields, ExprTupleFields, NodeList};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::token::{Tokens, parenthesized_range};
-use ruff_python_ast::{self as ast, Expr, ExprCall, ExprContext, StringLiteralFlags};
+use ruff_python_ast::{Expr, ExprCall, StringLiteralFlags};
 use ruff_python_codegen::Generator;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::fix::syntax;
 use crate::registry::Rule;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -302,29 +304,31 @@ impl Violation for PytestDuplicateParametrizeTestCases {
     }
 }
 
-fn elts_to_csv(elts: &[Expr], generator: Generator, flags: StringLiteralFlags) -> Option<String> {
-    if !elts.iter().all(Expr::is_string_literal_expr) {
+fn elts_to_csv(
+    elts: NodeList<'_, ruff_python_ast::kind::Expr>,
+    generator: Generator,
+    flags: StringLiteralFlags,
+) -> Option<String> {
+    if !elts
+        .iter()
+        .all(ruff_python_ast::Expr::is_string_literal_expr)
+    {
         return None;
     }
 
-    let node = Expr::from(ast::StringLiteral {
-        value: elts
-            .iter()
-            .fold(String::new(), |mut acc, elt| {
-                if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
-                    if !acc.is_empty() {
-                        acc.push_str(", ");
-                    }
-                    acc.push_str(value.to_str());
-                }
-                acc
-            })
-            .into_boxed_str(),
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        flags,
+    let text = elts.iter().fold(String::new(), |mut acc, elt| {
+        if let ExprKind::StringLiteral(string_literal) = elt.classify() {
+            let value = string_literal.value();
+            if !acc.is_empty() {
+                acc.push_str(", ");
+            }
+            acc.push_str(value.to_str());
+        }
+        acc
     });
-    Some(generator.expr(&node))
+    let mut builder = Builder::default();
+    let expression = syntax::string_literal(&mut builder, &text, flags);
+    Some(generator.expr(builder.get(expression)))
 }
 
 /// Returns the range of the `name` argument of `@pytest.mark.parametrize`.
@@ -339,92 +343,60 @@ fn elts_to_csv(elts: &[Expr], generator: Generator, flags: StringLiteralFlags) -
 /// ```
 ///
 /// This method assumes that the first argument is a string.
-fn get_parametrize_name_range(call: &ExprCall, expr: &Expr, tokens: &Tokens) -> Option<TextRange> {
-    parenthesized_range(expr.into(), (&call.arguments).into(), tokens)
+fn get_parametrize_name_range(
+    call: ExprCall<'_>,
+    expr: Expr<'_>,
+    tokens: &Tokens,
+) -> Option<TextRange> {
+    parenthesized_range(expr, (call.arguments()).into(), tokens)
 }
 
 /// PT006
-fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr) {
+fn check_names(checker: &Checker, call: ExprCall<'_>, expr: Expr<'_>, argvalues: Expr<'_>) {
     let names_type = checker
         .settings()
         .flake8_pytest_style
         .parametrize_names_type;
 
-    match expr {
-        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+    match expr.classify() {
+        ExprKind::StringLiteral(expr_string_literal) => {
+            let value = expr_string_literal.value();
+
             let names = split_names(value.to_str());
-            if names.len() > 1 {
-                match names_type {
-                    types::ParametrizeNameType::Tuple => {
-                        let name_range = get_parametrize_name_range(call, expr, checker.tokens())
-                            .unwrap_or(expr.range());
-                        let mut diagnostic = checker.report_diagnostic(
-                            PytestParametrizeNamesWrongType {
-                                single_argument: false,
-                                expected: names_type,
-                            },
-                            name_range,
-                        );
-                        let node = Expr::Tuple(ast::ExprTuple {
-                            elts: names
-                                .iter()
-                                .map(|name| {
-                                    Expr::from(ast::StringLiteral {
-                                        value: Box::from(*name),
-                                        range: TextRange::default(),
-                                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                                        flags: checker.default_string_flags(),
-                                    })
-                                })
-                                .collect(),
-                            ctx: ExprContext::Load,
-                            range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                            parenthesized: true,
-                        });
-                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                            format!("({})", checker.generator().expr(&node)),
-                            name_range,
-                        )));
-                    }
-                    types::ParametrizeNameType::List => {
-                        let name_range = get_parametrize_name_range(call, expr, checker.tokens())
-                            .unwrap_or(expr.range());
-                        let mut diagnostic = checker.report_diagnostic(
-                            PytestParametrizeNamesWrongType {
-                                single_argument: false,
-                                expected: names_type,
-                            },
-                            name_range,
-                        );
-                        let node = Expr::List(ast::ExprList {
-                            elts: names
-                                .iter()
-                                .map(|name| {
-                                    Expr::from(ast::StringLiteral {
-                                        value: Box::from(*name),
-                                        range: TextRange::default(),
-                                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                                        flags: checker.default_string_flags(),
-                                    })
-                                })
-                                .collect(),
-                            ctx: ExprContext::Load,
-                            range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                        });
-                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                            checker.generator().expr(&node),
-                            name_range,
-                        )));
-                    }
-                    types::ParametrizeNameType::Csv => {}
-                }
+            if names.len() <= 1 || matches!(names_type, types::ParametrizeNameType::Csv) {
+                return;
             }
+            let name_range =
+                get_parametrize_name_range(call, expr, checker.tokens()).unwrap_or(expr.range());
+            let mut diagnostic = checker.report_diagnostic(
+                PytestParametrizeNamesWrongType {
+                    single_argument: false,
+                    expected: names_type,
+                },
+                name_range,
+            );
+            let mut builder = Builder::default();
+            let flags = checker.default_string_flags();
+            let elts = builder.map_list(names, |builder, name| {
+                syntax::string_literal(builder, name, flags)
+            });
+            let replacement = if matches!(names_type, types::ParametrizeNameType::Tuple) {
+                let tuple = syntax::tuple(&mut builder, elts);
+                format!("({})", checker.generator().expr(builder.get(tuple)))
+            } else {
+                let list = syntax::list(&mut builder, elts);
+                checker.generator().expr(builder.get(list))
+            };
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                replacement,
+                name_range,
+            )));
         }
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+        ExprKind::Tuple(expr_tuple) => {
+            let elts = expr_tuple.elts();
+
             if elts.len() == 1 {
-                handle_single_name(checker, expr, &elts[0], argvalues);
+                handle_single_name(checker, expr, elts.at(0), argvalues);
             } else {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {}
@@ -436,14 +408,11 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             },
                             expr.range(),
                         );
-                        let node = Expr::List(ast::ExprList {
-                            elts: elts.clone(),
-                            ctx: ExprContext::Load,
-                            range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                        });
+                        let mut builder = Builder::default();
+                        let elts = builder.copy_nodes(elts);
+                        let node = syntax::list(&mut builder, elts);
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                            checker.generator().expr(&node),
+                            checker.generator().expr(builder.get(node)),
                             expr.range(),
                         )));
                     }
@@ -467,9 +436,11 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                 }
             }
         }
-        Expr::List(ast::ExprList { elts, .. }) => {
+        ExprKind::List(expr_list) => {
+            let elts = expr_list.elts();
+
             if elts.len() == 1 {
-                handle_single_name(checker, expr, &elts[0], argvalues);
+                handle_single_name(checker, expr, elts.at(0), argvalues);
             } else {
                 match names_type {
                     types::ParametrizeNameType::List => {}
@@ -481,15 +452,11 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                             },
                             expr.range(),
                         );
-                        let node = Expr::Tuple(ast::ExprTuple {
-                            elts: elts.clone(),
-                            ctx: ExprContext::Load,
-                            range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                            parenthesized: true,
-                        });
+                        let mut builder = Builder::default();
+                        let elts = builder.copy_nodes(elts);
+                        let node = syntax::tuple(&mut builder, elts);
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                            format!("({})", checker.generator().expr(&node)),
+                            format!("({})", checker.generator().expr(builder.get(node))),
                             expr.range(),
                         )));
                     }
@@ -518,7 +485,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
 }
 
 /// PT007
-fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
+fn check_values(checker: &Checker, names: Expr<'_>, values: Expr<'_>) {
     let values_type = checker
         .settings()
         .flake8_pytest_style
@@ -529,14 +496,17 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
         .flake8_pytest_style
         .parametrize_values_row_type;
 
-    let is_multi_named = if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &names {
+    let is_multi_named = if let ExprKind::StringLiteral(string_literal) = names.classify() {
+        let value = string_literal.value();
         split_names(value.to_str()).len() > 1
     } else {
         true
     };
 
-    match values {
-        Expr::List(ast::ExprList { elts, .. }) => {
+    match values.classify() {
+        ExprKind::List(expr_list) => {
+            let elts = expr_list.elts();
+
             if values_type != types::ParametrizeValuesType::List {
                 let mut diagnostic = checker.report_diagnostic(
                     PytestParametrizeValuesWrongType {
@@ -550,7 +520,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
                     // Determine whether the last element has a trailing comma. Single-element
                     // tuples _require_ a trailing comma, so this is a single-element list
                     // _without_ a trailing comma, we need to insert one.
-                    let needs_trailing_comma = if let [item] = elts.as_slice() {
+                    let needs_trailing_comma = if let Some([item]) = elts.as_array() {
                         SimpleTokenizer::new(
                             checker.locator().contents(),
                             TextRange::new(item.end(), values.end()),
@@ -584,7 +554,9 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
                 handle_value_rows(checker, elts, values_type, values_row_type);
             }
         }
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+        ExprKind::Tuple(expr_tuple) => {
+            let elts = expr_tuple.elts();
+
             if values_type != types::ParametrizeValuesType::Tuple {
                 let mut diagnostic = checker.report_diagnostic(
                     PytestParametrizeValuesWrongType {
@@ -645,7 +617,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
 ///              Tokenize this range to locate the comma.
 /// )
 /// ```
-fn trailing_comma(element: &Expr, source: &str, max_index: TextSize) -> TextSize {
+fn trailing_comma(element: Expr<'_>, source: &str, max_index: TextSize) -> TextSize {
     for token in SimpleTokenizer::starts_at(element.end(), source) {
         if matches!(token.kind, SimpleTokenKind::Comma) {
             return token.start();
@@ -657,9 +629,9 @@ fn trailing_comma(element: &Expr, source: &str, max_index: TextSize) -> TextSize
 }
 
 /// PT014
-fn check_duplicates(checker: &Checker, values: &Expr) {
-    let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) =
-        values
+fn check_duplicates(checker: &Checker, values: Expr<'_>) {
+    let (ExprFields::List(ExprListFields { elts, .. })
+    | ExprFields::Tuple(ExprTupleFields { elts, .. })) = values.fields()
     else {
         return;
     };
@@ -692,7 +664,7 @@ fn check_duplicates(checker: &Checker, values: &Expr) {
     }
 }
 
-fn handle_single_name(checker: &Checker, argnames: &Expr, value: &Expr, argvalues: &Expr) {
+fn handle_single_name(checker: &Checker, argnames: Expr<'_>, value: Expr<'_>, argvalues: Expr<'_>) {
     let mut diagnostic = checker.report_diagnostic(
         PytestParametrizeNamesWrongType {
             single_argument: true,
@@ -757,25 +729,24 @@ fn handle_single_name(checker: &Checker, argnames: &Expr, value: &Expr, argvalue
 ///
 /// If the elements of `expr` are not literal lists or tuples, `None` is returned to avoid changing
 /// behavior.
-fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Option<Vec<Edit>> {
-    let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) = expr
+fn unpack_single_element_items(checker: &Checker, expr: Expr<'_>) -> Option<Vec<Edit>> {
+    let (ExprFields::List(ExprListFields { elts, .. })
+    | ExprFields::Tuple(ExprTupleFields { elts, .. })) = expr.fields()
     else {
         return None;
     };
 
     let mut edits = Vec::with_capacity(elts.len());
     for value in elts {
-        let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) =
-            value
+        let (ExprFields::List(ExprListFields { elts, .. })
+        | ExprFields::Tuple(ExprTupleFields { elts, .. })) = value.fields()
         else {
             return None;
         };
 
-        let [elt] = elts.as_slice() else {
-            return None;
-        };
+        let [elt] = elts.as_array()?;
 
-        if matches!(elt, Expr::Starred(_)) {
+        if matches!(elt.classify(), ExprKind::Starred(_)) {
             return None;
         }
 
@@ -787,10 +758,10 @@ fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Option<Vec<Edi
     Some(edits)
 }
 
-fn unparse_expr_in_sequence(expr: &Expr, checker: &Checker) -> String {
+fn unparse_expr_in_sequence(expr: Expr<'_>, checker: &Checker) -> String {
     let content = checker.locator().slice(expr);
-    if let Expr::Tuple(tuple) = expr {
-        if !tuple.is_empty() && !tuple.parenthesized {
+    if let ExprKind::Tuple(tuple) = expr.classify() {
+        if !tuple.elts().is_empty() && !tuple.parenthesized() {
             return format!("({content})");
         }
     }
@@ -799,15 +770,17 @@ fn unparse_expr_in_sequence(expr: &Expr, checker: &Checker) -> String {
 
 fn handle_value_rows(
     checker: &Checker,
-    elts: &[Expr],
+    elts: NodeList<'_, ruff_python_ast::kind::Expr>,
     values_type: types::ParametrizeValuesType,
     values_row_type: types::ParametrizeValuesRowType,
 ) {
     for elt in elts {
-        match elt {
-            Expr::Tuple(ast::ExprTuple { elts, .. })
+        match elt.classify() {
+            ExprKind::Tuple(expr_tuple)
                 if values_row_type != types::ParametrizeValuesRowType::Tuple =>
             {
+                let elts = expr_tuple.elts();
+
                 let mut diagnostic = checker.report_diagnostic(
                     PytestParametrizeValuesWrongType {
                         values: values_type,
@@ -845,9 +818,11 @@ fn handle_value_rows(
                     Fix::unsafe_edits(elt_start, [elt_end])
                 });
             }
-            Expr::List(ast::ExprList { elts, .. })
+            ExprKind::List(expr_list)
                 if values_row_type != types::ParametrizeValuesRowType::List =>
             {
+                let elts = expr_list.elts();
+
                 let mut diagnostic = checker.report_diagnostic(
                     PytestParametrizeValuesWrongType {
                         values: values_type,
@@ -860,7 +835,7 @@ fn handle_value_rows(
                     // Determine whether the last element has a trailing comma. Single-element
                     // tuples _require_ a trailing comma, so this is a single-element list
                     // _without_ a trailing comma, we need to insert one.
-                    let needs_trailing_comma = if let [item] = elts.as_slice() {
+                    let needs_trailing_comma = if let Some([item]) = elts.as_array() {
                         SimpleTokenizer::new(
                             checker.locator().contents(),
                             TextRange::new(item.end(), elt.end()),
@@ -891,29 +866,29 @@ fn handle_value_rows(
     }
 }
 
-pub(crate) fn parametrize(checker: &Checker, call: &ExprCall) {
+pub(crate) fn parametrize(checker: &Checker, call: ExprCall<'_>) {
     if !is_pytest_parametrize(call, checker.semantic()) {
         return;
     }
 
     if checker.is_rule_enabled(Rule::PytestParametrizeNamesWrongType) {
-        let names = call.arguments.find_argument_value("argnames", 0);
-        let values = call.arguments.find_argument_value("argvalues", 1);
+        let names = call.arguments().find_argument_value("argnames", 0);
+        let values = call.arguments().find_argument_value("argvalues", 1);
 
         if let (Some(names), Some(values)) = (names, values) {
             check_names(checker, call, names, values);
         }
     }
     if checker.is_rule_enabled(Rule::PytestParametrizeValuesWrongType) {
-        let names = call.arguments.find_argument_value("argnames", 0);
-        let values = call.arguments.find_argument_value("argvalues", 1);
+        let names = call.arguments().find_argument_value("argnames", 0);
+        let values = call.arguments().find_argument_value("argvalues", 1);
 
         if let (Some(names), Some(values)) = (names, values) {
             check_values(checker, names, values);
         }
     }
     if checker.is_rule_enabled(Rule::PytestDuplicateParametrizeTestCases) {
-        if let Some(values) = call.arguments.find_argument_value("argvalues", 1) {
+        if let Some(values) = call.arguments().find_argument_value("argvalues", 1) {
             check_duplicates(checker, values);
         }
     }

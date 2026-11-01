@@ -1,22 +1,22 @@
 //! Rules from [flake8-gettext](https://pypi.org/project/flake8-gettext/).
 use crate::checkers::ast::Checker;
 use crate::preview::is_plural_ngettext_check_enabled;
+use ruff_python_ast::Expr;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
 
 pub(crate) mod rules;
 pub mod settings;
 
 /// Returns true if the function call is ngettext
-pub(crate) fn is_ngettext_call(checker: &Checker, func: &Expr) -> bool {
+pub(crate) fn is_ngettext_call(checker: &Checker, func: Expr<'_>) -> bool {
     if !is_plural_ngettext_check_enabled(checker.settings()) {
         return false;
     }
 
     // Check direct name reference first (e.g., `ngettext(...)`)
     if let Some(name) = func.as_name_expr() {
-        if name.id == "ngettext" {
+        if name.id() == "ngettext" {
             return true;
         }
     }
@@ -31,12 +31,12 @@ pub(crate) fn is_ngettext_call(checker: &Checker, func: &Expr) -> bool {
 /// Returns true if the [`Expr`] is an internationalization function call.
 pub(crate) fn is_gettext_func_call(
     checker: &Checker,
-    func: &Expr,
+    func: Expr<'_>,
     functions_names: &[Name],
 ) -> bool {
     if func
         .as_name_expr()
-        .map(ast::ExprName::id)
+        .map(ruff_python_ast::ExprName::id)
         .is_some_and(|id| functions_names.contains(id))
     {
         return true;

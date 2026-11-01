@@ -1,6 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, ExprCall, InterpolatedStringElement};
+use ruff_python_ast::{
+    self as ast, Expr, InterpolatedStringElement, InterpolatedStringElementKind,
+};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
@@ -56,12 +58,12 @@ impl Violation for Airflow3DagDynamicValue {
 }
 
 /// AIR304
-pub(crate) fn airflow_3_dag_dynamic_value(checker: &Checker, call: &ExprCall) {
+pub(crate) fn airflow_3_dag_dynamic_value(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
 
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(&call.func) else {
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func) else {
         return;
     };
 
@@ -69,8 +71,8 @@ pub(crate) fn airflow_3_dag_dynamic_value(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    for keyword in &call.arguments.keywords {
-        if let Some((expr, name)) = find_runtime_varying_call(&keyword.value, checker.semantic()) {
+    for keyword in call.arguments.keywords() {
+        if let Some((expr, name)) = find_runtime_varying_call(keyword.value(), checker.semantic()) {
             checker.report_diagnostic(
                 Airflow3DagDynamicValue {
                     function_name: name.to_string(),
@@ -97,11 +99,11 @@ fn is_dag_or_task_constructor(qualified_name: &QualifiedName) -> bool {
 /// The set of traversed expression variants mirrors [`any_over_expr`] in
 /// `ruff_python_ast::helpers` so that no nested sub-expression is silently skipped.
 fn find_runtime_varying_call<'a>(
-    expr: &'a Expr,
+    expr: Expr<'a>,
     semantic: &SemanticModel,
-) -> Option<(&'a Expr, &'static str)> {
-    match expr {
-        Expr::Call(ExprCall {
+) -> Option<(Expr<'a>, &'static str)> {
+    match expr.fields() {
+        ast::ExprFields::Call(ast::ExprCallFields {
             func, arguments, ..
         }) => {
             if let Some(qualified_name) = semantic.resolve_qualified_name(func) {
@@ -135,151 +137,141 @@ fn find_runtime_varying_call<'a>(
             find_runtime_varying_call(func, semantic)
                 .or_else(|| {
                     arguments
-                        .args
+                        .args()
                         .iter()
                         .find_map(|arg| find_runtime_varying_call(arg, semantic))
                 })
                 .or_else(|| {
                     arguments
-                        .keywords
+                        .keywords()
                         .iter()
-                        .find_map(|kw| find_runtime_varying_call(&kw.value, semantic))
+                        .find_map(|kw| find_runtime_varying_call(kw.value(), semantic))
                 })
         }
-        Expr::BoolOp(ast::ExprBoolOp { values, .. }) => values
+        ast::ExprFields::BoolOp(ast::ExprBoolOpFields { values, .. }) => values
             .iter()
             .find_map(|value| find_runtime_varying_call(value, semantic)),
-        Expr::Named(ast::ExprNamed { target, value, .. }) => {
+        ast::ExprFields::Named(ast::ExprNamedFields { target, value, .. }) => {
             find_runtime_varying_call(target, semantic)
                 .or_else(|| find_runtime_varying_call(value, semantic))
         }
-        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
+        ast::ExprFields::BinOp(ast::ExprBinOpFields { left, right, .. }) => {
             find_runtime_varying_call(left, semantic)
                 .or_else(|| find_runtime_varying_call(right, semantic))
         }
-        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => {
+        ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields { operand, .. }) => {
             find_runtime_varying_call(operand, semantic)
         }
         // Lambda defers execution — `lambda: datetime.now()` does not call
         // `now()` at DAG parse time, so traversing into the body would be a
         // false positive.
-        Expr::Lambda(_) => None,
-        Expr::If(ast::ExprIf {
+        ast::ExprFields::Lambda(_) => None,
+        ast::ExprFields::If(ast::ExprIfFields {
             test, body, orelse, ..
         }) => find_runtime_varying_call(test, semantic)
             .or_else(|| find_runtime_varying_call(body, semantic))
             .or_else(|| find_runtime_varying_call(orelse, semantic)),
-        Expr::Dict(ast::ExprDict { items, .. }) => items.iter().find_map(|item| {
-            item.key
-                .as_ref()
+        ast::ExprFields::Dict(ast::ExprDictFields { items, .. }) => items.iter().find_map(|item| {
+            item.key()
                 .and_then(|k| find_runtime_varying_call(k, semantic))
-                .or_else(|| find_runtime_varying_call(&item.value, semantic))
+                .or_else(|| find_runtime_varying_call(item.value(), semantic))
         }),
-        Expr::List(ast::ExprList { elts, .. })
-        | Expr::Tuple(ast::ExprTuple { elts, .. })
-        | Expr::Set(ast::ExprSet { elts, .. }) => elts
+        ast::ExprFields::List(ast::ExprListFields { elts, .. })
+        | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
+        | ast::ExprFields::Set(ast::ExprSetFields { elts, .. }) => elts
             .iter()
             .find_map(|elt| find_runtime_varying_call(elt, semantic)),
-        Expr::ListComp(ast::ExprListComp {
+        ast::ExprFields::ListComp(ast::ExprListCompFields {
             elt, generators, ..
         })
-        | Expr::SetComp(ast::ExprSetComp {
+        | ast::ExprFields::SetComp(ast::ExprSetCompFields {
             elt, generators, ..
         })
-        | Expr::Generator(ast::ExprGenerator {
+        | ast::ExprFields::Generator(ast::ExprGeneratorFields {
             elt, generators, ..
         }) => find_runtime_varying_call(elt, semantic).or_else(|| {
             generators.iter().find_map(|generator| {
-                find_runtime_varying_call(&generator.target, semantic)
-                    .or_else(|| find_runtime_varying_call(&generator.iter, semantic))
+                find_runtime_varying_call(generator.target(), semantic)
+                    .or_else(|| find_runtime_varying_call(generator.iter(), semantic))
                     .or_else(|| {
                         generator
-                            .ifs
+                            .ifs()
                             .iter()
                             .find_map(|e| find_runtime_varying_call(e, semantic))
                     })
             })
         }),
-        Expr::DictComp(ast::ExprDictComp {
+        ast::ExprFields::DictComp(ast::ExprDictCompFields {
             key,
             value,
             generators,
             ..
         }) => key
-            .as_deref()
             .and_then(|key| find_runtime_varying_call(key, semantic))
             .or_else(|| find_runtime_varying_call(value, semantic))
             .or_else(|| {
                 generators.iter().find_map(|generator| {
-                    find_runtime_varying_call(&generator.target, semantic)
-                        .or_else(|| find_runtime_varying_call(&generator.iter, semantic))
+                    find_runtime_varying_call(generator.target(), semantic)
+                        .or_else(|| find_runtime_varying_call(generator.iter(), semantic))
                         .or_else(|| {
                             generator
-                                .ifs
+                                .ifs()
                                 .iter()
                                 .find_map(|e| find_runtime_varying_call(e, semantic))
                         })
                 })
             }),
-        Expr::Await(ast::ExprAwait { value, .. })
-        | Expr::YieldFrom(ast::ExprYieldFrom { value, .. })
-        | Expr::Attribute(ast::ExprAttribute { value, .. })
-        | Expr::Starred(ast::ExprStarred { value, .. }) => {
+        ast::ExprFields::Await(ast::ExprAwaitFields { value, .. })
+        | ast::ExprFields::YieldFrom(ast::ExprYieldFromFields { value, .. })
+        | ast::ExprFields::Attribute(ast::ExprAttributeFields { value, .. })
+        | ast::ExprFields::Starred(ast::ExprStarredFields { value, .. }) => {
             find_runtime_varying_call(value, semantic)
         }
-        Expr::Yield(ast::ExprYield { value, .. }) => value
-            .as_ref()
-            .and_then(|v| find_runtime_varying_call(v, semantic)),
-        Expr::Compare(ast::ExprCompare { operands, .. }) => operands
+        ast::ExprFields::Yield(ast::ExprYieldFields { value, .. }) => {
+            value.and_then(|v| find_runtime_varying_call(v, semantic))
+        }
+        ast::ExprFields::Compare(ast::ExprCompareFields { operands, .. }) => operands
             .iter()
             .find_map(|operand| find_runtime_varying_call(operand, semantic)),
-        Expr::FString(ast::ExprFString { value, .. }) => value
+        ast::ExprFields::FString(ast::ExprFStringFields { value, .. }) => value
             .elements()
             .find_map(|element| find_runtime_in_interpolated_element(element, semantic)),
-        Expr::TString(ast::ExprTString { value, .. }) => value
+        ast::ExprFields::TString(ast::ExprTStringFields { value, .. }) => value
             .elements()
             .find_map(|element| find_runtime_in_interpolated_element(element, semantic)),
-        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+        ast::ExprFields::Subscript(ast::ExprSubscriptFields { value, slice, .. }) => {
             find_runtime_varying_call(value, semantic)
                 .or_else(|| find_runtime_varying_call(slice, semantic))
         }
-        Expr::Slice(ast::ExprSlice {
+        ast::ExprFields::Slice(ast::ExprSliceFields {
             lower, upper, step, ..
         }) => lower
-            .as_ref()
             .and_then(|v| find_runtime_varying_call(v, semantic))
-            .or_else(|| {
-                upper
-                    .as_ref()
-                    .and_then(|v| find_runtime_varying_call(v, semantic))
-            })
-            .or_else(|| {
-                step.as_ref()
-                    .and_then(|v| find_runtime_varying_call(v, semantic))
-            }),
-        Expr::Name(_)
-        | Expr::StringLiteral(_)
-        | Expr::BytesLiteral(_)
-        | Expr::NumberLiteral(_)
-        | Expr::BooleanLiteral(_)
-        | Expr::NoneLiteral(_)
-        | Expr::EllipsisLiteral(_)
-        | Expr::IpyEscapeCommand(_) => None,
+            .or_else(|| upper.and_then(|v| find_runtime_varying_call(v, semantic)))
+            .or_else(|| step.and_then(|v| find_runtime_varying_call(v, semantic))),
+        ast::ExprFields::Name(_)
+        | ast::ExprFields::StringLiteral(_)
+        | ast::ExprFields::BytesLiteral(_)
+        | ast::ExprFields::NumberLiteral(_)
+        | ast::ExprFields::BooleanLiteral(_)
+        | ast::ExprFields::NoneLiteral(_)
+        | ast::ExprFields::EllipsisLiteral(_)
+        | ast::ExprFields::IpyEscapeCommand(_) => None,
     }
 }
 
 /// Check an interpolated string element (f-string or t-string) for runtime-varying calls,
 /// including format specifications.
 fn find_runtime_in_interpolated_element<'a>(
-    element: &'a InterpolatedStringElement,
+    element: InterpolatedStringElement<'a>,
     semantic: &SemanticModel,
-) -> Option<(&'a Expr, &'static str)> {
-    match element {
-        InterpolatedStringElement::Literal(_) => None,
-        InterpolatedStringElement::Interpolation(interpolation) => {
-            find_runtime_varying_call(&interpolation.expression, semantic).or_else(|| {
-                interpolation.format_spec.as_ref().and_then(|spec| {
-                    spec.elements
+) -> Option<(Expr<'a>, &'static str)> {
+    match element.classify() {
+        InterpolatedStringElementKind::Literal(_) => None,
+        InterpolatedStringElementKind::Interpolation(interpolation) => {
+            find_runtime_varying_call(interpolation.expression(), semantic).or_else(|| {
+                interpolation.format_spec().and_then(|spec| {
+                    spec.elements()
                         .iter()
                         .find_map(|el| find_runtime_in_interpolated_element(el, semantic))
                 })
