@@ -1,4 +1,4 @@
-use ruff_index::newtype_index;
+use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
@@ -6,7 +6,7 @@ use crate::HasTrackedScope;
 use crate::frozen::PackedIds;
 use crate::member::ScopedMemberId;
 use crate::place::ScopedPlaceId;
-use crate::scope::FileScopeId;
+use crate::scope::{FileScopeId, Scope};
 use crate::symbol::ScopedSymbolId;
 
 pub use node_key::ExpressionNodeKey;
@@ -210,6 +210,12 @@ pub(crate) struct AstIds {
 }
 
 impl AstIds {
+    pub(super) fn record_first_expression_rows(&self, scopes: &mut IndexVec<FileScopeId, Scope>) {
+        for range in &self.scopes {
+            scopes[range.scope].record_first_expression_row(range.start);
+        }
+    }
+
     /// Looks up a node in the packed use array. Each earlier set bit on the same page
     /// accounts for one preceding entry in the array.
     fn use_index(&self, node: ast::NodeIndex) -> Option<usize> {
@@ -359,13 +365,13 @@ mod tests {
     }
     #[test]
     fn uses_across_blocks_scopes_and_annotations() -> Result<(), ParseError> {
-        let source = format!("({}a, b, c, 'T')", "x, ".repeat(61));
+        let source = format!("({}a, b, c, 'T')", "x, ".repeat(63));
         let mut module = parse_module(&source)?;
         module.index_module();
         let [stmt] = module.suite().as_array().unwrap();
         let expr = stmt.as_expr_stmt().unwrap().value();
         let tuple = expr.as_tuple_expr().unwrap();
-        let [a, b, c, string] = tuple.elts().slice(61..).as_array().unwrap();
+        let [a, b, c, string] = tuple.elts().slice(63..).as_array().unwrap();
         assert_eq!(a.node_index().as_u32(), Some(63));
         assert_eq!(b.node_index().as_u32(), Some(64));
 

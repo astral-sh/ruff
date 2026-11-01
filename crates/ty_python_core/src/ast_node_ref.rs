@@ -1,12 +1,11 @@
 use std::fmt::Debug;
-use std::marker::PhantomData;
 
 #[cfg(debug_assertions)]
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 #[cfg(debug_assertions)]
 use ruff_python_ast::PythonVersion;
-use ruff_python_ast::{AstNode, NodeIndex, NodeType};
+use ruff_python_ast::{AstNode, AstNodeId, NodeIndex, NodeType};
 
 /// Reference to an AST node.
 ///
@@ -34,8 +33,7 @@ use ruff_python_ast::{AstNode, NodeIndex, NodeType};
 /// run on every AST change. All other queries only run when the expression's identity changes.
 #[derive(Clone)]
 pub struct AstNodeRef<T> {
-    index: NodeIndex,
-    kind_marker: PhantomData<fn() -> T>,
+    handle: AstNodeId<T>,
 
     /// Debug information.
     #[cfg(debug_assertions)]
@@ -74,8 +72,8 @@ impl<T> AstNodeRef<T> {
         #[cfg(debug_assertions)]
         self.check_module(module_ref);
         module_ref
-            .get_by_index(self.index)
-            .cast::<T::Borrowed<'ast>>()
+            .ast()
+            .view(self.handle)
             .expect("AST indices should never change within the same revision")
     }
 
@@ -85,8 +83,7 @@ impl<T> AstNodeRef<T> {
     ) -> Self {
         debug_assert!(std::ptr::eq(module_ref.ast(), node.ast()));
         Self {
-            index: node.syntax_node().node_index(),
-            kind_marker: PhantomData,
+            handle: node.node_id(),
             #[cfg(debug_assertions)]
             file: module_ref.module().file(),
             #[cfg(debug_assertions)]
@@ -99,7 +96,7 @@ impl<T> AstNodeRef<T> {
     }
 
     pub fn index(&self) -> NodeIndex {
-        self.index
+        self.handle.module_index()
     }
 }
 

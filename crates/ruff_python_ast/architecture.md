@@ -186,12 +186,34 @@ so its semantic entry points to a view that retains the annotation's context.
 
 The linter looks up a name’s binding by its starting offset in the source.
 
-## Node identity in ty
+## Node identity
 
-When ty caches a parsed module, it walks the reachable syntax in source order, skipping the
-module wrapper. It stores a node index for each visited arena row and the row ID for each
-module index. ty can use the same index to resolve a reference after evicting and reparsing
-the file. String annotations use an interval of indices reserved by their parent literal.
+ty keeps a typed arena handle in each `AstNodeRef<T>`. Parsing the same source with the same
+options emits the same rows, so a reference still resolves after ty evicts and reparses the
+module. Resolving a handle reads the row directly. Allocation order can differ from source order.
+In `a.b()[i]`, for example, the parser emits the attribute and call before the enclosing subscript.
+
+Before caching a module, ty calls `index_module()` to use each row's zero-based allocation index
+as its node key. This takes constant time because the rows share one base offset. ty then calls
+`shrink_to_fit()` to release spare capacity in the parse buffers.
+
+A separately parsed string annotation has its own short-lived arena. ty calls
+`index_string_annotation()` to give its nodes keys in the range reserved by the containing
+string literal. A node's key is the start of the range plus its zero-based allocation index.
+If auxiliary rows would put an annotation over its 256-key limit (eight for a nested annotation),
+ty keeps a sorted list of the rows reached by source-order traversal. Each row's position in the
+list gives its offset within the reserved range.
+
+The IDE finds the enclosing annotation by searching annotation roots sorted by source position.
+To identify an unassigned call such as `return type("C", (), {})`, ty records its row relative to
+the first expression row in its scope. Rows inserted before the scope shift both by the same
+amount. A diagnostic can recover the call's current range even after whitespace edits.
+
+ty uses row keys to look up scoped use IDs and definitions. Each block of 64 module indices
+stores a bitmap of the rows with a value and the starting offset of those values. Looking up a
+row counts the set bits before it and adds the block offset. Only rows with a value occupy space
+in the values array. Annotation indices use separate sparse tables.
+[Node table](../ty_python_core/src/frozen.rs)
 
 ## Building replacement syntax
 
