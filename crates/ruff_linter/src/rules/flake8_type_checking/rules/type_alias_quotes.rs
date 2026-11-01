@@ -9,8 +9,8 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::registry::Rule;
-use crate::rules::flake8_type_checking::helpers::quote_type_expression;
-use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
+use crate::rules::flake8_type_checking::helpers::{contains_escape, quote_type_expression};
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::token::parenthesized_range;
 
@@ -40,10 +40,13 @@ use ruff_python_ast::token::parenthesized_range;
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is currently always marked as unsafe, since runtime
+/// This rule's fix is currently marked as unsafe, since runtime
 /// typing libraries may try to access/resolve the type alias in a way
 /// that we can't statically determine during analysis and relies on the
 /// type alias not containing any forward references.
+///
+/// The fix is display-only when the quoted type alias contains an escape sequence,
+/// since tools like ty can't analyze forward references that contain escape sequences.
 ///
 /// ## References
 /// - [PEP 613 – Explicit Type Aliases](https://peps.python.org/pep-0613/)
@@ -54,7 +57,7 @@ use ruff_python_ast::token::parenthesized_range;
 pub(crate) struct UnquotedTypeAlias;
 
 impl Violation for UnquotedTypeAlias {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -186,10 +189,15 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) {
         checker.locator(),
         checker.default_string_flags(),
     );
+    let applicability = if contains_escape(&edit) {
+        Applicability::DisplayOnly
+    } else {
+        Applicability::Unsafe
+    };
     for name in names {
         let mut diagnostic = checker.report_diagnostic(UnquotedTypeAlias, name.range());
         diagnostic.set_parent(parent);
-        diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
+        diagnostic.set_fix(Fix::applicable_edit(edit.clone(), applicability));
     }
 }
 

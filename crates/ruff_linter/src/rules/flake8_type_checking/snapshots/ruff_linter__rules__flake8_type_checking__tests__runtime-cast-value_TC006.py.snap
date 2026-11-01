@@ -197,8 +197,64 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
 99 |     cast(val=3.0, typ=int)  # TC006
    |                       ^^^
 help: Add quotes
-   |
-98 |     cast(typ=int, val=3.0)  # TC006
-   -     cast(val=3.0, typ=int)  # TC006
-99 +     cast(val=3.0, typ="int")  # TC006
-   |
+    |
+98  |     cast(typ=int, val=3.0)  # TC006
+    -     cast(val=3.0, typ=int)  # TC006
+99  +     cast(val=3.0, typ="int")  # TC006
+100 |
+    |
+
+TC006 [*] Add quotes to type expression in `typing.cast()`
+   --> TC006.py:106:10
+    |
+104 |     from typing import cast, Literal
+105 |
+106 |     cast(Literal["'"], "'")  # TC006
+    |          ^^^^^^^^^^^^
+107 |     cast(Literal["\n"], "\n")  # TC006
+108 |     cast(Literal[r'''a
+    |
+help: Add quotes
+    |
+105 |
+    -     cast(Literal["'"], "'")  # TC006
+106 +     cast("Literal[\"'\"]", "'")  # TC006
+107 |     cast(Literal["\n"], "\n")  # TC006
+    |
+note: This is a display-only fix and is likely to be incorrect
+
+TC006 [*] Add quotes to type expression in `typing.cast()`
+   --> TC006.py:107:10
+    |
+106 |     cast(Literal["'"], "'")  # TC006
+107 |     cast(Literal["\n"], "\n")  # TC006
+    |          ^^^^^^^^^^^^^
+108 |     cast(Literal[r'''a
+109 | b'''], "")  # TC006
+    |
+help: Add quotes
+    |
+106 |     cast(Literal["'"], "'")  # TC006
+    -     cast(Literal["\n"], "\n")  # TC006
+107 +     cast("Literal['\\n']", "\n")  # TC006
+108 |     cast(Literal[r'''a
+    |
+note: This is a display-only fix and is likely to be incorrect
+
+TC006 [*] Add quotes to type expression in `typing.cast()`
+   --> TC006.py:108:10
+    |
+106 |       cast(Literal["'"], "'")  # TC006
+107 |       cast(Literal["\n"], "\n")  # TC006
+108 |       cast(Literal[r'''a
+    |  __________^
+109 | | b'''], "")  # TC006
+    | |_____^
+help: Add quotes
+    |
+107 |     cast(Literal["\n"], "\n")  # TC006
+    -     cast(Literal[r'''a
+    - b'''], "")  # TC006
+108 +     cast("Literal[r'''a\nb''']", "")  # TC006
+    |
+note: This is a display-only fix and is likely to be incorrect
