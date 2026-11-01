@@ -1,7 +1,7 @@
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::PatternMatchMapping;
-use ruff_python_ast::{Expr, Identifier, Pattern};
+use ruff_python_ast::{Expr, Identifier, MappingPatternItem, Pattern};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -16,20 +16,12 @@ pub struct FormatPatternMatchMapping;
 
 impl FormatNodeRule<PatternMatchMapping> for FormatPatternMatchMapping {
     fn fmt_fields(&self, item: &PatternMatchMapping, f: &mut PyFormatter) -> FormatResult<()> {
-        let PatternMatchMapping {
-            keys,
-            patterns,
-            rest,
-            range: _,
-            node_index: _,
-        } = item;
-
-        debug_assert_eq!(keys.len(), patterns.len());
+        let items = &item.items;
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
 
-        if keys.is_empty() && rest.is_none() {
+        if items.is_empty() {
             return empty_parenthesized("{", dangling, "}").fmt(f);
         }
 
@@ -69,17 +61,20 @@ impl FormatNodeRule<PatternMatchMapping> for FormatPatternMatchMapping {
         let format_pairs = format_with(|f| {
             let mut joiner = f.join_comma_separated(item.end());
 
-            for (key, pattern) in keys.iter().zip(patterns) {
-                let key_pattern_pair = KeyPatternPair { key, pattern };
-                joiner.entry(&key_pattern_pair, &key_pattern_pair);
-            }
-
-            if let Some(identifier) = rest {
-                let rest_pattern = RestPattern {
-                    identifier,
-                    comments: double_star_comments,
-                };
-                joiner.entry(&rest_pattern, &rest_pattern);
+            for entry in items {
+                match entry {
+                    MappingPatternItem::Entry { key, pattern } => {
+                        let pair = KeyPatternPair { key, pattern };
+                        joiner.entry(&pair, &pair);
+                    }
+                    MappingPatternItem::Rest(identifier) => {
+                        let rest = RestPattern {
+                            identifier,
+                            comments: double_star_comments,
+                        };
+                        joiner.entry(&rest, &rest);
+                    }
+                }
             }
 
             joiner.finish()?;
@@ -159,20 +154,16 @@ impl Format<PyFormatContext<'_>> for KeyPatternPair<'_> {
 /// Given a [`PatternMatchMapping`], finds the range of the `**` element in the `rest` pattern,
 /// if it exists.
 fn find_double_star(pattern: &PatternMatchMapping, source: &str) -> Option<(TextRange, TextRange)> {
-    let PatternMatchMapping {
-        keys: _,
-        patterns,
-        rest,
-        range: _,
-        node_index: _,
-    } = pattern;
-
-    // If there's no `rest` element, there's no `**`.
-    let rest = rest.as_ref()?;
-
-    let mut tokenizer =
-        SimpleTokenizer::starts_at(patterns.last().map_or(pattern.start(), Ranged::end), source);
-    let double_star = tokenizer.find(|token| token.kind() == SimpleTokenKind::DoubleStar)?;
-
-    Some((double_star.range(), rest.range()))
+    let mut start = pattern.start();
+    for item in &pattern.items {
+        match item {
+            MappingPatternItem::Entry { pattern, .. } => start = pattern.end(),
+            MappingPatternItem::Rest(rest) => {
+                let double_star = SimpleTokenizer::starts_at(start, source)
+                    .find(|token| token.kind() == SimpleTokenKind::DoubleStar)?;
+                return Some((double_star.range(), rest.range()));
+            }
+        }
+    }
+    None
 }
