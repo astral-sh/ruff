@@ -13,12 +13,12 @@ use ruff_db::{
     files::FileRange,
     parsed::ParsedModuleRef,
 };
-use ruff_python_ast::{PythonVersion, name::Name};
+use ruff_python_ast::{PythonVersion, helpers::is_dunder, name::Name};
 use ruff_python_stdlib::identifiers::is_mangled_private;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
-    Db, FxIndexSet, ProgramEnvironment,
+    Db, FxIndexMap, FxIndexSet, Program, ProgramEnvironment,
     lint::LintId,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
@@ -26,9 +26,7 @@ use crate::{
         MemberLookupPolicy, Parameter, Parameters, Signature, StaticClassLiteral, Type,
         TypeContext, TypeQualifiers, UnionType,
         call::CallArguments,
-        class::{
-            CodeGeneratorKind, FieldKind, MethodDecorator, implicit_attribute_definition_names,
-        },
+        class::{CodeGeneratorKind, FieldKind, MethodDecorator},
         constraints::ConstraintSetBuilder,
         context::InferContext,
         diagnostic::{
@@ -149,7 +147,7 @@ pub(super) fn check_class<'db>(
         scope,
         kind: CodeGeneratorKind::from_class(db, class.into()),
         enum_info: enum_metadata(db, class.into()),
-        receiver_written_names: implicit_attribute_definition_names(db, scope),
+        receiver_written_names: class.implicit_attribute_definition_names(db),
         bases,
         named_tuple_bases,
     };
@@ -195,16 +193,20 @@ fn check_inherited_conflicts<'db>(
             })
             .cloned(),
     );
-    let attribute_contracts = configuration.check_attribute_type_violations().then(|| {
-        // The MRO and the explicit bases usually contain the same classes. Only
-        // different specializations introduce additional override contracts.
-        mro.iter()
-            .copied()
+    // Only MRO entries select the member. Other paths to a generic base can supply additional
+    // contracts, so keep their specializations after the MRO in the order they were declared.
+    let mro_len = mro.len();
+    let contracts = if configuration.check_attribute_type_violations() {
+        mro.into_iter()
             .chain(class_type.iter_explicit_ancestors(db, env).skip(1))
             .collect::<FxIndexSet<_>>()
-    });
+            .into_iter()
+            .collect()
+    } else {
+        mro
+    };
 
-    for (index, candidate_owner) in mro.iter().copied().enumerate() {
+    for (index, candidate_owner) in contracts[..mro_len].iter().copied().enumerate() {
         if first_dynamic_base.is_some_and(|position| index >= position) {
             break;
         }
@@ -226,36 +228,48 @@ fn check_inherited_conflicts<'db>(
         //
         // class Conflict(Ordered, AcceptsObject): ...
         // ```
-        let names = inherited_source_definitions(db, literal)
-            .iter()
-            .map(|(name, definition)| (name, Some(*definition)))
-            .chain(
-                candidate_owner
-                    .own_instance_attribute_names(db)
-                    .iter()
-                    .chain(literal.slot_names(db).unwrap_or_default().iter())
-                    .map(|name| (name, None)),
-            );
-        for (name, definition) in names {
-            if is_mangled_private(name)
-                || name == "__hash__"
-                || !seen.insert(name.clone())
-                || class
-                    .own_synthesized_member(db, env, None, None, name)
-                    .is_some()
+        let candidates = inherited_member_candidates(db, literal);
+        // An empty base, or one whose names were all overridden, needs no pairwise lookups.
+        let mut owners_by_name = LazyCell::new(|| {
+            let mut owners: FxHashMap<&Name, smallvec::SmallVec<[usize; 4]>> = FxHashMap::default();
+            for (other_index, &other) in contracts.iter().enumerate() {
+                if index == other_index {
+                    continue;
+                }
+                let mut add = |name| owners.entry(name).or_default().push(other_index);
+                // Bound the number of cached pairs per base by the number of names it contributes.
+                // Otherwise a wide hierarchy of single-member mixins can cache mostly empty lists.
+                if candidates.len() >= contracts.len() - 1 {
+                    shared_inherited_names(db, env.program(db), literal, other)
+                        .iter()
+                        .for_each(add);
+                } else {
+                    visit_shared_inherited_names(db, env, candidates, other, &mut add);
+                }
+            }
+            owners
+        });
+        for (name, &definition) in candidates {
+            if is_mangled_private(name) || name == "__hash__" || !seen.insert(name.clone()) {
+                continue;
+            }
+            let Some(owners) = owners_by_name.get_mut(name) else {
+                // A conflict requires two bases to supply this name.
+                continue;
+            };
+            if class
+                .own_synthesized_member(db, env, None, None, name)
+                .is_some()
             {
                 continue;
             }
-            let owner_index = mro[..index]
-                .iter()
-                .position(|owner| {
-                    !owner.own_class_member(db, env, None, name).is_undefined()
-                        || !owner.own_instance_member(db, env, name).is_undefined()
-                })
-                .unwrap_or(index);
-            let owner = mro[owner_index];
-            // Lookup already established that no earlier MRO entry defines this name.
-            let later_bases = &mro[owner_index + 1..];
+            // Names listed on an earlier base are already in `seen`. Any earlier owner in this
+            // list was found by member lookup, including synthesized members without a declaration.
+            let position = owners.partition_point(|&other| other < index);
+            owners.insert(position, index);
+            let (&owner_index, later_owners) =
+                owners.split_first().expect("the candidate was inserted");
+            let owner = contracts[owner_index];
 
             // Only a source definition on the selected owner goes to the method checker.
             // A generated member on an earlier base must not expose an older method.
@@ -268,22 +282,22 @@ fn check_inherited_conflicts<'db>(
                     class,
                     class_type,
                     owner,
-                    later_bases,
+                    later_owners
+                        .iter()
+                        .copied()
+                        .take_while(|&i| i < mro_len)
+                        .map(|i| contracts[i]),
                     name,
                     definition,
                 );
             }
-            // The ordered set starts with the valid MRO, followed by any additional
-            // specializations from other paths to the same base.
-            if let Some(contracts) = &attribute_contracts
-                && owner_index + 1 < contracts.len()
-            {
+            if configuration.check_attribute_type_violations() {
                 attributes::check_inherited_conflict(
                     context,
                     class,
                     class_type,
                     owner,
-                    contracts.iter().skip(owner_index + 1).copied(),
+                    later_owners.iter().map(|&i| contracts[i]),
                     name,
                 );
             }
@@ -336,18 +350,19 @@ fn check_inherited_method_conflict<'db>(
     class: StaticClassLiteral<'db>,
     class_type: ClassType<'db>,
     owner: ClassType<'db>,
-    contracts: &[ClassType<'db>],
+    contracts: impl Iterator<Item = ClassType<'db>>,
     name: &Name,
     definition: Definition<'db>,
 ) {
-    if contracts.is_empty() || is_constructor_like_method(name) {
+    let mut contracts = contracts.peekable();
+    if is_constructor_like_method(name) || contracts.peek().is_none() {
         return;
     }
     let db = context.db();
     let env = &context.program_environment();
     let receiver = Type::instance(db, env, class_type);
     let selected = LazyCell::new(|| source_method_contract(db, env, owner, receiver, name));
-    for &contract_owner in contracts {
+    for contract_owner in contracts {
         let Some((contract_decorator, contract_ty)) =
             source_method_contract(db, env, contract_owner, receiver, name)
         else {
@@ -502,16 +517,86 @@ fn inherited_conflict_mro<'db>(
     Some((mro, first_dynamic_base))
 }
 
-/// Subclasses share the source declarations of a base, even when they specialize it differently.
-/// Keep the definitions in lookup order; binding their types still depends on the subclass.
-#[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
-fn inherited_source_definitions<'db>(
+/// Source declarations, receiver attributes, and slots in their lookup order. Only a source
+/// declaration can supply the definition for an inherited method diagnostic.
+#[salsa::tracked(returns(ref), cycle_initial=|_, _, _| FxIndexMap::default(), heap_size=ruff_memory_usage::heap_size)]
+fn inherited_member_candidates<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
-) -> Box<[(Name, Definition<'db>)]> {
-    all_end_of_scope_members(db, class.body_scope(db))
-        .map(|member| (member.member.name, member.first_reachable_definition))
-        .collect()
+) -> FxIndexMap<Name, Option<Definition<'db>>> {
+    let mut names = FxIndexMap::default();
+    for member in all_end_of_scope_members(db, class.body_scope(db)) {
+        names
+            .entry(member.member.name)
+            .or_insert(Some(member.first_reachable_definition));
+    }
+    for name in ClassType::NonGeneric(class.into())
+        .own_instance_attribute_names(db)
+        .iter()
+        .chain(class.slot_names(db).unwrap_or_default())
+    {
+        names.entry(name.clone()).or_insert(None);
+    }
+    names
+}
+
+/// Names listed by one base that could participate in an override check with another.
+///
+/// A declaration, receiver use, or slot on both bases is enough to retain a name; the normal
+/// check resolves its type for the subclass. When only one base lists the name, use member
+/// lookup on the other because synthesis can introduce an override target or shadow a method.
+#[salsa::tracked(returns(deref), cycle_initial=|_, _, _, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+fn shared_inherited_names<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    source: StaticClassLiteral<'db>,
+    other: ClassType<'db>,
+) -> Box<[Name]> {
+    let mut names = Vec::new();
+    visit_shared_inherited_names(
+        db,
+        &ProgramEnvironment::from_program(program),
+        inherited_member_candidates(db, source),
+        other,
+        |name| names.push(name.clone()),
+    );
+    names.into_boxed_slice()
+}
+
+/// Collect the same candidate names for cached and uncached base pairs.
+fn visit_shared_inherited_names<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    candidates: &'db FxIndexMap<Name, Option<Definition<'db>>>,
+    other: ClassType<'db>,
+    visit: impl FnMut(&'db Name),
+) {
+    let Some((literal, specialization)) = other.static_class_literal(db) else {
+        // All the MRO entries are static. Extra specializations only supply attribute contracts,
+        // which require a static class literal.
+        return;
+    };
+    let listed = inherited_member_candidates(db, literal);
+    let table = place_table(db, literal.body_scope(db));
+    let specialization = specialization.map(|s| s.tuple_runtime_element_specialization(db));
+    candidates
+        .keys()
+        .filter(|name| !is_mangled_private(name) && *name != "__hash__")
+        .filter(|name| {
+            if listed.contains_key(*name) {
+                return true;
+            }
+            // The inventory includes every slot and receiver attribute. If the class body
+            // has no symbol either, a non-dunder can only come from member synthesis.
+            if !is_dunder(name) && table.symbol_id(name).is_none() {
+                return literal
+                    .own_synthesized_member(db, env, specialization, None, name)
+                    .is_some();
+            }
+            !other.own_class_member(db, env, None, name).is_undefined()
+                || !other.own_instance_member(db, env, name).is_undefined()
+        })
+        .for_each(visit);
 }
 
 /// Returns a source-defined method bound to the class whose MRO is being checked.

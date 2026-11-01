@@ -916,8 +916,38 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         other: Type<'db>,
     ) -> bool {
+        if let (Type::Never, ty) | (ty, Type::Never) = (self, other) {
+            // `Never` is redundant with every type, so only the converse needs checking.
+            return ty.might_be_equivalent_to_never(db)
+                && ty.is_pure_redundant_with(db, env, Type::Never);
+        }
         self.when_equivalent_to(db, env, other, &ConstraintSetBuilder::new())
             .is_always_satisfied(db, env, TypeVarSet::None)
+    }
+
+    /// Returns `false` for types we can cheaply distinguish from `Never`. A single such
+    /// member rules out an entire union without resolving the other members.
+    ///
+    /// ```python
+    /// type Result[T] = T | int  # Even Result[Never] contains int.
+    /// ```
+    ///
+    /// A `true` result still needs a relation check. For example, an alias may expand to `Never`.
+    fn might_be_equivalent_to_never(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::NominalInstance(_)
+            | Type::LiteralValue(_)
+            | Type::Dynamic(_)
+            | Type::FunctionLiteral(_)
+            | Type::BoundMethod(_)
+            | Type::ClassLiteral(_) => false,
+            Type::Divergent(_) => self.is_never(),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|element| element.might_be_equivalent_to_never(db)),
+            _ => true,
+        }
     }
 
     pub(crate) fn is_equivalent_to_with_materialization_visitor(
