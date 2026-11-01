@@ -1374,6 +1374,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         () => rules::ruff::rules::SharedClockMock,
         () => rules::ruff::rules::UnnecessaryRegularExpressionCompile,
 
+        // SQLAlchemy
+        (SQLAlchemy, "201") => (RuleGroup::Preview, rules::sqlalchemy::rules::SQLAlchemyMissingMappedTypeAnnotation),
+
         _ => return None,
     })
 }
