@@ -1,1 +1,4 @@
-mypy==2.1.0
+# Keep mypy's runtime dependencies compatible when projects pin older versions.
+mypy==2.4.0
+ast-serialize>=0.11.2,<1.0.0
+librt>=0.16.0
