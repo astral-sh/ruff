@@ -2602,6 +2602,10 @@ impl Builder {
         [ops, operands]: [u64; 2],
     ) -> BuildId<crate::kind::ExprCompare> {
         let mut row = Row::new(NodeKind::ExprCompare, range);
+        let [start, len] = split_words(ops);
+        if len == 1 && split_words(operands)[1] == 2 {
+            row.set_expr_compare_single_op(self.ast.extra[start as usize].to_le_bytes()[0] + 1);
+        }
         let [ops, operands] =
             super::list::Interval::pack_pair(&mut self.ast.extra, [ops, operands]);
         row.set_expr_compare_ops(split_words(ops)[0]);
@@ -2613,9 +2617,14 @@ impl<'a> crate::ExprCompare<'a> {
     /// Returns the operands and operator of a single comparison.
     #[inline]
     pub fn as_single(self) -> Option<(crate::Expr<'a>, crate::CmpOp, crate::Expr<'a>)> {
-        let [operator] = self.ops().as_array()?;
-        let [left, right] = self.operands().as_array()?;
-        Some((left, operator, right))
+        let operator = self.syntax.row.expr_compare_single_op().checked_sub(1)?;
+        let start = split_words(self.syntax.row.expr_compare_operands())[0] as usize;
+        let &[left, right] = self.syntax.ast.extra.get(start..)?.first_chunk()?;
+        Some((
+            self.syntax.ast.child(u64::from(left)),
+            crate::CmpOp::decode(u64::from(operator)),
+            self.syntax.ast.child(u64::from(right)),
+        ))
     }
 
     #[inline]

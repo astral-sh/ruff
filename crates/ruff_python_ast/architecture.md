@@ -99,7 +99,9 @@ row stores that boundary and both lengths in twelve bytes. The parser appends th
 to each other. A builder that supplies two nonadjacent, nonempty lists copies them into
 consecutive slots.
 
-An `ExprCompare` row shares a boundary between its operators and operands.
+An `ExprCompare` row shares a boundary between its operators and operands. For a single
+comparison such as `a == b`, a spare byte holds the operator. The `as_single` accessor can
+therefore reject a chain such as `a < b < c` before reading either list.
 
 A `Parameters` row stores its two optional variadic children inline. Its three groups of
 ordinary parameters have list bounds in the extra-data column.
