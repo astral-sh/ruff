@@ -131,7 +131,46 @@ pub(crate) fn function_annotation_runtime_semantics(
     semantic: &SemanticModel,
     settings: &LinterSettings,
 ) -> RuntimeSemantics {
-    decorator_runtime_semantics(&function_def.decorator_list, semantic, settings)
+    let semantics = decorator_runtime_semantics(&function_def.decorator_list, semantic, settings);
+    if !semantics.is_default() {
+        return semantics;
+    }
+
+    // generic subscripts with special runtime semantics are viral and
+    // make all the function annotations runtime ambiguous, since
+    // depending on how the function is introspected it either needs
+    // all of the annotations to be available at runtime, or only the
+    // specific parameters that are wrapped in a runtime-required generic
+    // since we can't know which case applies we have to treat it as
+    // runtime-ambiguous. This virality currently only applies to top-level
+    // subscripts for speed and simplicity reasons, it is also unclear
+    // whether or not there any use-cases beyond `typing.Annotated` where
+    // we would realistically want this to work on lower level expressions.
+    // we could potentially add a simplified traversal step where we look
+    // at the slice if it contains a subscript, a full traversal is probably
+    // never worth it.
+    if settings
+        .flake8_type_checking
+        .runtime_evaluated_generic_subscripts
+        .is_empty()
+    {
+        return RuntimeSemantics::Default;
+    }
+    for parameter in &*function_def.parameters {
+        if let Some(Expr::Subscript(subscript)) = parameter.annotation() {
+            if !generic_subscript_runtime_semantics(subscript, semantic, settings).is_default() {
+                return RuntimeSemantics::Ambiguous;
+            }
+        }
+    }
+    if let Some(ref returns) = function_def.returns
+        && let Expr::Subscript(subscript) = &**returns
+    {
+        if !generic_subscript_runtime_semantics(subscript, semantic, settings).is_default() {
+            return RuntimeSemantics::Ambiguous;
+        }
+    }
+    RuntimeSemantics::Default
 }
 
 /// Returns the desired `RuntimeSemantics` for a class's annotations
@@ -141,7 +180,7 @@ pub(crate) fn class_annotation_runtime_semantics(
     settings: &LinterSettings,
 ) -> RuntimeSemantics {
     let semantics = base_class_runtime_semantics(class_def, semantic, settings);
-    if matches!(semantics, RuntimeSemantics::Required) {
+    if semantics.is_required() {
         return semantics;
     }
     semantics.combine(decorator_runtime_semantics(
@@ -149,6 +188,30 @@ pub(crate) fn class_annotation_runtime_semantics(
         semantic,
         settings,
     ))
+}
+
+/// Returns the desired `RuntimeSemantics` for type expressions wrapped in a generic subscript
+pub(crate) fn generic_subscript_runtime_semantics(
+    subscript: &ast::ExprSubscript,
+    semantic: &SemanticModel,
+    settings: &LinterSettings,
+) -> RuntimeSemantics {
+    let generics = &settings
+        .flake8_type_checking
+        .runtime_evaluated_generic_subscripts;
+    if generics.is_empty() {
+        return RuntimeSemantics::Default;
+    }
+    match semantic
+        .resolve_qualified_name(&subscript.value)
+        .and_then(|qualified_name| {
+            generics
+                .iter()
+                .find(|(generic, ..)| QualifiedName::from_dotted_name(generic) == qualified_name)
+        }) {
+        Some((_, semantics)) => *semantics,
+        _ => RuntimeSemantics::Default,
+    }
 }
 
 /// Returns `RuntimeSemantics` based on a class's base class.
