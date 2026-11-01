@@ -497,14 +497,21 @@ def child_handle(kind: str, value: str) -> str:
     return f"{{ let word = {value}; (word != 0).then(|| AstNodeId::from_word(word)) }}"
 
 
-def simple_children(sources: list[tuple[str, str]]) -> str | None:
+def simple_children(
+    node: Node,
+    nodes: set[str],
+    sources: list[tuple[str, str]],
+    schema: list[InlineField],
+) -> str | None:
+    """Most nodes can borrow one slice from the row or the extra buffer."""
     kinds = tuple("node" if kind == "optional" else kind for kind, _ in sources)
     if not sources:
         return "Children::empty(self)"
-    if kinds == ("node",):
-        return f"Children::one(self, {child_handle(*sources[0])})"
-    if kinds == ("node", "node"):
-        return f"Children::two(self, {child_handle(*sources[0])}, {child_handle(*sources[1])})"
+    if (
+        all(kind == "node" for kind in kinds)
+        and (words := inline_child_slice(child_fields(node, nodes), schema)) is not None
+    ):
+        return f"Children::inline(self, {words})"
     if kinds == ("list",):
         return f"Children::rows(self, {sources[0][1]})"
     if kinds in (("node", "list"), ("list", "node"), ("node", "list", "node")):
@@ -515,26 +522,41 @@ def simple_children(sources: list[tuple[str, str]]) -> str | None:
 
 
 def child_field(
-    node: Node, nodes: set[str], words: dict[str, str], _schema: list[InlineField]
+    node: Node, nodes: set[str], words: dict[str, str], schema: list[InlineField]
 ) -> str:
     sources = child_sources(
         node, child_fields(node, nodes), words, f"node.retype::<crate::{node.name}>()"
     )
-    if simple_children(sources) is not None:
+    if simple_children(node, nodes, sources, schema) is not None:
         return "Field::One(None)"
     arms = [f"{i} => {field_value(*source)}," for i, source in enumerate(sources)]
     return "match field {" + "".join(arms) + "_ => Field::One(None) }"
 
 
 def direct_children(
-    node: Node, nodes: set[str], words: dict[str, str], _schema: list[InlineField]
+    node: Node, nodes: set[str], words: dict[str, str], schema: list[InlineField]
 ) -> str:
     view = f"node.retype::<crate::{node.name}>()"
     sources = child_sources(node, child_fields(node, nodes), words, view)
     return (
-        simple_children(sources)
+        simple_children(node, nodes, sources, schema)
         or f"Children::fields(node, {len(sources)})"
     )
+
+
+def inline_child_slice(children: list[Field], schema: list[InlineField]) -> str | None:
+    """Borrow consecutive inline handles when missing children can be trimmed at the ends."""
+    offsets = {field.name: field.offset for field in schema if field.width == 4}
+    if any(field.name not in offsets for field in children):
+        return None
+    start = offsets[children[0].name]
+    if any(offsets[field.name] != start + 4 * i for i, field in enumerate(children)):
+        return None
+    if any(field.optional for field in children[1:-1]):
+        return None
+    first = str(children[0].optional).lower()
+    last = str(len(children) > 1 and children[-1].optional).lower()
+    return f"record.inline_children::<{start // 4}, {len(children)}, {first}, {last}>()"
 
 
 def next_descendant(
