@@ -11,6 +11,7 @@
 //! arguments must match _at least one_ overload.
 
 use crate::ProgramEnvironment;
+use std::cell::LazyCell;
 use std::fmt;
 use std::num::NonZeroU32;
 use std::slice::Iter;
@@ -52,7 +53,9 @@ use crate::types::{
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, name::Name};
+use ty_python_core::SemanticIndex;
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
+use ty_python_core::scope::NodeWithScopeRef;
 
 /// Selects which binding context to use for type variables that only appear in a return-position
 /// `Callable`.
@@ -90,22 +93,18 @@ pub(super) fn function_signature_expression_type<'db>(
     }
 }
 
-fn function_signature_type_expression_flags<'db>(
+/// The return annotation in the function's lexical scope, before callable type variables
+/// are rescoped or the return type of an async function is wrapped.
+pub(super) fn lexical_return_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    expression: &ast::Expr,
-) -> TypeExpressionFlags {
-    let file = definition.program_file(db);
-    let index = semantic_index(db, file);
-    let file_scope = index.expression_scope_id(expression);
-    let scope = file_scope.to_scope_id(db, file);
-    if scope == definition.scope(db) {
-        // expression is in the function definition scope, but always deferred
-        infer_deferred_types(db, definition).type_expression_flags(expression)
-    } else {
-        // expression is in the PEP-695 type params sub-scope
-        infer_complete_scope_types(db, scope).type_expression_flags(expression)
-    }
+    function: &ast::StmtFunctionDef,
+) -> Type<'db> {
+    function
+        .returns
+        .as_deref()
+        .map(|returns| function_signature_expression_type(db, definition, returns))
+        .unwrap_or_else(Type::unknown)
 }
 
 /// The signature of a single callable. If the callable is overloaded, there is a separate
@@ -988,16 +987,40 @@ impl<'db> Signature<'db> {
         has_implicitly_positional_first_parameter: bool,
         return_callable_typevar_scope: ReturnCallableTypeVarScope,
     ) -> Self {
+        let file = definition.program_file(db);
+        let index = semantic_index(db, file);
+        // All annotations in a signature are inferred together, either in the type-parameter
+        // scope or in the function's deferred definition. An unannotated signature needs neither.
+        let inference = LazyCell::new(|| {
+            if function_node.type_params.is_some() {
+                let scope =
+                    index.node_scope(NodeWithScopeRef::FunctionTypeParameters(function_node));
+                Either::Left(infer_complete_scope_types(db, scope.to_scope_id(db, file)))
+            } else {
+                Either::Right(infer_deferred_types(db, definition))
+            }
+        });
+        let annotation = |expression: &ast::Expr| match *inference {
+            Either::Left(types) => (
+                types.expression_type(expression),
+                types.type_expression_flags(expression),
+            ),
+            Either::Right(types) => (
+                types.expression_type(expression),
+                types.type_expression_flags(expression),
+            ),
+        };
         let parameters = Parameters::from_parameters(
             db,
-            definition,
+            index,
             function_node.parameters.as_ref(),
             has_implicitly_positional_first_parameter,
+            &annotation,
         );
         let return_ty = function_node
             .returns
-            .as_ref()
-            .map(|returns| function_signature_expression_type(db, definition, returns.as_ref()))
+            .as_deref()
+            .map(|returns| annotation(returns).0)
             .unwrap_or_else(Type::unknown);
         let legacy_generic_context =
             GenericContext::from_function_params(db, definition, &parameters, return_ty);
@@ -5406,9 +5429,10 @@ impl<'db> Parameters<'db> {
 
     fn from_parameters(
         db: &'db dyn Db,
-        definition: Definition<'db>,
+        index: &SemanticIndex<'db>,
         parameters: &ast::Parameters,
         has_implicitly_positional_first_parameter: bool,
+        annotation: &impl Fn(&ast::Expr) -> (Type<'db>, TypeExpressionFlags),
     ) -> Self {
         let ast::Parameters {
             posonlyargs,
@@ -5420,7 +5444,6 @@ impl<'db> Parameters<'db> {
             node_index: _,
         } = parameters;
 
-        let index = semantic_index(db, definition.program_file(db));
         let default_type = |param: &ast::ParameterWithDefault| {
             param.default().map(|_| {
                 ParameterDefault::Deferred(index.expect_single_definition(&param.parameter))
@@ -5430,7 +5453,8 @@ impl<'db> Parameters<'db> {
         let pos_only_param = |param: &ast::ParameterWithDefault| {
             Parameter::from_node_and_kind(
                 db,
-                definition,
+                index,
+                annotation,
                 &param.parameter,
                 ParameterKind::PositionalOnly {
                     name: Some(param.parameter.name.id.clone()),
@@ -5462,7 +5486,8 @@ impl<'db> Parameters<'db> {
         let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
             Parameter::from_node_and_kind(
                 db,
-                definition,
+                index,
+                annotation,
                 &arg.parameter,
                 ParameterKind::PositionalOrKeyword {
                     name: arg.parameter.name.id.clone(),
@@ -5474,7 +5499,8 @@ impl<'db> Parameters<'db> {
         let variadic = vararg.as_ref().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
-                definition,
+                index,
+                annotation,
                 arg,
                 ParameterKind::Variadic {
                     name: arg.name.id.clone(),
@@ -5485,7 +5511,8 @@ impl<'db> Parameters<'db> {
         let keyword_only = kwonlyargs.iter().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
-                definition,
+                index,
+                annotation,
                 &arg.parameter,
                 ParameterKind::KeywordOnly {
                     name: arg.parameter.name.id.clone(),
@@ -5497,7 +5524,8 @@ impl<'db> Parameters<'db> {
         let keywords = kwarg.as_ref().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
-                definition,
+                index,
+                annotation,
                 arg,
                 ParameterKind::KeywordVariadic {
                     name: arg.name.id.clone(),
@@ -6159,21 +6187,17 @@ impl<'db> Parameter<'db> {
 
     fn from_node_and_kind(
         db: &'db dyn Db,
-        function_definition: Definition<'db>,
+        index: &SemanticIndex<'db>,
+        infer_annotation: &impl Fn(&ast::Expr) -> (Type<'db>, TypeExpressionFlags),
         parameter: &ast::Parameter,
         kind: ParameterKind<'db>,
     ) -> Self {
-        let index = semantic_index(db, function_definition.program_file(db));
         let definition = Some(index.expect_single_definition(parameter));
 
         let (annotated_type, inferred_annotation, annotation_flags, has_starred_annotation) =
             if let Some(annotation) = parameter.annotation() {
-                (
-                    function_signature_expression_type(db, function_definition, annotation),
-                    false,
-                    function_signature_type_expression_flags(db, function_definition, annotation),
-                    annotation.is_starred_expr(),
-                )
+                let (ty, flags) = infer_annotation(annotation);
+                (ty, false, flags, annotation.is_starred_expr())
             } else {
                 (Type::unknown(), true, TypeExpressionFlags::empty(), false)
             };

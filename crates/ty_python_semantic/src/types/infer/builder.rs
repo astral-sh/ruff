@@ -113,7 +113,9 @@ use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::narrow::pattern_success_types;
 use crate::types::newtype::NewType;
 use crate::types::set_theoretic::RecursivelyDefined;
-use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope};
+use crate::types::signatures::{
+    CallableSignature, ReturnCallableTypeVarScope, lexical_return_type,
+};
 use crate::types::special_form::TypeQualifier;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
@@ -5506,12 +5508,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // the expected type passed should be the "raw" type,
                     // i.e. type variables in the return type are non-inferable,
                     // and the return types of async functions are not wrapped in `CoroutineType[...]`.
-                    let return_ty = same_module_uncached_raw_signature(
+                    let return_ty = lexical_return_type(
                         db,
-                        func,
-                        ReturnCallableTypeVarScope::Lexical,
-                    )
-                    .return_ty;
+                        func.definition(db),
+                        func.node(db, self.file(), self.module()),
+                    );
 
                     // For generator functions, the declared return type is e.g.
                     // `Generator[YieldType, SendType, ReturnType]`. The type context
