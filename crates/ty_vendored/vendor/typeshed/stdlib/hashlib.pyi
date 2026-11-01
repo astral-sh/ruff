@@ -48,6 +48,7 @@ More condensed:
     >>> hashlib.sha256(b"Nobody inspects the spammish repetition").hexdigest()
     '031edd7d41651593c5fe5c006fa5752b37fddff7bc4e843aa6af0c950f4b9406'
 """
+
 import sys
 from _blake2 import blake2b as blake2b, blake2s as blake2s
 from _hashlib import (
@@ -148,8 +149,8 @@ else:
 @overload
 def new(name: _XofDigestName, data: ReadableBuffer = b"", *, usedforsecurity: bool = True) -> HASHXOF:
     """new(name, data=b'') - Return a new hashing object using the named algorithm;
-optionally initialized with data (which must be a bytes-like object).
-"""
+    optionally initialized with data (which must be a bytes-like object).
+    """
 @overload
 def new(name: _FixedDigestName, data: ReadableBuffer = b"", *, usedforsecurity: bool = True) -> HASH: ...
 @overload
@@ -172,14 +173,14 @@ if sys.version_info >= (3, 11):
     def file_digest(fileobj: _BytesIOLike | _FileDigestFileObj, digest: str, /, *, _bufsize: int = 262144) -> HASH:
         """Hash the contents of a file-like object. Returns a digest object.
 
-*fileobj* must be a file-like object opened for reading in binary mode.
-It accepts file objects from open(), io.BytesIO(), and SocketIO objects.
-The function may bypass Python's I/O and use the file descriptor *fileno*
-directly.
+        *fileobj* must be a file-like object opened for reading in binary mode.
+        It accepts file objects from open(), io.BytesIO(), and SocketIO objects.
+        The function may bypass Python's I/O and use the file descriptor *fileno*
+        directly.
 
-*digest* must either be a hash algorithm name as a *str*, a hash
-constructor, or a callable that returns a hash object.
-"""
+        *digest* must either be a hash algorithm name as a *str*, a hash
+        constructor, or a callable that returns a hash object.
+        """
     @overload
     def file_digest(
         fileobj: _BytesIOLike | _FileDigestFileObj, digest: Callable[[], _HashT], /, *, _bufsize: int = 262144

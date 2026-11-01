@@ -2,6 +2,7 @@
 
 Suggested usage: from stat import *
 """
+
 import sys
 from _stat import (
     S_ENFMT as S_ENFMT,

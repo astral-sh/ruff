@@ -9,6 +9,7 @@ the python source tree and run:
 
 Alternatively, you can run 'make regen-keyword'.
 """
+
 from collections.abc import Sequence
 from typing import Final
 

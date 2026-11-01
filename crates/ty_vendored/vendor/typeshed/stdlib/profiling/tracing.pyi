@@ -3,6 +3,7 @@
 This module provides deterministic profiling of Python programs by tracing
 every function call and return.
 """
+
 from cProfile import Profile as Profile, run as run, runctx as runctx
 from types import CodeType
 from typing import TypeAlias

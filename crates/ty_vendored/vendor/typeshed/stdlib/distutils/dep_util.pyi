@@ -4,6 +4,7 @@ Utility functions for simple, timestamp-based dependency of files
 and groups of files; also, function based entirely on such
 timestamp dependency analysis.
 """
+
 from _typeshed import StrOrBytesPath, SupportsLenAndGetItem
 from collections.abc import Iterable
 from typing import Literal, TypeVar
@@ -17,6 +18,7 @@ def newer(source: StrOrBytesPath, target: StrOrBytesPath) -> bool | Literal[1]:
     both exist and 'target' is the same age or younger than 'source'.
     Raise DistutilsFileError if 'source' does not exist.
     """
+
 def newer_pairwise(
     sources: SupportsLenAndGetItem[_SourcesT], targets: SupportsLenAndGetItem[_TargetsT]
 ) -> tuple[list[_SourcesT], list[_TargetsT]]:
@@ -25,6 +27,7 @@ def newer_pairwise(
     targets) where source is newer than target, according to the semantics
     of 'newer()'.
     """
+
 def newer_group(
     sources: Iterable[StrOrBytesPath], target: StrOrBytesPath, missing: Literal["error", "ignore", "newer"] = "error"
 ) -> Literal[0, 1]:
