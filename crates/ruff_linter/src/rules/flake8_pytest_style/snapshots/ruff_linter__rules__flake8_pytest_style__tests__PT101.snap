@@ -1,0 +1,59 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+---
+PT101 Boolean value in `pytest.mark.parametrize` without `ids` argument
+ --> PT101.py:5:2
+  |
+4 | # Error: boolean value without ids
+5 | @pytest.mark.parametrize("flag", [True, False])
+  |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+6 | def test_error_simple(flag):
+7 |     ...
+  |
+
+PT101 Boolean value in `pytest.mark.parametrize` without `ids` argument
+  --> PT101.py:11:2
+   |
+10 | # Error: boolean values in tuples without ids
+11 | @pytest.mark.parametrize(("x", "flag"), [(1, True), (2, False)])
+   |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+12 | def test_error_multi_param(x, flag):
+13 |     ...
+   |
+
+PT101 Boolean value in `pytest.mark.parametrize` without `ids` argument
+  --> PT101.py:17:2
+   |
+16 | # Error: boolean value in list without ids
+17 | @pytest.mark.parametrize("enabled", [True])
+   |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+18 | def test_error_single_bool(enabled):
+19 |     ...
+   |
+
+PT101 Boolean value in `pytest.mark.parametrize` without `ids` argument
+  --> PT101.py:23:2
+   |
+22 | # Error: multiple boolean values without ids
+23 | @pytest.mark.parametrize("x", [True, True, False])
+   |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+24 | def test_error_multiple_bools(x):
+25 |     ...
+   |
+
+PT101 Boolean value in `pytest.mark.parametrize` without `ids` argument
+  --> PT101.py:29:2
+   |
+28 |   # Error: nested booleans without ids
+29 |   @pytest.mark.parametrize(
+   |  __^
+30 | |     ("a", "b", "c"),
+31 | |     [
+32 | |         (1, True, "foo"),
+33 | |         (2, False, "bar"),
+34 | |     ],
+35 | | )
+   | |_^
+36 |   def test_error_nested(a, b, c):
+37 |       ...
+   |
