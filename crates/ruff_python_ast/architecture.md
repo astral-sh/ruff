@@ -156,7 +156,9 @@ For modules up to 4 KiB, the builder reserves row space from the source length. 
 start with at most 128 rows. When the rows fill, the builder estimates how many more it needs
 from the number of rows and source bytes consumed so far. It also reserves extra-data words in
 proportion to their use. The estimate allows the remaining source to be denser than the prefix,
-as happens when a module starts with a long docstring.
+as happens when a module starts with a long docstring. A dense prefix can also precede a long
+comment. The builder caps speculative growth at one MiB per buffer. A full row buffer still
+grows by at least one quarter of its length to keep repeated reallocations amortized.
 
 A function's body occupies a contiguous interval of rows before the function's own row. The
 parser records the length of that interval in two unused bytes of the function row. The arena
