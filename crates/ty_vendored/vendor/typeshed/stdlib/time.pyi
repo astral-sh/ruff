@@ -128,7 +128,7 @@ class struct_time(structseq[Any | int], _TimeTuple):
         """offset from UTC in seconds"""
 
 def asctime(time_tuple: _TimeTuple | struct_time = ..., /) -> str:
-    """asctime([tuple]) -> string
+    """asctime([time_tuple]) -> string
 
     Convert a time tuple to a string, e.g. 'Sat Jun 06 16:26:11 1998'.
     When the time tuple is not present, current time as returned by localtime()
@@ -136,11 +136,11 @@ def asctime(time_tuple: _TimeTuple | struct_time = ..., /) -> str:
     """
 
 def ctime(seconds: _SupportsFloatOrIndex | None = None, /) -> str:
-    """ctime(seconds) -> string
+    """ctime([seconds]) -> string
 
     Convert a time in seconds since the Epoch to a string in local time.
-    This is equivalent to asctime(localtime(seconds)). When the time tuple is
-    not present, current time as returned by localtime() is used.
+    This is equivalent to asctime(localtime(seconds)). When 'seconds' is not
+    passed in, convert the current time instead.
     """
 
 def gmtime(seconds: _SupportsFloatOrIndex | None = None, /) -> struct_time:
@@ -163,7 +163,7 @@ def localtime(seconds: _SupportsFloatOrIndex | None = None, /) -> struct_time:
     """
 
 def mktime(time_tuple: _TimeTuple | struct_time, /) -> float:
-    """mktime(tuple) -> floating-point number
+    """mktime(time_tuple) -> floating-point number
 
     Convert a time tuple in local time to seconds since the Epoch.
     Note that mktime(gmtime(0)) will not generally return zero for most
@@ -179,7 +179,7 @@ def sleep(seconds: _SupportsFloatOrIndex, /) -> None:
     """
 
 def strftime(format: str, time_tuple: _TimeTuple | struct_time = ..., /) -> str:
-    """strftime(format[, tuple]) -> string
+    """strftime(format[, time_tuple]) -> string
 
     Convert a time tuple to a string according to a format specification.
     See the library reference manual for formatting codes. When the time tuple
@@ -207,7 +207,7 @@ def strftime(format: str, time_tuple: _TimeTuple | struct_time = ..., /) -> str:
     """
 
 def strptime(data_string: str, format: str = "%a %b %d %H:%M:%S %Y", /) -> struct_time:
-    """strptime(string, format) -> struct_time
+    """strptime(string[, format]) -> struct_time
 
     Parse a string to a time tuple according to a format specification.
     See the library reference manual for formatting codes (same as

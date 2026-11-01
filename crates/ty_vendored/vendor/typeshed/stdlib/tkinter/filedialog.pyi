@@ -125,36 +125,36 @@ def asksaveasfilename(
     *,
     confirmoverwrite: bool | None = True,
     defaultextension: str | None = "",
-    filetypes: Iterable[tuple[str, str | list[str] | tuple[str, ...]]] | None = ...,
-    initialdir: StrOrBytesPath | None = ...,
-    initialfile: StrOrBytesPath | None = ...,
-    parent: Misc | None = ...,
-    title: str | None = ...,
-    typevariable: StringVar | str | None = ...,
+    filetypes: Iterable[tuple[str, str | list[str] | tuple[str, ...]]] = (),
+    initialdir: StrOrBytesPath | None = None,
+    initialfile: StrOrBytesPath | None = None,
+    parent: Misc | None = None,
+    title: str | None = None,
+    typevariable: StringVar | str | None = None,
 ) -> str:  # can be empty string
     """Ask for a filename to save as"""
 
 def askopenfilename(
     *,
     defaultextension: str | None = "",
-    filetypes: Iterable[tuple[str, str | list[str] | tuple[str, ...]]] | None = ...,
-    initialdir: StrOrBytesPath | None = ...,
-    initialfile: StrOrBytesPath | None = ...,
-    parent: Misc | None = ...,
-    title: str | None = ...,
-    typevariable: StringVar | str | None = ...,
+    filetypes: Iterable[tuple[str, str | list[str] | tuple[str, ...]]] = (),
+    initialdir: StrOrBytesPath | None = None,
+    initialfile: StrOrBytesPath | None = None,
+    parent: Misc | None = None,
+    title: str | None = None,
+    typevariable: StringVar | str | None = None,
 ) -> str:  # can be empty string
     """Ask for a filename to open"""
 
 def askopenfilenames(
     *,
     defaultextension: str | None = "",
-    filetypes: Iterable[tuple[str, str | list[str] | tuple[str, ...]]] | None = ...,
-    initialdir: StrOrBytesPath | None = ...,
-    initialfile: StrOrBytesPath | None = ...,
-    parent: Misc | None = ...,
-    title: str | None = ...,
-    typevariable: StringVar | str | None = ...,
+    filetypes: Iterable[tuple[str, str | list[str] | tuple[str, ...]]] = (),
+    initialdir: StrOrBytesPath | None = None,
+    initialfile: StrOrBytesPath | None = None,
+    parent: Misc | None = None,
+    title: str | None = None,
+    typevariable: StringVar | str | None = None,
 ) -> Literal[""] | tuple[str, ...]:
     """Ask for multiple filenames to open
 
@@ -163,7 +163,11 @@ def askopenfilenames(
     """
 
 def askdirectory(
-    *, initialdir: StrOrBytesPath | None = ..., mustexist: bool | None = False, parent: Misc | None = ..., title: str | None = ...
+    *,
+    initialdir: StrOrBytesPath | None = None,
+    mustexist: bool | None = False,
+    parent: Misc | None = None,
+    title: str | None = None,
 ) -> str:  # can be empty string
     """Ask for a directory, and return the file name"""
 
@@ -173,12 +177,12 @@ def asksaveasfile(
     *,
     confirmoverwrite: bool | None = True,
     defaultextension: str | None = "",
-    filetypes: Iterable[tuple[str, str | list[str] | tuple[str, ...]]] | None = ...,
-    initialdir: StrOrBytesPath | None = ...,
-    initialfile: StrOrBytesPath | None = ...,
-    parent: Misc | None = ...,
-    title: str | None = ...,
-    typevariable: StringVar | str | None = ...,
+    filetypes: Iterable[tuple[str, str | list[str] | tuple[str, ...]]] = (),
+    initialdir: StrOrBytesPath | None = None,
+    initialfile: StrOrBytesPath | None = None,
+    parent: Misc | None = None,
+    title: str | None = None,
+    typevariable: StringVar | str | None = None,
 ) -> IO[Incomplete] | None:
     """Ask for a filename to save as, and returned the opened file"""
 
@@ -186,12 +190,12 @@ def askopenfile(
     mode: str = "r",
     *,
     defaultextension: str | None = "",
-    filetypes: Iterable[tuple[str, str | list[str] | tuple[str, ...]]] | None = ...,
-    initialdir: StrOrBytesPath | None = ...,
-    initialfile: StrOrBytesPath | None = ...,
-    parent: Misc | None = ...,
-    title: str | None = ...,
-    typevariable: StringVar | str | None = ...,
+    filetypes: Iterable[tuple[str, str | list[str] | tuple[str, ...]]] = (),
+    initialdir: StrOrBytesPath | None = None,
+    initialfile: StrOrBytesPath | None = None,
+    parent: Misc | None = None,
+    title: str | None = None,
+    typevariable: StringVar | str | None = None,
 ) -> IO[Incomplete] | None:
     """Ask for a filename to open, and returned the opened file"""
 
@@ -199,12 +203,12 @@ def askopenfiles(
     mode: str = "r",
     *,
     defaultextension: str | None = "",
-    filetypes: Iterable[tuple[str, str | list[str] | tuple[str, ...]]] | None = ...,
-    initialdir: StrOrBytesPath | None = ...,
-    initialfile: StrOrBytesPath | None = ...,
-    parent: Misc | None = ...,
-    title: str | None = ...,
-    typevariable: StringVar | str | None = ...,
+    filetypes: Iterable[tuple[str, str | list[str] | tuple[str, ...]]] = (),
+    initialdir: StrOrBytesPath | None = None,
+    initialfile: StrOrBytesPath | None = None,
+    parent: Misc | None = None,
+    title: str | None = None,
+    typevariable: StringVar | str | None = None,
 ) -> tuple[IO[Incomplete], ...]:  # can be empty tuple
     """Ask for multiple filenames and return the open file
     objects

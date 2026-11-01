@@ -3580,20 +3580,20 @@ if sys.version_info >= (3, 13) and sys.platform == "linux":
         flags
           0 or a bit mask of TFD_TIMER_ABSTIME or TFD_TIMER_CANCEL_ON_SET.
         initial
-          initial expiration timing in seconds.
+          initial expiration timing in nanoseconds.
         interval
-          interval for the timer in seconds.
+          interval for the timer in nanoseconds.
         """
 
     def timerfd_gettime(fd: FileDescriptor, /) -> tuple[float, float]:
-        """Return a tuple of a timer file descriptor's (interval, next expiration) in float seconds.
+        """Return a tuple of a timer file descriptor's (next expiration, interval) in float seconds.
 
         fd
           A timer file descriptor.
         """
 
     def timerfd_gettime_ns(fd: FileDescriptor, /) -> tuple[int, int]:
-        """Return a tuple of a timer file descriptor's (interval, next expiration) in nanoseconds.
+        """Return a tuple of a timer file descriptor's (next expiration, interval) in nanoseconds.
 
         fd
           A timer file descriptor.

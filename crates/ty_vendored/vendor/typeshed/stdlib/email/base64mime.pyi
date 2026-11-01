@@ -24,7 +24,7 @@ __all__ = ["body_decode", "body_encode", "decode", "decodestring", "header_encod
 
 from _typeshed import ReadableBuffer
 
-def header_length(bytearray: str | bytes | bytearray) -> int:
+def header_length(bytearray: str | bytes | bytearray | memoryview) -> int:
     """Return the length of s when it is encoded with base64."""
 
 def header_encode(header_bytes: str | ReadableBuffer, charset: str = "iso-8859-1") -> str:
@@ -35,7 +35,7 @@ def header_encode(header_bytes: str | ReadableBuffer, charset: str = "iso-8859-1
     """
 
 # First argument should be a buffer that supports slicing and len().
-def body_encode(s: bytes | bytearray, maxlinelen: int = 76, eol: str = "\n") -> str:
+def body_encode(s: bytes | bytearray | memoryview, maxlinelen: int = 76, eol: str = "\n") -> str:
     """Encode a string with base64.
 
     Each line will be wrapped at, at most, maxlinelen characters (defaults to

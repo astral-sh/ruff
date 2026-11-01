@@ -3,7 +3,7 @@
 import sys
 from _typeshed import StrOrBytesPath
 from collections.abc import Callable, Sequence
-from typing import Literal, TypeAlias
+from typing import Literal, SupportsIndex, TypeAlias
 
 if sys.platform != "win32":
     _Completer: TypeAlias = Callable[[str, int], str | None]
@@ -60,7 +60,7 @@ if sys.platform != "win32":
     def get_current_history_length() -> int:
         """Return the current (not the maximum) length of history."""
 
-    def get_history_item(index: int, /) -> str:
+    def get_history_item(index: SupportsIndex, /) -> str | None:
         """Return the current contents of history item at one-based index."""
 
     def remove_history_item(pos: int, /) -> None:
