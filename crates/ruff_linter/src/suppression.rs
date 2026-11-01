@@ -397,6 +397,44 @@ impl Suppressions {
         false
     }
 
+    /// Check whether [`Rule::UnmatchedSuppressionComment`] is suppressed at `range`.
+    ///
+    /// Unmatched `disable` comments cannot suppress [`Rule::UnmatchedSuppressionComment`], but
+    /// `ignore`, `file-ignore`, and matching `disable`/`enable` pairs can.
+    fn check_unmatched_suppressed(&self, range: TextRange) -> bool {
+        for suppression in &self.valid {
+            // Unmatched `disable` comments cannot suppress `UnmatchedSuppressionComment`.
+            if matches!(
+                suppression.comments,
+                SuppressionComments::Single(SuppressionComment {
+                    action: SuppressionAction::Disable,
+                    ..
+                })
+            ) {
+                continue;
+            }
+
+            let suppression_code =
+                get_redirect_target(suppression.code.as_str()).unwrap_or(suppression.code.as_str());
+
+            let code_matches = Rule::UnmatchedSuppressionComment
+                .noqa_code()
+                .is_some_and(|code| code == suppression_code);
+            let name_matches = is_human_readable_names_enabled(self.preview)
+                && Rule::UnmatchedSuppressionComment.name() == suppression_code;
+
+            if !code_matches && !name_matches {
+                continue;
+            }
+
+            if suppression.applies_to_diagnostic(range, None) {
+                suppression.used.set(true);
+                return true;
+            }
+        }
+        false
+    }
+
     /// Check for rule codes in valid suppression comments.
     pub(crate) fn check_rule_codes(&self, context: &LintContext, locator: &Locator) {
         if !context.is_rule_enabled(Rule::RuleCodesInSuppressionComments) {
@@ -499,6 +537,29 @@ impl Suppressions {
 
         let mut grouped_diagnostic: Option<(TextRange, SuppressionDiagnostic)> = None;
         let mut unmatched_ranges = FxHashSet::default();
+        let mut suppressed_unmatched_ranges = FxHashSet::default();
+
+        // Check if any unmatched suppression comments are suppressed by a valid suppression
+        // comment (e.g., `file-ignore`, `disable`/`enable` pair, or `ignore`).
+        // We do this before checking for unused suppressions so that any suppression that
+        // suppresses RUF104 is marked as used and not reported as RUF100.
+        if context.is_rule_enabled(Rule::UnmatchedSuppressionComment) {
+            for suppression in &self.valid {
+                if suppression.used.get()
+                    && let SuppressionComments::Single(SuppressionComment {
+                        action: SuppressionAction::Disable,
+                        range,
+                        ..
+                    }) = &suppression.comments
+                {
+                    if !suppressed_unmatched_ranges.contains(range)
+                        && self.check_unmatched_suppressed(*range)
+                    {
+                        suppressed_unmatched_ranges.insert(*range);
+                    }
+                }
+            }
+        }
 
         for suppression in &self.valid {
             let first_comment = suppression.comments.first();
@@ -551,7 +612,7 @@ impl Suppressions {
             }) = &suppression.comments
             {
                 // UnmatchedSuppressionComment
-                if unmatched_ranges.insert(range) {
+                if !suppressed_unmatched_ranges.contains(range) && unmatched_ranges.insert(range) {
                     context.report_diagnostic_if_enabled(UnmatchedSuppressionComment {}, *range);
                 }
             }
