@@ -12,6 +12,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::pydocstyle;
     use crate::rules::pydocstyle::settings::Convention;
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_diagnostics, settings};
 
@@ -97,6 +98,109 @@ mod tests {
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UndocumentedParam, Path::new("canonical_google_examples.py"))]
+    #[test_case(Rule::UndocumentedParam, Path::new("canonical_numpy_examples.py"))]
+    #[test_case(Rule::UndocumentedParam, Path::new("sections.py"))]
+    fn undocumented_param(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pydocstyle").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                pydocstyle: pydocstyle::settings::Settings {
+                    ..pydocstyle::settings::Settings::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn d417_unspecified() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/D417.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                // When inferring the convention, we'll see a few false negatives.
+                // See: https://github.com/PyCQA/pydocstyle/issues/459.
+                pydocstyle: pydocstyle::settings::Settings::default(),
+                ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn d417_unspecified_ignore_var_parameters() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/D417.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                pydocstyle: pydocstyle::settings::Settings::default(),
+                ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn d417_google() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/D417.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                // With explicit Google convention, we should flag every function.
+                pydocstyle: pydocstyle::settings::Settings {
+                    convention: Some(Convention::Google),
+                    ..pydocstyle::settings::Settings::default()
+                },
+                ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn d417_google_ignore_var_parameters() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/D417.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                pydocstyle: pydocstyle::settings::Settings {
+                    convention: Some(Convention::Google),
+                    ignore_var_parameters: true,
+                    ..pydocstyle::settings::Settings::default()
+                },
+                ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn d417_numpy() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/D417.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                // With explicit numpy convention, we shouldn't flag anything.
+                pydocstyle: pydocstyle::settings::Settings {
+                    convention: Some(Convention::Numpy),
+                    ..pydocstyle::settings::Settings::default()
+                },
+                ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 }
