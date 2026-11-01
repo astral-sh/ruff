@@ -30,14 +30,16 @@ char_str = { workspace = true }
 compact_str = { workspace = true }
 get-size2 = { workspace = true, optional = true }
 is-macro = { workspace = true }
+itertools = { workspace = true }
 memchr = { workspace = true }
+hashbrown = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
+smallvec = { workspace = true }
 thiserror = { workspace = true }
-thin-vec = { workspace = true }
 
 [features]
 schemars = ["dep:schemars", "dep:serde_json"]
@@ -48,7 +50,6 @@ serde = [
     "dep:ruff_cache",
     "char_str/serde",
     "compact_str/serde",
-    "thin-vec/serde",
 ]
 get-size = ["dep:get-size2", "char_str/get-size", "ruff_text_size/get-size"]
 salsa = ["dep:salsa"]
