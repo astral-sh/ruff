@@ -253,6 +253,15 @@ fn references_for_keyword_arguments_in_file(
     // Reference and rename searches can scan the whole project, so release closed files' ASTs
     // as we go.
     let module = parsed.load_then_clear_on_drop(db);
+    // A spelling can occur throughout a file without ever being used as a keyword label.
+    // Only build ancestor paths for semantic resolution if there's a possible match.
+    if !module.ast().any_node(|node| {
+        node.cast::<ast::Keyword>()
+            .and_then(ast::Keyword::arg)
+            .is_some_and(|label| label.as_str() == search.target_text)
+    }) {
+        return Vec::new();
+    }
     let model = SemanticModel::new(db, file);
     let mut references = Vec::new();
 
