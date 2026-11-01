@@ -298,8 +298,9 @@ node_payloads! {
         is_async: u8 at 12 => comprehension_is_async, set_comprehension_is_async;
     }
     Arguments(arguments) {
-        keywords: u64 at 0 => arguments_keywords, set_arguments_keywords;
-        args: u32 at 8 => arguments_args, set_arguments_args;
+        keyword_group: u64 at 0 => arguments_keyword_group, set_arguments_keyword_group;
+        positional_len: u32 at 8 => arguments_positional_len, set_arguments_positional_len;
+        interleaved: u8 at 12 => arguments_interleaved, set_arguments_interleaved;
     }
     Parameters(parameters) {
         items: u64 at 0 => parameters_items, set_parameters_items;
@@ -546,10 +547,10 @@ impl super::Ast {
                 let group = node.retype::<crate::PatternArguments>();
                 Children::merged(self, group.patterns().words(), group.keywords().words())
             }
-            NodeKind::Arguments => {
-                let group = node.retype::<crate::Arguments>();
-                Children::merged(self, group.args().words(), group.keywords().words())
-            }
+            NodeKind::Arguments => Children::rows(
+                self,
+                node.retype::<crate::Arguments>().ordered_items().words(),
+            ),
             NodeKind::Parameters => Children::rows(
                 self,
                 node.retype::<crate::Parameters>().ordered_items().words(),
@@ -1213,8 +1214,7 @@ impl super::Ast {
                 split_words(record.inline_word::<4, 4>())[0]
             }
             NodeKind::Arguments => {
-                let group = node.retype::<crate::Arguments>();
-                stack.descend_merged(self, group.args().words(), group.keywords().words())
+                stack.descend_list(node.retype::<crate::Arguments>().ordered_items().words())
             }
             NodeKind::Parameters => {
                 stack.descend_list(node.retype::<crate::Parameters>().ordered_items().words())

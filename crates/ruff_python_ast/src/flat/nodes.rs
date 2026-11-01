@@ -604,10 +604,7 @@ impl Ranged for ArgOrKeyword<'_> {
 }
 impl<'a> crate::Arguments<'a> {
     pub fn iter_source_order(self) -> ArgumentsSourceOrder<'a> {
-        ArgumentsSourceOrder {
-            args: self.args(),
-            keywords: self.keywords(),
-        }
+        ArgumentsSourceOrder(self.ordered_items().iter())
     }
     pub fn find_argument(self, name: &str, position: usize) -> Option<ArgOrKeyword<'a>> {
         self.find_keyword(name)
@@ -697,35 +694,25 @@ impl fmt::Debug for BytesValue<'_> {
     }
 }
 
-/// Merges positional and keyword arguments by their location in the source.
+/// Call arguments in their order in the source.
 #[derive(Clone)]
-pub struct ArgumentsSourceOrder<'a> {
-    args: List<'a, AstNodeId<crate::kind::Expr>>,
-    keywords: List<'a, AstNodeId<crate::kind::Keyword>>,
-}
+pub struct ArgumentsSourceOrder<'a>(super::list::Iter<'a, AstNodeId<crate::kind::Any>>);
 
 impl<'a> Iterator for ArgumentsSourceOrder<'a> {
     type Item = ArgOrKeyword<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some((arg, rest)) = self.args.split_first()
-            && self
-                .keywords
-                .first()
-                .is_none_or(|keyword| arg.start() <= keyword.start())
-        {
-            self.args = rest;
-            Some(ArgOrKeyword::Arg(arg))
-        } else {
-            let (keyword, rest) = self.keywords.split_first()?;
-            self.keywords = rest;
-            Some(ArgOrKeyword::Keyword(keyword))
-        }
+        self.0.next().map(|node| {
+            if let Some(keyword) = node.cast::<crate::Keyword>() {
+                ArgOrKeyword::Keyword(keyword)
+            } else {
+                ArgOrKeyword::Arg(node.retype())
+            }
+        })
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.args.len() + self.keywords.len();
-        (len, Some(len))
+        self.0.size_hint()
     }
 }
 

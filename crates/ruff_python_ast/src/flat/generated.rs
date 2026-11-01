@@ -4220,26 +4220,45 @@ impl Builder {
         range: ruff_text_size::TextRange,
         [args, keywords]: [u64; 2],
     ) -> BuildId<crate::kind::Arguments> {
+        let groups = self.ordered_argument_lists(args, keywords);
+        self.push_arguments_parts(range, groups)
+    }
+    #[inline]
+    fn push_arguments_parts(
+        &mut self,
+        range: ruff_text_size::TextRange,
+        (keywords, positional, interleaved): (u64, u32, bool),
+    ) -> BuildId<crate::kind::Arguments> {
         let mut row = Row::new(NodeKind::Arguments, range);
-        let [args, keywords] =
-            super::list::Interval::pack_pair(&mut self.ast.extra, [args, keywords]);
-        row.set_arguments_args(split_words(args)[0]);
-        row.set_arguments_keywords(keywords);
+        row.set_arguments_keyword_group(keywords);
+        row.set_arguments_positional_len(positional);
+        row.set_arguments_interleaved(u8::from(interleaved));
         self.push(row)
     }
 }
 impl<'a> crate::Arguments<'a> {
     #[inline]
+    pub(super) fn ordered_items(self) -> NodeList<'a, crate::kind::Any> {
+        List::new(
+            self.syntax.ast,
+            super::ordered::argument_items(
+                self.syntax.row.arguments_keyword_group(),
+                self.syntax.row.arguments_positional_len(),
+                self.syntax.row.arguments_interleaved(),
+            ),
+        )
+    }
+    #[inline]
     pub fn args(self) -> NodeList<'a, crate::kind::Expr> {
         let word = super::list::Interval::preceding(
-            self.syntax.row.arguments_keywords(),
-            u64::from(self.syntax.row.arguments_args()),
+            self.syntax.row.arguments_keyword_group(),
+            u64::from(self.syntax.row.arguments_positional_len()),
         );
         List::new(self.syntax.ast, word)
     }
     #[inline]
     pub fn keywords(self) -> NodeList<'a, crate::kind::Keyword> {
-        let word = self.syntax.row.arguments_keywords();
+        let word = self.syntax.row.arguments_keyword_group();
         List::new(self.syntax.ast, word)
     }
 }
@@ -5651,14 +5670,20 @@ impl Builder {
             .emit(self)
             .0
             .cast(),
-            AnyKind::Arguments(node) => build::Arguments {
-                range: node.range(),
-                args: self.map_list(node.args(), |b, child| b.copy_with(child, rewriter)),
-                keywords: self.map_list(node.keywords(), |b, child| b.copy_with(child, rewriter)),
+            AnyKind::Arguments(node) => {
+                let first = self.map_list(node.args(), |b, child| b.copy_with(child, rewriter));
+                let second =
+                    self.map_list(node.keywords(), |b, child| b.copy_with(child, rewriter));
+                let template =
+                    (node.syntax.row.arguments_interleaved() != 0).then(|| node.ordered_items());
+                let groups = self.copy_argument_order(
+                    first.word(),
+                    second.word(),
+                    template,
+                    NodeKind::Keyword,
+                );
+                self.push_arguments_parts(node.range(), groups).cast()
             }
-            .emit(self)
-            .0
-            .cast(),
             AnyKind::Parameters(node) => build::Parameters {
                 range: node.range(),
                 posonlyargs: self

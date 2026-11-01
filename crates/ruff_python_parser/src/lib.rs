@@ -682,8 +682,9 @@ mod tests {
     use super::{ParseError, parse_expression, parse_module, parse_unchecked_source};
 
     #[test]
-    fn copying_call_arguments_preserves_source_order() -> Result<(), ParseError> {
-        let parsed = parse_expression("f(key=1, *xs)")?;
+    fn copying_relocated_call_arguments_preserves_source_order() -> Result<(), ParseError> {
+        let mut parsed = parse_expression("f(key=1, *xs)")?;
+        parsed.relocate_expression(ruff_text_size::TextRange::default());
         let mut builder = Builder::default();
         let copy = builder.copy_node(parsed.expr());
         for expr in [parsed.expr(), builder.get(copy)] {
