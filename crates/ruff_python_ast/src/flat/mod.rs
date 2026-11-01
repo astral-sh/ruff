@@ -259,7 +259,8 @@ pub trait AstNode<'ast>: sealed::FromSyntax<'ast> + Copy + fmt::Debug + PartialE
     /// Yields this node's immediate children in source order.
     #[inline]
     fn children(self) -> Children<'ast> {
-        self.syntax_node().children()
+        let syntax = self.syntax_node();
+        syntax.ast.direct_children(syntax, self.node_kind())
     }
 
     /// Visits this node and its descendants in source order, parents first.
@@ -305,7 +306,7 @@ impl<'ast> SyntaxNode<'ast> {
     /// Yields this node's immediate children in source order.
     #[inline]
     pub fn children(self) -> Children<'ast> {
-        self.ast.direct_children(self)
+        AstNode::children(self)
     }
 
     /// Returns the first immediate child in source order.
