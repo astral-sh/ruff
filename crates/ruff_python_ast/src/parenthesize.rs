@@ -1,8 +1,8 @@
 use ruff_python_trivia::{BackwardsTokenizer, CommentRanges, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
-use crate::AnyNodeRef;
-use crate::ExprRef;
+use crate::Expr;
+use crate::flat::SyntaxNode;
 
 /// Returns an iterator over the ranges of the optional parentheses surrounding an expression.
 ///
@@ -14,8 +14,8 @@ use crate::ExprRef;
 ///
 /// Prefer [`crate::token::parentheses_iterator`] if you have access to [`crate::token::Tokens`].
 fn parentheses_iterator<'a>(
-    expr: ExprRef<'a>,
-    parent: Option<AnyNodeRef>,
+    expr: Expr<'a>,
+    parent: Option<SyntaxNode>,
     comment_ranges: &'a CommentRanges,
     source: &'a str,
 ) -> impl Iterator<Item = TextRange> + 'a {
@@ -62,8 +62,8 @@ fn parentheses_iterator<'a>(
 ///
 /// Prefer [`crate::token::parenthesized_range`] if you have access to [`crate::token::Tokens`].
 pub fn parenthesized_range(
-    expr: ExprRef,
-    parent: AnyNodeRef,
+    expr: Expr<'_>,
+    parent: SyntaxNode,
     comment_ranges: &CommentRanges,
     source: &str,
 ) -> Option<TextRange> {
