@@ -284,8 +284,9 @@ node_payloads! {
         elements: u64 at 0 => interpolated_string_format_spec_elements, set_interpolated_string_format_spec_elements;
     }
     PatternArguments(pattern_arguments) {
-        keywords: u64 at 0 => pattern_arguments_keywords, set_pattern_arguments_keywords;
-        patterns: u32 at 8 => pattern_arguments_patterns, set_pattern_arguments_patterns;
+        keyword_group: u64 at 0 => pattern_arguments_keyword_group, set_pattern_arguments_keyword_group;
+        positional_len: u32 at 8 => pattern_arguments_positional_len, set_pattern_arguments_positional_len;
+        interleaved: u8 at 12 => pattern_arguments_interleaved, set_pattern_arguments_interleaved;
     }
     PatternKeyword(pattern_keyword) {
         attr: u32 at 0 => pattern_keyword_attr, set_pattern_keyword_attr;
@@ -543,10 +544,12 @@ impl super::Ast {
                     .map_or(&[][..], |spec| spec.elements().words()),
                 None,
             ),
-            NodeKind::PatternArguments => {
-                let group = node.retype::<crate::PatternArguments>();
-                Children::merged(self, group.patterns().words(), group.keywords().words())
-            }
+            NodeKind::PatternArguments => Children::rows(
+                self,
+                node.retype::<crate::PatternArguments>()
+                    .ordered_items()
+                    .words(),
+            ),
             NodeKind::Arguments => Children::rows(
                 self,
                 node.retype::<crate::Arguments>().ordered_items().words(),
@@ -1198,10 +1201,11 @@ impl super::Ast {
                 }
                 split_words(record.inline_word::<0, 4>())[0]
             }
-            NodeKind::PatternArguments => {
-                let group = node.retype::<crate::PatternArguments>();
-                stack.descend_merged(self, group.patterns().words(), group.keywords().words())
-            }
+            NodeKind::PatternArguments => stack.descend_list(
+                node.retype::<crate::PatternArguments>()
+                    .ordered_items()
+                    .words(),
+            ),
             NodeKind::Comprehension => {
                 stack.push_list(
                     List::<AstNodeId<crate::kind::Any>>::new(self, {

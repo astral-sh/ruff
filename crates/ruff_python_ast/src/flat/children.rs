@@ -2,7 +2,6 @@ use std::iter::FusedIterator;
 use std::num::NonZeroU32;
 use std::slice;
 
-use ruff_text_size::Ranged;
 use smallvec::SmallVec;
 
 use super::{Ast, AstNode, AstNodeId, SyntaxNode};
@@ -25,31 +24,6 @@ enum ChildSource<'a> {
         last: Option<AstNodeId<crate::kind::Any>>,
     },
     Fields(Fields<'a>),
-    Merged(MergedRows<'a>),
-}
-
-/// Positional and keyword children are stored in separate lists.
-#[derive(Clone)]
-struct MergedRows<'a> {
-    left: &'a [u32],
-    right: &'a [u32],
-}
-
-impl MergedRows<'_> {
-    fn next(&mut self, ast: &Ast) -> Option<u32> {
-        let list = match (self.left.first(), self.right.first()) {
-            (Some(&left), Some(&right))
-                if ast.child::<SyntaxNode<'_>>(u64::from(right)).start() < ast.child::<SyntaxNode<'_>>(u64::from(left)).start() =>
-            {
-                &mut self.right
-            }
-            (Some(_), _) => &mut self.left,
-            _ => &mut self.right,
-        };
-        let (&word, rest) = list.split_first()?;
-        *list = rest;
-        Some(word)
-    }
 }
 
 struct Fields<'a> {
@@ -130,19 +104,6 @@ impl<'a> Children<'a> {
         }
     }
 
-    pub(super) fn merged(ast: &'a Ast, left: &'a [u32], right: &'a [u32]) -> Self {
-        if left.is_empty() {
-            return Self::rows(ast, right);
-        }
-        if right.is_empty() {
-            return Self::rows(ast, left);
-        }
-        Self {
-            ast,
-            source: ChildSource::Merged(MergedRows { left, right }),
-        }
-    }
-
     pub(super) fn fields(node: SyntaxNode<'a>, count: u8) -> Self {
         let fields = Fields {
             node: node.node_id(),
@@ -171,7 +132,6 @@ impl<'a> Iterator for Children<'a> {
                 .or_else(|| rows.next().copied().map(AstNodeId::from_word))
                 .or_else(|| last.take())?,
             ChildSource::Fields(fields) => fields.next(self.ast)?,
-            ChildSource::Merged(rows) => AstNodeId::from_word(rows.next(self.ast)?),
         };
         Some(self.ast.at(handle))
     }
@@ -340,20 +300,6 @@ impl Pending {
     #[inline]
     pub(super) fn push_list(&mut self, words: &[u32]) {
         self.nodes.extend(words.iter().rev().copied());
-    }
-
-    pub(super) fn descend_merged(&mut self, ast: &Ast, left: &[u32], right: &[u32]) -> u32 {
-        if left.is_empty() {
-            return self.descend_list(right);
-        }
-        if right.is_empty() {
-            return self.descend_list(left);
-        }
-        let start = self.nodes.len();
-        let mut rows = MergedRows { left, right };
-        self.nodes.extend(std::iter::from_fn(|| rows.next(ast)));
-        self.nodes[start..].reverse();
-        self.resume()
     }
 
     #[inline]

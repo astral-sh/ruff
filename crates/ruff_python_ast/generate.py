@@ -456,7 +456,7 @@ def child_sources(
     """The source-ordered fields, each containing a handle or a list."""
     if not fields:
         return []
-    if node.name in {"Arguments", "Parameters"}:
+    if node.name in {"Arguments", "PatternArguments", "Parameters"}:
         return [("list", f"{view}.ordered_items().words()")]
     result = []
     for field in fields:
@@ -517,8 +517,6 @@ def simple_children(sources: list[tuple[str, str]]) -> str | None:
 def child_field(
     node: Node, nodes: set[str], words: dict[str, str], _schema: list[InlineField]
 ) -> str:
-    if node.name == "PatternArguments":
-        return "Field::One(None)"
     sources = child_sources(
         node, child_fields(node, nodes), words, f"node.retype::<crate::{node.name}>()"
     )
@@ -531,8 +529,6 @@ def child_field(
 def direct_children(
     node: Node, nodes: set[str], words: dict[str, str], _schema: list[InlineField]
 ) -> str:
-    if node.name == "PatternArguments":
-        return "let group = node.retype::<crate::PatternArguments>(); Children::merged(self, group.patterns().words(), group.keywords().words())"
     view = f"node.retype::<crate::{node.name}>()"
     sources = child_sources(node, child_fields(node, nodes), words, view)
     return (
@@ -544,8 +540,6 @@ def direct_children(
 def next_descendant(
     node: Node, nodes: set[str], words: dict[str, str], _schema: list[InlineField]
 ) -> str:
-    if node.name == "PatternArguments":
-        return "let group = node.retype::<crate::PatternArguments>(); stack.descend_merged(self, group.patterns().words(), group.keywords().words())"
     sources = child_sources(
         node, child_fields(node, nodes), words, f"node.retype::<crate::{node.name}>()"
     )
@@ -947,7 +941,7 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
         out.append('_ => unreachable!("typed node belongs to this group"), } } }')
     for n in ast.all_nodes:
         fields = [field_codec(f, nodes) for f in n.fields]
-        paired_lists = n.name in {"ExprCompare", "PatternArguments"}
+        paired_lists = n.name == "ExprCompare"
         if paired_lists:
             first, second = fields
             fields = [replace(first, width=4), second]
@@ -1032,7 +1026,7 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
                 )
             out.append("}")
             continue
-        if n.name == "Arguments":
+        if n.name in {"Arguments", "PatternArguments"}:
             schemas[n.name] = [
                 InlineField("keyword_group", 0, 8),
                 InlineField("positional_len", 8, 4),
@@ -1235,7 +1229,7 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
         "impl Builder { pub(super) fn copy_any<R: super::Rewriter + ?Sized>(&mut self, node: super::SyntaxNode<'_>, rewriter: &mut R) -> BuildId<crate::kind::Any> { match node.classify() {"
     )
     for node in ast.all_nodes:
-        if node.name == "Arguments":
+        if node.name in {"Arguments", "PatternArguments"}:
             arm = to_snake_case(node.name)
             first, second = node.fields
             keyword_kind = "Keyword" if node.name == "Arguments" else "PatternKeyword"
