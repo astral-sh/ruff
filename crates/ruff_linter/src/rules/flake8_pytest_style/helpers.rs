@@ -181,6 +181,21 @@ pub(super) fn split_names(names: &str) -> Vec<&str> {
         .collect::<Vec<&str>>()
 }
 
+/// Returns whether pytest unpacks each parameter value as a row.
+///
+/// Sequence-form parameter names always unpack rows, even when the sequence
+/// contains only one name. A single string name treats each value as one
+/// parameter instead.
+pub(super) fn parametrize_has_value_rows(names: &Expr) -> Option<bool> {
+    match names {
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+            Some(split_names(value.to_str()).len() > 1)
+        }
+        Expr::List(_) | Expr::Tuple(_) => Some(true),
+        _ => None,
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(super) enum Parentheses {
     None,
