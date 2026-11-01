@@ -6,8 +6,8 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::token::{Tokens, parenthesized_range};
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{
-    AnyNodeRef, ArgOrKeyword, Arguments, Expr, ExprAttribute, ExprName, ExprUnaryOp, Parameters,
-    Stmt, StmtAssign, UnaryOp,
+    self as ast, AnyKind, ArgOrKeyword, Arguments, AstNode, Expr, ExprKind, Parameters, Stmt,
+    StmtAssign, StmtKind, SyntaxNode, UnaryOp,
 };
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -31,8 +31,8 @@ pub struct InlayHint {
 impl InlayHint {
     fn variable_type<'db>(
         context: InlayHintImportContext<'_, 'db>,
-        expr: &Expr,
-        assignment: &StmtAssign,
+        expr: Expr<'_>,
+        assignment: StmtAssign<'_>,
         ty: Type<'db>,
         tokens: &Tokens,
     ) -> Option<Self> {
@@ -43,12 +43,11 @@ impl InlayHint {
         let details = ty.display(db, &env).to_string_parts();
 
         // Filter out repetitive hints like `x: T = T()`
-        if call_matches_name(&assignment.value, &details.label) {
+        if call_matches_name(assignment.value(), &details.label) {
             return None;
         }
 
-        let range =
-            parenthesized_range(expr.into(), assignment.into(), tokens).unwrap_or(expr.range());
+        let range = parenthesized_range(expr, assignment.into(), tokens).unwrap_or(expr.range());
         Some(Self::type_annotation(
             context,
             expr.into(),
@@ -61,7 +60,7 @@ impl InlayHint {
 
     fn type_annotation<'db>(
         context: InlayHintImportContext<'_, 'db>,
-        scope_node: AnyNodeRef<'_>,
+        scope_node: SyntaxNode<'_>,
         position: TextSize,
         details: &TypeDisplayDetails<'db>,
         prefix: &str,
@@ -222,12 +221,12 @@ impl InlayHint {
     }
 
     /// Attach the edits that turn this positional argument into a keyword argument.
-    fn enable_call_argument_edit(&mut self, argument: &Expr) {
-        let needs_parentheses = match argument {
+    fn enable_call_argument_edit(&mut self, argument: Expr<'_>) {
+        let needs_parentheses = match argument.classify() {
             // The named expression starts at the name on the left of `:=`. The hint starts
             // at that same name or at the outermost opening parenthesis if the argument is grouped.
-            Expr::Named(_) => self.position == argument.start(),
-            Expr::Generator(generator) => !generator.parenthesized,
+            ExprKind::Named(_) => self.position == argument.start(),
+            ExprKind::Generator(generator) => !generator.parenthesized(),
             _ => false,
         };
         let mut prefix = InlayHintTextEdit {
@@ -250,7 +249,7 @@ impl InlayHint {
 
     fn return_type<'db>(
         context: InlayHintImportContext<'_, 'db>,
-        function: &ruff_python_ast::StmtFunctionDef,
+        function: ruff_python_ast::StmtFunctionDef<'_>,
         ty: Type<'db>,
     ) -> Self {
         let env = ProgramEnvironment::from_file(context.file);
@@ -258,7 +257,7 @@ impl InlayHint {
         Self::type_annotation(
             context,
             function.into(),
-            function.parameters.end(),
+            function.parameters().end(),
             &details,
             " -> ",
             true,
@@ -429,8 +428,8 @@ struct InlayHintVisitor<'a, 'db> {
     importer: Importer<'db>,
     tokens: &'db Tokens,
     hints: Vec<InlayHint>,
-    pending_return_hint: Option<(&'a Parameters, InlayHint)>,
-    assignment: Option<&'a StmtAssign>,
+    pending_return_hint: Option<(Parameters<'a>, InlayHint)>,
+    assignment: Option<StmtAssign<'a>>,
     range: TextRange,
     settings: &'a InlayHintSettings,
 }
@@ -456,7 +455,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         }
     }
 
-    fn add_type_hint(&mut self, expr: &Expr) {
+    fn add_type_hint(&mut self, expr: Expr<'_>) {
         let Some(assignment) = self.assignment else {
             return;
         };
@@ -482,8 +481,8 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
 
     fn add_call_argument_name(
         &mut self,
-        argument: &Expr,
-        arguments: &Arguments,
+        argument: Expr<'_>,
+        arguments: Arguments<'_>,
         name: &str,
         navigation_target: Option<NavigationTarget>,
         mode: ArgumentHintMode,
@@ -492,7 +491,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             return;
         }
 
-        let range = parenthesized_range(argument.into(), arguments.into(), self.tokens)
+        let range = parenthesized_range(argument, arguments.into(), self.tokens)
             .unwrap_or(argument.range());
         let mut inlay_hint = InlayHint::call_argument_name(range.start(), name, navigation_target);
         match mode {
@@ -505,17 +504,17 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
 }
 
 impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
-    fn leave_node(&mut self, node: AnyNodeRef<'a>) {
-        if let AnyNodeRef::Parameters(parameters) = node
+    fn leave_node(&mut self, node: SyntaxNode<'a>) {
+        if let AnyKind::Parameters(parameters) = node.classify()
             && let Some((_, hint)) = self
                 .pending_return_hint
-                .take_if(|(expected, _)| std::ptr::eq(*expected, parameters))
+                .take_if(|(expected, _)| expected.is_same_node(parameters))
         {
             self.hints.push(hint);
         }
     }
 
-    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+    fn enter_node(&mut self, node: SyntaxNode<'a>) -> TraversalSignal {
         if self.range.intersect(node.range()).is_some() {
             TraversalSignal::Traverse
         } else {
@@ -523,39 +522,39 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
         }
     }
 
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        let node = AnyNodeRef::from(stmt);
+    fn visit_stmt(&mut self, stmt: Stmt<'a>) {
+        let node = SyntaxNode::from(stmt);
 
         if !self.enter_node(node).is_traverse() {
             return;
         }
 
-        match stmt {
-            Stmt::Assign(assign) => {
-                if !type_hint_is_excessive_for_expr(&assign.value) {
+        match stmt.classify() {
+            StmtKind::Assign(assign) => {
+                if !type_hint_is_excessive_for_expr(assign.value()) {
                     self.assignment = Some(assign);
                 }
-                for target in &assign.targets {
+                for target in assign.targets() {
                     self.visit_expr(target);
                 }
                 self.assignment = None;
 
-                self.visit_expr(&assign.value);
+                self.visit_expr(assign.value());
 
                 return;
             }
-            Stmt::Expr(expr) => {
-                self.visit_expr(&expr.value);
+            StmtKind::Expr(expr) => {
+                self.visit_expr(expr.value());
                 return;
             }
-            Stmt::FunctionDef(function) => {
-                let position = function.parameters.end();
+            StmtKind::FunctionDef(function) => {
+                let position = function.parameters().end();
                 if self.settings.return_types
                     && self.range.contains_inclusive(position)
                     && let Some(ty) = inlay_hint_return_type(&self.model, function)
                 {
                     self.pending_return_hint = Some((
-                        function.parameters.as_ref(),
+                        function.parameters(),
                         InlayHint::return_type(
                             InlayHintImportContext {
                                 db: self.db,
@@ -569,31 +568,32 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                 }
             }
             // TODO
-            Stmt::For(_) => {}
+            StmtKind::For(_) => {}
             _ => {}
         }
 
         source_order::walk_stmt(self, stmt);
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Name(ExprName { ctx, .. }) | Expr::Attribute(ExprAttribute { ctx, .. })
+    fn visit_expr(&mut self, expr: Expr<'a>) {
+        match expr.fields() {
+            ast::ExprFields::Name(ast::ExprNameFields { ctx, .. })
+            | ast::ExprFields::Attribute(ast::ExprAttributeFields { ctx, .. })
                 if ctx.is_store() =>
             {
                 self.add_type_hint(expr);
                 source_order::walk_expr(self, expr);
             }
-            Expr::Call(call) => {
+            ast::ExprFields::Call(ast::ExprCallFields { node: call, .. }) => {
                 let details = inlay_hint_call_argument_details(self.db, &self.model, call)
                     .unwrap_or_default();
 
-                self.visit_expr(&call.func);
+                self.visit_expr(call.func());
 
                 // `argument_names` is keyed by positional-arg index, not source-order index,
                 // so track them separately to stay in sync after keyword args appear mid-call.
                 let mut positional_index = 0;
-                for arg_or_keyword in call.arguments.iter_source_order() {
+                for arg_or_keyword in call.arguments().iter_source_order() {
                     if let ArgOrKeyword::Arg(argument) = arg_or_keyword {
                         if let Some((name, parameter_label_offset)) =
                             details.argument_names.get(&positional_index)
@@ -604,14 +604,14 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                             // `f(x=value(), *items())` would evaluate `items()` first and could
                             // pass `x` twice.
                             let is_last_positional =
-                                positional_index + 1 == call.arguments.args.len();
+                                positional_index + 1 == call.arguments().args().len();
                             // For `def f(ｉｆ): ...`, `name` is already normalized to the
                             // reserved word `if`. Inserting `if=` would be a syntax error.
                             // Repeating an existing keyword, as in `f(x=1, x=2)`, would be too.
                             let mode = if is_last_positional
                                 && !argument.is_starred_expr()
                                 && is_identifier(name)
-                                && call.arguments.find_keyword(name).is_none()
+                                && call.arguments().find_keyword(name).is_none()
                             {
                                 ArgumentHintMode::Insertable
                             } else {
@@ -619,7 +619,7 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                             };
                             self.add_call_argument_name(
                                 argument,
-                                &call.arguments,
+                                call.arguments(),
                                 name,
                                 parameter_label_offset.map(NavigationTarget::from),
                                 mode,
@@ -657,19 +657,21 @@ enum ArgumentHintMode {
 ///
 /// This allows us to filter out repetitive inlay hints like `x=x`, `x=y.x`, etc.,
 /// and suppresses hints for arguments that are already explicit keyword arguments.
-fn arg_matches_name(argument: &Expr, name: &str) -> bool {
+fn arg_matches_name(argument: Expr<'_>, name: &str) -> bool {
     let mut expr = argument;
     loop {
-        match expr {
+        match expr.classify() {
             // `x=x(1, 2)` counts as a match, recurse for it
-            Expr::Call(expr_call) => expr = &expr_call.func,
+            ExprKind::Call(expr_call) => expr = expr_call.func(),
             // `x=x[0]` is a match, recurse for it
-            Expr::Subscript(expr_subscript) => expr = &expr_subscript.value,
+            ExprKind::Subscript(expr_subscript) => expr = expr_subscript.value(),
             // `x=x` is a match
-            Expr::Name(expr_name) => return name_matches_parameter(expr_name.id.as_str(), name),
+            ExprKind::Name(expr_name) => {
+                return name_matches_parameter(expr_name.id().as_str(), name);
+            }
             // `x=y.x` is a match
-            Expr::Attribute(expr_attribute) => {
-                return name_matches_parameter(expr_attribute.attr.as_str(), name);
+            ExprKind::Attribute(expr_attribute) => {
+                return name_matches_parameter(expr_attribute.attr().as_str(), name);
             }
             _ => return false,
         }
@@ -698,17 +700,17 @@ fn name_matches_parameter(argument_name: &str, parameter_name: &str) -> bool {
 ///
 /// This allows us to filter out repetitive inlay hints like `x: T = T(...)`.
 /// While still allowing non-trivial ones like `x: T[U] = T()`.
-fn call_matches_name(expr: &Expr, name: &str) -> bool {
+fn call_matches_name(expr: Expr<'_>, name: &str) -> bool {
     // Only care about function calls
-    let Expr::Call(call) = expr else {
+    let ExprKind::Call(call) = expr.classify() else {
         return false;
     };
 
-    match &*call.func {
+    match call.func().classify() {
         // `x: T = T()` is a match
-        Expr::Name(expr_name) => expr_name.id.as_str() == name,
+        ExprKind::Name(expr_name) => expr_name.id().as_str() == name,
         // `x: T = a.T()` is a match
-        Expr::Attribute(expr_attribute) => expr_attribute.attr.as_str() == name,
+        ExprKind::Attribute(expr_attribute) => expr_attribute.attr().as_str() == name,
         _ => false,
     }
 }
@@ -717,29 +719,34 @@ fn call_matches_name(expr: &Expr, name: &str) -> bool {
 /// emit an inlay type hint for the variable assigned to it?
 ///
 /// This is used to suppress inlay hints for things like `x = 1`, `x, y = (1, 2)`, etc.
-fn type_hint_is_excessive_for_expr(expr: &Expr) -> bool {
-    match expr {
+fn type_hint_is_excessive_for_expr(expr: Expr<'_>) -> bool {
+    match expr.fields() {
         // A tuple of all literals is excessive to typehint
-        Expr::Tuple(expr_tuple) => expr_tuple.elts.iter().all(type_hint_is_excessive_for_expr),
+        ast::ExprFields::Tuple(ast::ExprTupleFields {
+            node: expr_tuple, ..
+        }) => expr_tuple
+            .elts()
+            .iter()
+            .all(type_hint_is_excessive_for_expr),
 
         // Various Literal[...] types which are always excessive to hint
-        Expr::BytesLiteral(_)
-        | Expr::NumberLiteral(_)
-        | Expr::BooleanLiteral(_)
-        | Expr::StringLiteral(_) => true,
+        ast::ExprFields::BytesLiteral(_)
+        | ast::ExprFields::NumberLiteral(_)
+        | ast::ExprFields::BooleanLiteral(_)
+        | ast::ExprFields::StringLiteral(_) => true,
         // `None` isn't terribly verbose, but still redundant
-        Expr::NoneLiteral(_) => true,
+        ast::ExprFields::NoneLiteral(_) => true,
         // This one expands to `str` which isn't verbose but is redundant
-        Expr::FString(_) => true,
+        ast::ExprFields::FString(_) => true,
         // This one expands to `Template` which isn't verbose but is redundant
-        Expr::TString(_) => true,
+        ast::ExprFields::TString(_) => true,
 
         // You too `+1 and `-1`, get back here
-        Expr::UnaryOp(ExprUnaryOp {
+        ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
             op: UnaryOp::UAdd | UnaryOp::USub,
             operand,
             ..
-        }) => matches!(**operand, Expr::NumberLiteral(_)),
+        }) => matches!(operand.classify(), ExprKind::NumberLiteral(_)),
 
         // Everything else is reasonable
         _ => false,
@@ -750,15 +757,15 @@ fn should_skip_import(db: &dyn Db, module: ty_module_resolver::Module, ty: Type)
     module.is_known(db, ty_module_resolver::KnownModule::Builtins) || ty.is_none(db)
 }
 
-fn annotations_are_valid_syntax(stmt_assign: &StmtAssign) -> bool {
-    if stmt_assign.targets.len() > 1 {
+fn annotations_are_valid_syntax(stmt_assign: StmtAssign<'_>) -> bool {
+    if stmt_assign.targets().len() > 1 {
         return false;
     }
 
     if stmt_assign
-        .targets
+        .targets()
         .iter()
-        .any(|target| matches!(target, Expr::Tuple(_)))
+        .any(|target| matches!(target.classify(), ExprKind::Tuple(_)))
     {
         return false;
     }
@@ -766,12 +773,12 @@ fn annotations_are_valid_syntax(stmt_assign: &StmtAssign) -> bool {
     true
 }
 
-fn is_ignored_variable_assignment_target(expr: &Expr) -> bool {
-    let Expr::Name(name) = expr else {
+fn is_ignored_variable_assignment_target(expr: Expr<'_>) -> bool {
+    let ExprKind::Name(name) = expr.classify() else {
         return false;
     };
 
-    let name = name.id.as_str();
+    let name = name.id().as_str();
     let is_dunder = name.starts_with("__") && name.ends_with("__") && name.len() > 4;
 
     name.starts_with('_') && !is_dunder
@@ -786,7 +793,7 @@ struct DynamicallyImportedMember {
 struct DynamicImporter<'a, 'db> {
     importer: &'a Importer<'db>,
     /// The node used to compute members in scope (lazily).
-    scope_node: AnyNodeRef<'a>,
+    scope_node: SyntaxNode<'a>,
     scope_offset: TextSize,
     members: Option<MembersInScope<'db>>,
     /// Deduplicate imports within this hint, preserving their order. Each hint must
@@ -795,7 +802,7 @@ struct DynamicImporter<'a, 'db> {
 }
 
 impl<'a, 'db> DynamicImporter<'a, 'db> {
-    fn new(importer: &'a Importer<'db>, scope_node: AnyNodeRef<'a>) -> Self {
+    fn new(importer: &'a Importer<'db>, scope_node: SyntaxNode<'a>) -> Self {
         Self {
             importer,
             scope_node,

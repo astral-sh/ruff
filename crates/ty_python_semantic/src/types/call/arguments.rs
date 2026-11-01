@@ -1,4 +1,5 @@
 use crate::Db;
+use ruff_python_ast::{ArgOrKeyword, ExprKind};
 use std::borrow::Cow;
 use std::cell::OnceCell;
 use std::fmt::Display;
@@ -511,8 +512,8 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// type of each splatted argument, so that we can determine its length. All other arguments
     /// will remain uninitialized.
     pub(crate) fn from_arguments(
-        arguments: &'a ast::Arguments,
-        mut infer_argument_type: impl FnMut(&ast::ArgOrKeyword, &ast::Expr) -> Type<'db>,
+        arguments: ast::Arguments<'a>,
+        mut infer_argument_type: impl FnMut(&ArgOrKeyword, ast::Expr<'_>) -> Type<'db>,
     ) -> Self {
         let mut call_arguments = Self {
             items: Vec::with_capacity(arguments.len()),
@@ -520,16 +521,20 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
         for arg_or_keyword in arguments.iter_source_order() {
             let (argument, ty) = match arg_or_keyword {
-                ast::ArgOrKeyword::Arg(arg) => match arg {
-                    ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                ArgOrKeyword::Arg(arg) => match arg.classify() {
+                    ExprKind::Starred(expr_starred) => {
+                        let value = expr_starred.value();
+
                         let ty = infer_argument_type(&arg_or_keyword, value);
                         (Argument::Variadic, Some(ty))
                     }
                     _ => (Argument::Positional, None),
                 },
-                ast::ArgOrKeyword::Keyword(ast::Keyword { arg, value, .. }) => {
+                ArgOrKeyword::Keyword(keyword) => {
+                    let arg = keyword.arg();
+                    let value = keyword.value();
                     if let Some(arg) = arg {
-                        (Argument::Keyword(&arg.id), None)
+                        (Argument::Keyword(arg.id()), None)
                     } else {
                         let ty = infer_argument_type(&arg_or_keyword, value);
                         (Argument::Keywords, Some(ty))
@@ -547,14 +552,16 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// This currently only exists for the LSP usecase, and shouldn't be used in normal
     /// typechecking.
     pub(crate) fn from_arguments_typed(
-        arguments: &'a ast::Arguments,
-        mut infer_argument_type: impl FnMut(&ast::Expr) -> Option<Type<'db>>,
+        arguments: ast::Arguments<'a>,
+        mut infer_argument_type: impl FnMut(ast::Expr<'_>) -> Option<Type<'db>>,
     ) -> Self {
         let call_arguments: Self = arguments
             .iter_source_order()
             .map(|arg_or_keyword| match arg_or_keyword {
-                ast::ArgOrKeyword::Arg(arg) => match arg {
-                    ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                ArgOrKeyword::Arg(arg) => match arg.classify() {
+                    ExprKind::Starred(expr_starred) => {
+                        let value = expr_starred.value();
+
                         let ty = infer_argument_type(value).unwrap_or(Type::unknown());
                         (Argument::Variadic, Some(ty))
                     }
@@ -563,10 +570,12 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                         (Argument::Positional, Some(ty))
                     }
                 },
-                ast::ArgOrKeyword::Keyword(ast::Keyword { arg, value, .. }) => {
+                ArgOrKeyword::Keyword(keyword) => {
+                    let arg = keyword.arg();
+                    let value = keyword.value();
                     let ty = infer_argument_type(value).unwrap_or(Type::unknown());
                     if let Some(arg) = arg {
-                        (Argument::Keyword(&arg.id), Some(ty))
+                        (Argument::Keyword(arg.id()), Some(ty))
                     } else {
                         (Argument::Keywords, Some(ty))
                     }
@@ -594,20 +603,21 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// The callback reads types inferred while checking the enclosing collection expression.
     pub(crate) fn with_known_unpacking(
         mut self,
-        arguments: &ast::Arguments,
-        mut expression_type: impl FnMut(&ast::Expr) -> Option<Type<'db>>,
+        arguments: ast::Arguments<'_>,
+        mut expression_type: impl FnMut(ast::Expr<'_>) -> Option<Type<'db>>,
     ) -> Self {
         for (argument, source) in self.items.iter_mut().zip(arguments.iter_source_order()) {
             match (argument, source) {
-                (
-                    CallArgument::Variadic(argument),
-                    ast::ArgOrKeyword::Arg(ast::Expr::Starred(ast::ExprStarred { value, .. })),
-                ) => {
+                (CallArgument::Variadic(argument), ArgOrKeyword::Arg(arg))
+                    if let Some(starred) = arg.as_starred_expr() =>
+                {
+                    let value = starred.value();
                     // Set literals keep ordinary type-based unpacking. Handling duplicate elements
                     // and unspecified iteration order is not worth the extra complexity for now.
-                    let ast::Expr::List(ast::ExprList { elts, .. }) = value.as_ref() else {
+                    let ExprKind::List(list_node) = value.classify() else {
                         continue;
                     };
+                    let elts = list_node.elts();
                     let Some(elements) = elts
                         .iter()
                         .map(|element| {
@@ -626,38 +636,38 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                         sequence: TupleSpec::heterogeneous(elements),
                     };
                 }
-                (
-                    CallArgument::Keywords(argument),
-                    ast::ArgOrKeyword::Keyword(ast::Keyword {
-                        arg: None, value, ..
-                    }),
-                ) => {
-                    let ast::Expr::Dict(ast::ExprDict { items, .. }) = value else {
+                (CallArgument::Keywords(argument), ArgOrKeyword::Keyword(keyword))
+                    if keyword.arg().is_none() =>
+                {
+                    let value = keyword.value();
+                    let ExprKind::Dict(dict) = value.classify() else {
                         continue;
                     };
+                    let items = dict.items();
                     let mut keywords = FxIndexMap::with_capacity_and_hasher(
                         items.len(),
                         BuildHasherDefault::default(),
                     );
-                    let all_entries_known =
-                        items.iter().all(|ast::DictItem { key, value, .. }| {
-                            let Some(ast::Expr::StringLiteral(key)) = key else {
-                                return false;
-                            };
-                            let Some(value_ty) = expression_type(value) else {
-                                return false;
-                            };
-                            // Replacing a duplicate key preserves its first position in the dictionary.
-                            keywords.insert(
-                                Name::new(key.value.to_str()),
-                                UnpackedTypedDictKey {
-                                    value_ty,
-                                    is_required: true,
-                                    definition: None,
-                                },
-                            );
-                            true
-                        });
+                    let all_entries_known = items.iter().all(|item| {
+                        let Some(ExprKind::StringLiteral(key)) =
+                            item.key().map(ast::Expr::classify)
+                        else {
+                            return false;
+                        };
+                        let Some(value_ty) = expression_type(item.value()) else {
+                            return false;
+                        };
+                        // Replacing a duplicate key preserves its first position in the dictionary.
+                        keywords.insert(
+                            Name::new(key.value().to_str()),
+                            UnpackedTypedDictKey {
+                                value_ty,
+                                is_required: true,
+                                definition: None,
+                            },
+                        );
+                        true
+                    });
                     if all_entries_known {
                         *argument = KeywordArgument::Known {
                             types: argument.source_types().clone(),

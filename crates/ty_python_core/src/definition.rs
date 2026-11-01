@@ -6,7 +6,7 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal::suite;
-use ruff_python_ast::{self as ast, AnyNodeRef, Expr};
+use ruff_python_ast::{self as ast, AnyParameter, AstNode, Expr, StmtKind, Suite};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use smallvec::SmallVec;
 
@@ -124,19 +124,19 @@ impl<'db> Definition<'db> {
         match kind {
             DefinitionKind::Function(def) => {
                 let node = def.node(&module);
-                Some(node.name.as_str().to_string())
+                Some(node.name().as_str().to_string())
             }
             DefinitionKind::Class(def) => {
                 let node = def.node(&module);
-                Some(node.name.as_str().to_string())
+                Some(node.name().as_str().to_string())
             }
             DefinitionKind::TypeAlias(def) => {
                 let node = def.node(&module);
                 Some(
-                    node.name
+                    node.name()
                         .as_name_expr()
                         .expect("type alias name should be a NameExpr")
-                        .id
+                        .id()
                         .as_str()
                         .to_string(),
                 )
@@ -145,7 +145,7 @@ impl<'db> Definition<'db> {
                 let target_node = assignment.target.node(&module);
                 target_node
                     .as_name_expr()
-                    .map(|name_expr| name_expr.id.as_str().to_string())
+                    .map(|name_expr| name_expr.id().as_str().to_string())
             }
             _ => None,
         }
@@ -162,22 +162,22 @@ impl<'db> Definition<'db> {
             DefinitionKind::Assignment(assign_def) => {
                 let assign_node = assign_def.target(&module);
                 attribute_docstring(&module, assign_node)
-                    .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+                    .map(|docstring_expr| docstring_expr.value().to_str().to_owned())
             }
             DefinitionKind::AnnotatedAssignment(assign_def) => {
                 let assign_node = assign_def.target(&module);
                 attribute_docstring(&module, assign_node)
-                    .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+                    .map(|docstring_expr| docstring_expr.value().to_str().to_owned())
             }
             DefinitionKind::Function(function_def) => {
                 let function_node = function_def.node(&module);
-                docstring_from_body(&function_node.body)
-                    .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+                docstring_from_body(function_node.body())
+                    .map(|docstring_expr| docstring_expr.value().to_str().to_owned())
             }
             DefinitionKind::Class(class_def) => {
                 let class_node = class_def.node(&module);
-                docstring_from_body(&class_node.body)
-                    .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+                docstring_from_body(class_node.body())
+                    .map(|docstring_expr| docstring_expr.value().to_str().to_owned())
             }
             _ => None,
         }
@@ -226,14 +226,11 @@ impl DefinitionPlace {
 }
 
 /// Extract a docstring from a function, module, or class body.
-pub fn docstring_from_body(body: &[ast::Stmt]) -> Option<&ast::ExprStringLiteral> {
+pub fn docstring_from_body(body: Suite<'_>) -> Option<ast::ExprStringLiteral<'_>> {
     let stmt = body.first()?;
     // Require the docstring to be a standalone expression.
-    let ast::StmtExpr {
-        value,
-        range: _,
-        node_index: _,
-    } = stmt.as_expr_stmt()?;
+    let stmt_expr = stmt.as_expr_stmt()?;
+    let value = stmt_expr.value();
     // Only match string literals.
     value.as_string_literal_expr()
 }
@@ -249,12 +246,14 @@ pub fn docstring_from_body(body: &[ast::Stmt]) -> Option<&ast::ExprStringLiteral
 /// AST wants to encourage.
 fn attribute_docstring<'a>(
     module: &'a ParsedModuleRef,
-    assign_lvalue: &Expr,
-) -> Option<&'a ast::ExprStringLiteral> {
+    assign_lvalue: Expr<'_>,
+) -> Option<ast::ExprStringLiteral<'a>> {
     // Find all the ancestors of the assign lvalue
-    let covering_node = covering_node(module.syntax().into(), assign_lvalue.range());
+    let covering_node = covering_node(module.root().syntax_node(), assign_lvalue.range());
     // The assignment is the closest parent statement
-    let assign = covering_node.find_first(AnyNodeRef::is_statement).ok()?;
+    let assign = covering_node
+        .find_first(|node| node.cast::<ast::Stmt>().is_some())
+        .ok()?;
     let parent = assign.parent()?;
     let assign_node = assign.node();
 
@@ -263,14 +262,10 @@ fn attribute_docstring<'a>(
     let next_stmt = parent_body.next_sibling()?;
 
     // Require the docstring to be a standalone expression.
-    let ast::Stmt::Expr(ast::StmtExpr {
-        value,
-        range: _,
-        node_index: _,
-    }) = next_stmt
-    else {
+    let StmtKind::Expr(expr) = next_stmt.classify() else {
         return None;
     };
+    let value = expr.value();
 
     // Only match string literals.
     value.as_string_literal_expr()
@@ -345,13 +340,13 @@ pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef<'ast>),
     ImportStar(StarImportDefinitionNodeRef<'ast>),
     For(ForStmtDefinitionNodeRef<'ast, 'db>),
-    Function(&'ast ast::StmtFunctionDef),
-    Class(&'ast ast::StmtClassDef),
-    TypeAlias(&'ast ast::StmtTypeAlias),
-    NamedExpression(&'ast ast::ExprNamed),
+    Function(ast::StmtFunctionDef<'ast>),
+    Class(ast::StmtClassDef<'ast>),
+    TypeAlias(ast::StmtTypeAlias<'ast>),
+    NamedExpression(ast::ExprNamed<'ast>),
     Assignment(AssignmentDefinitionNodeRef<'ast, 'db>),
     AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef<'ast>),
-    AugmentedAssignment(&'ast ast::StmtAugAssign),
+    AugmentedAssignment(ast::StmtAugAssign<'ast>),
     DictKeyAssignment(DictKeyAssignmentNodeRef<'ast, 'db>),
     Comprehension(ComprehensionDefinitionNodeRef<'ast, 'db>),
     Parameter(ParameterDefinitionNodeRef<'ast>),
@@ -359,56 +354,56 @@ pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     WithItem(WithItemDefinitionNodeRef<'ast, 'db>),
     MatchPattern(MatchPatternDefinitionNodeRef<'ast, 'db>),
     ExceptHandler(ExceptHandlerDefinitionNodeRef<'ast>),
-    TypeVar(&'ast ast::TypeParamTypeVar),
-    ParamSpec(&'ast ast::TypeParamParamSpec),
-    TypeVarTuple(&'ast ast::TypeParamTypeVarTuple),
+    TypeVar(ast::TypeParamTypeVar<'ast>),
+    ParamSpec(ast::TypeParamParamSpec<'ast>),
+    TypeVarTuple(ast::TypeParamTypeVarTuple<'ast>),
     LoopHeader(LoopHeaderDefinitionNodeRef<'ast>),
 }
 
-impl<'ast> From<&'ast ast::StmtFunctionDef> for DefinitionNodeRef<'ast, '_> {
-    fn from(node: &'ast ast::StmtFunctionDef) -> Self {
+impl<'ast> From<ast::StmtFunctionDef<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(node: ast::StmtFunctionDef<'ast>) -> Self {
         Self::Function(node)
     }
 }
 
-impl<'ast> From<&'ast ast::StmtClassDef> for DefinitionNodeRef<'ast, '_> {
-    fn from(node: &'ast ast::StmtClassDef) -> Self {
+impl<'ast> From<ast::StmtClassDef<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(node: ast::StmtClassDef<'ast>) -> Self {
         Self::Class(node)
     }
 }
 
-impl<'ast> From<&'ast ast::StmtTypeAlias> for DefinitionNodeRef<'ast, '_> {
-    fn from(node: &'ast ast::StmtTypeAlias) -> Self {
+impl<'ast> From<ast::StmtTypeAlias<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(node: ast::StmtTypeAlias<'ast>) -> Self {
         Self::TypeAlias(node)
     }
 }
 
-impl<'ast> From<&'ast ast::ExprNamed> for DefinitionNodeRef<'ast, '_> {
-    fn from(node: &'ast ast::ExprNamed) -> Self {
+impl<'ast> From<ast::ExprNamed<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(node: ast::ExprNamed<'ast>) -> Self {
         Self::NamedExpression(node)
     }
 }
 
-impl<'ast> From<&'ast ast::StmtAugAssign> for DefinitionNodeRef<'ast, '_> {
-    fn from(node: &'ast ast::StmtAugAssign) -> Self {
+impl<'ast> From<ast::StmtAugAssign<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(node: ast::StmtAugAssign<'ast>) -> Self {
         Self::AugmentedAssignment(node)
     }
 }
 
-impl<'ast> From<&'ast ast::TypeParamTypeVar> for DefinitionNodeRef<'ast, '_> {
-    fn from(value: &'ast ast::TypeParamTypeVar) -> Self {
+impl<'ast> From<ast::TypeParamTypeVar<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(value: ast::TypeParamTypeVar<'ast>) -> Self {
         Self::TypeVar(value)
     }
 }
 
-impl<'ast> From<&'ast ast::TypeParamParamSpec> for DefinitionNodeRef<'ast, '_> {
-    fn from(value: &'ast ast::TypeParamParamSpec) -> Self {
+impl<'ast> From<ast::TypeParamParamSpec<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(value: ast::TypeParamParamSpec<'ast>) -> Self {
         Self::ParamSpec(value)
     }
 }
 
-impl<'ast> From<&'ast ast::TypeParamTypeVarTuple> for DefinitionNodeRef<'ast, '_> {
-    fn from(value: &'ast ast::TypeParamTypeVarTuple) -> Self {
+impl<'ast> From<ast::TypeParamTypeVarTuple<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(value: ast::TypeParamTypeVarTuple<'ast>) -> Self {
         Self::TypeVarTuple(value)
     }
 }
@@ -499,68 +494,68 @@ impl<'ast> From<StarImportDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportDefinitionNodeRef<'ast> {
-    pub(crate) node: &'ast ast::StmtImport,
+    pub(crate) node: ast::StmtImport<'ast>,
     pub(crate) alias_index: usize,
     pub(crate) is_reexported: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct StarImportDefinitionNodeRef<'ast> {
-    pub(crate) node: &'ast ast::StmtImportFrom,
+    pub(crate) node: ast::StmtImportFrom<'ast>,
     pub(crate) symbol_id: ScopedSymbolId,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromDefinitionNodeRef<'ast> {
-    pub(crate) node: &'ast ast::StmtImportFrom,
+    pub(crate) node: ast::StmtImportFrom<'ast>,
     pub(crate) alias_index: usize,
     pub(crate) is_reexported: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromSubmoduleDefinitionNodeRef<'ast> {
-    pub(crate) node: &'ast ast::StmtImportFrom,
+    pub(crate) node: ast::StmtImportFrom<'ast>,
     pub(crate) module_index: usize,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AssignmentDefinitionNodeRef<'ast, 'db> {
     pub(crate) unpack: Option<Unpack<'db>>,
-    pub(crate) value: &'ast ast::Expr,
-    pub(crate) target: &'ast ast::Expr,
+    pub(crate) value: ast::Expr<'ast>,
+    pub(crate) target: ast::Expr<'ast>,
     pub(crate) owner: BindingsOwner,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AnnotatedAssignmentDefinitionNodeRef<'ast> {
-    pub(crate) node: &'ast ast::StmtAnnAssign,
+    pub(crate) node: ast::StmtAnnAssign<'ast>,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct DictKeyAssignmentNodeRef<'ast, 'db> {
-    pub(crate) key: &'ast ast::Expr,
-    pub(crate) value: &'ast ast::Expr,
+    pub(crate) key: ast::Expr<'ast>,
+    pub(crate) value: ast::Expr<'ast>,
     pub(crate) assignment: Definition<'db>,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct WithItemDefinitionNodeRef<'ast, 'db> {
     pub(crate) unpack: Option<(UnpackPosition, Unpack<'db>)>,
-    pub(crate) item: &'ast ast::WithItem,
-    pub(crate) target: &'ast ast::Expr,
+    pub(crate) item: ast::WithItem<'ast>,
+    pub(crate) target: ast::Expr<'ast>,
     pub(crate) is_async: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ForStmtDefinitionNodeRef<'ast, 'db> {
     pub(crate) unpack: Option<(UnpackPosition, Unpack<'db>)>,
-    pub(crate) node: &'ast ast::StmtFor,
-    pub(crate) target: &'ast ast::Expr,
+    pub(crate) node: ast::StmtFor<'ast>,
+    pub(crate) target: ast::Expr<'ast>,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ExceptHandlerDefinitionNodeRef<'ast> {
-    pub(crate) handler: &'ast ast::ExceptHandlerExceptHandler,
+    pub(crate) handler: ast::ExceptHandlerExceptHandler<'ast>,
     pub(crate) is_star: bool,
 }
 
@@ -573,40 +568,40 @@ pub(crate) struct LoopHeaderDefinitionNodeRef<'ast> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum LoopStmtRef<'ast> {
-    While(&'ast ast::StmtWhile),
-    For(&'ast ast::StmtFor),
+    While(ast::StmtWhile<'ast>),
+    For(ast::StmtFor<'ast>),
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ComprehensionDefinitionNodeRef<'ast, 'db> {
     pub(crate) unpack: Option<(UnpackPosition, Unpack<'db>)>,
-    pub(crate) node: &'ast ast::Comprehension,
-    pub(crate) target: &'ast ast::Expr,
+    pub(crate) node: ast::Comprehension<'ast>,
+    pub(crate) target: ast::Expr<'ast>,
     pub(crate) first: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum ParameterDefinitionNodeRef<'ast> {
-    VariadicPositionalParameter(&'ast ast::Parameter),
-    VariadicKeywordParameter(&'ast ast::Parameter),
-    Parameter(&'ast ast::ParameterWithDefault),
+    VariadicPositionalParameter(ast::Parameter<'ast>),
+    VariadicKeywordParameter(ast::Parameter<'ast>),
+    Parameter(ast::ParameterWithDefault<'ast>),
 }
 
 impl ParameterDefinitionNodeRef<'_> {
     fn into_owned(self, parsed: &ParsedModuleRef) -> ParameterDefinitionNodeKind {
         match self {
             Self::VariadicPositionalParameter(parameter) => {
-                ParameterDefinitionNodeKind::VariadicPositionalParameter(AstNodeRef::new(
+                ParameterDefinitionNodeKind::VariadicPositionalParameter(AstNodeRef::from_view(
                     parsed, parameter,
                 ))
             }
             Self::VariadicKeywordParameter(parameter) => {
-                ParameterDefinitionNodeKind::VariadicKeywordParameter(AstNodeRef::new(
+                ParameterDefinitionNodeKind::VariadicKeywordParameter(AstNodeRef::from_view(
                     parsed, parameter,
                 ))
             }
             Self::Parameter(parameter) => {
-                ParameterDefinitionNodeKind::Parameter(AstNodeRef::new(parsed, parameter))
+                ParameterDefinitionNodeKind::Parameter(AstNodeRef::from_view(parsed, parameter))
             }
         }
     }
@@ -615,7 +610,7 @@ impl ParameterDefinitionNodeRef<'_> {
         match self {
             Self::VariadicPositionalParameter(node) => node.into(),
             Self::VariadicKeywordParameter(node) => node.into(),
-            Self::Parameter(node) => (&node.parameter).into(),
+            Self::Parameter(node) => (node.parameter()).into(),
         }
     }
 }
@@ -624,15 +619,15 @@ impl ParameterDefinitionNodeRef<'_> {
 pub(crate) struct LambdaParameterDefinitionNodeRef<'ast> {
     pub(crate) index: usize,
     pub(crate) parameter: ParameterDefinitionNodeRef<'ast>,
-    pub(crate) lambda: &'ast ast::ExprLambda,
+    pub(crate) lambda: ast::ExprLambda<'ast>,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct MatchPatternDefinitionNodeRef<'ast, 'db> {
     /// The outermost pattern node in which the identifier being defined occurs.
-    pub(crate) pattern: &'ast ast::Pattern,
+    pub(crate) pattern: ast::Pattern<'ast>,
     /// The identifier being defined.
-    pub(crate) identifier: &'ast ast::Identifier,
+    pub(crate) identifier: ast::Identifier<'ast>,
     /// The predicate for the complete match case containing this binding.
     pub(crate) predicate: PatternPredicate<'db>,
 }
@@ -645,7 +640,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 alias_index,
                 is_reexported,
             }) => DefinitionKind::Import(ImportDefinitionKind {
-                node: AstNodeRef::new(parsed, node),
+                node: AstNodeRef::from_view(parsed, node),
                 alias_index: alias_index
                     .try_into()
                     .expect("import alias index should fit in u32"),
@@ -656,7 +651,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 alias_index,
                 is_reexported,
             }) => DefinitionKind::ImportFrom(ImportFromDefinitionKind {
-                node: AstNodeRef::new(parsed, node),
+                node: AstNodeRef::from_view(parsed, node),
                 alias_index: alias_index
                     .try_into()
                     .expect("import-from alias index should fit in u32"),
@@ -666,7 +661,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 node,
                 module_index,
             }) => DefinitionKind::ImportFromSubmodule(ImportFromSubmoduleDefinitionKind {
-                node: AstNodeRef::new(parsed, node),
+                node: AstNodeRef::from_view(parsed, node),
                 module_index: module_index
                     .try_into()
                     .expect("import-from submodule index should fit in u32"),
@@ -674,24 +669,24 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             DefinitionNodeRef::ImportStar(star_import) => {
                 let StarImportDefinitionNodeRef { node, symbol_id } = star_import;
                 DefinitionKind::StarImport(StarImportDefinitionKind {
-                    node: AstNodeRef::new(parsed, node),
+                    node: AstNodeRef::from_view(parsed, node),
                     symbol_id,
                 })
             }
             DefinitionNodeRef::Function(function) => {
                 DefinitionKind::Function(FunctionDefinitionKind {
-                    node: AstNodeRef::new(parsed, function),
-                    has_decorators: !function.decorator_list.is_empty(),
+                    node: AstNodeRef::from_view(parsed, function),
+                    has_decorators: !function.decorator_list().is_empty(),
                 })
             }
             DefinitionNodeRef::Class(class) => {
-                DefinitionKind::Class(AstNodeRef::new(parsed, class))
+                DefinitionKind::Class(AstNodeRef::from_view(parsed, class))
             }
             DefinitionNodeRef::TypeAlias(type_alias) => {
-                DefinitionKind::TypeAlias(AstNodeRef::new(parsed, type_alias))
+                DefinitionKind::TypeAlias(AstNodeRef::from_view(parsed, type_alias))
             }
             DefinitionNodeRef::NamedExpression(named) => {
-                DefinitionKind::NamedExpression(AstNodeRef::new(parsed, named))
+                DefinitionKind::NamedExpression(AstNodeRef::from_view(parsed, named))
             }
             DefinitionNodeRef::Assignment(AssignmentDefinitionNodeRef {
                 unpack,
@@ -700,26 +695,29 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 owner,
             }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
                 unpack,
-                value: AstNodeRef::new(parsed, value),
-                target: AstNodeRef::new(parsed, target),
+                value: AstNodeRef::from_view(parsed, value),
+                target: AstNodeRef::from_view(parsed, target),
                 owner,
             }),
             DefinitionNodeRef::AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef {
                 node,
             }) => DefinitionKind::AnnotatedAssignment(AnnotatedAssignmentDefinitionKind {
-                node: AstNodeRef::new(parsed, node),
-                has_value: node.value.is_some(),
+                node: AstNodeRef::from_view(parsed, node),
+                has_value: node.value().is_some(),
             }),
             DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
-                DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
+                DefinitionKind::AugmentedAssignment(AstNodeRef::from_view(
+                    parsed,
+                    augmented_assignment,
+                ))
             }
             DefinitionNodeRef::DictKeyAssignment(DictKeyAssignmentNodeRef {
                 key,
                 value,
                 assignment,
             }) => DefinitionKind::DictKeyAssignment(DictKeyAssignmentKind {
-                key: AstNodeRef::new(parsed, key),
-                value: AstNodeRef::new(parsed, value),
+                key: AstNodeRef::from_view(parsed, key),
+                value: AstNodeRef::from_view(parsed, value),
                 assignment,
             }),
             DefinitionNodeRef::For(ForStmtDefinitionNodeRef {
@@ -729,9 +727,9 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }) => DefinitionKind::For(ForStmtDefinitionKind {
                 unpack: unpack.map(|(_, unpack)| unpack),
                 unpack_position: unpack.map_or(UnpackPosition::First, |(position, _)| position),
-                node: AstNodeRef::new(parsed, node),
-                target: AstNodeRef::new(parsed, target),
-                is_async: node.is_async,
+                node: AstNodeRef::from_view(parsed, node),
+                target: AstNodeRef::from_view(parsed, target),
+                is_async: node.is_async(),
             }),
             DefinitionNodeRef::Comprehension(ComprehensionDefinitionNodeRef {
                 unpack,
@@ -741,10 +739,10 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }) => DefinitionKind::Comprehension(ComprehensionDefinitionKind {
                 unpack: unpack.map(|(_, unpack)| unpack),
                 unpack_position: unpack.map_or(UnpackPosition::First, |(position, _)| position),
-                node: AstNodeRef::new(parsed, node),
-                target: AstNodeRef::new(parsed, target),
+                node: AstNodeRef::from_view(parsed, node),
+                target: AstNodeRef::from_view(parsed, target),
                 first,
-                is_async: node.is_async,
+                is_async: node.is_async(),
             }),
             DefinitionNodeRef::Parameter(parameter) => {
                 DefinitionKind::Parameter(parameter.into_owned(parsed))
@@ -758,7 +756,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                     .try_into()
                     .expect("lambda parameter index should fit in u32"),
                 parameter: parameter.into_owned(parsed),
-                lambda: AstNodeRef::new(parsed, lambda),
+                lambda: AstNodeRef::from_view(parsed, lambda),
             }),
             DefinitionNodeRef::WithItem(WithItemDefinitionNodeRef {
                 unpack,
@@ -768,8 +766,8 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }) => DefinitionKind::WithItem(WithItemDefinitionKind {
                 unpack: unpack.map(|(_, unpack)| unpack),
                 unpack_position: unpack.map_or(UnpackPosition::First, |(position, _)| position),
-                item: AstNodeRef::new(parsed, item),
-                target: AstNodeRef::new(parsed, target),
+                item: AstNodeRef::from_view(parsed, item),
+                target: AstNodeRef::from_view(parsed, target),
                 is_async,
             }),
             DefinitionNodeRef::MatchPattern(MatchPatternDefinitionNodeRef {
@@ -777,25 +775,25 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 identifier,
                 predicate,
             }) => DefinitionKind::MatchPattern(MatchPatternDefinitionKind {
-                pattern: AstNodeRef::new(parsed, pattern),
-                identifier: AstNodeRef::new(parsed, identifier),
+                pattern: AstNodeRef::from_view(parsed, pattern),
+                identifier: AstNodeRef::from_view(parsed, identifier),
                 predicate,
             }),
             DefinitionNodeRef::ExceptHandler(ExceptHandlerDefinitionNodeRef {
                 handler,
                 is_star,
             }) => DefinitionKind::ExceptHandler(ExceptHandlerDefinitionKind {
-                handler: AstNodeRef::new(parsed, handler),
+                handler: AstNodeRef::from_view(parsed, handler),
                 is_star,
             }),
             DefinitionNodeRef::TypeVar(node) => {
-                DefinitionKind::TypeVar(AstNodeRef::new(parsed, node))
+                DefinitionKind::TypeVar(AstNodeRef::from_view(parsed, node))
             }
             DefinitionNodeRef::ParamSpec(node) => {
-                DefinitionKind::ParamSpec(AstNodeRef::new(parsed, node))
+                DefinitionKind::ParamSpec(AstNodeRef::from_view(parsed, node))
             }
             DefinitionNodeRef::TypeVarTuple(node) => {
-                DefinitionKind::TypeVarTuple(AstNodeRef::new(parsed, node))
+                DefinitionKind::TypeVarTuple(AstNodeRef::from_view(parsed, node))
             }
             DefinitionNodeRef::LoopHeader(LoopHeaderDefinitionNodeRef {
                 loop_stmt,
@@ -804,8 +802,12 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }) => DefinitionKind::LoopHeader(LoopHeaderDefinitionKind {
                 loop_header_id,
                 loop_stmt: match loop_stmt {
-                    LoopStmtRef::While(stmt) => LoopStmtKind::While(AstNodeRef::new(parsed, stmt)),
-                    LoopStmtRef::For(stmt) => LoopStmtKind::For(AstNodeRef::new(parsed, stmt)),
+                    LoopStmtRef::While(stmt) => {
+                        LoopStmtKind::While(AstNodeRef::from_view(parsed, stmt))
+                    }
+                    LoopStmtRef::For(stmt) => {
+                        LoopStmtKind::For(AstNodeRef::from_view(parsed, stmt))
+                    }
                 },
                 place,
             }),
@@ -818,21 +820,21 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 node,
                 alias_index,
                 is_reexported: _,
-            }) => (&node.names[alias_index]).into(),
+            }) => (node.names().at(alias_index)).into(),
             Self::ImportFrom(ImportFromDefinitionNodeRef {
                 node,
                 alias_index,
                 is_reexported: _,
-            }) => (&node.names[alias_index]).into(),
+            }) => (node.names().at(alias_index)).into(),
             Self::ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef { node, .. }) => {
                 node.into()
             }
             // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
             // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
             Self::ImportStar(StarImportDefinitionNodeRef { node, symbol_id: _ }) => node
-                .names
+                .names()
                 .iter()
-                .find(|alias| &alias.name == "*")
+                .find(|alias| alias.name() == "*")
                 .expect(
                     "The `StmtImportFrom` node of a `StarImportDefinitionKind` instance \
                     should always have at least one `alias` with the name `*`.",
@@ -934,12 +936,12 @@ pub enum DefinitionKind<'db> {
     ImportFromSubmodule(ImportFromSubmoduleDefinitionKind),
     StarImport(StarImportDefinitionKind),
     Function(FunctionDefinitionKind),
-    Class(AstNodeRef<ast::StmtClassDef>),
-    TypeAlias(AstNodeRef<ast::StmtTypeAlias>),
-    NamedExpression(AstNodeRef<ast::ExprNamed>),
+    Class(AstNodeRef<ast::kind::StmtClassDef>),
+    TypeAlias(AstNodeRef<ast::kind::StmtTypeAlias>),
+    NamedExpression(AstNodeRef<ast::kind::ExprNamed>),
     Assignment(AssignmentDefinitionKind<'db>),
     AnnotatedAssignment(AnnotatedAssignmentDefinitionKind),
-    AugmentedAssignment(AstNodeRef<ast::StmtAugAssign>),
+    AugmentedAssignment(AstNodeRef<ast::kind::StmtAugAssign>),
     DictKeyAssignment(DictKeyAssignmentKind<'db>),
     For(ForStmtDefinitionKind<'db>),
     Comprehension(ComprehensionDefinitionKind<'db>),
@@ -948,9 +950,9 @@ pub enum DefinitionKind<'db> {
     WithItem(WithItemDefinitionKind<'db>),
     MatchPattern(MatchPatternDefinitionKind<'db>),
     ExceptHandler(ExceptHandlerDefinitionKind),
-    TypeVar(AstNodeRef<ast::TypeParamTypeVar>),
-    ParamSpec(AstNodeRef<ast::TypeParamParamSpec>),
-    TypeVarTuple(AstNodeRef<ast::TypeParamTypeVarTuple>),
+    TypeVar(AstNodeRef<ast::kind::TypeParamTypeVar>),
+    ParamSpec(AstNodeRef<ast::kind::TypeParamParamSpec>),
+    TypeVarTuple(AstNodeRef<ast::kind::TypeParamTypeVarTuple>),
     LoopHeader(LoopHeaderDefinitionKind),
     // Boxing here helps avoid growing the memory footprint of this enum.
     NestedBindings(Box<NestedBindingsDefinitionKind>),
@@ -973,7 +975,7 @@ impl<'db> DefinitionKind<'db> {
         }
     }
 
-    pub const fn as_class(&self) -> Option<&AstNodeRef<ast::StmtClassDef>> {
+    pub const fn as_class(&self) -> Option<&AstNodeRef<ast::kind::StmtClassDef>> {
         match self {
             DefinitionKind::Class(class) => Some(class),
             _ => None,
@@ -1032,14 +1034,14 @@ impl<'db> DefinitionKind<'db> {
             DefinitionKind::ImportFrom(import) => import.alias(module).range(),
             DefinitionKind::ImportFromSubmodule(import) => import.target_range(module),
             DefinitionKind::StarImport(import) => import.alias(module).range(),
-            DefinitionKind::Function(function) => function.node(module).name.range(),
-            DefinitionKind::Class(class) => class.node(module).name.range(),
-            DefinitionKind::TypeAlias(type_alias) => type_alias.node(module).name.range(),
-            DefinitionKind::NamedExpression(named) => named.node(module).target.range(),
+            DefinitionKind::Function(function) => function.node.node(module).name().range(),
+            DefinitionKind::Class(class) => class.node(module).name().range(),
+            DefinitionKind::TypeAlias(type_alias) => type_alias.node(module).name().range(),
+            DefinitionKind::NamedExpression(named) => named.node(module).target().range(),
             DefinitionKind::Assignment(assignment) => assignment.target(module).range(),
             DefinitionKind::AnnotatedAssignment(assign) => assign.target(module).range(),
             DefinitionKind::AugmentedAssignment(aug_assign) => {
-                aug_assign.node(module).target.range()
+                aug_assign.node(module).target().range()
             }
             DefinitionKind::DictKeyAssignment(dict_key_assignment) => {
                 dict_key_assignment.key.node(module).range()
@@ -1057,13 +1059,12 @@ impl<'db> DefinitionKind<'db> {
             }
             DefinitionKind::ExceptHandler(handler) => handler
                 .node(module)
-                .name
-                .as_ref()
-                .map_or_else(|| handler.node(module).range(), Ranged::range),
-            DefinitionKind::TypeVar(type_var) => type_var.node(module).name.range(),
-            DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).name.range(),
+                .name()
+                .map_or_else(|| handler.handler.node(module).range(), |node| node.range()),
+            DefinitionKind::TypeVar(type_var) => type_var.node(module).name().range(),
+            DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).name().range(),
             DefinitionKind::TypeVarTuple(type_var_tuple) => {
-                type_var_tuple.node(module).name.range()
+                type_var_tuple.node(module).name().range()
             }
             DefinitionKind::LoopHeader(loop_header) => loop_header.range(module),
             DefinitionKind::NestedBindings(nested_bindings) => {
@@ -1082,7 +1083,7 @@ impl<'db> DefinitionKind<'db> {
             DefinitionKind::ImportFrom(import) => import.alias(module).range(),
             DefinitionKind::ImportFromSubmodule(import) => import.module(module).range(),
             DefinitionKind::StarImport(import) => import.import(module).range(),
-            DefinitionKind::Function(function) => function.node(module).range(),
+            DefinitionKind::Function(function) => function.node.node(module).range(),
             DefinitionKind::Class(class) => class.node(module).range(),
             DefinitionKind::TypeAlias(type_alias) => type_alias.node(module).range(),
             DefinitionKind::NamedExpression(named) => named.node(module).range(),
@@ -1116,7 +1117,7 @@ impl<'db> DefinitionKind<'db> {
             DefinitionKind::MatchPattern(match_pattern) => {
                 match_pattern.identifier.node(module).range()
             }
-            DefinitionKind::ExceptHandler(handler) => handler.node(module).range(),
+            DefinitionKind::ExceptHandler(handler) => handler.handler.node(module).range(),
             DefinitionKind::TypeVar(type_var) => type_var.node(module).range(),
             DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).range(),
             DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.node(module).range(),
@@ -1176,7 +1177,7 @@ impl<'db> DefinitionKind<'db> {
     ///
     /// Returns `Some` for `Assignment` and `AnnotatedAssignment` (if it has a value),
     /// `None` for all other definition kinds.
-    pub fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<&'ast ast::Expr> {
+    pub fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<ast::Expr<'ast>> {
         match self {
             DefinitionKind::Assignment(assignment) => Some(assignment.value(module)),
             DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(module),
@@ -1187,12 +1188,12 @@ impl<'db> DefinitionKind<'db> {
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct FunctionDefinitionKind {
-    node: AstNodeRef<ast::StmtFunctionDef>,
+    node: AstNodeRef<ast::kind::StmtFunctionDef>,
     has_decorators: bool,
 }
 
 impl FunctionDefinitionKind {
-    pub fn node<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtFunctionDef {
+    pub fn node<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::StmtFunctionDef<'ast> {
         self.node.node(module)
     }
 
@@ -1224,23 +1225,23 @@ impl<'db> TargetKind<'db> {
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct StarImportDefinitionKind {
-    node: AstNodeRef<ast::StmtImportFrom>,
+    node: AstNodeRef<ast::kind::StmtImportFrom>,
     symbol_id: ScopedSymbolId,
 }
 
 impl StarImportDefinitionKind {
-    pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
+    pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::StmtImportFrom<'ast> {
         self.node.node(module)
     }
 
-    pub fn alias<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Alias {
+    pub fn alias<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::Alias<'ast> {
         // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
         // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
         self.node
             .node(module)
-            .names
+            .names()
             .iter()
-            .find(|alias| &alias.name == "*")
+            .find(|alias| alias.name() == "*")
             .expect(
                 "The `StmtImportFrom` node of a `StarImportDefinitionKind` instance \
                 should always have at least one `alias` with the name `*`.",
@@ -1254,13 +1255,13 @@ impl StarImportDefinitionKind {
 
 #[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct MatchPatternDefinitionKind<'db> {
-    pattern: AstNodeRef<ast::Pattern>,
-    identifier: AstNodeRef<ast::Identifier>,
+    pattern: AstNodeRef<ast::kind::Pattern>,
+    identifier: AstNodeRef<ast::kind::Identifier>,
     predicate: PatternPredicate<'db>,
 }
 
 impl<'db> MatchPatternDefinitionKind<'db> {
-    pub fn pattern<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Pattern {
+    pub fn pattern<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::Pattern<'ast> {
         self.pattern.node(module)
     }
 
@@ -1277,23 +1278,23 @@ impl<'db> MatchPatternDefinitionKind<'db> {
 #[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct ComprehensionDefinitionKind<'db> {
     unpack: Option<Unpack<'db>>,
-    node: AstNodeRef<ast::Comprehension>,
-    target: AstNodeRef<ast::Expr>,
+    node: AstNodeRef<ast::kind::Comprehension>,
+    target: AstNodeRef<ast::kind::Expr>,
     first: bool,
     is_async: bool,
     unpack_position: UnpackPosition,
 }
 
 impl<'db> ComprehensionDefinitionKind<'db> {
-    pub fn iterable<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
-        &self.node.node(module).iter
+    pub fn iterable<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::Expr<'ast> {
+        self.node.node(module).iter()
     }
 
     pub fn target_kind(&self) -> TargetKind<'db> {
         TargetKind::from_unpack(self.unpack, self.unpack_position)
     }
 
-    pub fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+    pub fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::Expr<'ast> {
         self.target.node(module)
     }
 
@@ -1308,17 +1309,17 @@ impl<'db> ComprehensionDefinitionKind<'db> {
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub enum ParameterDefinitionNodeKind {
-    VariadicPositionalParameter(AstNodeRef<ast::Parameter>),
-    VariadicKeywordParameter(AstNodeRef<ast::Parameter>),
-    Parameter(AstNodeRef<ast::ParameterWithDefault>),
+    VariadicPositionalParameter(AstNodeRef<ast::kind::Parameter>),
+    VariadicKeywordParameter(AstNodeRef<ast::kind::Parameter>),
+    Parameter(AstNodeRef<ast::kind::ParameterWithDefault>),
 }
 
 impl ParameterDefinitionNodeKind {
     fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
         match self {
-            Self::VariadicPositionalParameter(parameter) => parameter.node(module).name.range(),
-            Self::VariadicKeywordParameter(parameter) => parameter.node(module).name.range(),
-            Self::Parameter(parameter) => parameter.node(module).parameter.name.range(),
+            Self::VariadicPositionalParameter(parameter) => parameter.node(module).name().range(),
+            Self::VariadicKeywordParameter(parameter) => parameter.node(module).name().range(),
+            Self::Parameter(parameter) => parameter.node(module).parameter().name().range(),
         }
     }
 
@@ -1326,7 +1327,7 @@ impl ParameterDefinitionNodeKind {
         match self {
             Self::VariadicPositionalParameter(parameter) => parameter.node(module).range(),
             Self::VariadicKeywordParameter(parameter) => parameter.node(module).range(),
-            Self::Parameter(parameter) => parameter.node(module).parameter.range(),
+            Self::Parameter(parameter) => parameter.node(module).parameter().range(),
         }
     }
 
@@ -1335,7 +1336,7 @@ impl ParameterDefinitionNodeKind {
             // a parameter always binds a value, but is only a declaration if annotated
             Self::VariadicPositionalParameter(parameter)
             | Self::VariadicKeywordParameter(parameter) => {
-                if parameter.node(module).annotation.is_some() {
+                if parameter.node(module).annotation().is_some() {
                     DefinitionCategory::DeclarationAndBinding
                 } else {
                     DefinitionCategory::Binding
@@ -1345,8 +1346,8 @@ impl ParameterDefinitionNodeKind {
             Self::Parameter(parameter_with_default) => {
                 if parameter_with_default
                     .node(module)
-                    .parameter
-                    .annotation
+                    .parameter()
+                    .annotation()
                     .is_some()
                 {
                     DefinitionCategory::DeclarationAndBinding
@@ -1357,17 +1358,13 @@ impl ParameterDefinitionNodeKind {
         }
     }
 
-    pub fn annotation<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<&'ast ast::Expr> {
+    pub fn annotation<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<ast::Expr<'ast>> {
         match self {
             Self::VariadicPositionalParameter(parameter)
-            | Self::VariadicKeywordParameter(parameter) => {
-                parameter.node(module).annotation.as_deref()
+            | Self::VariadicKeywordParameter(parameter) => parameter.node(module).annotation(),
+            Self::Parameter(parameter_with_default) => {
+                parameter_with_default.node(module).parameter().annotation()
             }
-            Self::Parameter(parameter_with_default) => parameter_with_default
-                .node(module)
-                .parameter
-                .annotation
-                .as_deref(),
         }
     }
 }
@@ -1375,24 +1372,24 @@ impl ParameterDefinitionNodeKind {
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct LambdaParameterDefinitionNodeKind {
     pub index: u32,
-    pub lambda: AstNodeRef<ast::ExprLambda>,
+    pub lambda: AstNodeRef<ast::kind::ExprLambda>,
     pub parameter: ParameterDefinitionNodeKind,
 }
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ImportDefinitionKind {
-    node: AstNodeRef<ast::StmtImport>,
+    node: AstNodeRef<ast::kind::StmtImport>,
     alias_index: u32,
     is_reexported: bool,
 }
 
 impl ImportDefinitionKind {
-    pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImport {
+    pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::StmtImport<'ast> {
         self.node.node(module)
     }
 
-    pub fn alias<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Alias {
-        &self.node.node(module).names[self.alias_index as usize]
+    pub fn alias<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::Alias<'ast> {
+        self.node.node(module).names().at(self.alias_index as usize)
     }
 
     fn is_reexported(&self) -> bool {
@@ -1402,18 +1399,18 @@ impl ImportDefinitionKind {
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ImportFromDefinitionKind {
-    node: AstNodeRef<ast::StmtImportFrom>,
+    node: AstNodeRef<ast::kind::StmtImportFrom>,
     alias_index: u32,
     is_reexported: bool,
 }
 
 impl ImportFromDefinitionKind {
-    pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
+    pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::StmtImportFrom<'ast> {
         self.node.node(module)
     }
 
-    pub fn alias<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Alias {
-        &self.node.node(module).names[self.alias_index as usize]
+    pub fn alias<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::Alias<'ast> {
+        self.node.node(module).names().at(self.alias_index as usize)
     }
 
     fn is_reexported(&self) -> bool {
@@ -1422,19 +1419,18 @@ impl ImportFromDefinitionKind {
 }
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ImportFromSubmoduleDefinitionKind {
-    node: AstNodeRef<ast::StmtImportFrom>,
+    node: AstNodeRef<ast::kind::StmtImportFrom>,
     module_index: u32,
 }
 
 impl ImportFromSubmoduleDefinitionKind {
-    pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
+    pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::StmtImportFrom<'ast> {
         self.node.node(module)
     }
 
-    fn module<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Identifier {
+    fn module<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::Identifier<'ast> {
         self.import(module)
-            .module
-            .as_ref()
+            .module()
             .expect("import-from submodule definitions should always have a module identifier")
     }
 
@@ -1476,8 +1472,8 @@ pub enum BindingsOwner {
 #[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct AssignmentDefinitionKind<'db> {
     unpack: Option<Unpack<'db>>,
-    value: AstNodeRef<ast::Expr>,
-    target: AstNodeRef<ast::Expr>,
+    value: AstNodeRef<ast::kind::Expr>,
+    target: AstNodeRef<ast::kind::Expr>,
     owner: BindingsOwner,
 }
 
@@ -1486,11 +1482,11 @@ impl<'db> AssignmentDefinitionKind<'db> {
         self.unpack
     }
 
-    pub fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+    pub fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::Expr<'ast> {
         self.value.node(module)
     }
 
-    pub fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+    pub fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::Expr<'ast> {
         self.target.node(module)
     }
 
@@ -1501,17 +1497,17 @@ impl<'db> AssignmentDefinitionKind<'db> {
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct AnnotatedAssignmentDefinitionKind {
-    node: AstNodeRef<ast::StmtAnnAssign>,
+    node: AstNodeRef<ast::kind::StmtAnnAssign>,
     has_value: bool,
 }
 
 impl AnnotatedAssignmentDefinitionKind {
-    fn node<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtAnnAssign {
+    fn node<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::StmtAnnAssign<'ast> {
         self.node.node(module)
     }
 
-    pub fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<&'ast ast::Expr> {
-        self.node(module).value.as_deref()
+    pub fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<ast::Expr<'ast>> {
+        self.node(module).value()
     }
 
     /// Returns whether this annotated assignment has a right-hand-side value.
@@ -1519,28 +1515,28 @@ impl AnnotatedAssignmentDefinitionKind {
         self.has_value
     }
 
-    pub fn annotation<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
-        &self.node(module).annotation
+    pub fn annotation<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::Expr<'ast> {
+        self.node(module).annotation()
     }
 
-    pub fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
-        &self.node(module).target
+    pub fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::Expr<'ast> {
+        self.node(module).target()
     }
 }
 
 #[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct DictKeyAssignmentKind<'db> {
-    key: AstNodeRef<ast::Expr>,
-    value: AstNodeRef<ast::Expr>,
+    key: AstNodeRef<ast::kind::Expr>,
+    value: AstNodeRef<ast::kind::Expr>,
     assignment: Definition<'db>,
 }
 
 impl<'db> DictKeyAssignmentKind<'db> {
-    pub fn key<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+    pub fn key<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::Expr<'ast> {
         self.key.node(module)
     }
 
-    pub fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+    pub fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::Expr<'ast> {
         self.value.node(module)
     }
 
@@ -1552,22 +1548,22 @@ impl<'db> DictKeyAssignmentKind<'db> {
 #[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct WithItemDefinitionKind<'db> {
     unpack: Option<Unpack<'db>>,
-    item: AstNodeRef<ast::WithItem>,
-    target: AstNodeRef<ast::Expr>,
+    item: AstNodeRef<ast::kind::WithItem>,
+    target: AstNodeRef<ast::kind::Expr>,
     is_async: bool,
     unpack_position: UnpackPosition,
 }
 
 impl<'db> WithItemDefinitionKind<'db> {
-    pub fn context_expr<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
-        &self.item.node(module).context_expr
+    pub fn context_expr<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::Expr<'ast> {
+        self.item.node(module).context_expr()
     }
 
     pub fn target_kind(&self) -> TargetKind<'db> {
         TargetKind::from_unpack(self.unpack, self.unpack_position)
     }
 
-    pub fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+    pub fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::Expr<'ast> {
         self.target.node(module)
     }
 
@@ -1579,22 +1575,22 @@ impl<'db> WithItemDefinitionKind<'db> {
 #[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct ForStmtDefinitionKind<'db> {
     unpack: Option<Unpack<'db>>,
-    node: AstNodeRef<ast::StmtFor>,
-    target: AstNodeRef<ast::Expr>,
+    node: AstNodeRef<ast::kind::StmtFor>,
+    target: AstNodeRef<ast::kind::Expr>,
     is_async: bool,
     unpack_position: UnpackPosition,
 }
 
 impl<'db> ForStmtDefinitionKind<'db> {
-    pub fn iterable<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
-        &self.node.node(module).iter
+    pub fn iterable<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::Expr<'ast> {
+        self.node.node(module).iter()
     }
 
     pub fn target_kind(&self) -> TargetKind<'db> {
         TargetKind::from_unpack(self.unpack, self.unpack_position)
     }
 
-    pub fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+    pub fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> ast::Expr<'ast> {
         self.target.node(module)
     }
 
@@ -1605,7 +1601,7 @@ impl<'db> ForStmtDefinitionKind<'db> {
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ExceptHandlerDefinitionKind {
-    handler: AstNodeRef<ast::ExceptHandlerExceptHandler>,
+    handler: AstNodeRef<ast::kind::ExceptHandlerExceptHandler>,
     is_star: bool,
 }
 
@@ -1613,15 +1609,15 @@ impl ExceptHandlerDefinitionKind {
     pub fn node<'ast>(
         &self,
         module: &'ast ParsedModuleRef,
-    ) -> &'ast ast::ExceptHandlerExceptHandler {
+    ) -> ast::ExceptHandlerExceptHandler<'ast> {
         self.handler.node(module)
     }
 
     pub fn handled_exceptions<'ast>(
         &self,
         module: &'ast ParsedModuleRef,
-    ) -> Option<&'ast ast::Expr> {
-        self.node(module).type_.as_deref()
+    ) -> Option<ast::Expr<'ast>> {
+        self.node(module).type_()
     }
 
     pub fn is_star(&self) -> bool {
@@ -1640,8 +1636,8 @@ pub struct LoopHeaderDefinitionKind {
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub(crate) enum LoopStmtKind {
-    While(AstNodeRef<ast::StmtWhile>),
-    For(AstNodeRef<ast::StmtFor>),
+    While(AstNodeRef<ast::kind::StmtWhile>),
+    For(AstNodeRef<ast::kind::StmtFor>),
 }
 
 impl LoopHeaderDefinitionKind {
@@ -1756,152 +1752,157 @@ pub enum NestedBindingExecution {
 pub struct DefinitionNodeKey(NodeKey);
 
 impl DefinitionNodeKey {
-    pub(crate) fn from_node_ref(node: ast::AnyNodeRef<'_>) -> Self {
-        match node {
-            ast::AnyNodeRef::ParameterWithDefault(parameter) => parameter.into(),
-            _ => Self(NodeKey::from_node(node)),
+    pub(crate) fn module_index(self) -> Option<usize> {
+        self.0.module_index()
+    }
+
+    pub(crate) fn from_node_ref(node: ruff_python_ast::SyntaxNode<'_>) -> Self {
+        if let Some(parameter) = node.cast::<ast::ParameterWithDefault>() {
+            parameter.into()
+        } else {
+            Self(NodeKey::from_node(node))
         }
     }
 
-    pub fn from_assignment(node: &ast::StmtAssign) -> impl Iterator<Item = DefinitionNodeKey> {
-        node.targets
+    pub fn from_assignment(node: ast::StmtAssign<'_>) -> impl Iterator<Item = DefinitionNodeKey> {
+        node.targets()
             .iter()
             .map(|target| Self(NodeKey::from_node(target)))
     }
 }
 
-impl From<&ast::Alias> for DefinitionNodeKey {
-    fn from(node: &ast::Alias) -> Self {
+impl From<ast::Alias<'_>> for DefinitionNodeKey {
+    fn from(node: ast::Alias<'_>) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
 
-impl From<&ast::StmtImportFrom> for DefinitionNodeKey {
-    fn from(node: &ast::StmtImportFrom) -> Self {
+impl From<ast::StmtImportFrom<'_>> for DefinitionNodeKey {
+    fn from(node: ast::StmtImportFrom<'_>) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
 
-impl From<&ast::StmtFunctionDef> for DefinitionNodeKey {
-    fn from(node: &ast::StmtFunctionDef) -> Self {
+impl From<ast::StmtFunctionDef<'_>> for DefinitionNodeKey {
+    fn from(node: ast::StmtFunctionDef<'_>) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
 
-impl From<&ast::StmtClassDef> for DefinitionNodeKey {
-    fn from(node: &ast::StmtClassDef) -> Self {
+impl From<ast::StmtClassDef<'_>> for DefinitionNodeKey {
+    fn from(node: ast::StmtClassDef<'_>) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
 
-impl From<&ast::StmtTypeAlias> for DefinitionNodeKey {
-    fn from(node: &ast::StmtTypeAlias) -> Self {
+impl From<ast::StmtTypeAlias<'_>> for DefinitionNodeKey {
+    fn from(node: ast::StmtTypeAlias<'_>) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
 
-impl From<&ast::ExprName> for DefinitionNodeKey {
-    fn from(node: &ast::ExprName) -> Self {
+impl From<ast::ExprName<'_>> for DefinitionNodeKey {
+    fn from(node: ast::ExprName<'_>) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
 
-impl From<&ast::ExprAttribute> for DefinitionNodeKey {
-    fn from(node: &ast::ExprAttribute) -> Self {
+impl From<ast::ExprAttribute<'_>> for DefinitionNodeKey {
+    fn from(node: ast::ExprAttribute<'_>) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
 
-impl From<&ast::ExprSubscript> for DefinitionNodeKey {
-    fn from(node: &ast::ExprSubscript) -> Self {
+impl From<ast::ExprSubscript<'_>> for DefinitionNodeKey {
+    fn from(node: ast::ExprSubscript<'_>) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
 
-impl From<&ast::ExprNamed> for DefinitionNodeKey {
-    fn from(node: &ast::ExprNamed) -> Self {
+impl From<ast::ExprNamed<'_>> for DefinitionNodeKey {
+    fn from(node: ast::ExprNamed<'_>) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
 
-impl From<&ast::StmtAnnAssign> for DefinitionNodeKey {
-    fn from(node: &ast::StmtAnnAssign) -> Self {
+impl From<ast::StmtAnnAssign<'_>> for DefinitionNodeKey {
+    fn from(node: ast::StmtAnnAssign<'_>) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
 
-impl From<&ast::StmtAugAssign> for DefinitionNodeKey {
-    fn from(node: &ast::StmtAugAssign) -> Self {
+impl From<ast::StmtAugAssign<'_>> for DefinitionNodeKey {
+    fn from(node: ast::StmtAugAssign<'_>) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
 
-impl From<&ast::StmtWhile> for DefinitionNodeKey {
-    fn from(node: &ast::StmtWhile) -> Self {
+impl From<ast::StmtWhile<'_>> for DefinitionNodeKey {
+    fn from(node: ast::StmtWhile<'_>) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
 
-impl From<&ast::StmtFor> for DefinitionNodeKey {
-    fn from(node: &ast::StmtFor) -> Self {
+impl From<ast::StmtFor<'_>> for DefinitionNodeKey {
+    fn from(node: ast::StmtFor<'_>) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
 
-impl From<&ast::Parameter> for DefinitionNodeKey {
-    fn from(node: &ast::Parameter) -> Self {
+impl From<ast::Parameter<'_>> for DefinitionNodeKey {
+    fn from(node: ast::Parameter<'_>) -> Self {
         Self(NodeKey::from_node(node))
     }
 }
 
-impl From<&ast::ParameterWithDefault> for DefinitionNodeKey {
-    fn from(node: &ast::ParameterWithDefault) -> Self {
-        Self(NodeKey::from_node(&node.parameter))
+impl From<ast::ParameterWithDefault<'_>> for DefinitionNodeKey {
+    fn from(node: ast::ParameterWithDefault<'_>) -> Self {
+        Self(NodeKey::from_node(node.parameter()))
     }
 }
 
-impl From<ast::AnyParameterRef<'_>> for DefinitionNodeKey {
-    fn from(value: ast::AnyParameterRef) -> Self {
+impl From<AnyParameter<'_>> for DefinitionNodeKey {
+    fn from(value: AnyParameter) -> Self {
         Self(match value {
-            ast::AnyParameterRef::Variadic(node) => NodeKey::from_node(node),
-            ast::AnyParameterRef::NonVariadic(node) => NodeKey::from_node(&node.parameter),
+            AnyParameter::Variadic(node) => NodeKey::from_node(node),
+            AnyParameter::NonVariadic(node) => NodeKey::from_node(node.parameter()),
         })
     }
 }
 
-impl From<&ast::Identifier> for DefinitionNodeKey {
-    fn from(identifier: &ast::Identifier) -> Self {
+impl From<ast::Identifier<'_>> for DefinitionNodeKey {
+    fn from(identifier: ast::Identifier<'_>) -> Self {
         Self(NodeKey::from_node(identifier))
     }
 }
 
-impl From<&ast::ExceptHandlerExceptHandler> for DefinitionNodeKey {
-    fn from(handler: &ast::ExceptHandlerExceptHandler) -> Self {
+impl From<ast::ExceptHandlerExceptHandler<'_>> for DefinitionNodeKey {
+    fn from(handler: ast::ExceptHandlerExceptHandler<'_>) -> Self {
         Self(NodeKey::from_node(handler))
     }
 }
 
-impl From<&ast::TypeParamTypeVar> for DefinitionNodeKey {
-    fn from(value: &ast::TypeParamTypeVar) -> Self {
+impl From<ast::TypeParamTypeVar<'_>> for DefinitionNodeKey {
+    fn from(value: ast::TypeParamTypeVar<'_>) -> Self {
         Self(NodeKey::from_node(value))
     }
 }
 
-impl From<&ast::TypeParamParamSpec> for DefinitionNodeKey {
-    fn from(value: &ast::TypeParamParamSpec) -> Self {
+impl From<ast::TypeParamParamSpec<'_>> for DefinitionNodeKey {
+    fn from(value: ast::TypeParamParamSpec<'_>) -> Self {
         Self(NodeKey::from_node(value))
     }
 }
 
-impl From<&ast::TypeParamTypeVarTuple> for DefinitionNodeKey {
-    fn from(value: &ast::TypeParamTypeVarTuple) -> Self {
+impl From<ast::TypeParamTypeVarTuple<'_>> for DefinitionNodeKey {
+    fn from(value: ast::TypeParamTypeVarTuple<'_>) -> Self {
         Self(NodeKey::from_node(value))
     }
 }
 
-impl<T> From<&AstNodeRef<T>> for DefinitionNodeKey
+impl<T: ast::NodeType> From<&AstNodeRef<T>> for DefinitionNodeKey
 where
-    for<'a> &'a T: Into<DefinitionNodeKey>,
+    for<'a> T::Borrowed<'a>: Into<DefinitionNodeKey>,
 {
     fn from(value: &AstNodeRef<T>) -> Self {
         Self(NodeKey::from_node_ref(value))

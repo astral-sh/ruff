@@ -51,12 +51,13 @@
 //! can only suppress `truthiness-test-of-iterable` warnings on an outer expression. The same is
 //! true for `truthiness-test-of-callable`.
 
+use ruff_python_ast::{self as ast, ExprKind, StmtKind, Suite};
 mod diagnostic;
 mod exemptions;
 
 use bitflags::bitflags;
 use ruff_python_ast::{
-    self as ast,
+    BoolOp, Expr, ExprUnaryOp, Number, Stmt, UnaryOp,
     helpers::any_over_expr,
     visitor::{Visitor, walk_expr},
 };
@@ -210,7 +211,7 @@ impl ConditionKind<'_> {
 /// always-false comparison does not replace the diagnostic on the always-truthy tuple.
 #[derive(Clone, Copy)]
 struct BooleanTest<'ast, 'db> {
-    expression: &'ast ast::Expr,
+    expression: Expr<'ast>,
     value_type: Type<'db>,
     truthiness: Truthiness,
     evaluation: ExpressionContext,
@@ -282,31 +283,32 @@ impl BooleanTest<'_, '_> {
     /// or falsy.
     fn truthiness_implied_by(self, condition: &RedundantCondition<'_, '_>) -> Truthiness {
         fn truthiness_from_condition(
-            expression: &ast::Expr,
+            expression: Expr<'_>,
             condition: &RedundantCondition<'_, '_>,
         ) -> Truthiness {
             if expression.range() == condition.expression.range() {
                 return condition.truthiness;
             }
 
-            match expression {
-                ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
+            match expression.classify() {
+                ExprKind::BoolOp(expr_bool_op) => {
+                    let op = expr_bool_op.op();
+                    let values = expr_bool_op.values();
                     values
                         .iter()
                         .fold(Truthiness::from(op.is_and()), |result, value| match op {
-                            ast::BoolOp::Or => {
+                            BoolOp::Or => {
                                 result.or_else(|| truthiness_from_condition(value, condition))
                             }
-                            ast::BoolOp::And => {
+                            BoolOp::And => {
                                 result.and_then(|| truthiness_from_condition(value, condition))
                             }
                         })
                 }
-                ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                    op: ast::UnaryOp::Not,
-                    operand,
-                    ..
-                }) => truthiness_from_condition(operand, condition).negate(),
+                ExprKind::UnaryOp(expr_unary_op) if expr_unary_op.op() == UnaryOp::Not => {
+                    let operand = expr_unary_op.operand();
+                    truthiness_from_condition(operand, condition).negate()
+                }
                 _ => Truthiness::Ambiguous,
             }
         }
@@ -335,7 +337,7 @@ impl BooleanTest<'_, '_> {
 /// ambiguous for suspicious `Callable` and `Iterable` tests.
 #[derive(Debug)]
 struct RedundantCondition<'ast, 'db> {
-    expression: &'ast ast::Expr,
+    expression: Expr<'ast>,
     value_type: Type<'db>,
     truthiness: Truthiness,
     kind: ConditionKind<'db>,
@@ -437,7 +439,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// always false.
     ///
     /// Tests in a different scope, such as a lambda body, are checked when that scope is inferred.
-    pub(super) fn check_condition_redundancy(&self, test: &ast::Expr, test_type: Type<'db>) {
+    pub(super) fn check_condition_redundancy(&self, test: Expr<'_>, test_type: Type<'db>) {
         if !self.should_check_redundant_conditions() {
             return;
         }
@@ -477,18 +479,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// if not ready:  # One `redundant-condition` diagnostic on `ready`.
     ///     print("unreachable")
     /// ```
-    pub(super) fn check_negation_redundancy(&self, unary: &ast::ExprUnaryOp) {
+    pub(super) fn check_negation_redundancy(&self, unary: ExprUnaryOp<'_>) {
         if !self.should_check_redundant_conditions() {
             return;
         }
 
         // Avoid duplicate diagnostics if we're visiting a nested boolean test.
-        if !self.index.is_boolean_test_root(&unary.operand) {
+        if !self.index.is_boolean_test_root(unary.operand()) {
             return;
         }
 
         for condition in self.redundant_conditions(
-            self.boolean_test(&unary.operand, ExpressionContext::Value),
+            self.boolean_test(unary.operand(), ExpressionContext::Value),
             RedundantConditionContext::Standalone,
         ) {
             self.report_redundant_condition(&condition);
@@ -535,35 +537,32 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// when `value: None`, although a literal `assert None` is exempt. Tests classified as
     /// [`ConditionKind::ContainsWalrus`], such as `assert (value := "foo")`, remain eligible for
     /// `redundant-condition-strict`.
-    pub(super) fn check_suite_for_redundant_conditions(&self, suite: &[ast::Stmt]) {
+    pub(super) fn check_suite_for_redundant_conditions(&self, suite: Suite<'_>) {
         if !self.should_check_redundant_conditions() {
             return;
         }
 
         for (i, statement) in suite.iter().enumerate() {
-            match statement {
-                ast::Stmt::If(if_stmt) => {
-                    let ast::StmtIf {
-                        test,
-                        body,
-                        elif_else_clauses,
-                        ..
-                    } = if_stmt;
+            match statement.classify() {
+                StmtKind::If(if_stmt) => {
+                    let test = if_stmt.test();
+                    let body = if_stmt.body();
+                    let elif_else_clauses = if_stmt.elif_else_clauses();
 
-                    let branches = std::iter::once((test.as_ref(), body.as_slice())).chain(
-                        elif_else_clauses.iter().map_while(|clause| {
-                            Some((clause.test.as_ref()?, clause.body.as_slice()))
-                        }),
+                    let branches = std::iter::once((test, body)).chain(
+                        elif_else_clauses
+                            .iter()
+                            .map_while(|clause| Some((clause.test()?, clause.body()))),
                     );
 
                     for (branch_index, (test, body)) in branches.enumerate() {
-                        let following_clauses = &elif_else_clauses[branch_index..];
+                        let following_clauses = elif_else_clauses.slice(branch_index..);
 
                         let context = RedundantConditionContext::for_if_statement(
                             self,
                             body,
                             following_clauses,
-                            &suite[i + 1..],
+                            suite.slice(i + 1..),
                         );
 
                         let boolean_test = self.boolean_test(test, ExpressionContext::Condition);
@@ -579,15 +578,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     boolean_test.truthiness_implied_by(&condition),
                                     if_stmt,
                                     branch_index,
-                                    &suite[i + 1..],
+                                    suite.slice(i + 1..),
                                 );
                             }
                         }
                     }
                 }
-                ast::Stmt::Assert(assert_statement) => {
+                StmtKind::Assert(assert_statement) => {
                     let boolean_test =
-                        self.boolean_test(&assert_statement.test, ExpressionContext::Condition);
+                        self.boolean_test(assert_statement.test(), ExpressionContext::Condition);
                     for condition in self
                         .redundant_conditions(boolean_test, RedundantConditionContext::Assertion)
                     {
@@ -595,14 +594,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             self.add_secondary_annotations_for_redundant_assert(
                                 &mut diagnostic,
                                 boolean_test.truthiness_implied_by(&condition),
-                                &suite[i + 1..],
+                                suite.slice(i + 1..),
                             );
                         }
                     }
                 }
-                ast::Stmt::While(while_statement) => {
+                StmtKind::While(while_statement) => {
                     let boolean_test =
-                        self.boolean_test(&while_statement.test, ExpressionContext::Condition);
+                        self.boolean_test(while_statement.test(), ExpressionContext::Condition);
                     for condition in self
                         .redundant_conditions(boolean_test, RedundantConditionContext::Standalone)
                     {
@@ -611,14 +610,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 &mut diagnostic,
                                 boolean_test.truthiness_implied_by(&condition),
                                 while_statement,
-                                &suite[i + 1..],
+                                suite.slice(i + 1..),
                             );
                         }
                     }
                 }
-                ast::Stmt::Match(match_statement) => {
-                    for (case_index, case) in match_statement.cases.iter().enumerate() {
-                        let Some(guard) = case.guard.as_deref() else {
+                StmtKind::Match(match_statement) => {
+                    for (case_index, case) in match_statement.cases().iter().enumerate() {
+                        let Some(guard) = case.guard() else {
                             continue;
                         };
 
@@ -634,7 +633,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     &mut diagnostic,
                                     boolean_test.truthiness_implied_by(&condition),
                                     case,
-                                    &match_statement.cases[case_index + 1..],
+                                    match_statement.cases().slice(case_index + 1..),
                                 );
                             }
                         }
@@ -701,11 +700,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         if matches!(
-            expression,
-            ast::Expr::BooleanLiteral(_)
-                | ast::Expr::NoneLiteral(_)
-                | ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: ast::Number::Int(_),
+            expression.fields(),
+            ast::ExprFields::BooleanLiteral(_)
+                | ast::ExprFields::NoneLiteral(_)
+                | ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+                    value: Number::Int(_),
                     ..
                 })
         ) {
@@ -737,7 +736,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ConditionKind::Boolean
         } else if value_type.bool(db, env).is_ambiguous() {
             ConditionKind::ShortCircuit
-        } else if any_over_expr(expression, ast::Expr::is_named_expr) {
+        } else if any_over_expr(expression, ruff_python_ast::Expr::is_named_expr) {
             // Include deferred bodies: a surrounding call may execute a lambda or generator.
             ConditionKind::ContainsWalrus
         } else {
@@ -756,7 +755,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// for `truthiness-test-of-none-union`.
     fn truthiness_test_of_none_union_candidate(
         &self,
-        expression: &ast::Expr,
+        expression: Expr<'_>,
         expanded_type: ExpandedType<'db>,
     ) -> Option<UnionType<'db>> {
         // Only check types that are unions with `None`:
@@ -811,7 +810,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // operands, as in `enabled and match` with `match: Match[str] | None`. Require a
         // value-producing operand to qualify independently, including through assignments.
         // The shared condition traversal prefers operand diagnostics where possible.
-        let is_candidate = |operand: &ast::Expr| {
+        let is_candidate = |operand: Expr<'_>| {
             self.truthiness_test_of_none_union_candidate(
                 operand,
                 ExpandedType::new(db, env, self.expression_type(operand)),
@@ -819,12 +818,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .is_some()
         };
 
-        let has_suspicious_operand = match expression {
-            ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) => values.iter().any(is_candidate),
-            ast::Expr::If(ast::ExprIf { body, orelse, .. }) => {
+        let has_suspicious_operand = match expression.classify() {
+            ExprKind::BoolOp(expr_bool_op) => {
+                let values = expr_bool_op.values();
+
+                values.iter().any(is_candidate)
+            }
+            ExprKind::If(expr_if) => {
+                let body = expr_if.body();
+                let orelse = expr_if.orelse();
+
                 is_candidate(body) || is_candidate(orelse)
             }
-            ast::Expr::Named(ast::ExprNamed { value, .. }) => is_candidate(value),
+            ExprKind::Named(expr_named) => {
+                let value = expr_named.value();
+                is_candidate(value)
+            }
             _ => true,
         };
         has_suspicious_operand.then_some(union)
@@ -926,7 +935,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// See the [`ExpressionContext`] doc-comment for more details.
     fn boolean_test<'expr>(
         &self,
-        expression: &'expr ast::Expr,
+        expression: Expr<'expr>,
         evaluation: ExpressionContext,
     ) -> BooleanTest<'expr, 'db> {
         let value_type = self.expression_type(expression);
@@ -1026,7 +1035,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let mut operand_result = ConditionCheckResult::empty();
 
-        let mut check_operand = |expression: &'ast ast::Expr, context, conditions: &mut Vec<_>| {
+        let mut check_operand = |expression: Expr<'ast>, context, conditions: &mut Vec<_>| {
             let result = self.check_boolean_test(
                 self.boolean_test(expression, test.evaluation),
                 context,
@@ -1036,25 +1045,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             operand_result |= result;
         };
 
-        match test.expression {
-            ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
+        match test.expression.classify() {
+            ExprKind::BoolOp(expr_bool_op) => {
+                let values = expr_bool_op.values();
+
                 // Include the final operand: `if flag and func` tests `func` when `flag` is true.
                 for value in values {
                     check_operand(value, condition_context, conditions);
                 }
             }
 
-            ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                op: ast::UnaryOp::Not,
-                operand,
-                ..
-            }) => {
+            ExprKind::UnaryOp(expr_unary_op) if expr_unary_op.op() == UnaryOp::Not => {
+                let operand = expr_unary_op.operand();
+
                 check_operand(operand, condition_context.negated(), conditions);
             }
 
-            ast::Expr::If(ast::ExprIf {
-                test, body, orelse, ..
-            }) => {
+            ExprKind::If(expr_if) => {
+                let test = expr_if.test();
+                let body = expr_if.body();
+                let orelse = expr_if.orelse();
+
                 // This test chooses a branch independently of the enclosing truthiness check.
                 // The selected branch supplies the value tested by the enclosing condition.
                 self.check_boolean_test(
@@ -1165,7 +1176,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// would hide the second mistake in the above example.
     fn check_nested_conditions<'ast>(
         &self,
-        test: &'ast ast::Expr,
+        test: Expr<'ast>,
         condition_context: RedundantConditionContext,
         conditions: &mut Vec<RedundantCondition<'ast, 'db>>,
     ) {
@@ -1195,11 +1206,11 @@ struct SubexpressionChecker<'a, 'ast, 'db> {
 }
 
 impl<'ast> Visitor<'ast> for SubexpressionChecker<'_, 'ast, '_> {
-    fn visit_expr(&mut self, expression: &'ast ast::Expr) {
+    fn visit_expr(&mut self, expression: Expr<'ast>) {
         let builder = self.builder;
 
         // Lambda bodies and comprehension scopes have their own inference and test owners.
-        if builder.index.try_expression_scope_id(expression)
+        if builder.index.try_expression_scope_id(&expression)
             != Some(builder.scope().file_scope_id(builder.db()))
         {
             return;
@@ -1209,12 +1220,10 @@ impl<'ast> Visitor<'ast> for SubexpressionChecker<'_, 'ast, '_> {
             return;
         }
 
-        match expression {
-            ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                op: ast::UnaryOp::Not,
-                operand,
-                ..
-            }) => {
+        match expression.classify() {
+            ExprKind::UnaryOp(expr_unary_op) if expr_unary_op.op() == UnaryOp::Not => {
+                let operand = expr_unary_op.operand();
+
                 builder.check_boolean_test(
                     builder.boolean_test(operand, ExpressionContext::Value),
                     self.condition_context,
@@ -1223,9 +1232,11 @@ impl<'ast> Visitor<'ast> for SubexpressionChecker<'_, 'ast, '_> {
                 );
             }
 
-            ast::Expr::If(ast::ExprIf {
-                test, body, orelse, ..
-            }) => {
+            ExprKind::If(expr_if) => {
+                let test = expr_if.test();
+                let body = expr_if.body();
+                let orelse = expr_if.orelse();
+
                 builder.check_boolean_test(
                     builder.boolean_test(test, ExpressionContext::Condition),
                     self.condition_context,
@@ -1266,7 +1277,7 @@ enum SuiteExitKind {
 /// prioritises avoiding false positives on intentional runtime checks.
 fn suite_ends_with_exit(
     builder: &TypeInferenceBuilder<'_, '_>,
-    suite: &[ast::Stmt],
+    suite: Suite<'_>,
     kind: SuiteExitKind,
 ) -> bool {
     let db = builder.db();
@@ -1275,18 +1286,23 @@ fn suite_ends_with_exit(
     suite
         .iter()
         .rev()
-        .find(|stmt| !is_trivial_statement(stmt))
-        .is_some_and(|stmt| match stmt {
-            ast::Stmt::Raise(_) => true,
-            ast::Stmt::Break(_) | ast::Stmt::Continue(_) => kind == SuiteExitKind::Any,
-            ast::Stmt::Assert(ast::StmtAssert { test, .. }) => !builder
-                .expression_truthiness(test, ExpressionContext::Condition)
-                .is_always_true(),
-            ast::Stmt::Expr(ast::StmtExpr { value, .. })
+        .find(|stmt| !is_trivial_statement(*stmt))
+        .is_some_and(|stmt| match stmt.classify() {
+            StmtKind::Raise(_) => true,
+            StmtKind::Break(_) | StmtKind::Continue(_) => kind == SuiteExitKind::Any,
+            StmtKind::Assert(stmt_assert) => {
+                let test = stmt_assert.test();
+                !builder
+                    .expression_truthiness(test, ExpressionContext::Condition)
+                    .is_always_true()
+            }
+            StmtKind::Expr(stmt_expr)
                 if let Some(StatementCall { call, is_await }) =
-                    StatementCall::from_expression(value) =>
+                    StatementCall::from_expression(stmt_expr.value()) =>
             {
-                let callable_type = builder.expression_type(&call.func);
+                let value = stmt_expr.value();
+
+                let callable_type = builder.expression_type(call.func());
                 // In a statically unreachable branch, even an ordinary callable can have type
                 // `Never`. Preserve the exemption in that case to avoid false positives on
                 // defensive checks made unreachable by type annotations.
@@ -1296,32 +1312,34 @@ fn suite_ends_with_exit(
                     })
                     .is_always_false()
             }
-            ast::Stmt::Return(ast::StmtReturn { value, .. }) => match kind {
-                SuiteExitKind::Any => true,
-                SuiteExitKind::Defensive => value.as_ref().is_some_and(|expr| {
-                    // Known limitation: `Any`, `Unknown`, and `Never` are also assignable to
-                    // `NotImplementedType`, so an ordinary return *can* suppress a diagnostic here.
-                    // We prioritise minimising false positives over minimising false negatives
-                    // when recognizing potentially deliberate defensive checks.
-                    builder.expression_type(expr).is_assignable_to(
-                        db,
-                        env,
-                        KnownClass::NotImplementedType.to_instance(db, env),
-                    )
-                }),
-            },
-            ast::Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                ..
-            }) => {
+            StmtKind::Return(stmt_return) => {
+                let value = stmt_return.value();
+                match kind {
+                    SuiteExitKind::Any => true,
+                    SuiteExitKind::Defensive => value.is_some_and(|expr| {
+                        // Known limitation: `Any`, `Unknown`, and `Never` are also assignable to
+                        // `NotImplementedType`, so an ordinary return *can* suppress a diagnostic here.
+                        // We prioritise minimising false positives over minimising false negatives
+                        // when recognizing potentially deliberate defensive checks.
+                        builder.expression_type(expr).is_assignable_to(
+                            db,
+                            env,
+                            KnownClass::NotImplementedType.to_instance(db, env),
+                        )
+                    }),
+                }
+            }
+            StmtKind::If(stmt_if) => {
+                let body = stmt_if.body();
+                let elif_else_clauses = stmt_if.elif_else_clauses();
+
                 elif_else_clauses
                     .last()
-                    .is_some_and(|last_clause| last_clause.test.is_none())
+                    .is_some_and(|last_clause| last_clause.test().is_none())
                     && suite_ends_with_exit(builder, body, kind)
                     && elif_else_clauses
                         .iter()
-                        .all(|clause| suite_ends_with_exit(builder, &clause.body, kind))
+                        .all(|clause| suite_ends_with_exit(builder, clause.body(), kind))
             }
             _ => false,
         })
@@ -1331,13 +1349,16 @@ fn suite_ends_with_exit(
 /// that has no effect nor side effect at runtime.
 ///
 /// Statements considered trivial are `pass`, `...`, and string-literal statements.
-fn is_trivial_statement(stmt: &ast::Stmt) -> bool {
-    match stmt {
-        ast::Stmt::Pass(_) => true,
-        ast::Stmt::Expr(ast::StmtExpr { value, .. }) => matches!(
-            &**value,
-            ast::Expr::StringLiteral(_) | ast::Expr::EllipsisLiteral(_)
-        ),
+fn is_trivial_statement(stmt: Stmt<'_>) -> bool {
+    match stmt.classify() {
+        StmtKind::Pass(_) => true,
+        StmtKind::Expr(stmt_expr) => {
+            let value = stmt_expr.value();
+            matches!(
+                value.classify(),
+                ExprKind::StringLiteral(_) | ExprKind::EllipsisLiteral(_)
+            )
+        }
         _ => false,
     }
 }
