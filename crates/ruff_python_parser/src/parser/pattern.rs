@@ -1,8 +1,7 @@
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
-    self as ast, AtomicNodeIndex, Expr, ExprContext, Number, Operator, Pattern, PatternKeys,
-    Patterns, Singleton,
+    self as ast, AtomicNodeIndex, Expr, ExprContext, Number, Operator, Pattern, Patterns, Singleton,
 };
 use ruff_text_size::{Ranged, TextSize};
 
@@ -185,16 +184,15 @@ impl Parser<'_> {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
-        let mut keys = PatternKeys::new();
-        let mut patterns = Patterns::new();
-        let mut rest = None;
+        let mut items = ast::MappingPatternItems::new();
+        let mut has_rest = false;
 
         self.parse_comma_separated_list(RecoveryContextKind::MatchPatternMapping, |parser| {
             let mapping_item_start = parser.node_start();
 
             if parser.eat(TokenKind::DoubleStar) {
                 let identifier = parser.parse_match_pattern_target();
-                if rest.is_some() {
+                if has_rest {
                     parser.add_error(
                         ParseErrorType::OtherError(
                             "Only one double star pattern is allowed".to_string(),
@@ -202,11 +200,8 @@ impl Parser<'_> {
                         parser.node_range(mapping_item_start),
                     );
                 }
-                // TODO(dhruvmanila): It's not possible to retain multiple double starred
-                // patterns because of the way the mapping node is represented in the grammar.
-                // The last value will always win. Update the AST representation.
-                // See: https://github.com/astral-sh/ruff/pull/10477#discussion_r1535143536
-                rest = Some(identifier);
+                has_rest = true;
+                items.push(ast::MappingPatternItem::Rest(identifier));
             } else {
                 let key = match parser.parse_match_pattern_lhs(AllowStarPattern::No) {
                     Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => *value,
@@ -237,13 +232,12 @@ impl Parser<'_> {
                         recovery::pattern_to_expr(pattern, &parser.tokens)
                     }
                 };
-                keys.push(key);
-
                 parser.expect(TokenKind::Colon);
 
-                patterns.push(parser.parse_match_pattern(AllowStarPattern::No));
+                let pattern = parser.parse_match_pattern(AllowStarPattern::No);
+                items.push(ast::MappingPatternItem::Entry { key, pattern });
 
-                if rest.is_some() {
+                if has_rest {
                     parser.add_error(
                         ParseErrorType::OtherError(
                             "Pattern cannot follow a double star pattern".to_string(),
@@ -258,9 +252,7 @@ impl Parser<'_> {
 
         ast::PatternMatchMapping {
             range: self.node_range(start),
-            keys,
-            patterns,
-            rest,
+            items,
             node_index: AtomicNodeIndex::NONE,
         }
     }

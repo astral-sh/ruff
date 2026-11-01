@@ -52,6 +52,7 @@ types_requiring_crate_prefix = {
     "CmpOp",
     "Comprehension",
     "DictItem",
+    "MappingPatternItems",
     "UnaryOp",
     "BoolOp",
     "Operator",

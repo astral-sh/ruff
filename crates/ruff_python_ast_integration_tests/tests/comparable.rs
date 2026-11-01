@@ -2,7 +2,8 @@ use std::collections::HashSet;
 use std::hash::{BuildHasher, RandomState};
 
 use ruff_python_ast::comparable::{
-    ComparableExpr, ComparableLiteral, ComparableMod, ComparableStmt, HashableExpr,
+    ComparableExpr, ComparableLiteral, ComparableMod, ComparablePattern, ComparableStmt,
+    HashableExpr,
 };
 use ruff_python_ast::{HasNodeIndex, Mod, NodeIndex};
 use ruff_python_parser::{ParseError, parse_expression, parse_module};
@@ -16,6 +17,8 @@ fn assert_comparable(left: &str, right: &str) -> Result<(), ParseError> {
     let right_compr = ComparableExpr::from(right_parsed.expr());
 
     assert_eq!(left_compr, right_compr);
+    assert_eq!(format!("{left_compr:?}"), format!("{right_compr:?}"));
+    assert_eq!(format!("{left_compr:#?}"), format!("{right_compr:#?}"));
     let hasher = RandomState::new();
     assert_eq!(hasher.hash_one(left_compr), hasher.hash_one(right_compr));
     Ok(())
@@ -38,10 +41,10 @@ fn assert_hashable_equal(left: &str, right: &str) -> Result<(), ParseError> {
     let left_parsed = parse_expression(left)?;
     let right_parsed = parse_expression(right)?;
 
-    assert_eq!(
-        HashableExpr::from(left_parsed.expr()),
-        HashableExpr::from(right_parsed.expr())
-    );
+    let left = HashableExpr::from(left_parsed.expr());
+    let right = HashableExpr::from(right_parsed.expr());
+    assert_eq!(left, right);
+    assert!(HashSet::from([left]).contains(&right));
 
     Ok(())
 }
@@ -62,22 +65,37 @@ fn assert_hashable_unequal(left: &str, right: &str) -> Result<(), ParseError> {
 #[test]
 fn call_arguments() -> Result<(), ParseError> {
     let call = "factory(item, *items, limit=2, **options)";
-    assert_comparable(call, "factory(item, *items, limit=0x2, **options)")?;
+    assert_comparable(call, "factory( (item), *items, limit=0x2, **options, )")?;
+    assert_noncomparable(call, "factory(*items, item, limit=2, **options)")?;
+    assert_noncomparable(call, "factory(item, *items, limit=3, **options)")?;
+    assert_noncomparable(call, "factory(item, *items, limit=2, options=options)")?;
     assert_noncomparable(call, "factory(item, *items, **options, limit=2)")
 }
 
 #[test]
-fn name_keys_ignore_context_location_and_node_index() -> Result<(), ParseError> {
+fn names_ignore_context_and_location() -> Result<(), ParseError> {
     let parsed = parse_expression("[item for item in items]")?;
     let comprehension = parsed.expr().as_list_comp_expr().unwrap();
-    let key = ComparableExpr::from(&comprehension.elt);
+    let target = &comprehension.generators[0].target;
+    let name = target.as_name_expr().unwrap();
+
+    let seen = HashSet::from([ComparableExpr::from(&comprehension.elt)]);
+    assert!(seen.contains(&ComparableExpr::from(target)));
+    assert!(seen.contains(&ComparableExpr::from(name)));
+    Ok(())
+}
+
+#[test]
+fn assigned_node_index_preserves_hash_lookup() -> Result<(), ParseError> {
+    let parsed = parse_expression("name")?;
+    let other = parse_expression("name")?;
+    let key = ComparableExpr::from(parsed.expr());
     let seen = HashSet::from([key]);
     let hash = seen.hasher().hash_one(key);
 
-    comprehension.elt.node_index().set(NodeIndex::from(7));
+    parsed.expr().node_index().set(NodeIndex::from(7));
     assert_eq!(seen.hasher().hash_one(key), hash);
-    let target = comprehension.generators[0].target.as_name_expr().unwrap();
-    assert!(seen.contains(&ComparableExpr::from(target)));
+    assert!(seen.contains(&ComparableExpr::from(other.expr())));
     Ok(())
 }
 
@@ -88,23 +106,75 @@ fn formatter_ast_diff_shows_only_structural_changes() -> Result<(), ParseError> 
         Ok(format!("{:#?}", ComparableMod::from(&module)))
     }
 
-    let split = debug_module("x=b'a' b'b'")?;
-    assert_eq!(split, debug_module("x = b'ab'")?);
-    assert_ne!(split, debug_module("x = b'ac'")?);
+    let before = debug_module("x=1")?;
+    assert_eq!(before, debug_module("x = (0x1)")?);
+    let after = debug_module("x = 2")?;
+    assert_ne!(before, after);
+    assert_eq!(before.replacen('1', "2", 1), after);
+
+    assert_eq!(
+        debug_module("def f[T](x: T):\n match x:\n  case [1]: pass")?,
+        debug_module("def f[ T ](x: T):\n    match (x):\n        case [0x1]: pass")?,
+    );
     Ok(())
 }
 
 #[test]
-fn match_statement_compares_its_pattern() -> Result<(), ParseError> {
-    let left = parse_module("match x:\n    case [1, 2]: pass")?;
-    let right = parse_module("match x:\n    case [0x1, 2]: pass")?;
-    let different = parse_module("match x:\n    case 1 | 2: pass")?;
+fn compound_statements() -> Result<(), ParseError> {
+    let left = parse_module("if ready:\n    send('a' 'b')\nelif retry:\n    pass")?;
+    let right = parse_module("if (ready): send('ab')\nelif retry: pass")?;
+    let different_test = parse_module("if ready: send('ab')\nelif later: pass")?;
+    let different_body = parse_module("if ready: send('ab')\nelif retry: send('ab')")?;
+
     let left = ComparableStmt::from(&left.syntax().body[0]);
     let right = ComparableStmt::from(&right.syntax().body[0]);
     assert_eq!(left, right);
     let hasher = RandomState::new();
     assert_eq!(hasher.hash_one(left), hasher.hash_one(right));
-    assert_ne!(left, ComparableStmt::from(&different.syntax().body[0]));
+    for different in [&different_test, &different_body] {
+        assert_ne!(left, ComparableStmt::from(&different.syntax().body[0]));
+    }
+    Ok(())
+}
+
+#[test]
+fn different_kinds_with_the_same_fields() -> Result<(), ParseError> {
+    for (left, right) in [
+        ("[x for x in xs]", "{x for x in xs}"),
+        ("[x for x in xs]", "(x for x in xs)"),
+        ("f'{x}'", "t'{x}'"),
+        ("global x", "nonlocal x"),
+        ("def f[*T](): pass", "def f[**T](): pass"),
+        (
+            "match x:\n    case [1, 2]: pass",
+            "match x:\n    case 1 | 2: pass",
+        ),
+    ] {
+        let left = parse_module(left)?;
+        let right = parse_module(right)?;
+        assert_ne!(
+            ComparableStmt::from(&left.syntax().body[0]),
+            ComparableStmt::from(&right.syntax().body[0]),
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn match_patterns() -> Result<(), ParseError> {
+    fn pattern(stmt: &ruff_python_ast::Stmt) -> ComparablePattern<'_> {
+        ComparablePattern::from(&stmt.as_match_stmt().unwrap().cases[0].pattern)
+    }
+
+    let left = parse_module("match x:\n    case Point(x=[1, *rest]): pass")?;
+    let right = parse_module("match other:\n    case Point(x = [0x1, *rest]): pass")?;
+    let different = parse_module("match x:\n    case Point(y=[1, *rest]): pass")?;
+    let left = pattern(&left.syntax().body[0]);
+    let right = pattern(&right.syntax().body[0]);
+    assert_eq!(left, right);
+    let hasher = RandomState::new();
+    assert_eq!(hasher.hash_one(left), hasher.hash_one(right));
+    assert_ne!(left, pattern(&different.syntax().body[0]));
     Ok(())
 }
 
@@ -115,8 +185,11 @@ fn literal_keys_preserve_part_boundaries() -> Result<(), ParseError> {
     }
 
     let split = parse_expression("'a' 'b'")?;
+    let equal = parse_expression("('a'  'b')")?;
     let joined = parse_expression("'ab'")?;
-    assert_ne!(key(split.expr()), key(joined.expr()));
+    let seen = HashSet::from([key(split.expr())]);
+    assert!(seen.contains(&key(equal.expr())));
+    assert!(!seen.contains(&key(joined.expr())));
     Ok(())
 }
 
@@ -129,10 +202,11 @@ fn concatenated_strings_compare_equal() -> Result<(), ParseError> {
 }
 
 #[test]
-fn bytes_across_part_boundaries() -> Result<(), ParseError> {
-    let split = "b'a' b'bc' b''";
-    assert_comparable("b'ab' b'c'", split)?;
-    assert_noncomparable("b'ab'", split)
+fn concatenated_bytes_compare_equal() -> Result<(), ParseError> {
+    let split_contents = r#"b'a' b'b'"#;
+    let value_contents = r#"b'ab'"#;
+
+    assert_comparable(split_contents, value_contents)
 }
 
 #[test]
@@ -154,7 +228,17 @@ fn concatenated_tstrings_compare_equal() -> Result<(), ParseError> {
 #[test]
 fn empty_interpolated_string_parts() -> Result<(), ParseError> {
     assert_noncomparable("f'{x}' ''", "f'{x}'")?;
-    assert_comparable("t'{x}' t''", "t'{x}'")
+    assert_comparable("f'{x}' '' 'a'", "f'{x}a'")?;
+    assert_comparable("t'' t'{x}' t'' t'{y}' t''", "t'{x}{y}'")
+}
+
+#[test]
+fn bytes_across_part_boundaries() -> Result<(), ParseError> {
+    let split = "b'' b'ab' b'c' b''";
+    assert_comparable(split, "b'a' b'bc'")?;
+    assert_noncomparable(split, "b'ab'")?;
+    assert_noncomparable("b'ab'", split)?;
+    assert_noncomparable(split, "b'a' b'bd'")
 }
 
 #[test]
@@ -167,6 +251,7 @@ fn t_strings_literal_order_matters_compare_unequal() -> Result<(), ParseError> {
 
 #[test]
 fn equivalent_numbers_hash_equal() -> Result<(), ParseError> {
+    assert_hashable_equal("True", "1.0")?;
     assert_hashable_equal("2", "2.0")?;
     assert_hashable_equal("-1", "-1.0")?;
     assert_hashable_equal("2", "2 + 0j")?;
