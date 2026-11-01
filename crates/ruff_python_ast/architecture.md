@@ -77,7 +77,7 @@ node. Use the node’s generated accessor when only one field is needed.
 
 ## Row layout
 
-Each row occupies 24 bytes, with 16 bytes for fields and the kind followed by an eight-byte source span. The
+Each row occupies 24 bytes, with a 16-byte union followed by an eight-byte source span. The
 first 15 bytes hold naturally aligned integer fields for the node's kind. The last byte holds
 the kind itself. A visitor can read the kind and span from the row it already borrows.
 The parser appends each completed node in one operation.
@@ -89,9 +89,12 @@ aligned four-byte field points into extra data. The remaining inline fields can 
 eleven bytes. Each spilled field takes one or two four-byte words.
 [Schema](ast.toml) · [Generator](generate.py)
 
-Only the row constructor writes the kind. Generated getters and setters read and write a
-fixed range of bytes for each integer field. Updating a name’s expression context leaves
-its identifier and kind intact. [Row implementation](src/flat/row.rs)
+Only the row constructor writes the kind. The union and its members are private. Construction
+initializes every field byte, and generated setters write individual integers. For example, when
+an assignment turns a name into a store target, the parser updates the name's expression context
+without touching its identifier or kind. Assigning a whole union member could overwrite the
+kind with trailing padding. Compile-time checks verify every field's offset and that it ends
+before the kind. [Row implementation](src/flat/row.rs)
 
 Lists store a starting slot and an element count. A `NodeList<T>` reads a row ID from one
 four-byte word for each element and returns a `T::Borrowed` with the same tree borrow. A `Suite` is
