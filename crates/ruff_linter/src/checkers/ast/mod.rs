@@ -1057,7 +1057,7 @@ impl SemanticSyntaxContext for Checker<'_> {
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: Stmt<'a>) {
         // Step 0: Pre-processing
-        self.semantic.push_node(stmt);
+        self.semantic.push_node(stmt.syntax_node());
 
         // For functions, defer semantic syntax error checks until the body of the function is
         // visited
@@ -1792,7 +1792,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             return;
         }
 
-        self.semantic.push_node(expr);
+        self.semantic.push_node(expr.syntax_node());
 
         // Store the flags prior to any further descent, so that we can restore them after visiting
         // the node.

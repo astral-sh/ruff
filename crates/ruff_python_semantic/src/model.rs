@@ -8,6 +8,7 @@ use ruff_python_ast::helpers::{from_relative_import, map_subscript, resolve_impo
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::{
     self as ast, Alias, Expr, ExprContext, ExprKind, PySourceType, PythonVersion, Stmt, StmtKind,
+    SyntaxNode,
 };
 use ruff_python_stdlib::builtins::{is_python_builtin, python_builtins, python_magic_globals};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -22,7 +23,7 @@ use crate::branches::{BranchId, Branches};
 use crate::context::ExecutionContext;
 use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
 use crate::globals::{Globals, GlobalsArena};
-use crate::nodes::{NodeId, NodeRef, Nodes};
+use crate::nodes::{NodeId, Nodes};
 use crate::reference::{
     ResolvedReference, ResolvedReferenceId, ResolvedReferences, UnresolvedReference,
     UnresolvedReferenceFlags, UnresolvedReferences,
@@ -1408,12 +1409,13 @@ impl<'a> SemanticModel<'a> {
             })
     }
 
-    /// Push an AST node [`NodeRef`] onto the stack.
-    pub fn push_node<T: Into<NodeRef<'a>>>(&mut self, node: T) {
-        self.node_id = Some(self.nodes.insert(node.into(), self.node_id, self.branch_id));
+    /// Push a statement or expression onto the stack.
+    pub fn push_node(&mut self, node: SyntaxNode<'a>) {
+        debug_assert!(node.is_statement() || node.is_expression());
+        self.node_id = Some(self.nodes.insert(node, self.node_id, self.branch_id));
     }
 
-    /// Pop the current AST node [`NodeRef`] off the stack.
+    /// Pop the current statement or expression off the stack.
     pub fn pop_node(&mut self) {
         let node_id = self.node_id.expect("Attempted to pop without node");
         self.node_id = self.nodes.parent_id(node_id);
@@ -1599,7 +1601,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Return the [`Stmt`] corresponding to the given [`NodeId`].
     #[inline]
-    pub fn node(&self, node_id: NodeId) -> NodeRef<'a> {
+    pub fn node(&self, node_id: NodeId) -> SyntaxNode<'a> {
         self.nodes.node(node_id)
     }
 

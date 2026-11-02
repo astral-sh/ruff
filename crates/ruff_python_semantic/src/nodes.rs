@@ -1,6 +1,5 @@
 use ruff_index::{IndexVec, newtype_index};
-use ruff_python_ast::{Expr, Stmt};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{AstNode, Expr, Stmt, SyntaxNode};
 
 use crate::BranchId;
 
@@ -16,7 +15,8 @@ pub struct NodeId;
 /// An AST node in a program, along with a pointer to its parent node (if any).
 #[derive(Debug)]
 struct NodeWithParent<'a> {
-    node: NodeRef<'a>,
+    // Quoted annotations can belong to a different AST from the enclosing module.
+    node: SyntaxNode<'a>,
     /// The ID of the parent of this node, if any.
     parent: Option<NodeId>,
     /// The branch ID of this node, if any.
@@ -34,7 +34,7 @@ impl<'a> Nodes<'a> {
     #[inline]
     pub(crate) fn insert(
         &mut self,
-        node: NodeRef<'a>,
+        node: SyntaxNode<'a>,
         parent: Option<NodeId>,
         branch: Option<BranchId>,
     ) -> NodeId {
@@ -63,73 +63,23 @@ impl<'a> Nodes<'a> {
     }
 
     #[inline]
-    pub(crate) fn node(&self, id: NodeId) -> NodeRef<'a> {
+    pub(crate) fn node(&self, id: NodeId) -> SyntaxNode<'a> {
         self.entries[id].node
     }
 
     #[inline]
     pub(crate) fn statement(&self, id: NodeId) -> Option<Stmt<'a>> {
-        self.entries[id].node.as_statement()
+        self.entries[id].node.cast::<Stmt>()
     }
 
     #[inline]
     pub(crate) fn expression(&self, id: NodeId) -> Option<Expr<'a>> {
-        self.entries[id].node.as_expression()
+        self.entries[id].node.cast::<Expr>()
     }
 
     #[inline]
     pub(crate) fn is_statement(&self, id: NodeId) -> bool {
         self.entries[id].node.is_statement()
-    }
-}
-
-/// A statement or expression visited by the semantic model.
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum NodeRef<'a> {
-    Stmt(Stmt<'a>),
-    Expr(Expr<'a>),
-}
-
-impl<'a> NodeRef<'a> {
-    #[inline]
-    fn as_statement(self) -> Option<Stmt<'a>> {
-        match self {
-            Self::Stmt(stmt) => Some(stmt),
-            Self::Expr(_) => None,
-        }
-    }
-
-    #[inline]
-    fn as_expression(self) -> Option<Expr<'a>> {
-        match self {
-            Self::Expr(expr) => Some(expr),
-            Self::Stmt(_) => None,
-        }
-    }
-
-    fn is_statement(self) -> bool {
-        matches!(self, Self::Stmt(_))
-    }
-}
-
-impl Ranged for NodeRef<'_> {
-    fn range(&self) -> TextRange {
-        match self {
-            Self::Stmt(stmt) => stmt.range(),
-            Self::Expr(expr) => expr.range(),
-        }
-    }
-}
-
-impl<'a> From<Expr<'a>> for NodeRef<'a> {
-    fn from(expr: Expr<'a>) -> Self {
-        Self::Expr(expr)
-    }
-}
-
-impl<'a> From<Stmt<'a>> for NodeRef<'a> {
-    fn from(stmt: Stmt<'a>) -> Self {
-        Self::Stmt(stmt)
     }
 }
 
@@ -141,7 +91,7 @@ mod tests {
     use super::Nodes;
 
     #[test]
-    fn expression_ids_resolve_in_their_original_tree() {
+    fn borrowed_nodes_keep_their_original_tree() {
         let module = parse_module("module").unwrap();
         let first = parse_expression("first").unwrap();
         let second = parse_expression("second").unwrap();
@@ -149,7 +99,7 @@ mod tests {
 
         let stmt = module.suite().first().unwrap();
         let expr = stmt.as_expr_stmt().unwrap().value();
-        let parent = nodes.insert(stmt.into(), None, None);
+        let parent = nodes.insert(stmt.syntax_node(), None, None);
         assert!(nodes.is_statement(parent));
         assert!(nodes.statement(parent).unwrap().is_same_node(stmt));
         assert!(nodes.expression(parent).is_none());
@@ -157,20 +107,14 @@ mod tests {
         assert_eq!(expr.node_id(), first.expr().node_id());
         assert_eq!(expr.node_id(), second.expr().node_id());
         let records = [expr, first.expr(), second.expr(), expr]
-            .map(|expr| (nodes.insert(expr.into(), Some(parent), None), expr));
+            .map(|expr| (nodes.insert(expr.syntax_node(), Some(parent), None), expr));
 
         for (id, original) in records {
             assert_eq!(nodes.parent_id(id), Some(parent));
             assert!(!nodes.is_statement(id));
             assert!(nodes.statement(id).is_none());
             assert!(nodes.expression(id).unwrap().is_same_node(original));
-            assert!(
-                nodes
-                    .node(id)
-                    .as_expression()
-                    .unwrap()
-                    .is_same_node(original)
-            );
+            assert_eq!(nodes.node(id), original.syntax_node());
         }
     }
 }
