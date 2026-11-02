@@ -1,7 +1,8 @@
 use crate::annotation_expression::is_in_annotation_expression;
 use crate::docstring::{Docstring, DocstringFragment};
 use crate::goto::{
-    Definitions, GotoTarget, docstring_for_call_definition, find_goto_target, find_goto_target_impl,
+    Definitions, GotoTarget, docstring_for_call_definition, docstring_for_parameter_field,
+    find_goto_target, find_goto_target_impl,
 };
 use crate::{Db, MarkupKind, RangedValue};
 use ruff_db::files::FileRange;
@@ -15,7 +16,7 @@ use ty_python_semantic::ProgramEnvironment;
 use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
 use ty_python_semantic::types::{KnownInstanceType, SpecialFormType, Type, TypeVarVariance};
 
-use ty_python_semantic::{ResolvedDefinition, SemanticModel, TypeQualifiers};
+use ty_python_semantic::{SemanticModel, TypeQualifiers};
 
 pub fn hover<'db>(
     db: &'db dyn Db,
@@ -297,15 +298,7 @@ fn keyword_argument_hover_contents<'db>(
         .and_then(|docstring| documentation_for_parameter(&docstring, &parameter.name))
     {
         contents.push(HoverContent::DocstringFragment(documentation));
-    } else if let Some(definition) = parameter.definition
-        // A parameter written in a `def` gets its docs from the function docstring checked above.
-        // A generated dataclass constructor has no `def __init__` to read. In `Foo(bar=True)`,
-        // `bar` points back to the field in the class body, where a string literal immediately
-        // following the field can document it.
-        && !definition.kind(db).is_parameter_def()
-        && let Some(docstring) =
-            Definitions::new(vec![ResolvedDefinition::Definition(definition)]).docstring(db)
-    {
+    } else if let Some(docstring) = docstring_for_parameter_field(db, parameter.definition) {
         contents.push(HoverContent::Docstring(docstring));
     }
 
