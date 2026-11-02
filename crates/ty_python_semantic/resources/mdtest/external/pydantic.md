@@ -1646,6 +1646,53 @@ DerivedSettings(1)
 DerivedSettings(1, _secrets_dir="./secrets")  # error: [unknown-argument]
 ```
 
+## BaseSettings extra fields
+
+Settings models forbid extra fields by default, but can allow them through `SettingsConfigDict`.
+
+```py
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(extra="allow")
+    name: str
+
+Settings(name="app", debug=True)
+Settings(debug=True, _secrets_dir="./secrets")
+```
+
+Declared fields and settings control parameters are still checked against their expected types:
+
+```py
+Settings(name=None, debug=True)  # error: [invalid-argument-type]
+Settings(debug=True, _secrets_dir=1)  # error: [invalid-argument-type]
+```
+
+With `extra="forbid"`, unknown arguments are rejected:
+
+```py
+class ForbidSettings(BaseSettings):
+    model_config = SettingsConfigDict(extra="forbid")
+
+ForbidSettings(debug=True)  # error: [unknown-argument]
+```
+
+Settings control parameters are still accepted when extra fields are forbidden:
+
+```py
+ForbidSettings(_secrets_dir="./secrets")  # ok
+```
+
+With `extra="ignore"`, extra arguments are accepted but discarded, so ty warns about them:
+
+```py
+class IgnoreSettings(BaseSettings):
+    model_config = SettingsConfigDict(extra="ignore")
+
+IgnoreSettings(debug=True)  # error: [pydantic-discarded-extra-argument]
+IgnoreSettings(_secrets_dir="./secrets")  # ok
+```
+
 ## Root models
 
 Unlike fields on ordinary Pydantic models, a root model's `root` field can be passed either

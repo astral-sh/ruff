@@ -171,6 +171,7 @@ pub enum KnownClass {
     PydanticBaseModel,
     PydanticBaseSettings,
     PydanticConfigDict,
+    PydanticSettingsConfigDict,
     PydanticRootModel,
     PydanticStrict,
     // Pytest
@@ -300,6 +301,7 @@ impl KnownClass {
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
+            | Self::PydanticSettingsConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestParametrizeMarkDecorator => false,
@@ -441,6 +443,7 @@ impl KnownClass {
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
+            | Self::PydanticSettingsConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestParametrizeMarkDecorator => Some(Truthiness::Ambiguous),
@@ -572,6 +575,7 @@ impl KnownClass {
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticSettingsConfigDict
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
             | KnownClass::PytestParametrizeMarkDecorator => false,
@@ -698,7 +702,7 @@ impl KnownClass {
             | KnownClass::PydanticStrict
             | KnownClass::PytestParametrizeMarkDecorator => false,
 
-            KnownClass::PydanticConfigDict => true,
+            KnownClass::PydanticConfigDict | KnownClass::PydanticSettingsConfigDict => true,
         }
     }
 
@@ -818,6 +822,7 @@ impl KnownClass {
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticSettingsConfigDict
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
             | KnownClass::PytestParametrizeMarkDecorator => false,
@@ -953,6 +958,7 @@ impl KnownClass {
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
+            | Self::PydanticSettingsConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestParametrizeMarkDecorator => false,
@@ -1077,6 +1083,7 @@ impl KnownClass {
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticSettingsConfigDict
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
             | KnownClass::PytestParametrizeMarkDecorator => false,
@@ -1213,6 +1220,7 @@ impl KnownClass {
             Self::PydanticBaseModel => "BaseModel",
             Self::PydanticBaseSettings => "BaseSettings",
             Self::PydanticConfigDict => "ConfigDict",
+            Self::PydanticSettingsConfigDict => "SettingsConfigDict",
             Self::PydanticRootModel => "RootModel",
             Self::PydanticStrict => "Strict",
             Self::PytestParametrizeMarkDecorator => "_ParametrizeMarkDecorator",
@@ -1651,7 +1659,9 @@ impl KnownClass {
             Self::DjangoField | Self::DjangoDateField => KnownModule::DjangoDbModelsFields,
             Self::DjangoForeignKey => KnownModule::DjangoDbModelsFieldsRelated,
             Self::PydanticBaseModel => KnownModule::PydanticMain,
-            Self::PydanticBaseSettings => KnownModule::PydanticSettingsMain,
+            Self::PydanticBaseSettings | Self::PydanticSettingsConfigDict => {
+                KnownModule::PydanticSettingsMain
+            }
             Self::PydanticConfigDict => KnownModule::PydanticConfig,
             Self::PydanticRootModel => KnownModule::PydanticRootModel,
             Self::PydanticStrict => KnownModule::PydanticTypes,
@@ -1779,6 +1789,7 @@ impl KnownClass {
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
+            | Self::PydanticSettingsConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestParametrizeMarkDecorator => false,
@@ -1901,6 +1912,7 @@ impl KnownClass {
             "BaseModel" => &[Self::PydanticBaseModel],
             "BaseSettings" => &[Self::PydanticBaseSettings],
             "ConfigDict" => &[Self::PydanticConfigDict],
+            "SettingsConfigDict" => &[Self::PydanticSettingsConfigDict],
             "RootModel" => &[Self::PydanticRootModel],
             "Strict" => &[Self::PydanticStrict],
             "_ParametrizeMarkDecorator" => &[Self::PytestParametrizeMarkDecorator],
@@ -2015,6 +2027,7 @@ impl KnownClass {
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
+            | Self::PydanticSettingsConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestParametrizeMarkDecorator => {
