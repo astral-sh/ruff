@@ -117,6 +117,7 @@ mod tests {
     #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065_1.py"))]
     #[test_case(Rule::PropertyWithoutReturn, Path::new("RUF066.py"))]
     #[test_case(Rule::DuplicateEntryInDunderAll, Path::new("RUF068.py"))]
+    #[test_case(Rule::OsPathCommonprefix, Path::new("RUF071.py"))]
     #[test_case(Rule::IncorrectDecoratorOrder, Path::new("RUF074.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
@@ -793,7 +794,6 @@ mod tests {
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
     #[test_case(Rule::FloatEqualityComparison, Path::new("RUF069.py"))]
     #[test_case(Rule::UnnecessaryAssignBeforeYield, Path::new("RUF070.py"))]
-    #[test_case(Rule::OsPathCommonprefix, Path::new("RUF071.py"))]
     #[test_case(Rule::UselessFinally, Path::new("RUF072.py"))]
     #[test_case(Rule::FStringPercentFormat, Path::new("RUF073.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {

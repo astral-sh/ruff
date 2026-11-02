@@ -132,9 +132,9 @@ suppression comments should essentially never be reasonable for a `correctness` 
 for `suspicious` lints. The `suspicious` category also includes deprecations, which aren't incorrect
 today but will cause errors in the future.
 
-The final branch of the flow chart deals with stylistic lints, which are again somewhat subjective
-to differentiate between changes that make code simpler often also make the code faster and
-more idiomatic. Thus, the question prompts you to consider the _primary_ improvement. Rules that
+The final branch of the flow chart deals with stylistic lints. These can be subjective to categorize:
+changes that make code simpler often also make it faster and more idiomatic. The question therefore
+prompts you to consider the _primary_ improvement. Rules that
 primarily make code simpler are `complexity` lints, those that primarily make code faster or use
 less memory are `performance` lints, and those that primarily make code more idiomatic are `style`.
 

@@ -116,6 +116,19 @@ first, *left, *right = [1, 2, 3]  # error: [invalid-syntax] "Two starred express
 first, *left, *right = (1, 2, 3)  # error: [invalid-syntax] "Two starred expressions in assignment"
 ```
 
+## Chained assignment with a missing value
+
+When a chained assignment has no right-hand side, an annotation that uses one of its targets
+resolves to `Unknown`.
+
+```py
+# error: [invalid-syntax] "Expected an expression"
+X = Y =
+
+def f(x: X):
+    reveal_type(x)  # revealed: Unknown
+```
+
 ## Match-pattern alternatives binding different names
 
 A capture present in only one invalid `or` alternative is possibly undefined.
@@ -216,7 +229,7 @@ not panic.
 ```py
 match 0:
     # error: [invalid-syntax] "alternative patterns bind different names"
-    # error: [invalid-syntax] "Expected `:`, found name"
+    # error: [invalid-syntax] "Expected `:`, found identifier"
     # error: [invalid-syntax] "Expected an expression"
     case first | second first:
 ```

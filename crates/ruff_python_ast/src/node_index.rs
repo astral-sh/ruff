@@ -89,7 +89,7 @@ pub enum NodeIndexError {
 }
 
 const MAX_LEVEL: u32 = 2;
-const LEVEL_BITS: u32 = 32 - MAX_LEVEL.leading_zeros();
+const LEVEL_BITS: u32 = MAX_LEVEL.bit_width();
 const LEVEL_SHIFT: u32 = 32 - LEVEL_BITS;
 const LEVEL_MASK: u32 = ((LEVEL_BITS << 1) - 1) << LEVEL_SHIFT;
 const SUB_NODES: u32 = 256;

@@ -1967,8 +1967,15 @@ fn has_unpack_annotation(checker: &Checker, parameter: &Parameter) -> bool {
 }
 
 // See: `GOOGLE_ARGS_REGEX` in `pydocstyle/checker.py`.
-static GOOGLE_ARGS_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:(\r\n|\n)?\s*.+").unwrap());
+static GOOGLE_ARGS_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^\s*((?:\\*\*){0,2}\w+)\s*(\(.*?\))?\s*:(\r\n|\n)?\s*.+").unwrap()
+});
+
+/// Removes the backslashes that escape `*` in reStructuredText, so that `\*\*kwargs` (or
+/// `\\*\\*kwargs` in a non-raw docstring) is treated as `**kwargs`.
+fn unescape_parameter_name(name: &str) -> String {
+    name.replace('\\', "")
+}
 
 fn args_section(context: &SectionContext) -> FxHashSet<String> {
     let mut following_lines = context.following_lines();
@@ -2018,7 +2025,11 @@ fn args_section(context: &SectionContext) -> FxHashSet<String> {
 
     matches
         .iter()
-        .filter_map(|captures| captures.get(1).map(|arg_name| arg_name.as_str().to_owned()))
+        .filter_map(|captures| {
+            captures
+                .get(1)
+                .map(|arg_name| unescape_parameter_name(arg_name.as_str()))
+        })
         .collect::<FxHashSet<String>>()
 }
 
@@ -2051,7 +2062,7 @@ fn parameters_section(checker: &Checker, docstring: &Docstring, context: &Sectio
                 // Notably, NumPy lets you put multiple parameters of the same type on the same
                 // line.
                 for parameter in parameters.split(',') {
-                    docstring_args.insert(parameter.trim().to_owned());
+                    docstring_args.insert(unescape_parameter_name(parameter.trim()));
                 }
             }
 

@@ -1,11 +1,10 @@
 ---
 source: crates/ruff_db/src/diagnostic/render/junit.rs
-assertion_line: 209
 expression: env.render_diagnostics(&diagnostics)
 ---
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="ty" tests="2" failures="2" errors="0">
-    <testsuite name="/syntax_errors.py" tests="2" disabled="0" errors="0" failures="2" package="org.ty">
+<testsuites name="ty" tests="2" skipped="0" failures="2" errors="0">
+    <testsuite name="/syntax_errors.py" tests="2" skipped="0" errors="0" failures="2" package="org.ty">
         <testcase name="org.ty.invalid-syntax" classname="/syntax_errors" line="1" column="15">
             <properties>
                 <property name="severity" value="error"/>

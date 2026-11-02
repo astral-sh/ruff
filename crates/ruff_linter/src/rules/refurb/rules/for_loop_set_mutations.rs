@@ -109,7 +109,7 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
             format!(
                 "{}.{batch_method_name}({})",
                 set.id,
-                parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Call),
+                parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Call).0,
             )
         }
         (for_target, arg) => {
@@ -124,7 +124,8 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
                 set.id,
                 arg_content,
                 locator.slice(for_target),
-                parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension),
+                parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension)
+                    .0,
             )
         }
     };

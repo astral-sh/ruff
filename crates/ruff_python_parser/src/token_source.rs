@@ -42,6 +42,15 @@ impl<'src> TokenSource<'src> {
         self.lexer.current_kind()
     }
 
+    /// Returns the last consumed non-trivia token kind.
+    pub(crate) fn previous_kind(&self) -> Option<TokenKind> {
+        self.tokens
+            .iter()
+            .rev()
+            .map(Token::kind)
+            .find(|kind| !kind.is_trivia())
+    }
+
     /// Returns the range of the current token.
     pub(crate) const fn current_range(&self) -> TextRange {
         self.lexer.current_range()
@@ -260,5 +269,5 @@ fn allocate_tokens_vec(contents: &str) -> Vec<Token> {
 
     // Stay on a power-of-two bucket so that later geometric growth does not preserve an
     // arbitrary capacity offset.
-    Vec::with_capacity(1 << capacity_hint.ilog2())
+    Vec::with_capacity(capacity_hint.isolate_highest_one())
 }

@@ -192,7 +192,7 @@ fn for_loop_writes(
             format!(
                 "{}.writelines({})",
                 locator.slice(io_object_name),
-                parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Call),
+                parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Call).0,
             )
         }
         (for_target, write_arg) => {
@@ -201,7 +201,8 @@ fn for_loop_writes(
                 locator.slice(io_object_name),
                 locator.slice(write_arg),
                 locator.slice(for_target),
-                parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension),
+                parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension)
+                    .0,
             )
         }
     };

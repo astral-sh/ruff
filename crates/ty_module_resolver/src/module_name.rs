@@ -79,7 +79,6 @@ impl ModuleName {
     ///
     /// assert_eq!(ModuleName::new_static("foo.bar.baz").unwrap().components().collect::<Vec<_>>(), vec!["foo", "bar", "baz"]);
     /// ```
-    #[must_use]
     pub fn components(&self) -> impl DoubleEndedIterator<Item = &str> {
         self.0.split('.')
     }

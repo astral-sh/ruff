@@ -1,5 +1,7 @@
 //! Implicit instance and class attributes inferred from method assignments.
 
+use std::{convert::Infallible, ops::ControlFlow, sync::Arc};
+
 use super::{MethodDecorator, static_literal::StaticClassLiteral};
 use crate::{
     Db, ProgramEnvironment, TypeQualifiers, attribute_assignments, attribute_declarations,
@@ -25,20 +27,6 @@ use ty_python_core::{
 
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
-    /// Tries to find declarations/bindings of an attribute named `name` that are only
-    /// "implicitly" defined (`self.x = …`, `cls.x = …`) in a method of this class.
-    /// The `target_method_decorator` parameter is used to skip methods that do not have the
-    /// expected decorator.
-    pub(super) fn implicit_attribute(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-        target_method_decorator: MethodDecorator,
-    ) -> Member<'db> {
-        self.implicit_attribute_bindings(db, name, target_method_decorator)
-            .member
-    }
-
     /// Separate assignments that establish an attribute from assignments that must first read it.
     ///
     /// ```python
@@ -55,27 +43,35 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> ImplicitAttribute<'db> {
-        let class_body_scope = self.body_scope(db);
-        // Collect names in a tracked query so unrelated edits can preserve dependent member
-        // lookups, and avoid retaining query entries for names that no method can define.
-        let names = implicit_attribute_names(db, class_body_scope);
-        let Ok(name_index) = names.binary_search_by(|candidate| candidate.as_str().cmp(name))
-        else {
-            return ImplicitAttribute {
-                member: Member::unbound(),
-                augmented_bindings: None,
-            };
-        };
+        self.member_sources(db)
+            .implicit_attribute_name(db, name, target_method_decorator)
+            .map_or_else(
+                || ImplicitAttribute {
+                    member: Member::unbound(),
+                    augmented_bindings: None,
+                },
+                |attribute| Self::implicit_attribute_inner(db, attribute),
+            )
+    }
 
-        Self::implicit_attribute_inner(
-            db,
-            ImplicitAttributeName::new(
-                db,
-                class_body_scope,
-                &names[name_index],
-                target_method_decorator,
-            ),
-        )
+    /// Names assigned to a method's receiver, in sorted order.
+    pub(in crate::types) fn implicit_attribute_definition_names(
+        self,
+        db: &'db dyn Db,
+    ) -> &'db [Name] {
+        &self.member_sources(db).implicit_names
+    }
+
+    /// The class-body table and receiver assignments used by lookups on this class.
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    pub(super) fn member_sources(self, db: &'db dyn Db) -> ClassMemberSources<'db> {
+        let scope = self.body_scope(db);
+        let index = semantic_index(db, scope.program_file(db));
+        ClassMemberSources {
+            scope,
+            table: index.shared_place_table(scope.file_scope_id(db)),
+            implicit_names: collect_implicit_attribute_names(db, scope, true),
+        }
     }
 
     #[salsa::tracked(
@@ -93,13 +89,31 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         attribute: ImplicitAttributeName<'db>,
     ) -> ImplicitAttribute<'db> {
-        Self::implicit_attribute_impl(db, attribute)
+        let ControlFlow::Continue(result) =
+            Self::implicit_attribute_impl(db, attribute, |binding| {
+                ControlFlow::<Infallible, _>::Continue(implicit_attribute_binding_type(db, binding))
+            });
+        result
     }
 
-    fn implicit_attribute_impl(
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+    fn has_implicit_attribute_inner(
         db: &'db dyn Db,
         attribute: ImplicitAttributeName<'db>,
-    ) -> ImplicitAttribute<'db> {
+    ) -> bool {
+        match Self::implicit_attribute_impl(db, attribute, |_| ControlFlow::Break(())) {
+            ControlFlow::Break(()) => true,
+            ControlFlow::Continue(result) => !result.member.is_undefined(),
+        }
+    }
+
+    /// An ordinary reachable assignment establishes the attribute even when its value's type
+    /// is unknown. Callers that only need presence can stop before inferring that value.
+    fn implicit_attribute_impl<B>(
+        db: &'db dyn Db,
+        attribute: ImplicitAttributeName<'db>,
+        mut binding_type: impl FnMut(Definition<'db>) -> ControlFlow<B, Option<Type<'db>>>,
+    ) -> ControlFlow<B, ImplicitAttribute<'db>> {
         let class_body_scope = attribute.class_body_scope(db);
         let name = attribute.name(db).as_str();
         let target_method_decorator = attribute.target_method_decorator(db);
@@ -208,14 +222,14 @@ impl<'db> StaticClassLiteral<'db> {
                             index.expression(value),
                             TypeContext::default(),
                         );
-                        return ImplicitAttribute {
+                        return ControlFlow::Continue(ImplicitAttribute {
                             member: Member {
                                 inner: Place::bound(inferred_ty)
                                     .with_definition(declaration)
                                     .with_qualifiers(all_qualifiers),
                             },
                             augmented_bindings: None,
-                        };
+                        });
                     }
 
                     // If there is no right-hand side, just record that we saw a `Final` qualifier
@@ -223,10 +237,10 @@ impl<'db> StaticClassLiteral<'db> {
                     continue;
                 }
 
-                return ImplicitAttribute {
+                return ControlFlow::Continue(ImplicitAttribute {
                     member: Member { inner: annotation },
                     augmented_bindings: None,
-                };
+                });
             }
         }
 
@@ -293,7 +307,7 @@ impl<'db> StaticClassLiteral<'db> {
                     is_attribute_bound = true;
                 }
 
-                let inferred_ty = implicit_attribute_binding_type(db, binding);
+                let inferred_ty = binding_type(binding)?;
 
                 if let Some(inferred_ty) = inferred_ty {
                     provenance = provenance.or(Provenance::SingleDefinition(binding));
@@ -317,11 +331,11 @@ impl<'db> StaticClassLiteral<'db> {
             Member::unbound()
         };
 
-        ImplicitAttribute {
+        ControlFlow::Continue(ImplicitAttribute {
             member,
             augmented_bindings: (!augmented_bindings.is_empty())
                 .then(|| AugmentedBindings::new(db, augmented_bindings.into_boxed_slice())),
-        }
+        })
     }
 }
 
@@ -463,16 +477,80 @@ pub(super) fn implicit_attribute_names<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
 ) -> Box<[Name]> {
+    collect_implicit_attribute_names(db, class_body_scope, false)
+}
+
+/// Syntax-derived sources for an explicit class member or an implicit receiver attribute.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct ClassMemberSources<'db> {
+    pub(super) scope: ScopeId<'db>,
+    pub(super) table: Arc<ty_python_core::place::PlaceTable>,
+    implicit_names: Box<[Name]>,
+}
+
+impl<'db> ClassMemberSources<'db> {
+    fn implicit_attribute_name(
+        &self,
+        db: &'db dyn Db,
+        name: &str,
+        decorator: MethodDecorator,
+    ) -> Option<ImplicitAttributeName<'db>> {
+        let index = self
+            .implicit_names
+            .binary_search_by(|candidate| candidate.as_str().cmp(name))
+            .ok()?;
+        Some(ImplicitAttributeName::new(
+            db,
+            self.scope,
+            &self.implicit_names[index],
+            decorator,
+        ))
+    }
+
+    /// Does a method establish instance storage for an attribute already typed by the class?
+    pub(super) fn has_implicit_instance_attribute(&self, db: &'db dyn Db, name: &str) -> bool {
+        self.implicit_attribute_name(db, name, MethodDecorator::None)
+            .is_some_and(|attribute| {
+                StaticClassLiteral::has_implicit_attribute_inner(db, attribute)
+            })
+    }
+
+    /// Tries to find declarations/bindings of an attribute named `name` that are only
+    /// "implicitly" defined (`self.x = …`, `cls.x = …`) in a method of this class.
+    /// The `target_method_decorator` parameter is used to skip methods that do not have the
+    /// expected decorator.
+    pub(super) fn implicit_attribute(
+        &self,
+        db: &'db dyn Db,
+        name: &str,
+        decorator: MethodDecorator,
+    ) -> Member<'db> {
+        self.implicit_attribute_name(db, name, decorator)
+            .map_or_else(Member::unbound, |attribute| {
+                StaticClassLiteral::implicit_attribute_inner(db, attribute).member
+            })
+    }
+}
+
+fn collect_implicit_attribute_names<'db>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+    defined_only: bool,
+) -> Box<[Name]> {
     let index = semantic_index(db, class_body_scope.program_file(db));
     let mut names = Vec::new();
 
     for function_scope_id in attribute_scopes(db, class_body_scope) {
-        names.extend(
-            index
-                .place_table(function_scope_id)
-                .members()
-                .filter_map(|member| member.as_instance_attribute().map(Name::new)),
-        );
+        let table = index.place_table(function_scope_id);
+        if defined_only {
+            names.extend(table.defined_instance_attribute_names().map(Name::new));
+        } else {
+            names.extend(
+                table
+                    .members()
+                    .filter_map(|member| member.as_instance_attribute().map(Name::new)),
+            );
+        }
     }
 
     names.sort_unstable();

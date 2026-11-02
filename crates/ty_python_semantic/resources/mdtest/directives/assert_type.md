@@ -79,6 +79,21 @@ def _(a: type[int]):
     assert_type(a, Type[int])  # fine
 ```
 
+## Recursive type aliases
+
+A named recursive alias can be written in an annotation, as can a union containing it. Asserting
+that either type is equivalent to its strict supertype reports an ordinary type assertion failure.
+
+```py
+from typing_extensions import assert_type
+
+Tree = tuple[int, "Tree | None"]
+
+def check(value: Tree, optional: Tree | None):
+    assert_type(value, object)  # error: [type-assertion-failure]
+    assert_type(optional, object)  # error: [type-assertion-failure]
+```
+
 ## Unspellable types
 
 If the actual type is an unspellable subtype, we emit `assert-type-unspellable-subtype` instead of

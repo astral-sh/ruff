@@ -509,7 +509,7 @@ def init_pair(pair_number: int, fg: int, bg: int, /) -> None:
 def initscr() -> window:
     """Initialize the library.
 
-    Return a WindowObject which represents the whole screen.
+    Return a window object which represents the whole screen.
     """
 
 def intrflush(flag: bool, /) -> None:

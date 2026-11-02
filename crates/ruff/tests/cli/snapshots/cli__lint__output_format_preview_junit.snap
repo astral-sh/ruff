@@ -18,8 +18,8 @@ success: false
 exit_code: 1
 ----- stdout -----
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="ruff" tests="3" failures="3" errors="0">
-    <testsuite name="[TMP]/input.py" tests="3" disabled="0" errors="0" failures="3" package="org.ruff">
+<testsuites name="ruff" tests="3" skipped="0" failures="3" errors="0">
+    <testsuite name="[TMP]/input.py" tests="3" skipped="0" errors="0" failures="3" package="org.ruff">
         <testcase name="org.ruff.unused-import" classname="[TMP]/input" line="1" column="8">
             <properties>
                 <property name="severity" value="error"/>

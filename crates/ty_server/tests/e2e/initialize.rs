@@ -1,6 +1,8 @@
 use anyhow::Result;
 use lsp_types::{
-    Code, Position, PublishDiagnosticsNotification, RegistrationRequest, ShowMessageNotification,
+    Code, HoverParams, HoverRequest, Position, PublishDiagnosticsNotification, RegistrationRequest,
+    ShowMessageNotification, TextDocumentIdentifier, TextDocumentPositionParams,
+    WorkDoneProgressParams,
 };
 use ruff_db::system::SystemPath;
 use serde_json::{Value, json};
@@ -78,6 +80,43 @@ fn single_workspace_folder() -> Result<()> {
     let initialization_result = server.initialization_result().unwrap();
 
     insta::assert_json_snapshot!("initialization_with_workspace", initialization_result);
+
+    Ok(())
+}
+
+/// Requests received before workspace configuration must complete once initialization finishes.
+#[test]
+fn deferred_request_burst_does_not_block_responses() -> Result<()> {
+    const REQUEST_COUNT: usize = 64;
+
+    let workspace_root = SystemPath::new("src");
+    let file = SystemPath::new("src/main.py");
+    let source = "x = 1\n";
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(file, source)?
+        .build();
+
+    // Hold the configuration response until the entire burst is queued, so every request
+    // must pass through the deferred-message queue.
+    server.open_text_document(file, source, 1);
+    let uri = server.file_uri(file);
+    let mut request_ids = Vec::with_capacity(REQUEST_COUNT);
+    for _ in 0..REQUEST_COUNT {
+        request_ids.push(server.send_request::<HoverRequest>(HoverParams {
+            text_document_position_params: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                position: Position::new(0, 0),
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        }));
+    }
+    let mut server = server.wait_until_workspaces_are_initialized();
+
+    for id in request_ids {
+        assert!(server.await_response::<HoverRequest>(&id).is_some());
+    }
+    assert!(server.hover_request(file, Position::new(0, 0)).is_some());
 
     Ok(())
 }

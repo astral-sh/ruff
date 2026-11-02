@@ -139,9 +139,13 @@ B043 [*] Do not call `delattr` with a constant attribute value. It is not any sa
 37 | import builtins
 38 | builtins.delattr(foo, "bar")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+39 |
+40 | # Regression test for: https://github.com/astral-sh/ruff/issues/28732
+   |
 help: Replace `delattr` with `del` statement
    |
 37 | import builtins
    - builtins.delattr(foo, "bar")
 38 + del foo.bar
+39 |
    |

@@ -16,8 +16,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 
 use crate::types::{
-    BoundTypeVarIdentity, ClassType, FunctionType, GenericAlias, StaticClassLiteral, TypeAliasType,
-    TypeVarVariance, TypedDictType,
+    BoundTypeVarIdentity, ClassType, FunctionType, GenericAlias, RecursiveType, StaticClassLiteral,
+    TypeAliasType, TypeVarVariance, TypedDictType,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -155,6 +155,7 @@ pub(crate) enum VarianceOrigin<'db> {
     ProtocolParameter(StaticClassLiteral<'db>, TypeVarVariance),
     GenericAlias(GenericAlias<'db>),
     TypeAlias(TypeAliasType<'db>),
+    Recursive(RecursiveType<'db>),
     Function(FunctionType<'db>),
     TypedDict(ClassType<'db>),
 }
@@ -205,6 +206,7 @@ impl<'db> VarianceVariable<'db> {
             }
             VarianceOrigin::GenericAlias(alias) => alias.variance_equation(db, typevar),
             VarianceOrigin::TypeAlias(alias) => alias.variance_equation(db, typevar),
+            VarianceOrigin::Recursive(recursive) => recursive.variance_equation(db, typevar),
             VarianceOrigin::Function(function) => function.variance_equation(db, typevar),
             VarianceOrigin::TypedDict(class) => {
                 let env = ProgramEnvironment::from_file(class.class_literal(db).program_file(db));

@@ -3278,18 +3278,18 @@ Module(
                                     ExprCompare {
                                         node_index: NodeIndex(None),
                                         range: 2282..2292,
-                                        left: Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 2282..2283,
-                                                id: Name("z"),
-                                                ctx: Load,
-                                            },
-                                        ),
                                         ops: [
                                             Eq,
                                         ],
-                                        comparators: [
+                                        operands: [
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 2282..2283,
+                                                    id: Name("z"),
+                                                    ctx: Load,
+                                                },
+                                            ),
                                             BinOp(
                                                 ExprBinOp {
                                                     node_index: NodeIndex(None),
@@ -4313,37 +4313,35 @@ Module(
                                             range: 2932..2938,
                                             value: FStringValue {
                                                 inner: Single(
-                                                    FString(
-                                                        FString {
-                                                            range: 2932..2938,
-                                                            node_index: NodeIndex(None),
-                                                            elements: [
-                                                                Interpolation(
-                                                                    InterpolatedElement {
-                                                                        range: 2934..2937,
-                                                                        node_index: NodeIndex(None),
-                                                                        expression: Name(
-                                                                            ExprName {
-                                                                                node_index: NodeIndex(None),
-                                                                                range: 2935..2936,
-                                                                                id: Name("y"),
-                                                                                ctx: Load,
-                                                                            },
-                                                                        ),
-                                                                        debug_text: None,
-                                                                        conversion: None,
-                                                                        format_spec: None,
-                                                                    },
-                                                                ),
-                                                            ],
-                                                            flags: FStringFlags {
-                                                                quote_style: Double,
-                                                                prefix: Regular,
-                                                                triple_quoted: false,
-                                                                unclosed: false,
-                                                            },
+                                                    FString {
+                                                        range: 2932..2938,
+                                                        node_index: NodeIndex(None),
+                                                        elements: [
+                                                            Interpolation(
+                                                                InterpolatedElement {
+                                                                    range: 2934..2937,
+                                                                    node_index: NodeIndex(None),
+                                                                    expression: Name(
+                                                                        ExprName {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 2935..2936,
+                                                                            id: Name("y"),
+                                                                            ctx: Load,
+                                                                        },
+                                                                    ),
+                                                                    debug_text: None,
+                                                                    conversion: None,
+                                                                    format_spec: None,
+                                                                },
+                                                            ),
+                                                        ],
+                                                        flags: FStringFlags {
+                                                            quote_style: Double,
+                                                            prefix: Regular,
+                                                            triple_quoted: false,
+                                                            unclosed: false,
                                                         },
-                                                    ),
+                                                    },
                                                 ),
                                             },
                                         },
@@ -7947,19 +7945,19 @@ Module(
                                     ExprCompare {
                                         node_index: NodeIndex(None),
                                         range: 5096..5101,
-                                        left: NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 5096..5097,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                            },
-                                        ),
                                         ops: [
                                             Lt,
                                         ],
-                                        comparators: [
+                                        operands: [
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 5096..5097,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
                                             NumberLiteral(
                                                 ExprNumberLiteral {
                                                     node_index: NodeIndex(None),
@@ -8866,18 +8864,18 @@ Module(
                                 ExprCompare {
                                     node_index: NodeIndex(None),
                                     range: 5738..5752,
-                                    left: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 5738..5743,
-                                            id: Name("query"),
-                                            ctx: Load,
-                                        },
-                                    ),
                                     ops: [
                                         Eq,
                                     ],
-                                    comparators: [
+                                    operands: [
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 5738..5743,
+                                                id: Name("query"),
+                                                ctx: Load,
+                                            },
+                                        ),
                                         Name(
                                             ExprName {
                                                 node_index: NodeIndex(None),

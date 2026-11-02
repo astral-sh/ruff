@@ -37,6 +37,7 @@ help: Remove redundant '+' operator to implicitly concatenate
 13 +      " a docstring"
 14 | )
    |
+note: This is an unsafe fix and may change runtime behavior
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
   --> ISC003_docstring.py:20:9

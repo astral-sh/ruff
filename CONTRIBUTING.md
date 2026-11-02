@@ -105,7 +105,7 @@ Prior to opening a pull request, ensure that your code has been auto-formatted,
 and that it passes both the lint and test validation checks:
 
 ```shell
-cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
+CARGO_BUILD_WARNINGS=deny cargo clippy --workspace --all-targets --all-features  # Rust linting
 RUFF_UPDATE_SCHEMA=1 cargo test  # Rust testing and updating ruff.schema.json
 uv run --only-dev --locked prek run --all-files  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
@@ -434,7 +434,7 @@ screenshots or recordings of your change in action.
 After opening the PR, an ecosystem report will be run as part of CI. This shows
 a diff of linter and formatter behavior before and after the changes in your PR.
 Going through these changes and reporting your findings in the PR summary or an
-additional comment help us to review your PR more efficiently. It's also a great
+additional comment helps us review your PR more efficiently. It's also a great
 way to find new test cases to incorporate into your PR if you identify any
 issues.
 
@@ -472,12 +472,11 @@ The documentation should then be available locally at
 
 ## Release Process
 
-As of now, Ruff has an ad hoc release process: releases are cut with high frequency via GitHub
+As of now, Ruff has an ad hoc release process: releases are cut frequently via GitHub
 Actions, which automatically generates the appropriate wheels across architectures and publishes
 them to [PyPI](https://pypi.org/project/ruff/).
 
-Ruff follows the [semver](https://semver.org/) versioning standard. However, as pre-1.0 software,
-even patch releases may contain [non-backwards-compatible changes](https://semver.org/#spec-item-4).
+See Ruff's [versioning policy](https://docs.astral.sh/ruff/versioning/).
 
 ### Installing tools
 
@@ -489,6 +488,13 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 
 Commit each step of this process separately for easier review.
 
+Optionally, run the [Prepare release workflow](https://github.com/astral-sh/ruff/actions/workflows/release-prepare.yml)
+to generate the version updates and changelog and open a pull request. Leave `version` blank to detect
+the next version from pull request labels, or provide an explicit version. The generated changelog
+still needs manual review and editing. Check out the generated branch and continue with the changelog
+review and remaining preparation steps below. To prepare the release locally, start with
+`./scripts/release.sh`.
+
 1. Run `./scripts/release.sh`; this command will:
 
     - Generate a temporary virtual environment with `rooster`
@@ -499,7 +505,7 @@ Commit each step of this process separately for easier review.
 
 1. The changelog should then be editorialized for consistency
 
-    - Often labels will be missing from pull requests they will need to be manually organized into the proper section
+    - Pull requests often lack labels and will need to be manually organized into the proper section
     - Changes should be edited to be user-facing descriptions, avoiding internal details
     - Square brackets (eg, `[ruff]` project name) will be automatically escaped by `prek`
 
@@ -576,6 +582,70 @@ See the [ruff-ecosystem package](https://github.com/astral-sh/ruff/tree/main/pyt
 1. Create and merge the PR
 1. Bump the Rust version in Ruff's conda forge recipe. See [this PR](https://github.com/conda-forge/ruff-feedstock/pull/266) for an example.
 1. Enjoy the new Rust version!
+
+## Updating the Python version
+
+1. Update `PythonVersion::latest` in `crates/ruff_python_ast/src/python_version.rs` to the latest
+    version.
+
+1. Update `PythonVersion::default` in the same file, assuming that version has also reached
+    end-of-life. You can check this schedule
+    [here](https://devguide.python.org/versions/#supported-versions).
+
+1. Update the `Options::target_version` metadata and docs in `crates/ruff_workspace/src/options.rs`.
+
+1. Remove any preview warnings about the new version, typically in
+    `crates/ruff_linter/src/linter.rs`
+
+1. Run the tests and update snapshots
+
+    Note that if the tests were intentionally exercising behavior on a particular version, you may need
+    to pin the version in the tests or add new tests to maintain coverage. Otherwise, prefer updating
+    the snapshots in place.
+
+1. Also consider updating the values for ty in the following locations:
+
+    - `PythonVersion::latest_ty` in `crates/ruff_python_ast/src/python_version.rs`
+    - The default in the `EnvironmentOptions::python_version` metadata in
+        `crates/ty_project/src/metadata/options.rs`
+
+1. Regenerate the affected schemas with `cargo dev generate-all`
+
+See [#28792](https://github.com/astral-sh/ruff/pull/28792) and
+[#20725](https://github.com/astral-sh/ruff/pull/20725) for previous examples.
+
+### Updating the supported Unicode version
+
+When adding support for a new Python version, update Ruff's Unicode data to match
+the Unicode standard used by that Python version. Check the target interpreter's
+`unicodedata.unidata_version` to find the required version.
+
+Check that the `unicode-ident` and `unicode-normalization` dependencies also
+support that Unicode version; the parser uses them to recognize and normalize
+identifiers.
+
+Unicode names and aliases for `\N{...}` escapes are vendored in
+[`ruff_unicode_names2`](https://github.com/astral-sh/ruff/blob/main/crates/ruff_unicode_names2/README.md). To update them:
+
+1. Download `UnicodeData.txt` and `NameAliases.txt` from
+    `https://www.unicode.org/Public/<version>/ucd/` and replace both files in
+    `crates/ruff_unicode_names2/data/`.
+
+1. Update the Unicode version in `crates/ruff_unicode_names2/src/lib.rs` and its
+    README, and the data source URLs in `crates/ruff_unicode_names2/build.rs`.
+
+1. Add a parser regression test for a name introduced in the new Unicode version.
+    Run the parser tests and the vendored library's exhaustive tests:
+
+    ```shell
+    cargo test -p ruff_python_parser
+    cargo +nightly test -p ruff_unicode_names2 --lib
+    ```
+
+The build script regenerates the lookup tables from these files automatically;
+there are no generated tables to check in. Preserve the vendored crate's strict,
+case-insensitive matching when taking upstream changes: Python requires spaces,
+hyphens, and underscores to match the registered name or alias.
 
 ## Benchmarking and Profiling
 
@@ -708,7 +778,8 @@ will execute Pylint with maximum parallelism and only report errors.
 To benchmark Pyupgrade, run the following from `crates/ruff_linter/resources/test/cpython`:
 
 ```shell
-uv run --only-dev hyperfine --ignore-failure --warmup 5 --prepare "git reset --hard HEAD" \
+uv run --only-dev hyperfine --shell=default --ignore-failure --warmup=5 \
+  --prepare="git reset --hard HEAD" \
   "find . -type f -name \"*.py\" | xargs -P 0 pyupgrade --py311-plus"
 
 Benchmark 1: find . -type f -name "*.py" | xargs -P 0 pyupgrade --py311-plus
@@ -1038,8 +1109,8 @@ The project root does not have a significant impact beyond that all relative pat
 configuration file are resolved relative to the project root.
 
 For example, to indicate that `bar` above is a namespace package (it isn't, but let's run with it),
-the `pyproject.toml` would list `namespace-packages = ["./src/bar"]`, which would resolve
-to `my_project/src/bar`.
+the `pyproject.toml` would list `namespace-packages = ["./src/foo/bar"]`, which would resolve
+to `my_project/src/foo/bar`.
 
 The same logic applies when providing a configuration file via `--config`. In that case, the
 _current working directory_ is used as the project root, and so all paths in that configuration file
@@ -1108,5 +1179,5 @@ There are three ways in which an import can be categorized as "first-party":
     the `src` setting and, for each directory, check for the existence of a subdirectory `foo` or a
     file `foo.py`.
 
-By default, `src` is set to the project root, along with `"src"` subdirectory in the project root.
+By default, `src` is set to the project root, along with the `"src"` subdirectory in the project root.
 This ensures that Ruff supports both flat and "src" layouts out of the box.

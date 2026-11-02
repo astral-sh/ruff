@@ -389,13 +389,8 @@ where
             }) => value
                 .as_ref()
                 .is_some_and(|value| any_over_expr(value, func)),
-            Expr::Compare(ast::ExprCompare {
-                left, comparators, ..
-            }) => {
-                any_over_expr(left, &mut *func)
-                    || comparators
-                        .iter()
-                        .any(|expr| any_over_expr(expr, &mut *func))
+            Expr::Compare(ast::ExprCompare { operands, .. }) => {
+                operands.iter().any(|expr| any_over_expr(expr, &mut *func))
             }
             Expr::Call(ast::ExprCall {
                 func: call_func,
@@ -1152,29 +1147,20 @@ impl<'a> Visitor<'a> for StoredNameFinder<'a> {
     }
 }
 
-/// A [`Visitor`] that collects all `return` statements in a function or method.
+/// A [`StatementVisitor`] that collects all `return` statements in a function or method.
 #[derive(Default)]
 pub struct ReturnStatementVisitor<'a> {
     pub returns: Vec<&'a ast::StmtReturn>,
-    pub is_generator: bool,
 }
 
-impl<'a> Visitor<'a> for ReturnStatementVisitor<'a> {
+impl<'a> StatementVisitor<'a> for ReturnStatementVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse.
             }
             Stmt::Return(stmt) => self.returns.push(stmt),
-            _ => crate::visitor::walk_stmt(self, stmt),
-        }
-    }
-
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        if let Expr::Yield(_) | Expr::YieldFrom(_) = expr {
-            self.is_generator = true;
-        } else {
-            crate::visitor::walk_expr(self, expr);
+            _ => crate::statement_visitor::walk_stmt(self, stmt),
         }
     }
 }
@@ -1604,8 +1590,8 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
     }
 
     expr.value.iter().any(|part| match part {
-        ast::FStringPart::Literal(string_literal) => !string_literal.is_empty(),
-        ast::FStringPart::FString(f_string) => {
+        ast::FStringPartRef::Literal(string_literal) => !string_literal.is_empty(),
+        ast::FStringPartRef::FString(f_string) => {
             // The part is a concatenation of elements, so it's guaranteed non-empty if any element is
             f_string.elements.iter().any(|element| match element {
                 InterpolatedStringElement::Literal(string_literal) => !string_literal.is_empty(),
@@ -1653,8 +1639,8 @@ pub fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
     }
 
     expr.value.iter().all(|part| match part {
-        ast::FStringPart::Literal(string_literal) => string_literal.is_empty(),
-        ast::FStringPart::FString(f_string) => {
+        ast::FStringPartRef::Literal(string_literal) => string_literal.is_empty(),
+        ast::FStringPartRef::FString(f_string) => {
             is_empty_interpolated_elements(f_string.elements.iter())
         }
     })

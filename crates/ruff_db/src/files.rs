@@ -4,7 +4,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use dashmap::mapref::entry::Entry;
-pub use directory::{DirectoryListing, DirectoryListingError, directory_listing};
+pub use directory::{
+    DirectoryListing, DirectoryListingError, directory_listing, system_path_to_directory,
+};
 pub use file_root::{FileRoot, FileRootKind};
 pub use path::FilePath;
 use ruff_notebook::{Notebook, NotebookError};

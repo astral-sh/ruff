@@ -138,7 +138,7 @@ if sys.version_info >= (3, 12):
         resolve to the zipfile.
 
         >>> str(path)
-        'mem/abcde.zip/'
+        'mem/abcde.zip'
         >>> path.name
         'abcde.zip'
         >>> path.filename == pathlib.Path('mem/abcde.zip')

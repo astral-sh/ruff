@@ -77,6 +77,8 @@ mod stable {
         type_generation::{FullyStaticTy, Ty},
         union,
     };
+    use crate::types::constraints::ConstraintSetBuilder;
+    use crate::types::typevar::TypeVarSet;
     use crate::types::{CallableType, IntersectionBuilder, KnownClass, Type};
 
     // Reflexivity: `T` is equivalent to itself.
@@ -89,6 +91,14 @@ mod stable {
     type_property_test!(
         equivalent_to_is_symmetric, db, env,
         forall types s, t. s.is_equivalent_to(db, env, t) => t.is_equivalent_to(db, env, s)
+    );
+
+    // The shortcut for Never must agree with the general equivalence relation.
+    type_property_test!(
+        equivalent_to_never, db, env,
+        forall types t. t.is_equivalent_to(db, env, Type::Never)
+            == t.when_equivalent_to(db, env, Type::Never, &ConstraintSetBuilder::new())
+                .is_always_satisfied(db, env, TypeVarSet::None)
     );
 
     // Transitivity: If `S` is equivalent to `T` and `T` is equivalent to `U`, then `S` must be equivalent to `U`.
@@ -109,11 +119,16 @@ mod stable {
         forall types s, t. s.is_subtype_of(db, env, t) && t.is_subtype_of(db, env, s) => s.is_equivalent_to(db, env, t)
     );
 
+    // Reusing a negation cache across targets gives the same results as explicitly negating `S`.
     type_property_test!(
-        structural_negation_subtyping_matches_materialized_negation, db, env,
-        forall types s, t. {
+        negation_subtyping_matches_materialized_negation, db, env,
+        forall types s, t, u. {
+            let negated = s.negate(db, env);
             let mut cache = None;
-            s.negation_is_subtype_of_cached(db, env, t, &mut cache) == s.negate(db, env).is_subtype_of(db, env, t)
+            [t, u].into_iter().all(|target| {
+                s.negation_is_subtype_of_cached(db, env, target, &mut cache)
+                    == negated.is_subtype_of(db, env, target)
+            })
         }
     );
 

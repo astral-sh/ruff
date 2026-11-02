@@ -127,6 +127,9 @@ if sys.platform != "win32":
         RWH_WRITE_LIFE_LONG: Final = 4
         RWH_WRITE_LIFE_EXTREME: Final = 5
 
+    if sys.version_info >= (3, 14) and sys.platform == "linux":
+        F_DUPFD_QUERY: Final[int]
+
     if sys.version_info >= (3, 11) and sys.platform == "darwin":
         F_OFD_SETLK: Final = 90
         F_OFD_SETLKW: Final = 91

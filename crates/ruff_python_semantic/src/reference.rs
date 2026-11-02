@@ -64,6 +64,12 @@ impl ResolvedReference {
             .intersects(SemanticModelFlags::RUNTIME_EVALUATED_ANNOTATION)
     }
 
+    /// Return `true` if the context is in a runtime-ambiguous type annotation.
+    pub const fn in_runtime_ambiguous_annotation(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::RUNTIME_AMBIGUOUS_ANNOTATION)
+    }
+
     /// Return `true` if the context is in a string type definition.
     pub const fn in_string_type_definition(&self) -> bool {
         self.flags

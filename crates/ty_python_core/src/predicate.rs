@@ -102,15 +102,23 @@ impl PredicateOrLiteral<'_> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+/// A stable key for call-completion queries. Creating it while building predicates lets cached
+/// queries use its ID directly, without looking up its components in Salsa's intern table again.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct CallableAndCallExpr<'db> {
+    #[returns(copy)]
     pub callable: Expression<'db>,
+    #[returns(copy)]
     pub call_expr: Expression<'db>,
     /// Whether the call is wrapped in an `await` expression. If `true`, `call_expr` refers to the
     /// `await` expression rather than the call itself. This is used to detect terminal `await`s of
     /// async functions that return `Never`.
+    #[returns(copy)]
     pub is_await: bool,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for CallableAndCallExpr<'_> {}
 
 /// A call whose completion determines whether an expression statement can continue.
 #[derive(Debug)]
@@ -152,16 +160,8 @@ impl<'ast> StatementCall<'ast> {
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PredicateNode<'db> {
-    /// The truthiness of an expression's resulting value.
+    /// The truthiness of an expression in its evaluation context.
     Expression(Expression<'db>),
-    /// A boolean operation, `not`, or conditional expression evaluated directly as a condition.
-    ///
-    /// In `if x and False`, the truthy branch is unreachable. But after `y = x and False`,
-    /// `if y` may be truthy: it can call `x.__bool__` a second time and get a different result.
-    Condition(Expression<'db>),
-    /// A chained comparison evaluated directly as a condition. Its inferred truthiness is
-    /// available without walking the expression again.
-    ChainedComparisonCondition(Expression<'db>),
     /// Whether a context manager's exit return type allows an exception to be suppressed.
     ///
     /// Resolved during type inference because the context manager's type is unavailable during

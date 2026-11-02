@@ -9,6 +9,8 @@ Constructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`, `TypedDict`, 
 all take a name argument that is normally expected to match the assigned variable. A mismatch is
 usually a typo and makes later diagnostics harder to understand.
 
+`mismatched-sentinel-name` is a similar but distinct rule, disabled by default.
+
 ## Default level
 
 This rule is a warning by default because ty can usually recover and continue understanding the

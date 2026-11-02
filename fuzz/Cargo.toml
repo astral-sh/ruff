@@ -21,7 +21,7 @@ ruff_db = { path = "../crates/ruff_db" }
 ruff_linter = { path = "../crates/ruff_linter" }
 ruff_python_ast = { path = "../crates/ruff_python_ast" }
 ruff_python_codegen = { path = "../crates/ruff_python_codegen" }
-ruff_python_parser = { path = "../crates/ruff_python_parser" }
+ruff_python_parser = { path = "../crates/ruff_python_parser", features = ["stacker"] }
 ruff_python_formatter = { path = "../crates/ruff_python_formatter" }
 ruff_text_size = { path = "../crates/ruff_text_size" }
 
@@ -31,7 +31,7 @@ ty_vendored = { path = "../crates/ty_vendored" }
 ty_python_core = { path = "../crates/ty_python_core" }
 
 libfuzzer-sys = { git = "https://github.com/rust-fuzz/libfuzzer", default-features = false }
-salsa = { version = "0.28.2", default-features = false, features = [
+salsa = { version = "0.28.5", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",

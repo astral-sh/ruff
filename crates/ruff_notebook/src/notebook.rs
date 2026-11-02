@@ -397,19 +397,35 @@ impl Notebook {
         &self.cell_offsets
     }
 
-    /// Returns the start offset of the cell at index `cell` in the concatenated
-    /// text document.
-    pub fn cell_offset(&self, cell: OneIndexed) -> Option<TextSize> {
-        self.cell_offsets.get(cell.to_zero_indexed()).copied()
-    }
-
-    /// Returns the text range in the concatenated document of the cell
-    /// with index `cell`.
+    /// Returns the text range in the concatenated document of the cell with index `cell`.
+    ///
+    /// `cell` is the cell's index among all of the notebook's cells, the same index that
+    /// [`NotebookIndex::cell`] returns. Returns `None` for cells that aren't part of the
+    /// concatenated document, such as Markdown cells and code cells that use a cell magic.
     pub fn cell_range(&self, cell: OneIndexed) -> Option<TextRange> {
-        let start = self.cell_offsets.get(cell.to_zero_indexed()).copied()?;
-        let end = self.cell_offsets.get(cell.to_zero_indexed() + 1).copied()?;
+        // The concatenated document only contains valid Python code cells, so the cell offsets
+        // are indexed by the cell's position among those cells, not among all cells.
+        let raw_cell_index = u32::try_from(cell.to_zero_indexed()).ok()?;
+        let code_cell_index = self.valid_code_cells.binary_search(&raw_cell_index).ok()?;
+
+        let start = self.cell_offsets.get(code_cell_index).copied()?;
+        let end = self.cell_offsets.get(code_cell_index + 1).copied()?;
 
         Some(TextRange::new(start, end))
+    }
+
+    /// Returns the text range in the concatenated document of the contents of the cell with
+    /// index `cell`, excluding the synthetic newline that separates it from the next cell.
+    ///
+    /// Like [`Notebook::cell_range`], `cell` is the cell's index among all of the notebook's
+    /// cells.
+    pub fn cell_content_range(&self, cell: OneIndexed) -> Option<TextRange> {
+        let range = self.cell_range(cell)?;
+        let end = range
+            .end()
+            .checked_sub(TextSize::of(SYNTHETIC_CELL_SEPARATOR))?;
+
+        Some(TextRange::new(range.start(), end))
     }
 
     /// Return `true` if the notebook has a trailing newline, `false` otherwise.
@@ -474,7 +490,11 @@ impl Notebook {
 
 impl PartialEq for Notebook {
     fn eq(&self, other: &Self) -> bool {
-        self.trailing_newline == other.trailing_newline && self.raw == other.raw
+        self.trailing_newline == other.trailing_newline
+            && self.raw == other.raw
+            && self.source_code == other.source_code
+            && self.cell_offsets == other.cell_offsets
+            && self.valid_code_cells == other.valid_code_cells
     }
 }
 
@@ -490,7 +510,7 @@ mod tests {
 
     use ruff_diagnostics::SourceMap;
     use ruff_source_file::OneIndexed;
-    use ruff_text_size::TextSize;
+    use ruff_text_size::{TextRange, TextSize};
 
     use crate::{Cell, CellStart, Notebook, NotebookError, NotebookIndex};
 
@@ -528,6 +548,45 @@ mod tests {
         let notebook = Notebook::empty();
 
         assert_eq!(notebook.source_code(), "\n");
+    }
+
+    #[test]
+    fn equality_after_adding_cell_magic() -> Result<()> {
+        let mut notebook = Notebook::empty();
+        let transformed = "%%markdown\nSome text\n";
+        let mut source_map = SourceMap::default();
+        source_map.push_marker(0.into(), 0.into());
+        source_map.push_marker(
+            TextSize::of(notebook.source_code()),
+            TextSize::of(transformed),
+        );
+        notebook.update(&source_map, transformed.to_string());
+
+        let mut serialized = Vec::new();
+        notebook.write(&mut serialized)?;
+        let reloaded = Notebook::from_source_code(std::str::from_utf8(&serialized)?)?;
+
+        // Updating preserves the original Python cell selection, so the edited source still
+        // contains this cell. Reloading recognizes `%%markdown` and excludes it instead.
+        // The raw cells match, but the Python source returned to callers differs, so comparing
+        // only the raw notebook would incorrectly treat these notebooks as equal.
+        assert_eq!(notebook.cells(), reloaded.cells());
+        assert_eq!(notebook.source_code(), transformed);
+        assert_eq!(reloaded.source_code(), "\n");
+        assert_ne!(notebook, reloaded);
+
+        Ok(())
+    }
+
+    #[test]
+    fn equality_ignores_cached_index() {
+        let notebook = Notebook::empty();
+        let other = notebook.clone();
+
+        notebook.index();
+
+        assert_eq!(notebook, other);
+        assert_eq!(other, notebook);
     }
 
     #[test_case("markdown", false)]
@@ -619,6 +678,31 @@ print("after empty cells")
                 198.into()
             ]
         );
+        Ok(())
+    }
+
+    /// Cell ranges are looked up by the cell's index among all cells, including the cells that
+    /// aren't part of the concatenated source, like the Markdown cells in this notebook.
+    #[test]
+    fn cell_range_by_raw_cell_index() -> Result<(), NotebookError> {
+        let notebook = Notebook::from_path(&notebook_path("valid.ipynb"))?;
+
+        // The third cell is the notebook's second Python cell.
+        let third_cell = OneIndexed::from_zero_indexed(2);
+        assert_eq!(
+            notebook.cell_range(third_cell),
+            Some(TextRange::new(90.into(), 168.into()))
+        );
+        assert_eq!(
+            notebook.cell_content_range(third_cell),
+            Some(TextRange::new(90.into(), 167.into()))
+        );
+
+        // The second cell is a Markdown cell.
+        let second_cell = OneIndexed::from_zero_indexed(1);
+        assert_eq!(notebook.cell_range(second_cell), None);
+        assert_eq!(notebook.cell_content_range(second_cell), None);
+
         Ok(())
     }
 

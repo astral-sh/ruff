@@ -270,6 +270,18 @@ def g(x: type[Any]):
     reveal_type(Child)  # revealed: <class 'Child'>
 ```
 
+## Instance layout conflicts
+
+As with a `class` statement, the bases of a class created with `types.new_class()` cannot have
+conflicting instance memory layouts:
+
+```py
+import types
+
+# error: [instance-layout-conflict]
+Conflict = types.new_class("Conflict", (int, str))
+```
+
 ## Dynamic namespace via `exec_body`
 
 When `exec_body` is provided, it can populate the class namespace dynamically, so attribute access

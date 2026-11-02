@@ -196,12 +196,14 @@ if sys.platform != "win32":
         EXTPROC: Final[int]
         IUTF8: Final[int]
 
-    if sys.platform == "darwin" and sys.version_info >= (3, 13):
-        ALTWERASE: Final[int]
+        # On Linux, only available when Python was built against glibc 2.42 or newer.
         B14400: Final[int]
         B28800: Final[int]
         B7200: Final[int]
         B76800: Final[int]
+
+    if sys.platform == "darwin" and sys.version_info >= (3, 13):
+        ALTWERASE: Final[int]
         CCAR_OFLOW: Final[int]
         CCTS_OFLOW: Final[int]
         CDSR_OFLOW: Final[int]
@@ -284,6 +286,8 @@ if sys.platform != "win32":
         B460800: Final[int]
         B500000: Final[int]
         B921600: Final[int]
+        # On Linux, only available when Python was built against glibc 2.42 or newer.
+        IBSHIFT: Final[int]
 
     if sys.platform != "linux":
         TCSASOFT: Final[int]
@@ -296,7 +300,6 @@ if sys.platform != "win32":
         CNUL: Final[int]
         COMMON: Final[int]
         CSWTCH: Final[int]
-        IBSHIFT: Final[int]
         INIT_C_CC: Final[int]
         NSWTCH: Final[int]
 

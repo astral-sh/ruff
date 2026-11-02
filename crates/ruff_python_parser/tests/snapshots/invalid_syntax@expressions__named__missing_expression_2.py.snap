@@ -93,7 +93,7 @@ Module(
 3 | (x :=
 4 |
 5 | def foo():
-  |     ^^^ Syntax Error: Expected `)`, found name
+  |     ^^^ Syntax Error: Expected `)`, found identifier
 6 |     pass
   |
 

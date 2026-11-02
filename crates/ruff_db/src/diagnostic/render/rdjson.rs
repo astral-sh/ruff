@@ -7,23 +7,24 @@ use ruff_text_size::Ranged;
 
 use crate::diagnostic::{ConciseMessage, Diagnostic, DisplayDiagnosticConfig};
 
-use super::FileResolver;
+use super::{FileResolver, Renderer};
 
+/// Print diagnostics in the JSON format expected by [reviewdog].
+///
+/// [reviewdog]: https://github.com/reviewdog/reviewdog
 pub struct RdjsonRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> RdjsonRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+    pub fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
         Self { resolver, config }
     }
+}
 
-    pub(super) fn render(
-        &self,
-        f: &mut std::fmt::Formatter,
-        diagnostics: &[Diagnostic],
-    ) -> std::fmt::Result {
+impl Renderer for RdjsonRenderer<'_> {
+    fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         write!(
             f,
             "{:#}",
@@ -208,9 +209,8 @@ struct RdjsonSuggestion<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::diagnostic::{
-        DiagnosticFormat,
-        render::tests::{TestEnvironment, create_diagnostics, create_syntax_error_diagnostics},
+    use crate::diagnostic::render::tests::{
+        DiagnosticFormat, TestEnvironment, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     #[test]

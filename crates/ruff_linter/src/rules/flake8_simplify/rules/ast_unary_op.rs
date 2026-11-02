@@ -152,17 +152,10 @@ pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp
     if !matches!(op, UnaryOp::Not) {
         return;
     }
-    let Expr::Compare(ast::ExprCompare {
-        left,
-        ops,
-        comparators,
-        range: _,
-        node_index: _,
-    }) = operand
-    else {
+    let Expr::Compare(compare) = operand else {
         return;
     };
-    if !matches!(&ops[..], [CmpOp::Eq]) {
+    if !matches!(&*compare.ops, [CmpOp::Eq]) {
         return;
     }
     if is_exception_check(checker.semantic().current_statement()) {
@@ -180,15 +173,14 @@ pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp
 
     let mut diagnostic = checker.report_diagnostic(
         NegateEqualOp {
-            left: checker.generator().expr(left),
-            right: checker.generator().expr(&comparators[0]),
+            left: checker.generator().expr(compare.first_operand()),
+            right: checker.generator().expr(compare.second_operand()),
         },
         expr.range(),
     );
     let node = ast::ExprCompare {
-        left: left.clone(),
-        ops: Box::from([CmpOp::NotEq]),
-        comparators: comparators.clone(),
+        ops: [CmpOp::NotEq].into(),
+        operands: compare.operands.clone(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
@@ -208,17 +200,10 @@ pub(crate) fn negation_with_not_equal_op(
     if !matches!(op, UnaryOp::Not) {
         return;
     }
-    let Expr::Compare(ast::ExprCompare {
-        left,
-        ops,
-        comparators,
-        range: _,
-        node_index: _,
-    }) = operand
-    else {
+    let Expr::Compare(compare) = operand else {
         return;
     };
-    if !matches!(&**ops, [CmpOp::NotEq]) {
+    if !matches!(&*compare.ops, [CmpOp::NotEq]) {
         return;
     }
     if is_exception_check(checker.semantic().current_statement()) {
@@ -236,15 +221,14 @@ pub(crate) fn negation_with_not_equal_op(
 
     let mut diagnostic = checker.report_diagnostic(
         NegateNotEqualOp {
-            left: checker.generator().expr(left),
-            right: checker.generator().expr(&comparators[0]),
+            left: checker.generator().expr(compare.first_operand()),
+            right: checker.generator().expr(compare.second_operand()),
         },
         expr.range(),
     );
     let node = ast::ExprCompare {
-        left: left.clone(),
-        ops: Box::from([CmpOp::Eq]),
-        comparators: comparators.clone(),
+        ops: [CmpOp::Eq].into(),
+        operands: compare.operands.clone(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
@@ -293,7 +277,7 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
         let node1 = ast::ExprCall {
             func: Box::new(node.into()),
             arguments: Arguments {
-                args: Box::from([*operand.clone()]),
+                args: [*operand.clone()].into(),
                 keywords: std::iter::empty().collect(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,

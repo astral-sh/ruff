@@ -304,7 +304,7 @@ class NNTP:
         """
 
     def over(
-        self, message_spec: None | str | _list[Any] | tuple[Any, ...], *, file: _File = None
+        self, message_spec: str | _list[Any] | tuple[Any, ...] | None, *, file: _File = None
     ) -> tuple[str, _list[tuple[int, dict[str, str]]]]:
         """Process an OVER command.  If the command isn't supported, fall
         back to XOVER. Arguments:

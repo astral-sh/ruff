@@ -3,7 +3,7 @@
 import bz2
 import io
 import sys
-from _typeshed import ReadableBuffer, StrOrBytesPath, StrPath, SupportsRead, WriteableBuffer
+from _typeshed import FileDescriptorOrPath, ReadableBuffer, StrOrBytesPath, StrPath, SupportsRead, WriteableBuffer
 from builtins import list as _list  # aliases to avoid name clashes with fields named "type" or "list"
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from gzip import _ReadableFileobj as _GzipReadableFileobj, _WritableFileobj as _GzipWritableFileobj
@@ -445,7 +445,7 @@ class TarFile:
         pax_headers: Mapping[str, str] | None = ...,
         debug: Literal[0, 1, 2, 3] | None = None,  # default 0
         errorlevel: Literal[0, 1, 2] | None = None,  # default 1
-        preset: Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9] | None = ...,
+        preset: int | None = ...,
     ) -> Self: ...
     @overload
     @classmethod
@@ -465,7 +465,7 @@ class TarFile:
         pax_headers: Mapping[str, str] | None = ...,
         debug: Literal[0, 1, 2, 3] | None = None,  # default 0
         errorlevel: Literal[0, 1, 2] | None = None,  # default 1
-        preset: Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9] | None = ...,
+        preset: int | None = ...,
     ) -> Self: ...
     if sys.version_info >= (3, 14):
         @overload
@@ -1068,7 +1068,7 @@ mode:
 'w|zst'      open a zstd compressed stream for writing
 """
 
-def is_tarfile(name: StrOrBytesPath | IO[bytes]) -> bool:
+def is_tarfile(name: FileDescriptorOrPath | IO[bytes]) -> bool:
     """Return True if name points to a tar archive that we
     are able to handle, else return False.
 

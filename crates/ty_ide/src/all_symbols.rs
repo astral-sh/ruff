@@ -35,18 +35,13 @@ pub fn all_symbols<'db>(
         .map_with_db(db, |db, module| {
             let name = module.name(db);
 
-            // Note that this will always consider namespace
-            // packages to be "not firsty party." This isn't
-            // necessarily correct, and we can probably improve
-            // on this in response to user feedback. (At time
-            // of writing, 2026-02-13, we don't really handle
-            // namespace packages in auto-import anyway.)
             let is_non_first_party = module.search_path(db).is_none_or(|sp| !sp.is_first_party());
 
             // Filter out non-first-party test and private modules, while retaining private
             // typeshed packages that are useful when writing type annotations.
             if is_non_first_party
-                && (name.is_test_module() || name.is_private() && !module.is_type_check_only(db))
+                && (name.is_test_module()
+                    || name.is_private() && !module.is_bundled_typing_stub(db))
             {
                 return Vec::new();
             }

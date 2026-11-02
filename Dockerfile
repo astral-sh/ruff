@@ -16,9 +16,14 @@ RUN case "$TARGETPLATFORM" in \
     "linux/amd64") echo "x86_64-unknown-linux-musl" > rust_target.txt ;; \
     *) exit 1 ;; \
     esac
-# Update rustup whenever we bump the rust version
 COPY rust-toolchain.toml rust-toolchain.toml
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --target $(cat rust_target.txt) --profile minimal --default-toolchain none
+ARG RUSTUP_VERSION=1.29.2
+RUN curl --proto '=https' --tlsv1.2 -sSf \
+    "https://static.rust-lang.org/rustup/archive/${RUSTUP_VERSION}/$(uname -m)-unknown-linux-gnu/rustup-init" \
+    -o rustup-init \
+    && chmod +x rustup-init \
+    && ./rustup-init -y --target $(cat rust_target.txt) --profile minimal --default-toolchain none \
+    && rm rustup-init
 ENV PATH="$HOME/.cargo/bin:$PATH"
 # Installs the correct toolchain version from rust-toolchain.toml and then the musl target
 RUN rustup target add $(cat rust_target.txt)

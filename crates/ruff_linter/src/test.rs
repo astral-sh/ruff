@@ -9,9 +9,8 @@ use anyhow::Result;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
-use ruff_db::diagnostic::{
-    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, Span,
-};
+use ruff_db::diagnostic::render::{FullRenderer, Renderer};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Span};
 use ruff_notebook::Notebook;
 #[cfg(test)]
 use ruff_notebook::NotebookError;
@@ -25,7 +24,7 @@ use ruff_source_file::SourceFileBuilder;
 use crate::codes::Rule;
 use crate::fix::{FixResult, fix_file};
 use crate::linter::check_path;
-use crate::message::EmitterContext;
+use crate::message::RenderContext;
 use crate::package::PackageRoot;
 use crate::packaging::detect_package_root;
 use crate::settings::types::UnsafeFixes;
@@ -486,35 +485,30 @@ pub(crate) fn print_jupyter_messages(
     notebook: &Notebook,
 ) -> String {
     let config = DisplayDiagnosticConfig::new("ruff")
-        .format(DiagnosticFormat::Full)
         .hide_severity(true)
         .with_show_fix_status(true)
         .with_fix_applicability(Applicability::DisplayOnly);
 
-    DisplayDiagnostics::new(
-        &EmitterContext::new(&FxHashMap::from_iter([(
+    FullRenderer::new(
+        &RenderContext::new(&FxHashMap::from_iter([(
             path.file_name().unwrap().to_string_lossy().to_string(),
             notebook.index().clone(),
         )])),
         &config,
-        diagnostics,
     )
+    .display(diagnostics)
     .to_string()
 }
 
 pub(crate) fn print_messages(diagnostics: &[Diagnostic]) -> String {
     let config = DisplayDiagnosticConfig::new("ruff")
-        .format(DiagnosticFormat::Full)
         .hide_severity(true)
         .with_show_fix_status(true)
         .with_fix_applicability(Applicability::DisplayOnly);
 
-    DisplayDiagnostics::new(
-        &EmitterContext::new(&FxHashMap::default()),
-        &config,
-        diagnostics,
-    )
-    .to_string()
+    FullRenderer::new(&RenderContext::new(&FxHashMap::default()), &config)
+        .display(diagnostics)
+        .to_string()
 }
 
 #[macro_export]

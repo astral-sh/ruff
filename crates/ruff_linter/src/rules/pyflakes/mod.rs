@@ -23,6 +23,7 @@ mod tests {
 
     use crate::linter::check_path;
     use crate::registry::{Linter, Rule};
+    use crate::rules::flake8_type_checking::settings::RuntimeSemantics;
     use crate::rules::isort;
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
@@ -206,10 +207,13 @@ mod tests {
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings {
                 flake8_type_checking: crate::rules::flake8_type_checking::settings::Settings {
-                    runtime_required_base_classes: vec![
-                        "pydantic.BaseModel".to_string(),
-                        "sqlalchemy.orm.DeclarativeBase".to_string(),
-                    ],
+                    runtime_evaluated_base_classes: FxHashMap::from_iter([
+                        ("pydantic.BaseModel".to_string(), RuntimeSemantics::Required),
+                        (
+                            "sqlalchemy.orm.DeclarativeBase".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                    ]),
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(rule_code)
@@ -4543,6 +4547,9 @@ lambda: fu
             List[TypedDict("x", x=int)]
             List[NamedTuple("a", a=int)]
             List[NamedTuple("a", [("a", int)])]
+
+            # Keyword arguments no longer define fields on Python 3.13+.
+            List[TypedDict("x", x="Y")]
         "#,
             &[],
         );
@@ -4551,7 +4558,6 @@ lambda: fu
             from typing import TypedDict, List, NamedTuple, TypeVar
 
             List[TypedDict("x", {"x": "Y"})]
-            List[TypedDict("x", x="Y")]
             List[NamedTuple("a", [("a", "Y")])]
             List[NamedTuple("a", a="Y")]
             List[TypedDict("x", {"x": List["a"]})]
@@ -4559,7 +4565,6 @@ lambda: fu
             List[TypeVar("A", List["C"])]
         "#,
             &[
-                Rule::UndefinedName,
                 Rule::UndefinedName,
                 Rule::UndefinedName,
                 Rule::UndefinedName,

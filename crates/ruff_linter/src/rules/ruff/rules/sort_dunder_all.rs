@@ -22,6 +22,13 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// a [natural sort](https://en.wikipedia.org/wiki/Natural_sort_order)
 /// is used to order the elements.
 ///
+/// Note that "isort-style" sorting here refers to how `isort` categorizes
+/// and orders imported symbols by casing (similar to `isort`'s
+/// [`order-by-type`](https://isort.readthedocs.io/en/latest/configuration/options.html#order-by-type)
+/// setting), rather than `isort`'s
+/// [`sort-reexports`](https://isort.readthedocs.io/en/latest/configuration/options.html#sort-re-exports)
+/// option, which sorts `__all__` strictly lexicographically.
+///
 /// ## Why is this bad?
 /// Consistency is good. Use a common convention for `__all__` to make your
 /// code more readable and idiomatic.
