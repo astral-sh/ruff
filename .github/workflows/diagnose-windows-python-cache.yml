@@ -8,6 +8,32 @@ permissions:
   contents: read
 
 jobs:
+  minimal-repro:
+    name: Minimal PowerShell junction repro
+    runs-on: windows-2022
+    timeout-minutes: 5
+    steps:
+      - name: Create an empty directory
+        shell: pwsh
+        run: New-Item -ItemType Directory "$env:RUNNER_TEMP/tar-junction-repro" | Out-Null
+      - name: Run the exact repro
+        shell: pwsh
+        working-directory: ${{ runner.temp }}/tar-junction-repro
+        run: |
+          # Run in an empty directory in PowerShell on windows-2022.
+          $tar = "$env:ProgramFiles\Git\usr\bin\tar.exe"
+          $env:MSYS = 'winsymlinks:nativestrict'
+
+          New-Item -ItemType Directory target | Out-Null
+          cmd /c mklink /J alias target
+          & $tar --posix -cPf repro.tar alias target
+          cmd /c "rmdir alias && rmdir target"
+
+          & $tar -xPf repro.tar
+          "tar exit code: $LASTEXITCODE"
+          cmd /c dir /al
+          python -c "import os; print(os.path.realpath('alias', strict=True))"
+
   seed-hosted-cache:
     runs-on: windows-2022
     timeout-minutes: 10
