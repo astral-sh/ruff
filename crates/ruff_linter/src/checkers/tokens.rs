@@ -76,7 +76,8 @@ pub(crate) fn check_tokens(
         Rule::InvalidCharacterEsc,
         Rule::InvalidCharacterNul,
         Rule::InvalidCharacterZeroWidthSpace,
-    ]) {
+    ]) && pylint::rules::contains_invalid_string_character(locator.contents())
+    {
         let mut interpolated_string_depths: Vec<u32> = Vec::new();
         let target_version = context
             .settings()
