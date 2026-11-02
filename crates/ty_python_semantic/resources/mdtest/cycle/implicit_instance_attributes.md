@@ -94,6 +94,23 @@ class C:
 reveal_type(C().value)  # revealed: list[int] | list[Divergent]
 ```
 
+## Wrapping recursively growing tuples
+
+If using the inferred attribute as type context for a subsequent write causes an unbounded cycle, we
+fall back to `Unknown` for the attribute type.
+
+```py
+class Items:
+    def update(self, values) -> None:
+        self.items = [*values]
+        self.items = [(x,) for x in self.items]
+        reveal_type(self.items)  # revealed: list[Unknown]
+
+def _(items: Items):
+    items.update(items.items)
+    reveal_type(items.items)  # revealed: list[Unknown] | list[tuple[Unknown]]
+```
+
 ## Concatenating recursively growing tuples
 
 Repeatedly appending or prepending elements to an inferred attribute can produce tuples of arbitrary
