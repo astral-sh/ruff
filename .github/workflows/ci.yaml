@@ -561,7 +561,10 @@ jobs:
           version: "0.13.6"
           checksum: "a2a8820d5eea32f08ef467ef3b7f66883a9b076d5737a2fc2fbb5f458d1bb50f"
           enable-cache: "true"
-          cache-python: true
+          # Restoring a managed Python installation turns uv's minor-version directory
+          # junction into a file symlink. Windows then denies access when ty resolves
+          # the virtual environment's `home` directory from pyvenv.cfg.
+          cache-python: false
       - name: "Install uv (macOS)"
         if: runner.os == 'macOS'
         uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
