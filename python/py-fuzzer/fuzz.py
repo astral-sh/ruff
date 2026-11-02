@@ -706,49 +706,21 @@ class ResolvedCliArgs:
     corpus_dir: Path | None
 
 
-def add_seeds_argument(parser: argparse.ArgumentParser) -> None:
+def parse_args() -> ResolvedCliArgs:
+    """Parse command-line arguments"""
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=RawDescriptionRichHelpFormatter
+    )
     parser.add_argument(
         "seeds",
         type=parse_seed_argument,
         nargs="+",
         help="Either a single seed, or an inclusive range of seeds in the format `0-5`",
     )
-
-
-def resolve_seeds(arguments: Sequence[int | range]) -> list[Seed]:
-    seen_seeds: set[int] = set()
-    for arg in arguments:
-        if isinstance(arg, int):
-            seen_seeds.add(arg)
-        else:
-            seen_seeds.update(arg)
-    return sorted(map(Seed, seen_seeds))
-
-
-def generate_corpus() -> None:
-    """Write the generated source for each requested seed to a directory."""
-    parser = argparse.ArgumentParser(description=generate_corpus.__doc__)
-    parser.add_argument("--output-dir", required=True, type=Path)
-    add_seeds_argument(parser)
-    args = parser.parse_args()
-    seeds = resolve_seeds(args.seeds)
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        sources = executor.map(generate_random_code, seeds, chunksize=16)
-        for seed, source in zip(seeds, sources, strict=True):
-            (args.output_dir / f"{seed}.py").write_text(source, encoding="utf-8")
-
-
-def parse_args() -> ResolvedCliArgs:
-    """Parse command-line arguments"""
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionRichHelpFormatter
-    )
-    add_seeds_argument(parser)
     parser.add_argument(
         "--corpus-dir",
         type=Path,
-        help="Read each seed's <seed>.py from a directory written by generate-fuzz-corpus.",
+        help="Read the generated source for each seed from <seed>.py in this directory.",
     )
     parser.add_argument(
         "--only-new-bugs",
@@ -893,8 +865,16 @@ def parse_args() -> ResolvedCliArgs:
         args.test_executable = Path("target", "profiling", executable)
         assert args.test_executable.is_file()
 
+    seen_seeds: set[int] = set()
+
+    for arg in args.seeds:
+        if isinstance(arg, int):
+            seen_seeds.add(arg)
+        else:
+            seen_seeds.update(arg)
+
     return ResolvedCliArgs(
-        seeds=resolve_seeds(args.seeds),
+        seeds=sorted(map(Seed, seen_seeds)),
         quiet=args.quiet,
         executable=executable,
         test_executable_path=args.test_executable,
