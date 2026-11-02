@@ -15,21 +15,23 @@ use rustc_hash::FxHashMap;
 use ruff_db::PythonFile;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 
-use crate::types::Type;
-use crate::{Db, SemanticModel};
+use crate::reachability::binding_reachability;
+use crate::types::{Type, TypeDisplayDetails, may_exist_at_runtime};
+use crate::{Db, ProgramEnvironment, SemanticModel};
 use ruff_db::source::{SourceText, source_text};
 use ruff_diagnostics::Edit;
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::Tokens;
+use ruff_python_ast::{self as ast, PythonVersion, str::TripleQuotes};
 use ruff_python_codegen::Stylist;
 use ruff_python_importer::Insertion;
+use ruff_python_literal::escape::UnicodeEscape;
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use ty_module_resolver::{ImportingFile, ModuleName};
+use ty_module_resolver::{ImportingFile, KnownModule, ModuleName, file_to_module};
 use ty_python_core::ast_node_ref::AstNodeRef;
-use ty_python_core::definition::{DefinitionKind, DefinitionState};
+use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::scope::FileScopeId;
-use ty_python_core::{ProgramFile, semantic_index};
+use ty_python_core::{ProgramFile, semantic_index, use_def_map};
 
 pub struct Importer<'a> {
     /// The ty Salsa database.
@@ -69,6 +71,92 @@ impl<'a> Importer<'a> {
             stylist: stylist(db, file.python_file(db)),
             imports,
         }
+    }
+
+    /// Spell an inferred type as an annotation and plan its imports at the insertion site.
+    pub(crate) fn type_annotation(
+        &self,
+        details: &TypeDisplayDetails<'a>,
+        scope: FileScopeId,
+        at: TextSize,
+    ) -> Option<(String, Vec<Edit>)> {
+        let db = self.db;
+        let env = ProgramEnvironment::from_file(self.file);
+        let index = semantic_index(db, self.file);
+        let mut imports: Vec<Edit> = Vec::new();
+        let annotation = details.annotation_text(|ty, name| {
+            if ty.is_none(db) {
+                return Some(name.into());
+            }
+            let (module_name, symbol) = if ty.is_never() {
+                let name = if env.python_version(db) < PythonVersion::PY311 {
+                    "NoReturn"
+                } else {
+                    "Never"
+                };
+                ("typing", name)
+            } else {
+                let definition = ty.definition(db, &env)?.definition()?;
+                let module = file_to_module(db, definition.program_file(db).resolver_file(db))?;
+                if module.is_known_stub_only(db) {
+                    return None;
+                }
+                let symbol = annotation_import_name(db, definition).as_deref()?;
+                let local = index.visible_ancestor_scopes(scope).find_map(|(scope, _)| {
+                    let places = index.place_table(scope);
+                    let id = places.symbol_id(symbol)?;
+                    let place = places.symbol(id);
+                    (place.is_bound() || place.is_declared()).then_some((scope, id))
+                });
+                if definition.file(db) == self.file.file(db) {
+                    let (scope, id) = local?;
+                    if !scope.is_global()
+                        || index.place_table(scope).symbol(id).is_reassigned()
+                        || definition.full_range(db, self.parsed).end() > at
+                    {
+                        return None;
+                    }
+                    return Some(symbol.into());
+                } else if module.is_known(db, KnownModule::Builtins) && local.is_none() {
+                    return Some(name.into());
+                }
+                (module.name(db).as_str(), symbol)
+            };
+            let request = if name.contains('.') {
+                ImportRequest::import(module_name, symbol).force()
+            } else {
+                ImportRequest::import_from(module_name, symbol)
+            };
+            let action = self.import_for_diagnostic(request, scope, at)?;
+            let symbol_text = action.symbol_text().to_owned();
+
+            if let Some(edit) = action.import
+                && !imports.contains(&edit)
+            {
+                // Independent requests can both rewrite the same existing import.
+                if imports
+                    .iter()
+                    .any(|other| other.range().intersect(edit.range()).is_some())
+                {
+                    return None;
+                }
+                imports.push(edit);
+            }
+            Some(symbol_text.into())
+        })?;
+        // On older Python versions these type expressions require postponed evaluation.
+        let version = env.python_version(db);
+        let annotation = if !index.has_future_annotations()
+            && (version < PythonVersion::PY310 && annotation.contains(" | ")
+                || version < PythonVersion::PY39 && annotation.contains('['))
+        {
+            UnicodeEscape::new_repr(&annotation)
+                .str_repr(TripleQuotes::No)
+                .to_string()?
+        } else {
+            annotation
+        };
+        Some((annotation, imports))
     }
 
     /// The file's indentation unit, shared with inserted imports and diagnostic fixes.
@@ -520,6 +608,24 @@ fn top_level_imports(db: &dyn Db, file: PythonFile<'_>) -> Box<[AstNodeRef<ast::
         .filter(|stmt| matches!(stmt, ast::Stmt::Import(_) | ast::Stmt::ImportFrom(_)))
         .map(|stmt| AstNodeRef::new(&parsed, stmt))
         .collect()
+}
+
+/// The module-level name of a type that is bound on every path at runtime.
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+fn annotation_import_name<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Option<String> {
+    if !definition.file_scope(db).is_global() || !may_exist_at_runtime(db, definition) {
+        return None;
+    }
+    let scope = use_def_map(db, definition.scope(db));
+    let symbol = definition.place(db).as_symbol()?;
+    if scope.end_of_scope_symbol_bindings(symbol).any(|binding| {
+        binding.binding.definition() == Some(definition)
+            && binding_reachability(db, scope, &binding).is_always_true()
+    }) {
+        definition.name(db)
+    } else {
+        None
+    }
 }
 
 /// A map of symbols in scope at a particular location in a module.
