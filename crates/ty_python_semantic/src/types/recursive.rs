@@ -36,7 +36,8 @@
 //! body by index, and each `RecursiveVar` refers to another index in that same graph.
 //! Unfolding replaces these variables with applications sharing the original graph,
 //! without copying the other bodies. Importing a body into a graph remaps its indices
-//! so that references retain their binding scope.
+//! so that references retain their binding scope. During cycle recovery, references to older
+//! approximations use the newest available body for their originating alias query.
 //!
 //! A *type constructor* takes type arguments and produces a type. Recursive types can
 //! also be parameterized this way. With type variable `T`, the alias
@@ -63,7 +64,7 @@
 
 use std::cell::{Cell, RefCell};
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
 
@@ -72,6 +73,7 @@ use super::generics::{ApplySpecialization, Specialization};
 use super::relation::{TypeRelation, TypeRelationChecker};
 use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
+use super::visitor::any_over_type_including_alias_arguments;
 use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, MaterializationKind, Type,
     TypeContext, TypeMapping, VarianceTerm,
@@ -137,14 +139,6 @@ impl<'db> RecursiveVar<'db> {
                 arguments,
                 self.materialization_kind(db),
             ),
-            TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
-                RecursiveSubstitution::Reindex(indices),
-            )) => Type::RecursiveVar(Self::new_internal(
-                db,
-                indices[self.index(db)],
-                self.materialization_kind(db),
-                arguments,
-            )),
             _ => unreachable!("semantic operation on an unbound recursive variable"),
         }
     }
@@ -162,8 +156,6 @@ enum RecursiveSubstitution<'a, 'db> {
     Bind(&'a RecursiveTypeGraphBuilder<'db>),
     /// Import an open body, resolving its references in the source graph.
     Import(&'a RecursiveTypeGraphBuilder<'db>, RecursiveTypeGraph<'db>),
-    /// Rewrite references to the representatives of equivalent nodes.
-    Reindex(&'a [usize]),
 }
 
 /// An unspecialized constructor body and its originating alias query.
@@ -171,6 +163,9 @@ enum RecursiveSubstitution<'a, 'db> {
 pub struct RecursiveTypeNode<'db> {
     definition: Definition<'db>,
     cycle: RecursiveCycle,
+    /// The originating query's recovery iteration; zero denotes its initial seed.
+    /// Compare only nodes from the same query.
+    iteration: u32,
     body: Type<'db>,
 }
 
@@ -184,60 +179,27 @@ pub struct RecursiveTypeGraph<'db> {
 impl get_size2::GetSize for RecursiveTypeGraph<'_> {}
 
 impl<'db> RecursiveTypeGraph<'db> {
-    /// Merge bisimilar nodes without identifying different approximations of a definition.
-    fn from_nodes(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        nodes: &[RecursiveTypeNode<'db>],
-    ) -> Self {
-        // Begin with one class per query, then split classes whose bodies differ after
-        // remapping their references. Refinement preserves distinct provisional bodies.
-        let mut cycles = FxHashMap::default();
-        let mut indices: Vec<usize> = nodes
-            .iter()
-            .map(|node| {
-                let next = cycles.len();
-                *cycles.entry(node.cycle).or_insert(next)
+    /// Compare the ordered bodies without the iteration metadata used to select them.
+    fn has_same_bodies(self, db: &'db dyn Db, other: Self) -> bool {
+        let nodes = self.nodes(db);
+        let other_nodes = other.nodes(db);
+        nodes.len() == other_nodes.len()
+            && nodes.iter().zip(other_nodes).all(|(node, other)| {
+                node.definition == other.definition
+                    && node.cycle == other.cycle
+                    && node.body == other.body
             })
-            .collect();
-        loop {
-            let mapping = TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
-                RecursiveSubstitution::Reindex(&indices),
-            ));
-            let visitor = ApplyTypeMappingVisitor::new(env);
-            let mut classes = FxHashMap::default();
-            let mut merged = Vec::new();
-            let mut refined = Vec::with_capacity(nodes.len());
-            for (index, node) in nodes.iter().enumerate() {
-                let body = node.body.apply_type_mapping_impl(
-                    db,
-                    &mapping,
-                    TypeContext::default(),
-                    &visitor,
-                );
-                let next = classes.len();
-                let target = *classes.entry((indices[index], body)).or_insert(next);
-                if target == merged.len() {
-                    merged.push(RecursiveTypeNode { body, ..*node });
-                }
-                refined.push(target);
-            }
-            if indices == refined {
-                // Classes are numbered by first occurrence, so the root remains at index zero.
-                return Self::new(db, merged.into_boxed_slice());
-            }
-            indices = refined;
-        }
     }
 }
 
-/// Collect reachable bodies, retaining each source node's scope until references are remapped.
+/// Collect the newest available body for each query, remapping references in its source scope.
 #[derive(Debug, PartialEq, Eq)]
 struct RecursiveTypeGraphBuilder<'db> {
     cycle: RecursiveCycle,
     referenced: Cell<bool>,
     nodes: RefCell<Vec<RecursiveTypeNode<'db>>>,
-    imported: RefCell<FxHashMap<(RecursiveTypeGraph<'db>, usize), usize>>,
+    imported: RefCell<FxHashMap<RecursiveCycle, usize>>,
+    latest: FxHashMap<RecursiveCycle, (RecursiveTypeGraph<'db>, usize)>,
 }
 
 impl get_size2::GetSize for RecursiveTypeGraphBuilder<'_> {}
@@ -274,14 +236,16 @@ impl<'db> RecursiveTypeGraphBuilder<'db> {
         graph: RecursiveTypeGraph<'db>,
         index: usize,
     ) -> usize {
-        if let Some(target) = self.imported.borrow().get(&(graph, index)) {
+        let cycle = graph.nodes(db)[index].cycle;
+        if let Some(target) = self.imported.borrow().get(&cycle) {
             return *target;
         }
+        let (graph, index) = self.latest.get(&cycle).copied().unwrap_or((graph, index));
         let node = graph.nodes(db)[index];
         let target = self.nodes.borrow().len();
         // Reserve the target before following backedges into the source graph.
         self.nodes.borrow_mut().push(node);
-        self.imported.borrow_mut().insert((graph, index), target);
+        self.imported.borrow_mut().insert(cycle, target);
         let body = node.body.apply_type_mapping_impl(
             db,
             &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
@@ -396,6 +360,7 @@ impl<'db> RecursiveType<'db> {
             vec![RecursiveTypeNode {
                 definition,
                 cycle,
+                iteration: 0,
                 body: Type::RecursiveVar(RecursiveVar::new_internal(db, 0, None, arguments)),
             }]
             .into_boxed_slice(),
@@ -407,18 +372,30 @@ impl<'db> RecursiveType<'db> {
     pub(super) fn recover(
         db: &'db dyn Db,
         definition: Definition<'db>,
-        cycle: salsa::Id,
+        cycle: &salsa::Cycle<'_>,
         parameters: Option<GenericContext<'db>>,
         result: Type<'db>,
+        previous: Type<'db>,
     ) -> Type<'db> {
         // Shared dependencies can still contain older iterations of this alias. They refer
         // to the same definition even when their provisional bodies differ. Derive the binder
         // from the query inputs: an earlier result might not expose recursive references yet.
-        Self::initial(db, definition, cycle, parameters).bind(
+        let result = Self::initial(db, definition, cycle.id(), parameters).bind(
             db,
             &ProgramEnvironment::from_definition(definition),
             result,
-        )
+            cycle.iteration() + 1,
+        );
+        // Iteration metadata selects bodies but must not keep an unchanged type from converging.
+        if let (Type::Recursive(current), Type::Recursive(previous)) = (result, previous)
+            && current.index(db) == previous.index(db)
+            && current.arguments(db) == previous.arguments(db)
+            && current.materialization_kind(db) == previous.materialization_kind(db)
+            && current.graph(db).has_same_bodies(db, previous.graph(db))
+        {
+            return Type::Recursive(previous);
+        }
+        result
     }
 
     /// Bind references to this alias's query cycle in a closed inference result.
@@ -428,12 +405,34 @@ impl<'db> RecursiveType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         original: Type<'db>,
+        iteration: u32,
     ) -> Type<'db> {
+        let latest =
+            RefCell::new(FxHashMap::<RecursiveCycle, (RecursiveTypeGraph<'db>, usize)>::default());
+        let seen = RefCell::new(FxHashSet::default());
+        // Select bodies before following edges: a newer occurrence can appear after an older
+        // one, and redirecting those edges during import must not depend on traversal order.
+        any_over_type_including_alias_arguments(db, env, original, |nested| {
+            if let Type::Recursive(recursive) = nested
+                && seen.borrow_mut().insert(recursive.graph(db))
+            {
+                let graph = recursive.graph(db);
+                for (index, node) in graph.nodes(db).iter().enumerate() {
+                    let mut latest = latest.borrow_mut();
+                    let entry = latest.entry(node.cycle).or_insert((graph, index));
+                    if node.iteration > entry.0.nodes(db)[entry.1].iteration {
+                        *entry = (graph, index);
+                    }
+                }
+            }
+            false
+        });
         let builder = RecursiveTypeGraphBuilder {
             cycle: self.cycle(db),
             referenced: Cell::new(false),
             nodes: RefCell::new(vec![self.graph(db).nodes(db)[self.index(db)]]),
             imported: RefCell::default(),
+            latest: latest.into_inner(),
         };
         let body = original.apply_type_mapping_impl(
             db,
@@ -446,7 +445,8 @@ impl<'db> RecursiveType<'db> {
         let result = if builder.referenced.get() {
             let mut nodes = builder.nodes.into_inner();
             nodes[0].body = body;
-            let graph = RecursiveTypeGraph::from_nodes(db, env, &nodes);
+            nodes[0].iteration = iteration;
+            let graph = RecursiveTypeGraph::new(db, nodes.into_boxed_slice());
             Type::Recursive(Self::new_internal(db, graph, 0, self.arguments(db), None))
         } else {
             original
@@ -588,7 +588,7 @@ impl<'db> RecursiveType<'db> {
                     .arguments(db)
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
                 match substitution {
-                    RecursiveSubstitution::Unfold(_) | RecursiveSubstitution::Reindex(_) => {
+                    RecursiveSubstitution::Unfold(_) => {
                         Type::Recursive(self.with_arguments(db, arguments))
                     }
                     RecursiveSubstitution::Bind(builder)
