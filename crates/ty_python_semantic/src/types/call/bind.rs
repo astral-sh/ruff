@@ -4178,7 +4178,7 @@ impl<'db> CallableBinding<'db> {
                             env,
                             call_arguments.as_ref(),
                             call_expression_tcx,
-                            new_signature,
+                            new_signature.as_ref(),
                         );
                         return;
                     }
@@ -10205,7 +10205,7 @@ impl<'db> Binding<'db> {
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
-        new_signature: Option<Signature<'db>>,
+        new_signature: Option<&Signature<'db>>,
     ) {
         // Each overload is an independent inference problem. Two candidates can contain
         // typevars with the same identity but different specialized bounds, so sharing a
@@ -10239,7 +10239,7 @@ impl<'db> Binding<'db> {
             return;
         }
 
-        let signature = new_signature.as_ref().unwrap_or(&self.signature);
+        let signature = new_signature.unwrap_or(&self.signature);
         let call = CallInference::new(db, env, self, signature, arguments, call_expression_tcx);
         let inferred = call
             .infer_structured(constraints)
