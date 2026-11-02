@@ -1120,7 +1120,7 @@ reveal_type(C(1))  # revealed: C[tuple[int, int]]
 reveal_type(C("hello"))  # revealed: C[tuple[str, str]]
 ```
 
-### A `Self` return preserves the bounds of class type parameters
+### A `Self` return preserves constraints from the constructor receiver
 
 The implicit `cls` parameter of `__new__` constrains `T` to `str`, even when the arguments provide
 no more specific type for `T`.
@@ -1163,6 +1163,19 @@ def check(values: list[int] | list[bytes]):
 def nested(errors: list[Any]):
     first = ExceptionGroup("failed", errors).exceptions[0]
     first.exceptions  # error: [unresolved-attribute]
+```
+
+When the constructor receives no arguments, either callback signature in the annotation is possible.
+
+```py
+class Handler[**P]:
+    callback: Callable[P, int]
+
+    def __new__(cls, /, *args: Any, **kwargs: Any) -> Self:
+        return super().__new__(cls)
+
+handler: Handler[[str]] | Handler[[int]] = Handler()
+reveal_type(handler)  # revealed: Handler[(str, /)] | Handler[(int, /)]
 ```
 
 ### `__new__` with arbitrary generic return types
