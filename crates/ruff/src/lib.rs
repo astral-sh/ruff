@@ -1,7 +1,7 @@
 #![allow(clippy::print_stdout)]
 
 use std::fs::File;
-use std::io::{self, BufWriter, Write, stdout};
+use std::io::{self, BufWriter, IsTerminal, Write, stdout};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
@@ -231,25 +231,28 @@ fn server(args: ServerCommand) -> Result<ExitStatus> {
     commands::server::run_server(args.resolve_preview(), args.resolve_workspace_trust())
 }
 
+trait OutputStream: Write + IsTerminal {}
+
+impl<T: Write + IsTerminal> OutputStream for T {}
+
 pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
+    let color = TerminalColor::resolve(global_options.color);
     let (cli, config_arguments) = args.partition(global_options)?;
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
     let pyproject_config = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
 
-    let mut writer: Box<dyn Write> = match cli.output_file {
+    let output: Box<dyn OutputStream> = match cli.output_file {
         Some(path) if !cli.watch => {
-            colored::control::set_override(false);
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)?;
             }
-            let file = File::create(path)?;
-            Box::new(BufWriter::new(file))
+            Box::new(File::create(path)?)
         }
-        _ => Box::new(BufWriter::new(io::stdout())),
+        _ => Box::new(io::stdout()),
     };
-    let stderr_writer = Box::new(BufWriter::new(io::stderr()));
+    let mut writer = BufWriter::new(output);
 
     let is_stdin = is_stdin(&cli.files, cli.stdin_filename.as_deref());
     let files = resolve_default_files(cli.files, is_stdin);
@@ -449,24 +452,23 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         )?
     };
 
-    // Always try to print violations (though the printer itself may suppress output)
-    // If we're writing fixes via stdin, the transformed source code goes to the writer
-    // so send the summary to stderr instead
-    let mut summary_writer = if is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff) {
-        stderr_writer
-    } else {
-        writer
-    };
-    if cli.statistics {
-        printer.write_statistics(&diagnostics, &mut summary_writer)?;
-    } else {
-        printer.write_once(
-            &diagnostics,
-            &mut summary_writer,
-            preview,
-            prefer_rule_codes,
-        )?;
+    // When fixing stdin, stdout carries the transformed source or diff. Send the report to stderr.
+    if is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff) {
+        writer = BufWriter::new(Box::new(io::stderr()));
     }
+
+    // Choose the report's color after linting. Setting `colored`'s process-wide override
+    // earlier would also apply the report's terminal detection to diffs written to stdout.
+    colored::control::set_override(color.should_colorize(&**writer.get_ref()));
+
+    // Always try to print violations (though the printer itself may suppress output).
+    let result = if cli.statistics {
+        printer.write_statistics(&diagnostics, &mut writer)
+    } else {
+        printer.write_once(&diagnostics, &mut writer, preview, prefer_rule_codes)
+    };
+    colored::control::set_override(color.should_colorize(&io::stdout()));
+    result?;
 
     if !cli.exit_zero {
         let max_severity = diagnostics
