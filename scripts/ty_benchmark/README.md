@@ -25,6 +25,19 @@ Measures how long it takes to type check a project without a pre-existing cache.
 Hyperfine 2.0 also reports peak resident set size (RSS) for each measured command
 in the `Memory` row. Both metrics use the same warmups and measured runs.
 
+All four CLIs receive the same list of tracked Python files. The runner applies
+each project's includes and excludes once and skips symlinks. When an
+implementation has an adjacent stub, the implementation is the check target.
+Standalone stubs stay in the list. If a file and a populated directory share a
+module name, the directory wins. Files omitted as targets remain available for
+import resolution. The runner prints the file count and SHA-256 of the list
+before timing each project.
+
+Each CLI checks unannotated function bodies. mypy uses its normal import
+following with project and user configuration disabled, so per-module overrides
+and plugins cannot change its workload. Checkers can still follow different
+imports or infer different types from the same source files.
+
 You can run the benchmark with `--single-threaded` to measure the check time when using a single thread only.
 
 ### Zuban
@@ -109,9 +122,10 @@ versions, project Python versions, and the dependency cutoff in
 `src/benchmark/venv.py` the same across both runs. A project's updated requirements
 can still change its installed dependencies.
 
-Record the hardware, operating system, tool versions, Python versions, and ty source
-revision with the results. The benchmark harness uses Python 3.15; each project's
-environment uses the Python version specified in `projects.py`.
+Record the CLI file counts and manifest hashes alongside the hardware, operating
+system, tool versions, Python versions, and ty source revision with the results.
+The benchmark harness uses Python 3.15. Each project's environment uses the
+Python version specified in `projects.py`.
 
 The benchmark script supports snapshotting the results when running with `--snapshot` and `--accept`.
 The goal of those snapshots is to catch accidental regressions. For example, if a project adds

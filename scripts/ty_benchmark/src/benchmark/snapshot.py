@@ -89,6 +89,9 @@ class SnapshotRunner(NamedTuple):
                 check=False,
             )
 
+            if result.returncode not in (0, 1):
+                result.check_returncode()
+
             # Get the actual output and combine stdout and stderr for the snapshot.
             actual_output = normalize_output(result.stdout + result.stderr, cwd)
 

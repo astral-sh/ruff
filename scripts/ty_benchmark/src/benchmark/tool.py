@@ -15,6 +15,7 @@ import tomlkit
 
 from benchmark import Command
 from benchmark.projects import Project
+from benchmark.targets import FILE_LIST, PYRIGHT_CONFIG
 
 if TYPE_CHECKING:
     from benchmark.venv import Venv
@@ -111,10 +112,8 @@ class Ty(Tool):
             "check",
             "--output-format=concise",
             "--no-progress",
+            f"@{FILE_LIST}",
         ]
-
-        for exclude in project.exclude:
-            command.extend(["--exclude", exclude])
 
         return Command(name=self._name, command=command)
 
@@ -145,21 +144,12 @@ class Mypy(Tool):
             "--python-version",
             project.python_version,
             "--no-pretty",
-            *project.include,
+            # An empty config path disables mypy's project and user config discovery.
+            "--config-file=",
+            "--follow-imports=normal",
             "--check-untyped-defs",
+            f"@{FILE_LIST}",
         ]
-
-        for exclude in project.exclude:
-            # Mypy uses regex...
-            # This is far from perfect, but not terrible.
-            command.extend(
-                [
-                    "--exclude",
-                    exclude.replace(".", r"\.")
-                    .replace("**", ".*")
-                    .replace("*", r"\w.*"),
-                ]
-            )
 
         prepare = None
 
@@ -232,7 +222,7 @@ class Pyright(Tool):
         )
 
     def command(self, project: Project, venv: Venv, single_threaded: bool) -> Command:
-        command = [str(self.path), "--skipunannotated"]
+        command = [str(self.path)]
 
         if not single_threaded:
             command.append("--threads")
@@ -241,8 +231,7 @@ class Pyright(Tool):
             [
                 "--level=warning",
                 "--project",
-                "pyrightconfig.json",
-                *project.include,
+                PYRIGHT_CONFIG,
             ]
         )
 
@@ -287,6 +276,9 @@ class Pyrefly(Tool):
             str(self.path),
             "check",
             "--output-format=min-text",
+            "--config=pyrefly.toml",
+            "--disable-project-excludes-heuristics=true",
+            f"@{FILE_LIST}",
         ]
 
         if single_threaded:

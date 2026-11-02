@@ -173,7 +173,6 @@ ALL: Final = [
             affected_files=["discord/channel.py"],
         ),
     ),
-    # Fairly chunky project, requires the pydantic mypy plugin.
     Project(
         name="homeassistant",
         repository="https://github.com/home-assistant/core.git",
