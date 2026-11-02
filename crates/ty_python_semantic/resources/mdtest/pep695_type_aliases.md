@@ -242,6 +242,23 @@ def _(flag: bool):
             reveal_type(x)  # revealed: int | str
 ```
 
+A generic alias can refer both to its own type parameters and to names in the enclosing class. The
+class binding takes precedence over a module binding with the same name:
+
+```py
+from typing import assert_type
+
+Inner = bytes
+
+class Outer:
+    type Pair[T] = tuple[T, Inner]
+
+    class Inner: ...
+
+def _(pair: Outer.Pair[int]):
+    assert_type(pair, tuple[int, Outer.Inner])
+```
+
 ## Generic type aliases
 
 ```py

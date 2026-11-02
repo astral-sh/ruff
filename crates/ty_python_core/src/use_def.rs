@@ -2934,9 +2934,8 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn snapshot_enclosing_state(
         &mut self,
         enclosing_place: ScopedPlaceId,
-        enclosing_scope: ScopeKind,
         enclosing_place_expr: PlaceExprRef,
-        is_parent_of_annotation_scope: bool,
+        snapshot_symbol_bindings: bool,
     ) -> ScopedEnclosingSnapshotId {
         let pending = self.pending_reachability.current;
         let place_state = pending_place_state_mut(
@@ -2954,7 +2953,6 @@ impl<'db> UseDefMapBuilder<'db> {
             )
             .bindings();
 
-        let is_class_symbol = enclosing_scope.is_class() && enclosing_place.is_symbol();
         let is_forwarding_symbol = enclosing_place_expr
             .as_symbol()
             .is_some_and(|symbol| symbol.is_global() || symbol.is_nonlocal());
@@ -2962,15 +2960,13 @@ impl<'db> UseDefMapBuilder<'db> {
             && bindings
                 .iter()
                 .any(|binding| !binding.binding().is_unbound());
-        // Names bound in class scopes are never visible to nested scopes (but
-        // attributes/subscripts are visible), so we never need to save eager scope bindings in a
-        // class scope. There is one exception to this rule: annotation scopes can see names
-        // defined in an immediately-enclosing class scope. Likewise, unbound `global` and
+        // Member bindings can be visible even when the enclosing scope's names are hidden
+        // (e.g. a comprehension in a class body). Likewise, unbound `global` and
         // `nonlocal` symbols in the enclosing scope are forwarding declarations, so nested scopes
         // should continue walking outward instead of treating any bindings here as owned by this
         // scope. However, if the enclosing scope actually rebound the forwarded name, that visible
         // state needs to be snapshotted so nested scopes can see the rebound type.
-        if (is_class_symbol && !is_parent_of_annotation_scope)
+        if (enclosing_place.is_symbol() && !snapshot_symbol_bindings)
             || !enclosing_place_expr.is_bound()
             || (is_forwarding_symbol && !stores_visible_bindings)
         {
