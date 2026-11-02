@@ -29,6 +29,8 @@ env:
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
   PYTHON_VERSION: "3.14"
+  # The parser uses the first 501 seeds from ty's corpus.
+  FUZZ_CORPUS_SEEDS: 0-1000
   NEXTEST_PROFILE: ci
   # Enable mdtests that require external dependencies
   MDTEST_EXTERNAL: "1"
@@ -61,7 +63,11 @@ jobs:
     # CI on main is redundant in the security repository.
     if: ${{ github.repository != 'astral-sh/ruff-security' || github.ref != 'refs/heads/main' }}
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    permissions:
+      actions: read
+      contents: read
     outputs:
+      fuzz-corpus-run-id: ${{ steps.fuzz_corpus.outputs.run-id }}
       comparison_base: ${{ steps.merge_base.outputs.sha }}
       # Flag that is raised when any code that affects parser is changed
       parser: ${{ steps.check_parser.outputs.changed }}
@@ -109,6 +115,26 @@ jobs:
             sha="$(git merge-base HEAD "origin/${BASE_REF}")"
           fi
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
+      # Change filters on main compare against main itself. Check the corpus directly
+      # so expiry or a Python patch release can trigger publication on the next push.
+      - name: Set up uv for the fuzz corpus lookup
+        if: ${{ github.event_name == 'push' }}
+        continue-on-error: true
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.13.6"
+          checksum: "f29c3e94ffabd7e6f3ba521dba169a9b7ec12100bf3257087f0f24f6123f3645"
+          enable-cache: false
+      - name: Find the fuzz corpus on main
+        if: ${{ github.event_name == 'push' }}
+        id: fuzz_corpus
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UV_PYTHON: ${{ env.PYTHON_VERSION }}
+        run: uv run --locked python/py-fuzzer/prepare_corpus.py "$FUZZ_CORPUS_SEEDS" >> "$GITHUB_OUTPUT"
 
       - name: Check if release build inputs changed
         id: check_release
@@ -663,9 +689,18 @@ jobs:
 
   fuzz-parser:
     name: "fuzz parser"
+    # Concurrent pushes can observe the same missing corpus before either publishes it.
+    concurrency: ${{ github.workflow }}-fuzz-parser-${{ github.ref }}
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     needs: determine_changes
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.parser == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
+    if: >-
+      !contains(github.event.pull_request.labels.*.name, 'no-test') &&
+      ((github.event_name == 'push' && !needs.determine_changes.outputs.fuzz-corpus-run-id) ||
+       needs.determine_changes.outputs.parser == 'true' ||
+       needs.determine_changes.outputs.py-fuzzer == 'true')
+    permissions:
+      actions: read
+      contents: read
     timeout-minutes: 20
     env:
       FORCE_COLOR: 1
@@ -693,7 +728,16 @@ jobs:
           # Line-tables-only debug info: faster builds, backtraces still work.
           CARGO_PROFILE_DEV_DEBUG: line-tables-only
         run: cargo build --bin ruff
+      - name: Prepare the fuzz corpus
+        id: corpus
+        continue-on-error: true
+        uses: $/python/py-fuzzer
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          seeds: ${{ env.FUZZ_CORPUS_SEEDS }}
       - name: Fuzz
+        env:
+          FUZZ_CORPUS: ${{ steps.corpus.outputs.path }}
         run: |
           (
             uv run \
@@ -702,6 +746,7 @@ jobs:
             --locked \
             fuzz \
             --test-executable=target/debug/ruff \
+            ${FUZZ_CORPUS:+--corpus-dir="$FUZZ_CORPUS"} \
             --budget-minutes="${FUZZ_JOB_TIMEOUT_MINUTES}" \
             --job-started-at="${FUZZ_JOB_STARTED_AT}" \
             --bin=ruff \
@@ -933,6 +978,9 @@ jobs:
       - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && (needs.determine_changes.outputs.ty == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
+    permissions:
+      actions: read
+      contents: read
     timeout-minutes: ${{ github.repository == 'astral-sh/ruff' && 20 || 40 }}
     env:
       # Keep in sync with the job's timeout-minutes.
@@ -960,8 +1008,16 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup show
+      - name: Prepare the fuzz corpus
+        id: corpus
+        continue-on-error: true
+        uses: $/python/py-fuzzer
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          seeds: ${{ env.FUZZ_CORPUS_SEEDS }}
       - name: Fuzz
         env:
+          FUZZ_CORPUS: ${{ steps.corpus.outputs.path }}
           FORCE_COLOR: 1
           MERGE_BASE: ${{ needs.determine_changes.outputs.comparison_base }}
           # Line-tables-only debug info: faster builds, backtraces still work.
@@ -989,10 +1045,11 @@ jobs:
             --test-executable=ty-new \
             --baseline-executable=ty-old \
             --only-new-bugs \
+            ${FUZZ_CORPUS:+--corpus-dir="$FUZZ_CORPUS"} \
             --budget-minutes="${FUZZ_JOB_TIMEOUT_MINUTES}" \
             --job-started-at="${FUZZ_JOB_STARTED_AT}" \
             --bin=ty \
-            0-1000
+            "$FUZZ_CORPUS_SEEDS"
           )
 
   cargo-deny:

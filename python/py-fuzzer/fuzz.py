@@ -298,7 +298,10 @@ def fuzz_code(
     if cancelled.is_set() or (deadline is not None and time.monotonic() >= deadline):
         return None
 
-    code = generate_random_code(seed)
+    if args.corpus_dir is None:
+        code = generate_random_code(seed)
+    else:
+        code = (args.corpus_dir / f"{seed}.py").read_text(encoding="utf-8")
 
     if cancelled.is_set() or (deadline is not None and time.monotonic() >= deadline):
         return None
@@ -684,6 +687,21 @@ def parse_seed_argument(arg: str) -> int | range:
     return int(arg)
 
 
+def generate_corpus() -> None:
+    """Write the Python source for each requested seed to a directory."""
+    parser = argparse.ArgumentParser(description=generate_corpus.__doc__)
+    parser.add_argument("seeds", type=parse_seed_argument)
+    parser.add_argument("directory", type=Path)
+    args = parser.parse_args()
+    seeds = [args.seeds] if isinstance(args.seeds, int) else args.seeds
+    args.directory.mkdir(exist_ok=True)
+    with concurrent.futures.ProcessPoolExecutor() as pool:
+        for seed, source in zip(
+            seeds, pool.map(generate_random_code, seeds, chunksize=16), strict=True
+        ):
+            (args.directory / f"{seed}.py").write_text(source, encoding="utf-8")
+
+
 class Executable(enum.StrEnum):
     RUFF = "ruff"
     TY = "ty"
@@ -700,6 +718,7 @@ class ResolvedCliArgs:
     github_issue_path: Path | None
     budget_minutes: float | None
     job_started_at: float | None
+    corpus_dir: Path | None
 
 
 def parse_args() -> ResolvedCliArgs:
@@ -712,6 +731,11 @@ def parse_args() -> ResolvedCliArgs:
         type=parse_seed_argument,
         nargs="+",
         help="Either a single seed, or an inclusive range of seeds in the format `0-5`",
+    )
+    parser.add_argument(
+        "--corpus-dir",
+        type=Path,
+        help="Read the generated source for each seed from <seed>.py in this directory.",
     )
     parser.add_argument(
         "--only-new-bugs",
@@ -873,6 +897,7 @@ def parse_args() -> ResolvedCliArgs:
         github_issue_path=args.write_github_issue,
         budget_minutes=args.budget_minutes,
         job_started_at=args.job_started_at,
+        corpus_dir=args.corpus_dir,
     )
 
 
