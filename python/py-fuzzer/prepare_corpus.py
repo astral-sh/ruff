@@ -59,14 +59,6 @@ def find_run(name: str) -> str | None:
     for run_id in runs.splitlines():
         run = json.loads(subprocess.check_output(["gh", "api", f"{api}/runs/{run_id}"]))
         if (
-            run_id == "41478760652"
-            and repo == "astral-sh/ruff"
-            and workflow == ".github/workflows/ci.yaml"
-            and os.environ["GITHUB_EVENT_NAME"] == "pull_request"
-            and os.environ["GITHUB_REF"] == "refs/pull/29909/merge"
-        ):
-            return run_id
-        if (
             run["path"] == workflow
             and run["head_branch"] == "main"
             and run["event"] in {"push", "schedule"}
