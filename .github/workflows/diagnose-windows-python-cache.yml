@@ -1,0 +1,90 @@
+name: Diagnose Windows Python cache
+
+on:
+  push:
+    branches: [zsol/diagnose-windows-python-cache]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: namespace-profile-windows-2022-x86-64-16x32
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        id: uv
+        with:
+          version: "0.13.6"
+          checksum: "a2a8820d5eea32f08ef467ef3b7f66883a9b076d5737a2fc2fbb5f458d1bb50f"
+          enable-cache: "true"
+          cache-python: true
+          save-cache: "false"
+          # Match the CI cache from before the diagnostic script was added.
+          cache-dependency-glob: |
+            **/*requirements*.txt
+            **/*requirements*.in
+            **/*constraints*.txt
+            **/*constraints*.in
+            **/pyproject.toml
+            **/uv.lock
+            **/*.py.lock
+            !**/diagnose_windows_python_home.py.lock
+      - name: Compare restored, fresh, and system Python
+        shell: pwsh
+        env:
+          PYTHON_CACHE_HIT: ${{ steps.uv.outputs.python-cache-hit }}
+        run: |
+          if ($env:PYTHON_CACHE_HIT -ne 'true') { throw 'The CI Python cache was unavailable' }
+          $PSNativeCommandUseErrorActionPreference = $true
+          $probe = Join-Path $env:GITHUB_WORKSPACE 'scripts/diagnose_windows_python_home.py'
+          $systemPython = uv python find --system --no-managed-python 3.12
+          $root = Join-Path $env:RUNNER_TEMP 'python-home-probes'
+          New-Item -ItemType Directory $root | Out-Null
+          @'
+          fn main() {
+              let path = std::env::args_os().nth(1).unwrap();
+              println!("std::fs::canonicalize({path:?}) = {:?}", std::fs::canonicalize(&path));
+          }
+          '@ | Set-Content "$root/canonicalize.rs"
+          rustc "$root/canonicalize.rs" -o "$root/canonicalize.exe"
+          Set-Location $root
+          $install = Get-Item -LiteralPath $env:UV_PYTHON_INSTALL_DIR
+          $tar = Join-Path $env:ProgramFiles 'Git/usr/bin/tar.exe'
+
+          function Test-PythonHome($case) {
+            Write-Host "::group::$case"
+            try {
+              $project = New-Item -ItemType Directory $case
+              Set-Content -Path "$project/pyproject.toml" -Value @(
+                '[project]', 'name = "probe"', 'version = "0"', 'requires-python = ">=3.8"'
+              )
+              $env:UV_CACHE_DIR = "$project/cache"
+              uv sync --project $project --offline --no-python-downloads --verbose
+              $config = "$project/.venv/pyvenv.cfg"
+              $pythonHome = (Select-String -Path $config -Pattern '^home = (.+)$').Matches[0].Groups[1].Value
+              & "$root/canonicalize.exe" $pythonHome
+              uv run --no-project --python $systemPython --script $probe $config
+            } finally {
+              Write-Host '::endgroup::'
+            }
+          }
+
+          Get-ChildItem -Force $env:UV_PYTHON_INSTALL_DIR | Format-Table Name, Attributes, LinkType, Target
+          Test-PythonHome 'restored'
+          $version = & '.\restored\.venv\Scripts\python.exe' -c 'import platform; print(platform.python_version())'
+          Write-Host "Comparing managed Python $version"
+
+          # Keep the install path identical. The managed installation's junction can contain an absolute target.
+          Rename-Item -LiteralPath $install.FullName -NewName 'python-before-probe'
+          Test-PythonHome 'system'
+          uv python install --no-bin $version
+          Test-PythonHome 'fresh'
+
+          & $tar --force-local --posix -cf "$root/python.tar" -C $install.Parent.FullName $install.Name
+          Rename-Item -LiteralPath $install.FullName -NewName 'python-before-tar'
+          & $tar --force-local -xf "$root/python.tar" -C $install.Parent.FullName
+          Test-PythonHome 'local-tar-restore'
