@@ -1036,7 +1036,7 @@ pub(super) fn check_inherited_conflict<'db>(
                 source.display(db, env),
                 target.display(db, env),
             )),
-            AttributeViolation::Write { target } => diagnostic.info(format_args!(
+            AttributeViolation::Write { target, .. } => diagnostic.info(format_args!(
                 "Inherited attribute does not accept writes of type `{}`",
                 target.display(db, env),
             )),
