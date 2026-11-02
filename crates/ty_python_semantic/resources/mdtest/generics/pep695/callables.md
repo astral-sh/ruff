@@ -308,6 +308,21 @@ reveal_type(generic_context(outside_callable(1)))
 outside_callable(1)("string")
 ```
 
+A type variable in an alias object's arguments also belongs to the factory, even if the alias value
+never uses that argument.
+
+```py
+from ty_extensions._internal import TypeOf
+
+type Tag[A] = int
+
+def tagged_factory[T](tag: TypeOf[Tag[T]]) -> Callable[[T], T]:
+    return lambda value: value
+
+# revealed: ty_extensions._internal.GenericContext[T@tagged_factory]
+reveal_type(generic_context(tagged_factory))
+```
+
 ## Naming a generic `Callable` with paramspecs: function return values
 
 The same pattern holds if the callable involves a paramspec.

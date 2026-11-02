@@ -297,6 +297,19 @@ def clear(values: set[Payload]) -> None:
     values.clear()  # ok
 ```
 
+## Iterables of type alias objects
+
+Checking an iterable of alias objects does not require evaluating their values, even when an alias's
+metadata iterates over the same collection.
+
+```py
+from typing import Annotated
+
+type Alias = Annotated[int, list(iter(aliases))]
+aliases = [Alias]
+aliases.extend([Alias])  # no diagnostic
+```
+
 ## Unpacking tuple aliases
 
 Both unpack spellings accept a tuple alias and preserve positional argument types and arity.

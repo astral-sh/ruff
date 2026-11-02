@@ -137,6 +137,16 @@ pub(crate) trait TypeVisitor<'db> {
         walk_known_instance_type(db, known_instance, self);
     }
 
+    /// Visit an alias used as a value, such as `Box[T]` in `values = [Box[T]]`.
+    /// Its specialization arguments are available without evaluating its lazy `__value__`.
+    fn visit_type_alias_object(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+        if self.should_visit_lazy_type_attributes() {
+            self.visit_type_alias_type(db, alias);
+        } else {
+            self.notify_skipped_lazy_type_attributes();
+        }
+    }
+
     fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
         walk_type_alias_type(db, type_alias, self);
     }
@@ -735,6 +745,10 @@ pub(super) fn may_contain_typevar_from<'db>(
             }
 
             walk_type_with_recursion_guard(db, ty, self, &self.visited_types);
+        }
+
+        fn visit_type_alias_object(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+            walk_type_alias_arguments(db, alias, self);
         }
 
         fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
