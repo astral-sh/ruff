@@ -1,3 +1,4 @@
+import asyncio
 import re
 import subprocess
 import sys
@@ -5,7 +6,9 @@ import tomllib
 from pathlib import Path
 
 import pytest
+from lsprotocol import types as lsp
 
+from benchmark.lsp_client import LSPClient
 from benchmark.projects import Project
 from benchmark.tool import Zuban
 from benchmark.venv import Venv
@@ -89,6 +92,58 @@ def test_zuban_checks_scope_untyped_code_and_project_dependencies(zuban_project)
     assert "outside.py" not in result.stdout
     assert "newer_python_only" not in result.stdout
     assert config.read_bytes() == original
+
+
+def test_zuban_lsp_checks_untyped_code_with_project_environment(zuban_project):
+    project, venv = zuban_project
+    tool = Zuban()
+    path = venv.project_path / "src" / "example" / "main.py"
+
+    async def fetch_diagnostics():
+        client = LSPClient()
+        try:
+            async with asyncio.timeout(20):
+                await client.start_io(
+                    *tool.lsp_command(project, venv), cwd=venv.project_path
+                )
+                await client.initialize_async(
+                    lsp.InitializeParams(
+                        root_uri=venv.project_path.as_uri(),
+                        initialization_options=tool.lsp_initialization_options(
+                            project, venv
+                        ),
+                        capabilities=lsp.ClientCapabilities(
+                            text_document=lsp.TextDocumentClientCapabilities(
+                                diagnostic=lsp.DiagnosticClientCapabilities()
+                            )
+                        ),
+                    )
+                )
+                client.initialized(lsp.InitializedParams())
+                client.text_document_did_open(
+                    lsp.DidOpenTextDocumentParams(
+                        text_document=lsp.TextDocumentItem(
+                            uri=path.as_uri(),
+                            language_id="python",
+                            version=1,
+                            text=path.read_text(),
+                        )
+                    )
+                )
+                diagnostics = await client.text_document_diagnostics_async(path)
+                await client.shutdown_async(None)
+                return diagnostics
+        finally:
+            client.exit(None)
+            await client.stop()
+
+    with tool.configure_lsp(project, venv):
+        diagnostics = asyncio.run(fetch_diagnostics())
+
+    assert len(diagnostics) == 1, diagnostics
+    assert (
+        'expression has type "str", variable has type "int"' in diagnostics[0].message
+    )
 
 
 @pytest.mark.parametrize(
