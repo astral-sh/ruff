@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_ast::{self as ast, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -50,10 +50,10 @@ impl Violation for SslInsecureVersion {
 }
 
 /// S502
-pub(crate) fn ssl_insecure_version(checker: &Checker, call: &ExprCall) {
+pub(crate) fn ssl_insecure_version(checker: &Checker, call: ast::ExprCall<'_>) {
     let Some(keyword) = checker
         .semantic()
-        .resolve_qualified_name(call.func.as_ref())
+        .resolve_qualified_name(call.func())
         .and_then(|qualified_name| match qualified_name.segments() {
             ["ssl", "wrap_socket"] => Some("ssl_version"),
             ["OpenSSL", "SSL", "Context"] => Some("method"),
@@ -63,12 +63,14 @@ pub(crate) fn ssl_insecure_version(checker: &Checker, call: &ExprCall) {
         return;
     };
 
-    let Some(keyword) = call.arguments.find_keyword(keyword) else {
+    let Some(keyword) = call.arguments().find_keyword(keyword) else {
         return;
     };
 
-    match &keyword.value {
-        Expr::Name(ast::ExprName { id, .. }) if is_insecure_protocol(id) => {
+    match keyword.value().classify() {
+        ExprKind::Name(expr_name) if is_insecure_protocol(expr_name.id()) => {
+            let id = expr_name.id();
+
             checker.report_diagnostic(
                 SslInsecureVersion {
                     protocol: id.to_string(),
@@ -76,7 +78,11 @@ pub(crate) fn ssl_insecure_version(checker: &Checker, call: &ExprCall) {
                 keyword.range(),
             );
         }
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) if is_insecure_protocol(attr) => {
+        ExprKind::Attribute(expr_attribute)
+            if is_insecure_protocol(expr_attribute.attr().as_str()) =>
+        {
+            let attr = expr_attribute.attr();
+
             checker.report_diagnostic(
                 SslInsecureVersion {
                     protocol: attr.to_string(),

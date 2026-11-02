@@ -1,9 +1,9 @@
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::comparable::ComparableLiteral;
+use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Stmt};
+use ruff_python_ast::{self as ast, CmpOp, Expr, ExprKind, Stmt, StmtIf};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::Ranged;
 
@@ -47,40 +47,35 @@ impl Violation for IfElseBlockInsteadOfDictLookup {
     }
 }
 /// SIM116
-pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &ast::StmtIf) {
+pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: StmtIf<'_>) {
     // Throughout this rule:
     // * Each if or elif statement's test must consist of a constant equality check with the same variable.
     // * Each if or elif statement's body must consist of a single `return`.
     // * The else clause must be empty, or a single `return`.
-    let ast::StmtIf {
-        body,
-        test,
-        elif_else_clauses,
-        ..
-    } = stmt_if;
+    let body = stmt_if.body();
+    let test = stmt_if.test();
+    let elif_else_clauses = stmt_if.elif_else_clauses();
 
-    let Expr::Compare(compare) = test.as_ref() else {
+    let ExprKind::Compare(compare) = test.classify() else {
         return;
     };
-    let Some((Expr::Name(ast::ExprName { id: target, .. }), CmpOp::Eq, expr)) = compare.as_single()
-    else {
+    let Some((left, CmpOp::Eq, expr)) = compare.as_single() else {
         return;
     };
+    let ExprKind::Name(name) = left.classify() else {
+        return;
+    };
+    let target = name.id();
     let Some(literal_expr) = expr.as_literal_expr() else {
         return;
     };
-    let [
-        Stmt::Return(ast::StmtReturn {
-            value,
-            range: _,
-            node_index: _,
-        }),
-    ] = body.as_slice()
+    let Some([ast::StmtFields::Return(ast::StmtReturnFields { value, .. })]) =
+        body.as_array().map(|items| items.map(Stmt::fields))
     else {
         return;
     };
 
-    if value.as_ref().is_some_and(|value| {
+    if value.is_some_and(|value| {
         contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
     }) {
         return;
@@ -97,49 +92,42 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
     }
 
     // The `expr` was checked to be a literal above, so this is safe.
-    let mut literals: FxHashSet<ComparableLiteral> = FxHashSet::default();
-    literals.insert(literal_expr.into());
+    let mut literals: FxHashSet<ComparableExpr> = FxHashSet::default();
+    literals.insert(literal_expr.view().into());
 
     for clause in elif_else_clauses {
-        let ElifElseClause { test, body, .. } = clause;
-        let [
-            Stmt::Return(ast::StmtReturn {
-                value,
-                range: _,
-                node_index: _,
-            }),
-        ] = body.as_slice()
+        let test = clause.test();
+        let body = clause.body();
+        let Some([ast::StmtFields::Return(ast::StmtReturnFields { value, .. })]) =
+            body.as_array().map(|items| items.map(Stmt::fields))
         else {
             return;
         };
 
-        match test.as_ref() {
+        match test.map(Expr::classify) {
             // `else`
             None => {
                 // The else must also be a single effect-free return statement
-                let [
-                    Stmt::Return(ast::StmtReturn {
-                        value,
-                        range: _,
-                        node_index: _,
-                    }),
-                ] = body.as_slice()
+                let Some([ast::StmtFields::Return(ast::StmtReturnFields { value, .. })]) =
+                    body.as_array().map(|items| items.map(Stmt::fields))
                 else {
                     return;
                 };
-                if value.as_ref().is_some_and(|value| {
+                if value.is_some_and(|value| {
                     contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
                 }) {
                     return;
                 }
             }
             // `elif`
-            Some(Expr::Compare(compare)) => {
-                let Some((Expr::Name(ast::ExprName { id, .. }), CmpOp::Eq, expr)) =
-                    compare.as_single()
-                else {
+            Some(ExprKind::Compare(compare)) => {
+                let Some((left, CmpOp::Eq, expr)) = compare.as_single() else {
                     return;
                 };
+                let ExprKind::Name(name) = left.classify() else {
+                    return;
+                };
+                let id = name.id();
                 if id != target {
                     return;
                 }
@@ -147,14 +135,14 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
                     return;
                 };
 
-                if value.as_ref().is_some_and(|value| {
+                if value.is_some_and(|value| {
                     contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
                 }) {
                     return;
                 }
 
                 // The `expr` was checked to be a literal above, so this is safe.
-                literals.insert(literal_expr.into());
+                literals.insert(literal_expr.view().into());
             }
             // Different `elif`
             _ => {

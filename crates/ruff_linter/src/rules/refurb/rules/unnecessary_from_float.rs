@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_ast::{Expr, ExprCall, ExprKind};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
@@ -87,10 +87,12 @@ impl Violation for UnnecessaryFromFloat {
 }
 
 /// FURB164
-pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = &*call.func else {
+pub(crate) fn unnecessary_from_float(checker: &Checker, call: ExprCall<'_>) {
+    let ExprKind::Attribute(attribute) = call.func().classify() else {
         return;
     };
+    let value = attribute.value();
+    let attr = attribute.attr();
 
     // The method name must be either `from_float` or `from_decimal`.
     let method_name = match attr.as_str() {
@@ -134,7 +136,7 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
         return;
     };
 
-    let constructor_name = checker.locator().slice(&**value).to_string();
+    let constructor_name = checker.locator().slice(value).to_string();
     let has_comments = checker.comment_ranges().intersects(call.range());
 
     // Special case for non-finite float literals: Decimal.from_float(float("inf")) -> Decimal("inf")
@@ -178,7 +180,7 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
 
 /// Check if the argument would be valid for the target constructor
 fn is_valid_argument_type(
-    arg_expr: &Expr,
+    arg_expr: Expr<'_>,
     method_name: MethodName,
     constructor: Constructor,
     checker: &Checker,
@@ -223,7 +225,7 @@ fn is_valid_argument_type(
             // First check if it's a Decimal constructor call
             let is_decimal_call = arg_expr
                 .as_call_expr()
-                .and_then(|call| semantic.resolve_qualified_name(&call.func))
+                .and_then(|call| semantic.resolve_qualified_name(call.func()))
                 .is_some_and(|qualified_name| {
                     matches!(qualified_name.segments(), ["decimal", "Decimal"])
                 });
@@ -246,11 +248,11 @@ fn is_valid_argument_type(
 
 /// Check if the call has valid arguments for the from_* method
 fn has_valid_method_arguments(
-    call: &ExprCall,
+    call: ExprCall<'_>,
     method_name: MethodName,
     constructor: Constructor,
-) -> Option<&Expr> {
-    if call.arguments.len() != 1 {
+) -> Option<Expr<'_>> {
+    if call.arguments().len() != 1 {
         return None;
     }
 
@@ -259,25 +261,25 @@ fn has_valid_method_arguments(
             // Decimal.from_float is positional-only; Fraction.from_float allows keyword 'f'.
             if constructor == Constructor::Decimal {
                 // Only allow positional argument for Decimal.from_float
-                call.arguments.find_positional(0)
+                call.arguments().find_positional(0)
             } else {
                 // Fraction.from_float allows either positional or 'f' keyword
-                call.arguments.find_argument_value("f", 0)
+                call.arguments().find_argument_value("f", 0)
             }
         }
         MethodName::FromDecimal => {
             // from_decimal(dec) - should have exactly one positional argument or 'dec' keyword
-            call.arguments.find_argument_value("dec", 0)
+            call.arguments().find_argument_value("dec", 0)
         }
     }
 }
 
 /// Handle the special case for non-finite float literals
 fn handle_non_finite_float_special_case(
-    call: &ExprCall,
+    call: ExprCall<'_>,
     method_name: MethodName,
     constructor: Constructor,
-    arg_value: &Expr,
+    arg_value: Expr<'_>,
     constructor_name: &str,
     checker: &Checker,
 ) -> Option<Edit> {
@@ -289,12 +291,11 @@ fn handle_non_finite_float_special_case(
         return None;
     }
 
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = arg_value
-    else {
+    let ExprKind::Call(call_node) = arg_value.classify() else {
         return None;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
     // Must be a call to the `float` builtin.
     if !checker.semantic().match_builtin_expr(func, "float") {
@@ -302,12 +303,10 @@ fn handle_non_finite_float_special_case(
     }
 
     // Must have exactly one argument, which is a string literal.
-    if !arguments.keywords.is_empty() {
+    if !arguments.keywords().is_empty() {
         return None;
     }
-    let [float_arg] = arguments.args.as_ref() else {
-        return None;
-    };
+    let [float_arg] = arguments.args().as_array()?;
     let normalized = as_non_finite_float_string_literal(float_arg)?;
     let replacement_text = format!(
         r#"{constructor_name}("{}")"#,

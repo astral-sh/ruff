@@ -1,17 +1,16 @@
 use std::num::NonZeroU32;
-use std::sync::atomic::{AtomicU32, Ordering};
 
 /// An AST node that has an index.
 pub trait HasNodeIndex {
-    /// Returns the [`AtomicNodeIndex`] for this node.
-    fn node_index(&self) -> &AtomicNodeIndex;
+    /// Returns the key of this node in its module or string annotation.
+    fn node_index(&self) -> NodeIndex;
 }
 
 impl<T> HasNodeIndex for &T
 where
     T: HasNodeIndex,
 {
-    fn node_index(&self) -> &AtomicNodeIndex {
+    fn node_index(&self) -> NodeIndex {
         T::node_index(*self)
     }
 }
@@ -61,12 +60,8 @@ where
 pub struct NodeIndex(NonZeroU32);
 
 impl NodeIndex {
-    /// A placeholder `NodeIndex`.
-    const NONE: NodeIndex = NodeIndex(NonZeroU32::new(NodeIndex::_NONE).unwrap());
-
-    // Note that the index `u32::MAX` is reserved for the `NonZeroU32` niche, and
-    // this placeholder also reserves the second highest index.
-    const _NONE: u32 = u32::MAX - 1;
+    /// Placeholder for a node without an assigned index, such as a node created for a fix.
+    pub const NONE: Self = Self(NonZeroU32::new(u32::MAX - 1).unwrap());
 
     /// Returns the index as a `u32`. or `None` for `NodeIndex::NONE`.
     pub fn as_u32(self) -> Option<u32> {
@@ -97,7 +92,7 @@ const SUB_SUB_NODES: u32 = 8;
 pub const MAX_REAL_INDEX: u32 = (1 << LEVEL_SHIFT) - 1;
 
 /// sub-AST level is stored in the top two bits
-pub fn sub_ast_level(index: u32) -> u32 {
+pub(crate) fn sub_ast_level(index: u32) -> u32 {
     (index & LEVEL_MASK) >> LEVEL_SHIFT
 }
 
@@ -134,6 +129,12 @@ pub fn sub_indices(index: u32) -> Result<(u32, u32), NodeIndexError> {
     Ok((first_index, last_index))
 }
 
+impl Default for NodeIndex {
+    fn default() -> Self {
+        Self::NONE
+    }
+}
+
 impl From<u32> for NodeIndex {
     fn from(value: u32) -> Self {
         match NonZeroU32::new(value + 1).map(NodeIndex) {
@@ -153,107 +154,16 @@ impl std::fmt::Debug for NodeIndex {
     }
 }
 
-/// A unique index for a node within an AST.
-///
-/// This type is interiorly mutable to allow assigning node indices
-/// on-demand after parsing.
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct AtomicNodeIndex(AtomicU32);
-
-#[expect(clippy::declare_interior_mutable_const)]
-impl AtomicNodeIndex {
-    /// A placeholder `AtomicNodeIndex`.
-    pub const NONE: AtomicNodeIndex = AtomicNodeIndex(AtomicU32::new(NodeIndex::_NONE));
-
-    /// Load the current value of the `AtomicNodeIndex`.
-    pub fn load(&self) -> NodeIndex {
-        let index = NonZeroU32::new(self.0.load(Ordering::Relaxed))
-            .expect("value stored was a valid `NodeIndex`");
-
-        NodeIndex(index)
-    }
-
-    /// Set the value of the `AtomicNodeIndex`.
-    pub fn set(&self, index: NodeIndex) {
-        self.0.store(index.0.get(), Ordering::Relaxed);
-    }
-}
-
-impl Default for AtomicNodeIndex {
-    fn default() -> Self {
-        Self::NONE
-    }
-}
-
-impl std::fmt::Debug for AtomicNodeIndex {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(&self.load(), f)
-    }
-}
-
-impl std::hash::Hash for AtomicNodeIndex {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.load().hash(state);
-    }
-}
-
-impl PartialOrd for AtomicNodeIndex {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for AtomicNodeIndex {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.load().cmp(&other.load())
-    }
-}
-
-impl Eq for AtomicNodeIndex {}
-
-impl PartialEq for AtomicNodeIndex {
-    fn eq(&self, other: &Self) -> bool {
-        self.load() == other.load()
-    }
-}
-
-impl PartialEq<NodeIndex> for AtomicNodeIndex {
-    fn eq(&self, other: &NodeIndex) -> bool {
-        self.load() == *other
-    }
-}
-
-impl PartialEq<AtomicNodeIndex> for NodeIndex {
-    fn eq(&self, other: &AtomicNodeIndex) -> bool {
-        *self == other.load()
-    }
-}
-
-impl Clone for AtomicNodeIndex {
-    fn clone(&self) -> Self {
-        Self(AtomicU32::from(self.0.load(Ordering::Relaxed)))
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{AtomicNodeIndex, NodeIndex};
+    use super::NodeIndex;
 
     #[test]
-    fn test_node_index() {
-        let index = AtomicNodeIndex::NONE;
-
-        assert_eq!(index.load(), NodeIndex::NONE);
-        assert_eq!(format!("{index:?}"), "NodeIndex(None)");
-
-        index.set(NodeIndex::from(1));
-        assert_eq!(index.load(), NodeIndex::from(1));
-        assert_eq!(index.load().as_u32(), Some(1));
-
-        let index = NodeIndex::from(0);
-        assert_eq!(index.as_u32(), Some(0));
-
-        let index = NodeIndex::NONE;
-        assert_eq!(index.as_u32(), None);
+    fn node_index() {
+        assert_eq!(NodeIndex::default(), NodeIndex::NONE);
+        assert_eq!(NodeIndex::NONE.as_u32(), None);
+        assert_eq!(format!("{:?}", NodeIndex::NONE), "NodeIndex(None)");
+        assert_eq!(NodeIndex::from(0).as_u32(), Some(0));
+        assert_eq!(NodeIndex::from(1).as_u32(), Some(1));
     }
 }

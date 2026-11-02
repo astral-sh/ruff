@@ -53,7 +53,7 @@ impl Violation for NumpyDeprecatedTypeAlias {
 }
 
 /// NPY001
-pub(crate) fn deprecated_type_alias(checker: &Checker, expr: &Expr) {
+pub(crate) fn deprecated_type_alias(checker: &Checker, &expr: &Expr<'_>) {
     if !checker.semantic().seen_module(Modules::NUMPY) {
         return;
     }

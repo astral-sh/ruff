@@ -3,7 +3,7 @@ use rustc_hash::FxHashMap;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::StoredNameFinder;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, ExprName};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -49,15 +49,15 @@ impl Violation for StaticKeyDictComprehension {
 }
 
 /// B035, RUF011
-pub(crate) fn static_key_dict_comprehension(checker: &Checker, dict_comp: &ast::ExprDictComp) {
-    let Some(key) = dict_comp.key.as_deref() else {
+pub(crate) fn static_key_dict_comprehension(checker: &Checker, dict_comp: ast::ExprDictComp<'_>) {
+    let Some(key) = dict_comp.key() else {
         return;
     };
 
     // Collect the bound names in the comprehension's generators.
     let names = {
         let mut visitor = StoredNameFinder::default();
-        for generator in &dict_comp.generators {
+        for generator in dict_comp.generators() {
             visitor.visit_comprehension(generator);
         }
         visitor.names
@@ -75,22 +75,28 @@ pub(crate) fn static_key_dict_comprehension(checker: &Checker, dict_comp: &ast::
 
 /// Returns `true` if the given expression is a constant in the context of the dictionary
 /// comprehension.
-fn is_constant(key: &Expr, names: &FxHashMap<&str, &ast::ExprName>) -> bool {
-    match key {
-        Expr::Tuple(tuple) => tuple.iter().all(|elem| is_constant(elem, names)),
-        Expr::Name(ast::ExprName { id, .. }) => !names.contains_key(id.as_str()),
-        Expr::Attribute(ast::ExprAttribute { value, .. }) => is_constant(value, names),
-        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+fn is_constant(key: Expr<'_>, names: &FxHashMap<&str, ExprName<'_>>) -> bool {
+    match key.fields() {
+        ast::ExprFields::Tuple(ast::ExprTupleFields { node: tuple, .. }) => {
+            tuple.iter().all(|elem| is_constant(elem, names))
+        }
+        ast::ExprFields::Name(ast::ExprNameFields { id, .. }) => !names.contains_key(id.as_str()),
+        ast::ExprFields::Attribute(ast::ExprAttributeFields { value, .. }) => {
+            is_constant(value, names)
+        }
+        ast::ExprFields::Subscript(ast::ExprSubscriptFields { value, slice, .. }) => {
             is_constant(value, names) && is_constant(slice, names)
         }
-        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
+        ast::ExprFields::BinOp(ast::ExprBinOpFields { left, right, .. }) => {
             is_constant(left, names) && is_constant(right, names)
         }
-        Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
+        ast::ExprFields::BoolOp(ast::ExprBoolOpFields { values, .. }) => {
             values.iter().all(|value| is_constant(value, names))
         }
-        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => is_constant(operand, names),
-        expr if expr.is_literal_expr() => true,
+        ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields { operand, .. }) => {
+            is_constant(operand, names)
+        }
+        expr if expr.view().is_literal_expr() => true,
         _ => false,
     }
 }

@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, UnaryOp};
+use ruff_python_ast::{self as ast, ExprKind, UnaryOp};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -42,49 +42,42 @@ impl Violation for UnnecessarySubscriptReversal {
 }
 
 /// C415
-pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: &ast::ExprCall) {
-    let Some(first_arg) = call.arguments.args.first() else {
+pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: ast::ExprCall<'_>) {
+    let Some(first_arg) = call.arguments().args().first() else {
         return;
     };
-    let Expr::Subscript(ast::ExprSubscript { slice, .. }) = first_arg else {
+    let ExprKind::Subscript(subscript_node) = first_arg.classify() else {
         return;
     };
-    let Expr::Slice(ast::ExprSlice {
-        lower,
-        upper,
-        step,
-        range: _,
-        node_index: _,
-    }) = slice.as_ref()
-    else {
+    let slice = subscript_node.slice();
+    let ExprKind::Slice(slice_node) = slice.classify() else {
         return;
     };
+    let lower = slice_node.lower();
+    let upper = slice_node.upper();
+    let step = slice_node.step();
     if lower.is_some() || upper.is_some() {
         return;
     }
-    let Some(step) = step.as_ref() else {
+    let Some(step) = step else {
         return;
     };
-    let Expr::UnaryOp(ast::ExprUnaryOp {
+    let ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
         op: UnaryOp::USub,
         operand,
         range: _,
-        node_index: _,
-    }) = step.as_ref()
+        node: _,
+    }) = step.fields()
     else {
         return;
     };
-    let Expr::NumberLiteral(ast::ExprNumberLiteral {
-        value: ast::Number::Int(val),
-        ..
-    }) = operand.as_ref()
-    else {
+    let Some(val) = operand.as_int_literal() else {
         return;
     };
     if *val != 1 {
         return;
     }
-    let Some(function_name) = checker.semantic().resolve_builtin_symbol(&call.func) else {
+    let Some(function_name) = checker.semantic().resolve_builtin_symbol(call.func()) else {
         return;
     };
     if !matches!(function_name, "reversed" | "set" | "sorted") {

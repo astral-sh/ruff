@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
+use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -38,13 +38,13 @@ impl Violation for SslWithNoVersion {
 }
 
 /// S504
-pub(crate) fn ssl_with_no_version(checker: &Checker, call: &ExprCall) {
+pub(crate) fn ssl_with_no_version(checker: &Checker, call: ast::ExprCall<'_>) {
     if checker
         .semantic()
-        .resolve_qualified_name(call.func.as_ref())
+        .resolve_qualified_name(call.func())
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["ssl", "wrap_socket"]))
     {
-        if call.arguments.find_keyword("ssl_version").is_none() {
+        if call.arguments().find_keyword("ssl_version").is_none() {
             checker.report_diagnostic(SslWithNoVersion, call.range());
         }
     }

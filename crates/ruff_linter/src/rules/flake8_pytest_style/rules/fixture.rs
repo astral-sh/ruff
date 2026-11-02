@@ -1,11 +1,11 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Decorator;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, Parameters, Stmt};
+use ruff_python_ast::{
+    self as ast, Decorator, Expr, ExprKind, NodeList, Parameters, Stmt, StmtKind, Suite, visitor,
+};
 use ruff_python_semantic::analyze::visibility::is_abstract;
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
@@ -668,43 +668,41 @@ impl AlwaysFixableViolation for PytestUnnecessaryAsyncioMarkOnFixture {
 struct SkipFunctionsVisitor<'a> {
     has_return_with_value: bool,
     has_yield_from: bool,
-    yield_statements: Vec<&'a Expr>,
-    addfinalizer_call: Option<&'a Expr>,
+    yield_statements: Vec<Expr<'a>>,
+    addfinalizer_call: Option<Expr<'a>>,
 }
 
 impl<'a> Visitor<'a> for SkipFunctionsVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::Return(ast::StmtReturn {
-                value,
-                range: _,
-                node_index: _,
-            }) => {
+    fn visit_stmt(&mut self, stmt: Stmt<'a>) {
+        match stmt.classify() {
+            StmtKind::Return(stmt_return) => {
+                let value = stmt_return.value();
+
                 if value.is_some() {
                     self.has_return_with_value = true;
                 }
             }
-            Stmt::FunctionDef(_) => {}
+            StmtKind::FunctionDef(_) => {}
             _ => visitor::walk_stmt(self, stmt),
         }
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::YieldFrom(_) => {
+    fn visit_expr(&mut self, expr: Expr<'a>) {
+        match expr.classify() {
+            ExprKind::YieldFrom(_) => {
                 self.has_yield_from = true;
             }
-            Expr::Yield(ast::ExprYield {
-                value,
-                range: _,
-                node_index: _,
-            }) => {
+            ExprKind::Yield(expr_yield) => {
+                let value = expr_yield.value();
+
                 self.yield_statements.push(expr);
                 if value.is_some() {
                     self.has_return_with_value = true;
                 }
             }
-            Expr::Call(ast::ExprCall { func, .. }) => {
+            ExprKind::Call(expr_call) => {
+                let func = expr_call.func();
+
                 if UnqualifiedName::from_expr(func)
                     .is_some_and(|name| matches!(name.segments(), ["request", "addfinalizer"]))
                 {
@@ -717,16 +715,19 @@ impl<'a> Visitor<'a> for SkipFunctionsVisitor<'a> {
     }
 }
 
-fn fixture_decorator<'a>(decorators: &'a [Decorator], checker: &Checker) -> Option<&'a Decorator> {
+fn fixture_decorator<'a>(
+    decorators: NodeList<'a, ruff_python_ast::kind::Decorator>,
+    checker: &Checker,
+) -> Option<Decorator<'a>> {
     decorators.iter().find(|decorator| {
-        is_pytest_fixture(decorator, checker)
-            || is_pytest_yield_fixture(decorator, checker.semantic())
+        is_pytest_fixture(*decorator, checker)
+            || is_pytest_yield_fixture(*decorator, checker.semantic())
     })
 }
 
 fn pytest_fixture_parentheses(
     checker: &Checker,
-    decorator: &Decorator,
+    decorator: Decorator<'_>,
     fix: Fix,
     expected: Parentheses,
     actual: Parentheses,
@@ -739,18 +740,15 @@ fn pytest_fixture_parentheses(
 }
 
 /// PT001, PT002, PT003
-fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decorator) {
-    match &decorator.expression {
-        Expr::Call(ast::ExprCall {
-            func: _,
-            arguments,
-            range_start: _,
-            node_index: _,
-        }) => {
+fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: Decorator<'_>) {
+    match decorator.expression().classify() {
+        ExprKind::Call(expr_call) => {
+            let arguments = expr_call.arguments();
+
             if checker.is_rule_enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {
                 if !checker.settings().flake8_pytest_style.fixture_parentheses
-                    && arguments.args.is_empty()
-                    && arguments.keywords.is_empty()
+                    && arguments.args().is_empty()
+                    && arguments.keywords().is_empty()
                 {
                     let fix = Fix::applicable_edit(
                         Edit::range_deletion(arguments.range()),
@@ -771,7 +769,7 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
             }
 
             if checker.is_rule_enabled(Rule::PytestFixturePositionalArgs) {
-                if !arguments.args.is_empty() {
+                if !arguments.args().is_empty() {
                     checker.report_diagnostic(
                         PytestFixturePositionalArgs {
                             function: func_name.to_string(),
@@ -788,7 +786,7 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
                             .report_diagnostic(PytestExtraneousScopeFunction, keyword.range());
                         diagnostic.try_set_fix(|| {
                             edits::remove_argument(
-                                keyword,
+                                &keyword,
                                 arguments,
                                 edits::Parentheses::Preserve,
                                 checker.source(),
@@ -821,7 +819,12 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
 }
 
 /// PT022
-fn check_fixture_returns(checker: &Checker, name: &str, body: &[Stmt], returns: Option<&Expr>) {
+fn check_fixture_returns(
+    checker: &Checker,
+    name: &str,
+    body: Suite<'_>,
+    returns: Option<Expr<'_>>,
+) {
     let mut visitor = SkipFunctionsVisitor::default();
 
     for stmt in body {
@@ -832,9 +835,10 @@ fn check_fixture_returns(checker: &Checker, name: &str, body: &[Stmt], returns: 
         let Some(stmt) = body.last() else {
             return;
         };
-        let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
+        let StmtKind::Expr(expr_node) = stmt.classify() else {
             return;
         };
+        let value = expr_node.value();
         if !value.is_yield_expr() {
             return;
         }
@@ -852,11 +856,12 @@ fn check_fixture_returns(checker: &Checker, name: &str, body: &[Stmt], returns: 
             TextRange::at(stmt.start(), "yield".text_len()),
         );
         let return_type_edit = returns.and_then(|returns| {
-            let ast::ExprSubscript { value, slice, .. } = returns.as_subscript_expr()?;
-            let ast::ExprTuple { elts, .. } = slice.as_tuple_expr()?;
-            let [first, ..] = elts.as_slice() else {
-                return None;
-            };
+            let expr_subscript = returns.as_subscript_expr()?;
+            let value = expr_subscript.value();
+            let slice = expr_subscript.slice();
+            let expr_tuple = slice.as_tuple_expr()?;
+            let elts = expr_tuple.elts();
+            let (first, _) = elts.split_first()?;
             if !checker.semantic().match_typing_expr(value, "Generator") {
                 return None;
             }
@@ -874,21 +879,25 @@ fn check_fixture_returns(checker: &Checker, name: &str, body: &[Stmt], returns: 
 }
 
 /// PT019
-fn check_test_function_args(checker: &Checker, parameters: &Parameters, decorators: &[Decorator]) {
+fn check_test_function_args(
+    checker: &Checker,
+    parameters: Parameters<'_>,
+    decorators: NodeList<'_, ruff_python_ast::kind::Decorator>,
+) {
     let mut named_parametrize = FxHashSet::default();
     for decorator in decorators.iter().filter(|decorator| {
-        UnqualifiedName::from_expr(map_callable(&decorator.expression))
+        UnqualifiedName::from_expr(map_callable(decorator.expression()))
             .is_some_and(|name| matches!(name.segments(), ["pytest", "mark", "parametrize"]))
     }) {
-        let Some(call_expr) = decorator.expression.as_call_expr() else {
+        let Some(call_expr) = decorator.expression().as_call_expr() else {
             continue;
         };
-        let Some(first_arg) = call_expr.arguments.find_argument_value("argnames", 0) else {
+        let Some(first_arg) = call_expr.arguments().find_argument_value("argnames", 0) else {
             continue;
         };
 
-        match first_arg {
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+        match first_arg.fields() {
+            ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { value, .. }) => {
                 named_parametrize.extend(
                     value
                         .to_str()
@@ -898,17 +907,19 @@ fn check_test_function_args(checker: &Checker, parameters: &Parameters, decorato
                 );
             }
 
-            Expr::Name(_) => return,
-            Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })
-                if elts.iter().any(Expr::is_name_expr) =>
+            ast::ExprFields::Name(_) => return,
+            ast::ExprFields::List(ast::ExprListFields { elts, .. })
+            | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
+                if elts.iter().any(ruff_python_ast::Expr::is_name_expr) =>
             {
                 return;
             }
-            Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            ast::ExprFields::List(ast::ExprListFields { elts, .. })
+            | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => {
                 named_parametrize.extend(
                     elts.iter()
-                        .filter_map(Expr::as_string_literal_expr)
-                        .map(|param| param.value.to_str().trim())
+                        .filter_map(ruff_python_ast::Expr::as_string_literal_expr)
+                        .map(|param| param.value().to_str().trim())
                         .filter(|param| !param.is_empty() && param.starts_with('_')),
                 );
             }
@@ -930,7 +941,7 @@ fn check_test_function_args(checker: &Checker, parameters: &Parameters, decorato
 }
 
 /// PT020
-fn check_fixture_decorator_name(checker: &Checker, decorator: &Decorator) {
+fn check_fixture_decorator_name(checker: &Checker, decorator: Decorator<'_>) {
     if is_pytest_yield_fixture(decorator, checker.semantic()) {
         let mut diagnostic =
             checker.report_diagnostic(PytestDeprecatedYieldFixture, decorator.range());
@@ -940,7 +951,7 @@ fn check_fixture_decorator_name(checker: &Checker, decorator: &Decorator) {
             return;
         }
 
-        let reference = map_callable(&decorator.expression);
+        let reference = map_callable(decorator.expression());
 
         // Mark the fix as unsafe when comments are in range, as replacing the
         // reference would remove them.
@@ -966,7 +977,7 @@ fn check_fixture_decorator_name(checker: &Checker, decorator: &Decorator) {
 }
 
 /// PT021
-fn check_fixture_addfinalizer(checker: &Checker, parameters: &Parameters, body: &[Stmt]) {
+fn check_fixture_addfinalizer(checker: &Checker, parameters: Parameters<'_>, body: Suite<'_>) {
     if !parameters.includes("request") {
         return;
     }
@@ -983,7 +994,10 @@ fn check_fixture_addfinalizer(checker: &Checker, parameters: &Parameters, body: 
 }
 
 /// PT024, PT025
-fn check_fixture_marks(checker: &Checker, decorators: &[Decorator]) {
+fn check_fixture_marks(
+    checker: &Checker,
+    decorators: NodeList<'_, ruff_python_ast::kind::Decorator>,
+) {
     for (expr, marker) in get_mark_decorators(decorators, checker.semantic()) {
         if checker.is_rule_enabled(Rule::PytestUnnecessaryAsyncioMarkOnFixture) {
             if marker == "asyncio" {
@@ -1008,10 +1022,10 @@ fn check_fixture_marks(checker: &Checker, decorators: &[Decorator]) {
 pub(crate) fn fixture(
     checker: &Checker,
     name: &str,
-    parameters: &Parameters,
-    returns: Option<&Expr>,
-    decorators: &[Decorator],
-    body: &[Stmt],
+    parameters: Parameters<'_>,
+    returns: Option<Expr<'_>>,
+    decorators: NodeList<'_, ruff_python_ast::kind::Decorator>,
+    body: Suite<'_>,
 ) {
     let decorator = fixture_decorator(decorators, checker);
     if let Some(decorator) = decorator {

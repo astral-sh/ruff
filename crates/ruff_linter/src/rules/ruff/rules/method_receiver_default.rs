@@ -1,6 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{self as ast};
 use ruff_python_semantic::analyze::function_type::is_class_method;
 use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_text_size::Ranged;
@@ -71,14 +70,11 @@ impl Violation for MethodReceiverDefault {
 
 /// RUF077 — Method receiver parameter should not have a default value
 pub(crate) fn method_receiver_default(checker: &Checker, scope: &Scope) {
-    let ScopeKind::Function(ast::StmtFunctionDef {
-        parameters,
-        decorator_list,
-        ..
-    }) = &scope.kind
-    else {
+    let ScopeKind::Function(stmt_function_def) = &scope.kind else {
         return;
     };
+    let parameters = stmt_function_def.parameters();
+    let decorator_list = stmt_function_def.decorator_list();
 
     let semantic = checker.semantic();
 
@@ -96,9 +92,9 @@ pub(crate) fn method_receiver_default(checker: &Checker, scope: &Scope) {
     // makes it a `@classmethod`; any other single decorator (e.g. `@staticmethod`, `@override`,
     // a custom wrapper) or more than one decorator could change how the first parameter is
     // bound, so we bail out rather than risk a false positive.
-    let has_receiver = match decorator_list.as_slice() {
-        [] => true,
-        [decorator] => is_class_method(
+    let has_receiver = match decorator_list.as_array() {
+        None if decorator_list.is_empty() => true,
+        Some([decorator]) => is_class_method(
             decorator,
             semantic,
             &checker.settings().pep8_naming.classmethod_decorators,
@@ -112,28 +108,24 @@ pub(crate) fn method_receiver_default(checker: &Checker, scope: &Scope) {
 
     // Get the first parameter (the receiver)
     let Some(first_param) = parameters
-        .posonlyargs
+        .posonlyargs()
         .first()
-        .or_else(|| parameters.args.first())
+        .or_else(|| parameters.args().first())
     else {
         return;
     };
 
     // Check if the receiver parameter has a default value
-    let Some(default_expr) = &first_param.default else {
+    let Some(default_expr) = first_param.default() else {
         return;
     };
 
     // Account for a parenthesized default (e.g. `self=(None)`) so the fix removes the
     // parentheses along with the default value.
-    let default_range = parenthesized_range(
-        default_expr.as_ref().into(),
-        first_param.into(),
-        checker.tokens(),
-    )
-    .unwrap_or(default_expr.range());
+    let default_range = parenthesized_range(default_expr, first_param.into(), checker.tokens())
+        .unwrap_or(default_expr.range());
 
-    let edit = Edit::deletion(first_param.parameter.end(), default_range.end());
+    let edit = Edit::deletion(first_param.parameter().end(), default_range.end());
 
     checker
         .report_diagnostic(MethodReceiverDefault, default_expr.range())

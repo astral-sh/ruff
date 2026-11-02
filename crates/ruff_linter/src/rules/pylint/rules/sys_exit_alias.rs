@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
+use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -72,8 +72,8 @@ impl Violation for SysExitAlias {
 }
 
 /// PLR1722
-pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
-    let Some(builtin) = checker.semantic().resolve_builtin_symbol(&call.func) else {
+pub(crate) fn sys_exit_alias(checker: &Checker, call: ast::ExprCall<'_>) {
+    let Some(builtin) = checker.semantic().resolve_builtin_symbol(call.func()) else {
         return;
     };
     if !matches!(builtin, "exit" | "quit") {
@@ -83,31 +83,31 @@ pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
         SysExitAlias {
             name: builtin.to_string(),
         },
-        call.func.range(),
+        call.func().range(),
     );
 
     let has_star_kwargs = call
-        .arguments
-        .keywords
+        .arguments()
+        .keywords()
         .iter()
-        .any(|kwarg| kwarg.arg.is_none());
+        .any(|kwarg| kwarg.arg().is_none());
     // only one optional argument allowed, and we can't convert **kwargs
-    if call.arguments.len() > 1 || has_star_kwargs {
+    if call.arguments().len() > 1 || has_star_kwargs {
         return;
     }
 
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("sys", "exit"),
-            call.func.start(),
+            call.func().start(),
             checker.semantic(),
         )?;
-        let reference_edit = Edit::range_replacement(binding, call.func.range());
+        let reference_edit = Edit::range_replacement(binding, call.func().range());
         let mut edits = vec![reference_edit];
-        if let Some(kwarg) = call.arguments.find_keyword("code") {
+        if let Some(kwarg) = call.arguments().find_keyword("code") {
             edits.push(Edit::range_replacement(
-                checker.source()[kwarg.value.range()].to_string(),
-                kwarg.range,
+                checker.source()[kwarg.value().range()].to_string(),
+                kwarg.range(),
             ));
         }
         Ok(Fix::unsafe_edits(import_edit, edits))

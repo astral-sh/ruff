@@ -1,8 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{
-    self as ast, DecoratorList, Expr, ExprEllipsisLiteral, ExprLambda, Identifier, Parameter,
-    ParameterWithDefault, Parameters, Stmt,
+    self as ast, BuildId, Builder, Expr, ExprKind, ExprLambda, ListId, NodeList,
+    ParameterWithDefault, Parameters, Stmt, build,
 };
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
@@ -11,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::fix::syntax;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -68,16 +69,17 @@ impl Violation for LambdaAssignment {
 /// E731
 pub(crate) fn lambda_assignment(
     checker: &Checker,
-    target: &Expr,
-    value: &Expr,
-    annotation: Option<&Expr>,
-    stmt: &Stmt,
+    target: Expr<'_>,
+    value: Expr<'_>,
+    annotation: Option<Expr<'_>>,
+    stmt: Stmt<'_>,
 ) {
-    let Expr::Name(ast::ExprName { id, .. }) = target else {
+    let ExprKind::Name(name_node) = target.classify() else {
         return;
     };
+    let id = name_node.id();
 
-    let Expr::Lambda(lambda) = value else {
+    let ExprKind::Lambda(lambda) = value.classify() else {
         return;
     };
 
@@ -137,20 +139,25 @@ pub(crate) fn lambda_assignment(
     }
 }
 
+struct CallableTypes<'a> {
+    arg_types: Option<NodeList<'a, ast::kind::Expr>>,
+    return_type: Expr<'a>,
+}
+
 /// Extract the argument types and return type from a `Callable` annotation.
 /// The `Callable` import can be from either `collections.abc` or `typing`.
-/// If an ellipsis is used for the argument types, an empty list is returned.
-/// The returned values are cloned, so they can be used as-is.
-fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Expr>, Expr)> {
-    let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = &annotation else {
+/// A literal parameter list supplies the individual argument annotations.
+fn extract_types<'a>(annotation: Expr<'a>, semantic: &SemanticModel) -> Option<CallableTypes<'a>> {
+    let ExprKind::Subscript(subscript) = annotation.classify() else {
         return None;
     };
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() else {
+    let value = subscript.value();
+    let slice = subscript.slice();
+    let ExprKind::Tuple(tuple) = slice.classify() else {
         return None;
     };
-    let [param_types, return_type] = elts.as_slice() else {
-        return None;
-    };
+    let elts = tuple.elts();
+    let [param_types, return_type] = elts.as_array()?;
 
     if !semantic
         .resolve_qualified_name(value)
@@ -168,116 +175,101 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
     // specification (e.g., a `ParamSpec`), or ellipsis.
     // For parameter specifications, we cannot assign per-parameter annotations,
     // but we can still preserve the return type annotation.
-    let params = match param_types {
-        Expr::List(ast::ExprList { elts, .. }) => elts.clone(),
-        Expr::EllipsisLiteral(_) => vec![],
-        // Treat any other form (e.g., `ParamSpec`, `Concatenate`, etc.) as a
-        // parameter specification: do not annotate individual parameters, but
-        // keep the return type.
-        _ => vec![],
-    };
-
-    // The second argument to `Callable` must be a type.
-    let return_type = return_type.clone();
-
-    Some((params, return_type))
+    let params = param_types.as_list_expr().map(ast::ExprList::elts);
+    Some(CallableTypes {
+        arg_types: params,
+        return_type,
+    })
 }
 
 /// Generate a function definition from a `lambda` expression.
 fn function(
     name: &str,
-    lambda: &ExprLambda,
-    annotation: Option<&Expr>,
-    stmt: &Stmt,
+    lambda: ExprLambda<'_>,
+    annotation: Option<Expr<'_>>,
+    stmt: Stmt<'_>,
     checker: &Checker,
 ) -> String {
-    // Use a dummy body. It gets replaced at the end with the actual body.
-    // This allows preserving the source formatting for the body.
-    let body = Stmt::Return(ast::StmtReturn {
-        value: Some(Box::new(Expr::EllipsisLiteral(
-            ExprEllipsisLiteral::default(),
-        ))),
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    });
-    let parameters = lambda.parameters.as_deref().cloned().unwrap_or_default();
-    if let Some(annotation) = annotation {
-        if let Some((arg_types, return_type)) = extract_types(annotation, checker.semantic()) {
-            // A `lambda` expression can only have positional-only and positional-or-keyword
-            // arguments. The order is always positional-only first, then positional-or-keyword.
-            let new_posonlyargs = parameters
-                .posonlyargs
-                .iter()
-                .enumerate()
-                .map(|(idx, parameter)| ParameterWithDefault {
-                    parameter: Parameter {
-                        annotation: arg_types
-                            .get(idx)
-                            .map(|arg_type| Box::new(arg_type.clone())),
-                        ..parameter.parameter.clone()
-                    },
-                    ..parameter.clone()
-                })
-                .collect::<ast::ParameterWithDefaults>();
-            let new_args = parameters
-                .args
-                .iter()
-                .enumerate()
-                .map(|(idx, parameter)| ParameterWithDefault {
-                    parameter: Parameter {
-                        annotation: arg_types
-                            .get(idx + new_posonlyargs.len())
-                            .map(|arg_type| Box::new(arg_type.clone())),
-                        ..parameter.parameter.clone()
-                    },
-                    ..parameter.clone()
-                })
-                .collect::<ast::ParameterWithDefaults>();
-            let func = Stmt::FunctionDef(ast::StmtFunctionDef {
-                is_async: false,
-                name: Identifier::new(name.to_string(), TextRange::default()),
-                parameters: Box::new(Parameters {
-                    posonlyargs: new_posonlyargs,
-                    args: new_args,
-                    ..parameters
-                }),
-                body: ast::Suite::from([body]),
-                decorator_list: ast::DecoratorList::new(),
-                returns: Some(Box::new(return_type)),
-                type_params: None,
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            });
-            let generated = checker.generator().stmt(&func);
-
-            return replace_trailing_ellipsis_with_original_expr(generated, lambda, stmt, checker);
+    let mut builder = Builder::default();
+    let callable = annotation.and_then(|annotation| extract_types(annotation, checker.semantic()));
+    let parameters = match (lambda.parameters(), callable.as_ref()) {
+        (Some(parameters), Some(types)) => {
+            annotated_parameters(&mut builder, parameters, types.arg_types)
         }
-    }
-    let function = Stmt::FunctionDef(ast::StmtFunctionDef {
+        (Some(parameters), None) => builder.copy_node(parameters),
+        (None, _) => builder.add(build::Parameters::default()),
+    };
+    let returns = callable.map(|types| builder.copy_node(types.return_type));
+
+    // A placeholder lets us preserve the source formatting of the lambda body.
+    let ellipsis = builder.add(build::ExprEllipsisLiteral {
+        range: TextRange::default(),
+    });
+    let return_stmt = builder.add(build::StmtReturn {
+        range: TextRange::default(),
+        value: Some(ellipsis.into()),
+    });
+    let body = builder.list([BuildId::<ast::kind::Stmt>::from(return_stmt)]);
+    let name = syntax::identifier(&mut builder, name);
+    let function = builder.add(build::StmtFunctionDef {
         is_async: false,
-        name: Identifier::new(name.to_string(), TextRange::default()),
-        parameters: Box::new(parameters),
-        body: ast::Suite::from([body]),
-        decorator_list: DecoratorList::new(),
-        returns: None,
+        name,
+        parameters,
+        body,
+        decorator_list: ListId::default(),
+        returns,
         type_params: None,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });
-    let generated = checker.generator().stmt(&function);
-
+    let generated = checker.generator().stmt(builder.get(function).into());
     replace_trailing_ellipsis_with_original_expr(generated, lambda, stmt, checker)
 }
 
+fn annotated_parameters(
+    builder: &mut Builder,
+    parameters: Parameters<'_>,
+    arg_types: Option<NodeList<'_, ast::kind::Expr>>,
+) -> BuildId<ast::kind::Parameters> {
+    // Callable lists positional-only annotations first, followed by positional-or-keyword annotations.
+    let mut annotations = arg_types.into_iter().flatten();
+    let mut annotated = |builder: &mut Builder, arg: ParameterWithDefault<'_>| {
+        let param = arg.parameter();
+        let name = builder.copy_node(param.name());
+        let annotation = annotations.next().map(|ty| builder.copy_node(ty));
+        let parameter = builder.add(build::Parameter {
+            range: param.range(),
+            name,
+            annotation,
+        });
+        let default = arg.default().map(|expr| builder.copy_node(expr));
+        builder.add(build::ParameterWithDefault {
+            range: arg.range(),
+            parameter,
+            default,
+        })
+    };
+    let posonlyargs = builder.map_list(parameters.posonlyargs(), &mut annotated);
+    let args = builder.map_list(parameters.args(), annotated);
+    let vararg = parameters.vararg().map(|arg| builder.copy_node(arg));
+    let kwonlyargs = builder.copy_nodes(parameters.kwonlyargs());
+    let kwarg = parameters.kwarg().map(|arg| builder.copy_node(arg));
+    builder.add(build::Parameters {
+        range: parameters.range(),
+        posonlyargs,
+        args,
+        vararg,
+        kwonlyargs,
+        kwarg,
+    })
+}
 fn replace_trailing_ellipsis_with_original_expr(
     mut generated: String,
-    lambda: &ExprLambda,
-    stmt: &Stmt,
+    lambda: ExprLambda<'_>,
+    stmt: Stmt<'_>,
     checker: &Checker,
 ) -> String {
-    let original_expr_range =
-        parenthesized_range((&lambda.body).into(), lambda.into(), checker.tokens())
-            .unwrap_or(lambda.body.range());
+    let original_expr_range = parenthesized_range(lambda.body(), lambda.into(), checker.tokens())
+        .unwrap_or(lambda.body().range());
 
     // This prevents the autofix of introducing a syntax error if the lambda's body is an
     // expression spanned across multiple lines. To avoid the syntax error we preserve

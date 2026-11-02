@@ -1,6 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, Operator};
+use ruff_python_ast::{Expr, ExprKind, Operator};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -65,7 +64,7 @@ impl Violation for RuntimeStringUnion {
 }
 
 /// TC010
-pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
+pub(crate) fn runtime_string_union(checker: &Checker, &expr: &Expr<'_>) {
     if !checker.semantic().in_type_definition() {
         return;
     }
@@ -84,20 +83,18 @@ pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
 }
 
 /// Collect all string members in possibly-nested binary `|` expressions.
-fn traverse_op<'a>(expr: &'a Expr, strings: &mut Vec<&'a Expr>) {
-    match expr {
-        Expr::StringLiteral(_) => {
+fn traverse_op<'a>(expr: Expr<'a>, strings: &mut Vec<Expr<'a>>) {
+    match expr.classify() {
+        ExprKind::StringLiteral(_) => {
             strings.push(expr);
         }
-        Expr::BytesLiteral(_) => {
+        ExprKind::BytesLiteral(_) => {
             strings.push(expr);
         }
-        Expr::BinOp(ast::ExprBinOp {
-            left,
-            right,
-            op: Operator::BitOr,
-            ..
-        }) => {
+        ExprKind::BinOp(expr_bin_op) if expr_bin_op.op() == Operator::BitOr => {
+            let left = expr_bin_op.left();
+            let right = expr_bin_op.right();
+
             traverse_op(left, strings);
             traverse_op(right, strings);
         }

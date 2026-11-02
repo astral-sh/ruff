@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
-use ruff_python_ast::{self as ast, Expr, PythonVersion, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprKind, PythonVersion, Stmt, StmtKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -87,39 +87,42 @@ impl Violation for ContextManagerIterator {
 }
 
 /// UP052
-pub(crate) fn context_manager_iterator(checker: &Checker, function: &ast::StmtFunctionDef) {
-    let Some(decorator) = function.decorator_list.last() else {
+pub(crate) fn context_manager_iterator(checker: &Checker, function: ast::StmtFunctionDef<'_>) {
+    let Some(decorator) = function.decorator_list().last() else {
         return;
     };
     let Some(qualified_name) = checker
         .semantic()
-        .resolve_qualified_name(&decorator.expression)
+        .resolve_qualified_name(decorator.expression())
     else {
         return;
     };
-    let (iterator, generator) = match (function.is_async, qualified_name.segments()) {
+    let (iterator, generator) = match (function.is_async(), qualified_name.segments()) {
         (false, ["contextlib", "contextmanager"]) => ("Iterator", "Generator"),
         (true, ["contextlib", "asynccontextmanager"]) => ("AsyncIterator", "AsyncGenerator"),
         _ => return,
     };
-    let Some(annotation) = function.returns.as_deref() else {
+    let Some(annotation) = function.returns() else {
         return;
     };
-    let (expression, simple, tokens) = if let Expr::StringLiteral(string) = annotation {
-        let Ok(parsed) = checker.parse_type_annotation(string) else {
-            return;
+    let (expression, simple, tokens) =
+        if let ExprKind::StringLiteral(string) = annotation.classify() {
+            let Ok(parsed) = checker.parse_type_annotation(string) else {
+                return;
+            };
+            (
+                parsed.expression(),
+                parsed.kind().is_simple(),
+                parsed.parsed().tokens(),
+            )
+        } else {
+            (annotation, true, checker.tokens())
         };
-        (
-            parsed.expression(),
-            parsed.kind().is_simple(),
-            parsed.parsed().tokens(),
-        )
-    } else {
-        (annotation, true, checker.tokens())
-    };
-    let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expression else {
+    let ExprKind::Subscript(subscript) = expression.classify() else {
         return;
     };
+    let value = subscript.value();
+    let slice = subscript.slice();
     let Some(name) = checker.semantic().resolve_qualified_name(value) else {
         return;
     };
@@ -128,16 +131,16 @@ pub(crate) fn context_manager_iterator(checker: &Checker, function: &ast::StmtFu
         ["collections", "abc", name] if *name == iterator => "collections.abc",
         _ => return,
     };
-    let (item, parent) = match slice.as_ref() {
-        Expr::Tuple(tuple) => match tuple.elts.as_slice() {
-            [item] => (item, slice.as_ref()),
+    let (item, parent) = match slice.classify() {
+        ExprKind::Tuple(tuple) => match tuple.elts().as_array() {
+            Some([item]) => (item, slice),
             _ => return,
         },
-        item => (item, expression),
+        item => (item.view(), expression),
     };
 
     let mut visitor = GeneratorBody::default();
-    visitor.visit_body(&function.body);
+    visitor.visit_body(function.body());
     if !visitor.has_yield {
         return;
     }
@@ -158,7 +161,7 @@ pub(crate) fn context_manager_iterator(checker: &Checker, function: &ast::StmtFu
     }
     diagnostic.try_set_fix(|| {
         let item_range =
-            parenthesized_range(item.into(), parent.into(), tokens).unwrap_or_else(|| item.range());
+            parenthesized_range(item, parent.into(), tokens).unwrap_or_else(|| item.range());
         let import = checker.importer().get_or_import_symbol(
             &ImportRequest::import_from(module, generator),
             function.start(),
@@ -198,7 +201,7 @@ pub(crate) fn context_manager_iterator(checker: &Checker, function: &ast::StmtFu
         let arguments =
             if checker.target_version() >= PythonVersion::PY313 && !visitor.returns_value {
                 None
-            } else if function.is_async {
+            } else if function.is_async() {
                 Some(", None".to_string())
             } else {
                 Some(format!(", None, {return_type}"))
@@ -220,13 +223,12 @@ struct GeneratorBody {
 }
 
 impl<'a> Visitor<'a> for GeneratorBody {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
-            Stmt::Return(return_stmt) => {
+    fn visit_stmt(&mut self, stmt: Stmt<'a>) {
+        match stmt.classify() {
+            StmtKind::FunctionDef(_) | StmtKind::ClassDef(_) => {}
+            StmtKind::Return(return_stmt) => {
                 if return_stmt
-                    .value
-                    .as_deref()
+                    .value()
                     .is_some_and(|value| !value.is_none_literal_expr())
                 {
                     self.returns_value = true;
@@ -237,10 +239,10 @@ impl<'a> Visitor<'a> for GeneratorBody {
         }
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Lambda(_) => {}
-            Expr::Yield(_) | Expr::YieldFrom(_) => {
+    fn visit_expr(&mut self, expr: Expr<'a>) {
+        match expr.classify() {
+            ExprKind::Lambda(_) => {}
+            ExprKind::Yield(_) | ExprKind::YieldFrom(_) => {
                 self.has_yield = true;
                 walk_expr(self, expr);
             }

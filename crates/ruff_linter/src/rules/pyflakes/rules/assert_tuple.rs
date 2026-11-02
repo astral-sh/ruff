@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, Stmt};
+use ruff_python_ast::{Expr, ExprKind, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -40,9 +40,9 @@ impl Violation for AssertTuple {
 }
 
 /// F631
-pub(crate) fn assert_tuple(checker: &Checker, stmt: &Stmt, test: &Expr) {
-    if let Expr::Tuple(tuple) = &test {
-        if !tuple.is_empty() {
+pub(crate) fn assert_tuple(checker: &Checker, stmt: Stmt<'_>, test: Expr<'_>) {
+    if let ExprKind::Tuple(tuple) = test.classify() {
+        if !tuple.elts().is_empty() {
             checker.report_diagnostic(AssertTuple, stmt.range());
         }
     }

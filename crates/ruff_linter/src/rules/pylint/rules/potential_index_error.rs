@@ -31,11 +31,12 @@ impl Violation for PotentialIndexError {
 }
 
 /// PLE0643
-pub(crate) fn potential_index_error(checker: &Checker, value: &Expr, slice: &Expr) {
+pub(crate) fn potential_index_error(checker: &Checker, value: Expr<'_>, slice: Expr<'_>) {
     // Determine the length of the sequence.
-    let length = match value {
-        Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
-            if elts.iter().any(Expr::is_starred_expr) {
+    let length = match value.fields() {
+        ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
+        | ast::ExprFields::List(ast::ExprListFields { elts, .. }) => {
+            if elts.iter().any(ast::Expr::is_starred_expr) {
                 return;
             }
             match i64::try_from(elts.len()) {
@@ -49,17 +50,17 @@ pub(crate) fn potential_index_error(checker: &Checker, value: &Expr, slice: &Exp
     };
 
     // Determine the index value.
-    let index = match slice {
-        Expr::NumberLiteral(ast::ExprNumberLiteral {
+    let index = match slice.fields() {
+        ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
             value: ast::Number::Int(number_value),
             ..
         }) => number_value.as_i64(),
-        Expr::UnaryOp(ast::ExprUnaryOp {
+        ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
             op: ast::UnaryOp::USub,
             operand,
             ..
-        }) => match operand.as_ref() {
-            Expr::NumberLiteral(ast::ExprNumberLiteral {
+        }) => match operand.fields() {
+            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
                 value: ast::Number::Int(number_value),
                 ..
             }) => number_value.as_i64().map(|number| -number),

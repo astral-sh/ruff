@@ -1,9 +1,7 @@
-use ast::Expr;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{ExprBinOp, ExprRef, Operator};
+use ruff_python_ast::{self as ast, Expr, ExprBinOp, ExprKind, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -95,30 +93,30 @@ impl AlwaysFixableViolation for NonAugmentedAssignment {
 }
 
 /// PLR6104
-pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssign) {
+pub(crate) fn non_augmented_assignment(checker: &Checker, assign: ast::StmtAssign<'_>) {
     // Ignore multiple assignment targets.
-    let [target] = assign.targets.as_slice() else {
+    let Some([target]) = assign.targets().as_array() else {
         return;
     };
 
     // Match, e.g., `x = x + 1`.
-    let Expr::BinOp(value) = &*assign.value else {
+    let ExprKind::BinOp(value) = assign.value().classify() else {
         return;
     };
 
-    let operator = AugmentedOperator::from(value.op);
+    let operator = AugmentedOperator::from(value.op());
 
     // Match, e.g., `x = x + 1`.
-    if ComparableExpr::from(target) == ComparableExpr::from(&value.left) {
+    if ComparableExpr::from(target) == ComparableExpr::from(value.left()) {
         let mut diagnostic =
             checker.report_diagnostic(NonAugmentedAssignment { operator }, assign.range());
         diagnostic.set_fix(Fix::unsafe_edit(augmented_assignment(
             checker,
             target,
             operator,
-            &value.right,
+            value.right(),
             value,
-            assign.range,
+            assign.range(),
         )));
 
         return;
@@ -126,8 +124,8 @@ pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssi
 
     // If the operator is commutative, match, e.g., `x = 1 + x`.
     if operator.is_commutative()
-        && is_number_or_bool_constant(&value.left)
-        && ComparableExpr::from(target) == ComparableExpr::from(&value.right)
+        && is_number_or_bool_constant(value.left())
+        && ComparableExpr::from(target) == ComparableExpr::from(value.right())
     {
         let mut diagnostic =
             checker.report_diagnostic(NonAugmentedAssignment { operator }, assign.range());
@@ -135,17 +133,17 @@ pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssi
             checker,
             target,
             operator,
-            &value.left,
+            value.left(),
             value,
-            assign.range,
+            assign.range(),
         )));
     }
 }
 
 /// Returns `true` if `expr` evaluates to a number or a boolean, looking through
 /// any unary operators applied to a number or boolean literal.
-fn is_number_or_bool_constant(mut expr: &Expr) -> bool {
-    while let Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) = expr {
+fn is_number_or_bool_constant(mut expr: Expr<'_>) -> bool {
+    while let ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields { operand, .. }) = expr.fields() {
         expr = operand;
     }
 
@@ -157,20 +155,19 @@ fn is_number_or_bool_constant(mut expr: &Expr) -> bool {
 /// For example, given `x = x + 1`, the fix would be `x += 1`.
 fn augmented_assignment(
     checker: &Checker,
-    target: &Expr,
+    target: Expr<'_>,
     operator: AugmentedOperator,
-    right_operand: &Expr,
-    original_expr: &ExprBinOp,
+    right_operand: Expr<'_>,
+    original_expr: ExprBinOp<'_>,
     range: TextRange,
 ) -> Edit {
     let locator = checker.locator();
 
-    let right_operand_ref = ExprRef::from(right_operand);
     let parent = original_expr.into();
     let tokens = checker.tokens();
 
     let right_operand_range =
-        parenthesized_range(right_operand_ref, parent, tokens).unwrap_or(right_operand.range());
+        parenthesized_range(right_operand, parent, tokens).unwrap_or(right_operand.range());
     let right_operand_expr = locator.slice(right_operand_range);
 
     let target_expr = locator.slice(target);

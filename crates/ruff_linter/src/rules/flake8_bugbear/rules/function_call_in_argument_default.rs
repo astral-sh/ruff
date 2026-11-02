@@ -1,8 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, Parameters};
+use ruff_python_ast::{Expr, ExprKind, Parameters, visitor};
 use ruff_python_semantic::analyze::typing::{
     is_immutable_annotation, is_immutable_func, is_immutable_newtype_call, is_mutable_func,
 };
@@ -101,9 +100,11 @@ impl<'a, 'b> ArgumentDefaultVisitor<'a, 'b> {
 }
 
 impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
-    fn visit_expr(&mut self, expr: &Expr) {
-        match expr {
-            Expr::Call(ast::ExprCall { func, .. }) => {
+    fn visit_expr(&mut self, expr: Expr<'_>) {
+        match expr.classify() {
+            ExprKind::Call(expr_call) => {
+                let func = expr_call.func();
+
                 if !is_mutable_func(func, self.checker.semantic())
                     && !is_immutable_func(
                         func,
@@ -127,7 +128,7 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
                 }
                 visitor::walk_expr(self, expr);
             }
-            Expr::Lambda(_) => {
+            ExprKind::Lambda(_) => {
                 // Don't recurse.
             }
             _ => visitor::walk_expr(self, expr),
@@ -136,7 +137,7 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
 }
 
 /// B008
-pub(crate) fn function_call_in_argument_default(checker: &Checker, parameters: &Parameters) {
+pub(crate) fn function_call_in_argument_default(checker: &Checker, parameters: Parameters<'_>) {
     // Map immutable calls to (module, member) format.
     let extend_immutable_calls: Vec<QualifiedName> = checker
         .settings()

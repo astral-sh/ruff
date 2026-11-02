@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, helpers::map_subscript};
+use ruff_python_ast::helpers::map_subscript;
+use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -102,8 +103,8 @@ impl Violation for GenericNotLastBaseClass {
 }
 
 /// PYI059
-pub(crate) fn generic_not_last_base_class(checker: &Checker, class_def: &ast::StmtClassDef) {
-    let Some(bases) = class_def.arguments.as_deref() else {
+pub(crate) fn generic_not_last_base_class(checker: &Checker, class_def: ast::StmtClassDef<'_>) {
+    let Some(bases) = class_def.arguments() else {
         return;
     };
 
@@ -112,14 +113,14 @@ pub(crate) fn generic_not_last_base_class(checker: &Checker, class_def: &ast::St
         return;
     }
 
-    let Some(last_base) = bases.args.last() else {
+    let Some(last_base) = bases.args().last() else {
         return;
     };
 
     let mut generic_base_iter = bases
-        .args
+        .args()
         .iter()
-        .filter(|base| semantic.match_typing_expr(map_subscript(base), "Generic"));
+        .filter(|base| semantic.match_typing_expr(map_subscript(*base), "Generic"));
 
     let Some(generic_base) = generic_base_iter.next() else {
         return;
@@ -155,8 +156,8 @@ pub(crate) fn generic_not_last_base_class(checker: &Checker, class_def: &ast::St
 }
 
 fn generate_fix(
-    generic_base: &ast::Expr,
-    arguments: &ast::Arguments,
+    generic_base: ast::Expr<'_>,
+    arguments: ast::Arguments<'_>,
     checker: &Checker,
 ) -> anyhow::Result<Fix> {
     let locator = checker.locator();
@@ -164,7 +165,7 @@ fn generate_fix(
     let tokens = checker.tokens();
 
     let deletion = remove_argument(
-        generic_base,
+        &generic_base,
         arguments,
         Parentheses::Preserve,
         source,

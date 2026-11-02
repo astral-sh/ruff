@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, OperatorPrecedence, Stmt};
+use ruff_python_ast::{ExprCallFields, ExprKind, OperatorPrecedence, StmtKind};
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -95,24 +94,26 @@ impl Violation for UnnecessaryDunderCall {
 }
 
 /// PLC2801
-pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = call.func.as_ref() else {
+pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ExprCallFields<'_>) {
+    let ExprKind::Attribute(attribute_node) = call.func.classify() else {
         return;
     };
+    let value = attribute_node.value();
+    let attr = attribute_node.attr();
 
     // If this isn't a known dunder method, abort.
-    if !is_known_dunder_method(attr) {
+    if !is_known_dunder_method(attr.as_str()) {
         return;
     }
 
     // If this is an allowed dunder method, abort.
-    if allowed_dunder_constants(attr, checker.target_version()) {
+    if allowed_dunder_constants(attr.as_str(), checker.target_version()) {
         return;
     }
 
     // Ignore certain dunder method calls in lambda expressions. These methods would require
     // rewriting as a statement, which is not possible in a lambda expression.
-    if allow_nested_expression(attr, checker.semantic()) {
+    if allow_nested_expression(attr.as_str(), checker.semantic()) {
         return;
     }
 
@@ -122,9 +123,11 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // Ignore dunder methods used on `super`.
-    if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
+    if let ExprKind::Call(call_node) = value.classify() {
+        let func = call_node.func();
         if checker.semantic().has_builtin_binding("super") {
-            if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
+            if let ExprKind::Name(name_node) = func.classify() {
+                let id = name_node.id();
                 if id == "super" {
                     return;
                 }
@@ -133,7 +136,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // If the call has keywords, abort.
-    if !call.arguments.keywords.is_empty() {
+    if !call.arguments.keywords().is_empty() {
         return;
     }
 
@@ -142,24 +145,22 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
     let mut fixed: Option<(String, OperatorPrecedence)> = None;
     let mut title: Option<String> = None;
 
-    if let Some(dunder) = DunderReplacement::from_method(attr) {
-        match (&*call.arguments.args, dunder) {
-            ([], DunderReplacement::Builtin(replacement, message)) => {
+    if let Some(dunder) = DunderReplacement::from_method(attr.as_str()) {
+        match (call.arguments.args(), dunder) {
+            (args, DunderReplacement::Builtin(replacement, message)) if args.is_empty() => {
                 if !checker.semantic().has_builtin_binding(replacement) {
                     return;
                 }
                 fixed = Some((
-                    format!(
-                        "{}({})",
-                        replacement,
-                        checker.locator().slice(value.as_ref()),
-                    ),
+                    format!("{}({})", replacement, checker.locator().slice(value)),
                     OperatorPrecedence::CallAttribute,
                 ));
                 title = Some(message.to_string());
             }
-            ([arg], DunderReplacement::Operator(replacement, message, precedence)) => {
-                let value_slice = checker.locator().slice(value.as_ref());
+            (args, DunderReplacement::Operator(replacement, message, precedence))
+                if let Some([arg]) = args.as_array() =>
+            {
+                let value_slice = checker.locator().slice(value);
                 let arg_slice = checker.locator().slice(arg);
 
                 if OperatorPrecedence::from_expr(arg) > precedence {
@@ -178,8 +179,10 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
 
                 title = Some(message.to_string());
             }
-            ([arg], DunderReplacement::ROperator(replacement, message, precedence)) => {
-                let value_slice = checker.locator().slice(value.as_ref());
+            (args, DunderReplacement::ROperator(replacement, message, precedence))
+                if let Some([arg]) = args.as_array() =>
+            {
+                let value_slice = checker.locator().slice(value);
                 let arg_slice = checker.locator().slice(arg);
 
                 if OperatorPrecedence::from_expr(arg) > precedence {
@@ -209,11 +212,11 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
             method: attr.to_string(),
             replacement: title,
         },
-        call.range(),
+        call.range,
     );
 
     if let Some((mut fixed, precedence)) = fixed {
-        let dunder = DunderReplacement::from_method(attr);
+        let dunder = DunderReplacement::from_method(attr.as_str());
 
         // If the parent expression has higher precedence then the new replacement,
         // it would associate with either the left operand (e.g. naive change from `a * b.__add__(c)`
@@ -238,8 +241,8 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
         }
 
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            edits::pad(fixed, call.range(), checker.locator()),
-            call.range(),
+            edits::pad(fixed, call.range, checker.locator()),
+            call.range,
         )));
     }
 }
@@ -614,9 +617,9 @@ fn allow_nested_expression(dunder_name: &str, semantic: &SemanticModel) -> bool 
 /// Returns `true` if the [`SemanticModel`] is currently in a dunder method definition.
 fn in_dunder_method_definition(semantic: &SemanticModel) -> bool {
     semantic.current_statements().any(|statement| {
-        let Stmt::FunctionDef(func_def) = statement else {
+        let StmtKind::FunctionDef(func_def) = statement.classify() else {
             return false;
         };
-        func_def.name.starts_with("__") && func_def.name.ends_with("__")
+        func_def.name().starts_with("__") && func_def.name().ends_with("__")
     })
 }

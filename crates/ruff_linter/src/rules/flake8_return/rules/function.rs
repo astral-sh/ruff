@@ -1,4 +1,5 @@
 use anyhow::Result;
+use ruff_python_ast::{NodeList, StmtKind, Suite};
 
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -7,7 +8,7 @@ use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, Decorator, ElifElseClause, Expr, Stmt};
+use ruff_python_ast::{ElifElseClause, Expr, Stmt, StmtFunctionDef};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::visibility::is_property;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, is_python_whitespace};
@@ -20,6 +21,7 @@ use crate::fix::edits;
 use crate::fix::edits::adjust_indentation;
 use crate::registry::Rule;
 use crate::rules::flake8_return::helpers::end_of_last_statement;
+use crate::rules::flake8_return::visitor::AssignmentReturn;
 use crate::{AlwaysFixableViolation, FixAvailability, Violation};
 use crate::{Edit, Fix};
 
@@ -382,9 +384,13 @@ impl Violation for SuperfluousElseBreak {
 }
 
 /// RET501
-fn unnecessary_return_none(checker: &Checker, decorator_list: &[Decorator], stack: &Stack) {
-    for stmt in &stack.returns {
-        let Some(expr) = stmt.value.as_deref() else {
+fn unnecessary_return_none(
+    checker: &Checker,
+    decorator_list: NodeList<'_, ruff_python_ast::kind::Decorator>,
+    stack: &Stack,
+) {
+    for stmt in stack.returns.clone() {
+        let Some(expr) = stmt.value() else {
             continue;
         };
         if !expr.is_none_literal_expr() {
@@ -415,8 +421,8 @@ fn unnecessary_return_none(checker: &Checker, decorator_list: &[Decorator], stac
 
 /// RET502
 fn implicit_return_value(checker: &Checker, stack: &Stack) {
-    for stmt in &stack.returns {
-        if stmt.value.is_some() {
+    for stmt in stack.returns.clone() {
+        if stmt.value().is_some() {
             continue;
         }
         let mut diagnostic = checker.report_diagnostic(ImplicitReturnValue, stmt.range());
@@ -428,7 +434,7 @@ fn implicit_return_value(checker: &Checker, stack: &Stack) {
 }
 
 /// Return `true` if the `func` appears to be non-returning.
-fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
+fn is_noreturn_func(func: Expr<'_>, semantic: &SemanticModel) -> bool {
     // First, look for known functions that never return from the standard library and popular
     // libraries.
     if semantic
@@ -455,12 +461,12 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    let Stmt::FunctionDef(ast::StmtFunctionDef { returns, .. }) = semantic.statement(node_id)
-    else {
+    let StmtKind::FunctionDef(function_def_node) = semantic.statement(node_id).classify() else {
         return false;
     };
+    let returns = function_def_node.returns();
 
-    let Some(returns) = returns.as_ref() else {
+    let Some(returns) = returns else {
         return false;
     };
 
@@ -472,9 +478,9 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
         || semantic.match_typing_qualified_name(&qualified_name, "Never")
 }
 
-fn add_return_none(checker: &Checker, stmt: &Stmt, range: TextRange) {
+fn add_return_none(checker: &Checker, stmt: Stmt<'_>, range: TextRange) {
     let mut diagnostic = checker.report_diagnostic(ImplicitReturn, range);
-    if let Some(indent) = indentation(checker.source(), stmt) {
+    if let Some(indent) = indentation(checker.source(), &stmt) {
         let mut content = String::new();
         content.push_str(checker.stylist().line_ending().as_str());
         content.push_str(indent);
@@ -486,23 +492,26 @@ fn add_return_none(checker: &Checker, stmt: &Stmt, range: TextRange) {
     }
 }
 
-fn has_implicit_return(checker: &Checker, stmt: &Stmt) -> bool {
-    match stmt {
-        Stmt::If(ast::StmtIf {
-            body,
-            elif_else_clauses,
-            ..
-        }) => {
-            if body
+fn has_implicit_return(checker: &Checker, stmt: Stmt<'_>) -> bool {
+    let loop_returns_implicitly = |orelse: Suite<'_>| {
+        orelse
+            .last()
+            .is_none_or(|last| has_implicit_return(checker, last))
+    };
+    match stmt.classify() {
+        StmtKind::If(stmt) => {
+            if stmt
+                .body()
                 .last()
                 .is_some_and(|last| has_implicit_return(checker, last))
             {
                 return true;
             }
 
+            let elif_else_clauses = stmt.elif_else_clauses();
             if elif_else_clauses.iter().any(|clause| {
                 clause
-                    .body
+                    .body()
                     .last()
                     .is_some_and(|last| has_implicit_return(checker, last))
             }) {
@@ -510,35 +519,29 @@ fn has_implicit_return(checker: &Checker, stmt: &Stmt) -> bool {
             }
 
             // Check if we don't have an else clause
-            matches!(
-                elif_else_clauses.last(),
-                None | Some(ast::ElifElseClause { test: Some(_), .. })
-            )
+            elif_else_clauses
+                .last()
+                .is_none_or(|clause| clause.test().is_some())
         }
-        Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => false,
-        Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => false,
-        Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
-            if let Some(last_stmt) = orelse.last() {
-                has_implicit_return(checker, last_stmt)
-            } else {
-                true
-            }
-        }
-        Stmt::Match(ast::StmtMatch { cases, .. }) => cases.iter().any(|case| {
-            case.body
+        StmtKind::Assert(stmt) if is_const_false(stmt.test()) => false,
+        StmtKind::While(stmt) if is_const_true(stmt.test()) => false,
+        StmtKind::For(stmt) => loop_returns_implicitly(stmt.orelse()),
+        StmtKind::While(stmt) => loop_returns_implicitly(stmt.orelse()),
+        StmtKind::Match(stmt) => stmt.cases().iter().any(|case| {
+            case.body()
                 .last()
                 .is_some_and(|last| has_implicit_return(checker, last))
         }),
-        Stmt::With(ast::StmtWith { body, .. }) => body
+        StmtKind::With(stmt) => stmt
+            .body()
             .last()
             .is_some_and(|last_stmt| has_implicit_return(checker, last_stmt)),
-        Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => false,
-        Stmt::Expr(ast::StmtExpr { value, .. })
-            if matches!(
-                value.as_ref(),
-                Expr::Call(ast::ExprCall { func, ..  })
-                    if is_noreturn_func(func, checker.semantic())
-            ) =>
+        StmtKind::Return(_) | StmtKind::Raise(_) | StmtKind::Try(_) => false,
+        StmtKind::Expr(stmt)
+            if stmt
+                .value()
+                .as_call_expr()
+                .is_some_and(|call| is_noreturn_func(call.func(), checker.semantic())) =>
         {
             false
         }
@@ -547,15 +550,15 @@ fn has_implicit_return(checker: &Checker, stmt: &Stmt) -> bool {
 }
 
 /// RET503
-fn implicit_return(checker: &Checker, function_def: &ast::StmtFunctionDef, stmt: &Stmt) {
+fn implicit_return(checker: &Checker, function_def: StmtFunctionDef<'_>, stmt: Stmt<'_>) {
     if has_implicit_return(checker, stmt) {
         add_return_none(checker, stmt, function_def.range());
     }
 }
 
 /// RET504
-pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
-    let Stmt::FunctionDef(function_def) = function_stmt else {
+pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: Stmt<'_>) {
+    let Some(function_def) = function_stmt.as_function_def_stmt() else {
         return;
     };
     let Some(stack) = create_stack(checker, function_def) else {
@@ -569,34 +572,35 @@ pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
     let Some(function_scope) = checker.semantic().function_scope(function_def) else {
         return;
     };
-    for (assign, return_, stmt, enclosing_finally) in &stack.assignment_return {
+    for AssignmentReturn {
+        assign,
+        return_,
+        enclosing_finally,
+    } in stack.assignment_return
+    {
         // Identify, e.g., `return x`.
-        let Some(value) = return_.value.as_ref() else {
+        let Some(value) = return_.value() else {
             continue;
         };
 
-        let Expr::Name(ast::ExprName {
-            id: returned_id, ..
-        }) = value.as_ref()
-        else {
+        let Some(name_node) = value.as_name_expr() else {
             continue;
         };
+        let returned_id = name_node.id();
 
         // Identify, e.g., `x = 1`.
-        if assign.targets.len() > 1 {
+        if assign.targets().len() > 1 {
             continue;
         }
 
-        let Some(target) = assign.targets.first() else {
+        let Some(target) = assign.targets().first() else {
             continue;
         };
 
-        let Expr::Name(ast::ExprName {
-            id: assigned_id, ..
-        }) = target
-        else {
+        let Some(name_node) = target.as_name_expr() else {
             continue;
         };
+        let assigned_id = name_node.id();
 
         if returned_id != assigned_id {
             continue;
@@ -655,11 +659,11 @@ pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
             // edit, since we're editing the preceding statement, so no conflicting edit would
             // be allowed to remove that preceding statement.
             let delete_return =
-                edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
+                edits::delete_stmt(return_.into(), None, checker.locator(), checker.indexer());
 
             let eq_token = checker
                 .tokens()
-                .before(assign.value.start())
+                .before(assign.value().start())
                 .iter()
                 .rfind(|token| token.kind() == TokenKind::Equal)
                 .unwrap();
@@ -689,10 +693,10 @@ pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
 /// RET505, RET506, RET507, RET508
 fn superfluous_else_node(
     checker: &Checker,
-    if_elif_body: &[Stmt],
-    elif_else: &ElifElseClause,
+    if_elif_body: Suite<'_>,
+    elif_else: ElifElseClause<'_>,
 ) -> bool {
-    let branch = if elif_else.test.is_some() {
+    let branch = if elif_else.test().is_some() {
         Branch::Elif
     } else {
         Branch::Else
@@ -721,16 +725,13 @@ fn superfluous_else_node(
 
 /// RET505, RET506, RET507, RET508
 fn superfluous_elif_else(checker: &Checker, stack: &Stack) {
-    for (if_elif_body, elif_else) in &stack.elifs_elses {
+    for (if_elif_body, elif_else) in stack.elifs_elses.clone() {
         superfluous_else_node(checker, if_elif_body, elif_else);
     }
 }
 
-fn create_stack<'a>(
-    checker: &'a Checker,
-    function_def: &'a ast::StmtFunctionDef,
-) -> Option<Stack<'a>> {
-    let ast::StmtFunctionDef { body, .. } = function_def;
+fn create_stack<'a>(checker: &'a Checker, function_def: StmtFunctionDef<'a>) -> Option<Stack<'a>> {
+    let body = function_def.body();
 
     // Find the last statement in the function.
     let Some(last_stmt) = body.last() else {
@@ -739,13 +740,14 @@ fn create_stack<'a>(
     };
 
     // Skip functions that consist of a single return statement.
-    if body.len() == 1 && matches!(last_stmt, Stmt::Return(_)) {
+    if body.len() == 1 && last_stmt.is_return_stmt() {
         return None;
     }
 
     // Traverse the function body, to collect the stack.
     let stack = {
-        let mut visitor = ReturnVisitor::new(checker.semantic());
+        let mut visitor =
+            ReturnVisitor::new(checker.semantic(), function_def.body_may_contain_yield());
         for stmt in body {
             visitor.visit_stmt(stmt);
         }
@@ -762,13 +764,10 @@ fn create_stack<'a>(
 
 /// Run all checks from the `flake8-return` plugin, but `RET504` which is ran
 /// after the semantic model is fully built.
-pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
-    let ast::StmtFunctionDef {
-        decorator_list,
-        returns,
-        body,
-        ..
-    } = function_def;
+pub(crate) fn function(checker: &Checker, function_def: StmtFunctionDef<'_>) {
+    let decorator_list = function_def.decorator_list();
+    let returns = function_def.returns();
+    let body = function_def.body();
 
     let Some(stack) = create_stack(checker, function_def) else {
         return;
@@ -802,7 +801,7 @@ pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     } else {
         if checker.is_rule_enabled(Rule::UnnecessaryReturnNone) {
             // Skip functions that have a return annotation that is not `None`.
-            if returns.as_deref().is_none_or(Expr::is_none_literal_expr) {
+            if returns.is_none_or(ruff_python_ast::Expr::is_none_literal_expr) {
                 unnecessary_return_none(checker, decorator_list, &stack);
             }
         }
@@ -810,12 +809,12 @@ pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
 }
 
 /// Generate a [`Fix`] to remove an `else` or `elif` clause.
-fn remove_else(checker: &Checker, elif_else: &ElifElseClause) -> Result<Fix> {
+fn remove_else(checker: &Checker, elif_else: ElifElseClause<'_>) -> Result<Fix> {
     let locator = checker.locator();
     let indexer = checker.indexer();
     let stylist = checker.stylist();
 
-    if elif_else.test.is_some() {
+    if elif_else.test().is_some() {
         // Ex) `elif` -> `if`
         Ok(Fix::safe_edit(Edit::deletion(
             elif_else.start(),
@@ -837,13 +836,13 @@ fn remove_else(checker: &Checker, elif_else: &ElifElseClause) -> Result<Fix> {
         };
 
         // get the indentation of the `else`, since that is the indent level we want to end with
-        let Some(desired_indentation) = indentation(locator.contents(), elif_else) else {
+        let Some(desired_indentation) = indentation(locator.contents(), &elif_else) else {
             return Err(anyhow::anyhow!("Compound statement cannot be inlined"));
         };
 
         // If the statement is on the same line as the `else`, just remove the `else: `.
         // Ex) `else: return True` -> `return True`
-        if let Some(first) = elif_else.body.first() {
+        if let Some(first) = elif_else.body().first() {
             if indexer.preceded_by_multi_statement_line(first, locator.contents()) {
                 return Ok(Fix::safe_edit(Edit::deletion(
                     elif_else.start(),

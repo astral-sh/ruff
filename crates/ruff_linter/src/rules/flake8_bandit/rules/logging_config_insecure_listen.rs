@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::ExprCall;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -37,22 +37,22 @@ impl Violation for LoggingConfigInsecureListen {
 }
 
 /// S612
-pub(crate) fn logging_config_insecure_listen(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn logging_config_insecure_listen(checker: &Checker, call: ExprCall<'_>) {
     if !checker.semantic().seen_module(Modules::LOGGING) {
         return;
     }
 
     if checker
         .semantic()
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func())
         .is_some_and(|qualified_name| {
             matches!(qualified_name.segments(), ["logging", "config", "listen"])
         })
     {
-        if call.arguments.find_keyword("verify").is_some() {
+        if call.arguments().find_keyword("verify").is_some() {
             return;
         }
 
-        checker.report_diagnostic(LoggingConfigInsecureListen, call.func.range());
+        checker.report_diagnostic(LoggingConfigInsecureListen, call.func().range());
     }
 }

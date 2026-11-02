@@ -5,8 +5,8 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatStmtPass;
 
-impl FormatNodeRule<StmtPass> for FormatStmtPass {
-    fn fmt_fields(&self, _item: &StmtPass, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<ruff_python_ast::kind::StmtPass> for FormatStmtPass {
+    fn fmt_fields(&self, _item: StmtPass<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         token("pass").fmt(f)
     }
 }

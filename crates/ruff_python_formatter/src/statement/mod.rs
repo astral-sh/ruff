@@ -1,5 +1,5 @@
-use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::{AnyNodeRef, Stmt};
+use ruff_formatter::FormatOwnedWithRule;
+use ruff_python_ast::{Stmt, StmtKind, SyntaxNode};
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -36,48 +36,41 @@ pub(crate) mod suite;
 #[derive(Default)]
 pub struct FormatStmt;
 
-impl FormatRule<Stmt, PyFormatContext<'_>> for FormatStmt {
-    fn fmt(&self, item: &Stmt, f: &mut PyFormatter) -> FormatResult<()> {
-        match item {
-            Stmt::FunctionDef(x) => x.format().fmt(f),
-            Stmt::ClassDef(x) => x.format().fmt(f),
-            Stmt::Return(x) => x.format().fmt(f),
-            Stmt::Delete(x) => x.format().fmt(f),
-            Stmt::Assign(x) => x.format().fmt(f),
-            Stmt::AugAssign(x) => x.format().fmt(f),
-            Stmt::AnnAssign(x) => x.format().fmt(f),
-            Stmt::For(x) => x.format().fmt(f),
-            Stmt::While(x) => x.format().fmt(f),
-            Stmt::If(x) => x.format().fmt(f),
-            Stmt::With(x) => x.format().fmt(f),
-            Stmt::Match(x) => x.format().fmt(f),
-            Stmt::Raise(x) => x.format().fmt(f),
-            Stmt::Try(x) => x.format().fmt(f),
-            Stmt::Assert(x) => x.format().fmt(f),
-            Stmt::Import(x) => x.format().fmt(f),
-            Stmt::ImportFrom(x) => x.format().fmt(f),
-            Stmt::Global(x) => x.format().fmt(f),
-            Stmt::Nonlocal(x) => x.format().fmt(f),
-            Stmt::Expr(x) => x.format().fmt(f),
-            Stmt::Pass(x) => x.format().fmt(f),
-            Stmt::Break(x) => x.format().fmt(f),
-            Stmt::Continue(x) => x.format().fmt(f),
-            Stmt::TypeAlias(x) => x.format().fmt(f),
-            Stmt::IpyEscapeCommand(x) => x.format().fmt(f),
+impl FormatRule<Stmt<'_>, PyFormatContext<'_>> for FormatStmt {
+    fn fmt(&self, item: &Stmt<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let item = *item;
+        match item.classify() {
+            StmtKind::FunctionDef(x) => x.format().fmt(f),
+            StmtKind::ClassDef(x) => x.format().fmt(f),
+            StmtKind::Return(x) => x.format().fmt(f),
+            StmtKind::Delete(x) => x.format().fmt(f),
+            StmtKind::Assign(x) => x.format().fmt(f),
+            StmtKind::AugAssign(x) => x.format().fmt(f),
+            StmtKind::AnnAssign(x) => x.format().fmt(f),
+            StmtKind::For(x) => x.format().fmt(f),
+            StmtKind::While(x) => x.format().fmt(f),
+            StmtKind::If(x) => x.format().fmt(f),
+            StmtKind::With(x) => x.format().fmt(f),
+            StmtKind::Match(x) => x.format().fmt(f),
+            StmtKind::Raise(x) => x.format().fmt(f),
+            StmtKind::Try(x) => x.format().fmt(f),
+            StmtKind::Assert(x) => x.format().fmt(f),
+            StmtKind::Import(x) => x.format().fmt(f),
+            StmtKind::ImportFrom(x) => x.format().fmt(f),
+            StmtKind::Global(x) => x.format().fmt(f),
+            StmtKind::Nonlocal(x) => x.format().fmt(f),
+            StmtKind::Expr(x) => x.format().fmt(f),
+            StmtKind::Pass(x) => x.format().fmt(f),
+            StmtKind::Break(x) => x.format().fmt(f),
+            StmtKind::Continue(x) => x.format().fmt(f),
+            StmtKind::TypeAlias(x) => x.format().fmt(f),
+            StmtKind::IpyEscapeCommand(x) => x.format().fmt(f),
         }
     }
 }
 
-impl<'ast> AsFormat<PyFormatContext<'ast>> for Stmt {
-    type Format<'a> = FormatRefWithRule<'a, Stmt, FormatStmt, PyFormatContext<'ast>>;
-
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, FormatStmt)
-    }
-}
-
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for Stmt {
-    type Format = FormatOwnedWithRule<Stmt, FormatStmt, PyFormatContext<'ast>>;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for Stmt<'_> {
+    type Format = FormatOwnedWithRule<Self, FormatStmt, PyFormatContext<'ast>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatStmt)
@@ -86,7 +79,7 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Stmt {
 
 /// Returns the range of the semicolon terminating the statement or `None` if the statement
 /// isn't terminated by a semicolon.
-pub(super) fn trailing_semicolon(node: AnyNodeRef, source: &str) -> Option<TextRange> {
+pub(super) fn trailing_semicolon(node: SyntaxNode, source: &str) -> Option<TextRange> {
     debug_assert!(node.is_statement());
 
     let tokenizer = SimpleTokenizer::starts_at(node.end(), source);

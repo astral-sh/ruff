@@ -7,12 +7,10 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::source_order::{
-    walk_arguments, walk_decorator, walk_expr, walk_parameters, walk_type_params,
+    SourceOrderVisitor, TraversalSignal, walk_arguments, walk_body, walk_decorator, walk_expr,
+    walk_parameters, walk_type_params,
 };
-use ruff_python_ast::{
-    self as ast, AnyNodeRef,
-    visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_body},
-};
+use ruff_python_ast::{self as ast, AnyKind, NodeList, SyntaxNode};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use ty_python_core::ProgramFile;
@@ -70,21 +68,21 @@ pub fn outgoing_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> V
             DefinitionKind::Function(fn_ref) => {
                 let func = fn_ref.node(&parsed);
                 finder.walk_callable_signature(
-                    &func.decorator_list,
-                    func.type_params.as_deref(),
-                    Some(&func.parameters),
-                    func.returns.as_deref(),
+                    func.decorator_list(),
+                    func.type_params(),
+                    Some(func.parameters()),
+                    func.returns(),
                 );
-                walk_body(&mut finder, &func.body);
+                walk_body(&mut finder, func.body());
             }
             DefinitionKind::Class(class_ref) => {
                 let class = class_ref.node(&parsed);
                 finder.walk_class_signature(
-                    &class.decorator_list,
-                    class.type_params.as_deref(),
-                    class.arguments.as_deref(),
+                    class.decorator_list(),
+                    class.type_params(),
+                    class.arguments(),
                 );
-                walk_body(&mut finder, &class.body);
+                walk_body(&mut finder, class.body());
             }
             _ => continue,
         }
@@ -122,7 +120,7 @@ struct OutgoingCallsFinder<'a, 'db> {
     tokens: &'a Tokens,
     /// Calls grouped by the callee. The value is the callee item alongside with all calls to it.
     by_callee: &'a mut FxHashMap<CalleeKey, (CallHierarchyItem, Vec<TextRange>)>,
-    ancestors: Vec<AnyNodeRef<'a>>,
+    ancestors: Vec<SyntaxNode<'a>>,
 }
 
 impl<'a> OutgoingCallsFinder<'a, '_> {
@@ -181,10 +179,10 @@ impl<'a> OutgoingCallsFinder<'a, '_> {
     /// and annotations, return-type annotation.
     fn walk_callable_signature(
         &mut self,
-        decorator_list: &'a [ast::Decorator],
-        type_params: Option<&'a ast::TypeParams>,
-        parameters: Option<&'a ast::Parameters>,
-        returns: Option<&'a ast::Expr>,
+        decorator_list: NodeList<'a, ast::kind::Decorator>,
+        type_params: Option<ast::TypeParams<'a>>,
+        parameters: Option<ast::Parameters<'a>>,
+        returns: Option<ast::Expr<'a>>,
     ) {
         for decorator in decorator_list {
             walk_decorator(self, decorator);
@@ -205,9 +203,9 @@ impl<'a> OutgoingCallsFinder<'a, '_> {
     /// handled separately so the caller can decide whether to walk it.
     fn walk_class_signature(
         &mut self,
-        decorator_list: &'a [ast::Decorator],
-        type_params: Option<&'a ast::TypeParams>,
-        arguments: Option<&'a ast::Arguments>,
+        decorator_list: NodeList<'a, ast::kind::Decorator>,
+        type_params: Option<ast::TypeParams<'a>>,
+        arguments: Option<ast::Arguments<'a>>,
     ) {
         for decorator in decorator_list {
             walk_decorator(self, decorator);
@@ -222,20 +220,20 @@ impl<'a> OutgoingCallsFinder<'a, '_> {
 }
 
 impl<'a> SourceOrderVisitor<'a> for OutgoingCallsFinder<'a, '_> {
-    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+    fn enter_node(&mut self, node: SyntaxNode<'a>) -> TraversalSignal {
         self.ancestors.push(node);
 
-        match node {
-            AnyNodeRef::ExprCall(call) => {
-                if let Some(leaf) = CalleeLeaf::from_expr(&call.func) {
+        match node.classify() {
+            AnyKind::ExprCall(call) => {
+                if let Some(leaf) = CalleeLeaf::from_expr(call.func()) {
                     self.record_callee(leaf);
                 }
             }
-            AnyNodeRef::Decorator(decorator) => {
+            AnyKind::Decorator(decorator) => {
                 // A bare `@foo` decorator with no parens is a runtime call. If
                 // the user wrote `@foo()` we'll pick it up via the `ExprCall`
                 // arm above instead.
-                if let Some(leaf) = CalleeLeaf::from_expr(&decorator.expression) {
+                if let Some(leaf) = CalleeLeaf::from_expr(decorator.expression()) {
                     self.record_callee(leaf);
                 }
             }
@@ -243,25 +241,25 @@ impl<'a> SourceOrderVisitor<'a> for OutgoingCallsFinder<'a, '_> {
             // surrounding scope runs (decorators, defaults, bases, ...). The
             // body belongs to the nested item itself and is reached by
             // expanding that item separately in the call hierarchy tree.
-            AnyNodeRef::StmtFunctionDef(func) => {
+            AnyKind::StmtFunctionDef(func) => {
                 self.walk_callable_signature(
-                    &func.decorator_list,
-                    func.type_params.as_deref(),
-                    Some(&func.parameters),
-                    func.returns.as_deref(),
+                    func.decorator_list(),
+                    func.type_params(),
+                    Some(func.parameters()),
+                    func.returns(),
                 );
                 return TraversalSignal::Skip;
             }
-            AnyNodeRef::StmtClassDef(class) => {
+            AnyKind::StmtClassDef(class) => {
                 self.walk_class_signature(
-                    &class.decorator_list,
-                    class.type_params.as_deref(),
-                    class.arguments.as_deref(),
+                    class.decorator_list(),
+                    class.type_params(),
+                    class.arguments(),
                 );
                 return TraversalSignal::Skip;
             }
-            AnyNodeRef::ExprLambda(lambda) => {
-                self.walk_callable_signature(&[], None, lambda.parameters.as_deref(), None);
+            AnyKind::ExprLambda(lambda) => {
+                self.walk_callable_signature(NodeList::default(), None, lambda.parameters(), None);
                 return TraversalSignal::Skip;
             }
             _ => {}
@@ -270,7 +268,7 @@ impl<'a> SourceOrderVisitor<'a> for OutgoingCallsFinder<'a, '_> {
         TraversalSignal::Traverse
     }
 
-    fn leave_node(&mut self, node: AnyNodeRef<'a>) {
+    fn leave_node(&mut self, node: SyntaxNode<'a>) {
         debug_assert_eq!(self.ancestors.last(), Some(&node));
         self.ancestors.pop();
     }

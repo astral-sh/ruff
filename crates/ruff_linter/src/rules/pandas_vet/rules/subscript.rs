@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
@@ -146,14 +146,16 @@ impl Violation for PandasUseOfDotIat {
     }
 }
 
-pub(crate) fn subscript(checker: &Checker, value: &Expr, expr: &Expr) {
+pub(crate) fn subscript(checker: &Checker, value: Expr<'_>, &expr: &Expr<'_>) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
 
-    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = value else {
+    let ExprKind::Attribute(attribute) = value.classify() else {
         return;
     };
+    let attr = attribute.attr();
+    let value = attribute.value();
 
     // Avoid flagging on non-DataFrames (e.g., `{"a": 1}.at[0]`), and on irrelevant bindings
     // (like imports).

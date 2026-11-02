@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprAttribute, helpers::Truthiness};
+use ruff_python_ast::helpers::Truthiness;
+use ruff_python_ast::{Expr, ExprKind};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
@@ -60,7 +61,7 @@ impl Violation for FalsyDictGetFallback {
 }
 
 /// RUF056
-pub(crate) fn falsy_dict_get_fallback(checker: &Checker, expr: &Expr) {
+pub(crate) fn falsy_dict_get_fallback(checker: &Checker, &expr: &Expr<'_>) {
     let semantic = checker.semantic();
 
     // Check if we are in a boolean test
@@ -69,14 +70,16 @@ pub(crate) fn falsy_dict_get_fallback(checker: &Checker, expr: &Expr) {
     }
 
     // Check if the expression is a call
-    let Expr::Call(call) = expr else {
+    let ExprKind::Call(call) = expr.classify() else {
         return;
     };
 
     // Check if the function being called is an attribute (e.g. `dict.get`)
-    let Expr::Attribute(ExprAttribute { value, attr, .. }) = &*call.func else {
+    let ExprKind::Attribute(attribute_node) = call.func().classify() else {
         return;
     };
+    let value = attribute_node.value();
+    let attr = attribute_node.attr();
 
     // Ensure the method called is `get`
     if attr != "get" {
@@ -92,7 +95,7 @@ pub(crate) fn falsy_dict_get_fallback(checker: &Checker, expr: &Expr) {
     }
 
     // Get the fallback argument
-    let Some(fallback_arg) = call.arguments.find_argument("default", 1) else {
+    let Some(fallback_arg) = call.arguments().find_argument("default", 1) else {
         return;
     };
 
@@ -107,19 +110,19 @@ pub(crate) fn falsy_dict_get_fallback(checker: &Checker, expr: &Expr) {
     let mut diagnostic = checker.report_diagnostic(FalsyDictGetFallback, fallback_arg.range());
 
     // All arguments to `dict.get` are positional-only.
-    if !call.arguments.keywords.is_empty() {
+    if !call.arguments().keywords().is_empty() {
         return;
     }
 
     // And there are only two of them, at most.
-    if call.arguments.args.len() > 2 {
+    if call.arguments().args().len() > 2 {
         return;
     }
 
     let comment_ranges = checker.comment_ranges();
 
     // Determine applicability based on the presence of comments
-    let applicability = if comment_ranges.intersects(call.arguments.range()) {
+    let applicability = if comment_ranges.intersects(call.arguments().range()) {
         Applicability::Unsafe
     } else {
         Applicability::Safe
@@ -128,7 +131,7 @@ pub(crate) fn falsy_dict_get_fallback(checker: &Checker, expr: &Expr) {
     diagnostic.try_set_fix(|| {
         remove_argument(
             &fallback_arg,
-            &call.arguments,
+            call.arguments(),
             Parentheses::Preserve,
             checker.locator().contents(),
             checker.tokens(),

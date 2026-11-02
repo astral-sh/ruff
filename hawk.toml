@@ -377,14 +377,6 @@ reason = "the public owned-format adapter retains its builder API"
 [[override]]
 lint = "hawk::dead_public"
 crate = "ruff_formatter"
-item = "FormatOwnedWithRule::<T, R, C>::with_options"
-kind = "inherent_method"
-level = "expect"
-reason = "the public owned-format adapter retains its builder API"
-
-[[override]]
-lint = "hawk::dead_public"
-crate = "ruff_formatter"
 item = "printer::printer_options::PrintWidth::new"
 kind = "inherent_method"
 level = "expect"
@@ -421,14 +413,6 @@ item = "Parsed::<T>::as_result"
 kind = "inherent_method"
 level = "expect"
 reason = "downstream parser clients retain borrowed result conversion"
-
-[[override]]
-lint = "hawk::dead_public"
-crate = "ruff_python_parser"
-item = "Parsed::<ruff_python_ast::ModExpression>::into_expr"
-kind = "inherent_method"
-level = "expect"
-reason = "parsed expressions retain borrowed and consuming accessors"
 
 [[override]]
 lint = "hawk::dead_public"
@@ -573,22 +557,6 @@ item = "size::TextSize::saturating_add"
 kind = "inherent_method"
 level = "expect"
 reason = "TextSize intentionally provides both checked and saturating arithmetic"
-
-[[override]]
-lint = "hawk::dead_public"
-crate = "ruff_text_size"
-item = "size::TextSize::saturating_sub"
-kind = "inherent_method"
-level = "expect"
-reason = "TextSize intentionally provides both checked and saturating arithmetic"
-
-[[override]]
-lint = "hawk::dead_public"
-crate = "ruff_python_ast"
-item = "expression::StringLikePart::<'a>::as_string_literal"
-kind = "inherent_method"
-level = "expect"
-reason = "string-like AST parts intentionally expose consistent typed accessors"
 
 [[override]]
 lint = "hawk::dead_public"
@@ -1227,6 +1195,11 @@ reason = "generated from crates/ruff_python_ast/ast.toml"
 
 [[exclude]]
 crate = "ruff_python_ast"
+file = "crates/ruff_python_ast/src/flat/generated.rs"
+reason = "generated from crates/ruff_python_ast/ast.toml"
+
+[[exclude]]
+crate = "ruff_python_ast"
 file = "crates/ruff_python_ast/src/nodes.rs"
 reason = "AST node APIs intentionally provide a consistent interface across node types"
 
@@ -1237,7 +1210,17 @@ reason = "the comparable AST intentionally mirrors the full AST hierarchy"
 
 [[exclude]]
 crate = "ruff_python_ast"
-file = "crates/ruff_python_ast/src/statement_visitor.rs"
+file = "crates/ruff_python_ast/src/flat/statement_visitor.rs"
+reason = "AST walk functions intentionally provide a consistent interface across node types"
+
+[[exclude]]
+crate = "ruff_python_ast"
+file = "crates/ruff_python_ast/src/flat/visitor.rs"
+reason = "AST walk functions intentionally provide a consistent interface across node types"
+
+[[exclude]]
+crate = "ruff_python_ast"
+file = "crates/ruff_python_ast/src/flat/visitor/source_order.rs"
 reason = "AST walk functions intentionally provide a consistent interface across node types"
 
 [[exclude]]

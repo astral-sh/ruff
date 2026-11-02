@@ -2,11 +2,12 @@ use std::fmt::{Debug, Write};
 
 use insta::assert_snapshot;
 
-use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
+use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{
-    AnyNodeRef, BoolOp, CmpOp, DictItem, Operator, PySourceType, Singleton, UnaryOp,
+    AnyKind, AstNode, BoolOp, CmpOp, DictItem, Expr, Operator, Singleton, Suite, SyntaxNode,
+    UnaryOp,
 };
-use ruff_python_parser::{Mode, ParseOptions, parse, parse_unchecked, parse_unchecked_source};
+use ruff_python_parser::{Mode, ParseOptions, parse, parse_expression, parse_unchecked};
 use ruff_text_size::Ranged;
 
 #[test]
@@ -55,13 +56,22 @@ fn dict_comprehension() {
 }
 
 #[test]
+fn set_comprehension() {
+    let source = "{x for x in numbers}";
+
+    let trace = trace_source_order_visitation(source);
+
+    assert_snapshot!(trace);
+}
+
+#[test]
 fn dictionary_entry_ranges() {
     #[derive(Default)]
-    struct Entries<'a>(Vec<&'a DictItem>);
+    struct Entries<'a>(Vec<DictItem<'a>>);
 
     impl<'a> SourceOrderVisitor<'a> for Entries<'a> {
-        fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
-            if let AnyNodeRef::DictItem(entry) = node {
+        fn enter_node(&mut self, node: SyntaxNode<'a>) -> TraversalSignal {
+            if let AnyKind::DictItem(entry) = node.classify() {
                 self.0.push(entry);
             }
             TraversalSignal::Traverse
@@ -80,26 +90,17 @@ fn dictionary_entry_ranges() {
             &[("**  # capture\n          rest", "rest")][..],
         ),
     ] {
-        let parsed = parse_unchecked_source(source, PySourceType::Python);
+        let parsed = parse_unchecked(source, ParseOptions::from(Mode::Module));
         assert_eq!(parsed.errors().is_empty(), valid);
         let mut entries = Entries::default();
-        entries.visit_body(parsed.suite());
+        entries.visit_mod(parsed.syntax());
         let ranges: Vec<_> = entries
             .0
             .iter()
-            .map(|entry| (&source[entry.range()], &source[entry.value.range()]))
+            .map(|entry| (&source[entry.range()], &source[entry.value().range()]))
             .collect();
         assert_eq!(ranges, expected);
     }
-}
-
-#[test]
-fn set_comprehension() {
-    let source = "{x for x in numbers}";
-
-    let trace = trace_source_order_visitation(source);
-
-    assert_snapshot!(trace);
 }
 
 #[test]
@@ -191,6 +192,27 @@ fn bytes_literals() {
 }
 
 #[test]
+fn f_string_parts_from_either_end() {
+    for (source, starts) in [("f''", &[0][..]), ("f'' 'x' f''", &[0, 4, 8])] {
+        let parsed = parse_expression(source).unwrap();
+        let mut parts = parsed.expr().as_f_string_expr().unwrap().value().iter();
+        let mut expected = starts.iter().copied();
+        while let Some(first) = expected.next() {
+            assert_eq!(parts.len(), expected.len() + 1);
+            assert_eq!(parts.next().map(|part| part.start().to_u32()), Some(first));
+            assert_eq!(parts.len(), expected.len());
+            assert_eq!(
+                parts.next_back().map(|part| part.start().to_u32()),
+                expected.next_back()
+            );
+        }
+        assert_eq!(parts.len(), 0);
+        assert!(parts.next().is_none());
+        assert!(parts.next_back().is_none());
+    }
+}
+
+#[test]
 fn f_strings() {
     let source = r"'pre' f'foo {bar:.{x}f} baz'";
 
@@ -217,6 +239,38 @@ fn trace_source_order_visitation(source: &str) -> String {
     visitor.output
 }
 
+#[test]
+fn suites_and_annotations() {
+    #[derive(Default)]
+    struct Roles {
+        suites: Vec<usize>,
+        annotations: Vec<String>,
+    }
+    impl<'a> SourceOrderVisitor<'a> for Roles {
+        fn visit_body(&mut self, body: Suite<'a>) {
+            self.suites.push(body.len());
+            source_order::walk_body(self, body);
+        }
+
+        fn visit_annotation(&mut self, expr: Expr<'a>) {
+            if let Some(name) = expr.as_name_expr() {
+                self.annotations.push(name.id().to_string());
+            }
+            source_order::walk_annotation(self, expr);
+        }
+    }
+
+    let parsed = parse(
+        "def f(x: A) -> B:\n    y: C = x\n    return y\n",
+        ParseOptions::from(Mode::Module),
+    )
+    .unwrap();
+    let mut roles = Roles::default();
+    roles.visit_mod(parsed.syntax());
+    assert_eq!(roles.suites, [1, 2]);
+    assert_eq!(roles.annotations, ["A", "B", "C"]);
+}
+
 /// Emits a `tree` with a node for every visited AST node (labelled by the AST node's kind)
 /// and leaves for attributes.
 #[derive(Default)]
@@ -236,34 +290,34 @@ impl RecordVisitor {
 }
 
 impl<'a> SourceOrderVisitor<'a> for RecordVisitor {
-    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
-        self.emit(&node.kind());
+    fn enter_node(&mut self, node: SyntaxNode<'a>) -> TraversalSignal {
+        self.emit(&node.node_kind());
         self.depth += 1;
 
         TraversalSignal::Traverse
     }
 
-    fn leave_node(&mut self, _node: AnyNodeRef<'a>) {
+    fn leave_node(&mut self, _node: SyntaxNode<'a>) {
         self.depth -= 1;
     }
 
-    fn visit_singleton(&mut self, singleton: &Singleton) {
+    fn visit_singleton(&mut self, singleton: Singleton) {
         self.emit(&singleton);
     }
 
-    fn visit_bool_op(&mut self, bool_op: &BoolOp) {
+    fn visit_bool_op(&mut self, bool_op: BoolOp) {
         self.emit(&bool_op);
     }
 
-    fn visit_operator(&mut self, operator: &Operator) {
+    fn visit_operator(&mut self, operator: Operator) {
         self.emit(&operator);
     }
 
-    fn visit_unary_op(&mut self, unary_op: &UnaryOp) {
+    fn visit_unary_op(&mut self, unary_op: UnaryOp) {
         self.emit(&unary_op);
     }
 
-    fn visit_cmp_op(&mut self, cmp_op: &CmpOp) {
+    fn visit_cmp_op(&mut self, cmp_op: CmpOp) {
         self.emit(&cmp_op);
     }
 }

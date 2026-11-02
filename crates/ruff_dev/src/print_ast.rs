@@ -24,8 +24,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
                 args.file.display()
             )
         })?;
-    let python_ast =
-        parse(source_kind.source_code(), ParseOptions::from(source_type))?.into_syntax();
-    println!("{python_ast:#?}");
+    let parsed = parse(source_kind.source_code(), ParseOptions::from(source_type))?;
+    println!("{:#?}", parsed.syntax());
     Ok(())
 }

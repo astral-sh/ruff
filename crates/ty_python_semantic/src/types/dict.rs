@@ -1,4 +1,4 @@
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, ExprKind};
 
 use crate::types::{Type, UnionBuilder};
 use crate::{Db, ProgramEnvironment};
@@ -12,25 +12,25 @@ use crate::{Db, ProgramEnvironment};
 pub(super) fn dict_literal_key_value_types<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    dict: &ast::ExprDict,
-    mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+    dict: ast::ExprDict<'_>,
+    mut expression_type: impl FnMut(ast::Expr<'_>) -> Type<'db>,
 ) -> Option<(Type<'db>, Type<'db>)> {
     fn extend<'db>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        dict: &ast::ExprDict,
-        expression_type: &mut impl FnMut(&ast::Expr) -> Type<'db>,
+        dict: ast::ExprDict<'_>,
+        expression_type: &mut impl FnMut(ast::Expr<'_>) -> Type<'db>,
         keys: &mut UnionBuilder<'db>,
         values: &mut UnionBuilder<'db>,
     ) -> Option<()> {
-        for item in &dict.items {
-            let (key, value) = if let Some(key) = &item.key {
-                (expression_type(key), expression_type(&item.value))
-            } else if let ast::Expr::Dict(unpacked) = &item.value {
+        for item in dict.items() {
+            let (key, value) = if let Some(key) = item.key() {
+                (expression_type(key), expression_type(item.value()))
+            } else if let ExprKind::Dict(unpacked) = item.value().classify() {
                 extend(db, env, unpacked, expression_type, keys, values)?;
                 continue;
             } else {
-                expression_type(&item.value).unpack_keys_and_items(db, env)?
+                expression_type(item.value()).unpack_keys_and_items(db, env)?
             };
             keys.add_in_place(key);
             values.add_in_place(value);

@@ -1,5 +1,5 @@
 use ruff_formatter::write;
-use ruff_python_ast::{Decorator, NodeKind, StmtClassDef};
+use ruff_python_ast::{self as ast, NodeKind, NodeList, StmtClassDef};
 use ruff_python_trivia::lines_after_ignoring_end_of_line_trivia;
 use ruff_text_size::Ranged;
 
@@ -14,17 +14,17 @@ use crate::statement::suite::SuiteKind;
 #[derive(Default)]
 pub struct FormatStmtClassDef;
 
-impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
-    fn fmt_fields(&self, item: &StmtClassDef, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtClassDef {
+impl FormatNodeRule<ruff_python_ast::kind::StmtClassDef> for FormatStmtClassDef {
+    fn fmt_fields(&self, item: StmtClassDef<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let ast::StmtClassDefFields {
             range: _,
-            node_index: _,
+            node: _,
             name,
             arguments,
             body,
             type_params,
             decorator_list,
-        } = item;
+        } = item.fields();
 
         let comments = f.context().comments().clone();
 
@@ -70,11 +70,11 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
                     &format_with(|f| {
                         write!(f, [token("class"), space(), name.format()])?;
 
-                        if let Some(type_params) = type_params.as_deref() {
+                        if let Some(type_params) = type_params {
                             write!(f, [type_params.format()])?;
                         }
 
-                        if let Some(arguments) = arguments.as_deref() {
+                        if let Some(arguments) = arguments {
                             // Drop empty the arguments node entirely (i.e., remove the parentheses) if it is empty,
                             // e.g., given:
                             // ```python
@@ -162,7 +162,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
 }
 
 pub(super) struct FormatDecorators<'a> {
-    pub(super) decorators: &'a [Decorator],
+    pub(super) decorators: NodeList<'a, ruff_python_ast::kind::Decorator>,
     pub(super) leading_definition_comments: &'a [SourceComment],
 }
 

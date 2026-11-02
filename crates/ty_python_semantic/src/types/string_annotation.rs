@@ -1,6 +1,6 @@
 use ruff_db::parsed::parsed_string_annotation;
 use ruff_db::source::source_text;
-use ruff_python_ast::{self as ast, ModExpression, StringFlags};
+use ruff_python_ast::{self as ast, StringFlags};
 use ruff_python_parser::{ParseError, ParseErrorType, Parsed};
 use ruff_text_size::Ranged;
 
@@ -51,8 +51,8 @@ declare_lint! {
 pub(crate) fn parse_string_annotation(
     context: &InferContext,
     inference_flags: InferenceFlags,
-    string_expr: &ast::ExprStringLiteral,
-) -> Option<Parsed<ModExpression>> {
+    string_expr: ast::ExprStringLiteral<'_>,
+) -> Option<Parsed<ast::kind::ModExpression>> {
     let file = context.file();
     let db = context.db();
 
@@ -62,7 +62,7 @@ pub(crate) fn parse_string_annotation(
     let source = source_text(db, file);
 
     if let Some(string_literal) = string_expr.as_single_part_string() {
-        let prefix = string_literal.flags.prefix();
+        let prefix = string_literal.flags().prefix();
         if prefix.is_raw() {
             if let Some(builder) = context.report_lint(&RAW_STRING_TYPE_ANNOTATION, string_literal)
             {
@@ -87,8 +87,8 @@ pub(crate) fn parse_string_annotation(
 
                         let possible_secondary = string_literal
                             .range()
-                            .add_start(string_literal.flags.opener_len())
-                            .sub_end(string_literal.flags.closer_len());
+                            .add_start(string_literal.flags().opener_len())
+                            .sub_end(string_literal.flags().closer_len());
                         if possible_secondary.contains_range(location)
                             && (possible_secondary.start() < location.start()
                                 || possible_secondary.end() > location.end())
@@ -97,7 +97,7 @@ pub(crate) fn parse_string_annotation(
                         }
 
                         if !matches!(error, ParseErrorType::StringAnnotationError(_))
-                            && !string_literal.contains('\n')
+                            && !string_literal.as_str().contains('\n')
                         {
                             diagnostic.help(format_args!(
                                 "Did you mean `typing.Literal[\"{}\"]`?",

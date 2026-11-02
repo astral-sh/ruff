@@ -1,6 +1,5 @@
 use ruff_formatter::prelude::format_with;
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::ExprList;
+use ruff_python_ast::{ExprList, SyntaxNode};
 use ruff_text_size::Ranged;
 
 use crate::expression::parentheses::{
@@ -11,14 +10,9 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprList;
 
-impl FormatNodeRule<ExprList> for FormatExprList {
-    fn fmt_fields(&self, item: &ExprList, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprList {
-            range: _,
-            node_index: _,
-            elts,
-            ctx: _,
-        } = item;
+impl FormatNodeRule<ruff_python_ast::kind::ExprList> for FormatExprList {
+    fn fmt_fields(&self, item: ExprList<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let elts = item.elts();
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
@@ -39,10 +33,10 @@ impl FormatNodeRule<ExprList> for FormatExprList {
     }
 }
 
-impl NeedsParentheses for ExprList {
+impl NeedsParentheses for ExprList<'_> {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        _parent: SyntaxNode,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
         OptionalParentheses::Never

@@ -1,4 +1,4 @@
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 
 use crate::types::{Type, context::InferContext, diagnostic::INVALID_TYPE_GUARD_DEFINITION};
 
@@ -8,7 +8,7 @@ use crate::types::{Type, context::InferContext, diagnostic::INVALID_TYPE_GUARD_D
 pub(crate) fn check_type_guard_definition<'db>(
     context: &InferContext<'db, '_>,
     ty: Type<'db>,
-    node: &ast::StmtFunctionDef,
+    node: ast::StmtFunctionDef<'_>,
 ) {
     let Type::FunctionLiteral(function) = ty else {
         return;
@@ -29,7 +29,7 @@ pub(crate) fn check_type_guard_definition<'db>(
     };
 
     // The return type annotation must exist since we matched `TypeIs`/`TypeGuard`.
-    let Some(returns_expr) = node.returns.as_deref() else {
+    let Some(returns_expr) = node.returns() else {
         return;
     };
 

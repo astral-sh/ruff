@@ -2,8 +2,7 @@ use std::fmt::Debug;
 use std::iter::Peekable;
 
 use ruff_formatter::{SourceCode, SourceCodeSlice};
-use ruff_python_ast::{AnyNodeRef, Identifier};
-use ruff_python_ast::{Mod, Stmt};
+use ruff_python_ast::{Identifier, Mod, Suite, SyntaxNode};
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.
 #[allow(clippy::wildcard_imports)]
@@ -18,12 +17,12 @@ use crate::comments::{CommentsMap, SourceComment};
 /// Collect the preceding, following and enclosing node for each comment without applying
 /// [`place_comment`] for debugging.
 pub(crate) fn collect_comments<'a>(
-    root: &'a Mod,
+    root: Mod<'a>,
     source_code: SourceCode<'a>,
     comment_ranges: &'a CommentRanges,
 ) -> Vec<DecoratedComment<'a>> {
     let mut collector = CommentsVecBuilder::default();
-    CommentsVisitor::new(source_code, comment_ranges, &mut collector).visit(AnyNodeRef::from(root));
+    CommentsVisitor::new(source_code, comment_ranges, &mut collector).visit(SyntaxNode::from(root));
     collector.comments
 }
 
@@ -31,8 +30,8 @@ pub(crate) fn collect_comments<'a>(
 pub(super) struct CommentsVisitor<'a, 'builder> {
     builder: &'builder mut (dyn PushComment<'a> + 'a),
     source_code: SourceCode<'a>,
-    parents: Vec<AnyNodeRef<'a>>,
-    preceding_node: Option<AnyNodeRef<'a>>,
+    parents: Vec<SyntaxNode<'a>>,
+    preceding_node: Option<SyntaxNode<'a>>,
     comment_ranges: Peekable<std::slice::Iter<'a, TextRange>>,
 }
 
@@ -51,7 +50,7 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
         }
     }
 
-    pub(super) fn visit(mut self, root: AnyNodeRef<'a>) {
+    pub(super) fn visit(mut self, root: SyntaxNode<'a>) {
         if self.enter_node(root).is_traverse() {
             root.visit_source_order(&mut self);
         }
@@ -70,7 +69,7 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
 }
 
 impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
-    fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
+    fn enter_node(&mut self, node: SyntaxNode<'ast>) -> TraversalSignal {
         let node_range = node.range();
 
         let enclosing_node = self.parents.last().copied().unwrap_or(node);
@@ -111,7 +110,7 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
         }
     }
 
-    fn leave_node(&mut self, node: AnyNodeRef<'ast>) {
+    fn leave_node(&mut self, node: SyntaxNode<'ast>) {
         // We are leaving this node, pop it from the parent stack.
         self.parents.pop();
 
@@ -147,13 +146,13 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
         self.preceding_node = Some(node);
     }
 
-    fn visit_body(&mut self, body: &'ast [Stmt]) {
-        match body {
-            [] => {
+    fn visit_body(&mut self, body: Suite<'ast>) {
+        match (body.first(), body.last()) {
+            (None, _) | (_, None) => {
                 // no-op
             }
-            [only] => self.visit_stmt(only),
-            [first, .., last] => {
+            (Some(only), _) if body.len() == 1 => self.visit_stmt(only),
+            (Some(first), Some(last)) => {
                 if self.can_skip(last.end()) {
                     // Skip traversing the body when there's no comment between the first and last statement.
                     // It is still necessary to visit the first statement to process all comments between
@@ -167,7 +166,7 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
         }
     }
 
-    fn visit_identifier(&mut self, _identifier: &'ast Identifier) {
+    fn visit_identifier(&mut self, _identifier: Identifier<'ast>) {
         // TODO: Visit and associate comments with identifiers
     }
 }
@@ -178,10 +177,10 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
 /// [dangling](self#dangling-comments), or [trailing](self#trailing-comments) comment.
 #[derive(Debug, Clone)]
 pub(crate) struct DecoratedComment<'a> {
-    enclosing: AnyNodeRef<'a>,
-    preceding: Option<AnyNodeRef<'a>>,
-    following: Option<AnyNodeRef<'a>>,
-    parent: Option<AnyNodeRef<'a>>,
+    enclosing: SyntaxNode<'a>,
+    preceding: Option<SyntaxNode<'a>>,
+    following: Option<SyntaxNode<'a>>,
+    parent: Option<SyntaxNode<'a>>,
     line_position: CommentLinePosition,
     slice: SourceCodeSlice,
 }
@@ -203,12 +202,12 @@ impl<'a> DecoratedComment<'a> {
     ///
     /// The enclosing node is the list expression and not the name `b` because
     /// `a` and `b` are children of the list expression and `comment` is between the two nodes.
-    pub(crate) fn enclosing_node(&self) -> AnyNodeRef<'a> {
+    pub(crate) fn enclosing_node(&self) -> SyntaxNode<'a> {
         self.enclosing
     }
 
     /// Returns the parent of the enclosing node, if any
-    pub(super) fn enclosing_parent(&self) -> Option<AnyNodeRef<'a>> {
+    pub(super) fn enclosing_parent(&self) -> Option<SyntaxNode<'a>> {
         self.parent
     }
 
@@ -252,7 +251,7 @@ impl<'a> DecoratedComment<'a> {
     ///
     ///  Returns `Some(a)` because `a` is the preceding node of `comment`. The presence of the `,` token
     /// doesn't change that.
-    pub(crate) fn preceding_node(&self) -> Option<AnyNodeRef<'a>> {
+    pub(crate) fn preceding_node(&self) -> Option<SyntaxNode<'a>> {
         self.preceding
     }
 
@@ -310,7 +309,7 @@ impl<'a> DecoratedComment<'a> {
     ///
     /// Returns `None` because `comment` is enclosed inside the parenthesized expression and it has no children
     /// following `# comment`.
-    pub(crate) fn following_node(&self) -> Option<AnyNodeRef<'a>> {
+    pub(crate) fn following_node(&self) -> Option<SyntaxNode<'a>> {
         self.following
     }
 
@@ -342,18 +341,18 @@ impl From<DecoratedComment<'_>> for SourceComment {
 pub(super) enum CommentPlacement<'a> {
     /// Makes `comment` a [leading comment](self#leading-comments) of `node`.
     Leading {
-        node: AnyNodeRef<'a>,
+        node: SyntaxNode<'a>,
         comment: SourceComment,
     },
     /// Makes `comment` a [trailing comment](self#trailing-comments) of `node`.
     Trailing {
-        node: AnyNodeRef<'a>,
+        node: SyntaxNode<'a>,
         comment: SourceComment,
     },
 
     /// Makes `comment` a [dangling comment](self#dangling-comments) of `node`.
     Dangling {
-        node: AnyNodeRef<'a>,
+        node: SyntaxNode<'a>,
         comment: SourceComment,
     },
 
@@ -476,7 +475,7 @@ pub(super) enum CommentPlacement<'a> {
 impl<'a> CommentPlacement<'a> {
     /// Makes `comment` a [leading comment](self#leading-comments) of `node`.
     #[inline]
-    pub(super) fn leading(node: impl Into<AnyNodeRef<'a>>, comment: DecoratedComment) -> Self {
+    pub(super) fn leading(node: impl Into<SyntaxNode<'a>>, comment: DecoratedComment) -> Self {
         Self::Leading {
             node: node.into(),
             comment: comment.into(),
@@ -484,7 +483,7 @@ impl<'a> CommentPlacement<'a> {
     }
 
     /// Makes `comment` a [dangling comment](self::dangling-comments) of `node`.
-    pub(super) fn dangling(node: impl Into<AnyNodeRef<'a>>, comment: DecoratedComment) -> Self {
+    pub(super) fn dangling(node: impl Into<SyntaxNode<'a>>, comment: DecoratedComment) -> Self {
         Self::Dangling {
             node: node.into(),
             comment: comment.into(),
@@ -493,7 +492,7 @@ impl<'a> CommentPlacement<'a> {
 
     /// Makes `comment` a [trailing comment](self::trailing-comments) of `node`.
     #[inline]
-    pub(super) fn trailing(node: impl Into<AnyNodeRef<'a>>, comment: DecoratedComment) -> Self {
+    pub(super) fn trailing(node: impl Into<SyntaxNode<'a>>, comment: DecoratedComment) -> Self {
         Self::Trailing {
             node: node.into(),
             comment: comment.into(),
@@ -614,17 +613,17 @@ impl<'a> CommentsMapBuilder<'a> {
         self.comments
     }
 
-    fn push_leading_comment(&mut self, node: AnyNodeRef<'a>, comment: impl Into<SourceComment>) {
+    fn push_leading_comment(&mut self, node: SyntaxNode<'a>, comment: impl Into<SourceComment>) {
         self.comments
             .push_leading(NodeRefEqualityKey::from_ref(node), comment.into());
     }
 
-    fn push_dangling_comment(&mut self, node: AnyNodeRef<'a>, comment: impl Into<SourceComment>) {
+    fn push_dangling_comment(&mut self, node: SyntaxNode<'a>, comment: impl Into<SourceComment>) {
         self.comments
             .push_dangling(NodeRefEqualityKey::from_ref(node), comment.into());
     }
 
-    fn push_trailing_comment(&mut self, node: AnyNodeRef<'a>, comment: impl Into<SourceComment>) {
+    fn push_trailing_comment(&mut self, node: SyntaxNode<'a>, comment: impl Into<SourceComment>) {
         self.comments
             .push_trailing(NodeRefEqualityKey::from_ref(node), comment.into());
     }

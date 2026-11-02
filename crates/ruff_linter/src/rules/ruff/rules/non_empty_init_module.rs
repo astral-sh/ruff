@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{AstNodeId, Expr, ListIter, Stmt, StmtKind};
 use ruff_python_semantic::analyze::typing::is_type_checking_block;
 use ruff_text_size::Ranged;
 
@@ -95,7 +95,7 @@ impl Violation for NonEmptyInitModule {
 }
 
 /// RUF067
-pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn non_empty_init_module(checker: &Checker, stmt: Stmt<'_>) {
     if !checker.in_init_module() {
         return;
     }
@@ -122,15 +122,19 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
     let strictly_empty_init_modules = checker.settings().ruff.strictly_empty_init_modules;
 
     if !strictly_empty_init_modules {
-        match stmt {
+        match stmt.classify() {
             // Allow imports
-            Stmt::Import(_) | Stmt::ImportFrom(_) => return,
+            StmtKind::Import(_) | StmtKind::ImportFrom(_) => return,
 
             // Allow PEP-562 module `__getattr__` and `__dir__`
-            Stmt::FunctionDef(func) if matches!(&*func.name, "__getattr__" | "__dir__") => return,
+            StmtKind::FunctionDef(func)
+                if matches!(func.name().as_str(), "__getattr__" | "__dir__") =>
+            {
+                return;
+            }
 
             // Allow `TYPE_CHECKING` blocks
-            Stmt::If(stmt_if) if is_type_checking_block(stmt_if, semantic) => return,
+            StmtKind::If(stmt_if) if is_type_checking_block(stmt_if, semantic) => return,
 
             _ => {}
         }
@@ -156,15 +160,30 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
 /// Any assignment statement, including plain assignment, annotated assignments, and augmented
 /// assignments.
 struct Assignment<'a> {
-    targets: &'a [Expr],
+    targets: itertools::Either<
+        ListIter<'a, AstNodeId<ruff_python_ast::kind::Expr>>,
+        std::iter::Once<Expr<'a>>,
+    >,
 }
 
 impl<'a> Assignment<'a> {
-    fn from_stmt(stmt: &'a Stmt) -> Option<Self> {
-        let targets = match stmt {
-            Stmt::Assign(ast::StmtAssign { targets, .. }) => targets.as_slice(),
-            Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => std::slice::from_ref(&**target),
-            Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => std::slice::from_ref(&**target),
+    fn from_stmt(stmt: Stmt<'a>) -> Option<Self> {
+        let targets = match stmt.classify() {
+            StmtKind::Assign(stmt_assign) => {
+                let targets = stmt_assign.targets();
+
+                itertools::Either::Left(targets.iter())
+            }
+            StmtKind::AnnAssign(stmt_ann_assign) => {
+                let target = stmt_ann_assign.target();
+
+                itertools::Either::Right(std::iter::once(target))
+            }
+            StmtKind::AugAssign(stmt_aug_assign) => {
+                let target = stmt_aug_assign.target();
+
+                itertools::Either::Right(std::iter::once(target))
+            }
             _ => return None,
         };
 
@@ -174,10 +193,10 @@ impl<'a> Assignment<'a> {
     /// Returns `true` when every assignment target is a simple name and each name is a dunder
     /// (`__` prefix and suffix), matching [`is_dunder`].
     fn all_targets_are_dunder(&self) -> bool {
-        self.targets.iter().all(|target| {
+        self.targets.clone().all(|target| {
             target
                 .as_name_expr()
-                .is_some_and(|name| is_dunder(name.id.as_str()))
+                .is_some_and(|name| is_dunder(name.id().as_str()))
         })
     }
 }

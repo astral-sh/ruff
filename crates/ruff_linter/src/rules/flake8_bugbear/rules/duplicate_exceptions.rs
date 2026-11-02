@@ -2,13 +2,14 @@ use itertools::Itertools;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{self as ast, Builder, Expr, ExprKind, NodeList};
+use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits::pad;
+use crate::fix::syntax;
 use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Violation};
 use crate::{Edit, Fix};
@@ -114,26 +115,15 @@ impl AlwaysFixableViolation for DuplicateHandlerException {
     }
 }
 
-fn type_pattern(elts: Vec<&Expr>) -> Expr {
-    ast::ExprTuple {
-        elts: elts.into_iter().cloned().collect(),
-        ctx: ExprContext::Load,
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        parenthesized: true,
-    }
-    .into()
-}
-
 /// B014
 fn duplicate_handler_exceptions<'a>(
     checker: &Checker,
-    expr: &'a Expr,
-    elts: &'a [Expr],
-) -> FxHashMap<UnqualifiedName<'a>, &'a Expr> {
-    let mut seen: FxHashMap<UnqualifiedName, &Expr> = FxHashMap::default();
+    expr: Expr<'a>,
+    elts: NodeList<'a, ruff_python_ast::kind::Expr>,
+) -> FxHashMap<UnqualifiedName<'a>, Expr<'a>> {
+    let mut seen: FxHashMap<UnqualifiedName, Expr<'_>> = FxHashMap::default();
     let mut duplicates: FxHashSet<UnqualifiedName> = FxHashSet::default();
-    let mut unique_elts: Vec<&Expr> = Vec::default();
+    let mut unique_elts: Vec<Expr<'_>> = Vec::default();
     for type_ in elts {
         if let Some(name) = UnqualifiedName::from_expr(type_) {
             if seen.contains_key(&name) {
@@ -146,7 +136,7 @@ fn duplicate_handler_exceptions<'a>(
     }
 
     if checker.is_rule_enabled(Rule::DuplicateHandlerException) {
-        // TODO(charlie): Handle "BaseException" and redundant exception aliases.
+        // TODO(charlie): AstNodeId "BaseException" and redundant exception aliases.
         if !duplicates.is_empty() {
             let mut diagnostic = checker.report_diagnostic(
                 DuplicateHandlerException {
@@ -171,14 +161,17 @@ fn duplicate_handler_exceptions<'a>(
                     // parentheses, insert whitespace as needed.
                     if let [elt] = unique_elts.as_slice() {
                         pad(
-                            checker.generator().expr(elt),
+                            checker.generator().expr(*elt),
                             expr.range(),
                             checker.locator(),
                         )
                     } else {
                         // Multiple exceptions must always be parenthesized. This is done
                         // manually as the generator never parenthesizes lone tuples.
-                        format!("({})", checker.generator().expr(&type_pattern(unique_elts)))
+                        let mut builder = Builder::default();
+                        let elts = builder.copy_nodes(unique_elts);
+                        let tuple = syntax::tuple(&mut builder, elts);
+                        format!("({})", checker.generator().expr(builder.get(tuple)))
                     },
                     expr.range(),
                 ),
@@ -191,19 +184,22 @@ fn duplicate_handler_exceptions<'a>(
 }
 
 /// B025
-pub(crate) fn duplicate_exceptions(checker: &Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn duplicate_exceptions(
+    checker: &Checker,
+    handlers: NodeList<'_, ruff_python_ast::kind::ExceptHandler>,
+) {
     let mut seen: FxHashSet<UnqualifiedName> = FxHashSet::default();
-    let mut duplicates: FxHashMap<UnqualifiedName, Vec<&Expr>> = FxHashMap::default();
+    let mut duplicates: FxHashMap<UnqualifiedName, Vec<Expr<'_>>> = FxHashMap::default();
     for handler in handlers {
-        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+        let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
             type_: Some(type_),
             ..
-        }) = handler
+        }) = handler.fields()
         else {
             continue;
         };
-        match type_.as_ref() {
-            Expr::Attribute(_) | Expr::Name(_) => {
+        match type_.classify() {
+            ExprKind::Attribute(_) | ExprKind::Name(_) => {
                 if let Some(name) = UnqualifiedName::from_expr(type_) {
                     if seen.contains(&name) {
                         duplicates.entry(name).or_default().push(type_);
@@ -212,7 +208,9 @@ pub(crate) fn duplicate_exceptions(checker: &Checker, handlers: &[ExceptHandler]
                     }
                 }
             }
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            ExprKind::Tuple(expr_tuple) => {
+                let elts = expr_tuple.elts();
+
                 #[expect(
                     clippy::iter_over_hash_type,
                     reason = "each distinct exception name updates independent set and map entries"
@@ -240,7 +238,7 @@ pub(crate) fn duplicate_exceptions(checker: &Checker, handlers: &[ExceptHandler]
                     .semantic()
                     .current_statement()
                     .as_try_stmt()
-                    .is_some_and(|try_stmt| try_stmt.is_star);
+                    .is_some_and(ruff_python_ast::StmtTry::is_star);
                 checker.report_diagnostic(
                     DuplicateTryBlockException {
                         name: name.segments().join("."),

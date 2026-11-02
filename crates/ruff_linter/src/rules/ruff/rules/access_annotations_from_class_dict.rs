@@ -2,7 +2,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprCall, ExprSubscript, PythonVersion};
+use ruff_python_ast::{self as ast, ExprKind, PythonVersion};
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -96,7 +96,10 @@ impl Violation for AccessAnnotationsFromClassDict {
 }
 
 /// RUF063
-pub(crate) fn access_annotations_from_class_dict_with_get(checker: &Checker, call: &ExprCall) {
+pub(crate) fn access_annotations_from_class_dict_with_get(
+    checker: &Checker,
+    call: &ast::ExprCallFields<'_>,
+) {
     let python_version = checker.target_version();
     let typing_extensions = checker.settings().typing_extensions;
 
@@ -109,14 +112,14 @@ pub(crate) fn access_annotations_from_class_dict_with_get(checker: &Checker, cal
     // Here, `call` is the `.get(...)` part.
 
     // 1. Check that the `call.func` is `get`
-    let get_attribute = match call.func.as_ref() {
-        Expr::Attribute(attr) if attr.attr.as_str() == "get" => attr,
+    let get_attribute = match call.func.classify() {
+        ExprKind::Attribute(attr) if attr.attr().as_str() == "get" => attr,
         _ => return,
     };
 
     // 2. Check that the `get_attribute.value` is `__dict__`
-    match get_attribute.value.as_ref() {
-        Expr::Attribute(attr) if attr.attr.as_str() == "__dict__" => {}
+    match get_attribute.value().classify() {
+        ExprKind::Attribute(attr) if attr.attr().as_str() == "__dict__" => {}
         _ => return,
     }
 
@@ -127,22 +130,22 @@ pub(crate) fn access_annotations_from_class_dict_with_get(checker: &Checker, cal
     //    - One or two positional arguments.
     //    - First positional argument must be the string literal "__annotations__".
     //    - The value of the second positional argument (if present) does not affect the match.
-    if !call.arguments.keywords.is_empty() || call.arguments.len() > 2 {
+    if !call.arguments.keywords().is_empty() || call.arguments.len() > 2 {
         return;
     }
 
-    let Some(first_arg) = &call.arguments.find_positional(0) else {
+    let Some(first_arg) = call.arguments.find_positional(0) else {
         return;
     };
 
     let is_first_arg_correct = first_arg
         .as_string_literal_expr()
-        .is_some_and(|s| s.value.to_str() == "__annotations__");
+        .is_some_and(|s| s.value().to_str() == "__annotations__");
 
     if is_first_arg_correct {
         checker.report_diagnostic(
             AccessAnnotationsFromClassDict { python_version },
-            call.range(),
+            call.range,
         );
     }
 }
@@ -150,7 +153,7 @@ pub(crate) fn access_annotations_from_class_dict_with_get(checker: &Checker, cal
 /// RUF063
 pub(crate) fn access_annotations_from_class_dict_by_key(
     checker: &Checker,
-    subscript: &ExprSubscript,
+    subscript: ast::ExprSubscript<'_>,
 ) {
     let python_version = checker.target_version();
     let typing_extensions = checker.settings().typing_extensions;
@@ -164,18 +167,18 @@ pub(crate) fn access_annotations_from_class_dict_by_key(
 
     // 1. Check that the slice is a string literal "__annotations__"
     if subscript
-        .slice
+        .slice()
         .as_string_literal_expr()
-        .is_none_or(|s| s.value.to_str() != "__annotations__")
+        .is_none_or(|s| s.value().to_str() != "__annotations__")
     {
         return;
     }
 
-    // 2. Check that the `subscript.value` is `__dict__`
+    // 2. Check that the `subscript.value()` is `__dict__`
     let is_value_correct = subscript
-        .value
+        .value()
         .as_attribute_expr()
-        .is_some_and(|attr| attr.attr.as_str() == "__dict__");
+        .is_some_and(|attr| attr.attr().as_str() == "__dict__");
 
     if is_value_correct {
         checker.report_diagnostic(

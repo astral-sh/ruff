@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Stmt;
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::{Stmt, Suite};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -41,7 +41,7 @@ impl Violation for StubBodyMultipleStatements {
 }
 
 /// PYI048
-pub(crate) fn stub_body_multiple_statements(checker: &Checker, stmt: &Stmt, body: &[Stmt]) {
+pub(crate) fn stub_body_multiple_statements(checker: &Checker, stmt: Stmt<'_>, body: Suite<'_>) {
     if body.len() > 1 {
         checker.report_diagnostic(StubBodyMultipleStatements, stmt.identifier());
     }

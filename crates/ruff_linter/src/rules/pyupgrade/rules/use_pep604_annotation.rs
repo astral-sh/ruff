@@ -1,7 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::PythonVersion;
-use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
-use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_python_ast::{self as ast, Builder, Expr, ExprKind, Operator, PythonVersion};
 use ruff_python_parser::semantic_errors::SemanticSyntaxContext;
 use ruff_python_semantic::analyze::typing::{Pep604Operator, to_pep604_operator};
 use ruff_source_file::LineRanges;
@@ -10,6 +8,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::codes::{Category, Rule};
 use crate::fix::edits::pad;
+use crate::fix::syntax;
 use crate::preview::is_pep604_future_annotations_fix_enabled;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
@@ -147,8 +146,8 @@ impl Violation for NonPEP604AnnotationOptional {
 /// UP007, UP045
 pub(crate) fn non_pep604_annotation(
     checker: &Checker,
-    expr: &Expr,
-    slice: &Expr,
+    &expr: &Expr<'_>,
+    slice: Expr<'_>,
     operator: Pep604Operator,
 ) {
     // `NamedTuple` is not a type; it's a type constructor. Using it in a type annotation doesn't
@@ -209,14 +208,19 @@ pub(crate) fn non_pep604_annotation(
             };
 
             if fixable {
-                match slice {
-                    Expr::Tuple(_) => {
+                match slice.classify() {
+                    ExprKind::Tuple(_) => {
                         // Invalid type annotation.
                     }
                     _ => {
                         // Unwrap all nested Optional[...] and wrap once as `X | None`.
                         let mut inner = slice;
-                        while let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = inner {
+                        while let ast::ExprFields::Subscript(ast::ExprSubscriptFields {
+                            value,
+                            slice,
+                            ..
+                        }) = inner.fields()
+                        {
                             if let Some(Pep604Operator::Optional) =
                                 to_pep604_operator(value, slice, checker.semantic())
                             {
@@ -231,24 +235,26 @@ pub(crate) fn non_pep604_annotation(
                         // This avoids generating `None | None` which is a runtime
                         // `TypeError`. For example, `Optional[None | int]` should
                         // become `int | None`, not `None | int | None`.
-                        let fix_expr = if let Expr::BinOp(ast::ExprBinOp {
+                        let mut builder = Builder::default();
+                        let value = if let ast::ExprFields::BinOp(ast::ExprBinOpFields {
                             op: Operator::BitOr,
                             ..
-                        }) = inner
+                        }) = inner.fields()
                         {
                             let elements = collect_non_none(inner);
                             if elements.is_empty() {
                                 // All elements were `None`; don't provide a fix.
                                 None
                             } else {
-                                Some(pep_604_optional(&pep_604_union(&elements)))
+                                Some(syntax::pep_604_union(&mut builder, elements))
                             }
                         } else {
-                            Some(pep_604_optional(inner))
+                            Some(builder.copy_node(inner))
                         };
 
-                        if let Some(fix_expr) = fix_expr {
-                            let replacement = checker.generator().expr(&fix_expr);
+                        if let Some(value) = value {
+                            let optional = syntax::pep_604_optional(&mut builder, value);
+                            let replacement = checker.generator().expr(builder.get(optional));
                             diagnostic.set_fix(create_fix(replacement));
                         }
                     }
@@ -262,12 +268,16 @@ pub(crate) fn non_pep604_annotation(
 
             let mut diagnostic = checker.report_diagnostic(NonPEP604AnnotationUnion, expr.range());
             if fixable {
-                match slice {
-                    Expr::Slice(_) => {
+                match slice.classify() {
+                    ExprKind::Slice(_) => {
                         // Invalid type annotation.
                     }
-                    Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                        let replacement = checker.generator().expr(&pep_604_union(elts));
+                    ExprKind::Tuple(expr_tuple) => {
+                        let elts = expr_tuple.elts();
+
+                        let mut builder = Builder::default();
+                        let union = syntax::pep_604_union(&mut builder, elts);
+                        let replacement = checker.generator().expr(builder.get(union));
                         diagnostic.set_fix(create_fix(replacement));
                     }
                     _ => {
@@ -293,7 +303,7 @@ pub(crate) fn non_pep604_annotation(
 /// Returns `true` if the expression is valid for use in a bitwise union (e.g., `X | Y`). Returns
 /// `false` for lambdas, yield expressions, and other expressions that are invalid in such a
 /// context.
-fn is_allowed_value(expr: &Expr) -> bool {
+fn is_allowed_value(expr: Expr<'_>) -> bool {
     // TODO(charlie): If the expression requires parentheses when multi-line, and the annotation
     // itself is not parenthesized, this should return `false`. Consider, for example:
     // ```python
@@ -305,85 +315,86 @@ fn is_allowed_value(expr: &Expr) -> bool {
     // ]
     // ```
     // Converting this to PEP 604 syntax requires that the multiline string is parenthesized.
-    match expr {
-        Expr::BoolOp(_)
-        | Expr::BinOp(_)
-        | Expr::UnaryOp(_)
-        | Expr::If(_)
-        | Expr::Dict(_)
-        | Expr::Set(_)
-        | Expr::ListComp(_)
-        | Expr::SetComp(_)
-        | Expr::DictComp(_)
-        | Expr::Generator(_)
-        | Expr::Compare(_)
-        | Expr::Call(_)
-        | Expr::FString(_)
-        | Expr::TString(_)
-        | Expr::StringLiteral(_)
-        | Expr::BytesLiteral(_)
-        | Expr::NumberLiteral(_)
-        | Expr::BooleanLiteral(_)
-        | Expr::NoneLiteral(_)
-        | Expr::EllipsisLiteral(_)
-        | Expr::Attribute(_)
-        | Expr::Subscript(_)
-        | Expr::Name(_)
-        | Expr::List(_) => true,
-        Expr::Tuple(tuple) => tuple.iter().all(is_allowed_value),
+    match expr.classify() {
+        ExprKind::BoolOp(_)
+        | ExprKind::BinOp(_)
+        | ExprKind::UnaryOp(_)
+        | ExprKind::If(_)
+        | ExprKind::Dict(_)
+        | ExprKind::Set(_)
+        | ExprKind::ListComp(_)
+        | ExprKind::SetComp(_)
+        | ExprKind::DictComp(_)
+        | ExprKind::Generator(_)
+        | ExprKind::Compare(_)
+        | ExprKind::Call(_)
+        | ExprKind::FString(_)
+        | ExprKind::TString(_)
+        | ExprKind::StringLiteral(_)
+        | ExprKind::BytesLiteral(_)
+        | ExprKind::NumberLiteral(_)
+        | ExprKind::BooleanLiteral(_)
+        | ExprKind::NoneLiteral(_)
+        | ExprKind::EllipsisLiteral(_)
+        | ExprKind::Attribute(_)
+        | ExprKind::Subscript(_)
+        | ExprKind::Name(_)
+        | ExprKind::List(_) => true,
+        ExprKind::Tuple(tuple) => tuple.iter().all(is_allowed_value),
         // Maybe require parentheses.
-        Expr::Named(_) => false,
+        ExprKind::Named(_) => false,
         // Invalid in binary expressions.
-        Expr::Await(_)
-        | Expr::Lambda(_)
-        | Expr::Yield(_)
-        | Expr::YieldFrom(_)
-        | Expr::Starred(_)
-        | Expr::Slice(_)
-        | Expr::IpyEscapeCommand(_) => false,
+        ExprKind::Await(_)
+        | ExprKind::Lambda(_)
+        | ExprKind::Yield(_)
+        | ExprKind::YieldFrom(_)
+        | ExprKind::Starred(_)
+        | ExprKind::Slice(_)
+        | ExprKind::IpyEscapeCommand(_) => false,
     }
 }
 
 /// Return `true` if this is an `Optional[typing.NamedTuple]` annotation.
-fn is_optional_named_tuple(checker: &Checker, operator: Pep604Operator, slice: &Expr) -> bool {
+fn is_optional_named_tuple(checker: &Checker, operator: Pep604Operator, slice: Expr<'_>) -> bool {
     matches!(operator, Pep604Operator::Optional) && is_named_tuple(checker, slice)
 }
 
 /// Return `true` if this is a `Union[...]` annotation containing `typing.NamedTuple`.
-fn is_union_with_named_tuple(checker: &Checker, operator: Pep604Operator, slice: &Expr) -> bool {
+fn is_union_with_named_tuple(checker: &Checker, operator: Pep604Operator, slice: Expr<'_>) -> bool {
     matches!(operator, Pep604Operator::Union)
         && (is_named_tuple(checker, slice)
             || slice
                 .as_tuple_expr()
-                .is_some_and(|tuple| tuple.elts.iter().any(|elt| is_named_tuple(checker, elt))))
+                .is_some_and(|tuple| tuple.elts().iter().any(|elt| is_named_tuple(checker, elt))))
 }
 
 /// Return `true` if this is a `typing.NamedTuple` annotation.
-fn is_named_tuple(checker: &Checker, expr: &Expr) -> bool {
+fn is_named_tuple(checker: &Checker, expr: Expr<'_>) -> bool {
     checker.semantic().match_typing_expr(expr, "NamedTuple")
 }
 
 /// Return `true` if this is an `Optional[None]` annotation.
-fn is_optional_none(operator: Pep604Operator, slice: &Expr) -> bool {
-    matches!(operator, Pep604Operator::Optional) && matches!(slice, Expr::NoneLiteral(_))
+fn is_optional_none(operator: Pep604Operator, slice: Expr<'_>) -> bool {
+    matches!(operator, Pep604Operator::Optional)
+        && matches!(slice.classify(), ExprKind::NoneLiteral(_))
 }
 
 /// Collect all non-`None` leaf elements of a chain of `BitOr` binary operations.
 ///
 /// For example, `a | None | b` is collected as `[a, b]`.
-fn collect_non_none(expr: &Expr) -> Vec<Expr> {
-    fn inner(expr: &Expr, elements: &mut Vec<Expr>) {
-        if let Expr::BinOp(ast::ExprBinOp {
+fn collect_non_none(expr: Expr<'_>) -> Vec<Expr<'_>> {
+    fn inner<'a>(expr: Expr<'a>, elements: &mut Vec<Expr<'a>>) {
+        if let ast::ExprFields::BinOp(ast::ExprBinOpFields {
             left,
             op: Operator::BitOr,
             right,
             ..
-        }) = expr
+        }) = expr.fields()
         {
             inner(left, elements);
             inner(right, elements);
         } else if !expr.is_none_literal_expr() {
-            elements.push(expr.clone());
+            elements.push(expr);
         }
     }
 

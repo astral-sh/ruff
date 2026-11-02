@@ -1,6 +1,5 @@
-use ast::{Expr, StmtIf};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -45,8 +44,8 @@ impl Violation for TooManyBooleanExpressions {
 }
 
 /// PLR0916
-pub(crate) fn too_many_boolean_expressions(checker: &Checker, stmt: &StmtIf) {
-    if let Some(bool_op) = stmt.test.as_bool_op_expr() {
+pub(crate) fn too_many_boolean_expressions(checker: &Checker, stmt: ast::StmtIf<'_>) {
+    if let Some(bool_op) = stmt.test().as_bool_op_expr() {
         let expressions = count_bools(bool_op);
         if expressions > checker.settings().pylint.max_bool_expr {
             checker.report_diagnostic(
@@ -59,8 +58,8 @@ pub(crate) fn too_many_boolean_expressions(checker: &Checker, stmt: &StmtIf) {
         }
     }
 
-    for elif in &stmt.elif_else_clauses {
-        if let Some(bool_op) = elif.test.as_ref().and_then(Expr::as_bool_op_expr) {
+    for elif in stmt.elif_else_clauses() {
+        if let Some(bool_op) = elif.test().and_then(ast::Expr::as_bool_op_expr) {
             let expressions = count_bools(bool_op);
             if expressions > checker.settings().pylint.max_bool_expr {
                 checker.report_diagnostic(
@@ -76,12 +75,12 @@ pub(crate) fn too_many_boolean_expressions(checker: &Checker, stmt: &StmtIf) {
 }
 
 /// Count the number of Boolean expressions in a `bool_op` expression.
-fn count_bools(bool_op: &ast::ExprBoolOp) -> usize {
+fn count_bools(bool_op: ast::ExprBoolOp<'_>) -> usize {
     bool_op
-        .values
+        .values()
         .iter()
         .map(|expr| {
-            if let Expr::BoolOp(bool_op) = expr {
+            if let ExprKind::BoolOp(bool_op) = expr.classify() {
                 count_bools(bool_op)
             } else {
                 1

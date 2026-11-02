@@ -1,6 +1,6 @@
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_formatter::write;
-use ruff_python_ast::{ExceptHandlerExceptHandler, Expr, PythonVersion};
+use ruff_python_ast::{ExceptHandlerExceptHandler, ExprKind, PythonVersion};
 
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::maybe_parenthesize_expression;
@@ -22,7 +22,7 @@ pub struct FormatExceptHandlerExceptHandler {
     pub(crate) last_suite_in_statement: bool,
 }
 
-impl FormatRuleWithOptions<ExceptHandlerExceptHandler, PyFormatContext<'_>>
+impl FormatRuleWithOptions<ExceptHandlerExceptHandler<'_>, PyFormatContext<'_>>
     for FormatExceptHandlerExceptHandler
 {
     type Options = FormatExceptHandlerExceptHandler;
@@ -34,20 +34,18 @@ impl FormatRuleWithOptions<ExceptHandlerExceptHandler, PyFormatContext<'_>>
     }
 }
 
-impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHandler {
+impl FormatNodeRule<ruff_python_ast::kind::ExceptHandlerExceptHandler>
+    for FormatExceptHandlerExceptHandler
+{
     fn fmt_fields(
         &self,
-        item: &ExceptHandlerExceptHandler,
+        item: ExceptHandlerExceptHandler<'_>,
         f: &mut PyFormatter,
     ) -> FormatResult<()> {
         let except_handler_kind = self.except_handler_kind;
-        let ExceptHandlerExceptHandler {
-            range: _,
-            node_index: _,
-            type_,
-            name,
-            body,
-        } = item;
+        let type_ = item.type_();
+        let name = item.name();
+        let body = item.body();
 
         let comments_info = f.context().comments().clone();
         let dangling_comments = comments_info.dangling(item);
@@ -68,7 +66,7 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
                         ]
                     )?;
 
-                    match type_.as_deref() {
+                    match type_.map(ruff_python_ast::Expr::classify) {
                         // For tuples of exception types without an `as` name and on 3.14+, the
                         // parentheses are optional.
                         //
@@ -98,10 +96,13 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
                         // except BaseException, *exceptions:  # SyntaxError
                         //     ...
                         // ```
-                        Some(Expr::Tuple(tuple))
+                        Some(ExprKind::Tuple(tuple))
                             if f.options().target_version() >= PythonVersion::PY314
                                 && name.is_none()
-                                && !tuple.iter().any(Expr::is_starred_expr) =>
+                                && !tuple
+                                    .elts()
+                                    .iter()
+                                    .any(ruff_python_ast::Expr::is_starred_expr) =>
                         {
                             write!(
                                 f,
@@ -112,6 +113,7 @@ impl FormatNodeRule<ExceptHandlerExceptHandler> for FormatExceptHandlerExceptHan
                             )?;
                         }
                         Some(type_) => {
+                            let type_ = type_.view();
                             write!(
                                 f,
                                 [

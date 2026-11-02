@@ -11,7 +11,7 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
-use ruff_python_ast::PythonVersion;
+use ruff_python_ast::{PythonVersion, StmtKind};
 use salsa::Database as _;
 use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
@@ -211,19 +211,21 @@ fn expected_types_are_collected_only_for_open_files() -> anyhow::Result<()> {
         }
 
         let module = parsed_module(&db, program_file(&db, file).python_file(&db)).load(&db);
-        let assignment = module.syntax().body[1]
+        let assignment = module
+            .syntax()
+            .body()
+            .at(1)
             .as_ann_assign_stmt()
             .expect("annotated assignment");
         let string_expr = assignment
-            .value
-            .as_deref()
+            .value()
             .expect("annotated assignment to have a value")
             .as_string_literal_expr()
             .expect("string literal value");
         let scope = global_scope(&db, program_file(&db, file));
 
         Ok(infer_complete_scope_types(&db, scope)
-            .try_expected_type(ruff_python_ast::ExprRef::from(string_expr))
+            .try_expected_type(ruff_python_ast::Expr::from(string_expr))
             .is_some())
     };
 
@@ -251,12 +253,12 @@ fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
 
     let file = system_path_to_file(&db, "/src/definitions.py").unwrap();
     let module = parsed_module(&db, program_file(&db, file).python_file(&db)).load(&db);
-    let first_assignment = module.syntax().body[0].as_assign_stmt().unwrap();
-    let second_assignment = module.syntax().body[1].as_assign_stmt().unwrap();
+    let first_assignment = module.syntax().body().at(0).as_assign_stmt().unwrap();
+    let second_assignment = module.syntax().body().at(1).as_assign_stmt().unwrap();
     let first = semantic_index(&db, program_file(&db, file))
-        .expect_single_definition(first_assignment.targets[0].as_name_expr().unwrap());
+        .expect_single_definition(first_assignment.targets().at(0).as_name_expr().unwrap());
     let second = semantic_index(&db, program_file(&db, file))
-        .expect_single_definition(second_assignment.targets[0].as_name_expr().unwrap());
+        .expect_single_definition(second_assignment.targets().at(0).as_name_expr().unwrap());
 
     let owner_type = Type::unknown();
     let owner = DefinitionTypes::from_parts(first, vec![(first, owner_type)], vec![]);
@@ -565,10 +567,15 @@ fn comparison_truthiness_widens_across_sparse_cycle_results() -> anyhow::Result<
     db.write_dedented("src/comparison.py", "0 < 1 < 2")?;
     let file = program_file(&db, system_path_to_file(&db, "src/comparison.py")?);
     let module = parsed_module(&db, file.python_file(&db)).load(&db);
-    let Some(ast::Stmt::Expr(statement)) = module.syntax().body.first() else {
+    let Some(StmtKind::Expr(statement)) = module
+        .syntax()
+        .body()
+        .first()
+        .map(ruff_python_ast::Stmt::classify)
+    else {
         anyhow::bail!("expected a comparison expression statement");
     };
-    let expression = ExpressionNodeKey::from(statement.value.as_ref());
+    let expression = ExpressionNodeKey::from(statement.value());
     let scope = global_scope(&db, file);
     let env = ProgramEnvironment::from_scope(scope);
     let inference = |ty, truthiness: Option<Truthiness>| {
@@ -1258,7 +1265,7 @@ fn function_inference_regions_are_disjoint() -> anyhow::Result<()> {
     let DefinitionKind::Function(function) = definition.kind(&db) else {
         anyhow::bail!("expected a function definition");
     };
-    let Some(parameter) = function.node(&module).parameters.find("x") else {
+    let Some(parameter) = function.node(&module).parameters().find("x") else {
         anyhow::bail!("expected parameter x");
     };
     let (Some(annotation), Some(default)) = (parameter.annotation(), parameter.default()) else {
@@ -1690,10 +1697,10 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
         let ast = parsed_module(db, program_file(db, file_main).python_file(db)).load(db);
         // Get the second statement in `main.py` (x = …) and extract the expression
         // node on the right-hand side:
-        let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
+        let x_rhs_node = ast.syntax().body().at(1).as_assign_stmt().unwrap().value();
 
         let index = semantic_index(db, program_file(db, file_main));
-        index.expression(x_rhs_node.as_ref())
+        index.expression(x_rhs_node)
     }
 
     let mut db = setup_db();
@@ -1788,10 +1795,10 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
         let ast = parsed_module(db, program_file(db, file_main).python_file(db)).load(db);
         // Get the second statement in `main.py` (x = …) and extract the expression
         // node on the right-hand side:
-        let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
+        let x_rhs_node = ast.syntax().body().at(1).as_assign_stmt().unwrap().value();
 
         let index = semantic_index(db, program_file(db, file_main));
-        index.expression(x_rhs_node.as_ref())
+        index.expression(x_rhs_node)
     }
 
     let mut db = setup_db();
@@ -1890,10 +1897,10 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
         let ast = parsed_module(db, program_file(db, file_main).python_file(db)).load(db);
         // Get the third statement in `main.py` (x = …) and extract the expression
         // node on the right-hand side:
-        let x_rhs_node = &ast.syntax().body[2].as_assign_stmt().unwrap().value;
+        let x_rhs_node = ast.syntax().body().at(2).as_assign_stmt().unwrap().value();
 
         let index = semantic_index(db, program_file(db, file_main));
-        index.expression(x_rhs_node.as_ref())
+        index.expression(x_rhs_node)
     }
 
     let mut db = setup_db();
@@ -2025,7 +2032,13 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
     let events = db.take_salsa_events();
 
     let module = parsed_module(&db, program_file(&db, bar).python_file(&db)).load(&db);
-    let call = &*module.syntax().body[1].as_assign_stmt().unwrap().value;
+    let call = module
+        .syntax()
+        .body()
+        .at(1)
+        .as_assign_stmt()
+        .unwrap()
+        .value();
     let foo_call = semantic_index(&db, program_file(&db, bar)).expression(call);
 
     assert_function_query_was_run(
@@ -2056,7 +2069,13 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
     let events = db.take_salsa_events();
 
     let module = parsed_module(&db, program_file(&db, bar).python_file(&db)).load(&db);
-    let call = &*module.syntax().body[1].as_assign_stmt().unwrap().value;
+    let call = module
+        .syntax()
+        .body()
+        .at(1)
+        .as_assign_stmt()
+        .unwrap()
+        .value();
     let foo_call = semantic_index(&db, program_file(&db, bar)).expression(call);
 
     assert_function_query_was_not_run(

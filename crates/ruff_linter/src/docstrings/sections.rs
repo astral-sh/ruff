@@ -580,7 +580,7 @@ fn is_docstring_section(
 /// same name as `section_name`.
 fn has_parameter(definition: &Definition, section_name: &str) -> bool {
     definition.as_function_def().is_some_and(|func| {
-        func.parameters
+        func.parameters()
             .iter()
             .any(|param| param.name() == section_name)
     })

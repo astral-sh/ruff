@@ -25,7 +25,7 @@ use ruff_db::{
     diagnostic::{Annotation, Span},
     parsed::parsed_module,
 };
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, AnyParameter};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use ty_python_core::definition::Definition;
@@ -33,7 +33,7 @@ use ty_python_core::definition::Definition;
 pub(crate) fn check_function_definition<'db>(
     context: &InferContext<'db, '_>,
     definition: Definition<'db>,
-    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+    file_expression_type: &impl Fn(ast::Expr<'_>) -> Type<'db>,
 ) {
     let db = context.db();
 
@@ -203,7 +203,7 @@ fn check_method_typevar_variance<'db>(
             .and_then(|signature| {
                 let parameters = signature.parameters().iter().filter_map(|parameter| {
                     let annotation = node
-                        .parameters
+                        .parameters()
                         .iter()
                         .nth(parameter.source_parameter_index()?)?
                         .annotation()?;
@@ -222,7 +222,7 @@ fn check_method_typevar_variance<'db>(
                             .evaluate(db),
                     ))
                 });
-                let returns = node.returns.iter().map(|annotation| {
+                let returns = node.returns().into_iter().map(|annotation| {
                     (
                         annotation.range(),
                         signature
@@ -235,12 +235,12 @@ fn check_method_typevar_variance<'db>(
                     (declared_variance.join(variance) != declared_variance).then_some(range)
                 })
             })
-            .unwrap_or_else(|| node.name.range());
+            .unwrap_or_else(|| node.name().range());
         if let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, range) {
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Variance of type variable `{}` is incompatible with method `{}`",
                 typevar.name(db),
-                node.name,
+                node.name(),
             ));
             diagnostic.info(format_args!(
                 "Type variable `{}` is declared as {}, but this method requires it to be {}",
@@ -256,11 +256,11 @@ fn check_method_typevar_variance<'db>(
 fn check_pep695_function_legacy_typevars<'db>(
     context: &InferContext<'db, '_>,
     last_definition: OverloadLiteral<'db>,
-    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+    file_expression_type: &impl Fn(ast::Expr<'_>) -> Type<'db>,
 ) {
     let db = context.db();
     let node = last_definition.node(db, context.file(), context.module());
-    let Some(type_params) = node.type_params.as_deref() else {
+    let Some(type_params) = node.type_params() else {
         return;
     };
     let env = context.program_environment();
@@ -335,18 +335,18 @@ fn check_legacy_positional_only_convention<'db>(
 ) {
     let db = context.db();
     let node = last_definition.node(db, context.file(), context.module());
-    let ast_parameters = &node.parameters;
+    let ast_parameters = node.parameters();
 
     // If the function has any PEP-570 positional-only parameters,
     // assume that `__`-prefixed parameters are not meant to be positional-only
-    if !ast_parameters.posonlyargs.is_empty() {
+    if !ast_parameters.posonlyargs().is_empty() {
         return;
     }
     let parsed_parameters = signature.parameters();
-    let mut previous_non_positional_only: Option<&ast::ParameterWithDefault> = None;
+    let mut previous_non_positional_only: Option<ast::ParameterWithDefault<'_>> = None;
 
-    for (param_node, param) in std::iter::zip(ast_parameters, parsed_parameters) {
-        let ast::AnyParameterRef::NonVariadic(param_node) = param_node else {
+    for (param_node, param) in std::iter::zip(ast_parameters.iter(), parsed_parameters) {
+        let AnyParameter::NonVariadic(param_node) = param_node else {
             continue;
         };
         if param.is_positional_only() {
@@ -395,7 +395,7 @@ fn check_legacy_typevar_defaults<'db>(
     context: &InferContext<'db, '_>,
     last_definition: OverloadLiteral<'db>,
     signature: &Signature<'db>,
-    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+    file_expression_type: &impl Fn(ast::Expr<'_>) -> Type<'db>,
 ) {
     let db = context.db();
 
@@ -496,21 +496,21 @@ fn check_legacy_typevar_defaults<'db>(
 
 fn find_typevar_annotation_range<'db>(
     context: &InferContext<'db, '_>,
-    node: &ast::StmtFunctionDef,
+    node: ast::StmtFunctionDef<'_>,
     typevar: TypeVarInstance<'db>,
-    file_expression_type: impl Fn(&ast::Expr) -> Type<'db>,
+    file_expression_type: impl Fn(ast::Expr<'_>) -> Type<'db>,
 ) -> TextRange {
     let db = context.db();
     let env = context.program_environment();
     let typevar_id = typevar.identity(db);
 
-    node.parameters
+    node.parameters()
         .iter()
-        .filter_map(ast::AnyParameterRef::annotation)
-        .chain(node.returns.as_deref())
-        .find(|ann| file_expression_type(ann).references_typevar(db, env, typevar_id))
-        .map(Ranged::range)
-        .unwrap_or_else(|| node.name.range())
+        .filter_map(AnyParameter::annotation)
+        .chain(node.returns())
+        .find(|ann| file_expression_type(*ann).references_typevar(db, env, typevar_id))
+        .map(|node| node.range())
+        .unwrap_or_else(|| node.name().range())
 }
 
 /// Check that legacy `TypeVar`s without defaults don't follow `TypeVar`s with defaults
@@ -522,7 +522,7 @@ fn check_legacy_typevar_ordering<'db>(
     context: &InferContext<'db, '_>,
     last_definition: OverloadLiteral<'db>,
     signature: &Signature<'db>,
-    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+    file_expression_type: &impl Fn(ast::Expr<'_>) -> Type<'db>,
 ) {
     struct State<'db> {
         typevar_with_default: TypeVarInstance<'db>,

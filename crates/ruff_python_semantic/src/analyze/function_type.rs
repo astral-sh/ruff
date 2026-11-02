@@ -1,6 +1,6 @@
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{Decorator, Expr, Stmt, StmtExpr, StmtFunctionDef, StmtRaise};
+use ruff_python_ast::{Decorator, ExprKind, NodeList, StmtFunctionDef, StmtKind};
 
 use crate::model::SemanticModel;
 use crate::scope::Scope;
@@ -19,7 +19,7 @@ pub enum FunctionType {
 /// Classify a function based on its scope, name, and decorators.
 pub fn classify(
     name: &str,
-    decorator_list: &[Decorator],
+    decorator_list: NodeList<'_, ruff_python_ast::kind::Decorator>,
     parent_scope: &Scope,
     semantic: &SemanticModel,
     classmethod_decorators: &[String],
@@ -53,7 +53,7 @@ pub fn classify(
 /// Principle, but some methods are exempt.
 pub fn is_subject_to_liskov_substitution_principle(
     function_name: &str,
-    decorator_list: &[Decorator],
+    decorator_list: NodeList<'_, ruff_python_ast::kind::Decorator>,
     parent_scope: &Scope,
     semantic: &SemanticModel,
     classmethod_decorators: &[String],
@@ -79,11 +79,11 @@ pub fn is_subject_to_liskov_substitution_principle(
 /// Return `true` if a [`Decorator`] is indicative of a static method.
 /// Note: Implicit static methods like `__new__` are not considered.
 fn is_static_method(
-    decorator: &Decorator,
+    decorator: Decorator<'_>,
     semantic: &SemanticModel,
     staticmethod_decorators: &[String],
 ) -> bool {
-    let decorator = map_callable(&decorator.expression);
+    let decorator = map_callable(decorator.expression());
 
     // The decorator is an import, so should match against a qualified path.
     if semantic
@@ -120,11 +120,11 @@ fn is_static_method(
 /// Return `true` if a [`Decorator`] is indicative of a class method.
 /// Note: Implicit class methods like `__init_subclass__` and `__class_getitem__` are not considered.
 pub fn is_class_method(
-    decorator: &Decorator,
+    decorator: Decorator<'_>,
     semantic: &SemanticModel,
     classmethod_decorators: &[String],
 ) -> bool {
-    let decorator = map_callable(&decorator.expression);
+    let decorator = map_callable(decorator.expression());
 
     // The decorator is an import, so should match against a qualified path.
     if semantic
@@ -162,29 +162,30 @@ pub fn is_class_method(
 ///
 /// A function body is considered to be empty if it contains only `pass` statements, `...` literals,
 /// `NotImplementedError` raises, or string literal statements (docstrings).
-pub fn is_stub(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool {
-    function_def.body.iter().all(|stmt| match stmt {
-        Stmt::Pass(_) => true,
-        Stmt::Expr(StmtExpr {
-            value,
-            range: _,
-            node_index: _,
-        }) => {
-            matches!(
-                value.as_ref(),
-                Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
-            )
-        }
-        Stmt::Raise(StmtRaise {
-            range: _,
-            node_index: _,
-            exc: exception,
-            cause: _,
-        }) => exception.as_ref().is_some_and(|exc| {
-            semantic
-                .resolve_builtin_symbol(map_callable(exc))
-                .is_some_and(|name| matches!(name, "NotImplementedError" | "NotImplemented"))
-        }),
-        _ => false,
-    })
+pub fn is_stub(function_def: StmtFunctionDef<'_>, semantic: &SemanticModel) -> bool {
+    function_def
+        .body()
+        .iter()
+        .all(|stmt| match stmt.classify() {
+            StmtKind::Pass(_) => true,
+            StmtKind::Expr(stmt_expr) => {
+                let value = stmt_expr.value();
+
+                matches!(
+                    value.classify(),
+                    ExprKind::StringLiteral(_) | ExprKind::EllipsisLiteral(_)
+                )
+            }
+            StmtKind::Raise(stmt_raise) => {
+                let exception = stmt_raise.exc();
+                exception.is_some_and(|exc| {
+                    semantic
+                        .resolve_builtin_symbol(map_callable(exc))
+                        .is_some_and(|name| {
+                            matches!(name, "NotImplementedError" | "NotImplemented")
+                        })
+                })
+            }
+            _ => false,
+        })
 }

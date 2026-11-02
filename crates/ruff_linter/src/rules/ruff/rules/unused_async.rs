@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::source_order;
-use ruff_python_ast::{self as ast, AnyNodeRef, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprKind, Stmt, StmtKind, SyntaxNode};
 use ruff_python_semantic::Modules;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_stub;
@@ -61,41 +61,41 @@ struct AsyncExprVisitor {
 /// async-for. Stop traversing after one is found. The bodies of inner-functions and inner-classes
 /// aren't traversed.
 impl<'a> source_order::SourceOrderVisitor<'a> for AsyncExprVisitor {
-    fn enter_node(&mut self, _node: AnyNodeRef<'a>) -> source_order::TraversalSignal {
+    fn enter_node(&mut self, _node: SyntaxNode<'a>) -> source_order::TraversalSignal {
         if self.found_await_or_async {
             source_order::TraversalSignal::Skip
         } else {
             source_order::TraversalSignal::Traverse
         }
     }
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::With(ast::StmtWith { is_async: true, .. }) => {
+    fn visit_stmt(&mut self, stmt: Stmt<'a>) {
+        match stmt.classify() {
+            StmtKind::With(stmt_with) if stmt_with.is_async() => {
                 self.found_await_or_async = true;
             }
-            Stmt::For(ast::StmtFor { is_async: true, .. }) => {
+            StmtKind::For(stmt_for) if stmt_for.is_async() => {
                 self.found_await_or_async = true;
             }
             // avoid counting inner classes' or functions' bodies toward the search
-            Stmt::FunctionDef(function_def) => {
+            StmtKind::FunctionDef(function_def) => {
                 function_def_visit_preorder_except_body(function_def, self);
             }
-            Stmt::ClassDef(class_def) => {
+            StmtKind::ClassDef(class_def) => {
                 class_def_visit_preorder_except_body(class_def, self);
             }
             _ => source_order::walk_stmt(self, stmt),
         }
     }
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Await(_) => {
+    fn visit_expr(&mut self, expr: Expr<'a>) {
+        match expr.classify() {
+            ExprKind::Await(_) => {
                 self.found_await_or_async = true;
             }
             _ => source_order::walk_expr(self, expr),
         }
     }
-    fn visit_comprehension(&mut self, comprehension: &'a ast::Comprehension) {
-        if comprehension.is_async {
+    fn visit_comprehension(&mut self, comprehension: ast::Comprehension<'a>) {
+        if comprehension.is_async() {
             self.found_await_or_async = true;
         } else {
             source_order::walk_comprehension(self, comprehension);
@@ -106,18 +106,15 @@ impl<'a> source_order::SourceOrderVisitor<'a> for AsyncExprVisitor {
 /// Very nearly `crate::node::StmtFunctionDef.visit_preorder`, except it is specialized and,
 /// crucially, doesn't traverse the body.
 fn function_def_visit_preorder_except_body<'a, V>(
-    function_def: &'a ast::StmtFunctionDef,
+    function_def: ast::StmtFunctionDef<'a>,
     visitor: &mut V,
 ) where
     V: source_order::SourceOrderVisitor<'a>,
 {
-    let ast::StmtFunctionDef {
-        parameters,
-        decorator_list,
-        returns,
-        type_params,
-        ..
-    } = function_def;
+    let parameters = function_def.parameters();
+    let decorator_list = function_def.decorator_list();
+    let returns = function_def.returns();
+    let type_params = function_def.type_params();
 
     for decorator in decorator_list {
         visitor.visit_decorator(decorator);
@@ -136,16 +133,13 @@ fn function_def_visit_preorder_except_body<'a, V>(
 
 /// Very nearly `crate::node::StmtClassDef.visit_preorder`, except it is specialized and,
 /// crucially, doesn't traverse the body.
-fn class_def_visit_preorder_except_body<'a, V>(class_def: &'a ast::StmtClassDef, visitor: &mut V)
+fn class_def_visit_preorder_except_body<'a, V>(class_def: ast::StmtClassDef<'a>, visitor: &mut V)
 where
     V: source_order::SourceOrderVisitor<'a>,
 {
-    let ast::StmtClassDef {
-        arguments,
-        decorator_list,
-        type_params,
-        ..
-    } = class_def;
+    let arguments = class_def.arguments();
+    let decorator_list = class_def.decorator_list();
+    let type_params = class_def.type_params();
 
     for decorator in decorator_list {
         visitor.visit_decorator(decorator);
@@ -161,10 +155,13 @@ where
 }
 
 /// Returns `true` if the function is decorated with `contextlib.asynccontextmanager`.
-fn is_async_context_manager(function_def: &ast::StmtFunctionDef, semantic: &SemanticModel) -> bool {
-    function_def.decorator_list.iter().any(|decorator| {
+fn is_async_context_manager(
+    function_def: ast::StmtFunctionDef<'_>,
+    semantic: &SemanticModel,
+) -> bool {
+    function_def.decorator_list().iter().any(|decorator| {
         semantic
-            .resolve_qualified_name(&decorator.expression)
+            .resolve_qualified_name(decorator.expression())
             .is_some_and(|qualified_name| {
                 matches!(
                     qualified_name.segments(),
@@ -175,15 +172,10 @@ fn is_async_context_manager(function_def: &ast::StmtFunctionDef, semantic: &Sema
 }
 
 /// RUF029
-pub(crate) fn unused_async(
-    checker: &Checker,
-    function_def @ ast::StmtFunctionDef {
-        is_async,
-        name,
-        body,
-        ..
-    }: &ast::StmtFunctionDef,
-) {
+pub(crate) fn unused_async(checker: &Checker, function_def: ast::StmtFunctionDef<'_>) {
+    let is_async = function_def.is_async();
+    let name = function_def.name();
+    let body = function_def.body();
     if !is_async {
         return;
     }

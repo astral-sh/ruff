@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::{self as ast, ExprKind};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
@@ -46,16 +46,18 @@ impl Violation for SSHNoHostKeyVerification {
 }
 
 /// S507
-pub(crate) fn ssh_no_host_key_verification(checker: &Checker, call: &ExprCall) {
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
+pub(crate) fn ssh_no_host_key_verification(checker: &Checker, call: ast::ExprCall<'_>) {
+    let ExprKind::Attribute(attribute) = call.func().classify() else {
         return;
     };
+    let attr = attribute.attr();
+    let value = attribute.value();
 
     if attr.as_str() != "set_missing_host_key_policy" {
         return;
     }
 
-    let Some(policy_argument) = call.arguments.find_argument_value("policy", 0) else {
+    let Some(policy_argument) = call.arguments().find_argument_value("policy", 0) else {
         return;
     };
 

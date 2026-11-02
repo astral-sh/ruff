@@ -51,7 +51,7 @@ impl Violation for TypingTextStrAlias {
 }
 
 /// UP019
-pub(crate) fn typing_text_str_alias(checker: &Checker, expr: &Expr) {
+pub(crate) fn typing_text_str_alias(checker: &Checker, &expr: &Expr<'_>) {
     if !checker
         .semantic()
         .seen_module(Modules::TYPING | Modules::TYPING_EXTENSIONS)

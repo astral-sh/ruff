@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprSubscript, PythonVersion};
+use ruff_python_ast::{self as ast, ExprKind, PythonVersion};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -64,25 +64,32 @@ impl AlwaysFixableViolation for IncorrectlyParenthesizedTupleInSubscript {
 }
 
 /// RUF031
-pub(crate) fn subscript_with_parenthesized_tuple(checker: &Checker, subscript: &ExprSubscript) {
+pub(crate) fn subscript_with_parenthesized_tuple(
+    checker: &Checker,
+    subscript: ast::ExprSubscript<'_>,
+) {
     let prefer_parentheses = checker.settings().ruff.parenthesize_tuple_in_subscript;
 
-    let Expr::Tuple(tuple_subscript) = &*subscript.slice else {
+    let ExprKind::Tuple(tuple_subscript) = subscript.slice().classify() else {
         return;
     };
 
-    if tuple_subscript.parenthesized == prefer_parentheses || tuple_subscript.is_empty() {
+    if tuple_subscript.parenthesized() == prefer_parentheses || tuple_subscript.elts().is_empty() {
         return;
     }
 
     // We should not handle single starred expressions
     // (regardless of `prefer_parentheses`)
-    if matches!(&tuple_subscript.elts[..], &[Expr::Starred(_)]) {
+    if matches!(tuple_subscript.elts().as_array(), Some([elt]) if elt.is_starred_expr()) {
         return;
     }
 
     // Adding parentheses in the presence of a slice leads to a syntax error.
-    if prefer_parentheses && tuple_subscript.iter().any(Expr::is_slice_expr) {
+    if prefer_parentheses
+        && tuple_subscript
+            .iter()
+            .any(ruff_python_ast::Expr::is_slice_expr)
+    {
         return;
     }
 
@@ -92,7 +99,9 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &Checker, subscript: &
     // see https://peps.python.org/pep-0646/#change-1-star-expressions-in-indexes
     if checker.target_version() <= PythonVersion::PY310
         && !prefer_parentheses
-        && tuple_subscript.iter().any(Expr::is_starred_expr)
+        && tuple_subscript
+            .iter()
+            .any(ruff_python_ast::Expr::is_starred_expr)
     {
         return;
     }
@@ -105,7 +114,7 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &Checker, subscript: &
     }
 
     let locator = checker.locator();
-    let source_range = subscript.slice.range();
+    let source_range = subscript.slice().range();
     let new_source = if prefer_parentheses {
         format!("({})", locator.slice(source_range))
     } else {

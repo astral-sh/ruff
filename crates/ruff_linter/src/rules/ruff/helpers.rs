@@ -1,5 +1,5 @@
 use ruff_python_ast::helpers::{Truthiness, map_callable, map_subscript};
-use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_ast::{self as ast, Decorator, Expr, ExprKind, NodeList, StmtClassDef};
 use ruff_python_semantic::{BindingKind, Modules, SemanticModel, analyze};
 
 /// Return `true` if the given [`Expr`] is a special class attribute, like `__slots__`.
@@ -7,8 +7,9 @@ use ruff_python_semantic::{BindingKind, Modules, SemanticModel, analyze};
 /// While `__slots__` is typically defined via a tuple, Python accepts any iterable and, in
 /// particular, allows the use of a dictionary to define the attribute names (as keys) and
 /// docstrings (as values).
-pub(super) fn is_special_attribute(value: &Expr) -> bool {
-    if let Expr::Name(ast::ExprName { id, .. }) = value {
+pub(super) fn is_special_attribute(value: Expr<'_>) -> bool {
+    if let ExprKind::Name(name) = value.classify() {
+        let id = name.id();
         matches!(
             id.as_str(),
             "__slots__" | "__dict__" | "__weakref__" | "__annotations__"
@@ -19,14 +20,14 @@ pub(super) fn is_special_attribute(value: &Expr) -> bool {
 }
 
 /// Returns `true` if the given [`Expr`] is a stdlib `dataclasses.field` call.
-fn is_stdlib_dataclass_field(func: &Expr, semantic: &SemanticModel) -> bool {
+fn is_stdlib_dataclass_field(func: Expr<'_>, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["dataclasses", "field"]))
 }
 
 /// Returns `true` if the given [`Expr`] is a call to an `attrs` field function.
-fn is_attrs_field(func: &Expr, semantic: &SemanticModel) -> bool {
+fn is_attrs_field(func: Expr<'_>, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| {
@@ -46,7 +47,7 @@ fn is_attrs_field(func: &Expr, semantic: &SemanticModel) -> bool {
 /// if `DataclassKind::Stdlib` is passed in,
 /// return `true` if `func` represents a call to `dataclasses.field()`.
 pub(super) fn is_dataclass_field(
-    func: &Expr,
+    func: Expr<'_>,
     semantic: &SemanticModel,
     dataclass_kind: DataclassKind,
 ) -> bool {
@@ -57,7 +58,7 @@ pub(super) fn is_dataclass_field(
 }
 
 /// Returns `true` if the given [`Expr`] is a `typing.ClassVar` annotation.
-pub(super) fn is_class_var_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+pub(super) fn is_class_var_annotation(annotation: Expr<'_>, semantic: &SemanticModel) -> bool {
     if !semantic.seen_typing() {
         return false;
     }
@@ -68,7 +69,7 @@ pub(super) fn is_class_var_annotation(annotation: &Expr, semantic: &SemanticMode
 }
 
 /// Returns `true` if the given [`Expr`] is a `typing.Final` annotation.
-pub(super) fn is_final_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+pub(super) fn is_final_annotation(annotation: Expr<'_>, semantic: &SemanticModel) -> bool {
     if !semantic.seen_typing() {
         return false;
     }
@@ -106,16 +107,16 @@ pub(super) enum DataclassKind {
 /// Return the kind of dataclass this class definition is (stdlib or `attrs`),
 /// or `None` if the class is not a dataclass.
 pub(super) fn dataclass_kind<'a>(
-    class_def: &'a ast::StmtClassDef,
+    class_def: StmtClassDef<'a>,
     semantic: &SemanticModel,
-) -> Option<(DataclassKind, &'a ast::Decorator)> {
+) -> Option<(DataclassKind, Decorator<'a>)> {
     if !(semantic.seen_module(Modules::DATACLASSES) || semantic.seen_module(Modules::ATTRS)) {
         return None;
     }
 
-    for decorator in &class_def.decorator_list {
+    for decorator in class_def.decorator_list() {
         let Some(qualified_name) =
-            semantic.resolve_qualified_name(map_callable(&decorator.expression))
+            semantic.resolve_qualified_name(map_callable(decorator.expression()))
         else {
             continue;
         };
@@ -128,7 +129,7 @@ pub(super) fn dataclass_kind<'a>(
                 // whereas `@attr.s` implicitly sets `auto_attribs=False`.
                 // https://www.attrs.org/en/stable/api.html#attrs.define
                 // https://www.attrs.org/en/stable/api-attr.html#attr.s
-                let Expr::Call(ExprCall { arguments, .. }) = &decorator.expression else {
+                let ExprKind::Call(call_node) = decorator.expression().classify() else {
                     let auto_attribs = if *func == "s" {
                         AttrsAutoAttribs::False
                     } else {
@@ -137,12 +138,13 @@ pub(super) fn dataclass_kind<'a>(
 
                     return Some((DataclassKind::Attrs(auto_attribs), decorator));
                 };
+                let arguments = call_node.arguments();
 
                 let Some(auto_attribs) = arguments.find_keyword("auto_attribs") else {
                     return Some((DataclassKind::Attrs(AttrsAutoAttribs::None), decorator));
                 };
 
-                let auto_attribs = match Truthiness::from_expr(&auto_attribs.value, |id| {
+                let auto_attribs = match Truthiness::from_expr(auto_attribs.value(), |id| {
                     semantic.has_builtin_binding(id)
                 }) {
                     // `auto_attribs` requires an exact `True` to be true
@@ -169,25 +171,26 @@ pub(super) fn dataclass_kind<'a>(
 
 /// Return true if dataclass (stdlib or `attrs`) is frozen
 pub(super) fn is_frozen_dataclass(
-    dataclass_decorator: &ast::Decorator,
+    dataclass_decorator: Decorator<'_>,
     semantic: &SemanticModel,
 ) -> bool {
     let Some(qualified_name) =
-        semantic.resolve_qualified_name(map_callable(&dataclass_decorator.expression))
+        semantic.resolve_qualified_name(map_callable(dataclass_decorator.expression()))
     else {
         return false;
     };
 
     match qualified_name.segments() {
         ["dataclasses", "dataclass"] => {
-            let Expr::Call(ExprCall { arguments, .. }) = &dataclass_decorator.expression else {
+            let ExprKind::Call(call_node) = dataclass_decorator.expression().classify() else {
                 return false;
             };
+            let arguments = call_node.arguments();
 
             let Some(keyword) = arguments.find_keyword("frozen") else {
                 return false;
             };
-            Truthiness::from_expr(&keyword.value, |id| semantic.has_builtin_binding(id))
+            Truthiness::from_expr(keyword.value(), |id| semantic.has_builtin_binding(id))
                 .into_bool()
                 .unwrap_or_default()
         }
@@ -201,7 +204,7 @@ pub(super) fn is_frozen_dataclass(
 /// For example, Pydantic `BaseModel` and `BaseSettings` subclasses copy attribute defaults on
 /// instance creation. As such, the use of mutable default values is safe for such classes.
 pub(super) fn has_default_copy_semantics(
-    class_def: &ast::StmtClassDef,
+    class_def: StmtClassDef<'_>,
     semantic: &SemanticModel,
 ) -> bool {
     analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
@@ -228,7 +231,7 @@ pub(super) fn has_default_copy_semantics(
 /// descriptor protocol.
 ///
 /// See: <https://docs.python.org/3/reference/datamodel.html#descriptors>
-pub(super) fn is_descriptor_class(func: &Expr, semantic: &SemanticModel) -> bool {
+pub(super) fn is_descriptor_class(func: Expr<'_>, semantic: &SemanticModel) -> bool {
     semantic.lookup_attribute(func).is_some_and(|id| {
         let BindingKind::ClassDefinition(scope_id) = semantic.binding(id).kind else {
             return false;
@@ -246,9 +249,9 @@ pub(super) fn is_descriptor_class(func: &Expr, semantic: &SemanticModel) -> bool
 /// Returns `true` if the class has `ctypes.Structure` as a base
 /// and the first target is the `_fields_` attribute.
 pub(super) fn is_ctypes_structure_fields(
-    class_def: &ast::StmtClassDef,
+    class_def: StmtClassDef<'_>,
     semantic: &SemanticModel,
-    targets: &[Expr],
+    targets: NodeList<'_, ruff_python_ast::kind::Expr>,
 ) -> bool {
     let is_ctypes_structure =
         analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
@@ -267,8 +270,8 @@ pub(super) fn is_ctypes_structure_fields(
         });
 
     let is_fields = matches!(
-        targets.first(),
-        Some(Expr::Name(ast::ExprName { id, .. })) if id == "_fields_"
+        targets.first().map(Expr::fields),
+        Some(ast::ExprFields::Name(ast::ExprNameFields { id, .. })) if id == "_fields_"
     );
 
     is_ctypes_structure && is_fields

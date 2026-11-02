@@ -1,7 +1,17 @@
 use std::ffi::OsStr;
 use std::path::Path;
 
-pub use expression::*;
+pub use flat::fields::*;
+pub use flat::{
+    AnyKind, AnyParameter, ArgOrKeyword, ArgumentsSourceOrder, Ast, AstNode, AstNodeId, BuildId,
+    Builder, BytesValue, Checkpoint, Children, Descendants, Emit, EmittedNode, ExceptHandlerKind,
+    ExprKind, FStringPartId, FStringPartView, FStringValue, InterpolatedStringElementKind,
+    InterpolatedStringElements, List, ListId, ListItem, ListIter, LiteralExpression, LiteralWriter,
+    MappingPatternItemId, MappingPatternItems, MappingPatternItemsId, ModKind, NameId, NodeList,
+    NodeType, PatternKind, Rewriter, StmtKind, StringLike, StringLikeKind, StringLikePart,
+    StringLikePartKind, StringValue, Suite, SyntaxNode, TStringValue, Tree, TypeParamKind, build,
+    find_node, statement_visitor, traversal, visitor,
+};
 pub use generated::*;
 pub use int::*;
 pub use node_index::*;
@@ -11,29 +21,23 @@ pub use python_version::*;
 
 pub mod comparable;
 pub mod docstrings;
-mod expression;
-pub mod find_node;
+mod flat;
 mod generated;
 pub mod helpers;
 pub mod identifier;
 mod int;
 pub mod name;
-mod node;
 mod node_index;
 mod nodes;
 pub mod operator_precedence;
 pub mod parenthesize;
 mod python_version;
-pub mod relocate;
 pub mod script;
-pub mod statement_visitor;
 pub mod stmt_if;
 pub mod str;
 pub mod str_prefix;
 pub mod token;
-pub mod traversal;
 pub mod types;
-pub mod visitor;
 pub mod whitespace;
 
 /// The type of a source file.

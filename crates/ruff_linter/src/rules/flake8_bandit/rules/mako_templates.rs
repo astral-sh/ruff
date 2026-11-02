@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::ExprCall;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -47,14 +47,14 @@ impl Violation for MakoTemplates {
 }
 
 /// S702
-pub(crate) fn mako_templates(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn mako_templates(checker: &Checker, call: ExprCall<'_>) {
     if checker
         .semantic()
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func())
         .is_some_and(|qualified_name| {
             matches!(qualified_name.segments(), ["mako", "template", "Template"])
         })
     {
-        checker.report_diagnostic(MakoTemplates, call.func.range());
+        checker.report_diagnostic(MakoTemplates, call.func().range());
     }
 }

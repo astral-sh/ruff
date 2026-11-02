@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_python_ast::{self as ast, ExprBinOp, ExprKind, Operator};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -39,17 +39,17 @@ impl Violation for FStringPercentFormat {
 }
 
 /// RUF073
-pub(crate) fn fstring_percent_format(checker: &Checker, expr: &ast::ExprBinOp) {
-    let ast::ExprBinOp {
+pub(crate) fn fstring_percent_format(checker: &Checker, expr: ExprBinOp<'_>) {
+    let ast::ExprBinOpFields {
         left,
         op: Operator::Mod,
         ..
-    } = expr
+    } = expr.fields()
     else {
         return;
     };
 
-    if matches!(left.as_ref(), Expr::FString(_)) {
+    if matches!(left.classify(), ExprKind::FString(_)) {
         checker.report_diagnostic(FStringPercentFormat, expr.range());
     }
 }

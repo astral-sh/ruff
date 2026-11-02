@@ -1,11 +1,12 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{BuildId, Builder, Expr, ExprKind, NodeList};
+use ruff_text_size::Ranged;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::fix::syntax;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -100,8 +101,8 @@ impl Violation for NestedMinMax {
 impl MinMax {
     /// Converts a function call [`Expr`] into a [`MinMax`] if it is a call to `min` or `max`.
     fn try_from_call(
-        func: &Expr,
-        keywords: &[Keyword],
+        func: Expr<'_>,
+        keywords: NodeList<'_, ruff_python_ast::kind::Keyword>,
         semantic: &SemanticModel,
     ) -> Option<MinMax> {
         if !keywords.is_empty() {
@@ -124,57 +125,40 @@ impl std::fmt::Display for MinMax {
     }
 }
 
-/// Collect a new set of arguments to by either accepting existing args as-is or
-/// collecting child arguments, if it's a call to the same function.
-fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel) -> Vec<Expr> {
-    fn inner(min_max: MinMax, args: &[Expr], semantic: &SemanticModel, new_args: &mut Vec<Expr>) {
-        for arg in args {
-            if let Expr::Call(ast::ExprCall {
-                func,
-                arguments:
-                    Arguments {
-                        args,
-                        keywords,
-                        range: _,
-                        node_index: _,
-                    },
-                range_start: _,
-                node_index: _,
-            }) = arg
+/// Flattens calls to the same builtin, unpacking the iterable in a single-argument call.
+fn collect_nested_args(
+    builder: &mut Builder,
+    min_max: MinMax,
+    args: NodeList<'_, ruff_python_ast::kind::Expr>,
+    semantic: &SemanticModel,
+    flattened: &mut Vec<BuildId<ruff_python_ast::kind::Expr>>,
+) {
+    for arg in args {
+        if let Some(call) = arg.as_call_expr()
+            && MinMax::try_from_call(call.func(), call.arguments().keywords(), semantic)
+                == Some(min_max)
+        {
+            let args = call.arguments().args();
+            if let Some([single]) = args.as_array()
+                && !single.is_starred_expr()
             {
-                if MinMax::try_from_call(func, keywords, semantic) == Some(min_max) {
-                    if let [arg] = &**args {
-                        if arg.as_starred_expr().is_none() {
-                            let new_arg = Expr::Starred(ast::ExprStarred {
-                                value: Box::new(arg.clone()),
-                                ctx: ast::ExprContext::Load,
-                                range: TextRange::default(),
-                                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                            });
-                            new_args.push(new_arg);
-                            continue;
-                        }
-                    }
-                    inner(min_max, args, semantic, new_args);
-                    continue;
-                }
+                let value = builder.copy_node(single);
+                flattened.push(syntax::starred(builder, value));
+            } else {
+                collect_nested_args(builder, min_max, args, semantic, flattened);
             }
-            new_args.push(arg.clone());
+        } else {
+            flattened.push(builder.copy_node(arg));
         }
     }
-
-    let mut new_args = Vec::with_capacity(args.len());
-    inner(min_max, args, semantic, &mut new_args);
-    new_args
 }
-
 /// PLW3301
 pub(crate) fn nested_min_max(
     checker: &Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
+    &expr: &Expr<'_>,
+    func: Expr<'_>,
+    args: NodeList<'_, ruff_python_ast::kind::Expr>,
+    keywords: NodeList<'_, ruff_python_ast::kind::Keyword>,
 ) {
     let Some(min_max) = MinMax::try_from_call(func, keywords, checker.semantic()) else {
         return;
@@ -188,31 +172,31 @@ pub(crate) fn nested_min_max(
     }
 
     if args.iter().any(|arg| {
-        let Expr::Call(ast::ExprCall {
-            func,
-            arguments: Arguments { keywords, .. },
-            ..
-        }) = arg
-        else {
+        let ExprKind::Call(call_node) = arg.classify() else {
             return false;
         };
-        MinMax::try_from_call(func.as_ref(), keywords.as_ref(), checker.semantic()) == Some(min_max)
+        let func = call_node.func();
+        let arguments = call_node.arguments();
+        let keywords = arguments.keywords();
+        MinMax::try_from_call(func, keywords, checker.semantic()) == Some(min_max)
     }) {
         let mut diagnostic =
             checker.report_diagnostic(NestedMinMax { func: min_max }, expr.range());
-        let flattened_expr = Expr::Call(ast::ExprCall {
-            func: Box::new(func.clone()),
-            arguments: Arguments {
-                args: collect_nested_args(min_max, args, checker.semantic()).into(),
-                keywords: keywords.iter().cloned().collect(),
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            },
-            range_start: ruff_text_size::TextSize::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        });
+        let mut builder = Builder::default();
+        let mut flattened = Vec::with_capacity(args.len());
+        collect_nested_args(
+            &mut builder,
+            min_max,
+            args,
+            checker.semantic(),
+            &mut flattened,
+        );
+        let args = builder.list(flattened);
+        let keywords = builder.copy_nodes(keywords);
+        let func = builder.copy_node(func);
+        let replacement = syntax::call_with_keywords(&mut builder, func, args, keywords);
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            checker.generator().expr(&flattened_expr),
+            checker.generator().expr(builder.get(replacement)),
             expr.range(),
         )));
     }

@@ -1,6 +1,6 @@
 use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{Argument, Arguments, format_args, write};
-use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::{AnyKind, SyntaxNode};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{
@@ -32,20 +32,17 @@ pub(crate) trait NeedsParentheses {
     /// Determines if this object needs optional parentheses or if it is safe to omit the parentheses.
     fn needs_parentheses(
         &self,
-        parent: AnyNodeRef,
+        parent: SyntaxNode,
         context: &PyFormatContext,
     ) -> OptionalParentheses;
 }
 
 /// Returns `true` if `expr_range` identifies a type annotation child of `parent`,
 /// i.e. the annotation of a `StmtAnnAssign` or the return annotation of a `StmtFunctionDef`.
-pub(crate) fn is_type_annotation_of(expr_range: TextRange, parent: AnyNodeRef) -> bool {
-    match parent {
-        AnyNodeRef::StmtAnnAssign(stmt) => stmt.annotation.range() == expr_range,
-        AnyNodeRef::StmtFunctionDef(stmt) => stmt
-            .returns
-            .as_deref()
-            .is_some_and(|r| r.range() == expr_range),
+pub(crate) fn is_type_annotation_of(expr_range: TextRange, parent: SyntaxNode) -> bool {
+    match parent.classify() {
+        AnyKind::StmtAnnAssign(stmt) => stmt.annotation().range() == expr_range,
+        AnyKind::StmtFunctionDef(stmt) => stmt.returns().is_some_and(|r| r.range() == expr_range),
         _ => false,
     }
 }

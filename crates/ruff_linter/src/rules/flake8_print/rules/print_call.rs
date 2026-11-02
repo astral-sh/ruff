@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -121,10 +121,10 @@ impl Violation for PPrint {
 }
 
 /// T201, T203
-pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn print_call(checker: &Checker, call: ast::ExprCall<'_>) {
     let semantic = checker.semantic();
 
-    let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) else {
+    let Some(qualified_name) = semantic.resolve_qualified_name(call.func()) else {
         return;
     };
 
@@ -135,7 +135,7 @@ pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
             if has_non_default_output_target(semantic, call, "file") {
                 return;
             }
-            checker.report_diagnostic_if_enabled(Print, call.func.range())
+            checker.report_diagnostic_if_enabled(Print, call.func().range())
         }
         ["pprint", "pprint"] => {
             // If the pprint call has a `stream=` argument (that isn't `None`,
@@ -143,7 +143,7 @@ pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
             if has_non_default_output_target(semantic, call, "stream") {
                 return;
             }
-            checker.report_diagnostic_if_enabled(PPrint, call.func.range())
+            checker.report_diagnostic_if_enabled(PPrint, call.func().range())
         }
         _ => return,
     };
@@ -166,15 +166,17 @@ pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
 
 fn has_non_default_output_target(
     semantic: &SemanticModel,
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     keyword: &str,
 ) -> bool {
-    call.arguments.find_keyword(keyword).is_some_and(|keyword| {
-        !keyword.value.is_none_literal_expr()
-            && semantic
-                .resolve_qualified_name(&keyword.value)
-                .is_none_or(|qualified_name| {
-                    !matches!(qualified_name.segments(), ["sys", "stdout" | "stderr"])
-                })
-    })
+    call.arguments()
+        .find_keyword(keyword)
+        .is_some_and(|keyword| {
+            !keyword.value().is_none_literal_expr()
+                && semantic
+                    .resolve_qualified_name(keyword.value())
+                    .is_none_or(|qualified_name| {
+                        !matches!(qualified_name.segments(), ["sys", "stdout" | "stderr"])
+                    })
+        })
 }

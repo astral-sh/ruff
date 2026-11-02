@@ -1,6 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::{self as ast, ExprKind};
 use ruff_python_semantic::Modules;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -53,41 +53,45 @@ impl Violation for HashlibDigestHex {
 }
 
 /// FURB181
-pub(crate) fn hashlib_digest_hex(checker: &Checker, call: &ExprCall) {
+pub(crate) fn hashlib_digest_hex(checker: &Checker, call: ast::ExprCall<'_>) {
     if !checker.semantic().seen_module(Modules::HASHLIB) {
         return;
     }
 
-    if !call.arguments.is_empty() {
+    if !call.arguments().is_empty() {
         return;
     }
 
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
+    let ExprKind::Attribute(attribute) = call.func().classify() else {
         return;
     };
+    let attr = attribute.attr();
+    let value = attribute.value();
 
     if attr.as_str() != "hex" {
         return;
     }
 
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = value.as_ref()
-    else {
+    let ExprKind::Call(call_node) = value.classify() else {
         return;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = func.as_ref() else {
+    let ExprKind::Attribute(attribute) = func.classify() else {
         return;
     };
+    let attr = attribute.attr();
+    let value = attribute.value();
 
     if attr.as_str() != "digest" {
         return;
     }
 
-    let Expr::Call(ExprCall { func, .. }) = value.as_ref() else {
+    let ExprKind::Call(call_node) = value.classify() else {
         return;
     };
+    let func = call_node.func();
 
     if checker
         .semantic()
@@ -117,7 +121,7 @@ pub(crate) fn hashlib_digest_hex(checker: &Checker, call: &ExprCall) {
     {
         let mut diagnostic = checker.report_diagnostic(HashlibDigestHex, call.range());
         if arguments.is_empty() {
-            let replacement_range = TextRange::new(value.end(), call.func.end());
+            let replacement_range = TextRange::new(value.end(), call.func().end());
 
             let applicability = if checker.comment_ranges().intersects(replacement_range) {
                 Applicability::Unsafe

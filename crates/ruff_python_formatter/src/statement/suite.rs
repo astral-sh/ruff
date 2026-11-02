@@ -1,9 +1,8 @@
-use ruff_formatter::{
-    FormatContext, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions, write,
-};
+use ruff_formatter::{FormatContext, FormatOwnedWithRule, FormatRuleWithOptions, write};
 use ruff_python_ast::helpers::is_compound_statement;
-use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt, Suite};
-use ruff_python_ast::{AnyNodeRef, StmtExpr};
+use ruff_python_ast::{
+    self as ast, AnyKind, ExprKind, PySourceType, Stmt, StmtExpr, StmtKind, Suite, SyntaxNode,
+};
 use ruff_python_trivia::{
     SimpleTokenKind, SimpleTokenizer, lines_after, lines_after_ignoring_end_of_line_trivia,
     lines_before,
@@ -92,8 +91,9 @@ pub struct FormatSuite {
     kind: SuiteKind,
 }
 
-impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
-    fn fmt(&self, statements: &Suite, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatRule<Suite<'_>, PyFormatContext<'_>> for FormatSuite {
+    fn fmt(&self, statements: &Suite<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let statements = *statements;
         let mut iter = statements.iter();
         let Some(first) = iter.next() else {
             return Ok(());
@@ -257,7 +257,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                             .as_function_def_stmt()
                             .is_some_and(|preceding_stub| {
                                 contains_only_an_ellipsis(
-                                    &preceding_stub.body,
+                                    preceding_stub.body(),
                                     f.context().comments(),
                                 ) && lines_after_ignoring_end_of_line_trivia(
                                     preceding_stub.end(),
@@ -465,7 +465,7 @@ impl FormatSuite {
     /// ```
     fn between_alternative_blocks_empty_line(
         &self,
-        statements: &Suite,
+        statements: Suite<'_>,
         comments: &Comments,
         f: &mut PyFormatter,
     ) -> FormatResult<()> {
@@ -483,11 +483,11 @@ impl FormatSuite {
 
         // Skip the last trailing own line comment of the suite, if any, otherwise we count
         // the lines wrongly by stopping at that comment.
-        let node_with_last_trailing_comment = std::iter::successors(
-            statements.last().map(AnyNodeRef::from),
-            AnyNodeRef::last_child_in_body,
-        )
-        .find(|last_child| comments.has_trailing_own_line(*last_child));
+        let node_with_last_trailing_comment =
+            std::iter::successors(statements.last().map(SyntaxNode::from), |node| {
+                node.last_child_in_body()
+            })
+            .find(|last_child| comments.has_trailing_own_line(*last_child));
 
         let end_of_def_or_class = node_with_last_trailing_comment
             .and_then(|child| comments.trailing(child).last().map(Ranged::end))
@@ -519,13 +519,12 @@ impl FormatSuite {
 ///     print("below function")
 /// ```
 fn trailing_function_or_class_def<'a>(
-    preceding: Option<&'a Stmt>,
+    preceding: Option<Stmt<'a>>,
     comments: &Comments,
-) -> Option<AnyNodeRef<'a>> {
-    std::iter::successors(
-        preceding.map(AnyNodeRef::from),
-        AnyNodeRef::last_child_in_body,
-    )
+) -> Option<SyntaxNode<'a>> {
+    std::iter::successors(preceding.map(SyntaxNode::from), |node| {
+        node.last_child_in_body()
+    })
     // If there is a comment between preceding and following the empty lines were
     // inserted before the comment by preceding and there are no extra empty lines
     // after the comment.
@@ -555,8 +554,8 @@ fn trailing_function_or_class_def<'a>(
     .take_while(|last_child| !comments.has_trailing_own_line(*last_child))
     .find(|last_child| {
         matches!(
-            last_child,
-            AnyNodeRef::StmtFunctionDef(_) | AnyNodeRef::StmtClassDef(_)
+            last_child.classify(),
+            AnyKind::StmtFunctionDef(_) | AnyKind::StmtClassDef(_)
         )
     })
 }
@@ -567,8 +566,8 @@ fn trailing_function_or_class_def<'a>(
 /// <https://github.com/psf/black/blob/c160e4b7ce30c661ac4f2dfa5038becf1b8c5c33/src/black/lines.py#L576-L744>
 fn stub_file_empty_lines(
     kind: SuiteKind,
-    preceding: &Stmt,
-    following: &Stmt,
+    preceding: Stmt<'_>,
+    following: Stmt<'_>,
     preceding_comments: &LeadingDanglingTrailingComments,
     following_comments: &LeadingDanglingTrailingComments,
     f: &mut PyFormatter,
@@ -613,8 +612,8 @@ fn stub_file_empty_lines(
 /// caller needs to make sure that the suite which the preceding node is part of is
 /// followed by an alternate branch and shouldn't be a top-level suite.
 pub(crate) fn should_insert_blank_line_after_class_in_stub_file(
-    preceding: AnyNodeRef<'_>,
-    following: Option<AnyNodeRef<'_>>,
+    preceding: SyntaxNode<'_>,
+    following: Option<SyntaxNode<'_>>,
     context: &PyFormatContext,
 ) -> bool {
     if !context.options().source_type().is_stub() {
@@ -628,7 +627,7 @@ pub(crate) fn should_insert_blank_line_after_class_in_stub_file(
 
     let comments = context.comments();
     match preceding.as_stmt_class_def() {
-        Some(class) if contains_only_an_ellipsis(&class.body, comments) => {
+        Some(class) if contains_only_an_ellipsis(class.body(), comments) => {
             // If the preceding class has decorators, then we need to add an empty
             // line even if it only contains ellipsis.
             //
@@ -638,7 +637,7 @@ pub(crate) fn should_insert_blank_line_after_class_in_stub_file(
             //     class Nested1: ...
             //     foo = 1
             // ```
-            let preceding_has_decorators = !class.decorator_list.is_empty();
+            let preceding_has_decorators = !class.decorator_list().is_empty();
 
             // If the following statement is a class definition, then an empty line
             // should be inserted if it (1) doesn't just contain ellipsis, or (2) has decorators.
@@ -658,8 +657,8 @@ pub(crate) fn should_insert_blank_line_after_class_in_stub_file(
             // Both of the above examples should add a blank line in between.
             let following_is_class_without_only_ellipsis_or_has_decorators =
                 following.as_stmt_class_def().is_some_and(|following| {
-                    !contains_only_an_ellipsis(&following.body, comments)
-                        || !following.decorator_list.is_empty()
+                    !contains_only_an_ellipsis(following.body(), comments)
+                        || !following.decorator_list().is_empty()
                 });
 
             preceding_has_decorators
@@ -697,18 +696,21 @@ pub(crate) fn should_insert_blank_line_after_class_in_stub_file(
             // if other:
             //     pass
             // ```
-            std::iter::successors(
-                preceding.last_child_in_body(),
-                AnyNodeRef::last_child_in_body,
-            )
+            std::iter::successors(preceding.last_child_in_body(), |node| {
+                node.last_child_in_body()
+            })
             .take_while(|last_child| !comments.has_trailing_own_line(*last_child))
-            .any(|last_child| last_child.is_stmt_class_def())
+            .any(ruff_python_ast::SyntaxNode::is_stmt_class_def)
         }
     }
 }
 
 /// Only a function to compute it lazily
-fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &PyFormatter) -> bool {
+fn stub_suite_can_omit_empty_line(
+    preceding: Stmt<'_>,
+    following: Stmt<'_>,
+    f: &PyFormatter,
+) -> bool {
     // Two subsequent class definitions that both have an ellipsis only body
     // ```python
     // class A: ...
@@ -719,10 +721,10 @@ fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &PyForm
     // ```
     let class_sequences_with_ellipsis_only = preceding
         .as_class_def_stmt()
-        .is_some_and(|class| contains_only_an_ellipsis(&class.body, f.context().comments()))
+        .is_some_and(|class| contains_only_an_ellipsis(class.body(), f.context().comments()))
         && following.as_class_def_stmt().is_some_and(|class| {
-            contains_only_an_ellipsis(&class.body, f.context().comments())
-                && class.decorator_list.is_empty()
+            contains_only_an_ellipsis(class.body(), f.context().comments())
+                && class.decorator_list().is_empty()
         });
 
     // A function definition following a stub function definition
@@ -732,42 +734,50 @@ fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &PyForm
     // ```
     let function_with_ellipsis = preceding
         .as_function_def_stmt()
-        .is_some_and(|function| contains_only_an_ellipsis(&function.body, f.context().comments()))
+        .is_some_and(|function| contains_only_an_ellipsis(function.body(), f.context().comments()))
         && following.is_function_def_stmt();
 
     class_sequences_with_ellipsis_only || function_with_ellipsis
 }
 
 /// Returns `true` if a function or class body contains only an ellipsis with no comments.
-fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> bool {
+fn contains_only_an_ellipsis(body: Suite<'_>, comments: &Comments) -> bool {
     as_only_an_ellipsis(body, comments).is_some()
 }
 
-/// Returns `Some(Stmt::Ellipsis)` if a function or class body contains only an ellipsis with no
-/// comments.
-pub(crate) fn as_only_an_ellipsis<'a>(body: &'a [Stmt], comments: &Comments) -> Option<&'a Stmt> {
-    if let [node @ Stmt::Expr(ast::StmtExpr { value, .. })] = body
+/// Returns the ellipsis statement if it is the only statement in a function or class body
+/// and has no comments.
+pub(crate) fn as_only_an_ellipsis<'a>(body: Suite<'a>, comments: &Comments) -> Option<Stmt<'a>> {
+    if let Some([node @ ast::StmtFields::Expr(ast::StmtExprFields { value, .. })]) = body
+        .as_array()
+        .map(|items| items.map(ruff_python_ast::Stmt::fields))
         && value.is_ellipsis_literal_expr()
-        && !comments.has_leading(node)
-        && !comments.has_trailing_own_line(node)
+        && !comments.has_leading(node.view())
+        && !comments.has_trailing_own_line(node.view())
     {
-        return Some(node);
+        return Some(node.view());
     }
 
     None
 }
 
 /// Returns `true` if a [`Stmt`] is a class or function definition.
-const fn is_class_or_function_definition(stmt: &Stmt) -> bool {
-    matches!(stmt, Stmt::FunctionDef(_) | Stmt::ClassDef(_))
+fn is_class_or_function_definition(stmt: Stmt<'_>) -> bool {
+    matches!(
+        stmt.classify(),
+        StmtKind::FunctionDef(_) | StmtKind::ClassDef(_)
+    )
 }
 
 /// Returns `true` if a [`Stmt`] is an import.
-const fn is_import_definition(stmt: &Stmt) -> bool {
-    matches!(stmt, Stmt::Import(_) | Stmt::ImportFrom(_))
+fn is_import_definition(stmt: Stmt<'_>) -> bool {
+    matches!(
+        stmt.classify(),
+        StmtKind::Import(_) | StmtKind::ImportFrom(_)
+    )
 }
 
-impl FormatRuleWithOptions<Suite, PyFormatContext<'_>> for FormatSuite {
+impl FormatRuleWithOptions<Suite<'_>, PyFormatContext<'_>> for FormatSuite {
     type Options = SuiteKind;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -776,16 +786,19 @@ impl FormatRuleWithOptions<Suite, PyFormatContext<'_>> for FormatSuite {
     }
 }
 
-impl<'ast> AsFormat<PyFormatContext<'ast>> for Suite {
-    type Format<'a> = FormatRefWithRule<'a, Suite, FormatSuite, PyFormatContext<'ast>>;
+impl<'ast> AsFormat<PyFormatContext<'ast>> for Suite<'_> {
+    type Format<'a>
+        = FormatOwnedWithRule<Self, FormatSuite, PyFormatContext<'ast>>
+    where
+        Self: 'a;
 
     fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, FormatSuite::default())
+        FormatOwnedWithRule::new(*self, FormatSuite::default())
     }
 }
 
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
-    type Format = FormatOwnedWithRule<Suite, FormatSuite, PyFormatContext<'ast>>;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite<'_> {
+    type Format = FormatOwnedWithRule<Self, FormatSuite, PyFormatContext<'ast>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatSuite::default())
@@ -795,8 +808,8 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
 /// A statement representing a docstring.
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct DocstringStmt<'a> {
-    /// The [`Stmt::Expr`]
-    docstring: &'a Stmt,
+    /// The expression statement containing the docstring.
+    docstring: Stmt<'a>,
     /// The parent suite kind
     suite_kind: SuiteKind,
 }
@@ -804,7 +817,7 @@ pub(crate) struct DocstringStmt<'a> {
 impl<'a> DocstringStmt<'a> {
     /// Checks if the statement is a simple string that can be formatted as a docstring
     fn try_from_statement(
-        stmt: &'a Stmt,
+        stmt: Stmt<'a>,
         suite_kind: SuiteKind,
         context: &PyFormatContext,
     ) -> Option<DocstringStmt<'a>> {
@@ -819,8 +832,9 @@ impl<'a> DocstringStmt<'a> {
         })
     }
 
-    pub(crate) fn is_docstring_statement(stmt: &StmtExpr, context: &PyFormatContext) -> bool {
-        if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = stmt.value.as_ref() {
+    pub(crate) fn is_docstring_statement(stmt: StmtExpr<'_>, context: &PyFormatContext) -> bool {
+        if let ExprKind::StringLiteral(string_literal_node) = stmt.value().classify() {
+            let value = string_literal_node.value();
             !value.is_implicit_concatenated()
                 || !value.iter().any(|literal| context.comments().has(literal))
         } else {
@@ -839,7 +853,7 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
             .docstring
             .as_expr_stmt()
             .unwrap()
-            .value
+            .value()
             .as_string_literal_expr()
             .unwrap();
 
@@ -895,11 +909,11 @@ pub(crate) enum SuiteChildStatement<'a> {
     Docstring(DocstringStmt<'a>),
 
     /// Any other statement.
-    Other(&'a Stmt),
+    Other(Stmt<'a>),
 }
 
 impl<'a> SuiteChildStatement<'a> {
-    pub(crate) const fn statement(self) -> &'a Stmt {
+    pub(crate) const fn statement(self) -> Stmt<'a> {
         match self {
             SuiteChildStatement::Docstring(docstring) => docstring.docstring,
             SuiteChildStatement::Other(statement) => statement,
@@ -913,7 +927,7 @@ impl Ranged for SuiteChildStatement<'_> {
     }
 }
 
-impl<'a> From<SuiteChildStatement<'a>> for AnyNodeRef<'a> {
+impl<'a> From<SuiteChildStatement<'a>> for SyntaxNode<'a> {
     fn from(value: SuiteChildStatement<'a>) -> Self {
         value.statement().into()
     }
@@ -929,8 +943,8 @@ impl Format<PyFormatContext<'_>> for SuiteChildStatement<'_> {
 }
 
 pub(crate) fn skip_range(
-    first: &Stmt,
-    statements: &[Stmt],
+    first: Stmt<'_>,
+    statements: Suite<'_>,
     context: &PyFormatContext,
 ) -> Option<TextRange> {
     let start = first.start();

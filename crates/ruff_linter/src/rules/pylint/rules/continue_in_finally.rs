@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::{self as ast, Suite};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -48,36 +48,37 @@ impl Violation for ContinueInFinally {
     }
 }
 
-fn traverse_body(checker: &Checker, body: &[Stmt]) {
+fn traverse_body(checker: &Checker, body: Suite<'_>) {
     for stmt in body {
         if stmt.is_continue_stmt() {
             checker.report_diagnostic(ContinueInFinally, stmt.range());
         }
 
-        match stmt {
-            Stmt::If(ast::StmtIf {
+        match stmt.fields() {
+            ast::StmtFields::If(ast::StmtIfFields {
                 body,
                 elif_else_clauses,
                 ..
             }) => {
                 traverse_body(checker, body);
                 for clause in elif_else_clauses {
-                    traverse_body(checker, &clause.body);
+                    traverse_body(checker, clause.body());
                 }
             }
-            Stmt::Try(ast::StmtTry { body, orelse, .. }) => {
+            ast::StmtFields::Try(ast::StmtTryFields { body, orelse, .. }) => {
                 traverse_body(checker, body);
                 traverse_body(checker, orelse);
             }
-            Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
+            ast::StmtFields::For(ast::StmtForFields { orelse, .. })
+            | ast::StmtFields::While(ast::StmtWhileFields { orelse, .. }) => {
                 traverse_body(checker, orelse);
             }
-            Stmt::With(ast::StmtWith { body, .. }) => {
+            ast::StmtFields::With(ast::StmtWithFields { body, .. }) => {
                 traverse_body(checker, body);
             }
-            Stmt::Match(ast::StmtMatch { cases, .. }) => {
+            ast::StmtFields::Match(ast::StmtMatchFields { cases, .. }) => {
                 for case in cases {
-                    traverse_body(checker, &case.body);
+                    traverse_body(checker, case.body());
                 }
             }
             _ => {}
@@ -86,6 +87,6 @@ fn traverse_body(checker: &Checker, body: &[Stmt]) {
 }
 
 /// PLE0116
-pub(crate) fn continue_in_finally(checker: &Checker, body: &[Stmt]) {
+pub(crate) fn continue_in_finally(checker: &Checker, body: Suite<'_>) {
     traverse_body(checker, body);
 }

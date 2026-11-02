@@ -32,7 +32,7 @@ use crate::{
 
 /// (C402) Convert `dict((x, x) for x in range(3))` to `{x: x for x in
 /// range(3)}`.
-pub(crate) fn fix_unnecessary_generator_dict(expr: &Expr, checker: &Checker) -> Result<Edit> {
+pub(crate) fn fix_unnecessary_generator_dict(expr: Expr<'_>, checker: &Checker) -> Result<Edit> {
     let locator = checker.locator();
     let stylist = checker.stylist();
 
@@ -92,7 +92,7 @@ pub(crate) fn fix_unnecessary_generator_dict(expr: &Expr, checker: &Checker) -> 
 /// (C404) Convert `dict([(i, i) for i in range(3)])` to `{i: i for i in
 /// range(3)}`.
 pub(crate) fn fix_unnecessary_list_comprehension_dict(
-    expr: &Expr,
+    expr: Expr<'_>,
     checker: &Checker,
 ) -> Result<Edit> {
     let locator = checker.locator();
@@ -153,7 +153,7 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
 }
 
 /// (C406) Convert `dict([(1, 2)])` to `{1: 2}`.
-pub(crate) fn fix_unnecessary_literal_dict(expr: &Expr, checker: &Checker) -> Result<Edit> {
+pub(crate) fn fix_unnecessary_literal_dict(expr: Expr<'_>, checker: &Checker) -> Result<Edit> {
     let locator = checker.locator();
     let stylist = checker.stylist();
 
@@ -222,7 +222,7 @@ pub(crate) fn fix_unnecessary_literal_dict(expr: &Expr, checker: &Checker) -> Re
 
 /// (C408) Convert `dict(a=1, b=2)` to `{"a": 1, "b": 2}`.
 pub(crate) fn fix_unnecessary_collection_call(
-    expr: &ast::ExprCall,
+    expr: ast::ExprCall<'_>,
     checker: &Checker,
 ) -> Result<Edit> {
     let locator = checker.locator();
@@ -394,7 +394,7 @@ pub(crate) fn pad_end(
 
 /// (C411) Convert `list([i * i for i in x])` to `[i * i for i in x]`.
 pub(crate) fn fix_unnecessary_list_call(
-    expr: &Expr,
+    expr: Expr<'_>,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
@@ -416,7 +416,7 @@ pub(crate) fn fix_unnecessary_list_call(
 /// (C413) Convert `reversed(sorted([2, 3, 1]))` to `sorted([2, 3, 1],
 /// reverse=True)`.
 pub(crate) fn fix_unnecessary_call_around_sorted(
-    expr: &Expr,
+    expr: Expr<'_>,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
@@ -539,7 +539,7 @@ pub(crate) fn fix_unnecessary_call_around_sorted(
 
 /// (C414) Convert `sorted(list(foo))` to `sorted(foo)`
 pub(crate) fn fix_unnecessary_double_cast_or_process(
-    expr: &Expr,
+    expr: Expr<'_>,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
@@ -576,7 +576,7 @@ pub(crate) fn fix_unnecessary_double_cast_or_process(
 
 /// (C416) Convert `[i for i in x]` to `list(x)`.
 pub(crate) fn fix_unnecessary_comprehension(
-    expr: &Expr,
+    expr: Expr<'_>,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
@@ -663,8 +663,8 @@ pub(crate) fn fix_unnecessary_comprehension(
 
 /// (C417) Convert `map(lambda x: x * 2, bar)` to `(x * 2 for x in bar)`.
 pub(crate) fn fix_unnecessary_map(
-    call_ast_node: &ExprCall,
-    parent: Option<&Expr>,
+    call_ast_node: ExprCall<'_>,
+    parent: Option<Expr<'_>>,
     object_type: ObjectType,
     locator: &Locator,
     stylist: &Stylist,
@@ -819,7 +819,7 @@ pub(crate) fn fix_unnecessary_map(
 
 /// (C419) Convert `[i for i in a]` into `i for i in a`
 pub(crate) fn fix_unnecessary_comprehension_in_call(
-    expr: &Expr,
+    expr: Expr<'_>,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Fix> {

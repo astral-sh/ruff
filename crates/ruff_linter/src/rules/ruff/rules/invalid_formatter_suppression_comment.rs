@@ -2,9 +2,10 @@ use std::fmt::Display;
 
 use smallvec::SmallVec;
 
-use ast::{StmtClassDef, StmtFunctionDef};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, AnyNodeRef, helpers::comment_indentation_after};
+use ruff_python_ast::{
+    self as ast, AnyKind, Suite, SyntaxNode, helpers::comment_indentation_after,
+};
 use ruff_python_trivia::{SuppressionKind, indentation_at_offset};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
@@ -76,7 +77,7 @@ impl AlwaysFixableViolation for InvalidFormatterSuppressionComment {
 }
 
 /// RUF028
-pub(crate) fn ignored_formatter_suppression_comment(checker: &Checker, suite: &ast::Suite) {
+pub(crate) fn ignored_formatter_suppression_comment(checker: &Checker, suite: Suite<'_>) {
     let locator = checker.locator();
     let comment_ranges: SmallVec<[SuppressionComment; 8]> = checker
         .comment_ranges()
@@ -145,17 +146,17 @@ impl<'src, 'loc> UselessSuppressionComments<'src, 'loc> {
 
         if comment.kind == SuppressionKind::Off || comment.kind == SuppressionKind::On {
             if let Some(
-                AnyNodeRef::StmtClassDef(StmtClassDef {
+                ast::AnyFields::StmtClassDef(ast::StmtClassDefFields {
                     name,
                     decorator_list,
                     ..
                 })
-                | AnyNodeRef::StmtFunctionDef(StmtFunctionDef {
+                | ast::AnyFields::StmtFunctionDef(ast::StmtFunctionDefFields {
                     name,
                     decorator_list,
                     ..
                 }),
-            ) = comment.enclosing
+            ) = comment.enclosing.map(SyntaxNode::fields)
             {
                 if comment.line_position.is_own_line() && comment.range.start() < name.start() {
                     if let Some(decorator) = decorator_list.first() {
@@ -253,103 +254,103 @@ impl Display for IgnoredReason {
 }
 
 /// Checks if an enclosing node is allowed to enclose a suppression comment.
-const fn is_valid_enclosing_node(node: AnyNodeRef) -> bool {
-    match node {
-        AnyNodeRef::ModModule(_)
-        | AnyNodeRef::ModExpression(_)
-        | AnyNodeRef::StmtFunctionDef(_)
-        | AnyNodeRef::StmtClassDef(_)
-        | AnyNodeRef::StmtReturn(_)
-        | AnyNodeRef::StmtDelete(_)
-        | AnyNodeRef::StmtTypeAlias(_)
-        | AnyNodeRef::StmtAssign(_)
-        | AnyNodeRef::StmtAugAssign(_)
-        | AnyNodeRef::StmtAnnAssign(_)
-        | AnyNodeRef::StmtFor(_)
-        | AnyNodeRef::StmtWhile(_)
-        | AnyNodeRef::StmtIf(_)
-        | AnyNodeRef::StmtWith(_)
-        | AnyNodeRef::StmtMatch(_)
-        | AnyNodeRef::StmtRaise(_)
-        | AnyNodeRef::StmtTry(_)
-        | AnyNodeRef::StmtAssert(_)
-        | AnyNodeRef::StmtImport(_)
-        | AnyNodeRef::StmtImportFrom(_)
-        | AnyNodeRef::StmtGlobal(_)
-        | AnyNodeRef::StmtNonlocal(_)
-        | AnyNodeRef::StmtExpr(_)
-        | AnyNodeRef::StmtPass(_)
-        | AnyNodeRef::StmtBreak(_)
-        | AnyNodeRef::StmtContinue(_)
-        | AnyNodeRef::StmtIpyEscapeCommand(_)
-        | AnyNodeRef::ExceptHandlerExceptHandler(_)
-        | AnyNodeRef::MatchCase(_)
-        | AnyNodeRef::Decorator(_)
-        | AnyNodeRef::ElifElseClause(_) => true,
+fn is_valid_enclosing_node(node: SyntaxNode) -> bool {
+    match node.classify() {
+        AnyKind::ModModule(_)
+        | AnyKind::ModExpression(_)
+        | AnyKind::StmtFunctionDef(_)
+        | AnyKind::StmtClassDef(_)
+        | AnyKind::StmtReturn(_)
+        | AnyKind::StmtDelete(_)
+        | AnyKind::StmtTypeAlias(_)
+        | AnyKind::StmtAssign(_)
+        | AnyKind::StmtAugAssign(_)
+        | AnyKind::StmtAnnAssign(_)
+        | AnyKind::StmtFor(_)
+        | AnyKind::StmtWhile(_)
+        | AnyKind::StmtIf(_)
+        | AnyKind::StmtWith(_)
+        | AnyKind::StmtMatch(_)
+        | AnyKind::StmtRaise(_)
+        | AnyKind::StmtTry(_)
+        | AnyKind::StmtAssert(_)
+        | AnyKind::StmtImport(_)
+        | AnyKind::StmtImportFrom(_)
+        | AnyKind::StmtGlobal(_)
+        | AnyKind::StmtNonlocal(_)
+        | AnyKind::StmtExpr(_)
+        | AnyKind::StmtPass(_)
+        | AnyKind::StmtBreak(_)
+        | AnyKind::StmtContinue(_)
+        | AnyKind::StmtIpyEscapeCommand(_)
+        | AnyKind::ExceptHandlerExceptHandler(_)
+        | AnyKind::MatchCase(_)
+        | AnyKind::Decorator(_)
+        | AnyKind::ElifElseClause(_) => true,
 
-        AnyNodeRef::ExprBoolOp(_)
-        | AnyNodeRef::ExprNamed(_)
-        | AnyNodeRef::ExprBinOp(_)
-        | AnyNodeRef::ExprUnaryOp(_)
-        | AnyNodeRef::ExprLambda(_)
-        | AnyNodeRef::ExprIf(_)
-        | AnyNodeRef::ExprDict(_)
-        | AnyNodeRef::DictItem(_)
-        | AnyNodeRef::ExprSet(_)
-        | AnyNodeRef::ExprListComp(_)
-        | AnyNodeRef::ExprSetComp(_)
-        | AnyNodeRef::ExprDictComp(_)
-        | AnyNodeRef::ExprGenerator(_)
-        | AnyNodeRef::ExprAwait(_)
-        | AnyNodeRef::ExprYield(_)
-        | AnyNodeRef::ExprYieldFrom(_)
-        | AnyNodeRef::ExprCompare(_)
-        | AnyNodeRef::ExprCall(_)
-        | AnyNodeRef::InterpolatedElement(_)
-        | AnyNodeRef::InterpolatedStringLiteralElement(_)
-        | AnyNodeRef::InterpolatedStringFormatSpec(_)
-        | AnyNodeRef::ExprFString(_)
-        | AnyNodeRef::ExprTString(_)
-        | AnyNodeRef::ExprStringLiteral(_)
-        | AnyNodeRef::ExprBytesLiteral(_)
-        | AnyNodeRef::ExprNumberLiteral(_)
-        | AnyNodeRef::ExprBooleanLiteral(_)
-        | AnyNodeRef::ExprNoneLiteral(_)
-        | AnyNodeRef::ExprEllipsisLiteral(_)
-        | AnyNodeRef::ExprAttribute(_)
-        | AnyNodeRef::ExprSubscript(_)
-        | AnyNodeRef::ExprStarred(_)
-        | AnyNodeRef::ExprName(_)
-        | AnyNodeRef::ExprList(_)
-        | AnyNodeRef::ExprTuple(_)
-        | AnyNodeRef::ExprSlice(_)
-        | AnyNodeRef::ExprIpyEscapeCommand(_)
-        | AnyNodeRef::PatternMatchValue(_)
-        | AnyNodeRef::PatternMatchSingleton(_)
-        | AnyNodeRef::PatternMatchSequence(_)
-        | AnyNodeRef::PatternMatchMapping(_)
-        | AnyNodeRef::PatternMatchClass(_)
-        | AnyNodeRef::PatternMatchStar(_)
-        | AnyNodeRef::PatternMatchAs(_)
-        | AnyNodeRef::PatternMatchOr(_)
-        | AnyNodeRef::PatternArguments(_)
-        | AnyNodeRef::PatternKeyword(_)
-        | AnyNodeRef::Comprehension(_)
-        | AnyNodeRef::Arguments(_)
-        | AnyNodeRef::Parameters(_)
-        | AnyNodeRef::Parameter(_)
-        | AnyNodeRef::ParameterWithDefault(_)
-        | AnyNodeRef::Keyword(_)
-        | AnyNodeRef::Alias(_)
-        | AnyNodeRef::WithItem(_)
-        | AnyNodeRef::TypeParams(_)
-        | AnyNodeRef::TypeParamTypeVar(_)
-        | AnyNodeRef::TypeParamTypeVarTuple(_)
-        | AnyNodeRef::TypeParamParamSpec(_)
-        | AnyNodeRef::FString(_)
-        | AnyNodeRef::TString(_)
-        | AnyNodeRef::StringLiteral(_)
-        | AnyNodeRef::BytesLiteral(_)
-        | AnyNodeRef::Identifier(_) => false,
+        AnyKind::ExprBoolOp(_)
+        | AnyKind::ExprNamed(_)
+        | AnyKind::ExprBinOp(_)
+        | AnyKind::ExprUnaryOp(_)
+        | AnyKind::ExprLambda(_)
+        | AnyKind::ExprIf(_)
+        | AnyKind::ExprDict(_)
+        | AnyKind::ExprSet(_)
+        | AnyKind::ExprListComp(_)
+        | AnyKind::ExprSetComp(_)
+        | AnyKind::ExprDictComp(_)
+        | AnyKind::ExprGenerator(_)
+        | AnyKind::ExprAwait(_)
+        | AnyKind::ExprYield(_)
+        | AnyKind::ExprYieldFrom(_)
+        | AnyKind::ExprCompare(_)
+        | AnyKind::ExprCall(_)
+        | AnyKind::InterpolatedElement(_)
+        | AnyKind::InterpolatedStringLiteralElement(_)
+        | AnyKind::InterpolatedStringFormatSpec(_)
+        | AnyKind::ExprFString(_)
+        | AnyKind::ExprTString(_)
+        | AnyKind::ExprStringLiteral(_)
+        | AnyKind::ExprBytesLiteral(_)
+        | AnyKind::ExprNumberLiteral(_)
+        | AnyKind::ExprBooleanLiteral(_)
+        | AnyKind::ExprNoneLiteral(_)
+        | AnyKind::ExprEllipsisLiteral(_)
+        | AnyKind::ExprAttribute(_)
+        | AnyKind::ExprSubscript(_)
+        | AnyKind::ExprStarred(_)
+        | AnyKind::ExprName(_)
+        | AnyKind::ExprList(_)
+        | AnyKind::ExprTuple(_)
+        | AnyKind::ExprSlice(_)
+        | AnyKind::ExprIpyEscapeCommand(_)
+        | AnyKind::PatternMatchValue(_)
+        | AnyKind::PatternMatchSingleton(_)
+        | AnyKind::PatternMatchSequence(_)
+        | AnyKind::PatternMatchMapping(_)
+        | AnyKind::PatternMatchClass(_)
+        | AnyKind::PatternMatchStar(_)
+        | AnyKind::PatternMatchAs(_)
+        | AnyKind::PatternMatchOr(_)
+        | AnyKind::PatternArguments(_)
+        | AnyKind::PatternKeyword(_)
+        | AnyKind::Comprehension(_)
+        | AnyKind::Arguments(_)
+        | AnyKind::Parameters(_)
+        | AnyKind::Parameter(_)
+        | AnyKind::ParameterWithDefault(_)
+        | AnyKind::DictItem(_)
+        | AnyKind::Keyword(_)
+        | AnyKind::Alias(_)
+        | AnyKind::WithItem(_)
+        | AnyKind::TypeParams(_)
+        | AnyKind::TypeParamTypeVar(_)
+        | AnyKind::TypeParamTypeVarTuple(_)
+        | AnyKind::TypeParamParamSpec(_)
+        | AnyKind::FString(_)
+        | AnyKind::TString(_)
+        | AnyKind::StringLiteral(_)
+        | AnyKind::BytesLiteral(_)
+        | AnyKind::Identifier(_) => false,
     }
 }

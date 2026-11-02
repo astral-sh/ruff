@@ -1,6 +1,6 @@
 use compact_str::ToCompactString;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, PythonVersion};
+use ruff_python_ast::{self as ast, ExprKind, NodeList, PythonVersion};
 use rustc_hash::FxHashSet;
 
 use ty_python_core::definition::Definition;
@@ -294,20 +294,17 @@ fn apply_generated_type_mixin_member_values<'db>(
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(crate) fn infer_enum_call_expression(
         &mut self,
-        call_expr: &ast::ExprCall,
+        call_expr: ast::ExprCall<'_>,
         definition: Option<Definition<'db>>,
         base_class: KnownClass,
     ) -> Option<Type<'db>> {
         let db = self.db();
-        let ast::Arguments {
-            args,
-            keywords,
-            range: _,
-            node_index: _,
-        } = &call_expr.arguments;
+        let arguments_node = call_expr.arguments();
+        let args = arguments_node.args();
+        let keywords = arguments_node.keywords();
 
         for kw in keywords {
-            let Some(name) = &kw.arg else {
+            let Some(name) = kw.arg() else {
                 continue;
             };
             let env = self.program_environment();
@@ -322,10 +319,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
 
-        let value_kw = call_expr.arguments.find_keyword("value");
-        let names_kw = call_expr.arguments.find_keyword("names");
-        let start_kw = call_expr.arguments.find_keyword("start");
-        let type_kw = call_expr.arguments.find_keyword("type");
+        let value_kw = call_expr.arguments().find_keyword("value");
+        let names_kw = call_expr.arguments().find_keyword("names");
+        let start_kw = call_expr.arguments().find_keyword("start");
+        let type_kw = call_expr.arguments().find_keyword("type");
 
         let has_positional_keyword_conflict =
             (!args.is_empty() && value_kw.is_some()) || (args.len() >= 2 && names_kw.is_some());
@@ -352,11 +349,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
         }
 
-        let (name_arg, names_arg): (Option<&ast::Expr>, Option<&ast::Expr>) = match &**args {
-            [name, names, ..] => (Some(name), Some(names)),
-            [name] => (Some(name), names_kw.map(|kw| &kw.value)),
-            [] => (value_kw.map(|kw| &kw.value), names_kw.map(|kw| &kw.value)),
-        };
+        let name_arg = args.first().or_else(|| value_kw.map(ast::Keyword::value));
+        let names_arg = args.get(1).or_else(|| names_kw.map(ast::Keyword::value));
 
         let name_arg = name_arg?;
         let env = self.program_environment();
@@ -366,15 +360,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_expression(arg, TypeContext::default());
             }
             for kw in keywords {
-                self.infer_expression(&kw.value, TypeContext::default());
+                self.infer_expression(kw.value(), TypeContext::default());
             }
 
             self.infer_enum_name_argument(name_arg, base_class);
             if let Some(keyword) = start_kw {
-                self.infer_enum_start_argument(&keyword.value);
+                self.infer_enum_start_argument(keyword.value());
             }
             if let Some(keyword) = type_kw {
-                self.infer_enum_mixin_argument(&keyword.value, base_class);
+                self.infer_enum_mixin_argument(keyword.value(), base_class);
             }
 
             let python_version = self.program_environment().python_version(db);
@@ -392,14 +386,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.infer_expression(arg, TypeContext::default());
         }
         for kw in keywords {
-            self.infer_expression(&kw.value, TypeContext::default());
+            self.infer_expression(kw.value(), TypeContext::default());
         }
 
         let start = start_kw.map_or(EnumStart::Literal(1), |kw| {
-            self.infer_enum_start_argument(&kw.value)
+            self.infer_enum_start_argument(kw.value())
         });
         let (mixin_type, valid_mixin_type) = type_kw.map_or((None, true), |kw| {
-            self.infer_enum_mixin_argument(&kw.value, base_class)
+            self.infer_enum_mixin_argument(kw.value(), base_class)
         });
 
         // Only 1 extra positional arg is allowed (the `names` parameter).
@@ -408,7 +402,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if has_too_many_positional
             && let Some(builder) = self
                 .context
-                .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, &args[2])
+                .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, args.at(2))
         {
             builder.into_diagnostic(format_args!(
                 "Too many positional arguments to function `{base_name}`: expected 2, got {}",
@@ -469,7 +463,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     fn infer_enum_name_argument(
         &mut self,
-        name_arg: &ast::Expr,
+        name_arg: ast::Expr<'_>,
         base_class: KnownClass,
     ) -> Option<&'db str> {
         let db = self.db();
@@ -495,7 +489,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         Some(name_literal.value(db))
     }
 
-    fn infer_enum_start_argument(&mut self, value: &ast::Expr) -> EnumStart {
+    fn infer_enum_start_argument(&mut self, value: ast::Expr<'_>) -> EnumStart {
         let db = self.db();
         let ty = self.expression_type(value);
         if let Some(literal) = ty.as_int_literal() {
@@ -519,7 +513,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     fn infer_enum_mixin_argument(
         &mut self,
-        value: &ast::Expr,
+        value: ast::Expr<'_>,
         base_class: KnownClass,
     ) -> (Option<Type<'db>>, bool) {
         let db = self.db();
@@ -572,7 +566,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     fn infer_enum_spec(
         &mut self,
-        names_arg: &ast::Expr,
+        names_arg: ast::Expr<'_>,
         start: EnumStart,
         base_class: KnownClass,
         mixin_type: Option<Type<'db>>,
@@ -631,7 +625,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     fn create_dynamic_enum_anchor(
         &mut self,
-        call_expr: &ast::ExprCall,
+        call_expr: ast::ExprCall<'_>,
         definition: Option<Definition<'db>>,
         spec: EnumSpec<'db>,
     ) -> DynamicEnumAnchor<'db> {
@@ -654,7 +648,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// - `{"RED": 1, "GREEN": 2}` (dict mapping)
     fn parse_enum_members_arg(
         &mut self,
-        names_arg: &ast::Expr,
+        names_arg: ast::Expr<'_>,
         start: EnumStart,
         base_class: KnownClass,
     ) -> EnumMembersArgParseResult<'db> {
@@ -675,16 +669,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             });
         }
 
-        let elts = match names_arg {
-            ast::Expr::List(list) => Some(list.elts.as_slice()),
-            ast::Expr::Tuple(tup) => Some(tup.elts.as_slice()),
+        let elts = match names_arg.classify() {
+            ExprKind::List(list) => Some(list.elts()),
+            ExprKind::Tuple(tup) => Some(tup.elts()),
             _ => None,
         };
         if let Some(elts) = elts {
             return self.parse_enum_members_from_sequence(elts, start, base_class);
         }
 
-        if let ast::Expr::Dict(dict) = names_arg {
+        if let ExprKind::Dict(dict) = names_arg.classify() {
             return self.parse_enum_members_from_dict(dict, base_class);
         }
 
@@ -698,7 +692,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     fn parse_enum_members_from_sequence(
         &mut self,
-        elts: &[ast::Expr],
+        elts: NodeList<'_, ast::kind::Expr>,
         start: EnumStart,
         base_class: KnownClass,
     ) -> EnumMembersArgParseResult<'db> {
@@ -709,7 +703,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut has_opaque_members = false;
 
         for elt in elts {
-            if matches!(elt, ast::Expr::Starred(_)) {
+            if matches!(elt.classify(), ExprKind::Starred(_)) {
                 return EnumMembersArgParseResult::Invalid;
             }
             match self.classify_sequence_enum_member(elt) {
@@ -788,16 +782,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// `Enum("E", {"A": 10, "B": auto()})` gives `B.value == 11`.
     fn parse_enum_members_from_dict(
         &mut self,
-        dict: &ast::ExprDict,
+        dict: ast::ExprDict<'_>,
         base_class: KnownClass,
     ) -> EnumMembersArgParseResult<'db> {
         let db = self.db();
-        let mut members = Vec::with_capacity(dict.items.len());
+        let mut members = Vec::with_capacity(dict.items().len());
         let mut last_int_value = Some(0);
         let mut has_opaque_keys = false;
         let env = self.program_environment();
-        for item in &dict.items {
-            let Some(key) = &item.key else {
+        for item in dict.items() {
+            let Some(key) = item.key() else {
                 return EnumMembersArgParseResult::Invalid;
             };
             let key_ty = self.expression_type(key);
@@ -811,7 +805,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 return EnumMembersArgParseResult::Invalid;
             };
             let name = Name::new(string_lit.value(db));
-            let raw_value = self.expression_type(&item.value);
+            let raw_value = self.expression_type(item.value());
             let value = if raw_value.is_instance_of(db, KnownClass::Auto) {
                 next_auto_value(&self.context, base_class, name.as_str(), last_int_value)
             } else {
@@ -831,15 +825,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     /// Extract a `(name, value)` pair from a tuple element like `("RED", 1)`.
-    fn parse_explicit_enum_member(&mut self, elt: &ast::Expr) -> Option<(Name, Type<'db>)> {
-        let pair = match elt {
-            ast::Expr::Tuple(tup) => &tup.elts,
-            ast::Expr::List(list) => &list.elts,
+    fn parse_explicit_enum_member(&mut self, elt: ast::Expr<'_>) -> Option<(Name, Type<'db>)> {
+        let pair = match elt.classify() {
+            ExprKind::Tuple(tup) => tup.elts(),
+            ExprKind::List(list) => list.elts(),
             _ => return None,
         };
-        let [name_expr, value_expr] = &**pair else {
-            return None;
-        };
+        let [name_expr, value_expr] = pair.as_array()?;
         let db = self.db();
         let name_ty = self.expression_type(name_expr);
         let name = Name::new(name_ty.as_string_literal()?.value(db));
@@ -851,14 +843,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///
     /// This is used when the name position is not a known string literal, but
     /// is still compatible with `str`.
-    fn is_potential_explicit_enum_member(&mut self, elt: &ast::Expr) -> bool {
+    fn is_potential_explicit_enum_member(&mut self, elt: ast::Expr<'_>) -> bool {
         let db = self.db();
-        let pair = match elt {
-            ast::Expr::Tuple(tup) => &tup.elts,
-            ast::Expr::List(list) => &list.elts,
+        let pair = match elt.classify() {
+            ExprKind::Tuple(tup) => tup.elts(),
+            ExprKind::List(list) => list.elts(),
             _ => return false,
         };
-        let [name_expr, _value_expr] = &**pair else {
+        let Some([name_expr, _value_expr]) = pair.as_array() else {
             return false;
         };
         let name_ty = self.expression_type(name_expr);
@@ -871,7 +863,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///
     /// This distinguishes between known names, opaque names, known explicit
     /// pairs, opaque explicit pairs, and definitely invalid elements.
-    fn classify_sequence_enum_member(&mut self, elt: &ast::Expr) -> SequenceEnumMember<'db> {
+    fn classify_sequence_enum_member(&mut self, elt: ast::Expr<'_>) -> SequenceEnumMember<'db> {
         let db = self.db();
         let ty = self.expression_type(elt);
         if let Some(string_lit) = ty.as_string_literal() {
@@ -892,7 +884,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     fn report_invalid_enum_names_argument(
         &mut self,
-        names_arg: &ast::Expr,
+        names_arg: ast::Expr<'_>,
         base_class: KnownClass,
     ) {
         let db = self.db();

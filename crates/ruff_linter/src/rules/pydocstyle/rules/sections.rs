@@ -1903,11 +1903,11 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
 
     // If this is a non-static method, skip `cls` or `self`.
     for parameter in function
-        .parameters
+        .parameters()
         .iter_non_variadic_params()
         .skip(usize::from(
             docstring.definition.is_method()
-                && !is_staticmethod(&function.decorator_list, checker.semantic()),
+                && !is_staticmethod(function.decorator_list(), checker.semantic()),
         ))
     {
         let arg_name = parameter.name().as_str();
@@ -1919,8 +1919,8 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
     // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
     // single or double star, respectively.
     if !checker.settings().pydocstyle.ignore_var_parameters() {
-        if let Some(arg) = function.parameters.vararg.as_ref() {
-            let arg_name = arg.name.as_str();
+        if let Some(arg) = function.parameters().vararg() {
+            let arg_name = arg.name().as_str();
             let starred_arg_name = format!("*{arg_name}");
             if !arg_name.starts_with('_')
                 && !docstrings_args.contains(arg_name)
@@ -1929,10 +1929,10 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
                 missing_arg_names.insert(starred_arg_name);
             }
         }
-        if let Some(arg) = function.parameters.kwarg.as_ref()
+        if let Some(arg) = function.parameters().kwarg()
             && !has_unpack_annotation(checker, arg)
         {
-            let arg_name = arg.name.as_str();
+            let arg_name = arg.name().as_str();
             let starred_arg_name = format!("**{arg_name}");
             if !arg_name.starts_with('_')
                 && !docstrings_args.contains(arg_name)
@@ -1958,8 +1958,8 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
 }
 
 /// Returns `true` if the parameter is annotated with `typing.Unpack`
-fn has_unpack_annotation(checker: &Checker, parameter: &Parameter) -> bool {
-    parameter.annotation.as_ref().is_some_and(|annotation| {
+fn has_unpack_annotation(checker: &Checker, parameter: Parameter<'_>) -> bool {
+    parameter.annotation().is_some_and(|annotation| {
         checker
             .semantic()
             .match_typing_expr(map_subscript(annotation), "Unpack")

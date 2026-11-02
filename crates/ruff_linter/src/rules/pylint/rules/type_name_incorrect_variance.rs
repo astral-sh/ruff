@@ -2,7 +2,7 @@ use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_true;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -68,18 +68,17 @@ impl Violation for TypeNameIncorrectVariance {
 }
 
 /// PLC0105
-pub(crate) fn type_name_incorrect_variance(checker: &Checker, value: &Expr) {
+pub(crate) fn type_name_incorrect_variance(checker: &Checker, value: Expr<'_>) {
     // If the typing modules were never imported, we'll never match below.
     if !checker.semantic().seen_typing() {
         return;
     }
 
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = value
-    else {
+    let ExprKind::Call(call) = value.classify() else {
         return;
     };
+    let func = call.func();
+    let arguments = call.arguments();
 
     let Some(param_name) = type_param_name(arguments) else {
         return;
@@ -87,11 +86,11 @@ pub(crate) fn type_name_incorrect_variance(checker: &Checker, value: &Expr) {
 
     let covariant = arguments
         .find_keyword("covariant")
-        .map(|keyword| &keyword.value);
+        .map(ruff_python_ast::Keyword::value);
 
     let contravariant = arguments
         .find_keyword("contravariant")
-        .map(|keyword| &keyword.value);
+        .map(ruff_python_ast::Keyword::value);
 
     if !mismatch(param_name, covariant, contravariant) {
         return;
@@ -142,7 +141,11 @@ pub(crate) fn type_name_incorrect_variance(checker: &Checker, value: &Expr) {
 }
 
 /// Returns `true` if the parameter name does not match its type variance.
-fn mismatch(param_name: &str, covariant: Option<&Expr>, contravariant: Option<&Expr>) -> bool {
+fn mismatch(
+    param_name: &str,
+    covariant: Option<Expr<'_>>,
+    contravariant: Option<Expr<'_>>,
+) -> bool {
     if param_name.ends_with("_co") {
         covariant.is_none_or(|covariant| !is_const_true(covariant))
     } else if param_name.ends_with("_contra") {
@@ -153,7 +156,7 @@ fn mismatch(param_name: &str, covariant: Option<&Expr>, contravariant: Option<&E
 }
 
 /// Return the variance of the type parameter.
-fn variance(covariant: Option<&Expr>, contravariant: Option<&Expr>) -> VarVariance {
+fn variance(covariant: Option<Expr<'_>>, contravariant: Option<Expr<'_>>) -> VarVariance {
     match (
         covariant.map(is_const_true),
         contravariant.map(is_const_true),

@@ -48,7 +48,7 @@ use ruff_db::files::{File, FilePath, FileRootKind, directory_listing, system_pat
 use ruff_db::source::source_text;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_python_ast::{self as ast, PySourceType};
+use ruff_python_ast::{Expr, ExprCall, ExprKind, NodeList, PySourceType, StmtImportFrom, StmtKind};
 
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
@@ -85,7 +85,7 @@ pub fn resolve_module<'db>(
 pub fn resolve_module_for_import_from<'db>(
     db: &'db dyn Db,
     importing_file: ImportingFile<'db>,
-    import: &ast::StmtImportFrom,
+    import: StmtImportFrom<'_>,
 ) -> Option<Module<'db>> {
     let module_name = ModuleName::from_import_statement(db, importing_file, import).ok()?;
     resolve_module(db, importing_file, &module_name)
@@ -1669,151 +1669,88 @@ fn has_legacy_namespace_declaration(db: &dyn Db, init: PythonFile<'_>) -> bool {
     // The downside is if you write slightly different syntax we will fail to detect the idiom,
     // but hey, this is better than nothing!
     let parsed = ruff_db::parsed::parsed_module(db, init);
-    parsed.load(db).suite().iter().any(|stmt| match stmt {
-        ast::Stmt::Assign(assign) => is_pkgutil_extend_path(&assign.targets, &assign.value),
-        ast::Stmt::Expr(stmt) => is_pkg_resources_declare_namespace(&stmt.value),
+    parsed
+        .load(db)
+        .suite()
+        .iter()
+        .any(|stmt| match stmt.classify() {
+            StmtKind::Assign(assign) => is_pkgutil_extend_path(assign.targets(), assign.value()),
+            StmtKind::Expr(stmt) => is_pkg_resources_declare_namespace(stmt.value()),
+            _ => false,
+        })
+}
+
+/// Matches `__path__ = pkgutil.extend_path(__path__, __name__)`, including the
+/// form that uses `__import__("pkgutil")` to obtain the module.
+fn is_pkgutil_extend_path(
+    targets: NodeList<'_, ruff_python_ast::kind::Expr>,
+    value: Expr<'_>,
+) -> bool {
+    let Some([target]) = targets.as_array() else {
+        return false;
+    };
+    if target
+        .as_name_expr()
+        .is_none_or(|name| name.id() != "__path__")
+    {
+        return false;
+    }
+    let Some(call) = value.as_call_expr() else {
+        return false;
+    };
+    let Some(method) = call.func().as_attribute_expr() else {
+        return false;
+    };
+    if method.attr() != "extend_path" {
+        return false;
+    }
+    let module = method.value();
+    let is_pkgutil = match module.classify() {
+        ExprKind::Name(name) => name.id() == "pkgutil",
+        ExprKind::Call(import) => is_dunder_import(import, "pkgutil"),
         _ => false,
-    })
+    };
+    let args = call.arguments();
+    is_pkgutil
+        && args
+            .find_argument_value("path", 0)
+            .and_then(ruff_python_ast::Expr::as_name_expr)
+            .is_some_and(|name| name.id() == "__path__")
+        && args
+            .find_argument_value("name", 1)
+            .and_then(ruff_python_ast::Expr::as_name_expr)
+            .is_some_and(|name| name.id() == "__name__")
 }
 
-/// Check for `__path__ = pkgutil.extend_path(__path__, __name__)` or
-/// `__path__ = __import__("pkgutil").extend_path(__path__, __name__)`
-fn is_pkgutil_extend_path(targets: &[ast::Expr], value: &ast::Expr) -> bool {
-    let [ast::Expr::Name(maybe_path)] = targets else {
+/// Matches `__import__("pkg_resources").declare_namespace(__name__)`.
+fn is_pkg_resources_declare_namespace(value: Expr<'_>) -> bool {
+    let Some(call) = value.as_call_expr() else {
         return false;
     };
-
-    if &*maybe_path.id != "__path__" {
-        return false;
-    }
-
-    let ast::Expr::Call(ast::ExprCall {
-        func: extend_func,
-        arguments: extend_arguments,
-        ..
-    }) = value
-    else {
+    let Some(method) = call.func().as_attribute_expr() else {
         return false;
     };
-
-    let ast::Expr::Attribute(ast::ExprAttribute {
-        value: maybe_pkg_util,
-        attr: maybe_extend_path,
-        ..
-    }) = &**extend_func
-    else {
-        return false;
-    };
-
-    // Match if the left side of the attribute access is either `__import__("pkgutil")` or `pkgutil`
-    match &**maybe_pkg_util {
-        // __import__("pkgutil").extend_path(__path__, __name__)
-        ast::Expr::Call(ruff_python_ast::ExprCall {
-            func: maybe_import,
-            arguments: import_arguments,
-            ..
-        }) => {
-            let ast::Expr::Name(maybe_import) = &**maybe_import else {
-                return false;
-            };
-
-            if maybe_import.id() != "__import__" {
-                return false;
-            }
-
-            let Some(ast::Expr::StringLiteral(name)) =
-                import_arguments.find_argument_value("name", 0)
-            else {
-                return false;
-            };
-
-            if name.value.to_str() != "pkgutil" {
-                return false;
-            }
-        }
-        // "pkgutil.extend_path(__path__, __name__)"
-        ast::Expr::Name(name) => {
-            if name.id() != "pkgutil" {
-                return false;
-            }
-        }
-        _ => {
-            return false;
-        }
-    }
-
-    // Test that this is an `extend_path(__path__, __name__)` call
-    if maybe_extend_path != "extend_path" {
-        return false;
-    }
-
-    let Some(ast::Expr::Name(path)) = extend_arguments.find_argument_value("path", 0) else {
-        return false;
-    };
-    let Some(ast::Expr::Name(name)) = extend_arguments.find_argument_value("name", 1) else {
-        return false;
-    };
-
-    path.id() == "__path__" && name.id() == "__name__"
+    method.attr() == "declare_namespace"
+        && method
+            .value()
+            .as_call_expr()
+            .is_some_and(|import| is_dunder_import(import, "pkg_resources"))
+        && call
+            .arguments()
+            .find_argument_value("name", 0)
+            .and_then(ruff_python_ast::Expr::as_name_expr)
+            .is_some_and(|name| name.id() == "__name__")
 }
 
-/// Check for `__import__('pkg_resources').declare_namespace(__name__)`
-fn is_pkg_resources_declare_namespace(value: &ast::Expr) -> bool {
-    let ast::Expr::Call(ast::ExprCall {
-        func,
-        arguments: declare_arguments,
-        ..
-    }) = value
-    else {
-        return false;
-    };
-
-    let ast::Expr::Attribute(ast::ExprAttribute {
-        value: maybe_pkg_resources,
-        attr: maybe_declare_namespace,
-        ..
-    }) = &**func
-    else {
-        return false;
-    };
-
-    if maybe_declare_namespace != "declare_namespace" {
-        return false;
-    }
-
-    // Match `__import__("pkg_resources")`
-    let ast::Expr::Call(ast::ExprCall {
-        func: maybe_import,
-        arguments: import_arguments,
-        ..
-    }) = &**maybe_pkg_resources
-    else {
-        return false;
-    };
-
-    let ast::Expr::Name(maybe_import) = &**maybe_import else {
-        return false;
-    };
-
-    if maybe_import.id() != "__import__" {
-        return false;
-    }
-
-    let Some(ast::Expr::StringLiteral(name)) = import_arguments.find_argument_value("name", 0)
-    else {
-        return false;
-    };
-
-    if name.value.to_str() != "pkg_resources" {
-        return false;
-    }
-
-    // Check that the argument is `__name__`
-    let Some(ast::Expr::Name(name_arg)) = declare_arguments.find_argument_value("name", 0) else {
-        return false;
-    };
-
-    name_arg.id() == "__name__"
+fn is_dunder_import(call: ExprCall<'_>, module: &str) -> bool {
+    call.func()
+        .as_name_expr()
+        .is_some_and(|name| name.id() == "__import__")
+        && call
+            .arguments()
+            .find_argument_value("name", 0)
+            .and_then(ruff_python_ast::Expr::as_string_literal_expr)
+            .is_some_and(|name| name.value().to_str() == module)
 }
 
 /// Info about the `py.typed` file for this package

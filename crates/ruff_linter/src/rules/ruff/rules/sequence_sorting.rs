@@ -1,8 +1,3 @@
-/// Utilities for sorting constant lists of string literals.
-///
-/// Examples where these are useful:
-/// - Sorting `__all__` in the global scope,
-/// - Sorting `__slots__` in a class scope
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
@@ -185,16 +180,16 @@ impl SequenceKind {
 ///
 /// 1. The two iterables that are zipped together have the same length; and,
 /// 2. The length of both iterables is >= 2
-struct SequenceElements<'a>(Vec<(&'a &'a str, &'a ast::Expr)>);
+struct SequenceElements<'a>(Vec<(&'a str, ast::Expr<'a>)>);
 
 impl<'a> SequenceElements<'a> {
-    fn new(elements: &'a [&str], elts: &'a [ast::Expr]) -> Self {
+    fn new(elements: &[&'a str], elts: impl ExactSizeIterator<Item = ast::Expr<'a>>) -> Self {
         assert_eq!(elements.len(), elts.len());
         assert!(
             elements.len() >= 2,
             "A sequence with < 2 elements cannot be unsorted"
         );
-        Self(elements.iter().zip(elts).collect())
+        Self(elements.iter().copied().zip(elts).collect())
     }
 
     fn last_item_index(&self) -> usize {
@@ -206,7 +201,7 @@ impl<'a> SequenceElements<'a> {
     fn into_sorted_elts(
         mut self,
         sorting_style: SortingStyle,
-    ) -> impl Iterator<Item = &'a ast::Expr> {
+    ) -> impl Iterator<Item = ast::Expr<'a>> {
         self.0
             .sort_by(|(elem1, _), (elem2, _)| sorting_style.compare(elem1, elem2));
         self.0.into_iter().map(|(_, elt)| elt)
@@ -217,14 +212,14 @@ impl<'a> SequenceElements<'a> {
 /// definition of `__all__` or `__slots__` (etc.),
 /// that can be inserted into the
 /// source code as a `range_replacement` autofix.
-pub(super) fn sort_single_line_elements_sequence(
+pub(super) fn sort_single_line_elements_sequence<'a>(
     kind: SequenceKind,
-    elts: &[ast::Expr],
-    elements: &[&str],
+    elts: impl IntoIterator<Item = ast::Expr<'a>, IntoIter: ExactSizeIterator>,
+    elements: &[&'a str],
     locator: &Locator,
     sorting_style: SortingStyle,
 ) -> String {
-    let element_pairs = SequenceElements::new(elements, elts);
+    let element_pairs = SequenceElements::new(elements, elts.into_iter());
     let last_item_index = element_pairs.last_item_index();
     let (opening_paren, closing_paren) = kind.surrounding_brackets();
     let mut result = String::from(opening_paren);
@@ -262,9 +257,14 @@ pub(super) enum SortClassification<'a> {
 }
 
 impl<'a> SortClassification<'a> {
-    pub(super) fn of_elements(elements: &'a [ast::Expr], sorting_style: SortingStyle) -> Self {
+    pub(super) fn of_elements(
+        elements: impl IntoIterator<Item = ast::Expr<'a>, IntoIter: ExactSizeIterator + Clone>,
+        sorting_style: SortingStyle,
+    ) -> Self {
         // If it's of length less than 2, it has to be sorted already
-        let Some((first, rest @ [_, ..])) = elements.split_first() else {
+        let elements = elements.into_iter();
+        let mut rest = elements.clone();
+        let Some(first) = rest.next().filter(|_| rest.len() != 0) else {
             return Self::Sorted;
         };
 
@@ -274,13 +274,13 @@ impl<'a> SortClassification<'a> {
         let Some(string_node) = first.as_string_literal_expr() else {
             return Self::NotAListOfStringLiterals;
         };
-        let mut current = string_node.value.to_str();
+        let mut current = string_node.value().to_str();
 
         for expr in rest {
             let Some(string_node) = expr.as_string_literal_expr() else {
                 return Self::NotAListOfStringLiterals;
             };
-            let next = string_node.value.to_str();
+            let next = string_node.value().to_str();
             if sorting_style.compare(next, current).is_lt() {
                 // Looks like the sequence was not in fact already sorted!
                 //
@@ -301,7 +301,7 @@ impl<'a> SortClassification<'a> {
                         return Self::NotAListOfStringLiterals;
                     };
                     match string_node.as_single_part_string() {
-                        Some(literal) => items.push(&*literal.value),
+                        Some(literal) => items.push(literal.value()),
                         None => any_implicit_concatenation = true,
                     }
                 }

@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
@@ -64,7 +64,7 @@ impl Violation for DatetimeMinMax {
 }
 
 /// DTZ901
-pub(crate) fn datetime_min_max(checker: &Checker, expr: &Expr) {
+pub(crate) fn datetime_min_max(checker: &Checker, &expr: &Expr<'_>) {
     let semantic = checker.semantic();
 
     if !semantic.seen_module(Modules::DATETIME) {
@@ -97,13 +97,16 @@ fn usage_is_safe(semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    match (parent, grandparent) {
-        (Expr::Attribute(ExprAttribute { attr, .. }), Expr::Call(ExprCall { arguments, .. })) => {
+    match (parent.fields(), grandparent.fields()) {
+        (
+            ast::ExprFields::Attribute(ast::ExprAttributeFields { attr, .. }),
+            ast::ExprFields::Call(ast::ExprCallFields { arguments, .. }),
+        ) => {
             attr == "time"
                 || (attr == "replace"
                     && arguments
                         .find_keyword("tzinfo")
-                        .is_some_and(|keyword| !keyword.value.is_none_literal_expr()))
+                        .is_some_and(|keyword| !keyword.value().is_none_literal_expr()))
         }
         _ => false,
     }

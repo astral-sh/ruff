@@ -3521,7 +3521,9 @@ dependencies = [
  "char_str",
  "compact_str",
  "get-size2",
+ "hashbrown 0.17.1",
  "is-macro",
+ "itertools 0.15.0",
  "memchr",
  "ruff_cache",
  "ruff_macros",
@@ -3533,7 +3535,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "thin-vec",
+ "smallvec",
  "thiserror 2.0.21",
 ]
 
@@ -3650,7 +3652,6 @@ dependencies = [
  "datatest-stable",
  "drop_bomb",
  "get-size2",
- "hashbrown 0.17.1",
  "insta",
  "itertools 0.15.0",
  "memchr",
@@ -4412,9 +4413,6 @@ name = "thin-vec"
 version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4568d7e143ec86d2021c338bae2afa88699e84b8e0af523626654fe6f03a1748"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "thiserror"

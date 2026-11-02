@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, StmtFunctionDef};
+use ruff_python_ast::{self as ast, ExprKind};
+use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -50,29 +51,38 @@ impl Violation for SslWithBadDefaults {
 }
 
 /// S503
-pub(crate) fn ssl_with_bad_defaults(checker: &Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn ssl_with_bad_defaults(
+    checker: &Checker,
+    function_def: &ast::StmtFunctionDefFields<'_>,
+) {
     for default in function_def
         .parameters
         .iter_non_variadic_params()
-        .filter_map(|param| param.default.as_deref())
+        .filter_map(ruff_python_ast::ParameterWithDefault::default)
     {
-        match default {
-            Expr::Name(ast::ExprName { id, range, .. }) if is_insecure_protocol(id.as_str()) => {
+        match default.classify() {
+            ExprKind::Name(expr_name) if is_insecure_protocol(expr_name.id().as_str()) => {
+                let id = expr_name.id();
+                let range = expr_name.range();
+
                 checker.report_diagnostic(
                     SslWithBadDefaults {
                         protocol: id.to_string(),
                     },
-                    *range,
+                    range,
                 );
             }
-            Expr::Attribute(ast::ExprAttribute { attr, range, .. })
-                if is_insecure_protocol(attr.as_str()) =>
+            ExprKind::Attribute(expr_attribute)
+                if is_insecure_protocol(expr_attribute.attr().as_str()) =>
             {
+                let attr = expr_attribute.attr();
+                let range = expr_attribute.range();
+
                 checker.report_diagnostic(
                     SslWithBadDefaults {
                         protocol: attr.to_string(),
                     },
-                    *range,
+                    range,
                 );
             }
             _ => {}

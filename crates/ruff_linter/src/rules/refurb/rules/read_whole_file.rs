@@ -1,15 +1,14 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{
-    self as ast, Expr, Stmt,
-    visitor::{self, Visitor},
-};
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, Builder, Expr, ExprKind, ListId, visitor};
 use ruff_python_codegen::Generator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::fix::syntax;
 use crate::importer::ImportRequest;
 use crate::rules::refurb::helpers::{FileOpen, OpenArgument, find_file_opens};
 use crate::{FixAvailability, Violation};
@@ -82,9 +81,9 @@ impl Violation for ReadWholeFile<'_> {
 }
 
 /// FURB101
-pub(crate) fn read_whole_file(checker: &Checker, with: &ast::StmtWith) {
+pub(crate) fn read_whole_file(checker: &Checker, with: ast::StmtWith<'_>) {
     // `async` check here is more of a precaution.
-    if with.is_async {
+    if with.is_async() {
         return;
     }
 
@@ -96,21 +95,21 @@ pub(crate) fn read_whole_file(checker: &Checker, with: &ast::StmtWith) {
 
     // Then we need to match each `open` operation with exactly one `read` call.
     let mut matcher = ReadMatcher::new(checker, candidates, with);
-    visitor::walk_body(&mut matcher, &with.body);
+    visitor::walk_body(&mut matcher, with.body());
 }
 
 /// AST visitor that matches `open` operations with the corresponding `read` calls.
 struct ReadMatcher<'a, 'b> {
     checker: &'a Checker<'b>,
     candidates: Vec<FileOpen<'a>>,
-    with_stmt: &'a ast::StmtWith,
+    with_stmt: ast::StmtWith<'a>,
 }
 
 impl<'a, 'b> ReadMatcher<'a, 'b> {
     fn new(
         checker: &'a Checker<'b>,
         candidates: Vec<FileOpen<'a>>,
-        with_stmt: &'a ast::StmtWith,
+        with_stmt: ast::StmtWith<'a>,
     ) -> Self {
         Self {
             checker,
@@ -121,7 +120,7 @@ impl<'a, 'b> ReadMatcher<'a, 'b> {
 }
 
 impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&mut self, expr: Expr<'a>) {
         if let Some(read_from) = match_read_call(expr) {
             if let Some(open) = self
                 .candidates
@@ -153,51 +152,37 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
 }
 
 /// Match `x.read()` expression and return expression `x` on success.
-fn match_read_call(expr: &Expr) -> Option<&Expr> {
+fn match_read_call(expr: Expr<'_>) -> Option<Expr<'_>> {
     let call = expr.as_call_expr()?;
-    let attr = call.func.as_attribute_expr()?;
-    let method_name = &attr.attr;
+    let attr = call.func().as_attribute_expr()?;
+    let method_name = attr.attr();
 
     if method_name != "read"
-        || !attr.value.is_name_expr()
-        || !call.arguments.args.is_empty()
-        || !call.arguments.keywords.is_empty()
+        || !attr.value().is_name_expr()
+        || !call.arguments().args().is_empty()
+        || !call.arguments().keywords().is_empty()
     {
         return None;
     }
 
-    Some(&*attr.value)
+    Some(attr.value())
 }
 
 fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> String {
-    let name = ast::ExprName {
-        id: open.mode.pathlib_method(),
-        ctx: ast::ExprContext::Load,
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    let call = ast::ExprCall {
-        func: Box::new(name.into()),
-        arguments: ast::Arguments {
-            args: [].into(),
-            keywords: open.keywords.iter().copied().cloned().collect(),
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        },
-        range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    generator.expr(&call.into())
+    let mut builder = Builder::default();
+    let method = syntax::name(&mut builder, open.mode.pathlib_method());
+    let keywords = builder.copy_nodes(open.keywords.iter().copied());
+    let call = syntax::call_with_keywords(&mut builder, method, ListId::default(), keywords);
+    generator.expr(builder.get(call))
 }
-
 fn generate_fix(
     checker: &Checker,
     open: &FileOpen,
-    expr: &Expr,
-    with_stmt: &ast::StmtWith,
+    expr: Expr<'_>,
+    with_stmt: ast::StmtWith<'_>,
     suggestion: &str,
 ) -> Option<Fix> {
-    if with_stmt.items.len() != 1 {
+    if with_stmt.items().len() != 1 {
         return None;
     }
 
@@ -215,10 +200,18 @@ fn generate_fix(
     // Only replace context managers with a single assignment or annotated assignment in the body.
     // The assignment's RHS must also be the same as the `read` call in `expr`, otherwise this fix
     // would remove the rest of the expression.
-    let replacement = match with_stmt.body.as_slice() {
-        [Stmt::Assign(ast::StmtAssign { targets, value, .. })] if value.range() == expr.range() => {
-            match targets.as_slice() {
-                [Expr::Name(name)] => {
+    let replacement = match with_stmt
+        .body()
+        .as_array()
+        .map(|items| items.map(ast::Stmt::fields))
+    {
+        Some([ast::StmtFields::Assign(ast::StmtAssignFields { targets, value, .. })])
+            if value.range() == expr.range() =>
+        {
+            match targets {
+                args if let Some([expr]) = args.as_array()
+                    && let ExprKind::Name(name) = expr.classify() =>
+                {
                     let target = match open.argument {
                         OpenArgument::Builtin { filename } => {
                             let filename_code = locator.slice(filename.range());
@@ -227,20 +220,22 @@ fn generate_fix(
                         OpenArgument::Pathlib { path } => locator.slice(path.range()).to_string(),
                     };
 
-                    format!("{name} = {target}.{suggestion}", name = name.id)
+                    format!("{name} = {target}.{suggestion}", name = name.id())
                 }
                 _ => return None,
             }
         }
-        [
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                target,
-                annotation,
-                value: Some(value),
-                ..
-            }),
-        ] if value.range() == expr.range() => match target.as_ref() {
-            Expr::Name(name) => {
+        Some(
+            [
+                ast::StmtFields::AnnAssign(ast::StmtAnnAssignFields {
+                    target,
+                    annotation,
+                    value: Some(value),
+                    ..
+                }),
+            ],
+        ) if value.range() == expr.range() => match target.classify() {
+            ExprKind::Name(name) => {
                 let target = match open.argument {
                     OpenArgument::Builtin { filename } => {
                         let filename_code = locator.slice(filename.range());
@@ -251,7 +246,7 @@ fn generate_fix(
 
                 format!(
                     "{var}: {ann} = {target}.{suggestion}",
-                    var = name.id,
+                    var = name.id(),
                     ann = locator.slice(annotation.range())
                 )
             }

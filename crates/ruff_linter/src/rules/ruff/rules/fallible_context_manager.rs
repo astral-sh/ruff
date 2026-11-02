@@ -1,7 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
-use ruff_python_ast::{self as ast, Expr, Stmt, StmtFunctionDef};
+use ruff_python_ast::{
+    self as ast, ExceptHandler, Expr, ExprKind, Stmt, StmtFunctionDef, StmtKind, Suite,
+};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -61,20 +63,20 @@ impl Violation for FallibleContextManager {
 }
 
 /// RUF075
-pub(crate) fn fallible_context_manager(checker: &Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn fallible_context_manager(checker: &Checker, function_def: StmtFunctionDef<'_>) {
     if !has_contextmanager_decorator(checker, function_def) {
         return;
     }
 
     let mut visitor = YieldFinallyVisitor::new(checker);
-    visitor.visit_body_with_terminal(&function_def.body, true);
+    visitor.visit_body_with_terminal(function_def.body(), true);
 }
 
-fn has_contextmanager_decorator(checker: &Checker, function_def: &StmtFunctionDef) -> bool {
-    function_def.decorator_list.iter().any(|decorator| {
+fn has_contextmanager_decorator(checker: &Checker, function_def: StmtFunctionDef<'_>) -> bool {
+    function_def.decorator_list().iter().any(|decorator| {
         checker
             .semantic()
-            .resolve_qualified_name(map_callable(&decorator.expression))
+            .resolve_qualified_name(map_callable(decorator.expression()))
             .is_some_and(|qualified_name| {
                 matches!(
                     qualified_name.segments(),
@@ -121,17 +123,16 @@ impl<'a, 'b> YieldFinallyVisitor<'a, 'b> {
 }
 
 impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
-        match stmt {
-            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
+    fn visit_stmt(&mut self, stmt: Stmt<'_>) {
+        match stmt.classify() {
+            StmtKind::FunctionDef(_) | StmtKind::ClassDef(_) => {}
 
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
+            StmtKind::Try(stmt_try) => {
+                let body = stmt_try.body();
+                let handlers = stmt_try.handlers();
+                let orelse = stmt_try.orelse();
+                let finalbody = stmt_try.finalbody();
+
                 // Only the `try` body itself catches exceptions. Yields in
                 // `except` / `else` / `finally` are unprotected, but they
                 // inherit the surrounding terminal position because the
@@ -148,37 +149,38 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
                 self.visit_body_with_terminal(finalbody, terminal);
             }
 
-            Stmt::With(ast::StmtWith { items, body, .. }) => {
+            StmtKind::With(stmt_with) => {
+                let items = stmt_with.items();
+                let body = stmt_with.body();
+
                 for item in items {
-                    self.visit_expr(&item.context_expr);
+                    self.visit_expr(item.context_expr());
                 }
                 self.visit_body_with_terminal(body, true);
             }
 
-            Stmt::If(ast::StmtIf {
-                test,
-                body,
-                elif_else_clauses,
-                ..
-            }) => {
+            StmtKind::If(stmt_if) => {
+                let test = stmt_if.test();
+                let body = stmt_if.body();
+                let elif_else_clauses = stmt_if.elif_else_clauses();
+
                 self.visit_expr(test);
                 let terminal = self.in_terminal_position;
                 self.visit_body_with_terminal(body, terminal);
                 for clause in elif_else_clauses {
-                    if let Some(test) = &clause.test {
+                    if let Some(test) = clause.test() {
                         self.visit_expr(test);
                     }
-                    self.visit_body_with_terminal(&clause.body, terminal);
+                    self.visit_body_with_terminal(clause.body(), terminal);
                 }
             }
 
-            Stmt::For(ast::StmtFor {
-                target,
-                iter,
-                body,
-                orelse,
-                ..
-            }) => {
+            StmtKind::For(stmt_for) => {
+                let target = stmt_for.target();
+                let iter = stmt_for.iter();
+                let body = stmt_for.body();
+                let orelse = stmt_for.orelse();
+
                 self.visit_expr(iter);
                 self.visit_expr(target);
                 let terminal = self.in_terminal_position;
@@ -189,9 +191,11 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
                 self.visit_body_with_terminal(orelse, terminal);
             }
 
-            Stmt::While(ast::StmtWhile {
-                test, body, orelse, ..
-            }) => {
+            StmtKind::While(stmt_while) => {
+                let test = stmt_while.test();
+                let body = stmt_while.body();
+                let orelse = stmt_while.orelse();
+
                 self.visit_expr(test);
                 let terminal = self.in_terminal_position;
                 let prev_loop = self.in_terminal_loop;
@@ -201,14 +205,17 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
                 self.visit_body_with_terminal(orelse, terminal);
             }
 
-            Stmt::Match(ast::StmtMatch { subject, cases, .. }) => {
+            StmtKind::Match(stmt_match) => {
+                let subject = stmt_match.subject();
+                let cases = stmt_match.cases();
+
                 self.visit_expr(subject);
                 let terminal = self.in_terminal_position;
                 for case in cases {
-                    if let Some(guard) = &case.guard {
+                    if let Some(guard) = case.guard() {
                         self.visit_expr(guard);
                     }
-                    self.visit_body_with_terminal(&case.body, terminal);
+                    self.visit_body_with_terminal(case.body(), terminal);
                 }
             }
 
@@ -216,15 +223,15 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
         }
     }
 
-    fn visit_expr(&mut self, expr: &Expr) {
-        match expr {
-            Expr::Yield(_) | Expr::YieldFrom(_) => {
+    fn visit_expr(&mut self, expr: Expr<'_>) {
+        match expr.classify() {
+            ExprKind::Yield(_) | ExprKind::YieldFrom(_) => {
                 if !self.in_protected_try && !self.in_terminal_position {
                     self.checker
                         .report_diagnostic(FallibleContextManager, expr.range());
                 }
             }
-            Expr::Lambda(_) => {}
+            ExprKind::Lambda(_) => {}
             _ => walk_expr(self, expr),
         }
     }
@@ -232,10 +239,12 @@ impl Visitor<'_> for YieldFinallyVisitor<'_, '_> {
 
 impl YieldFinallyVisitor<'_, '_> {
     /// Visits an `except` handler, propagating the surrounding `terminal` flag into its body.
-    fn visit_except_handler_with_terminal(&mut self, handler: &ast::ExceptHandler, terminal: bool) {
-        let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-            type_, body, ..
-        }) = handler;
+    fn visit_except_handler_with_terminal(&mut self, handler: ExceptHandler<'_>, terminal: bool) {
+        let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
+            type_,
+            body,
+            ..
+        }) = handler.fields();
 
         if let Some(type_) = type_ {
             self.visit_expr(type_);
@@ -248,13 +257,13 @@ impl YieldFinallyVisitor<'_, '_> {
     /// A statement is considered terminal if it is the last in the body (when `terminal` is true),
     /// if it is a yield statement immediately followed by a `return`, or if it is a yield
     /// statement immediately followed by a `break` from a terminal loop.
-    fn visit_body_with_terminal(&mut self, body: &[Stmt], terminal: bool) {
+    fn visit_body_with_terminal(&mut self, body: Suite<'_>, terminal: bool) {
         for (i, stmt) in body.iter().enumerate() {
             let is_last = i == body.len() - 1;
             let is_yield_before_terminator = Self::is_yield_statement(stmt)
-                && body.get(i + 1).is_some_and(|next| match next {
-                    Stmt::Return(_) => true,
-                    Stmt::Break(_) => self.in_terminal_loop,
+                && body.get(i + 1).is_some_and(|next| match next.classify() {
+                    StmtKind::Return(_) => true,
+                    StmtKind::Break(_) => self.in_terminal_loop,
                     _ => false,
                 });
 
@@ -266,11 +275,12 @@ impl YieldFinallyVisitor<'_, '_> {
     }
 
     /// Returns `true` if the statement is an expression statement containing a `yield` or `yield from`.
-    fn is_yield_statement(stmt: &Stmt) -> bool {
-        matches!(
-            stmt,
-            Stmt::Expr(ast::StmtExpr { value, .. })
-                if matches!(value.as_ref(), Expr::Yield(_) | Expr::YieldFrom(_))
-        )
+    fn is_yield_statement(stmt: Stmt<'_>) -> bool {
+        stmt.as_expr_stmt().is_some_and(|statement| {
+            matches!(
+                statement.value().classify(),
+                ExprKind::Yield(_) | ExprKind::YieldFrom(_)
+            )
+        })
     }
 }

@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprCall, ExprKind};
 use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_text_size::Ranged;
 
@@ -46,20 +46,20 @@ impl Violation for BlockingOpenCallInAsyncFunction {
 }
 
 /// ASYNC230
-pub(crate) fn blocking_open_call(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn blocking_open_call(checker: &Checker, call: ExprCall<'_>) {
     if !checker.semantic().in_async_context() {
         return;
     }
 
-    if is_open_call(&call.func, checker.semantic())
-        || is_open_call_from_pathlib(call.func.as_ref(), checker.semantic())
+    if is_open_call(call.func(), checker.semantic())
+        || is_open_call_from_pathlib(call.func(), checker.semantic())
     {
-        checker.report_diagnostic(BlockingOpenCallInAsyncFunction, call.func.range());
+        checker.report_diagnostic(BlockingOpenCallInAsyncFunction, call.func().range());
     }
 }
 
 /// Returns `true` if the expression resolves to a blocking open call, like `open` or `Path().open()`.
-fn is_open_call(func: &Expr, semantic: &SemanticModel) -> bool {
+fn is_open_call(func: Expr<'_>, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| {
@@ -71,10 +71,12 @@ fn is_open_call(func: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// Returns `true` if an expression resolves to a call to `pathlib.Path.open`.
-pub(crate) fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func else {
+pub(crate) fn is_open_call_from_pathlib(func: Expr<'_>, semantic: &SemanticModel) -> bool {
+    let ExprKind::Attribute(attribute) = func.classify() else {
         return false;
     };
+    let attr = attribute.attr();
+    let value = attribute.value();
 
     if attr.as_str() != "open" {
         return false;
@@ -85,8 +87,8 @@ pub(crate) fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -
     // from pathlib import Path
     // Path("foo").open()
     // ```
-    if let Expr::Call(call) = value.as_ref() {
-        let Some(qualified_name) = semantic.resolve_qualified_name(call.func.as_ref()) else {
+    if let ExprKind::Call(call) = value.classify() {
+        let Some(qualified_name) = semantic.resolve_qualified_name(call.func()) else {
             return false;
         };
         if qualified_name.segments() == ["pathlib", "Path"] {
@@ -100,7 +102,7 @@ pub(crate) fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -
     // path = Path("foo")
     // path.open()
     // ```
-    let Expr::Name(name) = value.as_ref() else {
+    let ExprKind::Name(name) = value.classify() else {
         return false;
     };
 
@@ -110,11 +112,13 @@ pub(crate) fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -
 
     let binding = semantic.binding(binding_id);
 
-    let Some(Expr::Call(call)) = analyze::typing::find_binding_value(binding, semantic) else {
+    let Some(ExprKind::Call(call)) =
+        analyze::typing::find_binding_value(binding, semantic).map(Expr::classify)
+    else {
         return false;
     };
 
     semantic
-        .resolve_qualified_name(call.func.as_ref())
+        .resolve_qualified_name(call.func())
         .is_some_and(|qualified_name| qualified_name.segments() == ["pathlib", "Path"])
 }

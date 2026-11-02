@@ -1,14 +1,14 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::pep_604_union;
-use ruff_python_ast::{Expr, ExprBinOp, Operator};
+use ruff_python_ast::{Builder, Expr, ExprKind, Operator};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::traverse_union;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits::pad;
+use crate::fix::syntax;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -57,16 +57,17 @@ impl Violation for NoneNotAtEndOfUnion {
 /// Only right-hand unions indicate actual nesting from parenthesization, e.g.
 /// `a | (b | c)`. For `typing.Union`, any tuple element that is itself a union
 /// is considered nested.
-fn has_nested_union(semantic: &SemanticModel, expr: &Expr) -> bool {
-    match expr {
-        Expr::BinOp(ExprBinOp {
-            op: Operator::BitOr,
-            left,
-            right,
-            ..
-        }) => is_union_expr(semantic, right) || has_nested_union(semantic, left),
-        Expr::Subscript(subscript) if semantic.match_typing_expr(&subscript.value, "Union") => {
-            if let Expr::Tuple(tuple) = &*subscript.slice {
+fn has_nested_union(semantic: &SemanticModel, expr: Expr<'_>) -> bool {
+    match expr.classify() {
+        ExprKind::BinOp(expr_bin_op) if expr_bin_op.op() == Operator::BitOr => {
+            let left = expr_bin_op.left();
+            let right = expr_bin_op.right();
+            is_union_expr(semantic, right) || has_nested_union(semantic, left)
+        }
+        ExprKind::Subscript(subscript)
+            if semantic.match_typing_expr(subscript.value(), "Union") =>
+        {
+            if let ExprKind::Tuple(tuple) = subscript.slice().classify() {
                 tuple.iter().any(|elt| is_union_expr(semantic, elt))
             } else {
                 false
@@ -78,37 +79,34 @@ fn has_nested_union(semantic: &SemanticModel, expr: &Expr) -> bool {
 
 /// Returns `true` if `expr` is itself a union type (PEP 604 `|` or
 /// `typing.Union[...]`).
-fn is_union_expr(semantic: &SemanticModel, expr: &Expr) -> bool {
-    match expr {
-        Expr::BinOp(ExprBinOp {
-            op: Operator::BitOr,
-            ..
-        }) => true,
-        Expr::Subscript(subscript) => semantic.match_typing_expr(&subscript.value, "Union"),
+fn is_union_expr(semantic: &SemanticModel, expr: Expr<'_>) -> bool {
+    match expr.classify() {
+        ExprKind::BinOp(expr_bin_op) if expr_bin_op.op() == Operator::BitOr => true,
+        ExprKind::Subscript(subscript) => semantic.match_typing_expr(subscript.value(), "Union"),
         _ => false,
     }
 }
 
 /// RUF036
-pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
+pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, &union: &Expr<'a>) {
     let semantic = checker.semantic();
 
     if !semantic.in_type_definition() {
         return;
     }
 
-    let mut none_exprs: Vec<&Expr> = Vec::new();
-    let mut other_exprs: Vec<&Expr> = Vec::new();
+    let mut none_exprs: Vec<Expr<'_>> = Vec::new();
+    let mut other_exprs: Vec<Expr<'_>> = Vec::new();
 
-    let mut last_expr: Option<&Expr> = None;
+    let mut last_expr: Option<Expr<'_>> = None;
     let mut is_pep604 = false;
 
-    let mut collect_members = |expr: &'a Expr, parent: &'a Expr| {
+    let mut collect_members = |expr: Expr<'a>, parent: Expr<'a>| {
         if !is_pep604 {
-            is_pep604 = matches!(parent, Expr::BinOp(_));
+            is_pep604 = matches!(parent.classify(), ExprKind::BinOp(_));
         }
 
-        if matches!(expr, Expr::NoneLiteral(_)) {
+        if matches!(expr.classify(), ExprKind::NoneLiteral(_)) {
             none_exprs.push(expr);
         } else {
             other_exprs.push(expr);
@@ -151,9 +149,9 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
 
 fn generate_fix(
     checker: &Checker,
-    other_exprs: &[&Expr],
-    none_exprs: &[&Expr],
-    annotation: &Expr,
+    other_exprs: &[Expr<'_>],
+    none_exprs: &[Expr<'_>],
+    annotation: Expr<'_>,
     is_pep604: bool,
 ) -> Option<Fix> {
     let applicability = if checker.semantic().in_typing_only_annotation()
@@ -164,38 +162,20 @@ fn generate_fix(
         Applicability::Unsafe
     };
 
-    let reordered: Vec<Expr> = other_exprs
-        .iter()
-        .chain(none_exprs)
-        .copied()
-        .cloned()
-        .collect();
-
-    let new_expr = if is_pep604 {
-        pep_604_union(&reordered)
+    let mut builder = Builder::default();
+    let reordered = other_exprs.iter().chain(none_exprs).copied();
+    let replacement = if is_pep604 {
+        syntax::pep_604_union(&mut builder, reordered)
     } else {
         // Preserve the original subscript value (e.g., `Union`, `U`, `typing.Union`).
-        let Expr::Subscript(subscript) = annotation else {
-            return None;
-        };
-        Expr::Subscript(ruff_python_ast::ExprSubscript {
-            value: subscript.value.clone(),
-            slice: Box::new(Expr::Tuple(ruff_python_ast::ExprTuple {
-                elts: reordered,
-                ctx: ruff_python_ast::ExprContext::Load,
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                parenthesized: false,
-            })),
-            ctx: ruff_python_ast::ExprContext::Load,
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        })
+        let subscript = annotation.as_subscript_expr()?;
+        let value = builder.copy_node(subscript.value());
+        let elts = builder.copy_nodes(reordered);
+        syntax::subscript_tuple(&mut builder, value, elts)
     };
-
     let edit = Edit::range_replacement(
         pad(
-            checker.generator().expr(&new_expr),
+            checker.generator().expr(builder.get(replacement)),
             annotation.range(),
             checker.locator(),
         ),

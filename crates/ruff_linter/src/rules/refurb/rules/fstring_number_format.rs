@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprCall, Number, PythonVersion, UnaryOp};
+use ruff_python_ast::{self as ast, Expr, ExprKind, Number, PythonVersion, UnaryOp};
 use ruff_source_file::find_newline;
 use ruff_text_size::Ranged;
 
@@ -71,23 +71,19 @@ impl Violation for FStringNumberFormat {
 }
 
 /// FURB116
-pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubscript) {
+pub(crate) fn fstring_number_format(checker: &Checker, subscript: ast::ExprSubscript<'_>) {
     // The slice must be exactly `[2:]`.
-    let Expr::Slice(ast::ExprSlice {
+    let ast::ExprFields::Slice(ast::ExprSliceFields {
         lower: Some(lower),
         upper: None,
         step: None,
         ..
-    }) = subscript.slice.as_ref()
+    }) = subscript.slice().fields()
     else {
         return;
     };
 
-    let Expr::NumberLiteral(ast::ExprNumberLiteral {
-        value: Number::Int(int),
-        ..
-    }) = lower.as_ref()
-    else {
+    let Some(int) = lower.as_int_literal() else {
         return;
     };
 
@@ -96,18 +92,17 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
     }
 
     // The call must be exactly `hex(...)`, `bin(...)`, or `oct(...)`.
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = subscript.value.as_ref()
-    else {
+    let ExprKind::Call(call_node) = subscript.value().classify() else {
         return;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
-    if !arguments.keywords.is_empty() {
+    if !arguments.keywords().is_empty() {
         return;
     }
 
-    let [arg] = &*arguments.args else {
+    let Some([arg]) = arguments.args().as_array() else {
         return;
     };
 
@@ -120,27 +115,24 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
     };
 
     // float and complex numbers are false positives, ignore them.
-    if matches!(
-        arg,
-        Expr::NumberLiteral(ast::ExprNumberLiteral {
-            value: Number::Float(_) | Number::Complex { .. },
-            ..
-        })
-    ) {
+    if arg
+        .as_number_literal_expr()
+        .is_some_and(|number| matches!(number.value(), Number::Float(_) | Number::Complex { .. }))
+    {
         return;
     }
 
     let maybe_number = if let Some(maybe_number) = arg
         .as_unary_op_expr()
-        .filter(|unary_expr| unary_expr.op == UnaryOp::UAdd)
-        .map(|unary_expr| &unary_expr.operand)
+        .filter(|unary_expr| unary_expr.op() == UnaryOp::UAdd)
+        .map(ruff_python_ast::ExprUnaryOp::operand)
     {
         maybe_number
     } else {
         arg
     };
 
-    let applicability = if matches!(maybe_number, Expr::NumberLiteral(_)) {
+    let applicability = if matches!(maybe_number.classify(), ExprKind::NumberLiteral(_)) {
         if checker.comment_ranges().intersects(subscript.range()) {
             Applicability::Unsafe
         } else {
@@ -167,10 +159,13 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
 }
 
 /// Generate a replacement, if possible.
-fn try_create_replacement(checker: &Checker, arg: &Expr, base: Base) -> Option<String> {
+fn try_create_replacement(checker: &Checker, arg: Expr<'_>, base: Base) -> Option<String> {
     if !matches!(
-        arg,
-        Expr::NumberLiteral(_) | Expr::Name(_) | Expr::Attribute(_) | Expr::UnaryOp(_)
+        arg.classify(),
+        ExprKind::NumberLiteral(_)
+            | ExprKind::Name(_)
+            | ExprKind::Attribute(_)
+            | ExprKind::UnaryOp(_)
     ) {
         return None;
     }

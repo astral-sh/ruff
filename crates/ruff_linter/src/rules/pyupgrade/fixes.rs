@@ -1,13 +1,125 @@
-use ruff_python_ast::StmtImportFrom;
 use ruff_python_ast::token::{TokenKind, Tokens};
+use ruff_python_ast::{
+    self as ast, BuildId, Builder, Expr, ListId, NodeList, Stmt, StmtImportFrom, build,
+};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::Locator;
+use crate::checkers::ast::Checker;
+use crate::fix::syntax;
+use crate::{Applicability, Edit, Fix, Locator};
+
+/// Replaces all aliases in an exception tuple with one occurrence of the built-in exception.
+pub(super) fn replace_exception_aliases(
+    checker: &Checker,
+    tuple: ast::ExprTuple<'_>,
+    aliases: &[Expr<'_>],
+    builtin: &str,
+) -> String {
+    let mut builder = Builder::default();
+    let mut remaining = Vec::new();
+    if tuple
+        .iter()
+        .all(|element| !checker.semantic().match_builtin_expr(element, builtin))
+    {
+        remaining.push(syntax::name(&mut builder, builtin));
+    }
+    remaining.extend(
+        tuple
+            .iter()
+            .filter(|element| !aliases.contains(element))
+            .map(|element| builder.copy_node(element)),
+    );
+    if remaining.len() == 1 {
+        return builtin.to_owned();
+    }
+    let elts = builder.list(remaining);
+    let tuple = syntax::tuple(&mut builder, elts);
+    format!("({})", checker.generator().expr(builder.get(tuple)))
+}
+
+pub(super) struct ClassField<'a> {
+    pub(super) name: &'a str,
+    pub(super) annotation: Expr<'a>,
+}
+
+impl<'a> ClassField<'a> {
+    pub(super) fn from_keywords(keywords: NodeList<'a, ast::kind::Keyword>) -> Option<Vec<Self>> {
+        keywords
+            .iter()
+            .map(|keyword| {
+                Some(Self {
+                    name: keyword.arg()?.as_str(),
+                    annotation: keyword.value(),
+                })
+            })
+            .collect()
+    }
+
+    fn into_statement(self, builder: &mut Builder) -> BuildId<ast::kind::Stmt> {
+        let target = syntax::name(builder, self.name);
+        let annotation = builder.copy_node(self.annotation);
+        builder
+            .add(build::StmtAnnAssign {
+                range: TextRange::default(),
+                target,
+                annotation,
+                value: None,
+                simple: true,
+            })
+            .into()
+    }
+}
+/// Convert a functional `NamedTuple` or `TypedDict` declaration to a class definition.
+pub(super) fn functional_to_class_fix(
+    checker: &Checker,
+    stmt: Stmt<'_>,
+    name: &str,
+    base: Expr<'_>,
+    fields: Vec<ClassField<'_>>,
+    keywords: NodeList<'_, ast::kind::Keyword>,
+) -> Fix {
+    let mut builder = Builder::default();
+    let body = if fields.is_empty() {
+        let pass = builder.add(build::StmtPass {
+            range: TextRange::default(),
+        });
+        builder.list([BuildId::<ast::kind::Stmt>::from(pass)])
+    } else {
+        builder.map_list(fields, |builder, field| field.into_statement(builder))
+    };
+    let name = syntax::identifier(&mut builder, name);
+    let args = builder.copy_nodes([base]);
+    let keywords = builder.copy_nodes(keywords);
+    let arguments = builder.add(build::Arguments {
+        range: TextRange::default(),
+        args,
+        keywords,
+    });
+    let class = builder.add(build::StmtClassDef {
+        range: TextRange::default(),
+        name,
+        arguments: Some(arguments),
+        body,
+        type_params: None,
+        decorator_list: ListId::default(),
+    });
+    Fix::applicable_edit(
+        Edit::range_replacement(
+            checker.generator().stmt(builder.get(class).into()),
+            stmt.range(),
+        ),
+        if checker.comment_ranges().intersects(stmt.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        },
+    )
+}
 
 /// Remove any imports matching `members` from an import-from statement.
 pub(crate) fn remove_import_members(
     locator: &Locator<'_>,
-    import_from_stmt: &StmtImportFrom,
+    import_from_stmt: StmtImportFrom<'_>,
     tokens: &Tokens,
     members_to_remove: &[&str],
 ) -> String {
@@ -29,21 +141,21 @@ pub(crate) fn remove_import_members(
     let mut last_pos = import_from_stmt.start();
     let mut is_first = true;
 
-    for (index, member) in import_from_stmt.names.iter().enumerate() {
-        if !members_to_remove.contains(&member.name.as_str()) {
+    for (index, member) in import_from_stmt.names().iter().enumerate() {
+        if !members_to_remove.contains(&member.name().as_str()) {
             is_first = false;
             continue;
         }
 
         let range = if is_first {
             TextRange::new(
-                import_from_stmt.names[index].start(),
-                import_from_stmt.names[index + 1].start(),
+                import_from_stmt.names().at(index).start(),
+                import_from_stmt.names().at(index + 1).start(),
             )
         } else {
             TextRange::new(
                 commas[index - 1].start(),
-                import_from_stmt.names[index].end(),
+                import_from_stmt.names().at(index).end(),
             )
         };
 

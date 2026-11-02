@@ -3,12 +3,12 @@ use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Builder, Expr, ExprKind, NodeList};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::fix::syntax;
 use crate::importer::ImportRequest;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -70,7 +70,7 @@ impl Violation for ReimplementedStarmap {
 /// FURB140
 pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate) {
     // Generator should have exactly one comprehension.
-    let [comprehension] = target.generators() else {
+    let Some([comprehension]) = target.generators().as_array() else {
         return;
     };
 
@@ -100,28 +100,30 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
     match value {
         // Ex) `f(*x) for x in iter`
         ComprehensionTarget::Name(name) => {
-            let [arg] = args else {
+            let Some([arg]) = args.as_array() else {
                 return;
             };
 
-            let Expr::Starred(ast::ExprStarred { value, .. }) = arg else {
+            let ExprKind::Starred(starred) = arg.classify() else {
                 return;
             };
+            let value = starred.value();
 
-            if ComparableExpr::from(value.as_ref()) != ComparableExpr::from(name) {
+            if ComparableExpr::from(value) != ComparableExpr::from(name) {
                 return;
             }
 
             // If the argument is used outside the function call, we can't replace it.
             if any_over_expr(func, |expr| {
-                expr.as_name_expr().is_some_and(|expr| expr.id == name.id)
+                expr.as_name_expr()
+                    .is_some_and(|expr| expr.id() == name.id())
             }) {
                 return;
             }
         }
         // Ex) `f(x, y, z) for x, y, z in iter`
         ComprehensionTarget::Tuple(tuple) => {
-            if tuple.len() != args.len()
+            if tuple.elts().len() != args.len()
                 || std::iter::zip(tuple, args)
                     .any(|(x, y)| ComparableExpr::from(x) != ComparableExpr::from(y))
             {
@@ -152,12 +154,7 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
         // - For list and set comprehensions, we'd want to wrap it with `list` and `set`
         //   correspondingly.
         let main_edit = Edit::range_replacement(
-            target.try_make_suggestion(
-                Name::from(starmap_name),
-                &comprehension.iter,
-                func,
-                checker,
-            )?,
+            target.try_make_suggestion(&starmap_name, comprehension.iter(), func, checker)?,
             target.range(),
         );
 
@@ -178,25 +175,25 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
 /// An enum for a node that can be considered a candidate for replacement with `starmap`.
 #[derive(Debug)]
 pub(crate) enum StarmapCandidate<'a> {
-    Generator(&'a ast::ExprGenerator),
-    ListComp(&'a ast::ExprListComp),
-    SetComp(&'a ast::ExprSetComp),
+    Generator(ast::ExprGenerator<'a>),
+    ListComp(ast::ExprListComp<'a>),
+    SetComp(ast::ExprSetComp<'a>),
 }
 
-impl<'a> From<&'a ast::ExprGenerator> for StarmapCandidate<'a> {
-    fn from(generator: &'a ast::ExprGenerator) -> Self {
+impl<'a> From<ast::ExprGenerator<'a>> for StarmapCandidate<'a> {
+    fn from(generator: ast::ExprGenerator<'a>) -> Self {
         Self::Generator(generator)
     }
 }
 
-impl<'a> From<&'a ast::ExprListComp> for StarmapCandidate<'a> {
-    fn from(list_comp: &'a ast::ExprListComp) -> Self {
+impl<'a> From<ast::ExprListComp<'a>> for StarmapCandidate<'a> {
+    fn from(list_comp: ast::ExprListComp<'a>) -> Self {
         Self::ListComp(list_comp)
     }
 }
 
-impl<'a> From<&'a ast::ExprSetComp> for StarmapCandidate<'a> {
-    fn from(set_comp: &'a ast::ExprSetComp) -> Self {
+impl<'a> From<ast::ExprSetComp<'a>> for StarmapCandidate<'a> {
+    fn from(set_comp: ast::ExprSetComp<'a>) -> Self {
         Self::SetComp(set_comp)
     }
 }
@@ -213,173 +210,84 @@ impl Ranged for StarmapCandidate<'_> {
 
 impl StarmapCandidate<'_> {
     /// Return the generated element for the candidate.
-    fn element(&self) -> &Expr {
+    fn element(&self) -> Expr<'_> {
         match self {
-            Self::Generator(generator) => generator.elt.as_ref(),
-            Self::ListComp(list_comp) => list_comp.elt.as_ref(),
-            Self::SetComp(set_comp) => set_comp.elt.as_ref(),
+            Self::Generator(generator) => generator.elt(),
+            Self::ListComp(list_comp) => list_comp.elt(),
+            Self::SetComp(set_comp) => set_comp.elt(),
         }
     }
 
     /// Return the generator comprehensions for the candidate.
-    fn generators(&self) -> &[ast::Comprehension] {
+    fn generators(&self) -> NodeList<'_, ast::kind::Comprehension> {
         match self {
-            Self::Generator(generator) => generator.generators.as_slice(),
-            Self::ListComp(list_comp) => list_comp.generators.as_slice(),
-            Self::SetComp(set_comp) => set_comp.generators.as_slice(),
+            Self::Generator(generator) => generator.generators(),
+            Self::ListComp(list_comp) => list_comp.generators(),
+            Self::SetComp(set_comp) => set_comp.generators(),
         }
     }
 
-    /// Try to produce a fix suggestion transforming this node into a call to `starmap`.
+    /// Generator expressions become `starmap(func, iter)`. List and set comprehensions wrap the call
+    /// in `list(...)` or `set(...)` to preserve the result type.
     fn try_make_suggestion(
         &self,
-        name: Name,
-        iter: &Expr,
-        func: &Expr,
+        starmap_name: &str,
+        iter: Expr<'_>,
+        func: Expr<'_>,
         checker: &Checker,
     ) -> Result<String> {
-        match self {
-            Self::Generator(_) => {
-                // For generator expressions, we replace:
-                // ```python
-                // (foo(...) for ... in iter)
-                // ```
-                //
-                // with:
-                // ```python
-                // itertools.starmap(foo, iter)
-                // ```
-                let call = construct_starmap_call(name, iter, func);
-                Ok(checker.generator().expr(&call.into()))
-            }
-            Self::ListComp(_) => {
-                // For list comprehensions, we replace:
-                // ```python
-                // [foo(...) for ... in iter]
-                // ```
-                //
-                // with:
-                // ```python
-                // list(itertools.starmap(foo, iter))
-                // ```
-                try_construct_call(name, iter, func, Name::new_static("list"), checker)
-            }
-            Self::SetComp(_) => {
-                // For set comprehensions, we replace:
-                // ```python
-                // {foo(...) for ... in iter}
-                // ```
-                //
-                // with:
-                // ```python
-                // set(itertools.starmap(foo, iter))
-                // ```
-                try_construct_call(name, iter, func, Name::new_static("set"), checker)
-            }
+        let wrapper = match self {
+            Self::Generator(_) => None,
+            Self::ListComp(_) => Some("list"),
+            Self::SetComp(_) => Some("set"),
+        };
+        if let Some(builtin) = wrapper
+            && !checker.semantic().has_builtin_binding(builtin)
+        {
+            bail!("Can't use built-in `{builtin}` constructor");
         }
+
+        let mut builder = Builder::default();
+        let args = builder.copy_nodes([func, iter]);
+        let starmap = syntax::call_name(&mut builder, starmap_name, args);
+        let replacement = if let Some(wrapper) = wrapper {
+            let args = builder.list([starmap]);
+            syntax::call_name(&mut builder, wrapper, args)
+        } else {
+            starmap
+        };
+        Ok(checker.generator().expr(builder.get(replacement)))
     }
 }
-
-/// Try constructing the call to `itertools.starmap` and wrapping it with the given builtin.
-fn try_construct_call(
-    name: Name,
-    iter: &Expr,
-    func: &Expr,
-    builtin: Name,
-    checker: &Checker,
-) -> Result<String> {
-    // We can only do our fix if `builtin` identifier is still bound to
-    // the built-in type.
-    if !checker.semantic().has_builtin_binding(&builtin) {
-        bail!("Can't use built-in `{builtin}` constructor")
-    }
-
-    // In general, we replace:
-    // ```python
-    // foo(...) for ... in iter
-    // ```
-    //
-    // with:
-    // ```python
-    // builtin(itertools.starmap(foo, iter))
-    // ```
-    // where `builtin` is a constructor for a target collection.
-    let call = construct_starmap_call(name, iter, func);
-    let wrapped = wrap_with_call_to(call, builtin);
-    Ok(checker.generator().expr(&wrapped.into()))
-}
-
-/// Construct the call to `itertools.starmap` for suggestion.
-fn construct_starmap_call(starmap_binding: Name, iter: &Expr, func: &Expr) -> ast::ExprCall {
-    let starmap = ast::ExprName {
-        id: starmap_binding,
-        ctx: ast::ExprContext::Load,
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    ast::ExprCall {
-        func: Box::new(starmap.into()),
-        arguments: ast::Arguments {
-            args: [func.clone(), iter.clone()].into(),
-            keywords: std::iter::empty().collect(),
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        },
-        range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    }
-}
-
-/// Wrap given function call with yet another call.
-fn wrap_with_call_to(call: ast::ExprCall, func_name: Name) -> ast::ExprCall {
-    let name = ast::ExprName {
-        id: func_name,
-        ctx: ast::ExprContext::Load,
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    ast::ExprCall {
-        func: Box::new(name.into()),
-        arguments: ast::Arguments {
-            args: [call.into()].into(),
-            keywords: std::iter::empty().collect(),
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        },
-        range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    }
-}
-
 #[derive(Debug)]
 enum ComprehensionTarget<'a> {
     /// E.g., `(x, y, z, ...)` in `(x, y, z, ...) in iter`.
-    Tuple(&'a ast::ExprTuple),
+    Tuple(ast::ExprTuple<'a>),
     /// E.g., `x` in `x in iter`.
-    Name(&'a ast::ExprName),
+    Name(ast::ExprName<'a>),
 }
 
 /// Extract the target from the comprehension (e.g., `(x, y, z)` in `(x, y, z, ...) in iter`).
 fn match_comprehension_target(
-    comprehension: &ast::Comprehension,
+    comprehension: ast::Comprehension<'_>,
 ) -> Option<ComprehensionTarget<'_>> {
-    if comprehension.is_async || !comprehension.ifs.is_empty() {
+    if comprehension.is_async() || !comprehension.ifs().is_empty() {
         return None;
     }
-    match &comprehension.target {
-        Expr::Tuple(tuple) => Some(ComprehensionTarget::Tuple(tuple)),
-        Expr::Name(name) => Some(ComprehensionTarget::Name(name)),
+    match comprehension.target().classify() {
+        ExprKind::Tuple(tuple) => Some(ComprehensionTarget::Tuple(tuple)),
+        ExprKind::Name(name) => Some(ComprehensionTarget::Name(name)),
         _ => None,
     }
 }
 
 /// Match that the given expression is `func(x, y, z, ...)`.
-fn match_call(element: &Expr) -> Option<(&[Expr], &Expr)> {
-    let ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
-    } = element.as_call_expr()?;
+fn match_call(element: Expr<'_>) -> Option<(NodeList<'_, ast::kind::Expr>, Expr<'_>)> {
+    let expr_call = element.as_call_expr()?;
+    let func = expr_call.func();
+    let arguments = expr_call.arguments();
+    let args = arguments.args();
+    let keywords = arguments.keywords();
 
     if !keywords.is_empty() {
         return None;

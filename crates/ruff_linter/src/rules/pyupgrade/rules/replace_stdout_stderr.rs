@@ -61,34 +61,34 @@ impl Violation for ReplaceStdoutStderr {
 }
 
 /// UP022
-pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn replace_stdout_stderr(checker: &Checker, call: ast::ExprCall<'_>) {
     if !checker.semantic().seen_module(Modules::SUBPROCESS) {
         return;
     }
 
     if checker
         .semantic()
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func())
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["subprocess", "run"]))
     {
         // Find `stdout` and `stderr` kwargs.
-        let Some(stdout) = call.arguments.find_keyword("stdout") else {
+        let Some(stdout) = call.arguments().find_keyword("stdout") else {
             return;
         };
-        let Some(stderr) = call.arguments.find_keyword("stderr") else {
+        let Some(stderr) = call.arguments().find_keyword("stderr") else {
             return;
         };
 
         // Verify that they're both set to `subprocess.PIPE`.
         if !checker
             .semantic()
-            .resolve_qualified_name(&stdout.value)
+            .resolve_qualified_name(stdout.value())
             .is_some_and(|qualified_name| {
                 matches!(qualified_name.segments(), ["subprocess", "PIPE"])
             })
             || !checker
                 .semantic()
-                .resolve_qualified_name(&stderr.value)
+                .resolve_qualified_name(stderr.value())
                 .is_some_and(|qualified_name| {
                     matches!(qualified_name.segments(), ["subprocess", "PIPE"])
                 })
@@ -97,7 +97,7 @@ pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCall) {
         }
 
         let mut diagnostic = checker.report_diagnostic(ReplaceStdoutStderr, call.range());
-        if call.arguments.find_keyword("capture_output").is_none() {
+        if call.arguments().find_keyword("capture_output").is_none() {
             diagnostic.try_set_fix(|| {
                 generate_fix(
                     stdout,
@@ -113,9 +113,9 @@ pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCall) {
 
 /// Generate a [`Edit`] for a `stdout` and `stderr` [`Keyword`] pair.
 fn generate_fix(
-    stdout: &Keyword,
-    stderr: &Keyword,
-    call: &ast::ExprCall,
+    stdout: Keyword<'_>,
+    stderr: Keyword<'_>,
+    call: ast::ExprCall<'_>,
     source: &str,
     tokens: &Tokens,
 ) -> Result<Fix> {
@@ -128,8 +128,8 @@ fn generate_fix(
     Ok(Fix::unsafe_edits(
         Edit::range_replacement("capture_output=True".to_string(), first.range()),
         [remove_argument(
-            second,
-            &call.arguments,
+            &second,
+            call.arguments(),
             Parentheses::Preserve,
             source,
             tokens,

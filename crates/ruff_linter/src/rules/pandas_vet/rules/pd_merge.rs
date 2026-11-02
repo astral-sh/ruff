@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
@@ -58,13 +58,16 @@ impl Violation for PandasUseOfPdMerge {
 }
 
 /// PD015
-pub(crate) fn use_of_pd_merge(checker: &Checker, func: &Expr) {
+pub(crate) fn use_of_pd_merge(checker: &Checker, func: Expr<'_>) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
 
-    if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func {
-        if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
+    if let ExprKind::Attribute(attribute) = func.classify() {
+        let attr = attribute.attr();
+        let value = attribute.value();
+        if let ExprKind::Name(name) = value.classify() {
+            let id = name.id();
             if id == "pd" && attr == "merge" {
                 checker.report_diagnostic(PandasUseOfPdMerge, func.range());
             }

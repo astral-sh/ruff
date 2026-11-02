@@ -1,13 +1,14 @@
 //! Definitions within a Python program. In this context, a "definition" is any named entity that
 //! can be documented, such as a module, class, or function.
 
+use ruff_python_ast::Suite;
 use std::fmt::Debug;
 use std::ops::Deref;
 use std::path::Path;
 
 use ruff_index::{IndexSlice, IndexVec, newtype_index};
+use ruff_python_ast as ast;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Stmt, StmtFunctionDef};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::SemanticModel;
@@ -54,7 +55,7 @@ pub enum ModuleKind {
 pub struct Module<'a> {
     pub kind: ModuleKind,
     pub source: ModuleSource<'a>,
-    pub python_ast: &'a [Stmt],
+    pub python_ast: Suite<'a>,
     pub name: Option<&'a str>,
 }
 
@@ -77,15 +78,15 @@ impl<'a> Module<'a> {
 #[derive(Debug, Copy, Clone, is_macro::Is)]
 pub enum MemberKind<'a> {
     /// A class definition within a program.
-    Class(&'a ast::StmtClassDef),
+    Class(ast::StmtClassDef<'a>),
     /// A nested class definition within a program.
-    NestedClass(&'a ast::StmtClassDef),
+    NestedClass(ast::StmtClassDef<'a>),
     /// A function definition within a program.
-    Function(&'a ast::StmtFunctionDef),
+    Function(ast::StmtFunctionDef<'a>),
     /// A nested function definition within a program.
-    NestedFunction(&'a ast::StmtFunctionDef),
+    NestedFunction(ast::StmtFunctionDef<'a>),
     /// A method definition within a program.
-    Method(&'a ast::StmtFunctionDef),
+    Method(ast::StmtFunctionDef<'a>),
 }
 
 /// A member of a Python module.
@@ -99,22 +100,22 @@ impl<'a> Member<'a> {
     /// Return the name of the member.
     fn name(&self) -> &'a str {
         match self.kind {
-            MemberKind::Class(class) => &class.name,
-            MemberKind::NestedClass(class) => &class.name,
-            MemberKind::Function(function) => &function.name,
-            MemberKind::NestedFunction(function) => &function.name,
-            MemberKind::Method(method) => &method.name,
+            MemberKind::Class(class) => class.name().as_str(),
+            MemberKind::NestedClass(class) => class.name().as_str(),
+            MemberKind::Function(function) => function.name().as_str(),
+            MemberKind::NestedFunction(function) => function.name().as_str(),
+            MemberKind::Method(method) => method.name().as_str(),
         }
     }
 
     /// Return the body of the member.
-    pub fn body(&self) -> &'a [Stmt] {
+    pub fn body(&self) -> Suite<'a> {
         match self.kind {
-            MemberKind::Class(class) => &class.body,
-            MemberKind::NestedClass(class) => &class.body,
-            MemberKind::Function(function) => &function.body,
-            MemberKind::NestedFunction(function) => &function.body,
-            MemberKind::Method(method) => &method.body,
+            MemberKind::Class(class) => class.body(),
+            MemberKind::NestedClass(class) => class.body(),
+            MemberKind::Function(function) => function.body(),
+            MemberKind::NestedFunction(function) => function.body(),
+            MemberKind::Method(method) => method.body(),
         }
     }
 }
@@ -156,10 +157,9 @@ impl<'a> Definition<'a> {
         P: IntoIterator<IntoIter = I>,
         I: Iterator<Item = QualifiedName<'a>> + Clone,
     {
-        self.as_function_def()
-            .is_some_and(|StmtFunctionDef { decorator_list, .. }| {
-                is_property(decorator_list, extra_properties, semantic)
-            })
+        self.as_function_def().is_some_and(|function| {
+            is_property(function.decorator_list(), extra_properties, semantic)
+        })
     }
 
     /// Return the name of the definition.
@@ -171,7 +171,7 @@ impl<'a> Definition<'a> {
     }
 
     /// Return the [`ast::StmtFunctionDef`] of the definition, if it's a function definition.
-    pub fn as_function_def(&self) -> Option<&'a ast::StmtFunctionDef> {
+    pub fn as_function_def(&self) -> Option<ast::StmtFunctionDef<'a>> {
         match self {
             Definition::Member(Member {
                 kind:
@@ -179,18 +179,18 @@ impl<'a> Definition<'a> {
                     | MemberKind::NestedFunction(function)
                     | MemberKind::Method(function),
                 ..
-            }) => Some(function),
+            }) => Some(*function),
             _ => None,
         }
     }
 
     /// Return the [`ast::StmtClassDef`] of the definition, if it's a class definition.
-    pub fn as_class_def(&self) -> Option<&'a ast::StmtClassDef> {
+    pub fn as_class_def(&self) -> Option<ast::StmtClassDef<'a>> {
         match self {
             Definition::Member(Member {
                 kind: MemberKind::Class(class) | MemberKind::NestedClass(class),
                 ..
-            }) => Some(class),
+            }) => Some(*class),
             _ => None,
         }
     }
@@ -281,7 +281,7 @@ impl<'a> Definitions<'a> {
     }
 
     /// Returns a reference to the Python AST.
-    pub fn python_ast(&self) -> Option<&'a [Stmt]> {
+    pub fn python_ast(&self) -> Option<Suite<'a>> {
         let Some(definition) = self.get(DefinitionId::module()) else {
             debug_assert!(false, "Module definition unavailable");
             return None;

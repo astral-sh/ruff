@@ -90,16 +90,16 @@ impl Violation for TooManyStatementsInTryClause {
 /// W0717
 pub(crate) fn too_many_try_statements(
     checker: &Checker,
-    try_stmt: &StmtTry,
+    try_stmt: StmtTry<'_>,
     max_statements: usize,
 ) {
     // Ignore cases with only `finally` clauses and no `except` handlers. These can't accidentally
     // catch the wrong exception and are instead being used more like context managers.
-    if try_stmt.handlers.is_empty() {
+    if try_stmt.handlers().is_empty() {
         return;
     }
 
-    let statements = num_statements(&try_stmt.body);
+    let statements = num_statements(try_stmt.body());
     if statements > max_statements {
         checker.report_diagnostic(
             TooManyStatementsInTryClause {

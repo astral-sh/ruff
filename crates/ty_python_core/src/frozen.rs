@@ -3,6 +3,60 @@ use std::hash::Hash;
 use ruff_index::{FrozenIndexVec, IndexVec, newtype_index};
 use rustc_hash::FxHashMap;
 
+/// A table keyed by the arena rows of nodes in a module.
+/// Each block marks which of 64 nodes have a value. Counting the preceding
+/// set bits gives a node's position in the packed values for that block.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct NodeTable<V> {
+    blocks: Box<[NodeBlock]>,
+    values: Box<[V]>,
+}
+
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+struct NodeBlock {
+    present: u64,
+    start: u32,
+}
+
+impl<V> NodeTable<V> {
+    pub(crate) fn from_rows<T>(
+        rows: &[Option<T>],
+        count: usize,
+        mut value: impl FnMut(&T) -> V,
+    ) -> Self {
+        let mut values = Vec::with_capacity(count);
+        let blocks = rows
+            .chunks(64)
+            .map(|nodes| {
+                let start =
+                    u32::try_from(values.len()).expect("each value has a 32-bit module node index");
+                let mut present = 0;
+                for (offset, node) in nodes.iter().enumerate() {
+                    if let Some(node) = node {
+                        present |= 1u64 << offset;
+                        values.push(value(node));
+                    }
+                }
+                NodeBlock { present, start }
+            })
+            .collect();
+        Self {
+            blocks,
+            values: values.into_boxed_slice(),
+        }
+    }
+
+    pub(crate) fn get(&self, index: usize) -> Option<&V> {
+        let block = self.blocks.get(index / 64)?;
+        let bit = 1u64 << (index % 64);
+        if block.present & bit == 0 {
+            return None;
+        }
+        let preceding = (block.present & (bit - 1)).count_ones();
+        Some(&self.values[(block.start + preceding) as usize])
+    }
+}
+
 /// Compact immutable key-value entries stored in key order.
 ///
 /// Analysis builds these tables with hash maps, but after construction they only need keyed
@@ -20,10 +74,6 @@ impl<K, V> FrozenMap<K, V> {
     ) -> impl DoubleEndedIterator<Item = (&K, &mut V)> + ExactSizeIterator + std::iter::FusedIterator
     {
         self.into_iter()
-    }
-
-    pub(crate) fn keys(&self) -> impl DoubleEndedIterator<Item = &K> + ExactSizeIterator {
-        self.0.iter().map(|(key, _)| key)
     }
 
     pub fn values(&self) -> impl DoubleEndedIterator<Item = &V> + ExactSizeIterator {

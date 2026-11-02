@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::ExprCall;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -51,32 +51,32 @@ impl AlwaysFixableViolation for ReplaceUniversalNewlines {
 }
 
 /// UP021
-pub(crate) fn replace_universal_newlines(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn replace_universal_newlines(checker: &Checker, call: ExprCall<'_>) {
     if !checker.semantic().seen_module(Modules::SUBPROCESS) {
         return;
     }
 
     if checker
         .semantic()
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func())
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["subprocess", "run"]))
     {
-        let Some(kwarg) = call.arguments.find_keyword("universal_newlines") else {
+        let Some(kwarg) = call.arguments().find_keyword("universal_newlines") else {
             return;
         };
 
-        let Some(arg) = kwarg.arg.as_ref() else {
+        let Some(arg) = kwarg.arg() else {
             return;
         };
 
         let mut diagnostic = checker.report_diagnostic(ReplaceUniversalNewlines, arg.range());
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
 
-        if call.arguments.find_keyword("text").is_some() {
+        if call.arguments().find_keyword("text").is_some() {
             diagnostic.try_set_fix(|| {
                 remove_argument(
-                    kwarg,
-                    &call.arguments,
+                    &kwarg,
+                    call.arguments(),
                     Parentheses::Preserve,
                     checker.locator().contents(),
                     checker.tokens(),

@@ -4,7 +4,7 @@ use anyhow::Result;
 use rustc_hash::FxHashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{PythonVersion, Stmt};
+use ruff_python_ast::{PythonVersion, StmtKind};
 use ruff_python_semantic::{Binding, Imported, NodeId, Scope};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -728,15 +728,18 @@ impl ImportFixStyle {
         let semantic = checker.semantic();
         if checker.target_version() < PythonVersion::PY315
             || !scope.kind.is_module()
-            || semantic.statements(node_id).skip(1).any(Stmt::is_try_stmt)
+            || semantic
+                .statements(node_id)
+                .skip(1)
+                .any(ruff_python_ast::Stmt::is_try_stmt)
         {
             return Self::TypeCheckingBlock;
         }
 
         let statement = semantic.statement(node_id);
-        let names = match statement {
-            Stmt::Import(import) => &import.names,
-            Stmt::ImportFrom(import) => &import.names,
+        let names = match statement.classify() {
+            StmtKind::Import(import) => import.names(),
+            StmtKind::ImportFrom(import) => import.names(),
             _ => return Self::TypeCheckingBlock,
         };
         // Other members may be used at runtime, suppressed, or governed by another lazy-import policy.

@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{ExprCall, ExprKind, StmtKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
@@ -51,27 +51,27 @@ fn match_async_exit_stack(semantic: &SemanticModel) -> bool {
     let Some(expr) = semantic.current_expression_grandparent() else {
         return false;
     };
-    let Expr::Await(ast::ExprAwait {
-        value,
-        range: _,
-        node_index: _,
-    }) = expr
-    else {
+    let ExprKind::Await(await_expr) = expr.classify() else {
         return false;
     };
-    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
+    let value = await_expr.value();
+    let ExprKind::Call(call_node) = value.classify() else {
         return false;
     };
-    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
+    let func = call_node.func();
+    let ExprKind::Attribute(attribute) = func.classify() else {
         return false;
     };
+    let attr = attribute.attr();
     if attr != "enter_async_context" {
         return false;
     }
     for parent in semantic.current_statements() {
-        if let Stmt::With(ast::StmtWith { items, .. }) = parent {
+        if let StmtKind::With(with_node) = parent.classify() {
+            let items = with_node.items();
             for item in items {
-                if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
+                if let ExprKind::Call(call_node_view) = item.context_expr().classify() {
+                    let func = call_node_view.func();
                     if semantic
                         .resolve_qualified_name(func)
                         .is_some_and(|qualified_name| {
@@ -93,19 +93,23 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
     let Some(expr) = semantic.current_expression_parent() else {
         return false;
     };
-    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+    let ExprKind::Call(call_node) = expr.classify() else {
         return false;
     };
-    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
+    let func = call_node.func();
+    let ExprKind::Attribute(attribute) = func.classify() else {
         return false;
     };
+    let attr = attribute.attr();
     if attr != "enter_context" {
         return false;
     }
     for parent in semantic.current_statements() {
-        if let Stmt::With(ast::StmtWith { items, .. }) = parent {
+        if let StmtKind::With(with_node) = parent.classify() {
+            let items = with_node.items();
             for item in items {
-                if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
+                if let ExprKind::Call(call_node_view) = item.context_expr().classify() {
+                    let func = call_node_view.func();
                     if semantic
                         .resolve_qualified_name(func)
                         .is_some_and(|qualified_name| {
@@ -128,15 +132,19 @@ fn match_unittest_context_methods(semantic: &SemanticModel) -> bool {
     let Some(expr) = semantic.current_expression_parent() else {
         return false;
     };
-    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+    let ExprKind::Call(call_node) = expr.classify() else {
         return false;
     };
-    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
+    let func = call_node.func();
+    let ExprKind::Attribute(attribute) = func.classify() else {
         return false;
     };
-    let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+    let attr = attribute.attr();
+    let value = attribute.value();
+    let ExprKind::Name(name_node) = value.classify() else {
         return false;
     };
+    let id = name_node.id();
     matches!(
         (id.as_str(), attr.as_str()),
         ("cls", "enterClassContext") | ("self", "enterContext" | "enterAsyncContext")
@@ -145,8 +153,8 @@ fn match_unittest_context_methods(semantic: &SemanticModel) -> bool {
 
 /// Return `true` if the expression is a call to `open()`,
 /// or a call to some other standard-library function that opens a file.
-fn is_open_call(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
-    let func = &*call.func;
+fn is_open_call(semantic: &SemanticModel, call: ExprCall<'_>) -> bool {
+    let func = call.func();
 
     // Ex) `open(...)`
     if let Some(qualified_name) = semantic.resolve_qualified_name(func) {
@@ -176,13 +184,16 @@ fn is_open_call(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
     }
 
     // Ex) `pathlib.Path(...).open()`
-    let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func else {
+    let ExprKind::Attribute(attribute) = func.classify() else {
         return false;
     };
+    let attr = attribute.attr();
+    let value = attribute.value();
 
-    let Expr::Call(ast::ExprCall { func, .. }) = &**value else {
+    let ExprKind::Call(call_node) = value.classify() else {
         return false;
     };
+    let func = call_node.func();
 
     // E.g. for `pathlib.Path(...).open()`, `qualified_name_of_instance.segments() == ["pathlib", "Path"]`
     let Some(qualified_name_of_instance) = semantic.resolve_qualified_name(func) else {
@@ -190,7 +201,7 @@ fn is_open_call(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
     };
 
     matches!(
-        (qualified_name_of_instance.segments(), &**attr),
+        (qualified_name_of_instance.segments(), attr.as_str()),
         (
             ["pathlib", "Path"] | ["zipfile", "ZipFile"] | ["lzma", "LZMAFile"],
             "open"
@@ -207,26 +218,26 @@ fn is_immediately_closed(semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = expr
-    else {
+    let ExprKind::Call(call_node) = expr.classify() else {
         return false;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
     if !arguments.is_empty() {
         return false;
     }
 
-    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() else {
+    let ExprKind::Attribute(attribute) = func.classify() else {
         return false;
     };
+    let attr = attribute.attr();
 
     attr.as_str() == "close"
 }
 
 /// SIM115
-pub(crate) fn open_file_with_context_handler(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn open_file_with_context_handler(checker: &Checker, call: ExprCall<'_>) {
     let semantic = checker.semantic();
 
     if !is_open_call(semantic, call) {
@@ -264,13 +275,11 @@ pub(crate) fn open_file_with_context_handler(checker: &Checker, call: &ast::Expr
     }
 
     // Ex) `def __enter__(self): ...`
-    if let ScopeKind::Function(ast::StmtFunctionDef { name, .. }) =
-        &checker.semantic().current_scope().kind
+    if let ScopeKind::Function(stmt_function_def) = &checker.semantic().current_scope().kind
+        && stmt_function_def.name() == "__enter__"
     {
-        if name == "__enter__" {
-            return;
-        }
+        return;
     }
 
-    checker.report_diagnostic(OpenFileWithContextHandler, call.func.range());
+    checker.report_diagnostic(OpenFileWithContextHandler, call.func().range());
 }

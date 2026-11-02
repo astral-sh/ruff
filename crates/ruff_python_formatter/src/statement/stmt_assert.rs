@@ -9,14 +9,10 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatStmtAssert;
 
-impl FormatNodeRule<StmtAssert> for FormatStmtAssert {
-    fn fmt_fields(&self, item: &StmtAssert, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtAssert {
-            range: _,
-            node_index: _,
-            test,
-            msg,
-        } = item;
+impl FormatNodeRule<ruff_python_ast::kind::StmtAssert> for FormatStmtAssert {
+    fn fmt_fields(&self, item: StmtAssert<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let test = item.test();
+        let msg = item.msg();
 
         write!(
             f,

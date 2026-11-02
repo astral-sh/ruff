@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, UnaryOp};
+use ruff_python_ast::{Expr, ExprKind, UnaryOp};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -54,13 +54,14 @@ impl Violation for UnaryPrefixIncrementDecrement {
 /// B002
 pub(crate) fn unary_prefix_increment_decrement(
     checker: &Checker,
-    expr: &Expr,
+    &expr: &Expr<'_>,
     op: UnaryOp,
-    operand: &Expr,
+    operand: Expr<'_>,
 ) {
-    let Expr::UnaryOp(ast::ExprUnaryOp { op: nested_op, .. }) = operand else {
+    let ExprKind::UnaryOp(unary_op) = operand.classify() else {
         return;
     };
+    let nested_op = unary_op.op();
     match (op, nested_op) {
         (UnaryOp::UAdd, UnaryOp::UAdd) => {
             checker.report_diagnostic(

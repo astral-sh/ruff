@@ -72,18 +72,18 @@ impl<'db> ScopeId<'db> {
         match self.node(db) {
             NodeWithScopeKind::Module => "<module>",
             NodeWithScopeKind::Class(class) | NodeWithScopeKind::ClassTypeParameters(class) => {
-                class.node(module).name.as_str()
+                class.node(module).name().as_str()
             }
             NodeWithScopeKind::Function(function)
             | NodeWithScopeKind::FunctionTypeParameters(function) => {
-                function.node(module).name.as_str()
+                function.node(module).name().as_str()
             }
             NodeWithScopeKind::TypeAlias(type_alias)
             | NodeWithScopeKind::TypeAliasTypeParameters(type_alias) => type_alias
                 .node(module)
-                .name
+                .name()
                 .as_name_expr()
-                .map(|name| name.id.as_str())
+                .map(|name| name.id().as_str())
                 .unwrap_or("<type alias>"),
             NodeWithScopeKind::Lambda(_) => "<lambda>",
             NodeWithScopeKind::ListComprehension(_) => "<listcomp>",
@@ -133,6 +133,9 @@ pub struct Scope {
 
     /// The range of [`FileScopeId`]s that are descendants of this scope.
     descendants: Range<FileScopeId>,
+
+    /// First module expression row in this scope. A scope's own row can follow its body.
+    first_expression_row: Option<NodeIndex>,
 }
 
 impl Scope {
@@ -145,7 +148,20 @@ impl Scope {
             parent,
             node,
             descendants,
+            first_expression_row: None,
         }
+    }
+
+    pub(super) fn record_first_expression_row(&mut self, row: NodeIndex) {
+        self.first_expression_row.get_or_insert(row);
+    }
+
+    /// The first module expression row belonging to this scope, or zero if it has no module expressions.
+    pub fn first_expression_row(&self) -> u32 {
+        self.first_expression_row
+            .and_then(NodeIndex::as_u32)
+            .filter(|&row| row <= ast::MAX_REAL_INDEX)
+            .unwrap_or(0)
     }
 
     pub fn parent(&self) -> Option<FileScopeId> {
@@ -284,17 +300,17 @@ impl ScopeKind {
 #[derive(Copy, Clone, Debug)]
 pub enum NodeWithScopeRef<'a> {
     Module,
-    Class(&'a ast::StmtClassDef),
-    Function(&'a ast::StmtFunctionDef),
-    Lambda(&'a ast::ExprLambda),
-    FunctionTypeParameters(&'a ast::StmtFunctionDef),
-    ClassTypeParameters(&'a ast::StmtClassDef),
-    TypeAlias(&'a ast::StmtTypeAlias),
-    TypeAliasTypeParameters(&'a ast::StmtTypeAlias),
-    ListComprehension(&'a ast::ExprListComp),
-    SetComprehension(&'a ast::ExprSetComp),
-    DictComprehension(&'a ast::ExprDictComp),
-    GeneratorExpression(&'a ast::ExprGenerator),
+    Class(ast::StmtClassDef<'a>),
+    Function(ast::StmtFunctionDef<'a>),
+    Lambda(ast::ExprLambda<'a>),
+    FunctionTypeParameters(ast::StmtFunctionDef<'a>),
+    ClassTypeParameters(ast::StmtClassDef<'a>),
+    TypeAlias(ast::StmtTypeAlias<'a>),
+    TypeAliasTypeParameters(ast::StmtTypeAlias<'a>),
+    ListComprehension(ast::ExprListComp<'a>),
+    SetComprehension(ast::ExprSetComp<'a>),
+    DictComprehension(ast::ExprDictComp<'a>),
+    GeneratorExpression(ast::ExprGenerator<'a>),
 }
 
 impl NodeWithScopeRef<'_> {
@@ -305,37 +321,39 @@ impl NodeWithScopeRef<'_> {
         match self {
             NodeWithScopeRef::Module => NodeWithScopeKind::Module,
             NodeWithScopeRef::Class(class) => {
-                NodeWithScopeKind::Class(AstNodeRef::new(module, class))
+                NodeWithScopeKind::Class(AstNodeRef::from_view(module, class))
             }
             NodeWithScopeRef::Function(function) => {
-                NodeWithScopeKind::Function(AstNodeRef::new(module, function))
+                NodeWithScopeKind::Function(AstNodeRef::from_view(module, function))
             }
             NodeWithScopeRef::TypeAlias(type_alias) => {
-                NodeWithScopeKind::TypeAlias(AstNodeRef::new(module, type_alias))
+                NodeWithScopeKind::TypeAlias(AstNodeRef::from_view(module, type_alias))
             }
             NodeWithScopeRef::TypeAliasTypeParameters(type_alias) => {
-                NodeWithScopeKind::TypeAliasTypeParameters(AstNodeRef::new(module, type_alias))
+                NodeWithScopeKind::TypeAliasTypeParameters(AstNodeRef::from_view(
+                    module, type_alias,
+                ))
             }
             NodeWithScopeRef::Lambda(lambda) => {
-                NodeWithScopeKind::Lambda(AstNodeRef::new(module, lambda))
+                NodeWithScopeKind::Lambda(AstNodeRef::from_view(module, lambda))
             }
             NodeWithScopeRef::FunctionTypeParameters(function) => {
-                NodeWithScopeKind::FunctionTypeParameters(AstNodeRef::new(module, function))
+                NodeWithScopeKind::FunctionTypeParameters(AstNodeRef::from_view(module, function))
             }
             NodeWithScopeRef::ClassTypeParameters(class) => {
-                NodeWithScopeKind::ClassTypeParameters(AstNodeRef::new(module, class))
+                NodeWithScopeKind::ClassTypeParameters(AstNodeRef::from_view(module, class))
             }
             NodeWithScopeRef::ListComprehension(comprehension) => {
-                NodeWithScopeKind::ListComprehension(AstNodeRef::new(module, comprehension))
+                NodeWithScopeKind::ListComprehension(AstNodeRef::from_view(module, comprehension))
             }
             NodeWithScopeRef::SetComprehension(comprehension) => {
-                NodeWithScopeKind::SetComprehension(AstNodeRef::new(module, comprehension))
+                NodeWithScopeKind::SetComprehension(AstNodeRef::from_view(module, comprehension))
             }
             NodeWithScopeRef::DictComprehension(comprehension) => {
-                NodeWithScopeKind::DictComprehension(AstNodeRef::new(module, comprehension))
+                NodeWithScopeKind::DictComprehension(AstNodeRef::from_view(module, comprehension))
             }
             NodeWithScopeRef::GeneratorExpression(generator) => {
-                NodeWithScopeKind::GeneratorExpression(AstNodeRef::new(module, generator))
+                NodeWithScopeKind::GeneratorExpression(AstNodeRef::from_view(module, generator))
             }
         }
     }
@@ -382,17 +400,17 @@ impl NodeWithScopeRef<'_> {
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub enum NodeWithScopeKind {
     Module,
-    Class(AstNodeRef<ast::StmtClassDef>),
-    ClassTypeParameters(AstNodeRef<ast::StmtClassDef>),
-    Function(AstNodeRef<ast::StmtFunctionDef>),
-    FunctionTypeParameters(AstNodeRef<ast::StmtFunctionDef>),
-    TypeAliasTypeParameters(AstNodeRef<ast::StmtTypeAlias>),
-    TypeAlias(AstNodeRef<ast::StmtTypeAlias>),
-    Lambda(AstNodeRef<ast::ExprLambda>),
-    ListComprehension(AstNodeRef<ast::ExprListComp>),
-    SetComprehension(AstNodeRef<ast::ExprSetComp>),
-    DictComprehension(AstNodeRef<ast::ExprDictComp>),
-    GeneratorExpression(AstNodeRef<ast::ExprGenerator>),
+    Class(AstNodeRef<ast::kind::StmtClassDef>),
+    ClassTypeParameters(AstNodeRef<ast::kind::StmtClassDef>),
+    Function(AstNodeRef<ast::kind::StmtFunctionDef>),
+    FunctionTypeParameters(AstNodeRef<ast::kind::StmtFunctionDef>),
+    TypeAliasTypeParameters(AstNodeRef<ast::kind::StmtTypeAlias>),
+    TypeAlias(AstNodeRef<ast::kind::StmtTypeAlias>),
+    Lambda(AstNodeRef<ast::kind::ExprLambda>),
+    ListComprehension(AstNodeRef<ast::kind::ExprListComp>),
+    SetComprehension(AstNodeRef<ast::kind::ExprSetComp>),
+    DictComprehension(AstNodeRef<ast::kind::ExprDictComp>),
+    GeneratorExpression(AstNodeRef<ast::kind::ExprGenerator>),
 }
 
 impl NodeWithScopeKind {
@@ -413,58 +431,37 @@ impl NodeWithScopeKind {
         }
     }
 
-    pub fn as_class(&self) -> Option<&AstNodeRef<ast::StmtClassDef>> {
+    pub fn as_class(&self) -> Option<&AstNodeRef<ast::kind::StmtClassDef>> {
         match self {
             Self::Class(class) => Some(class),
             _ => None,
         }
     }
 
-    pub fn expect_class(&self) -> &AstNodeRef<ast::StmtClassDef> {
+    pub fn expect_class(&self) -> &AstNodeRef<ast::kind::StmtClassDef> {
         self.as_class().expect("expected class")
     }
 
-    pub fn as_function(&self) -> Option<&AstNodeRef<ast::StmtFunctionDef>> {
+    pub fn as_function(&self) -> Option<&AstNodeRef<ast::kind::StmtFunctionDef>> {
         match self {
             Self::Function(function) => Some(function),
             _ => None,
         }
     }
 
-    pub fn expect_function(&self) -> &AstNodeRef<ast::StmtFunctionDef> {
+    pub fn expect_function(&self) -> &AstNodeRef<ast::kind::StmtFunctionDef> {
         self.as_function().expect("expected function")
     }
 
-    fn as_type_alias(&self) -> Option<&AstNodeRef<ast::StmtTypeAlias>> {
+    fn as_type_alias(&self) -> Option<&AstNodeRef<ast::kind::StmtTypeAlias>> {
         match self {
             Self::TypeAlias(type_alias) => Some(type_alias),
             _ => None,
         }
     }
 
-    pub fn expect_type_alias(&self) -> &AstNodeRef<ast::StmtTypeAlias> {
+    pub fn expect_type_alias(&self) -> &AstNodeRef<ast::kind::StmtTypeAlias> {
         self.as_type_alias().expect("expected type alias")
-    }
-
-    /// Returns the anchor node index for this scope, or `None` for the module scope.
-    ///
-    /// This is used to compute relative node indices for expressions within the scope,
-    /// providing a stable anchor that only changes when the scope-introducing node changes.
-    pub fn node_index(&self) -> Option<NodeIndex> {
-        match self {
-            Self::Module => None,
-            Self::Class(class) => Some(class.index()),
-            Self::ClassTypeParameters(class) => Some(class.index()),
-            Self::Function(function) => Some(function.index()),
-            Self::FunctionTypeParameters(function) => Some(function.index()),
-            Self::TypeAlias(type_alias) => Some(type_alias.index()),
-            Self::TypeAliasTypeParameters(type_alias) => Some(type_alias.index()),
-            Self::Lambda(lambda) => Some(lambda.index()),
-            Self::ListComprehension(comp) => Some(comp.index()),
-            Self::SetComprehension(comp) => Some(comp.index()),
-            Self::DictComprehension(comp) => Some(comp.index()),
-            Self::GeneratorExpression(generator) => Some(generator.index()),
-        }
     }
 }
 

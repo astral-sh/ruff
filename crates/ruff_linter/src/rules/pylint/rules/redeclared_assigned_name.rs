@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprKind, NodeList};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
@@ -49,7 +49,10 @@ impl Violation for RedeclaredAssignedName {
 }
 
 /// PLW0128
-pub(crate) fn redeclared_assigned_name(checker: &Checker, targets: &Vec<Expr>) {
+pub(crate) fn redeclared_assigned_name(
+    checker: &Checker,
+    targets: NodeList<'_, ruff_python_ast::kind::Expr>,
+) {
     let mut names: Vec<Name> = Vec::new();
 
     for target in targets {
@@ -57,22 +60,24 @@ pub(crate) fn redeclared_assigned_name(checker: &Checker, targets: &Vec<Expr>) {
     }
 }
 
-fn check_expr(checker: &Checker, expr: &Expr, names: &mut Vec<Name>) {
-    match expr {
-        Expr::Tuple(tuple) => {
-            for target in tuple {
+fn check_expr(checker: &Checker, expr: Expr<'_>, names: &mut Vec<Name>) {
+    match expr.classify() {
+        ExprKind::Tuple(tuple) => {
+            for target in tuple.elts() {
                 check_expr(checker, target, names);
             }
         }
-        Expr::List(list) => {
-            for target in list {
+        ExprKind::List(list) => {
+            for target in list.elts() {
                 check_expr(checker, target, names);
             }
         }
-        Expr::Starred(starred) => {
-            check_expr(checker, &starred.value, names);
+        ExprKind::Starred(starred) => {
+            check_expr(checker, starred.value(), names);
         }
-        Expr::Name(ast::ExprName { id, .. }) => {
+        ExprKind::Name(expr_name) => {
+            let id = expr_name.id();
+
             if checker.settings().dummy_variable_rgx.is_match(id) {
                 // Ignore dummy variable assignments
                 return;

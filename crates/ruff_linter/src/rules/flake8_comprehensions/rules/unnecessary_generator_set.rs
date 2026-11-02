@@ -1,17 +1,14 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
-use ruff_python_ast::ExprGenerator;
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::token::parenthesized_range;
+use ruff_python_ast::token::{TokenKind, parenthesized_range};
+use ruff_python_ast::{self as ast, ExprKind};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
+use crate::rules::flake8_comprehensions::helpers::exactly_one_argument_with_matching_function;
 use crate::{AlwaysFixableViolation, Edit, Fix};
-
-use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for unnecessary generators that can be rewritten as set
@@ -69,40 +66,32 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorSet {
 }
 
 /// C401 (`set(generator)`)
-pub(crate) fn unnecessary_generator_set(checker: &Checker, call: &ast::ExprCall) {
-    let Some(argument) = helpers::exactly_one_argument_with_matching_function(
-        "set",
-        &call.func,
-        &call.arguments.args,
-        &call.arguments.keywords,
-    ) else {
+pub(crate) fn unnecessary_generator_set(checker: &Checker, call: ast::ExprCall<'_>) {
+    let Some(argument) = exactly_one_argument_with_matching_function("set", call) else {
         return;
     };
-
-    let ast::Expr::Generator(ExprGenerator {
-        elt,
-        generators,
-        parenthesized,
-        ..
-    }) = argument
-    else {
+    let ExprKind::Generator(generator_node) = argument.classify() else {
         return;
     };
+    let elt = generator_node.elt();
+    let generators = generator_node.generators();
+    let parenthesized = generator_node.parenthesized();
     if !checker.semantic().has_builtin_binding("set") {
         return;
     }
 
     // Short-circuit: given `set(x for x in y)`, generate `set(y)` (in lieu of `{x for x in y}`).
-    if let [generator] = generators.as_slice() {
-        if generator.ifs.is_empty() && !generator.is_async {
-            if ComparableExpr::from(elt) == ComparableExpr::from(&generator.target) {
+    if let Some([generator]) = generators.as_array() {
+        if generator.ifs().is_empty() && !generator.is_async() {
+            if ComparableExpr::from(elt) == ComparableExpr::from(generator.target()) {
                 let mut diagnostic = checker.report_diagnostic(
                     UnnecessaryGeneratorSet {
                         short_circuit: true,
                     },
                     call.range(),
                 );
-                let iterator = format!("set({})", checker.locator().slice(generator.iter.range()));
+                let iterator =
+                    format!("set({})", checker.locator().slice(generator.iter().range()));
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                     iterator,
                     call.range(),
@@ -124,7 +113,7 @@ pub(crate) fn unnecessary_generator_set(checker: &Checker, call: &ast::ExprCall)
         let call_start = Edit::replacement(
             pad_start("{", call.range(), checker.locator(), checker.semantic()),
             call.start(),
-            call.arguments.start() + TextSize::from(1),
+            call.arguments().start() + TextSize::from(1),
         );
 
         // Replace `)` with `}`.
@@ -135,7 +124,7 @@ pub(crate) fn unnecessary_generator_set(checker: &Checker, call: &ast::ExprCall)
         let right_brace_loc = after_arg_tokens
             .iter()
             .find(|token| token.kind() == TokenKind::Comma)
-            .map_or(call.arguments.end(), Ranged::end)
+            .map_or(call.arguments().end(), Ranged::end)
             - TextSize::from(1);
         let call_end = Edit::replacement(
             pad_end("}", call.range(), checker.locator(), checker.semantic()),
@@ -145,12 +134,11 @@ pub(crate) fn unnecessary_generator_set(checker: &Checker, call: &ast::ExprCall)
 
         // Remove the inner parentheses, if the expression is a generator. The easiest way to do
         // this reliably is to use the printer.
-        if *parenthesized {
+        if parenthesized {
             // The generator's range will include the innermost parentheses, but it could be
             // surrounded by additional parentheses.
-            let range =
-                parenthesized_range(argument.into(), (&call.arguments).into(), checker.tokens())
-                    .unwrap_or(argument.range());
+            let range = parenthesized_range(argument, (call.arguments()).into(), checker.tokens())
+                .unwrap_or(argument.range());
 
             // The generator always parenthesizes the expression; trim the parentheses.
             let generator = checker.generator().expr(argument);

@@ -1,13 +1,14 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::{self as ast, BoolOp, ElifElseClause, Expr, Stmt};
+use ruff_python_ast::{self as ast, BoolOp, BuildId, Builder, ExprKind, Stmt, build};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits::fits;
+use crate::fix::syntax;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -85,7 +86,7 @@ impl Violation for IfElseBlockInsteadOfIfExp {
             AssignmentKind::Ternary => {
                 format!("Use ternary operator `{contents}` instead of `if`-`else`-block")
             }
-            AssignmentKind::Binary => {
+            AssignmentKind::Binary(_) => {
                 format!("Use binary operator `{contents}` instead of `if`-`else`-block")
             }
         }
@@ -98,55 +99,60 @@ impl Violation for IfElseBlockInsteadOfIfExp {
 }
 
 /// SIM108
-pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::StmtIf) {
-    let ast::StmtIf {
-        test,
-        body,
-        elif_else_clauses,
-        range: _,
-        node_index: _,
-    } = stmt_if;
+pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: ast::StmtIf<'_>) {
+    let test = stmt_if.test();
+    let body = stmt_if.body();
+    let elif_else_clauses = stmt_if.elif_else_clauses();
 
     // `test: None` to only match an `else` clause
-    let [
-        ElifElseClause {
-            body: else_body,
-            test: None,
-            ..
-        },
-    ] = elif_else_clauses.as_slice()
+    let Some([elif_else_clause]) = elif_else_clauses.as_array() else {
+        return;
+    };
+    let ast::ElifElseClauseFields {
+        body: else_body,
+        test: None,
+        ..
+    } = elif_else_clause.fields()
     else {
         return;
     };
-    let [
-        Stmt::Assign(ast::StmtAssign {
-            targets: body_targets,
-            value: body_value,
-            ..
-        }),
-    ] = body.as_slice()
+    let Some(
+        [
+            ast::StmtFields::Assign(ast::StmtAssignFields {
+                targets: body_targets,
+                value: body_value,
+                ..
+            }),
+        ],
+    ) = body.as_array().map(|items| items.map(Stmt::fields))
     else {
         return;
     };
-    let [
-        Stmt::Assign(ast::StmtAssign {
-            targets: else_targets,
-            value: else_value,
-            ..
-        }),
-    ] = else_body.as_slice()
+    let Some(
+        [
+            ast::StmtFields::Assign(ast::StmtAssignFields {
+                targets: else_targets,
+                value: else_value,
+                ..
+            }),
+        ],
+    ) = else_body.as_array().map(|[stmt]| [stmt.fields()])
     else {
         return;
     };
-    let ([body_target], [else_target]) = (body_targets.as_slice(), else_targets.as_slice()) else {
+    let (Some([body_target]), Some([else_target])) =
+        (body_targets.as_array(), else_targets.as_array())
+    else {
         return;
     };
-    let Expr::Name(ast::ExprName { id: body_id, .. }) = body_target else {
+    let ExprKind::Name(name) = body_target.classify() else {
         return;
     };
-    let Expr::Name(ast::ExprName { id: else_id, .. }) = else_target else {
+    let body_id = name.id();
+    let ExprKind::Name(name) = else_target.classify() else {
         return;
     };
+    let else_id = name.id();
     if body_id != else_id {
         return;
     }
@@ -154,14 +160,14 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
     // Avoid suggesting ternary for `if (yield ...)`-style checks.
     // TODO(charlie): Fix precedence handling for yields in generator.
     if matches!(
-        body_value.as_ref(),
-        Expr::Yield(_) | Expr::YieldFrom(_) | Expr::Await(_)
+        body_value.classify(),
+        ExprKind::Yield(_) | ExprKind::YieldFrom(_) | ExprKind::Await(_)
     ) {
         return;
     }
     if matches!(
-        else_value.as_ref(),
-        Expr::Yield(_) | Expr::YieldFrom(_) | Expr::Await(_)
+        else_value.classify(),
+        ExprKind::Yield(_) | ExprKind::YieldFrom(_) | ExprKind::Await(_)
     ) {
         return;
     }
@@ -196,36 +202,48 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
     //     - If `test == not body_value`, replace with `target_var = body_value and else_value`
     //     - If `not test == body_value`, replace with `target_var = body_value and else_value`
     //     - Otherwise, replace with `target_var = body_value if test else else_value`
-    let (contents, assignment_kind) = match (test, body_value) {
+    let assignment_kind = match (test, body_value) {
         (test_node, body_node)
             if ComparableExpr::from(test_node) == ComparableExpr::from(body_node)
                 && !contains_effect(test_node, |id| checker.semantic().has_builtin_binding(id)) =>
         {
-            let target_var = &body_target;
-            let binary = assignment_binary_or(target_var, body_value, else_value);
-            (checker.generator().stmt(&binary), AssignmentKind::Binary)
+            AssignmentKind::Binary(BoolOp::Or)
         }
         (test_node, body_node)
             if (test_node.as_unary_op_expr().is_some_and(|op_expr| {
-                op_expr.op.is_not()
-                    && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(body_node)
+                op_expr.op().is_not()
+                    && ComparableExpr::from(op_expr.operand()) == ComparableExpr::from(body_node)
             }) || body_node.as_unary_op_expr().is_some_and(|op_expr| {
-                op_expr.op.is_not()
-                    && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(test_node)
+                op_expr.op().is_not()
+                    && ComparableExpr::from(op_expr.operand()) == ComparableExpr::from(test_node)
             })) && !contains_effect(test_node, |id| {
                 checker.semantic().has_builtin_binding(id)
             }) =>
         {
-            let target_var = &body_target;
-            let binary = assignment_binary_and(target_var, body_value, else_value);
-            (checker.generator().stmt(&binary), AssignmentKind::Binary)
+            AssignmentKind::Binary(BoolOp::And)
         }
-        _ => {
-            let target_var = &body_target;
-            let ternary = assignment_ternary(target_var, body_value, test, else_value);
-            (checker.generator().stmt(&ternary), AssignmentKind::Ternary)
+        _ => AssignmentKind::Ternary,
+    };
+
+    let mut builder = Builder::default();
+    let range = TextRange::default();
+    let value: BuildId<ast::kind::Expr> = match assignment_kind {
+        AssignmentKind::Binary(op) => {
+            let values = builder.copy_nodes([body_value, else_value]);
+            builder.add(build::ExprBoolOp { range, op, values }).into()
+        }
+        AssignmentKind::Ternary => {
+            let conditional = build::ExprIf {
+                range,
+                test: builder.copy_node(test),
+                body: builder.copy_node(body_value),
+                orelse: builder.copy_node(else_value),
+            };
+            builder.add(conditional).into()
         }
     };
+    let assignment = syntax::assignment(&mut builder, body_target, value);
+    let contents = checker.generator().stmt(builder.get(assignment));
 
     // Don't flag if the resulting expression would exceed the maximum line length.
     if !fits(
@@ -247,7 +265,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
     );
     if !checker
         .comment_ranges()
-        .has_comments(stmt_if, checker.source())
+        .has_comments(&stmt_if, checker.source())
     {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             contents,
@@ -258,62 +276,6 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AssignmentKind {
-    Binary,
+    Binary(BoolOp),
     Ternary,
-}
-
-fn assignment_ternary(
-    target_var: &Expr,
-    body_value: &Expr,
-    test: &Expr,
-    orelse_value: &Expr,
-) -> Stmt {
-    let node = ast::ExprIf {
-        test: Box::new(test.clone()),
-        body: Box::new(body_value.clone()),
-        orelse: Box::new(orelse_value.clone()),
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    let node1 = ast::StmtAssign {
-        targets: vec![target_var.clone()],
-        value: Box::new(node.into()),
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    node1.into()
-}
-
-fn assignment_binary_and(target_var: &Expr, left_value: &Expr, right_value: &Expr) -> Stmt {
-    let node = ast::ExprBoolOp {
-        op: BoolOp::And,
-        values: vec![left_value.clone(), right_value.clone()],
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    let node1 = ast::StmtAssign {
-        targets: vec![target_var.clone()],
-        value: Box::new(node.into()),
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    node1.into()
-}
-
-fn assignment_binary_or(target_var: &Expr, left_value: &Expr, right_value: &Expr) -> Stmt {
-    (ast::StmtAssign {
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        targets: vec![target_var.clone()],
-        value: Box::new(
-            (ast::ExprBoolOp {
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                op: BoolOp::Or,
-                values: vec![left_value.clone(), right_value.clone()],
-            })
-            .into(),
-        ),
-    })
-    .into()
 }

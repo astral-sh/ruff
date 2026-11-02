@@ -1,5 +1,5 @@
 use ruff_python_ast::token::{TokenIterWithContext, Tokens, parenthesized_range};
-use ruff_python_ast::{self as ast, AnyNodeRef, Expr, ExprCall, OperatorPrecedence};
+use ruff_python_ast::{self as ast, Expr, ExprCall, OperatorPrecedence, SyntaxNode};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
@@ -16,13 +16,13 @@ use ruff_text_size::Ranged;
 /// Callers are responsible for determining whether removing the call is valid and whether discarding
 /// its other arguments or comments affects the applicability of a fix.
 pub fn unwrapped_call_argument(
-    call: &ExprCall,
-    argument: &Expr,
-    parent: Option<AnyNodeRef>,
+    call: ExprCall<'_>,
+    argument: Expr<'_>,
+    parent: Option<SyntaxNode>,
     tokens: &Tokens,
     source: &str,
 ) -> String {
-    if let Some(range) = parenthesized_range(argument.into(), (&call.arguments).into(), tokens) {
+    if let Some(range) = parenthesized_range(argument, (call.arguments()).into(), tokens) {
         return source[range].to_string();
     }
 
@@ -42,28 +42,24 @@ pub fn unwrapped_call_argument(
     let needs_boundary_parens = adjacent_before.is_some_and(|token| {
         token.kind().is_keyword() || (token.kind().is_lbrace() && argument_source.starts_with('{'))
     }) || adjacent_after.is_some_and(|token| {
-        token.kind().is_keyword()
-            || (token.kind().is_dot()
-                && matches!(
-                    argument,
-                    Expr::NumberLiteral(ast::ExprNumberLiteral {
-                        value: ast::Number::Int(_),
-                        ..
-                    })
-                ))
+        token.kind().is_keyword() || (token.kind().is_dot() && argument.as_int_literal().is_some())
     });
 
     // These positions accept a complete expression. A callee still needs grouping:
     // `consume(f if flag else g)` is valid, but calling the result needs `(f if flag else g)()`.
-    let parent_allows_unparenthesized = parent.is_some_and(|parent| match parent {
-        AnyNodeRef::Arguments(_) | AnyNodeRef::Keyword(_) => true,
-        AnyNodeRef::ExprCall(parent) => parent.arguments.range().contains_range(call.range()),
-        AnyNodeRef::StmtExpr(ast::StmtExpr { value, .. })
-        | AnyNodeRef::StmtAssign(ast::StmtAssign { value, .. }) => value.range() == call.range(),
-        AnyNodeRef::StmtReturn(ast::StmtReturn { value, .. })
-        | AnyNodeRef::StmtAnnAssign(ast::StmtAnnAssign { value, .. }) => value
-            .as_ref()
-            .is_some_and(|value| value.range() == call.range()),
+    let parent_allows_unparenthesized = parent.is_some_and(|parent| match parent.fields() {
+        ast::AnyFields::Arguments(_) | ast::AnyFields::Keyword(_) => true,
+        ast::AnyFields::ExprCall(ast::ExprCallFields { node: parent, .. }) => {
+            parent.arguments().range().contains_range(call.range())
+        }
+        ast::AnyFields::StmtExpr(ast::StmtExprFields { value, .. })
+        | ast::AnyFields::StmtAssign(ast::StmtAssignFields { value, .. }) => {
+            value.range() == call.range()
+        }
+        ast::AnyFields::StmtReturn(ast::StmtReturnFields { value, .. })
+        | ast::AnyFields::StmtAnnAssign(ast::StmtAnnAssignFields { value, .. }) => {
+            value.is_some_and(|value| value.range() == call.range())
+        }
         _ => false,
     });
 
@@ -85,15 +81,15 @@ pub fn unwrapped_call_argument(
         || (OperatorPrecedence::from(argument) < OperatorPrecedence::CallAttribute
             && !parent_allows_unparenthesized)
         || matches!(
-            argument,
-            Expr::Named(_)
-                | Expr::Yield(_)
-                | Expr::YieldFrom(_)
-                | Expr::Tuple(ast::ExprTuple {
+            argument.fields(),
+            ast::ExprFields::Named(_)
+                | ast::ExprFields::Yield(_)
+                | ast::ExprFields::YieldFrom(_)
+                | ast::ExprFields::Tuple(ast::ExprTupleFields {
                     parenthesized: false,
                     ..
                 })
-                | Expr::Generator(ast::ExprGenerator {
+                | ast::ExprFields::Generator(ast::ExprGeneratorFields {
                     parenthesized: false,
                     ..
                 })
@@ -108,9 +104,9 @@ pub fn unwrapped_call_argument(
 
 #[cfg(test)]
 mod tests {
+    use ruff_python_ast::AnyKind;
     use std::error::Error;
 
-    use ruff_python_ast::AnyNodeRef;
     use ruff_python_ast::find_node::covering_node;
     use ruff_python_parser::parse_module;
     use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -133,12 +129,12 @@ mod tests {
                 parsed.syntax().into(),
                 TextRange::at(start, "wrap".text_len()),
             )
-            .find_first(|node| matches!(node, AnyNodeRef::ExprCall(_)))
+            .find_first(|node| matches!(node.classify(), AnyKind::ExprCall(_)))
             .map_err(|_| "missing enclosing call")?;
-            let AnyNodeRef::ExprCall(call) = covering.node() else {
+            let AnyKind::ExprCall(call) = covering.node().classify() else {
                 return Err("expected a call expression".into());
             };
-            let argument = call.arguments.args.first().ok_or("missing argument")?;
+            let argument = call.arguments().args().first().ok_or("missing argument")?;
             let replacement =
                 unwrapped_call_argument(call, argument, covering.parent(), parsed.tokens(), source);
 

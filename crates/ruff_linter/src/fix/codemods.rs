@@ -41,7 +41,7 @@ impl<'a, T: Codegen<'a>> CodegenStylist<'a> for T {
 /// Returns `Ok(None)` if the statement is empty after removing the imports.
 pub(crate) fn remove_imports<'a>(
     member_names: impl Iterator<Item = &'a str>,
-    stmt: &Stmt,
+    stmt: Stmt<'_>,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Option<String>> {
@@ -133,7 +133,7 @@ pub(crate) fn remove_imports<'a>(
 /// Returns the modified import statement.
 pub(crate) fn retain_imports(
     member_names: &[&str],
-    stmt: &Stmt,
+    stmt: Stmt<'_>,
     contents: &str,
     stylist: &Stylist,
 ) -> Result<String> {

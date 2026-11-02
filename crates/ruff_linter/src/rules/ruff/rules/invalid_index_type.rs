@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, ExprNumberLiteral, ExprSlice, ExprSubscript, Number};
+use ruff_python_ast::{self as ast, Expr, ExprKind, Number};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -55,22 +55,19 @@ impl Violation for InvalidIndexType {
 }
 
 /// RUF016
-pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
-    let ExprSubscript {
-        value,
-        slice: index,
-        ..
-    } = expr;
+pub(crate) fn invalid_index_type(checker: &Checker, expr: ast::ExprSubscript<'_>) {
+    let value = expr.value();
+    let index = expr.slice();
 
     // Check the value being indexed is a list, tuple, string, f-string, bytes, or comprehension
     if !matches!(
-        value.as_ref(),
-        Expr::List(_)
-            | Expr::ListComp(_)
-            | Expr::Tuple(_)
-            | Expr::FString(_)
-            | Expr::StringLiteral(_)
-            | Expr::BytesLiteral(_)
+        value.classify(),
+        ExprKind::List(_)
+            | ExprKind::ListComp(_)
+            | ExprKind::Tuple(_)
+            | ExprKind::FString(_)
+            | ExprKind::StringLiteral(_)
+            | ExprKind::BytesLiteral(_)
     ) {
         return;
     }
@@ -89,10 +86,10 @@ pub(crate) fn invalid_index_type(checker: &Checker, expr: &ExprSubscript) {
         return;
     };
 
-    if let Expr::Slice(ExprSlice {
-        lower, upper, step, ..
-    }) = index.as_ref()
-    {
+    if let ExprKind::Slice(slice_node) = index.classify() {
+        let lower = slice_node.lower();
+        let upper = slice_node.upper();
+        let step = slice_node.step();
         for is_slice in [lower, upper, step].into_iter().flatten() {
             let Some(is_slice_type) = CheckableExprType::try_from(is_slice) else {
                 continue;
@@ -187,30 +184,33 @@ impl fmt::Display for CheckableExprType {
 }
 
 impl CheckableExprType {
-    fn try_from(expr: &Expr) -> Option<Self> {
-        match expr {
-            Expr::StringLiteral(_) => Some(Self::StringLiteral),
-            Expr::BytesLiteral(_) => Some(Self::BytesLiteral),
-            Expr::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
-                Number::Int(_) => Some(Self::IntLiteral),
-                Number::Float(_) => Some(Self::FloatLiteral),
-                Number::Complex { .. } => Some(Self::ComplexLiteral),
-            },
-            Expr::BooleanLiteral(_) => Some(Self::BooleanLiteral),
-            Expr::NoneLiteral(_) => Some(Self::NoneLiteral),
-            Expr::EllipsisLiteral(_) => Some(Self::EllipsisLiteral),
-            Expr::TString(_) => Some(Self::TString),
-            Expr::FString(_) => Some(Self::FString),
-            Expr::List(_) => Some(Self::List),
-            Expr::ListComp(_) => Some(Self::ListComp),
-            Expr::SetComp(_) => Some(Self::SetComp),
-            Expr::DictComp(_) => Some(Self::DictComp),
-            Expr::Set(_) => Some(Self::Set),
-            Expr::Dict(_) => Some(Self::Dict),
-            Expr::Tuple(_) => Some(Self::Tuple),
-            Expr::Slice(_) => Some(Self::Slice),
-            Expr::Generator(_) => Some(Self::Generator),
-            Expr::Lambda(_) => Some(Self::Lambda),
+    fn try_from(expr: Expr<'_>) -> Option<Self> {
+        match expr.classify() {
+            ExprKind::StringLiteral(_) => Some(Self::StringLiteral),
+            ExprKind::BytesLiteral(_) => Some(Self::BytesLiteral),
+            ExprKind::NumberLiteral(expr_number_literal) => {
+                let value = expr_number_literal.value();
+                match value {
+                    Number::Int(_) => Some(Self::IntLiteral),
+                    Number::Float(_) => Some(Self::FloatLiteral),
+                    Number::Complex { .. } => Some(Self::ComplexLiteral),
+                }
+            }
+            ExprKind::BooleanLiteral(_) => Some(Self::BooleanLiteral),
+            ExprKind::NoneLiteral(_) => Some(Self::NoneLiteral),
+            ExprKind::EllipsisLiteral(_) => Some(Self::EllipsisLiteral),
+            ExprKind::TString(_) => Some(Self::TString),
+            ExprKind::FString(_) => Some(Self::FString),
+            ExprKind::List(_) => Some(Self::List),
+            ExprKind::ListComp(_) => Some(Self::ListComp),
+            ExprKind::SetComp(_) => Some(Self::SetComp),
+            ExprKind::DictComp(_) => Some(Self::DictComp),
+            ExprKind::Set(_) => Some(Self::Set),
+            ExprKind::Dict(_) => Some(Self::Dict),
+            ExprKind::Tuple(_) => Some(Self::Tuple),
+            ExprKind::Slice(_) => Some(Self::Slice),
+            ExprKind::Generator(_) => Some(Self::Generator),
+            ExprKind::Lambda(_) => Some(Self::Lambda),
             _ => None,
         }
     }

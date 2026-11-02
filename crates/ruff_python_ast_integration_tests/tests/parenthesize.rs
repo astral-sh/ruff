@@ -9,14 +9,10 @@ fn test_parenthesized_name() {
     let parsed = parse_expression(source_code).unwrap();
 
     let bin_op = parsed.expr().as_bin_op_expr().unwrap();
-    let name = bin_op.left.as_ref();
+    let name = bin_op.left();
 
-    let parenthesized = parenthesized_range(
-        name.into(),
-        bin_op.into(),
-        &CommentRanges::default(),
-        source_code,
-    );
+    let parenthesized =
+        parenthesized_range(name, bin_op.into(), &CommentRanges::default(), source_code);
     assert_eq!(parenthesized, Some(TextRange::new(0.into(), 3.into())));
 }
 
@@ -26,14 +22,10 @@ fn test_non_parenthesized_name() {
     let parsed = parse_expression(source_code).unwrap();
 
     let bin_op = parsed.expr().as_bin_op_expr().unwrap();
-    let name = bin_op.left.as_ref();
+    let name = bin_op.left();
 
-    let parenthesized = parenthesized_range(
-        name.into(),
-        bin_op.into(),
-        &CommentRanges::default(),
-        source_code,
-    );
+    let parenthesized =
+        parenthesized_range(name, bin_op.into(), &CommentRanges::default(), source_code);
     assert_eq!(parenthesized, None);
 }
 
@@ -43,11 +35,11 @@ fn test_parenthesized_argument() {
     let parsed = parse_expression(source_code).unwrap();
 
     let call = parsed.expr().as_call_expr().unwrap();
-    let arguments = &call.arguments;
-    let argument = arguments.args.first().unwrap();
+    let arguments = call.arguments();
+    let argument = arguments.args().first().unwrap();
 
     let parenthesized = parenthesized_range(
-        argument.into(),
+        argument,
         arguments.into(),
         &CommentRanges::default(),
         source_code,
@@ -61,11 +53,11 @@ fn test_non_parenthesized_argument() {
     let parsed = parse_expression(source_code).unwrap();
 
     let call = parsed.expr().as_call_expr().unwrap();
-    let arguments = &call.arguments;
-    let argument = arguments.args.first().unwrap();
+    let arguments = call.arguments();
+    let argument = arguments.args().first().unwrap();
 
     let parenthesized = parenthesized_range(
-        argument.into(),
+        argument,
         arguments.into(),
         &CommentRanges::default(),
         source_code,
@@ -79,14 +71,10 @@ fn test_parenthesized_tuple_member() {
     let parsed = parse_expression(source_code).unwrap();
 
     let tuple = parsed.expr().as_tuple_expr().unwrap();
-    let member = tuple.elts.last().unwrap();
+    let member = tuple.elts().last().unwrap();
 
-    let parenthesized = parenthesized_range(
-        member.into(),
-        tuple.into(),
-        &CommentRanges::default(),
-        source_code,
-    );
+    let parenthesized =
+        parenthesized_range(member, tuple.into(), &CommentRanges::default(), source_code);
     assert_eq!(parenthesized, Some(TextRange::new(4.into(), 7.into())));
 }
 
@@ -96,14 +84,10 @@ fn test_non_parenthesized_tuple_member() {
     let parsed = parse_expression(source_code).unwrap();
 
     let tuple = parsed.expr().as_tuple_expr().unwrap();
-    let member = tuple.elts.last().unwrap();
+    let member = tuple.elts().last().unwrap();
 
-    let parenthesized = parenthesized_range(
-        member.into(),
-        tuple.into(),
-        &CommentRanges::default(),
-        source_code,
-    );
+    let parenthesized =
+        parenthesized_range(member, tuple.into(), &CommentRanges::default(), source_code);
     assert_eq!(parenthesized, None);
 }
 
@@ -113,14 +97,10 @@ fn test_twice_parenthesized_name() {
     let parsed = parse_expression(source_code).unwrap();
 
     let bin_op = parsed.expr().as_bin_op_expr().unwrap();
-    let name = bin_op.left.as_ref();
+    let name = bin_op.left();
 
-    let parenthesized = parenthesized_range(
-        name.into(),
-        bin_op.into(),
-        &CommentRanges::default(),
-        source_code,
-    );
+    let parenthesized =
+        parenthesized_range(name, bin_op.into(), &CommentRanges::default(), source_code);
     assert_eq!(parenthesized, Some(TextRange::new(0.into(), 5.into())));
 }
 
@@ -130,11 +110,11 @@ fn test_twice_parenthesized_argument() {
     let parsed = parse_expression(source_code).unwrap();
 
     let call = parsed.expr().as_call_expr().unwrap();
-    let arguments = &call.arguments;
-    let argument = arguments.args.first().unwrap();
+    let arguments = call.arguments();
+    let argument = arguments.args().first().unwrap();
 
     let parenthesized = parenthesized_range(
-        argument.into(),
+        argument,
         arguments.into(),
         &CommentRanges::default(),
         source_code,

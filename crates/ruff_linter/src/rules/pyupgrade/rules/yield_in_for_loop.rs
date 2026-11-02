@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprYield;
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{Expr, ExprKind, ExprName, StmtFor, StmtKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -69,21 +70,16 @@ impl Violation for YieldInForLoop {
 }
 
 /// UP028
-pub(crate) fn yield_in_for_loop(checker: &Checker, stmt_for: &ast::StmtFor) {
+pub(crate) fn yield_in_for_loop(checker: &Checker, stmt_for: StmtFor<'_>) {
     // Intentionally omit async contexts.
     if checker.semantic().in_async_context() {
         return;
     }
 
-    let ast::StmtFor {
-        target,
-        iter,
-        body,
-        orelse,
-        is_async: _,
-        range: _,
-        node_index: _,
-    } = stmt_for;
+    let target = stmt_for.target();
+    let iter = stmt_for.iter();
+    let body = stmt_for.body();
+    let orelse = stmt_for.orelse();
 
     // If there is an else statement, don't rewrite.
     if !orelse.is_empty() {
@@ -91,25 +87,16 @@ pub(crate) fn yield_in_for_loop(checker: &Checker, stmt_for: &ast::StmtFor) {
     }
 
     // If there's any logic besides a yield, don't rewrite.
-    let [body] = body.as_slice() else {
+    let Some([body]) = body.as_array() else {
         return;
     };
 
     // If the body is not a yield, don't rewrite.
-    let Stmt::Expr(ast::StmtExpr {
-        value,
-        range: _,
-        node_index: _,
-    }) = &body
-    else {
+    let StmtKind::Expr(expr_node) = body.classify() else {
         return;
     };
-    let Expr::Yield(ast::ExprYield {
-        value: Some(value),
-        range: _,
-        node_index: _,
-    }) = value.as_ref()
-    else {
+    let value = expr_node.value();
+    let Some(value) = value.as_yield_expr().and_then(ExprYield::value) else {
         return;
     };
 
@@ -124,7 +111,7 @@ pub(crate) fn yield_in_for_loop(checker: &Checker, stmt_for: &ast::StmtFor) {
         checker
             .semantic()
             .current_scope()
-            .get_all(name.id.as_str())
+            .get_all(name.id().as_str())
             // Skip unbound bindings like `del x`
             .find(|&id| !checker.semantic().binding(id).is_unbound())
             .is_some_and(|binding_id| {
@@ -140,10 +127,9 @@ pub(crate) fn yield_in_for_loop(checker: &Checker, stmt_for: &ast::StmtFor) {
     let mut diagnostic = checker.report_diagnostic(YieldInForLoop, stmt_for.range());
 
     let contents = checker.locator().slice(
-        parenthesized_range(iter.as_ref().into(), stmt_for.into(), checker.tokens())
-            .unwrap_or(iter.range()),
+        parenthesized_range(iter, stmt_for.into(), checker.tokens()).unwrap_or(iter.range()),
     );
-    let contents = if iter.as_tuple_expr().is_some_and(|it| !it.parenthesized) {
+    let contents = if iter.as_tuple_expr().is_some_and(|it| !it.parenthesized()) {
         format!("yield from ({contents})")
     } else {
         format!("yield from {contents}")
@@ -151,7 +137,7 @@ pub(crate) fn yield_in_for_loop(checker: &Checker, stmt_for: &ast::StmtFor) {
 
     if !collect_names(value).any(|name| {
         let semantic = checker.semantic();
-        let mut bindings = semantic.current_scope().get_all(name.id.as_str());
+        let mut bindings = semantic.current_scope().get_all(name.id().as_str());
 
         bindings.any(|id| {
             let binding = semantic.binding(id);
@@ -168,11 +154,11 @@ pub(crate) fn yield_in_for_loop(checker: &Checker, stmt_for: &ast::StmtFor) {
 
 /// Return `true` if the two expressions are equivalent, and both consistent solely
 /// of tuples and names.
-fn is_same_expr(left: &Expr, right: &Expr) -> bool {
-    match (&left, &right) {
-        (Expr::Name(left), Expr::Name(right)) => left.id == right.id,
-        (Expr::Tuple(left), Expr::Tuple(right)) => {
-            left.len() == right.len()
+fn is_same_expr(left: Expr<'_>, right: Expr<'_>) -> bool {
+    match (left.classify(), right.classify()) {
+        (ExprKind::Name(left), ExprKind::Name(right)) => left.id() == right.id(),
+        (ExprKind::Tuple(left), ExprKind::Tuple(right)) => {
+            left.elts().len() == right.elts().len()
                 && left
                     .iter()
                     .zip(right)
@@ -184,7 +170,7 @@ fn is_same_expr(left: &Expr, right: &Expr) -> bool {
 
 /// Collect all named variables in an expression consisting solely of tuples and
 /// names.
-fn collect_names<'a>(expr: &'a Expr) -> Box<dyn Iterator<Item = &'a ast::ExprName> + 'a> {
+fn collect_names<'a>(expr: Expr<'a>) -> Box<dyn Iterator<Item = ExprName<'a>> + 'a> {
     Box::new(
         expr.as_name_expr().into_iter().chain(
             expr.as_tuple_expr()

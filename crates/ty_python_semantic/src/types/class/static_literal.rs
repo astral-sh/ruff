@@ -6,8 +6,8 @@ use ruff_db::{
     files::File,
     parsed::{ParsedModuleRef, parsed_module},
 };
-use ruff_python_ast as ast;
-use ruff_python_ast::{PythonVersion, name::Name};
+use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast, ExprKind, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 use std::cell::RefCell;
 
@@ -431,7 +431,7 @@ impl<'db> StaticClassLiteral<'db> {
         let python_file = program_file.python_file(db);
         let parsed = parsed_module(db, python_file).load(db);
         let class_def_node = scope.node(db).expect_class().node(&parsed);
-        class_def_node.type_params.as_ref().and_then(|type_params| {
+        class_def_node.type_params().and_then(|type_params| {
             let index = semantic_index(db, program_file);
             let definition = index.expect_single_definition(class_def_node);
             GenericContext::from_type_params(db, index, definition, type_params)
@@ -517,16 +517,16 @@ impl<'db> StaticClassLiteral<'db> {
         let definition = self.definition(db);
         let file = definition.file(db);
         self.node(db, &parsed_module(db, definition.python_file(db)).load(db))
-            .decorator_list
+            .decorator_list()
             .iter()
             .find(|decorator| {
                 predicate(definition_expression_type(
                     db,
                     definition,
-                    &decorator.expression,
+                    decorator.expression(),
                 ))
             })
-            .map(|decorator| Span::from(file).with_range(decorator.range))
+            .map(|decorator| Span::from(file).with_range(decorator.range()))
     }
 
     /// Iterate through the decorators on this class, returning the span of the first one
@@ -619,7 +619,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// ## Note
     /// Only call this function from queries in the same file or your
     /// query depends on the AST of another file (bad!).
-    fn node<'ast>(self, db: &'db dyn Db, module: &'ast ParsedModuleRef) -> &'ast ast::StmtClassDef {
+    fn node<'ast>(self, db: &'db dyn Db, module: &'ast ParsedModuleRef) -> ast::StmtClassDef<'ast> {
         self.body_scope(db).node(db).expect_class().node(module)
     }
 
@@ -813,7 +813,7 @@ impl<'db> StaticClassLiteral<'db> {
         let module = parsed_module(db, python_file).load(db);
 
         let class_stmt = self.node(db, &module);
-        if class_stmt.decorator_list.is_empty() {
+        if class_stmt.decorator_list().is_empty() {
             return Box::new([]);
         }
 
@@ -821,10 +821,10 @@ impl<'db> StaticClassLiteral<'db> {
             semantic_index(db, self.program_file(db)).expect_single_definition(class_stmt);
 
         class_stmt
-            .decorator_list
+            .decorator_list()
             .iter()
             .map(|decorator_node| {
-                definition_expression_type(db, class_definition, &decorator_node.expression)
+                definition_expression_type(db, class_definition, decorator_node.expression())
             })
             .collect()
     }
@@ -849,11 +849,11 @@ impl<'db> StaticClassLiteral<'db> {
         let class_definition =
             semantic_index(db, program_file).expect_single_definition(class_stmt);
 
-        class_stmt.decorator_list.iter().position(|decorator| {
+        class_stmt.decorator_list().iter().position(|decorator| {
             let decorator_callable = decorator
-                .expression
+                .expression()
                 .as_call_expr()
-                .map_or(&decorator.expression, |call| &call.func);
+                .map_or(decorator.expression(), ast::ExprCall::func);
 
             definition_expression_type(db, class_definition, decorator_callable)
                 .as_function_literal()
@@ -1102,16 +1102,18 @@ impl<'db> StaticClassLiteral<'db> {
         {
             let module = parsed_module(db, self.python_file(db)).load(db);
 
-            if let Some(arguments) = &class_def.node(&module).arguments {
+            if let Some(arguments) = class_def.node(&module).arguments() {
                 let mut flags = transformer_params.flags(db);
 
-                for ast::Keyword { arg, value, .. } in &arguments.keywords {
+                for keyword in arguments.keywords() {
+                    let arg = keyword.arg();
+                    let value = keyword.value();
                     if let Some(arg_name) = arg
-                        && let ast::Expr::BooleanLiteral(is_set) = value
+                        && let ExprKind::BooleanLiteral(is_set) = value.classify()
                     {
                         for (flag_name, flag) in DATACLASS_FLAGS {
-                            if arg_name == *flag_name {
-                                flags.set(*flag, is_set.value);
+                            if *arg_name == **flag_name {
+                                flags.set(*flag, is_set.value());
                             }
                         }
                     }
@@ -1201,11 +1203,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// query depends on the AST of another file (bad!).
     fn explicit_metaclass(self, db: &'db dyn Db, module: &ParsedModuleRef) -> Option<Type<'db>> {
         let class_stmt = self.node(db, module);
-        let metaclass_node = &class_stmt
-            .arguments
-            .as_ref()?
-            .find_keyword("metaclass")?
-            .value;
+        let metaclass_node = class_stmt.arguments()?.find_keyword("metaclass")?.value();
 
         let class_definition = self.definition(db);
 
@@ -3348,13 +3346,12 @@ impl<'db> StaticClassLiteral<'db> {
         let class_scope = self.body_scope(db);
         let module = parsed_module(db, class_scope.python_file(db)).load(db);
         let class_node = self.node(db, &module);
-        let class_name = &class_node.name;
+        let class_name = class_node.name();
         TextRange::new(
             class_name.start(),
             class_node
-                .arguments
-                .as_deref()
-                .map(Ranged::end)
+                .arguments()
+                .map(|node| node.end())
                 .unwrap_or_else(|| class_name.end()),
         )
     }
@@ -3364,20 +3361,20 @@ impl<'db> StaticClassLiteral<'db> {
         let class_scope = self.body_scope(db);
         let module = parsed_module(db, class_scope.python_file(db)).load(db);
         let class_node = self.node(db, &module);
-        class_node.name.range()
+        class_node.name().range()
     }
 }
 
 /// A single semantic class-base entry after expanding starred tuple bases.
 #[derive(Clone, Copy)]
 pub(crate) struct ExpandedClassBaseEntry<'a, 'db> {
-    source_node: &'a ast::Expr,
+    source_node: ast::Expr<'a>,
     ty: Type<'db>,
 }
 
 impl<'a, 'db> ExpandedClassBaseEntry<'a, 'db> {
     /// Returns the source expression for this base entry.
-    pub(crate) const fn source_node(self) -> &'a ast::Expr {
+    pub(crate) const fn source_node(self) -> ast::Expr<'a> {
         self.source_node
     }
 
@@ -3391,7 +3388,7 @@ impl<'a, 'db> ExpandedClassBaseEntry<'a, 'db> {
 pub(crate) fn expanded_class_base_entries<'a, 'db>(
     db: &'db dyn Db,
     known_class: Option<KnownClass>,
-    class_stmt: &'a ast::StmtClassDef,
+    class_stmt: ast::StmtClassDef<'a>,
     class_definition: Definition<'db>,
 ) -> Vec<ExpandedClassBaseEntry<'a, 'db>> {
     match known_class {
@@ -3405,9 +3402,9 @@ pub(crate) fn expanded_class_base_entries<'a, 'db>(
                 if let Some(tuple) =
                     expanded_fixed_length_starred_class_base_tuple(db, class_definition, base_node)
                 {
-                    if let ast::Expr::Starred(starred) = base_node
-                        && let Some(tuple_literal) = starred.value.as_tuple_expr()
-                        && tuple_literal.len() == tuple.len()
+                    if let ExprKind::Starred(starred) = base_node.classify()
+                        && let Some(tuple_literal) = starred.value().as_tuple_expr()
+                        && tuple_literal.elts().len() == tuple.len()
                         && tuple_literal
                             .iter()
                             .all(|element| !element.is_starred_expr())
@@ -3433,7 +3430,7 @@ pub(crate) fn expanded_class_base_entries<'a, 'db>(
                     continue;
                 }
 
-                let ty = if matches!(base_node, ast::Expr::Starred(_)) {
+                let ty = if matches!(base_node.classify(), ExprKind::Starred(_)) {
                     Type::unknown()
                 } else {
                     definition_expression_type(db, class_definition, base_node)
@@ -3454,13 +3451,13 @@ pub(crate) fn expanded_class_base_entries<'a, 'db>(
 fn expanded_fixed_length_starred_class_base_tuple<'db>(
     db: &'db dyn Db,
     class_definition: Definition<'db>,
-    base_node: &ast::Expr,
+    base_node: ast::Expr<'_>,
 ) -> Option<FixedLengthTuple<Type<'db>>> {
-    let ast::Expr::Starred(starred) = base_node else {
+    let ExprKind::Starred(starred) = base_node.classify() else {
         return None;
     };
 
-    let starred_ty = definition_expression_type(db, class_definition, &starred.value);
+    let starred_ty = definition_expression_type(db, class_definition, starred.value());
     let env = ProgramEnvironment::from_definition(class_definition);
     let Tuple::Fixed(tuple) = starred_ty.tuple_instance_spec(db, &env)?.into_owned() else {
         return None;

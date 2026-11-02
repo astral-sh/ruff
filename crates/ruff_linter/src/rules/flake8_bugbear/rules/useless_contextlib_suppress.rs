@@ -1,4 +1,4 @@
-use ruff_python_ast::Expr;
+use ruff_python_ast::{Expr, NodeList};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -53,9 +53,9 @@ impl Violation for UselessContextlibSuppress {
 /// B022
 pub(crate) fn useless_contextlib_suppress(
     checker: &Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
+    &expr: &Expr<'_>,
+    func: Expr<'_>,
+    args: NodeList<'_, ruff_python_ast::kind::Expr>,
 ) {
     if args.is_empty()
         && checker

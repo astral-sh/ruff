@@ -1,4 +1,4 @@
-use ruff_python_ast::{AnyNodeRef, ExprDict};
+use ruff_python_ast::{ExprDict, SyntaxNode};
 use ruff_text_size::Ranged;
 
 use crate::expression::parentheses::{
@@ -9,9 +9,9 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprDict;
 
-impl FormatNodeRule<ExprDict> for FormatExprDict {
-    fn fmt_fields(&self, item: &ExprDict, f: &mut PyFormatter) -> FormatResult<()> {
-        let items = &item.items;
+impl FormatNodeRule<ruff_python_ast::kind::ExprDict> for FormatExprDict {
+    fn fmt_fields(&self, item: ExprDict<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let items = item.items();
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
@@ -31,10 +31,10 @@ impl FormatNodeRule<ExprDict> for FormatExprDict {
     }
 }
 
-impl NeedsParentheses for ExprDict {
+impl NeedsParentheses for ExprDict<'_> {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        _parent: SyntaxNode,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
         OptionalParentheses::Never

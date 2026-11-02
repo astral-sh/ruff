@@ -1,6 +1,8 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, PythonVersion};
+use ruff_python_ast::{
+    self as ast, Expr, ExprIf, Int, Number, PythonVersion, StmtIf, UnaryOp, comparable,
+};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -74,7 +76,7 @@ impl AlwaysFixableViolation for SliceToRemovePrefixOrSuffix {
 }
 
 /// FURB188
-pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprIf) {
+pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: ExprIf<'_>) {
     if checker.target_version() < PythonVersion::PY39 {
         return;
     }
@@ -89,12 +91,12 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
                     affix_kind: kind,
                     stmt_or_expression: StmtOrExpr::Expression,
                 },
-                if_expr.range,
+                if_expr.range(),
             );
             let replacement =
                 generate_removeaffix_expr(text, &removal_data.affix_query, checker.locator());
 
-            let applicability = if checker.comment_ranges().intersects(if_expr.range) {
+            let applicability = if checker.comment_ranges().intersects(if_expr.range()) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
@@ -109,7 +111,7 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
 }
 
 /// FURB188
-pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtIf) {
+pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: StmtIf<'_>) {
     if checker.target_version() < PythonVersion::PY39 {
         return;
     }
@@ -123,7 +125,7 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
                     affix_kind: kind,
                     stmt_or_expression: StmtOrExpr::Statement,
                 },
-                if_stmt.range,
+                if_stmt.range(),
             );
 
             let replacement = generate_assignment_with_removeaffix(
@@ -132,7 +134,7 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
                 checker.locator(),
             );
 
-            let applicability = if checker.comment_ranges().intersects(if_stmt.range) {
+            let applicability = if checker.comment_ranges().intersects(if_stmt.range()) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
@@ -155,16 +157,14 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
 /// where `func` is either `startswith` or `endswith`,
 /// this function collects `text`,`func`, `affix`, and the non-null
 /// bound of the slice. Otherwise, returns `None`.
-fn affix_removal_data_expr(if_expr: &ast::ExprIf) -> Option<RemoveAffixData<'_>> {
-    let ast::ExprIf {
-        test,
-        body,
-        orelse,
-        range: _,
-        node_index: _,
-    } = if_expr;
+fn affix_removal_data_expr(if_expr: ExprIf<'_>) -> Option<RemoveAffixData<'_>> {
+    let test = if_expr.test();
+    let body = if_expr.body();
+    let orelse = if_expr.orelse();
 
-    let ast::ExprSubscript { value, slice, .. } = body.as_subscript_expr()?;
+    let expr_subscript = body.as_subscript_expr()?;
+    let value = expr_subscript.value();
+    let slice = expr_subscript.slice();
     // Variable names correspond to:
     // ```python
     // value[slice] if test else orelse
@@ -182,14 +182,10 @@ fn affix_removal_data_expr(if_expr: &ast::ExprIf) -> Option<RemoveAffixData<'_>>
 /// where `func` is either `startswith` or `endswith`,
 /// this function collects `text`,`func`, `affix`, and the non-null
 /// bound of the slice. Otherwise, returns `None`.
-fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData<'_>> {
-    let ast::StmtIf {
-        test,
-        body,
-        elif_else_clauses,
-        range: _,
-        node_index: _,
-    } = if_stmt;
+fn affix_removal_data_stmt(if_stmt: StmtIf<'_>) -> Option<RemoveAffixData<'_>> {
+    let test = if_stmt.test();
+    let body = if_stmt.body();
+    let elif_else_clauses = if_stmt.elif_else_clauses();
 
     // Cannot safely transform, e.g.,
     // ```python
@@ -208,25 +204,20 @@ fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData<'_>>
     //     text = f"{prefix} something completely different"
     //     text = text[len(prefix):]
     // ```
-    let [statement] = body.as_slice() else {
-        return None;
-    };
+    let [statement] = body.as_array()?;
 
     // Variable names correspond to:
     // ```python
     // if test:
     //     else_or_target_name = value[slice]
     // ```
-    let ast::StmtAssign {
-        value,
-        targets,
-        range: _,
-        node_index: _,
-    } = statement.as_assign_stmt()?;
-    let [target] = targets.as_slice() else {
-        return None;
-    };
-    let ast::ExprSubscript { value, slice, .. } = value.as_subscript_expr()?;
+    let stmt_assign = statement.as_assign_stmt()?;
+    let value = stmt_assign.value();
+    let targets = stmt_assign.targets();
+    let [target] = targets.as_array()?;
+    let expr_subscript = value.as_subscript_expr()?;
+    let value = expr_subscript.value();
+    let slice = expr_subscript.slice();
 
     affix_removal_data(value, test, target, slice)
 }
@@ -252,13 +243,13 @@ fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData<'_>>
 /// returns the corresponding `RemoveAffixData` object;
 /// otherwise it returns `None`.
 fn affix_removal_data<'a>(
-    value: &'a ast::Expr,
-    test: &'a ast::Expr,
-    else_or_target: &'a ast::Expr,
-    slice: &'a ast::Expr,
+    value: Expr<'a>,
+    test: Expr<'a>,
+    else_or_target: Expr<'a>,
+    slice: Expr<'a>,
 ) -> Option<RemoveAffixData<'a>> {
-    let compr_value = ast::comparable::ComparableExpr::from(value);
-    let compr_else_or_target = ast::comparable::ComparableExpr::from(else_or_target);
+    let compr_value = comparable::ComparableExpr::from(value);
+    let compr_else_or_target = comparable::ComparableExpr::from(else_or_target);
     if compr_value != compr_else_or_target {
         return None;
     }
@@ -266,46 +257,44 @@ fn affix_removal_data<'a>(
 
     // Exit early if slice step is...
     if slice
-        .step
-        .as_deref()
+        .step()
         // present and
-        .is_some_and(|step| match step {
+        .is_some_and(|step| match step.fields() {
             // not equal to 1
-            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: ast::Number::Int(x),
+            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+                value: Number::Int(x),
                 ..
             }) => x.as_u8() != Some(1),
             // and not equal to `None` or `True`
-            ast::Expr::NoneLiteral(_)
-            | ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. }) => false,
+            ast::ExprFields::NoneLiteral(_)
+            | ast::ExprFields::BooleanLiteral(ast::ExprBooleanLiteralFields {
+                value: true, ..
+            }) => false,
             _ => true,
         })
     {
         return None;
     }
 
-    let compr_test_expr = ast::comparable::ComparableExpr::from(
-        &test.as_call_expr()?.func.as_attribute_expr()?.value,
-    );
+    let compr_test_expr =
+        comparable::ComparableExpr::from(test.as_call_expr()?.func().as_attribute_expr()?.value());
     let func_name = test
         .as_call_expr()?
-        .func
+        .func()
         .as_attribute_expr()?
-        .attr
-        .id
+        .attr()
+        .id()
         .as_str();
 
-    let func_args = &test.as_call_expr()?.arguments.args;
+    let func_args = test.as_call_expr()?.arguments().args();
 
-    let [affix] = func_args.as_ref() else {
-        return None;
-    };
+    let [affix] = func_args.as_array()?;
     if compr_value != compr_test_expr || compr_test_expr != compr_else_or_target {
         return None;
     }
     let (affix_kind, bound) = match func_name {
-        "startswith" if slice.upper.is_none() => (AffixKind::StartsWith, slice.lower.as_ref()?),
-        "endswith" if slice.lower.is_none() => (AffixKind::EndsWith, slice.upper.as_ref()?),
+        "startswith" if slice.upper().is_none() => (AffixKind::StartsWith, slice.lower()?),
+        "endswith" if slice.lower().is_none() => (AffixKind::EndsWith, slice.upper()?),
         _ => return None,
     };
     Some(RemoveAffixData {
@@ -338,29 +327,29 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
         affix_query: AffixQuery { kind, affix },
     } = *data;
 
-    match (kind, bound, affix) {
+    match (kind, bound.fields(), affix.fields()) {
         (
             AffixKind::StartsWith,
-            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
                 value: num,
                 range: _,
-                node_index: _,
+                node: _,
             }),
-            ast::Expr::StringLiteral(ast::ExprStringLiteral {
+            ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields {
                 range: _,
-                node_index: _,
+                node: _,
                 value: string_val,
             }),
         ) => num
             .as_int()
             // Only support prefix removal for size at most `usize::MAX`
-            .and_then(ast::Int::as_usize)
+            .and_then(Int::as_usize)
             .is_some_and(|x| x == string_val.chars().count()),
         (
             AffixKind::StartsWith,
-            ast::Expr::Call(ast::ExprCall {
-                range_start: _,
-                node_index: _,
+            ast::ExprFields::Call(ast::ExprCallFields {
+                range: _,
+                node: _,
                 func,
                 arguments,
             }),
@@ -368,30 +357,26 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
         ) => {
             arguments.len() == 1
                 && arguments.find_positional(0).is_some_and(|arg| {
-                    let compr_affix = ast::comparable::ComparableExpr::from(affix);
-                    let compr_arg = ast::comparable::ComparableExpr::from(arg);
+                    let compr_affix = comparable::ComparableExpr::from(affix);
+                    let compr_arg = comparable::ComparableExpr::from(arg);
                     compr_affix == compr_arg
                 })
                 && semantic.match_builtin_expr(func, "len")
         }
         (
             AffixKind::EndsWith,
-            ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                op: ast::UnaryOp::USub,
+            ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
+                op: UnaryOp::USub,
                 operand,
                 range: _,
-                node_index: _,
+                node: _,
             }),
-            ast::Expr::StringLiteral(ast::ExprStringLiteral {
+            ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields {
                 range: _,
-                node_index: _,
+                node: _,
                 value: string_val,
             }),
-        ) if let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-            value: ast::Number::Int(value),
-            ..
-        }) = &**operand =>
-        {
+        ) if let Some(value) = operand.as_int_literal() => {
             // Only support prefix removal for size at most `u32::MAX`
             value
                 .as_usize()
@@ -399,29 +384,24 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
         }
         (
             AffixKind::EndsWith,
-            ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                op: ast::UnaryOp::USub,
+            ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
+                op: UnaryOp::USub,
                 operand,
                 range: _,
-                node_index: _,
+                node: _,
             }),
             _,
-        ) => operand.as_call_expr().is_some_and(
-            |ast::ExprCall {
-                 range_start: _,
-                 node_index: _,
-                 func,
-                 arguments,
-             }| {
-                arguments.len() == 1
-                    && arguments.find_positional(0).is_some_and(|arg| {
-                        let compr_affix = ast::comparable::ComparableExpr::from(affix);
-                        let compr_arg = ast::comparable::ComparableExpr::from(arg);
-                        compr_affix == compr_arg
-                    })
-                    && semantic.match_builtin_expr(func, "len")
-            },
-        ),
+        ) => operand.as_call_expr().is_some_and(|expr_call| {
+            let func = expr_call.func();
+            let arguments = expr_call.arguments();
+            arguments.len() == 1
+                && arguments.find_positional(0).is_some_and(|arg| {
+                    let compr_affix = comparable::ComparableExpr::from(affix);
+                    let compr_arg = comparable::ComparableExpr::from(arg);
+                    compr_affix == compr_arg
+                })
+                && semantic.match_builtin_expr(func, "len")
+        }),
         _ => false,
     }
 }
@@ -436,7 +416,7 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
 /// ```
 /// as appropriate.
 fn generate_assignment_with_removeaffix(
-    text: &ast::Expr,
+    text: Expr<'_>,
     affix_query: &AffixQuery,
     locator: &Locator,
 ) -> String {
@@ -457,7 +437,7 @@ fn generate_assignment_with_removeaffix(
 /// ```
 /// as appropriate.
 fn generate_removeaffix_expr(
-    text: &ast::Expr,
+    text: Expr<'_>,
     affix_query: &AffixQuery,
     locator: &Locator,
 ) -> String {
@@ -501,7 +481,7 @@ struct AffixQuery<'a> {
     /// Whether the method called is `startswith` or `endswith`.
     kind: AffixKind,
     /// Node representing the prefix or suffix being passed to the string method.
-    affix: &'a ast::Expr,
+    affix: Expr<'a>,
 }
 
 /// Ingredients for a statement or expression
@@ -511,9 +491,9 @@ struct AffixQuery<'a> {
 #[derive(Debug)]
 struct RemoveAffixData<'a> {
     /// Node representing the string whose prefix or suffix we want to remove
-    text: &'a ast::Expr,
+    text: Expr<'a>,
     /// Node representing the bound used to slice the string
-    bound: &'a ast::Expr,
+    bound: Expr<'a>,
     /// Contains the prefix or suffix used in `text.startswith(prefix)` or `text.endswith(suffix)`
     affix_query: AffixQuery<'a>,
 }

@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+use ruff_python_ast::{ExceptHandlerKind, Stmt, StmtKind, Suite};
 
 use crate::Violation;
 use crate::codes::Category;
@@ -163,70 +163,51 @@ impl Violation for TooManyBranches {
     }
 }
 
-fn num_branches(stmts: &[Stmt]) -> usize {
+fn num_branches(stmts: Suite<'_>) -> usize {
+    fn clause(body: Suite<'_>) -> usize {
+        if body.is_empty() {
+            0
+        } else {
+            1 + num_branches(body)
+        }
+    }
+
     stmts
         .iter()
-        .map(|stmt| match stmt {
-            Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                ..
-            }) => {
-                1 + num_branches(body)
+        .map(|stmt| match stmt.classify() {
+            StmtKind::If(stmt) => {
+                let elif_else_clauses = stmt.elif_else_clauses();
+                1 + num_branches(stmt.body())
                     + elif_else_clauses.len()
                     + elif_else_clauses
                         .iter()
-                        .map(|clause| num_branches(&clause.body))
+                        .map(|clause| num_branches(clause.body()))
                         .sum::<usize>()
             }
-            Stmt::Match(ast::StmtMatch { cases, .. }) => {
+            StmtKind::Match(stmt) => {
+                let cases = stmt.cases();
                 cases.len()
                     + cases
                         .iter()
-                        .map(|case| num_branches(&case.body))
+                        .map(|case| num_branches(case.body()))
                         .sum::<usize>()
             }
             // The `with` statement is not considered a branch but the statements inside the `with` should be counted.
-            Stmt::With(ast::StmtWith { body, .. }) => num_branches(body),
-            Stmt::For(ast::StmtFor { body, orelse, .. })
-            | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-                1 + num_branches(body)
-                    + (if orelse.is_empty() {
-                        0
-                    } else {
-                        1 + num_branches(orelse)
-                    })
-            }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
+            StmtKind::With(stmt) => num_branches(stmt.body()),
+            StmtKind::For(stmt) => 1 + num_branches(stmt.body()) + clause(stmt.orelse()),
+            StmtKind::While(stmt) => 1 + num_branches(stmt.body()) + clause(stmt.orelse()),
+            StmtKind::Try(stmt) => {
                 // Count each `except` clause as a branch; the `else` and `finally` clauses also
                 // count, but the `try` clause itself does not.
-                num_branches(body)
-                    + (if orelse.is_empty() {
-                        0
-                    } else {
-                        1 + num_branches(orelse)
-                    })
-                    + (if finalbody.is_empty() {
-                        0
-                    } else {
-                        1 + num_branches(finalbody)
-                    })
-                    + handlers
+                num_branches(stmt.body())
+                    + clause(stmt.orelse())
+                    + clause(stmt.finalbody())
+                    + stmt
+                        .handlers()
                         .iter()
                         .map(|handler| {
-                            1 + {
-                                let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                                    body,
-                                    ..
-                                }) = handler;
-                                num_branches(body)
-                            }
+                            let ExceptHandlerKind::ExceptHandler(handler) = handler.classify();
+                            1 + num_branches(handler.body())
                         })
                         .sum::<usize>()
             }
@@ -238,8 +219,8 @@ fn num_branches(stmts: &[Stmt]) -> usize {
 /// PLR0912
 pub(crate) fn too_many_branches(
     checker: &Checker,
-    stmt: &Stmt,
-    body: &[Stmt],
+    stmt: Stmt<'_>,
+    body: Suite<'_>,
     max_branches: usize,
 ) {
     let branches = num_branches(body);

@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
@@ -167,14 +167,16 @@ impl Violation for PandasUseOfDotStack {
     }
 }
 
-pub(crate) fn call(checker: &Checker, func: &Expr) {
+pub(crate) fn call(checker: &Checker, func: Expr<'_>) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
 
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func else {
+    let ExprKind::Attribute(attribute) = func.classify() else {
         return;
     };
+    let value = attribute.value();
+    let attr = attribute.attr();
 
     // Ignore irrelevant bindings (like imports).
     if !matches!(

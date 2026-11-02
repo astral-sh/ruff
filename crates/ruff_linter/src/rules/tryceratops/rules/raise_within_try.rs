@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+use ruff_python_ast::StmtRaise;
+use ruff_python_ast::{NodeList, Stmt, StmtKind, Suite};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
@@ -63,21 +64,25 @@ impl Violation for RaiseWithinTry {
 
 #[derive(Default)]
 struct RaiseStatementVisitor<'a> {
-    raises: Vec<&'a Stmt>,
+    raises: Vec<Stmt<'a>>,
 }
 
 impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::Raise(_) => self.raises.push(stmt),
-            Stmt::Try(_) => (),
+    fn visit_stmt(&mut self, stmt: Stmt<'a>) {
+        match stmt.classify() {
+            StmtKind::Raise(_) => self.raises.push(stmt),
+            StmtKind::Try(_) => (),
             _ => walk_stmt(self, stmt),
         }
     }
 }
 
 /// TRY301
-pub(crate) fn raise_within_try(checker: &Checker, body: &[Stmt], handlers: &[ExceptHandler]) {
+pub(crate) fn raise_within_try(
+    checker: &Checker,
+    body: Suite<'_>,
+    handlers: NodeList<'_, ruff_python_ast::kind::ExceptHandler>,
+) {
     if handlers.is_empty() {
         return;
     }
@@ -99,11 +104,7 @@ pub(crate) fn raise_within_try(checker: &Checker, body: &[Stmt], handlers: &[Exc
         .collect();
 
     for stmt in raises {
-        let Stmt::Raise(ast::StmtRaise {
-            exc: Some(exception),
-            ..
-        }) = stmt
-        else {
+        let Some(exception) = stmt.as_raise_stmt().and_then(StmtRaise::exc) else {
             continue;
         };
 
@@ -113,7 +114,7 @@ pub(crate) fn raise_within_try(checker: &Checker, body: &[Stmt], handlers: &[Exc
             || handled_exceptions.iter().any(|expr| {
                 checker
                     .semantic()
-                    .resolve_builtin_symbol(expr)
+                    .resolve_builtin_symbol(*expr)
                     .is_some_and(|builtin| matches!(builtin, "Exception" | "BaseException"))
             })
         {

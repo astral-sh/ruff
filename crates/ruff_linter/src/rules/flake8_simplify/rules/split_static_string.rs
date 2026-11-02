@@ -1,15 +1,15 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::StringFlags;
+use ruff_python_ast::str::TripleQuotes;
 use ruff_python_ast::{
-    Expr, ExprCall, ExprContext, ExprList, ExprUnaryOp, StringLiteral, StringLiteralFlags,
-    StringLiteralValue, UnaryOp, str::TripleQuotes,
+    self as ast, BuildId, Builder, Expr, ExprKind, StringFlags, StringLiteralFlags, StringValue,
+    UnaryOp,
 };
-use ruff_text_size::{Ranged, TextRange};
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::fix::syntax;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -92,10 +92,10 @@ impl Violation for SplitStaticString {
 pub(crate) fn split_static_string(
     checker: &Checker,
     attr: &str,
-    call: &ExprCall,
-    str_value: &StringLiteralValue,
+    call: &ast::ExprCallFields<'_>,
+    str_value: StringValue<'_>,
 ) {
-    let ExprCall { arguments, .. } = call;
+    let arguments = call.arguments;
 
     let maxsplit_arg = arguments.find_argument_value("maxsplit", 1);
     let Some(maxsplit_value) = get_maxsplit_value(maxsplit_arg) else {
@@ -109,29 +109,34 @@ pub(crate) fn split_static_string(
         Method::RSplit
     };
 
-    let sep_arg = arguments.find_argument_value("sep", 0);
-    let split_replacement = if let Some(sep) = sep_arg {
-        match sep {
-            Expr::NoneLiteral(_) => split_default(str_value, maxsplit_value, method),
-            Expr::StringLiteral(sep_value) => {
-                let sep_value_str = sep_value.value.to_str();
-                Some(split_sep(str_value, sep_value_str, maxsplit_value, method))
-            }
-            // Ignore names until type inference is available.
-            _ => {
-                return;
-            }
-        }
+    let separator = match arguments.find_argument_value("sep", 0).map(Expr::classify) {
+        None | Some(ExprKind::NoneLiteral(_)) => None,
+        Some(ExprKind::StringLiteral(sep)) => Some(sep.value().to_str()),
+        // Ignore names until type inference is available.
+        _ => return,
+    };
+    let mut builder = Builder::default();
+    let split_replacement = if let Some(separator) = separator {
+        Some(split_sep(
+            &mut builder,
+            str_value,
+            separator,
+            maxsplit_value,
+            method,
+        ))
     } else {
-        split_default(str_value, maxsplit_value, method)
+        split_default(&mut builder, str_value, maxsplit_value, method)
     };
 
-    let mut diagnostic = checker.report_diagnostic(SplitStaticString { method }, call.range());
-    if let Some(ref replacement_expr) = split_replacement {
+    let mut diagnostic = checker.report_diagnostic(SplitStaticString { method }, call.range);
+    if let Some(replacement_expr) = split_replacement {
         diagnostic.set_fix(Fix::applicable_edit(
-            Edit::range_replacement(checker.generator().expr(replacement_expr), call.range()),
+            Edit::range_replacement(
+                checker.generator().expr(builder.get(replacement_expr)),
+                call.range,
+            ),
             // The fix does not preserve comments within implicit string concatenations.
-            if checker.comment_ranges().intersects(call.range()) {
+            if checker.comment_ranges().intersects(call.range) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
@@ -173,27 +178,23 @@ fn replace_flags(elt: &str, flags: StringLiteralFlags) -> StringLiteralFlags {
     }
 }
 
-fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
-    Expr::List(ExprList {
-        elts: elts
-            .iter()
-            .map(|elt| {
-                let element_flags = replace_flags(elt, flags);
-                Expr::from(StringLiteral {
-                    value: Box::from(*elt),
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                    flags: element_flags,
-                })
-            })
-            .collect(),
-        ctx: ExprContext::Load,
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    })
+fn construct_replacement(
+    builder: &mut Builder,
+    elts: &[&str],
+    flags: StringLiteralFlags,
+) -> BuildId<ruff_python_ast::kind::Expr> {
+    let elts = builder.map_list(elts, |builder, elt| {
+        syntax::string_literal(builder, elt, replace_flags(elt, flags))
+    });
+    syntax::list(builder, elts)
 }
 
-fn split_default(str_value: &StringLiteralValue, max_split: i32, method: Method) -> Option<Expr> {
+fn split_default(
+    builder: &mut Builder,
+    str_value: StringValue<'_>,
+    max_split: i32,
+    method: Method,
+) -> Option<BuildId<ruff_python_ast::kind::Expr>> {
     let string_val = str_value.to_str();
     match max_split.cmp(&0) {
         Ordering::Greater | Ordering::Equal => {
@@ -202,6 +203,7 @@ fn split_default(str_value: &StringLiteralValue, max_split: i32, method: Method)
             };
             let list_items = split_whitespace_with_maxsplit(string_val, max_split, method);
             Some(construct_replacement(
+                builder,
                 &list_items,
                 str_value.first_literal_flags(),
             ))
@@ -212,6 +214,7 @@ fn split_default(str_value: &StringLiteralValue, max_split: i32, method: Method)
                 .filter(|s| !s.is_empty())
                 .collect();
             Some(construct_replacement(
+                builder,
                 &list_items,
                 str_value.first_literal_flags(),
             ))
@@ -220,11 +223,12 @@ fn split_default(str_value: &StringLiteralValue, max_split: i32, method: Method)
 }
 
 fn split_sep(
-    str_value: &StringLiteralValue,
+    builder: &mut Builder,
+    str_value: StringValue<'_>,
     sep_value: &str,
     max_split: i32,
     method: Method,
-) -> Expr {
+) -> BuildId<ruff_python_ast::kind::Expr> {
     let value = str_value.to_str();
     let list_items: Vec<&str> = if let Ok(split_n) = usize::try_from(max_split) {
         match method {
@@ -246,22 +250,20 @@ fn split_sep(
         }
     };
 
-    construct_replacement(&list_items, str_value.first_literal_flags())
+    construct_replacement(builder, &list_items, str_value.first_literal_flags())
 }
 
 /// Returns the value of the `maxsplit` argument as an `i32`, if it is a numeric value.
-fn get_maxsplit_value(arg: Option<&Expr>) -> Option<i32> {
+fn get_maxsplit_value(arg: Option<Expr<'_>>) -> Option<i32> {
     if let Some(maxsplit) = arg {
-        match maxsplit {
+        match maxsplit.classify() {
             // Negative number.
-            Expr::UnaryOp(ExprUnaryOp {
-                op: UnaryOp::USub,
-                operand,
-                ..
-            }) => {
-                match &**operand {
-                    Expr::NumberLiteral(maxsplit_val) => maxsplit_val
-                        .value
+            ExprKind::UnaryOp(expr_unary_op) if expr_unary_op.op() == UnaryOp::USub => {
+                let operand = expr_unary_op.operand();
+
+                match operand.classify() {
+                    ExprKind::NumberLiteral(maxsplit_val) => maxsplit_val
+                        .value()
                         .as_int()
                         .and_then(ruff_python_ast::Int::as_i32)
                         .map(|f| -f),
@@ -270,8 +272,8 @@ fn get_maxsplit_value(arg: Option<&Expr>) -> Option<i32> {
                 }
             }
             // Positive number
-            Expr::NumberLiteral(maxsplit_val) => maxsplit_val
-                .value
+            ExprKind::NumberLiteral(maxsplit_val) => maxsplit_val
+                .value()
                 .as_int()
                 .and_then(ruff_python_ast::Int::as_i32),
             // Ignore when `maxsplit` is not a numeric value.

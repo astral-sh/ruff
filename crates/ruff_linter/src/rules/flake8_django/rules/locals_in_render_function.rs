@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprCall, ExprKind};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
@@ -46,14 +46,14 @@ impl Violation for DjangoLocalsInRenderFunction {
 }
 
 /// DJ003
-pub(crate) fn locals_in_render_function(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn locals_in_render_function(checker: &Checker, call: ExprCall<'_>) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
 
     if !checker
         .semantic()
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func())
         .is_some_and(|qualified_name| {
             matches!(qualified_name.segments(), ["django", "shortcuts", "render"])
         })
@@ -61,16 +61,17 @@ pub(crate) fn locals_in_render_function(checker: &Checker, call: &ast::ExprCall)
         return;
     }
 
-    if let Some(argument) = call.arguments.find_argument_value("context", 2) {
+    if let Some(argument) = call.arguments().find_argument_value("context", 2) {
         if is_locals_call(argument, checker.semantic()) {
             checker.report_diagnostic(DjangoLocalsInRenderFunction, argument.range());
         }
     }
 }
 
-fn is_locals_call(expr: &Expr, semantic: &SemanticModel) -> bool {
-    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+fn is_locals_call(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
+    let ExprKind::Call(call_node) = expr.classify() else {
         return false;
     };
+    let func = call_node.func();
     semantic.match_builtin_expr(func, "locals")
 }

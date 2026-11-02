@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::terminal::Terminal;
@@ -53,8 +52,8 @@ impl Violation for InvalidIndexReturnType {
 }
 
 /// PLE0305
-pub(crate) fn invalid_index_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
-    if function_def.name.as_str() != "__index__" {
+pub(crate) fn invalid_index_return(checker: &Checker, function_def: ast::StmtFunctionDef<'_>) {
+    if function_def.name().as_str() != "__index__" {
         return;
     }
 
@@ -80,14 +79,10 @@ pub(crate) fn invalid_index_return(checker: &Checker, function_def: &ast::StmtFu
         return;
     }
 
-    let returns = {
-        let mut visitor = ReturnStatementVisitor::default();
-        visitor.visit_body(&function_def.body);
-        visitor.returns
-    };
+    let returns = ReturnStatementVisitor::for_function(function_def).returns;
 
     for stmt in returns {
-        if let Some(value) = stmt.value.as_deref() {
+        if let Some(value) = stmt.value() {
             if !matches!(
                 ResolvedPythonType::from(value),
                 ResolvedPythonType::Unknown

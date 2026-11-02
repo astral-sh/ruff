@@ -144,10 +144,16 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
         } else {
             None
         };
-        let range = match binding.source.map(|id| checker.semantic().statement(id)) {
-            Some(ast::Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. })) => {
+        let range = match binding
+            .source
+            .map(|id| checker.semantic().statement(id))
+            .map(ruff_python_ast::Stmt::fields)
+        {
+            Some(ast::StmtFields::ImportFrom(ast::StmtImportFromFields {
+                module, names, ..
+            })) => {
                 if index < import_info.module_name.len() {
-                    module.as_ref().map_or(binding.range(), |module| {
+                    module.map_or(binding.range(), |module| {
                         SimpleTokenizer::starts_at(module.start(), checker.locator().contents())
                             .skip_trivia()
                             .find(|token| {
@@ -159,8 +165,8 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
                 } else {
                     names
                         .iter()
-                        .find(|alias| alias.name.as_str() == import_info.member_name)
-                        .map_or(binding.range(), |alias| alias.name.range())
+                        .find(|alias| alias.name().as_str() == import_info.member_name)
+                        .map_or(binding.range(), |alias| alias.name().range())
                 }
             }
             _ => binding.range(),

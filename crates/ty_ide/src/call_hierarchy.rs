@@ -8,6 +8,7 @@
 //! AST access goes through the salsa-cached `parsed_module`, which preserves
 //! incrementality without forcing the entry points themselves to be tracked.
 
+use ruff_python_ast::ExprKind;
 pub(crate) mod incoming_calls;
 pub(crate) mod outgoing_calls;
 
@@ -18,7 +19,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::CoveringNode;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::Tokens;
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::{self as ast, SyntaxNode};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::ResolverFile;
 use ty_python_core::ProgramFile;
@@ -136,20 +137,20 @@ pub(super) fn snapshot_item_label(item: &CallHierarchyItem) -> String {
 /// `Identifier` of `foo` in the attribute access.
 #[derive(Clone, Copy)]
 enum CalleeLeaf<'a> {
-    Name(&'a ast::ExprName),
+    Name(ast::ExprName<'a>),
     AttrIdentifier {
-        attribute: &'a ast::ExprAttribute,
-        identifier: &'a ast::Identifier,
+        attribute: ast::ExprAttribute<'a>,
+        identifier: ast::Identifier<'a>,
     },
 }
 
 impl<'a> CalleeLeaf<'a> {
-    fn from_expr(expr: &'a ast::Expr) -> Option<Self> {
-        match expr {
-            ast::Expr::Name(name) => Some(CalleeLeaf::Name(name)),
-            ast::Expr::Attribute(attr) => Some(CalleeLeaf::AttrIdentifier {
+    fn from_expr(expr: ast::Expr<'a>) -> Option<Self> {
+        match expr.classify() {
+            ExprKind::Name(name) => Some(CalleeLeaf::Name(name)),
+            ExprKind::Attribute(attr) => Some(CalleeLeaf::AttrIdentifier {
                 attribute: attr,
-                identifier: &attr.attr,
+                identifier: attr.attr(),
             }),
             _ => None,
         }
@@ -162,25 +163,25 @@ impl<'a> CalleeLeaf<'a> {
         self,
         model: &'a SemanticModel,
         tokens: &Tokens,
-        ancestors: &[AnyNodeRef<'a>],
+        ancestors: &[SyntaxNode<'a>],
     ) -> Option<(GotoTarget<'a>, TextRange)> {
         // Construct the leaf stack the way `find_goto_target_impl` does: the leaf
         // node has to be the identifier/name, with `ExprAttribute` (for attribute
         // calls) sitting just above it so `from_covering_node`'s `Identifier` arm
         // walks up to the `ExprCall` grandparent.
-        let mut stack: Vec<AnyNodeRef<'_>> = ancestors.to_vec();
+        let mut stack: Vec<SyntaxNode<'_>> = ancestors.to_vec();
         let call_site_range = match self {
             CalleeLeaf::Name(name) => {
-                stack.push(AnyNodeRef::from(name));
-                name.range
+                stack.push(SyntaxNode::from(name));
+                name.range()
             }
             CalleeLeaf::AttrIdentifier {
                 attribute,
                 identifier,
             } => {
-                stack.push(AnyNodeRef::from(attribute));
-                stack.push(AnyNodeRef::from(identifier));
-                identifier.range
+                stack.push(SyntaxNode::from(attribute));
+                stack.push(SyntaxNode::from(identifier));
+                identifier.range()
             }
         };
         let covering = CoveringNode::from_ancestors(stack);

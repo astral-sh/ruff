@@ -58,7 +58,7 @@ impl Violation for InvalidClassName {
 /// N801
 pub(crate) fn invalid_class_name(
     checker: &Checker,
-    class_def: &Stmt,
+    class_def: Stmt<'_>,
     name: &str,
     ignore_names: &IgnoreNames,
 ) {

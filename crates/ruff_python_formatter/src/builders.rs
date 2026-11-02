@@ -200,13 +200,13 @@ impl<'fmt, 'ast, 'buf, 'state> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf, 'stat
         self
     }
 
-    pub(crate) fn nodes<'a, T, I>(&mut self, entries: I) -> &mut Self
+    pub(crate) fn nodes<T, I>(&mut self, entries: I) -> &mut Self
     where
-        T: Ranged + AsFormat<PyFormatContext<'ast>> + 'a,
-        I: IntoIterator<Item = &'a T>,
+        T: Ranged + AsFormat<PyFormatContext<'ast>>,
+        I: IntoIterator<Item = T>,
     {
         for node in entries {
-            self.entry(node, &node.format());
+            self.entry(&node, &node.format());
         }
 
         self

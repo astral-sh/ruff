@@ -63,6 +63,7 @@
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::StmtClassDef;
+
 use ruff_text_size::Ranged;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::scope::ScopeKind;
@@ -141,7 +142,7 @@ impl<'db> PytestTest<'db> {
         &self,
         db: &'db dyn Db,
         module: &'ast ParsedModuleRef,
-    ) -> Vec<&'ast StmtClassDef> {
+    ) -> Vec<StmtClassDef<'ast>> {
         semantic_index(db, self.binding.program_file(db))
             .ancestor_scopes(self.binding.file_scope(db))
             .filter_map(|(_, scope)| scope.node().as_class().map(|class| class.node(module)))
@@ -234,14 +235,14 @@ fn is_excluded_test_function<'db>(db: &'db dyn Db, definition: Definition<'db>) 
     };
 
     let module = parsed_module(db, definition.python_file(db)).load(db);
-    let decorators = &function.node(&module).decorator_list;
+    let decorators = function.node(&module).decorator_list();
     if decorators.is_empty() {
         return false;
     }
 
     let inference = function_known_decorators(db, definition);
     for decorator in decorators {
-        match inference.expression_type(&decorator.expression) {
+        match inference.expression_type(decorator.expression()) {
             Some(Type::ClassLiteral(class)) if class.is_known(db, KnownClass::Property) => {
                 return true;
             }
@@ -400,7 +401,7 @@ fn pytest_test_class_kind<'db>(
     }
 
     let module = parsed_module(db, definition.python_file(db)).load(db);
-    if !class_ref.node(&module).name.as_str().starts_with("Test") {
+    if !class_ref.node(&module).name().as_str().starts_with("Test") {
         return None;
     }
 
@@ -628,7 +629,7 @@ test_alias = Helper.check
             let classes = collected
                 .enclosing_classes(&test.db, &module)
                 .into_iter()
-                .map(|class| class.name.as_str())
+                .map(|class| class.name().as_str())
                 .collect::<Vec<_>>();
             assert_eq!(classes, expected);
         }
@@ -1219,14 +1220,14 @@ class NonCallable(unittest.TestCase):
     }
 
     fn find_function<'ast>(
-        statements: &'ast [ast::Stmt],
+        statements: ruff_python_ast::Suite<'ast>,
         selector: &str,
-    ) -> Option<&'ast ast::StmtFunctionDef> {
+    ) -> Option<ast::StmtFunctionDef<'ast>> {
         if let Some((class_name, nested)) = selector.split_once('.') {
             return statements.iter().find_map(|statement| {
                 let class = statement.as_class_def_stmt()?;
-                (class.name.as_str() == class_name)
-                    .then(|| find_function(&class.body, nested))
+                (class.name().as_str() == class_name)
+                    .then(|| find_function(class.body(), nested))
                     .flatten()
             });
         }
@@ -1234,7 +1235,7 @@ class NonCallable(unittest.TestCase):
         statements.iter().find_map(|statement| {
             statement
                 .as_function_def_stmt()
-                .filter(|function| function.name.as_str() == selector)
+                .filter(|function| function.name().as_str() == selector)
         })
     }
 
@@ -1305,7 +1306,7 @@ mark: MarkGenerator
                         let alias = import.alias(&module);
                         FileRange::new(
                             test.binding.file(db),
-                            alias.asname.as_ref().unwrap_or(&alias.name).range(),
+                            alias.asname().unwrap_or(alias.name()).range(),
                         )
                     }
                     _ => test.binding.focus_range(db, &module),

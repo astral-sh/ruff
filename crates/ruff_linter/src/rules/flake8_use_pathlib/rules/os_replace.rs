@@ -72,7 +72,7 @@ impl Violation for OsReplace {
 }
 
 /// PTH105
-pub(crate) fn os_replace(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_replace(checker: &Checker, call: ExprCall<'_>, segments: &[&str]) {
     if segments != ["os", "replace"] {
         return;
     }
@@ -83,15 +83,15 @@ pub(crate) fn os_replace(checker: &Checker, call: &ExprCall, segments: &[&str]) 
     //             0    1           2                3
     // os.replace(src, dst, *, src_dir_fd=None, dst_dir_fd=None)
     // ```
-    if is_keyword_only_argument_non_default(&call.arguments, "src_dir_fd")
-        || is_keyword_only_argument_non_default(&call.arguments, "dst_dir_fd")
+    if is_keyword_only_argument_non_default(call.arguments(), "src_dir_fd")
+        || is_keyword_only_argument_non_default(call.arguments(), "dst_dir_fd")
     {
         return;
     }
 
     let fix_enabled = is_fix_os_replace_enabled(checker.settings())
         && !has_unknown_keywords_or_starred_expr(
-            &call.arguments,
+            call.arguments(),
             &["src", "dst", "src_dir_fd", "dst_dir_fd"],
         );
 
