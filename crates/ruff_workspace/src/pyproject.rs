@@ -261,8 +261,9 @@ fn get_minimum_supported_version(
         Some((major, minor))
     }
 
-    // Extract the minimum supported version from the specifiers.
-    let (major, minor) = requires_version
+    // Every specifier must hold, so the minimum supported version is the highest lower bound.
+    // For example, `>=3,>=3.12` only allows Python 3.12 and later.
+    let (mut major, mut minor) = requires_version
         .iter()
         .filter(|specifier| {
             matches!(
@@ -276,7 +277,31 @@ fn get_minimum_supported_version(
             )
         })
         .filter_map(|specifier| major_minor(specifier.version()))
-        .min()?;
+        .max()?;
+
+    // Skip release series that a wildcard exclusion rules out entirely. For example,
+    // `>=3.7,!=3.7.*` allows Python 3.8 and later, and `>=2.7,!=2.*` allows Python 3.0 and later.
+    // A narrower exclusion like `!=3.7.0.*` or `!=3.7.0` still allows Python 3.7.1, so it doesn't
+    // change the minimum version. Each step moves the version forward past the matching
+    // specifier, so the loop runs at most once per specifier.
+    while let Some(next) = requires_version.iter().find_map(|specifier| {
+        if *specifier.operator() != Operator::NotEqualStar {
+            return None;
+        }
+        match *specifier.version().release() {
+            [excluded_major] if excluded_major == major => {
+                major.checked_add(1).map(|major| (major, 0))
+            }
+            [excluded_major, excluded_minor]
+                if excluded_major == major && excluded_minor == minor =>
+            {
+                minor.checked_add(1).map(|minor| (major, minor))
+            }
+            _ => None,
+        }
+    }) {
+        (major, minor) = next;
+    }
 
     debug!("Detected minimum supported `requires-python` version: {major}.{minor}");
 
@@ -645,6 +670,21 @@ per-file-ignores = { "__init__.py" = ["F401"] }
         assert_eq!(minimum(">=3.8.2")?, Some(PythonVersion::PY38));
         assert_eq!(minimum(">=3.8,<3.12")?, Some(PythonVersion::PY38));
         assert_eq!(minimum("<3.12")?, None);
+
+        // The highest lower bound wins, because every specifier must hold.
+        assert_eq!(minimum(">=3,>=3.12")?, Some(PythonVersion::PY312));
+        assert_eq!(minimum(">=3.12,>=3.8")?, Some(PythonVersion::PY312));
+
+        // A wildcard exclusion of the minimum release series moves the minimum past it.
+        assert_eq!(minimum(">=3.7,!=3.7.*")?, Some(PythonVersion::PY38));
+        assert_eq!(minimum(">=3.7,!=3.7.*,!=3.8.*")?, Some(PythonVersion::PY39));
+        assert_eq!(minimum(">=3.7,!=3.8.*")?, Some(PythonVersion::PY37));
+        assert_eq!(minimum(">=3.7,!=3.7.0.*")?, Some(PythonVersion::PY37));
+        assert_eq!(minimum(">=3.7,!=3.7.0")?, Some(PythonVersion::PY37));
+        assert_eq!(
+            minimum(">=2.7,!=2.*")?,
+            Some(PythonVersion { major: 3, minor: 0 })
+        );
 
         // A missing minor component is treated as `0`.
         assert_eq!(minimum(">=3")?, Some(PythonVersion { major: 3, minor: 0 }));

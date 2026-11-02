@@ -3008,6 +3008,64 @@ select = ["UP006"]
     Ok(())
 }
 
+/// Infer `3.12` from `requires-python` in `pyproject.toml` with several lower bounds. Every
+/// specifier must hold, so the highest lower bound wins, and the `>=3` doesn't trigger a warning
+/// about Python 3.0 being older than the oldest supported version. `type` statements require
+/// Python 3.12.
+#[test]
+fn requires_python_multiple_lower_bounds() -> Result<()> {
+    let fixture = CliTest::with_file(
+        "pyproject.toml",
+        r#"[project]
+requires-python = ">= 3, >= 3.12"
+"#,
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--select", "F"])
+        .args(["--stdin-filename", "test.py"])
+        .arg("-")
+        .pass_stdin("type X = int\n"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// Infer `3.8` from `requires-python` in `pyproject.toml` that excludes the Python 3.7 series.
+/// Named assignment expressions require Python 3.8.
+#[test]
+fn requires_python_excluded_series() -> Result<()> {
+    let fixture = CliTest::with_file(
+        "pyproject.toml",
+        r#"[project]
+requires-python = ">= 3.7, != 3.7.*"
+"#,
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--select", "F"])
+        .args(["--stdin-filename", "test.py"])
+        .arg("-")
+        .pass_stdin("if (x := 1): ...\n"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 /// A `requires-python` older than the oldest supported version is clamped to that version. UP006
 /// requires Python 3.9, so it doesn't apply when targeting Python 3.7. See astral-sh/ruff#29863.
 #[test]
