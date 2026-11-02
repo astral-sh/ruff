@@ -243,8 +243,8 @@ def _(ebook: Ebook, review: Review):
 ```
 
 With `to_field`, both `pk` and `<field>_id` have the referenced field's value type, even when it
-differs from the related model's primary key. Here, `to_field="isbn"` makes `pk` and `book_id`
-have type `str`, while `Book.pk` still has type `UUID`.
+differs from the related model's primary key. Here, `to_field="isbn"` makes `pk` and `book_id` have
+type `str`, while `Book.pk` still has type `UUID`.
 
 ```py
 class EbookByIsbn(models.Model):
