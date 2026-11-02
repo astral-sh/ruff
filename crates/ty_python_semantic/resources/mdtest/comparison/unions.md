@@ -158,3 +158,71 @@ error[unsupported-operator]: Unsupported `<` operation
    |               Has type `tuple[int] | tuple[int, int]`
 info: Operation fails because operator `<` is not supported between objects of type `int` and `str`
 ```
+
+## Equality narrowing with many union alternatives
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Excluding a union of intersections can expand into exponentially many alternatives.
+
+```py
+from typing import Any, Literal
+from ty_extensions import Intersection
+
+class A[T]: ...
+class B[T]: ...
+
+type Case[T] = Intersection[A[T], B[T]]
+```
+
+With two cases, the exact exclusions fit within the budget:
+
+```py
+def two_cases(value: Any | Case[Literal[1]] | Case[Literal[2]]) -> None:
+    if value == "example":
+        # revealed: (Any & ~A[Literal[1]] & ~A[Literal[2]]) | (Any & ~B[Literal[1]] & ~A[Literal[2]]) | (Any & ~A[Literal[1]] & ~B[Literal[2]]) | (Any & ~B[Literal[1]] & ~B[Literal[2]])
+        reveal_type(value)
+```
+
+When the expansion exceeds the intersection budget, equality narrowing keeps the surviving `Any`
+without the exclusions:
+
+```py
+def three_cases(value: Any | Case[Literal[1]] | Case[Literal[2]] | Case[Literal[3]]) -> None:
+    if value == "example":
+        reveal_type(value)  # revealed: Any
+```
+
+The same fallback prevents excessive memory use with a larger union:
+
+```py
+type Cases = (
+    Case[Literal[1]]
+    | Case[Literal[2]]
+    | Case[Literal[3]]
+    | Case[Literal[4]]
+    | Case[Literal[5]]
+    | Case[Literal[6]]
+    | Case[Literal[7]]
+    | Case[Literal[8]]
+    | Case[Literal[9]]
+    | Case[Literal[10]]
+    | Case[Literal[11]]
+    | Case[Literal[12]]
+    | Case[Literal[13]]
+    | Case[Literal[14]]
+    | Case[Literal[15]]
+    | Case[Literal[16]]
+    | Case[Literal[17]]
+    | Case[Literal[18]]
+    | Case[Literal[19]]
+    | Case[Literal[20]]
+)
+
+def large(value: Any | Cases) -> None:
+    if value == "example":
+        reveal_type(value)  # revealed: Any
+```
