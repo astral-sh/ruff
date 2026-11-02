@@ -1,0 +1,92 @@
+name: Prepare a fuzz corpus
+description: Find or publish an artifact containing the generated Python source for each seed
+inputs:
+  python-version:
+    description: Python version used by the fuzzer
+    required: true
+  seeds:
+    description: Inclusive seed range
+    required: true
+  producer-workflow:
+    description: Path of the workflow that publishes the default-branch corpus
+    required: true
+  download:
+    description: Also make the sources available in this job
+    default: "false"
+outputs:
+  name:
+    description: Artifact name
+    value: ${{ steps.corpus.outputs.name }}
+  run-id:
+    description: Workflow run containing the artifact
+    value: ${{ steps.upload.outputs.artifact-id && github.run_id || steps.corpus.outputs.run-id }}
+  path:
+    description: Directory containing the sources when download is enabled
+    value: ${{ steps.corpus.outputs.path }}
+runs:
+  using: composite
+  steps:
+    - name: Find a matching fuzz corpus
+      id: corpus
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        FUZZ_PYTHON: ${{ inputs.python-version }}
+        FUZZ_SEEDS: ${{ inputs.seeds }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        PRODUCER_WORKFLOW: ${{ inputs.producer-workflow }}
+        PR_NUMBER: ${{ github.event.pull_request.number || 0 }}
+      run: |
+        python_version=$(uv run --no-project --python="$FUZZ_PYTHON" python -c 'import platform; print(platform.python_version())')
+        generator=$(uv tree --frozen --project="$GITHUB_ACTION_PATH" --python="$FUZZ_PYTHON" \
+          --package pysource-codegen --color never | sha256sum)
+        # Bump the format version if the generator arguments or file layout change.
+        name="py-fuzzer-corpus-v1-$python_version-$FUZZ_SEEDS-${generator%% *}"
+        echo "name=$name" >> "$GITHUB_OUTPUT"
+        echo "path=$RUNNER_TEMP/fuzz-corpus" >> "$GITHUB_OUTPUT"
+
+        runs=$(gh api --paginate -X GET "repos/$GITHUB_REPOSITORY/actions/artifacts" -f name="$name" \
+          --jq '.artifacts[] | select(.expired == false) | .workflow_run.id')
+        workflow=${GITHUB_WORKFLOW_REF#"$GITHUB_REPOSITORY/"}
+        # A pull request can reuse its own corpus. Only default-branch runs
+        # can supply a corpus to other pull requests or scheduled jobs.
+        for run in $runs; do
+          producer=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run")
+          if jq -e --arg publisher "$PRODUCER_WORKFLOW" --arg caller "${workflow%%@*}" \
+            --arg branch "$DEFAULT_BRANCH" --argjson pr "$PR_NUMBER" '
+            (.path == $publisher and .head_branch == $branch and (.event == "push" or .event == "schedule")) or
+            (.path == $caller and .event == "pull_request" and any(.pull_requests[]; .number == $pr))
+          ' <<< "$producer" > /dev/null; then
+            echo "run-id=$run" >> "$GITHUB_OUTPUT"
+            break
+          fi
+        done
+    - name: Download the fuzz corpus
+      id: download
+      if: ${{ steps.corpus.outputs.run-id != '' && inputs.download == 'true' }}
+      continue-on-error: true
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        github-token: ${{ github.token }}
+        run-id: ${{ steps.corpus.outputs.run-id }}
+        name: ${{ steps.corpus.outputs.name }}
+        path: ${{ steps.corpus.outputs.path }}
+    - name: Generate the fuzz corpus
+      id: generate
+      if: ${{ steps.corpus.outputs.run-id == '' || steps.download.outcome == 'failure' }}
+      shell: bash
+      env:
+        FUZZ_PYTHON: ${{ inputs.python-version }}
+        FUZZ_SEEDS: ${{ inputs.seeds }}
+      run: |
+        uv run --python="$FUZZ_PYTHON" --project="$GITHUB_ACTION_PATH" --locked --no-dev \
+          generate-fuzz-corpus --output-dir="$RUNNER_TEMP/fuzz-corpus" "$FUZZ_SEEDS"
+    - name: Upload the fuzz corpus
+      id: upload
+      if: ${{ steps.generate.outcome == 'success' }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ${{ steps.corpus.outputs.name }}
+        path: ${{ steps.corpus.outputs.path }}
+        if-no-files-found: error
+        overwrite: true

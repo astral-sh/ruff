@@ -1,0 +1,43 @@
+name: Fixed-seed fuzz corpus
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "python/py-fuzzer/**"
+      - ".github/workflows/fuzz-corpus.yml"
+  # Replace expired artifacts even when the generator hasn't changed.
+  schedule:
+    - cron: "13 3 * * *"
+  workflow_call:
+    outputs:
+      name:
+        value: ${{ jobs.corpus.outputs.name }}
+      run-id:
+        value: ${{ jobs.corpus.outputs.run-id }}
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  corpus:
+    if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    outputs:
+      name: ${{ steps.corpus.outputs.name }}
+      run-id: ${{ steps.corpus.outputs.run-id }}
+    steps:
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: false
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.13.6"
+          checksum: "f29c3e94ffabd7e6f3ba521dba169a9b7ec12100bf3257087f0f24f6123f3645"
+      - uses: $/python/py-fuzzer
+        id: corpus
+        with:
+          # The parser checks the first 501 seeds in ty's 1,001-seed corpus.
+          seeds: 0-1000
+          python-version: "3.14"
+          producer-workflow: .github/workflows/fuzz-corpus.yml
