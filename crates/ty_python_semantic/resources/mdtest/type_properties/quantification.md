@@ -330,6 +330,25 @@ def impossible[X, A, B]() -> None:
     static_assert(impossible.is_trivially_never_satisfied())
 ```
 
+The same impossible bounds arise when ty checks whether `Iterable[tuple[T, str]]` already covers
+`type[Enum]` in the union below. `EnumMeta.__iter__` takes `self: type[M]` and returns
+`Iterator[M]`, so this would require `Enum ≤ M ≤ tuple[T, str]`. No such `M` exists for any `T`.
+Iterating over `Choice` yields enum members, so the call relies on ty keeping the `type[Enum]` arm.
+This is a regression test for <https://github.com/astral-sh/ty/issues/4551>.
+
+```py
+from collections.abc import Iterable
+from enum import Enum
+
+class Choice(Enum):
+    A = "a"
+
+def accepts_choices[T](choices: Iterable[tuple[T, str]] | type[Enum]) -> None:
+    pass
+
+accepts_choices(Choice)  # ok
+```
+
 ## Satisfiability depends on free variables
 
 There is an `X` satisfying `A ≤ X ≤ int` when `A` is `int`, but not when `A` is `str`. When we
