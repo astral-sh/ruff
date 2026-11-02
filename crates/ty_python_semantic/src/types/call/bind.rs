@@ -6606,7 +6606,8 @@ impl<'db> CallInference<'_, 'db> {
 
     /// Reuse the type arguments of ordinary calls with the same inference evidence.
     /// Argument validation and return refinement still use the complete original call.
-    fn shared_type_arguments(&self, context: GenericContext<'db>) -> Option<TypeVarInference<'db>> {
+    fn shared_type_arguments(&self) -> Option<TypeVarInference<'db>> {
+        let context = self.signature.generic_context?;
         if self.is_partial_application
             || (0..self.arguments.len()).any(|index| self.arguments.is_variadic(index))
             || self
@@ -6631,14 +6632,12 @@ impl<'db> CallInference<'_, 'db> {
 
         let relations: Box<[_]> = self
             .argument_relations()
+            .map(|relation| (relation.declared_type, relation.argument_type))
             // Equal types produce no inference evidence. Two string literals also contribute
             // no mapping, whether or not the actual value will pass argument validation.
-            .filter(|r| {
-                r.declared_type != r.argument_type
-                    && !(r.declared_type.as_string_literal().is_some()
-                        && r.argument_type.as_string_literal().is_some())
+            .filter(|(formal, actual)| {
+                formal != actual && !(formal.is_string_literal() && actual.is_string_literal())
             })
-            .map(|r| (r.declared_type, r.argument_type))
             .collect();
         // Instance types recur across calls even when their values differ. Limit sharing for
         // explicitly bounded variables to this case: a callback or class object can introduce
@@ -6885,7 +6884,6 @@ impl<'db> GenericCallInference<'_, 'db> {
 
         let inference = self.solve(
             constraints,
-            generic_context,
             builder,
             &preferred_type_mappings,
             preferred_solutions_incomplete,
@@ -6909,7 +6907,6 @@ impl<'db> GenericCallInference<'_, 'db> {
     fn solve<'c>(
         &self,
         constraints: &'c ConstraintSetBuilder<'db>,
-        generic_context: GenericContext<'db>,
         mut builder: SpecializationBuilder<'db, 'c>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         preferred_solutions_incomplete: bool,
@@ -6974,9 +6971,9 @@ impl<'db> GenericCallInference<'_, 'db> {
         };
 
         let preferred_specialization = (!preferred_type_mappings.is_empty()).then(|| {
-            generic_context.specialize(
+            self.generic_context.specialize(
                 db,
-                generic_context
+                self.generic_context
                     .variables(db)
                     .map(|typevar| {
                         preferred_type_mappings
@@ -8953,10 +8950,11 @@ impl<'db> Binding<'db> {
                 .generic_context
                 .map_or(TypeVarSet::None, |context| context.inferable_typevars(db)),
         };
-        let check = |inferred,
+        let check = |shared,
                      constraints: &ConstraintSetBuilder<'db>,
                      errors: &mut Vec<_>,
                      parameter_tys: &mut [Option<Type<'db>>]| {
+            let inferred = call.infer(constraints, shared);
             let mut checker = ArgumentTypeChecker::new(
                 db,
                 env,
@@ -8975,20 +8973,11 @@ impl<'db> Binding<'db> {
             checker.finish()
         };
 
-        if let Some(shared) = self
-            .signature
-            .generic_context
-            .and_then(|context| call.shared_type_arguments(context))
-        {
+        if let Some(shared) = call.shared_type_arguments() {
             let validation = ConstraintSetBuilder::new();
             let mut errors = self.errors.clone();
             let mut parameter_tys = self.parameter_tys.clone();
-            let result = check(
-                call.infer(&validation, Some(shared)),
-                &validation,
-                &mut errors,
-                &mut parameter_tys,
-            );
+            let result = check(Some(shared), &validation, &mut errors, &mut parameter_tys);
             // The source call's solver seeds its builder with the first instance of each
             // type-variable identity, including specialized bounds. Terminal checks never
             // consult those entries. Otherwise check this call with its original seeded builder.
@@ -9000,11 +8989,9 @@ impl<'db> Binding<'db> {
             }
         }
 
-        let constraints = &ConstraintSetBuilder::new();
-        let inferred = call.infer(constraints, None);
         (self.inferable_typevars, self.inference, self.return_ty) = check(
-            inferred,
-            constraints,
+            None,
+            &ConstraintSetBuilder::new(),
             &mut self.errors,
             &mut self.parameter_tys,
         );
