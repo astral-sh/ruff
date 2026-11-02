@@ -5017,6 +5017,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return self.infer_from_constraint_set(when);
             }
 
+            (formal @ Type::TypedDict(_), actual) => {
+                let when = self.constraint_for_relation(formal, actual, relation_polarity);
+                return self.infer_from_constraint_set(when);
+            }
+
             (Type::Callable(formal_callable), _) => {
                 let Some(actual_callables) = actual.try_upcast_to_callable(db, self.env) else {
                     return Ok(());
