@@ -1,0 +1,55 @@
+name: Reproduce a Windows junction restore with @actions/cache
+
+on:
+  push:
+    branches: [zsol/diagnose-windows-python-cache]
+    paths: [.github/workflows/reproduce-windows-cache-junction.yml]
+
+permissions: {}
+
+jobs:
+  reproduce:
+    runs-on: windows-2022
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["6.2.0", "6.3.0"]
+    env:
+      CACHE_VERSION: ${{ matrix.version }}
+    steps:
+      - name: Prepare the repro
+        shell: pwsh
+        run: |
+          @{ dependencies = @{ '@actions/cache' = $env:CACHE_VERSION } } | ConvertTo-Json | Set-Content package.json
+          npm install --ignore-scripts --no-audit --no-fund
+          @'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import { restoreCache, saveCache } from '@actions/cache';
+
+          fs.mkdirSync('target');
+          fs.symlinkSync(path.resolve('target'), 'alias', 'junction');
+          console.log('Before save:', fs.realpathSync.native('alias'));
+
+          const paths = ['alias', 'target'];
+          const key = ['junction', process.env.CACHE_VERSION, process.env.GITHUB_RUN_ID, process.env.GITHUB_RUN_ATTEMPT].join('-');
+          const id = await saveCache(paths, key);
+          assert.ok(id > 0, 'cache save failed');
+          fs.unlinkSync('alias');
+          fs.rmdirSync('target');
+
+          const hit = await restoreCache(paths, key);
+          assert.equal(hit, key);
+          console.log('Restored exact key:', hit);
+          '@ | Set-Content repro.mjs
+      - name: Save and restore using the cache API
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: await exec.exec('node', ['repro.mjs'])
+      - name: Inspect the restored link
+        shell: pwsh
+        run: |
+          cmd /c dir /al
+          python -c "import os; print(os.path.realpath('alias', strict=True))"
