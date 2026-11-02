@@ -63,7 +63,11 @@ jobs:
     # CI on main is redundant in the security repository.
     if: ${{ github.repository != 'astral-sh/ruff-security' || github.ref != 'refs/heads/main' }}
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    permissions:
+      actions: read
+      contents: read
     outputs:
+      fuzz-corpus-run-id: ${{ steps.fuzz_corpus.outputs.run-id }}
       comparison_base: ${{ steps.merge_base.outputs.sha }}
       # Flag that is raised when any code that affects parser is changed
       parser: ${{ steps.check_parser.outputs.changed }}
@@ -111,6 +115,26 @@ jobs:
             sha="$(git merge-base HEAD "origin/${BASE_REF}")"
           fi
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
+      # Change filters on main compare against main itself. Check the corpus directly
+      # so expiry or a Python patch release can trigger publication on the next push.
+      - name: Set up uv for the fuzz corpus lookup
+        if: ${{ github.event_name == 'push' }}
+        continue-on-error: true
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.13.6"
+          checksum: "f29c3e94ffabd7e6f3ba521dba169a9b7ec12100bf3257087f0f24f6123f3645"
+          enable-cache: false
+      - name: Find the fuzz corpus on main
+        if: ${{ github.event_name == 'push' }}
+        id: fuzz_corpus
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UV_PYTHON: ${{ env.PYTHON_VERSION }}
+        run: uv run --locked python/py-fuzzer/prepare_corpus.py "$FUZZ_CORPUS_SEEDS" >> "$GITHUB_OUTPUT"
 
       - name: Check if release build inputs changed
         id: check_release
@@ -665,9 +689,15 @@ jobs:
 
   fuzz-parser:
     name: "fuzz parser"
+    # Concurrent pushes can observe the same missing corpus before either publishes it.
+    concurrency: ${{ github.workflow }}-fuzz-parser-${{ github.ref }}
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     needs: determine_changes
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.parser == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
+    if: >-
+      !contains(github.event.pull_request.labels.*.name, 'no-test') &&
+      ((github.event_name == 'push' && !needs.determine_changes.outputs.fuzz-corpus-run-id) ||
+       needs.determine_changes.outputs.parser == 'true' ||
+       needs.determine_changes.outputs.py-fuzzer == 'true')
     permissions:
       actions: read
       contents: read
