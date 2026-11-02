@@ -1,0 +1,146 @@
+name: Verify the setup-uv Windows Python cache fix
+
+on:
+  push:
+    branches: [zsol/diagnose-windows-python-cache]
+    paths:
+      - .github/workflows/verify-windows-python-cache-fix.yml
+      - .github/diagnostics/setup-uv-windows.patch
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    outputs:
+      cache-key: ${{ steps.setup.outputs.cache-key }}
+    steps:
+      - &cache-input
+        name: Write a common cache dependency file
+        run: Set-Content cache-input.txt 'junction-restore'
+      - name: Set up uv with the original action
+        id: setup
+        uses: astral-sh/setup-uv@4c58170a945e4e68ce3fc5b7af3d341d9b8c64ef
+        with:
+          version: "0.13.6"
+          python-version: "3.10"
+          enable-cache: true
+          cache-python: true
+          restore-cache: false
+          cache-dependency-glob: cache-input.txt
+          cache-suffix: &suffix junction-repair-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Seed the managed installation
+        run: |
+          uv python install --no-bin 3.10.22
+          New-Item -ItemType Directory -Force $env:UV_CACHE_DIR | Out-Null
+          Set-Content (Join-Path $env:UV_CACHE_DIR 'seed.txt') 'junction-restore'
+
+  verify:
+    needs: seed
+    runs-on: windows-2022
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        action: [original, patched]
+    steps:
+      - name: Check out the diagnostic patch
+        if: matrix.action == 'patched'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check out setup-uv
+        if: matrix.action == 'patched'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: astral-sh/setup-uv
+          ref: 4c58170a945e4e68ce3fc5b7af3d341d9b8c64ef
+          path: candidate
+          persist-credentials: false
+      - name: Use setup-uv's Node version
+        if: matrix.action == 'patched'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: candidate/.nvmrc
+          package-manager-cache: false
+      - name: Apply, build, and test the patch
+        if: matrix.action == 'patched'
+        working-directory: candidate
+        shell: bash
+        run: |
+          git apply ../.github/diagnostics/setup-uv-windows.patch
+          npm ci --ignore-scripts
+          npm run build
+          npm run check
+          npm run package
+          npm run test:unit -- --runInBand --runTestsByPath __tests__/cache/repair-python-junctions.test.ts __tests__/cache/restore-cache.test.ts
+      - *cache-input
+      - name: Restore with the original action
+        if: matrix.action == 'original'
+        id: original
+        uses: astral-sh/setup-uv@4c58170a945e4e68ce3fc5b7af3d341d9b8c64ef
+        with: &restore
+          version: "0.13.6"
+          python-version: "3.10"
+          enable-cache: true
+          cache-python: true
+          save-cache: false
+          cache-dependency-glob: cache-input.txt
+          cache-suffix: *suffix
+      - name: Restore with the patched action
+        if: matrix.action == 'patched'
+        id: patched
+        # Execute the bundle rebuilt in this job.
+        uses: ./candidate # zizmor: ignore[self-repository]
+        with: *restore
+      - name: Check the cache hit and resolve the restored minor-version alias
+        shell: python
+        env:
+          ACTION: ${{ matrix.action }}
+          SEED_KEY: ${{ needs.seed.outputs.cache-key }}
+          RESTORE_KEY: ${{ steps.original.outputs.cache-key || steps.patched.outputs.cache-key }}
+          PYTHON_HIT: ${{ steps.original.outputs.python-cache-hit || steps.patched.outputs.python-cache-hit }}
+        run: |
+          import os
+          from pathlib import Path
+
+          assert os.environ["SEED_KEY"] == os.environ["RESTORE_KEY"] != ""
+          assert os.environ["PYTHON_HIT"] == "true", "expected the seeded Python cache"
+          root = Path(os.environ["UV_PYTHON_INSTALL_DIR"])
+          target = (root / "cpython-3.10.22-windows-x86_64-none").resolve(strict=True)
+          alias = root / "cpython-3.10-windows-x86_64-none"
+          print(f"Restored {os.environ['RESTORE_KEY']}-python; target exists at {target}")
+          if os.environ["ACTION"] == "original":
+              try:
+                  alias.resolve(strict=True)
+              except PermissionError as error:
+                  assert error.winerror == 5, error
+                  print(f"Original action reproduced {error}")
+              else:
+                  raise AssertionError(f"Expected WinError 5 when resolving {alias}")
+          else:
+              resolved = alias.resolve(strict=True)
+              assert resolved == target, (resolved, target)
+              print(f"Patched action resolved {alias} to {resolved}")
+      - name: Create a venv offline and resolve its Python home
+        if: matrix.action == 'patched'
+        shell: python
+        run: |
+          import os
+          import subprocess
+          from pathlib import Path
+
+          project = Path(os.environ["RUNNER_TEMP"]) / "junction-project"
+          project.mkdir()
+          (project / "pyproject.toml").write_text(
+              '[project]\nname = "probe"\nversion = "0.0.0"\nrequires-python = ">=3.8"\n'
+          )
+          subprocess.run(["uv", "sync", "--offline", "--managed-python", "--no-python-downloads"], cwd=project, check=True)
+          config = (project / ".venv" / "pyvenv.cfg").read_text()
+          home, = [Path(line.removeprefix("home = ")) for line in config.splitlines() if line.startswith("home = ")]
+          target = Path(os.environ["UV_PYTHON_INSTALL_DIR"]) / "cpython-3.10.22-windows-x86_64-none"
+          resolved = home.resolve(strict=True)
+          assert resolved == target.resolve(strict=True), (resolved, target)
+          print(f"pyvenv.cfg home {home} resolves to {resolved}")

@@ -1,0 +1,293 @@
+diff --git a/.github/workflows/test.yml b/.github/workflows/test.yml
+index a22926f..8a3fbc0 100644
+--- a/.github/workflows/test.yml
++++ b/.github/workflows/test.yml
+@@ -985,44 +985,41 @@ jobs:
+         run: rm -rf "$UV_PYTHON_INSTALL_DIR"
+
+   test-cache-python-installs:
+-    runs-on: ubuntu-latest
++    runs-on: ${{ matrix.os }}
++    strategy:
++      matrix:
++        os: [ubuntu-latest, windows-2022]
+     steps:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+         with:
+           persist-credentials: false
+       - name: Verify Python install dir is not populated
+-        run: |
+-          if [ -d /home/runner/work/_temp/uv-python-dir ]; then
+-            echo "Python install dir should not exist"
+-            exit 1
+-          fi
++        shell: bash
++        run: test ! -e "$RUNNER_TEMP/uv-python-dir"
+       - name: Setup uv with cache
+         uses: $/
+         with:
+           enable-cache: true
+           cache-python: true
+           cache-suffix: ${{ github.run_id }}-${{ github.run_attempt }}-test-cache-python-installs
+-      - run: uv sync --managed-python
++      - run: uv sync --managed-python --python 3.12
+         working-directory: __tests__/fixtures/uv-project
+       - name: Verify Python install dir exists
+-        run: |
+-          if [ ! -d /home/runner/work/_temp/uv-python-dir ]; then
+-            echo "Python install dir should exist"
+-            exit 1
+-          fi
++        shell: bash
++        run: test -d "$UV_PYTHON_INSTALL_DIR"
+   test-restore-python-installs:
+-    runs-on: ubuntu-latest
++    runs-on: ${{ matrix.os }}
+     needs: test-cache-python-installs
++    strategy:
++      matrix:
++        os: [ubuntu-latest, windows-2022]
+     steps:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+         with:
+           persist-credentials: false
+       - name: Verify Python install dir does not exist
+-        run: |
+-          if [ -d /home/runner/work/_temp/uv-python-dir ]; then
+-            echo "Python install dir should not exist"
+-            exit 1
+-          fi
++        shell: bash
++        run: test ! -e "$RUNNER_TEMP/uv-python-dir"
+       - name: Restore with cache
+         id: restore
+         uses: $/
+@@ -1030,20 +1027,19 @@ jobs:
+           enable-cache: true
+           cache-python: true
+           cache-suffix: ${{ github.run_id }}-${{ github.run_attempt }}-test-cache-python-installs
+-      - name: Verify Python install dir exists
+-        run: |
+-          if [ ! -d /home/runner/work/_temp/uv-python-dir ]; then
+-            echo "Python install dir should exist"
+-            exit 1
+-          fi
+-      - name: Cache was hit
+-        run: |
+-          if [ "$CACHE_HIT" != "true" ]; then
+-            exit 1
+-          fi
++      - name: Verify the restored Python minor-version link resolves to the patch directory
++        shell: python
+         env:
+           CACHE_HIT: ${{ steps.restore.outputs.python-cache-hit }}
+-      - run: uv sync --managed-python
++        run: |
++          import os
++          from pathlib import Path
++
++          assert os.environ["CACHE_HIT"] == "true", "expected a Python cache hit"
++          installs = Path(os.environ["UV_PYTHON_INSTALL_DIR"]).resolve(strict=True)
++          alias = next(installs.glob("cpython-3.12-*"))
++          assert alias.resolve(strict=True) in installs.glob("cpython-3.12.*-*"), alias
++      - run: uv sync --managed-python --python 3.12
+         working-directory: __tests__/fixtures/uv-project
+
+   test-python-install-dir:
+diff --git a/__tests__/cache/restore-cache.test.ts b/__tests__/cache/restore-cache.test.ts
+index fdc80d5..1a69d95 100644
+--- a/__tests__/cache/restore-cache.test.ts
++++ b/__tests__/cache/restore-cache.test.ts
+@@ -1,3 +1,4 @@
++import { fileURLToPath } from "node:url";
+ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+ import { createSetupInputs } from "../helpers/setup-inputs";
+
+@@ -48,6 +49,26 @@ beforeEach(() => {
+ });
+
+ describe("restoreCache", () => {
++  it("reports a Python cache miss on Windows when the restored install directory cannot be read", async () => {
++    const inputs = createSetupInputs({
++      cachePython: true,
++      // A file at the install directory path makes readdir fail.
++      pythonDir: fileURLToPath(import.meta.url),
++      restoreCache: true,
++    });
++    mockRestoreCache
++      .mockReturnValueOnce("uv-key")
++      .mockReturnValueOnce("python-key");
++
++    await restoreCache(inputs);
++
++    expect(mockSetOutput).toHaveBeenCalledWith("cache-hit", true);
++    expect(mockSetOutput).toHaveBeenCalledWith(
++      "python-cache-hit",
++      process.platform !== "win32",
++    );
++  });
++
+   it("encodes Python version ranges before adding them to the cache key", async () => {
+     await restoreCache(createSetupInputs(), ">3.10.11,<3.11");
+
+diff --git a/src/cache/restore-cache.ts b/src/cache/restore-cache.ts
+index e803e10..70ed522 100644
+--- a/src/cache/restore-cache.ts
++++ b/src/cache/restore-cache.ts
+@@ -4,6 +4,7 @@ import { hashFiles } from "../hash/hash-files";
+ import type { SetupInputs } from "../utils/inputs";
+ import * as log from "../utils/logging";
+ import { getArch, getOSNameVersion, getPlatform } from "../utils/platforms";
++import { repairPythonJunctions } from "./repair-python-junctions";
+
+ export const STATE_CACHE_KEY = "cache-key";
+ export const STATE_CACHE_MATCHED_KEY = "cache-matched-key";
+@@ -44,6 +45,7 @@ export async function restoreCache(
+       inputs.pythonDir,
+       STATE_PYTHON_CACHE_MATCHED_KEY,
+       "python-cache-hit",
++      process.platform === "win32" ? repairPythonJunctions : undefined,
+     );
+   } else {
+     core.setOutput("python-cache-hit", false);
+@@ -55,6 +57,7 @@ async function restoreCacheFromKey(
+   cachePath: string,
+   stateKey: string,
+   outputKey: string,
++  afterRestore?: (cachePath: string) => Promise<void>,
+ ): Promise<void> {
+   log.info(
+     `Trying to restore cache from GitHub Actions cache with key: ${cacheKey}`,
+@@ -62,6 +65,9 @@ async function restoreCacheFromKey(
+   let matchedKey: string | undefined;
+   try {
+     matchedKey = await cache.restoreCache([cachePath], cacheKey);
++    if (matchedKey) {
++      await afterRestore?.(cachePath);
++    }
+   } catch (err) {
+     const message = (err as Error).message;
+     log.warning(message);
+diff --git a/__tests__/cache/repair-python-junctions.test.ts b/__tests__/cache/repair-python-junctions.test.ts
+new file mode 100644
+index 0000000..ff909b1
+--- /dev/null
++++ b/__tests__/cache/repair-python-junctions.test.ts
+@@ -0,0 +1,65 @@
++import { promises as fs } from "node:fs";
++import { tmpdir } from "node:os";
++import * as path from "node:path";
++import { expect, it, jest } from "@jest/globals";
++
++const mockRealpath = jest.fn((p: string) => fs.realpath(p));
++const mockSymlink = jest.fn(fs.symlink);
++jest.unstable_mockModule("node:fs/promises", () => ({
++  ...fs,
++  realpath: mockRealpath,
++  symlink: mockSymlink,
++}));
++
++const { repairPythonJunctions } = await import(
++  "../../src/cache/repair-python-junctions"
++);
++
++it("repairs only broken links to sibling installations and preserves the cached target", async () => {
++  const temp = await fs.mkdtemp(path.join(tmpdir(), "setup-uv-"));
++  try {
++    const root = path.join(temp, "python");
++    const target = path.join(root, "cpython-3.10.22-windows-x86_64-none");
++    const alias = path.join(root, "cpython-3.10-windows-x86_64-none");
++    const outside = path.join(root, "cpython-3.14-windows-x86_64-none");
++    const outsideTarget = path.join(temp, "cpython-3.14.0-windows-x86_64-none");
++    const wrongMinor = path.join(root, "cpython-3.12-windows-x86_64-none");
++    const working = path.join(root, "cpython-3.11-windows-x86_64-none");
++    const workingTarget = path.join(root, "cpython-3.11.1-windows-x86_64-none");
++    const custom = path.join(root, "latest");
++    const customTarget = path.join(root, ".temp");
++    await fs.mkdir(root);
++    await fs.symlink(target, alias, "file");
++    await fs.mkdir(target);
++    await fs.mkdir(path.join(root, "cpython-3.10.23-windows-x86_64-none"));
++    await fs.mkdir(workingTarget);
++    await fs.symlink(workingTarget, working, "junction");
++    await fs.symlink(target, wrongMinor, "file");
++    await fs.mkdir(customTarget);
++    await fs.symlink(customTarget, custom, "file");
++    await fs.mkdir(outsideTarget);
++    await fs.symlink(outsideTarget, outside, "file");
++    await fs.symlink(
++      path.join(temp, "missing"),
++      path.join(root, "dangling"),
++      "file",
++    );
++
++    // POSIX has no distinction between file and directory symlinks.
++    if (process.platform !== "win32") {
++      mockRealpath.mockImplementation(async (p) => {
++        if ([alias, outside, wrongMinor, custom].includes(p)) {
++          throw Object.assign(new Error("Access is denied"), { code: "EPERM" });
++        }
++        return fs.realpath(p);
++      });
++    }
++
++    await repairPythonJunctions(root);
++
++    expect(mockSymlink.mock.calls).toEqual([[target, alias, "junction"]]);
++    expect(await fs.realpath(alias)).toBe(await fs.realpath(target));
++  } finally {
++    await fs.rm(temp, { force: true, recursive: true });
++  }
++});
+diff --git a/src/cache/repair-python-junctions.ts b/src/cache/repair-python-junctions.ts
+new file mode 100644
+index 0000000..fa51870
+--- /dev/null
++++ b/src/cache/repair-python-junctions.ts
+@@ -0,0 +1,46 @@
++import { readdir, readlink, realpath, symlink, unlink } from "node:fs/promises";
++import * as path from "node:path";
++
++export async function repairPythonJunctions(pythonDir: string): Promise<void> {
++  const entries = await readdir(pythonDir, { withFileTypes: true });
++  const directories = new Set(
++    entries
++      .filter((entry) => entry.isDirectory())
++      .map((entry) => entry.name.toLowerCase()),
++  );
++
++  for (const entry of entries) {
++    if (!entry.isSymbolicLink()) {
++      continue;
++    }
++    const link = path.join(pythonDir, entry.name);
++    try {
++      await realpath(link);
++      continue;
++    } catch (err) {
++      // Git for Windows tar can restore a junction as a file symlink when it
++      // extracts the link before its target. Opening it as a directory fails.
++      if ((err as NodeJS.ErrnoException).code !== "EPERM") {
++        continue;
++      }
++    }
++
++    const target = path.resolve(pythonDir, await readlink(link));
++    // uv omits only the patch and prerelease from its minor-version links.
++    const sibling = path.relative(pythonDir, target).toLowerCase();
++    const version = /^(cpython-\d+\.\d+)\.\d+(?:(?:a|b|rc)\d+)?([+-].+)$/.exec(
++      sibling,
++    );
++    if (
++      !version ||
++      version[1] + version[2] !== entry.name.toLowerCase() ||
++      !directories.has(sibling)
++    ) {
++      continue;
++    }
++    // An inaccessible installation can also cause EPERM through a valid link.
++    await realpath(target);
++    await unlink(link);
++    await symlink(target, link, "junction");
++  }
++}
