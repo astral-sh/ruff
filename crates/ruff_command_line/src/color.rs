@@ -55,7 +55,7 @@ impl TerminalColor {
 
     /// Returns whether to use color on this stream. Call [`Self::resolve`] first to apply the
     /// environment. In the resolved [`Self::Auto`] mode, this checks whether the stream is a terminal.
-    pub fn should_colorize(self, stream: &dyn IsTerminal) -> bool {
+    pub fn should_colorize(self, stream: &impl IsTerminal) -> bool {
         self.as_override().unwrap_or_else(|| stream.is_terminal())
     }
 
