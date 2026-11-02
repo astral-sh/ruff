@@ -2,6 +2,24 @@
 # requires-python = ">=3.12"
 # dependencies = []
 #
+# [tool.ty.analysis]
+# return-type-inference = "always"
+#
+# [tool.ty.rules]
+# truthiness-test-of-none-union = "warn"
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+# dynamic-function-decorator-return = "warn"
+# unsound-assignment = "warn"
+# redundant-condition-strict = "warn"
+# disjoint-cast = "warn"
+# missing-direct-dependency = "warn"
+#
 # [tool.uv]
 # exclude-newer = "P7D"
 # ///
@@ -20,7 +38,6 @@ import os
 import platform
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
 from urllib.parse import quote
 
@@ -30,14 +47,23 @@ def corpus_name(seeds: str) -> str:
 
     The generator uses Python's `ast` module, which can change between patch releases.
     """
-    with Path(__file__).with_name("uv.lock").open("rb") as lock:
-        packages = tomllib.load(lock)["package"]
-    generator = next(
-        package["version"]
-        for package in packages
-        if package["name"] == "pysource-codegen"
+    tree = json.loads(
+        subprocess.check_output(
+            [
+                "uv",
+                "tree",
+                "--quiet",
+                "--frozen",
+                "--package=pysource-codegen",
+                "--depth=0",
+                "--format=json",
+            ],
+            cwd=Path(__file__).parent,
+        )
     )
-    return f"py-fuzzer-corpus-v1-{platform.python_version()}-{seeds}-pysource-codegen-{generator}"
+    root = tree["roots"][0]["id"]
+    version = tree["resolution"][root]["version"]
+    return f"py-fuzzer-corpus-v1-{platform.python_version()}-{seeds}-pysource-codegen-{version}"
 
 
 def find_run(name: str) -> str | None:
@@ -52,18 +78,23 @@ def find_run(name: str) -> str | None:
     )
     api = f"repos/{repo}/actions"
     artifacts = f"{api}/artifacts?name={quote(name)}"
-    unexpired_runs = ".artifacts[] | select(.expired == false) | .workflow_run.id"
-    runs = subprocess.check_output(
-        ["gh", "api", "--paginate", artifacts, "--jq", unexpired_runs], text=True
+    pages = json.loads(
+        subprocess.check_output(["gh", "api", "--paginate", "--slurp", artifacts])
     )
-    for run_id in runs.splitlines():
-        run = json.loads(subprocess.check_output(["gh", "api", f"{api}/runs/{run_id}"]))
-        if (
-            run["path"] == workflow
-            and run["head_branch"] == "main"
-            and run["event"] in {"push", "schedule"}
-        ):
-            return run_id
+    for page in pages:
+        for artifact in page["artifacts"]:
+            if artifact["expired"]:
+                continue
+            run_id = str(artifact["workflow_run"]["id"])
+            run = json.loads(
+                subprocess.check_output(["gh", "api", f"{api}/runs/{run_id}"])
+            )
+            if (
+                run["path"] == workflow
+                and run["head_branch"] == "main"
+                and run["event"] in {"push", "schedule"}
+            ):
+                return run_id
     return None
 
 
