@@ -11,7 +11,7 @@ use super::{
 };
 use crate::dependency::is_direct_dependency;
 use crate::diagnostic::{did_you_mean, format_enumeration};
-use crate::importer::{ImportAction, ImportRequest, MembersInScope};
+use crate::importer::{ImportAction, ImportRequest, Importer, MembersInScope};
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, imported_symbol, place_from_bindings};
 use crate::suppression::FileSuppressionId;
@@ -21,7 +21,9 @@ use crate::types::call::{Bindings, CallDiagnosticOverride, CallError};
 use crate::types::class::{
     CodeGeneratorKind, DisjointBase, DisjointBaseKind, ExpandedClassBaseEntry, MethodDecorator,
 };
-use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
+use crate::types::function::{
+    FunctionDecorators, FunctionType, InferredReturnTypeFor, KnownFunction, OverloadLiteral,
+};
 use crate::types::infer::UnsupportedComparisonError;
 use crate::types::overrides::MethodKind;
 use crate::types::protocol_class::ProtocolMember;
@@ -37,16 +39,18 @@ use crate::types::unpacker::{starred_assignment_values, unpacked_assignment_valu
 use crate::types::{
     BoundTypeVarInstance, ClassType, DynamicType, ErrorContextTree, LintDiagnosticGuard,
     SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance, binding_type,
-    protocol_class::ProtocolClass,
+    infer_definition_types, protocol_class::ProtocolClass,
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarKind, TypedDictType, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, ProgramEnvironment, SemanticModel, declare_lint};
 use itertools::Itertools;
 use ruff_db::source::source_text;
 use ruff_db::{
-    diagnostic::{Annotation, Diagnostic, LintName, Span, SubDiagnostic, SubDiagnosticSeverity},
+    diagnostic::{
+        Annotation, Diagnostic, LintName, Span, SubDiagnostic, SubDiagnosticSeverity, UnifiedFile,
+    },
     files::File,
-    parsed::parsed_module,
+    parsed::{ParsedModuleRef, parsed_module},
 };
 use ruff_diagnostics::{Edit, Fix, IsolationLevel};
 use ruff_python_ast::name::Name;
@@ -62,7 +66,7 @@ use ty_module_resolver::{
 };
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_core::place::{PlaceTable, ScopedPlaceId};
-use ty_python_core::{ProgramFile, global_scope, place_table, use_def_map};
+use ty_python_core::{ProgramFile, global_scope, place_table, semantic_index, use_def_map};
 
 const RUNTIME_CHECKABLE_DOCS_URL: &str =
     "https://docs.python.org/3/library/typing.html#typing.runtime_checkable";
@@ -3257,6 +3261,88 @@ pub(super) fn report_undefined_reveal(context: &InferContext, name: &ast::ExprNa
         diagnostic.help(format_args!("Import `reveal_type` from `{module}`"));
         diagnostic.set_fix(Fix::unsafe_edit(edit.clone()));
     }
+}
+
+/// Infer annotation fixes after checking the file. Requesting the body type while inferring the
+/// enclosing scope can pull both scopes into the same Salsa cycle.
+pub(super) fn add_missing_return_type_fixes(
+    db: &dyn Db,
+    file: ProgramFile<'_>,
+    diagnostics: &mut [Diagnostic],
+) {
+    let mut missing = diagnostics
+        .iter_mut()
+        .filter_map(|diagnostic| {
+            if diagnostic.id().as_lint() != Some(MISSING_RETURN_ANNOTATION.name()) {
+                return None;
+            }
+            let span = diagnostic.primary_span()?;
+            (span.file() == &UnifiedFile::Ty(file.file(db))).then_some((span.range()?, diagnostic))
+        })
+        .peekable();
+    if missing.peek().is_none() {
+        return;
+    }
+
+    let module = parsed_module(db, file.python_file(db)).load(db);
+    let index = semantic_index(db, file);
+    let functions: FxHashMap<_, _> = index
+        .scope_ids()
+        .filter_map(|scope| {
+            let function = scope.node(db).as_function()?.node(&module);
+            Some((function.name.range(), function))
+        })
+        .collect();
+
+    for (range, diagnostic) in missing {
+        if let Some(&function) = functions.get(&range)
+            && let Some((annotation, imports)) =
+                suggested_return_annotation(db, file, &module, function)
+        {
+            diagnostic.prepend_sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Help,
+                format_args!("Add return type annotation `{annotation}`"),
+            ));
+            diagnostic.set_fix(Fix::unsafe_edits(
+                Edit::insertion(format!(" -> {annotation}"), function.parameters.end()),
+                imports,
+            ));
+        }
+    }
+}
+
+fn suggested_return_annotation(
+    db: &dyn Db,
+    file: ProgramFile<'_>,
+    module: &ParsedModuleRef,
+    function: &ast::StmtFunctionDef,
+) -> Option<(String, Vec<Edit>)> {
+    let index = semantic_index(db, file);
+    let definition = index.expect_single_definition(function);
+    let function_type = infer_definition_types(db, definition).function_type(definition)?;
+    let overload = function_type.literal(db).last_definition;
+    if function.name.as_str() == "__init__" && overload.body_scope(db).is_method_scope(db) {
+        return Some((String::from("None"), Vec::new()));
+    }
+    if function.is_async
+        || overload.is_overload(db)
+        || file.file(db).is_stub(db)
+        || function_type.has_trivial_body(db)
+    {
+        return None;
+    }
+    let env = ProgramEnvironment::from_file(file);
+    let ty = function_type.inferred_return_type(db, InferredReturnTypeFor::Annotation);
+    if ty.has_dynamic(db, &env) {
+        return None;
+    }
+    let details = ty.promote(db, &env).display(db, &env).to_string_parts();
+    let annotation_scope = index.parent_scope_id(overload.body_scope(db).file_scope_id(db))?;
+    Importer::new(db, file, module).type_annotation(
+        &details,
+        annotation_scope,
+        function.parameters.end(),
+    )
 }
 
 /// Add an autofix to `diagnostic` that replaces the given node with `NotImplementedError`

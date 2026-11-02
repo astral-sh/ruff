@@ -1182,6 +1182,14 @@ impl<'db> UpdatedFunctionSignatures<'db> {
     }
 }
 
+/// A return annotation describes the implementation being annotated. At a call site,
+/// an override of a non-final method may return a different type.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub(super) enum InferredReturnTypeFor {
+    Call,
+    Annotation,
+}
+
 /// Represents a function type, which might be a non-generic function, or a specialization of a
 /// generic function.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
@@ -1754,20 +1762,24 @@ impl<'db> FunctionType<'db> {
             return Cow::Borrowed(signature);
         }
         let mut overload = overload.clone();
-        overload.return_ty = self.inferred_return_type(db);
+        overload.return_ty = self.inferred_return_type(db, InferredReturnTypeFor::Call);
         Cow::Owned(CallableSignature::single(overload))
     }
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, function: FunctionType<'db>| {
+        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, function: FunctionType<'db>, _: InferredReturnTypeFor| {
             let env = ProgramEnvironment::from_scope(function.literal(db).last_definition.body_scope(db));
             result.cycle_normalized(db, &env, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size,
     )]
-    fn inferred_return_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn inferred_return_type(
+        self,
+        db: &'db dyn Db,
+        purpose: InferredReturnTypeFor,
+    ) -> Type<'db> {
         let scope = self.literal(db).last_definition.body_scope(db);
         let env = ProgramEnvironment::from_scope(scope);
         let index = semantic_index(db, scope.program_file(db));
@@ -1833,8 +1845,14 @@ impl<'db> FunctionType<'db> {
 
         let mut return_type = infer_complete_scope_types(db, scope).return_type();
         if let Some(inherited) = self.inherited_return_annotation(db) {
+            if purpose == InferredReturnTypeFor::Annotation
+                && !return_type.is_assignable_to(db, &env, inherited)
+            {
+                return Type::unknown();
+            }
             return_type = inherited;
-        } else if !self.has_known_decorator(db, FunctionDecorators::FINAL)
+        } else if purpose == InferredReturnTypeFor::Call
+            && !self.has_known_decorator(db, FunctionDecorators::FINAL)
             && !class.is_some_and(|class| class.is_final(db))
         {
             // For non-final methods on non-final classes, we include `Unknown` in the return type
