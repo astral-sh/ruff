@@ -94,15 +94,22 @@ class Ty(Tool):
     def config(self, project: Project, venv: Venv):
         return (
             Path("ty.toml"),
-            f"""
-            [src]
-            include = [{", ".join([f'"{include}"' for include in project.include])}]
-            exclude = [{", ".join([f'"{exclude}"' for exclude in project.exclude])}]
-
-            [environment]
-            python-version = "{project.python_version}"
-            python = "{venv.path.as_posix()}"
-            """,
+            tomlkit.dumps(
+                {
+                    "src": {
+                        "include": [
+                            path.replace(" ", r"\ ") for path in project.include
+                        ],
+                        "exclude": [
+                            path.replace(" ", r"\ ") for path in project.exclude
+                        ],
+                    },
+                    "environment": {
+                        "python-version": project.python_version,
+                        "python": venv.path.as_posix(),
+                    },
+                }
+            ),
         )
 
     @override

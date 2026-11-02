@@ -11,7 +11,7 @@ from lsprotocol import types as lsp
 from benchmark.lsp_client import LSPClient
 from benchmark.projects import Project
 from benchmark.targets import write_cli_targets
-from benchmark.tool import Zuban
+from benchmark.tool import Ty, Zuban
 from benchmark.venv import Venv
 
 
@@ -94,6 +94,37 @@ def test_zuban_checks_scope_untyped_code_and_project_dependencies(zuban_project)
     assert "outside.py" not in result.stdout
     assert "newer_python_only" not in result.stdout
     assert config.read_bytes() == original
+
+
+def test_ty_cli_checks_source_paths_with_spaces(zuban_project):
+    project, venv = zuban_project
+    root = venv.project_path
+    with (venv.path / "pyvenv.cfg").open("a") as config:
+        config.write(f"home = {Path(sys.executable).resolve().parent}\n")
+    (root / "src").rename(root / "source root")
+    (root / "source root/example/main.py").write_text(
+        'def untyped():\n    number: int = "wrong"\n'
+    )
+    project = project._replace(
+        include=["source root/example"], exclude=["source root/**/tests/**"]
+    )
+    subprocess.run(["git", "add", "--all"], cwd=root, check=True)
+    write_cli_targets(project, root)
+    tool = Ty()
+    tool.write_config(project, venv)
+    result = subprocess.run(
+        tool.command(project, venv, single_threaded=False).command,
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=20,
+    )
+    assert result.returncode == 1, result.stderr
+    assert "source root/example/main.py" in result.stdout
+    assert "invalid-assignment" in result.stdout
+    assert "excluded.py" not in result.stdout
+    assert "outside.py" not in result.stdout
 
 
 def test_zuban_cli_checks_implementations_beside_stubs(zuban_project):
