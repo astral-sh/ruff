@@ -24,6 +24,19 @@ uv run --python 3.15 benchmark
 Measures elapsed time and peak resident set size (RSS) when type checking a project
 without a pre-existing cache.
 
+All four CLIs receive the same list of tracked Python files. The runner applies
+each project's includes and excludes once and skips symlinks. When an
+implementation has an adjacent stub, the implementation is the check target.
+Standalone stubs stay in the list. If a file and a populated directory share a
+module name, the directory wins. Files omitted as targets remain available for
+import resolution. The runner prints the file count and SHA-256 of the list
+before timing each project.
+
+Each CLI checks unannotated function bodies. mypy uses its normal import
+following with project and user configuration disabled, so per-module overrides
+and plugins cannot change its workload. Checkers can still follow different
+imports or infer different types from the same source files.
+
 You can run the benchmark with `--single-threaded` to measure the check time when using a single thread only.
 
 ### Warm check time
@@ -71,6 +84,8 @@ may use another version in practice, leading to different diagnostic results
 between benchmarking and reality.
 
 ## Updating the benchmark
+
+Record the CLI file counts and manifest hashes with the results.
 
 The benchmark script supports snapshotting the results when running with `--snapshot` and `--accept`.
 The goal of those snapshots is to catch accidental regressions. For example, if a project adds

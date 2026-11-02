@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Final
 from benchmark import Hyperfine
 from benchmark.projects import ALL as ALL_PROJECTS
 from benchmark.snapshot import SnapshotRunner
+from benchmark.targets import write_cli_targets
 from benchmark.tool import Mypy, Pyrefly, Pyright, Tool, Ty, Zuban
 from benchmark.venv import Venv
 
@@ -149,6 +150,7 @@ def main() -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             cwd = Path(tempdir)
             project.clone(cwd)
+            write_cli_targets(project, cwd)
 
             venv = Venv.create(
                 project=project.name, parent=cwd, python_version=project.python_version

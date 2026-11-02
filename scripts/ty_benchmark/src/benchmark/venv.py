@@ -92,7 +92,6 @@ class Venv:
             # annotations of one of that project's dependencies
             "--exclude-newer",
             "2026-10-24T19:50:00Z",
-            # mypy needs the project environment to load project-local plugins.
             *(["mypy"] if include_mypy else []),
         ]
 
