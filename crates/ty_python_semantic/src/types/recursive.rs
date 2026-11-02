@@ -31,11 +31,12 @@
 //! ```
 //!
 //! The result is closed, so ordinary type operations can inspect it. Binding works in
-//! the other direction: it replaces applications of a recursive type with variables
-//! and encloses the resulting open body in a `RecursiveType`. Both operations respect
-//! nested binders. A variable refers to the nearest enclosing binder with the same
-//! `RecursiveCycle`; substitution does not enter that binder's body when it binds the
-//! target variable. The binder's arguments are outside its scope and are still substituted.
+//! the other direction: it replaces applications of a recursive type with variables.
+//! Mutually recursive bodies share a `RecursiveGraph`; a `RecursiveType` selects one
+//! body by index, and each `RecursiveVar` refers to another index in that same graph.
+//! Unfolding replaces these variables with applications sharing the original graph,
+//! without copying the other bodies. Importing a body into a graph remaps its indices
+//! so that references retain their binding scope.
 //!
 //! A *type constructor* takes type arguments and produces a type. Recursive types can
 //! also be parameterized this way. With type variable `T`, the alias
@@ -47,7 +48,7 @@
 //!
 //! Here `μF` binds the recursive constructor, and `λT` binds its type parameter.
 //! The occurrence `F[list[T]]` is stored as `RecursiveVar` with the constructor's
-//! `RecursiveCycle` and unspecialized arguments `[list[T]]`.
+//! graph index and unspecialized arguments `[list[T]]`.
 //!
 //! To infer `x[1]` for `x: Tree[int]`, first unfold `x`'s type: substitute the constructor
 //! for `F`, then apply `T := int`. This order closes the body before specializing it:
@@ -60,6 +61,9 @@
 //!
 //! Tuple subscripting then selects the element at index 1: `x[1]: Tree[list[int]] | None`.
 
+use std::cell::{Cell, RefCell};
+
+use rustc_hash::FxHashMap;
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
 
@@ -74,15 +78,18 @@ use super::{
 };
 use crate::{Db, ProgramEnvironment};
 
-/// A recursive variable named by its binder's query cycle.
+/// A reference to a constructor in the enclosing recursive graph.
 /// An escaping reference has no type semantics; in particular, it is neither a
 /// gradual type nor an assignability operand.
 /// Only recursive-type binding and substitution operations may construct or operate on recursive variables.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveVar<'db> {
-    /// Refers to the nearest enclosing recursive binder with this cycle identity.
+    /// The constructor's index in the enclosing graph. Graph-local references keep mutually
+    /// recursive bodies shared during unfolding, avoiding substitution through nested binders.
     #[returns(copy)]
-    cycle: RecursiveCycle,
+    index: usize,
+    #[returns(copy)]
+    materialization_kind: Option<MaterializationKind>,
     /// The unspecialized arguments of this occurrence, in the alias definition's scope.
     /// For `Tree = tuple[T, "Tree[list[T]] | None"]`, these are `[list[T]]`.
     /// Unfolding substitutes the enclosing application's arguments for the type parameters.
@@ -93,7 +100,7 @@ pub struct RecursiveVar<'db> {
 impl get_size2::GetSize for RecursiveVar<'_> {}
 
 impl<'db> RecursiveVar<'db> {
-    /// Unfold references to the target cycle, retaining variables bound by other cycles.
+    /// Resolve or remap graph references while preserving their arguments.
     pub(super) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
@@ -106,12 +113,38 @@ impl<'db> RecursiveVar<'db> {
         match mapping {
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
                 RecursiveSubstitution::Unfold(recursive),
-            )) if self.cycle(db) == recursive.cycle(db) => {
-                Type::Recursive(recursive.with_arguments(db, arguments))
-            }
-            TypeMapping::ApplyRecursiveSubstitution(_) => {
-                Type::RecursiveVar(Self::new_internal(db, self.cycle(db), arguments))
-            }
+            )) => Type::Recursive(RecursiveType::new_internal(
+                db,
+                recursive.graph(db),
+                self.index(db),
+                arguments,
+                if self.index(db) == recursive.index(db) {
+                    // An unfolded self-reference retains the application's pending materialization.
+                    recursive
+                        .materialization_kind(db)
+                        .or(self.materialization_kind(db))
+                } else {
+                    self.materialization_kind(db)
+                },
+            )),
+            TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Import(builder, graph),
+            )) => builder.reference(
+                db,
+                visitor.env,
+                *graph,
+                self.index(db),
+                arguments,
+                self.materialization_kind(db),
+            ),
+            TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Reindex(indices),
+            )) => Type::RecursiveVar(Self::new_internal(
+                db,
+                indices[self.index(db)],
+                self.materialization_kind(db),
+                arguments,
+            )),
             _ => unreachable!("semantic operation on an unbound recursive variable"),
         }
     }
@@ -119,30 +152,152 @@ impl<'db> RecursiveVar<'db> {
 
 /// A structural substitution that only the recursive-type binder can construct.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
-pub struct RecursiveMapping<'db>(RecursiveSubstitution<'db>);
+pub struct RecursiveMapping<'a, 'db>(RecursiveSubstitution<'a, 'db>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
-enum RecursiveSubstitution<'db> {
-    /// Replace references to a binder with applications of its recursive constructor.
-    /// In the module example, this replaces `F[list[T]]` with `Tree[list[T]]`.
+enum RecursiveSubstitution<'a, 'db> {
+    /// Replace graph variables with closed applications sharing the graph.
     Unfold(RecursiveType<'db>),
-    /// Replace applications of the target binder with variables to form an open body.
-    /// In the module example, this replaces `Tree[list[T]]` with `F[list[T]]`.
-    Bind(RecursiveCycle),
+    /// Collect a closed inference result into a graph rooted at the recovered query.
+    Bind(&'a RecursiveTypeGraphBuilder<'db>),
+    /// Import an open body, resolving its references in the source graph.
+    Import(&'a RecursiveTypeGraphBuilder<'db>, RecursiveTypeGraph<'db>),
+    /// Rewrite references to the representatives of equivalent nodes.
+    Reindex(&'a [usize]),
 }
 
-impl RecursiveSubstitution<'_> {
-    fn cycle(self, db: &dyn Db) -> RecursiveCycle {
-        match self {
-            Self::Unfold(recursive) => recursive.cycle(db),
-            Self::Bind(cycle) => cycle,
+/// An unspecialized constructor body and its originating alias query.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub struct RecursiveTypeNode<'db> {
+    definition: Definition<'db>,
+    cycle: RecursiveCycle,
+    body: Type<'db>,
+}
+
+/// Bodies in a recursive component share one binding scope.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct RecursiveTypeGraph<'db> {
+    #[returns(ref)]
+    nodes: Box<[RecursiveTypeNode<'db>]>,
+}
+
+impl get_size2::GetSize for RecursiveTypeGraph<'_> {}
+
+impl<'db> RecursiveTypeGraph<'db> {
+    /// Merge bisimilar nodes without identifying different approximations of a definition.
+    fn from_nodes(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        nodes: &[RecursiveTypeNode<'db>],
+    ) -> Self {
+        // Begin with one class per query, then split classes whose bodies differ after
+        // remapping their references. Refinement preserves distinct provisional bodies.
+        let mut cycles = FxHashMap::default();
+        let mut indices: Vec<usize> = nodes
+            .iter()
+            .map(|node| {
+                let next = cycles.len();
+                *cycles.entry(node.cycle).or_insert(next)
+            })
+            .collect();
+        loop {
+            let mapping = TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Reindex(&indices),
+            ));
+            let visitor = ApplyTypeMappingVisitor::new(env);
+            let mut classes = FxHashMap::default();
+            let mut merged = Vec::new();
+            let mut refined = Vec::with_capacity(nodes.len());
+            for (index, node) in nodes.iter().enumerate() {
+                let body = node.body.apply_type_mapping_impl(
+                    db,
+                    &mapping,
+                    TypeContext::default(),
+                    &visitor,
+                );
+                let next = classes.len();
+                let target = *classes.entry((indices[index], body)).or_insert(next);
+                if target == merged.len() {
+                    merged.push(RecursiveTypeNode { body, ..*node });
+                }
+                refined.push(target);
+            }
+            if indices == refined {
+                // Classes are numbered by first occurrence, so the root remains at index zero.
+                return Self::new(db, merged.into_boxed_slice());
+            }
+            indices = refined;
         }
     }
 }
 
-/// Identifies an alias query and names its recursive binder and variables.
+/// Collect reachable bodies, retaining each source node's scope until references are remapped.
+#[derive(Debug, PartialEq, Eq)]
+struct RecursiveTypeGraphBuilder<'db> {
+    cycle: RecursiveCycle,
+    referenced: Cell<bool>,
+    nodes: RefCell<Vec<RecursiveTypeNode<'db>>>,
+    imported: RefCell<FxHashMap<(RecursiveTypeGraph<'db>, usize), usize>>,
+}
+
+impl get_size2::GetSize for RecursiveTypeGraphBuilder<'_> {}
+
+impl<'db> RecursiveTypeGraphBuilder<'db> {
+    fn reference(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        graph: RecursiveTypeGraph<'db>,
+        index: usize,
+        arguments: Option<Specialization<'db>>,
+        materialization: Option<MaterializationKind>,
+    ) -> Type<'db> {
+        let node = graph.nodes(db)[index];
+        let target = if node.cycle == self.cycle && materialization.is_none() {
+            self.referenced.set(true);
+            0
+        } else {
+            self.import(db, env, graph, index)
+        };
+        Type::RecursiveVar(RecursiveVar::new_internal(
+            db,
+            target,
+            materialization,
+            arguments,
+        ))
+    }
+
+    fn import(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        graph: RecursiveTypeGraph<'db>,
+        index: usize,
+    ) -> usize {
+        if let Some(target) = self.imported.borrow().get(&(graph, index)) {
+            return *target;
+        }
+        let node = graph.nodes(db)[index];
+        let target = self.nodes.borrow().len();
+        // Reserve the target before following backedges into the source graph.
+        self.nodes.borrow_mut().push(node);
+        self.imported.borrow_mut().insert((graph, index), target);
+        let body = node.body.apply_type_mapping_impl(
+            db,
+            &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Import(self, graph),
+            )),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::new(env),
+        );
+        self.nodes.borrow_mut()[target].body = body;
+        target
+    }
+}
+
+/// Identifies an alias query whose provisional recursive references are being bound.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct RecursiveCycle(salsa::Id);
+pub(super) struct RecursiveCycle(salsa::Id);
 
 impl get_size2::GetSize for RecursiveCycle {}
 
@@ -154,14 +309,13 @@ impl get_size2::GetSize for RecursiveCycle {}
 /// Use the binding operations in this module to construct recursive types.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveType<'db> {
-    /// The defining symbol of the legacy type alias, including for qualified references.
+    /// Shared unspecialized bodies; specialization only changes this application's arguments.
     #[returns(copy)]
-    pub(super) definition: Definition<'db>,
-    /// Names the binder and distinguishes provisional types of different alias queries.
+    graph: RecursiveTypeGraph<'db>,
+    /// Selects a body in `graph`. Sharing the graph and indexing its bodies avoids rebuilding
+    /// nested binders for mutually recursive types when unfolding a reference.
     #[returns(copy)]
-    cycle: RecursiveCycle,
-    #[returns(copy)]
-    body: Type<'db>,
+    index: usize,
     /// The actual arguments for this application, which may themselves contain type variables.
     /// They are applied when unfolding; the stored body remains unspecialized.
     #[returns(copy)]
@@ -175,11 +329,46 @@ impl get_size2::GetSize for RecursiveType<'_> {}
 
 #[salsa::tracked]
 impl<'db> RecursiveType<'db> {
+    /// The defining symbol of this constructor, including for qualified references.
+    pub(super) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+        self.graph(db).nodes(db)[self.index(db)].definition
+    }
+
+    /// Resolve a variable in this graph without expanding or specializing its body.
+    pub(super) fn reference(self, db: &'db dyn Db, variable: RecursiveVar<'db>) -> Self {
+        Self::new_internal(
+            db,
+            self.graph(db),
+            variable.index(db),
+            variable.arguments(db),
+            variable.materialization_kind(db),
+        )
+    }
+
+    fn cycle(self, db: &'db dyn Db) -> RecursiveCycle {
+        self.graph(db).nodes(db)[self.index(db)].cycle
+    }
+
+    fn body(self, db: &'db dyn Db) -> Type<'db> {
+        self.graph(db).nodes(db)[self.index(db)].body
+    }
+
+    fn closed_body(self, db: &'db dyn Db) -> Type<'db> {
+        self.body(db).apply_type_mapping_impl(
+            db,
+            &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Unfold(self),
+            )),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::new(&self.environment(db)),
+        )
+    }
+
     /// Summarize the open constructor body without applying semantic substitutions.
     pub(super) fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|db, id, _, ()| AliasCycleSummary::from_type(db, Type::divergent_alias(id)),
+            cycle_initial=|db, _, recursive: RecursiveType<'db>, ()| AliasCycleSummary::from_type(db, Type::divergent_alias(recursive.cycle(db).0), None),
             heap_size=ruff_memory_usage::heap_size
         )]
         fn cycle_summary_impl<'db>(
@@ -187,19 +376,13 @@ impl<'db> RecursiveType<'db> {
             recursive: RecursiveType<'db>,
             (): (),
         ) -> AliasCycleSummary<'db> {
-            let mut summary = AliasCycleSummary::from_type(db, recursive.body(db));
-            // Nested bodies can refer to an enclosing binder. Close only the cycle marker,
-            // so recovery never exposes an unbound variable as a standalone type.
-            if let Some(Type::RecursiveVar(variable)) = summary.cycle {
-                summary.cycle = Some(Type::divergent_alias(variable.cycle(db).0));
-            }
-            summary
+            AliasCycleSummary::from_type(db, recursive.body(db), Some(recursive))
         }
 
         cycle_summary_impl(db, self.constructor(db), ())
     }
 
-    /// Seed a query cycle with `μa. a`, using the same identity for binder and variable.
+    /// Seed a query cycle with a one-node graph representing `μa. a`.
     pub(super) fn initial(
         db: &'db dyn Db,
         definition: Definition<'db>,
@@ -208,14 +391,16 @@ impl<'db> RecursiveType<'db> {
     ) -> Self {
         let cycle = RecursiveCycle(cycle);
         let arguments = parameters.map(|parameters| parameters.identity_specialization(db));
-        Self::new_internal(
+        let graph = RecursiveTypeGraph::new(
             db,
-            definition,
-            cycle,
-            Type::RecursiveVar(RecursiveVar::new_internal(db, cycle, arguments)),
-            arguments,
-            None,
-        )
+            vec![RecursiveTypeNode {
+                definition,
+                cycle,
+                body: Type::RecursiveVar(RecursiveVar::new_internal(db, 0, None, arguments)),
+            }]
+            .into_boxed_slice(),
+        );
+        Self::new_internal(db, graph, 0, arguments, None)
     }
 
     /// Close recursive occurrences after inferring an alias's constructor expression.
@@ -237,45 +422,48 @@ impl<'db> RecursiveType<'db> {
     }
 
     /// Bind references to this alias's query cycle in a closed inference result.
-    /// Each bound occurrence retains its arguments and refers to this constructor's cycle.
+    /// Each bound occurrence retains its arguments and refers to the graph's root node.
     fn bind(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         original: Type<'db>,
     ) -> Type<'db> {
+        let builder = RecursiveTypeGraphBuilder {
+            cycle: self.cycle(db),
+            referenced: Cell::new(false),
+            nodes: RefCell::new(vec![self.graph(db).nodes(db)[self.index(db)]]),
+            imported: RefCell::default(),
+        };
         let body = original.apply_type_mapping_impl(
             db,
             &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
-                RecursiveSubstitution::Bind(self.cycle(db)),
+                RecursiveSubstitution::Bind(&builder),
             )),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
         );
-        // Alias arguments can expose a reference without introducing a container.
-        if body.has_unguarded_alias_cycle(db) {
-            Type::divergent_alias(self.cycle(db).0)
-        } else if body == original {
-            // Binding changes a closed type only by introducing references to this binder.
-            body
+        let result = if builder.referenced.get() {
+            let mut nodes = builder.nodes.into_inner();
+            nodes[0].body = body;
+            let graph = RecursiveTypeGraph::from_nodes(db, env, &nodes);
+            Type::Recursive(Self::new_internal(db, graph, 0, self.arguments(db), None))
         } else {
-            Type::Recursive(Self::new_internal(
-                db,
-                self.definition(db),
-                self.cycle(db),
-                body,
-                self.arguments(db),
-                None,
-            ))
+            original
+        };
+        // An earlier recovery can leave an unguarded cycle even without references to bind.
+        if result.has_unguarded_alias_cycle(db) {
+            Type::divergent_alias(self.cycle(db).0)
+        } else {
+            result
         }
     }
 
     fn with_arguments(self, db: &'db dyn Db, arguments: Option<Specialization<'db>>) -> Self {
         Self::new_internal(
             db,
-            self.definition(db),
-            self.cycle(db),
-            self.body(db),
+            self.graph(db),
+            self.index(db),
             arguments,
             self.materialization_kind(db),
         )
@@ -288,9 +476,8 @@ impl<'db> RecursiveType<'db> {
     ) -> Self {
         Self::new_internal(
             db,
-            self.definition(db),
-            self.cycle(db),
-            self.body(db),
+            self.graph(db),
+            self.index(db),
             self.arguments(db),
             materialization,
         )
@@ -375,14 +562,7 @@ impl<'db> RecursiveType<'db> {
     )]
     fn unfolded_body(self, db: &'db dyn Db) -> Type<'db> {
         let env = self.environment(db);
-        let unfolded = self.body(db).apply_type_mapping_impl(
-            db,
-            &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
-                RecursiveSubstitution::Unfold(self),
-            )),
-            TypeContext::default(),
-            &ApplyTypeMappingVisitor::new(&env),
-        );
+        let unfolded = self.closed_body(db);
         match self.arguments(db) {
             Some(arguments) => unfolded.apply_type_mapping(
                 db,
@@ -394,7 +574,7 @@ impl<'db> RecursiveType<'db> {
         }
     }
 
-    /// Substitute by cycle identity, respecting the scope of nested recursive binders.
+    /// Substitute graph references or transform this application's arguments.
     pub(super) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
@@ -403,33 +583,24 @@ impl<'db> RecursiveType<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         match mapping {
-            TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
-                RecursiveSubstitution::Bind(cycle),
-            )) if self.cycle(db) == *cycle && self.materialization_kind(db).is_none() => {
-                let arguments = self
-                    .arguments(db)
-                    .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
-                Type::RecursiveVar(RecursiveVar::new_internal(db, self.cycle(db), arguments))
-            }
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(substitution)) => {
-                // This binder shadows the target in its body, but not in its arguments.
-                let body = if self.cycle(db) == substitution.cycle(db) {
-                    self.body(db)
-                } else {
-                    self.body(db)
-                        .apply_type_mapping_impl(db, mapping, tcx, visitor)
-                };
                 let arguments = self
                     .arguments(db)
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
-                Type::Recursive(Self::new_internal(
-                    db,
-                    self.definition(db),
-                    self.cycle(db),
-                    body,
-                    arguments,
-                    self.materialization_kind(db),
-                ))
+                match substitution {
+                    RecursiveSubstitution::Unfold(_) | RecursiveSubstitution::Reindex(_) => {
+                        Type::Recursive(self.with_arguments(db, arguments))
+                    }
+                    RecursiveSubstitution::Bind(builder)
+                    | RecursiveSubstitution::Import(builder, _) => builder.reference(
+                        db,
+                        visitor.env,
+                        self.graph(db),
+                        self.index(db),
+                        arguments,
+                        self.materialization_kind(db),
+                    ),
+                }
             }
             TypeMapping::ApplySpecialization(_)
             | TypeMapping::ApplySpecializationWithMaterialization { .. }

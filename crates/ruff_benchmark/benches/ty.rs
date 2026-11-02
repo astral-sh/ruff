@@ -223,6 +223,34 @@ fn benchmark_micro_case(criterion: &mut Criterion, name: &str, code: &str) {
     });
 }
 
+/// Shared recursive references should reuse constructor bodies when aliases are unfolded.
+fn benchmark_mutually_recursive_aliases(criterion: &mut Criterion) {
+    for (aliases, references) in [(4, 3), (8, 3), (32, 3), (6, 6)] {
+        let mut code = String::from("from typing import TypeVar\nT = TypeVar('T')\n");
+        for alias in 0..aliases {
+            write!(code, "A{alias} = tuple[T").unwrap();
+            for target in 0..aliases {
+                if (target + aliases - alias) % aliases < references {
+                    write!(code, ", 'A{target}[T] | None'").unwrap();
+                }
+            }
+            writeln!(code, "]").unwrap();
+        }
+        for alias in 0..aliases {
+            writeln!(
+                code,
+                "def inspect_{alias}(value: A{alias}[int]) -> int:\n    return value[0]"
+            )
+            .unwrap();
+        }
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[mutually_recursive_aliases_{aliases}_{references}]"),
+            &code,
+        );
+    }
+}
+
 fn benchmark_many_string_assignments(criterion: &mut Criterion) {
     // This is a micro benchmark, but it is effectively identical to a code sample
     // observed "in the wild":
@@ -2673,6 +2701,7 @@ fn datetype(criterion: &mut Criterion) {
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
 criterion_group!(
     micro,
+    benchmark_mutually_recursive_aliases,
     benchmark_many_string_assignments,
     benchmark_many_tuple_assignments,
     benchmark_tuple_implicit_instance_attributes,
