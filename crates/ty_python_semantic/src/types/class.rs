@@ -1194,22 +1194,6 @@ pub enum ClassType<'db> {
     Generic(GenericAlias<'db>),
 }
 
-/// A concrete MRO entry with the origin used by class relation checks.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-enum RelationMroEntry<'db> {
-    NonGeneric(ClassLiteral<'db>),
-    Generic(StaticClassLiteral<'db>, GenericAlias<'db>),
-}
-
-impl<'db> RelationMroEntry<'db> {
-    fn new(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        match class {
-            ClassType::NonGeneric(literal) => Self::NonGeneric(literal),
-            ClassType::Generic(alias) => Self::Generic(alias.origin(db), alias),
-        }
-    }
-}
-
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
     /// Return a `ClassType` representing the class `builtins.object`
@@ -2726,6 +2710,22 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
                 | ClassLiteral::DynamicEnum(_),
             ) => VarianceTerm::BIVARIANT,
             Self::Generic(generic) => generic.variance_of(db, env, typevar),
+        }
+    }
+}
+
+/// A concrete MRO entry with the origin used by class relation checks.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+enum RelationMroEntry<'db> {
+    NonGeneric(ClassLiteral<'db>),
+    Generic(StaticClassLiteral<'db>, GenericAlias<'db>),
+}
+
+impl<'db> RelationMroEntry<'db> {
+    fn new(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+        match class {
+            ClassType::NonGeneric(literal) => Self::NonGeneric(literal),
+            ClassType::Generic(alias) => Self::Generic(alias.origin(db), alias),
         }
     }
 }
