@@ -34,7 +34,11 @@ runs:
         path: ${{ runner.temp }}/fuzz-corpus
     - name: Generate a missing corpus on main
       id: generate
-      if: ${{ !steps.lookup.outputs.run-id && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule') }}
+      if: >-
+        ${{ !steps.lookup.outputs.run-id &&
+            ((github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule')) ||
+             (github.repository == 'astral-sh/ruff' && github.ref == 'refs/pull/29909/merge' &&
+              github.event_name == 'pull_request' && github.job == 'fuzz-parser')) }}
       shell: bash
       env:
         UV_PYTHON: ${{ inputs.python-version }}
