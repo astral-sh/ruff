@@ -23,11 +23,13 @@ runs:
         FUZZ_SEEDS: ${{ inputs.seeds }}
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       run: |
-        generator=$(uv tree --frozen --project="$GITHUB_ACTION_PATH" --python="$FUZZ_PYTHON" \
+        # Python patch releases can produce different sources for the same seed.
+        python_version=$(uv run --no-project --python="$FUZZ_PYTHON" python -c 'import platform; print(platform.python_version())')
+        echo "python-version=$python_version" >> "$GITHUB_OUTPUT"
+        generator=$(uv tree --frozen --project="$GITHUB_ACTION_PATH" --python="$python_version" \
           --package pysource-codegen --color never | sha256sum)
-        # Use the configured Python version across runners with different patch releases.
         # Bump the format version if the generator arguments or file layout change.
-        name="py-fuzzer-corpus-v1-$FUZZ_PYTHON-$FUZZ_SEEDS-${generator%% *}"
+        name="py-fuzzer-corpus-v1-$python_version-$FUZZ_SEEDS-${generator%% *}"
         echo "name=$name" >> "$GITHUB_OUTPUT"
 
         runs=$(gh api --paginate -X GET "repos/$GITHUB_REPOSITORY/actions/artifacts" -f name="$name" \
@@ -61,7 +63,7 @@ runs:
         !steps.corpus.outputs.run-id
       shell: bash
       env:
-        FUZZ_PYTHON: ${{ inputs.python-version }}
+        FUZZ_PYTHON: ${{ steps.corpus.outputs.python-version }}
         FUZZ_SEEDS: ${{ inputs.seeds }}
       run: |
         uv run --python="$FUZZ_PYTHON" --project="$GITHUB_ACTION_PATH" --locked --no-dev \
