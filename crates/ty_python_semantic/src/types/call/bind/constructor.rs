@@ -8,9 +8,10 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Signature};
 use crate::types::typevar::TypeVarNonceGenerator;
+use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext,
-    TypeMapping, UnionType,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 
 impl<'db> CallableBinding<'db> {
@@ -841,12 +842,65 @@ impl<'db> Binding<'db> {
         let signature = &self.signature;
         let returned = signature.return_ty.as_typevar()?;
         let receiver = signature.parameters().get(0)?;
-        if !matches!(instance, Type::NominalInstance(_))
-            || !receiver.inferred_annotation
+        let Type::NominalInstance(nominal) = instance else {
+            return None;
+        };
+        if !receiver.inferred_annotation
             || !returned.typevar(db).is_self(db)
             || !matches!(receiver.annotated_type(), Type::SubclassOf(cls) if cls.into_type_var() == Some(returned))
         {
             return None;
+        }
+
+        if nominal.is_definition_generic(db) {
+            // An allocator such as `dict.__new__` leaves its class arguments to `__init__`.
+            // The receiver and the bound of `Self` must carry the same type variables in
+            // invariant positions. A covariant position can supply an upper bound instead.
+            if signature
+                .parameters()
+                .iter()
+                .skip(1)
+                .any(|parameter| parameter.annotated_type() != Type::any())
+            {
+                return None;
+            }
+            let (_, actual) = instance.class_specialization(db, env)?;
+            let self_bound = returned.typevar(db).upper_bound(db, env)?;
+            self_bound.as_nominal_instance()?;
+            let (_, bound) = self_bound.class_specialization(db, env)?;
+            let arguments = actual.types(db);
+            let variables = signature.generic_context?;
+            if arguments != bound.types(db)
+                || variables.len(db) != arguments.len() + 1
+                || actual
+                    .generic_context(db)
+                    .variables(db)
+                    .chain(bound.generic_context(db).variables(db))
+                    .any(|parameter| parameter.variance(db) != TypeVarVariance::Invariant)
+                || variables.variables(db).any(|variable| {
+                    !variable.is_same_typevar_as(db, returned)
+                        && (!arguments.contains(&Type::TypeVar(variable))
+                            || variable.is_paramspec(db)
+                            || variable.is_typevartuple(db)
+                            || variable.default_type(db).is_some()
+                            || variable
+                                .typevar(db)
+                                .bound_or_constraints(db, env)
+                                .is_some_and(|restriction| match restriction {
+                                    TypeVarBoundOrConstraints::Constraints(_) => true,
+                                    TypeVarBoundOrConstraints::UpperBound(upper) => {
+                                        any_over_type_expanding_aliases(
+                                            db,
+                                            env,
+                                            upper,
+                                            Type::is_type_var,
+                                        )
+                                    }
+                                }))
+                })
+            {
+                return None;
+            }
         }
 
         // The stored signature still describes a `Self` return. It is used when a later
