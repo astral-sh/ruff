@@ -181,10 +181,10 @@ class L2: ...
 class L3: ...
 ```
 
-With two cases, the exact exclusions fit within the budget:
+With two elements, the exact exclusions fit within the budget:
 
 ```py
-def two_cases(value: Any | Both[L1] | Both[L2]) -> None:
+def two_elements(value: Any | Both[L1] | Both[L2]) -> None:
     if value == "example":
         # revealed: (Any & ~A[L1] & ~A[L2]) | (Any & ~B[L1] & ~A[L2]) | (Any & ~A[L1] & ~B[L2]) | (Any & ~B[L1] & ~B[L2])
         reveal_type(value)
@@ -194,7 +194,7 @@ When the expansion exceeds the intersection budget, equality narrowing keeps the
 without the exclusions:
 
 ```py
-def three_cases(value: Any | Both[L1] | Both[L2] | Both[L3]) -> None:
+def three_elements(value: Any | Both[L1] | Both[L2] | Both[L3]) -> None:
     if value == "example":
         reveal_type(value)  # revealed: Any
 ```
@@ -202,7 +202,7 @@ def three_cases(value: Any | Both[L1] | Both[L2] | Both[L3]) -> None:
 The same fallback prevents excessive memory use with a larger union:
 
 ```py
-type Cases = (
+type Elements = (
     Both[Literal[1]]
     | Both[Literal[2]]
     | Both[Literal[3]]
@@ -225,7 +225,7 @@ type Cases = (
     | Both[Literal[20]]
 )
 
-def large(value: Any | Cases) -> None:
+def large(value: Any | Elements) -> None:
     if value == "example":
         reveal_type(value)  # revealed: Any
 ```
