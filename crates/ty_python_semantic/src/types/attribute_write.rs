@@ -518,14 +518,14 @@ fn instance_attribute_write_requirement<'db>(
 ) -> AttributeWriteRequirement<'db> {
     // Class-member lookup through `type[object]` (normalized to `type`) falls back to `object`.
     // This does not guarantee writable storage, even though typeshed annotates metadata such as
-    // `__module__` as ordinary instance attributes.
+    // `__module__` as ordinary instance attributes. Data descriptors, such as the `__class__`
+    // property, have their own write contracts and are checked below.
     if matches!(
         object_ty.to_meta_type(db, env),
         Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type)
-    ) && !object_ty
-        .class_member(db, env, attribute)
-        .place
-        .is_undefined()
+    ) && let Place::Defined(DefinedPlace { ty, .. }) =
+        object_ty.class_member(db, env, attribute).place
+        && ty.is_definitely_non_data_descriptor(db, env)
     {
         return AttributeWriteRequirement::CannotAssign;
     }

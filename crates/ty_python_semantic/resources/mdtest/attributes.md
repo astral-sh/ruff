@@ -4487,9 +4487,6 @@ matches the annotation:
 ```py
 def set_module(obj: object):
     obj.__module__ = "custom"  # error: [invalid-assignment] "Cannot assign to attribute `__module__` on type `object`"
-
-def set_class(obj: object):
-    obj.__class__ = object  # error: [invalid-assignment]
 ```
 
 A subclass can expose this metadata as a read-only property. Passing it to a function that accepts
@@ -4502,6 +4499,14 @@ class ReadOnly:
         return "custom"
 
 set_module(ReadOnly())  # no diagnostic
+```
+
+The `__class__` attribute has an explicit property setter in typeshed. Writes to it are checked
+against that setter's `type[Self]` parameter:
+
+```py
+def set_class(obj: object):
+    obj.__class__ = object  # no diagnostic
 ```
 
 Ordinary subclasses provide instance dictionaries, so they can still write inherited metadata. Class
