@@ -687,6 +687,21 @@ def parse_seed_argument(arg: str) -> int | range:
     return int(arg)
 
 
+def generate_corpus() -> None:
+    """Write the Python source for each requested seed to a directory."""
+    parser = argparse.ArgumentParser(description=generate_corpus.__doc__)
+    parser.add_argument("seeds", type=parse_seed_argument)
+    parser.add_argument("directory", type=Path)
+    args = parser.parse_args()
+    seeds = [args.seeds] if isinstance(args.seeds, int) else args.seeds
+    args.directory.mkdir(exist_ok=True)
+    with concurrent.futures.ProcessPoolExecutor() as pool:
+        for seed, source in zip(
+            seeds, pool.map(generate_random_code, seeds, chunksize=16), strict=True
+        ):
+            (args.directory / f"{seed}.py").write_text(source, encoding="utf-8")
+
+
 class Executable(enum.StrEnum):
     RUFF = "ruff"
     TY = "ty"

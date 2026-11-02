@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 fuzz = "fuzz:main"
+generate-fuzz-corpus = "fuzz:generate_corpus"
 
 [build-system]
 requires = ["flit-core>=3.12,<5"]
