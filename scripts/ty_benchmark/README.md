@@ -24,7 +24,7 @@ uv run --python 3.15 benchmark
 Measures elapsed time and peak resident set size (RSS) when type checking a project
 without a pre-existing cache.
 
-All four CLIs receive the same list of tracked Python files. The runner applies
+All five CLIs receive the same list of tracked Python files. The runner applies
 each project's includes and excludes once and skips symlinks. When an
 implementation has an adjacent stub, the implementation is the check target.
 Standalone stubs stay in the list. If a file and a populated directory share a
