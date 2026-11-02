@@ -49,10 +49,7 @@ _Marshallable: TypeAlias = (
     | types.CodeType
     | ReadableBuffer
     # handled in w_object() in marshal.c
-    | type[StopIteration]
-    | types.EllipsisType
-    | bool
-    | None
+    | type[StopIteration] | types.EllipsisType | bool | None
 )
 
 if sys.version_info >= (3, 15):

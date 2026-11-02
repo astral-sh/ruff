@@ -6,10 +6,9 @@
 //! types, and documentation. It supports multiple signatures for union types
 //! and overloads.
 
-use crate::Db;
-use crate::FxIndexMap;
 use crate::docstring::Docstring;
-use crate::goto::docstring_for_call_definition;
+use crate::goto::{docstring_for_call_definition, docstring_for_parameter_field};
+use crate::{Db, FxIndexMap, MarkupKind};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::find_node::covering_node;
@@ -235,7 +234,7 @@ fn create_signature_details_from_call_signature_details<'db>(
                 })
         };
 
-    let parameters = create_parameters(details.parameters, documentation.as_ref());
+    let parameters = create_parameters(db, details.parameters, documentation.as_ref());
     let active_parameter = active_parameter.filter(|&index| index < parameters.len());
     SignatureDetails {
         label: details.label,
@@ -247,6 +246,7 @@ fn create_signature_details_from_call_signature_details<'db>(
 
 /// Create `ParameterDetails` objects from semantic displayed parameter details.
 fn create_parameters<'db>(
+    db: &'db dyn Db,
     parameters: Vec<CallSignatureParameter<'db>>,
     docstring: Option<&Docstring>,
 ) -> Vec<ParameterDetails<'db>> {
@@ -261,6 +261,7 @@ fn create_parameters<'db>(
         .into_iter()
         .map(|parameter| {
             let CallSignatureParameter {
+                definition,
                 label,
                 name,
                 ty,
@@ -268,8 +269,10 @@ fn create_parameters<'db>(
                 is_variadic,
                 is_keyword_variadic,
             } = parameter;
-            // Get the parameter name for documentation lookup.
-            let documentation = param_docs.get(name.as_str()).cloned();
+            let documentation = param_docs.get(name.as_str()).cloned().or_else(|| {
+                docstring_for_parameter_field(db, definition)
+                    .map(|docstring| docstring.render(MarkupKind::PlainText))
+            });
 
             ParameterDetails {
                 name,
@@ -1371,6 +1374,33 @@ def ab(a: int, *, c: int):
             param2.documentation,
             Some("The second parameter description".to_string())
         );
+    }
+
+    #[test]
+    fn signature_help_named_tuple_field_documentation() {
+        let test = cursor_test(
+            r#"
+        from typing import NamedTuple
+
+        class Point(NamedTuple):
+            x: int
+            """Horizontal coordinate."""
+
+        Point(<CURSOR>1)
+        "#,
+        );
+
+        assert_snapshot!(test.signature_help_render(), @"
+
+        ============== active signature =============
+        (x: int) -> Point
+        ---------------------------------------------
+
+        -------------- active parameter -------------
+        x: int
+        ---------------------------------------------
+        Horizontal coordinate.
+        ");
     }
 
     #[test]

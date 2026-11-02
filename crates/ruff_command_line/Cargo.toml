@@ -11,6 +11,8 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+ty_static = { workspace = true }
+
 argfile = { workspace = true }
 clap = { workspace = true }
 

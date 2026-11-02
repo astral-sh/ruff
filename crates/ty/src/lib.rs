@@ -7,7 +7,7 @@ mod server;
 mod version;
 
 use std::fmt::Display;
-use std::io::{BufWriter, Write};
+use std::io::{self, BufWriter, Write};
 use std::process::{ExitCode, Termination};
 use std::sync::Mutex;
 
@@ -96,9 +96,14 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
-    let color = TerminalColor::resolve(args.color, || std::env::var_os(EnvVars::FORCE_COLOR));
+    let color = TerminalColor::resolve(args.color);
+    colored::control::set_override(color.should_colorize(&io::stdout()));
+
     if let Some(color_override) = color.as_override() {
-        colored::control::set_override(color_override);
+        // indicatif bars styled while hidden use the stdout setting (`set_colors_enabled`)
+        // even when later drawn on stderr. Bars styled after attachment to stderr use its setting.
+        console::set_colors_enabled(color_override);
+        console::set_colors_enabled_stderr(color_override);
     }
 
     let verbosity = args.verbosity.level();

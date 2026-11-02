@@ -35,6 +35,34 @@ def return_value[T](x: T) -> T:
     return x
 ```
 
+## Inferring generic typed-dictionary parameters
+
+A type variable that appears only inside a typed dictionary still makes the function generic, so
+specialized typed dictionaries can be passed to it.
+
+```py
+from typing import TypedDict
+
+class Item[T](TypedDict):
+    value: T
+
+def accept[T](value: Item[T]) -> None: ...
+
+item: Item[int] = {"value": 1}
+
+reveal_type(accept)  # revealed: def accept[T](value: Item[T]) -> None
+accept(item)
+```
+
+The field type also determines the return type of a generic call.
+
+```py
+def get_value[T](item: Item[T]) -> T:
+    return item["value"]
+
+reveal_type(get_value(item))  # revealed: int
+```
+
 ## Compatibility with legacy type variables
 
 A function with its own PEP 695 type parameter list cannot also introduce a legacy type variable.

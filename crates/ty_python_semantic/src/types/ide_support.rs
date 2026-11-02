@@ -977,6 +977,9 @@ pub struct CallSignatureDetails<'db> {
 /// A single displayed parameter in a callable signature for IDE support.
 #[derive(Debug, Clone)]
 pub struct CallSignatureParameter<'db> {
+    /// The parameter's source definition, such as the field that supplies a constructor parameter.
+    pub definition: Option<Definition<'db>>,
+
     /// The rendered label of the parameter as shown in the signature.
     pub label: String,
 
@@ -1082,6 +1085,7 @@ fn displayed_parameters_for_signature<'db>(
                 parameter_to_displayed_parameter_mapping[parameter_index] =
                     Some(displayed_parameters.len());
                 displayed_parameters.push(CallSignatureParameter {
+                    definition: parameter.definition(),
                     label,
                     name,
                     ty: apply_specialization(parameter.annotated_type()),
@@ -1116,6 +1120,7 @@ fn displayed_parameters_for_signature<'db>(
 
             (
                 vec![CallSignatureParameter {
+                    definition: None,
                     label,
                     name,
                     ty: Type::TypeVar(typevar),

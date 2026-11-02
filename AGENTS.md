@@ -18,7 +18,9 @@ ignored labels, in the `[tool.rooster]` and
 `internal`, `testing`, and `ci` can exclude a PR from a changelog. Decide whether and how the change
 should appear in each changelog, then select appropriate labels for the PR's content.
 
-When working on ty, PR titles should start with `[ty]`. If you can, add the `ty` GitHub label.
+For changes that primarily affect ty, prefix the PR title with `[ty]` and add the `ty` label,
+even if the change has incidental effects on Ruff. When a change affects both tools comparably,
+omit both the prefix and the `ty` label.
 
 If you have permission, apply the selected labels when creating the PR or afterward, then verify
 that the PR's actual labels include them and have the intended effect on each changelog. If the

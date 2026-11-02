@@ -192,6 +192,15 @@ reveal_type(accept)  # revealed: def accept[T](value: Item[T]) -> None
 accept(item)
 ```
 
+The field type also determines the return type of a generic call.
+
+```py
+def get_value(item: Item[T]) -> T:
+    return item["value"]
+
+reveal_type(get_value(item))  # revealed: int
+```
+
 ## Inferring a class-object parameter through a generic factory
 
 A factory can infer its type arguments from a specialized subclass of its class-object parameter.
