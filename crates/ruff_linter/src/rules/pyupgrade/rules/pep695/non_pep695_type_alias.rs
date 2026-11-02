@@ -182,6 +182,7 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
                     restriction: None,
                     kind: TypeParamKind::TypeVar,
                     default: None,
+                    has_unpacked_keywords: false,
                 })
             })
         })
@@ -244,6 +245,10 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
         visitor.vars
     };
 
+    if vars.iter().any(|tvar| tvar.has_unpacked_keywords) {
+        return;
+    }
+
     // Type variables must be unique; filter while preserving order.
     let vars = vars
         .into_iter()
@@ -272,6 +277,13 @@ fn create_diagnostic(
     type_alias_kind: TypeAliasKind,
     value_source: &str,
 ) {
+    if type_vars
+        .iter()
+        .any(|type_var| type_var.has_unpacked_keywords)
+    {
+        return;
+    }
+
     if type_vars.iter().any(TypeVar::has_unsupported_restriction) {
         return;
     }
