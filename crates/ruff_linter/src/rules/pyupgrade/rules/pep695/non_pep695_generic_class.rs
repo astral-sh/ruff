@@ -212,6 +212,15 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
     };
     visitor.visit_expr(slice);
 
+    if visitor
+        .vars
+        .iter()
+        .any(|type_var| type_var.has_unpacked_keywords)
+    {
+        diagnostic.defuse();
+        return;
+    }
+
     // if any of the parameters have been skipped, this indicates that we could not resolve the type
     // to a `TypeVar`, `TypeVarTuple`, or `ParamSpec`, and thus our fix would remove it from the
     // signature incorrectly. We can still offer the diagnostic created above without a Fix. For
@@ -237,13 +246,6 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
             diagnostic.defuse();
             return;
         };
-
-        if type_vars
-            .iter()
-            .any(|type_var| type_var.has_unpacked_keywords)
-        {
-            return;
-        }
 
         // build the fix as a String to avoid removing comments from the entire function body
         let type_params = DisplayTypeVars {

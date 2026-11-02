@@ -105,7 +105,7 @@ enum TypeAliasKind {
 }
 
 impl Violation for NonPEP695TypeAlias {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -245,6 +245,10 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
         visitor.vars
     };
 
+    if vars.iter().any(|tvar| tvar.has_unpacked_keywords) {
+        return;
+    }
+
     // Type variables must be unique; filter while preserving order.
     let vars = vars
         .into_iter()
@@ -273,6 +277,13 @@ fn create_diagnostic(
     type_alias_kind: TypeAliasKind,
     value_source: &str,
 ) {
+    if type_vars
+        .iter()
+        .any(|type_var| type_var.has_unpacked_keywords)
+    {
+        return;
+    }
+
     if type_vars.iter().any(TypeVar::has_unsupported_restriction) {
         return;
     }
@@ -290,21 +301,6 @@ fn create_diagnostic(
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(
-        NonPEP695TypeAlias {
-            name: name.to_string(),
-            type_alias_kind,
-        },
-        stmt.range(),
-    );
-
-    if type_vars
-        .iter()
-        .any(|type_var| type_var.has_unpacked_keywords)
-    {
-        return;
-    }
-
     let source = checker.source();
 
     let content = format!(
@@ -313,5 +309,13 @@ fn create_diagnostic(
     );
     let edit = Edit::range_replacement(content, stmt.range());
 
-    diagnostic.set_fix(Fix::unsafe_edit(edit));
+    checker
+        .report_diagnostic(
+            NonPEP695TypeAlias {
+                name: name.to_string(),
+                type_alias_kind,
+            },
+            stmt.range(),
+        )
+        .set_fix(Fix::unsafe_edit(edit));
 }

@@ -333,11 +333,14 @@ pub(crate) fn expr_name_to_type_var<'a>(
                 return None;
             };
 
-            if arguments
+            let positional_name = arguments
                 .args
                 .first()
-                .is_some_and(Expr::is_string_literal_expr)
-            {
+                .is_some_and(Expr::is_string_literal_expr);
+            let keyword_name = arguments
+                .find_keyword("name")
+                .is_some_and(|keyword| keyword.value.is_string_literal_expr());
+            if positional_name || keyword_name {
                 // `default` was added in PEP 696 and Python 3.13. We now support converting
                 // TypeVars with defaults to PEP 695 type parameters.
                 //
@@ -354,12 +357,15 @@ pub(crate) fn expr_name_to_type_var<'a>(
                 let default = arguments
                     .find_keyword("default")
                     .map(|default| &default.value);
+                let constraints: Vec<_> = if positional_name {
+                    arguments.args.iter().skip(1).collect()
+                } else {
+                    arguments.args.iter().collect()
+                };
                 let restriction = if let Some(bound) = arguments.find_keyword("bound") {
                     Some(TypeVarRestriction::Bound(&bound.value))
-                } else if arguments.args.len() > 1 {
-                    Some(TypeVarRestriction::Constraint(
-                        arguments.args.iter().skip(1).collect(),
-                    ))
+                } else if !constraints.is_empty() {
+                    Some(TypeVarRestriction::Constraint(constraints))
                 } else {
                     None
                 };
