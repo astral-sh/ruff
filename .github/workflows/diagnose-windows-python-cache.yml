@@ -84,7 +84,19 @@ jobs:
           uv python install --no-bin $version
           Test-PythonHome 'fresh'
 
-          & $tar --force-local --posix -cf "$root/python.tar" -C $install.Parent.FullName $install.Name
+          # Use the native symlink mode and absolute, slash-separated paths used by @actions/cache.
+          $env:MSYS = 'winsymlinks:nativestrict'
+          $archive = "$root/python.tar".Replace('\', '/')
+          $installPath = $install.FullName.Replace('\', '/')
+          $patch = Get-ChildItem -LiteralPath $install.FullName -Directory -Filter "cpython-$version-*"
+          & $tar --force-local --posix -cPf $archive $installPath
+          & $tar --force-local -tvPf $archive | Select-String 'cpython-[^/]+/?( -> .*)?$'
           Rename-Item -LiteralPath $install.FullName -NewName 'python-before-tar'
-          & $tar --force-local -xf "$root/python.tar" -C $install.Parent.FullName
+          & $tar --force-local -xPf $archive
           Test-PythonHome 'local-tar-restore'
+
+          # Windows needs to know whether the target is a directory when the symlink is created.
+          Rename-Item -LiteralPath $install.FullName -NewName 'python-after-tar'
+          New-Item -ItemType Directory -Force -Path $patch.FullName | Out-Null
+          & $tar --force-local -xPf $archive
+          Test-PythonHome 'target-exists-before-restore'
