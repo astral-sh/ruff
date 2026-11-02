@@ -4600,6 +4600,31 @@ fn output_format_show_fixes(output_format: &str) -> Result<()> {
     Ok(())
 }
 
+/// When `--output-file` names a regular file, `--color=always` includes ANSI styling in the
+/// diagnostic. With no environment override, `--color=auto` writes it as plain text.
+#[test_case::test_case("always", true)]
+#[test_case::test_case("auto", false)]
+fn color_in_output_file(color: &str, styled: bool) {
+    let fixture = CliTest::with_file("input.py", "import os").unwrap();
+    let output = fixture
+        .check_command()
+        .args([
+            "--isolated",
+            "--color",
+            color,
+            "--output-file",
+            "out",
+            "input.py",
+        ])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(1));
+    let report = fixture.read_file("out").unwrap();
+    let diagnostic = report.lines().find(|line| line.contains("F401")).unwrap();
+    assert_eq!(diagnostic.contains("\x1b["), styled, "{diagnostic:?}");
+}
+
 /// Rule codes in `--statistics` output link to the rule documentation, as they do in the concise
 /// and full output formats.
 #[test]
