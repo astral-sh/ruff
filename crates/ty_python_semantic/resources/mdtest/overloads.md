@@ -256,8 +256,8 @@ reveal_type(SyncCommands().alias())  # revealed: int
 async def use_async(client: AsyncCommands) -> None:
     reveal_type(client.method())  # revealed: Awaitable[int]
     reveal_type(client.alias())  # revealed: Awaitable[int]
-    await client.method()  # no diagnostic
-    await client.alias()  # no diagnostic
+    await client.method()  # ok
+    await client.alias()  # ok
 ```
 
 ## Specialized generic receivers

@@ -1387,11 +1387,11 @@ class B(NamedTuple):
 
 def choose(flag: bool) -> Callable[..., A]:
     # TODO: Report [invalid-return-type] (https://github.com/astral-sh/ty/issues/3114).
-    return A._replace if flag else B._replace  # no diagnostic
+    return A._replace if flag else B._replace  # ok
 
 def reversed_order(flag: bool) -> Callable[..., A]:
     # TODO: Report [invalid-return-type] (https://github.com/astral-sh/ty/issues/3114).
-    return B._replace if flag else A._replace  # no diagnostic
+    return B._replace if flag else A._replace  # ok
 
 def either_class(flag: bool) -> Callable[..., A | B]:
     return A._replace if flag else B._replace  # ok
@@ -1405,7 +1405,7 @@ DynamicB = NamedTuple("DynamicB", [("x", int)])
 
 def choose_dynamic(flag: bool) -> Callable[..., DynamicA]:
     # TODO: Report [invalid-return-type] (https://github.com/astral-sh/ty/issues/3114).
-    return DynamicA._replace if flag else DynamicB._replace  # no diagnostic
+    return DynamicA._replace if flag else DynamicB._replace  # ok
 ```
 
 ### Fields annotated with `Self`
