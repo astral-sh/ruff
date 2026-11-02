@@ -127,7 +127,8 @@ ty_base="${TY_ECOSYSTEM_BASE_BINARY:-$PWD/target/ty-ecosystem-bins/ty-base}"
 ty_pr="${TY_ECOSYSTEM_PR_BINARY:-$PWD/target/ty-ecosystem-bins/ty-pr}"
 test -x "$ty_base" && test -x "$ty_pr" || exit 1
 ecosystem_analysis_mode="<strict-or-non-strict-from-detailed-report>"
-jaq=(uv run --project "$PWD" --locked --only-group jaq jaq)
+# Resolve jaq in the Ruff checkout so the third-party project cannot shadow it.
+jaq=(uv run --directory "$PWD" --locked --only-group jaq jaq)
 analyzer_profile="$("${jaq[@]}" -er '.runtime.analyzer_profile' "$TY_ECOSYSTEM_RUN_METADATA")" || exit 1
 case "$analyzer_profile" in
   profiling|release) checker_timeout=30 ;;
