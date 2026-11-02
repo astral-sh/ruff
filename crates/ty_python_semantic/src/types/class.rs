@@ -1,4 +1,4 @@
-use crate::ProgramEnvironment;
+use crate::{Program, ProgramEnvironment};
 use std::fmt::Write;
 
 pub(crate) use self::dynamic_literal::{
@@ -1477,6 +1477,47 @@ impl<'db> ClassType<'db> {
         })
     }
 
+    /// Resolve each concrete MRO entry's origin once, retaining MRO order when an
+    /// origin contributes more than one specialization. Dynamic entries can match a
+    /// different target themselves, so keep those MROs on the ordinary path.
+    #[salsa::tracked(
+        returns(as_ref),
+        cycle_initial=|_, _, _| None,
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn relation_mro(self, db: &'db dyn Db) -> Option<Box<[RelationMroEntry<'db>]>> {
+        let mut classes = Vec::new();
+        for base in self.iter_mro(db) {
+            match base {
+                ClassBase::Class(class) => classes.push(RelationMroEntry::new(db, class)),
+                ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => {}
+                ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => return None,
+            }
+        }
+        Some(classes.into_boxed_slice())
+    }
+
+    /// An explicit inheritance path can contribute a different specialization of the
+    /// same origin. Keep all such aliases in their original traversal order.
+    #[salsa::tracked(
+        returns(as_ref),
+        cycle_initial=|_, _, _, _| None,
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn explicit_generic_bases(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+    ) -> Option<Box<[(StaticClassLiteral<'db>, GenericAlias<'db>)]>> {
+        let env = ProgramEnvironment::from_program(program);
+        Some(
+            self.iter_explicit_ancestors(db, &env)
+                .filter_map(ClassType::into_generic_alias)
+                .map(|alias| (alias.origin(db), alias))
+                .collect(),
+        )
+    }
+
     /// Is this class final?
     pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
         self.class_literal(db).is_final(db)
@@ -2673,6 +2714,22 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
     }
 }
 
+/// A concrete MRO entry with the origin used by class relation checks.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+enum RelationMroEntry<'db> {
+    NonGeneric(ClassLiteral<'db>),
+    Generic(StaticClassLiteral<'db>, GenericAlias<'db>),
+}
+
+impl<'db> RelationMroEntry<'db> {
+    fn new(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+        match class {
+            ClassType::NonGeneric(literal) => Self::NonGeneric(literal),
+            ClassType::Generic(alias) => Self::Generic(alias.origin(db), alias),
+        }
+    }
+}
+
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     pub(super) fn check_class_pair(
         &self,
@@ -2682,12 +2739,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         // Fast path: if source and target are the same class (possibly with different
         // specializations), we can compare them directly without walking the MRO.
-        match (source, target) {
-            (ClassType::NonGeneric(source), ClassType::NonGeneric(target)) if source == target => {
+        let target_entry = RelationMroEntry::new(db, target);
+        match (source, target_entry) {
+            (ClassType::NonGeneric(source), RelationMroEntry::NonGeneric(target))
+                if source == target =>
+            {
                 return self.always();
             }
-            (ClassType::Generic(source_alias), ClassType::Generic(target_alias))
-                if source_alias.origin(db) == target_alias.origin(db) =>
+            (ClassType::Generic(source_alias), RelationMroEntry::Generic(origin, target_alias))
+                if source_alias.origin(db) == origin =>
             {
                 return self.check_specialization_pair(
                     db,
@@ -2699,7 +2759,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         let mut generic_target = None;
-        let result = source.iter_mro(db).when_any(db, self.constraints, |base| {
+        let bases = match source.relation_mro(db) {
+            Some(classes) => {
+                let RelationMroEntry::Generic(target_origin, _) = target_entry else {
+                    return ConstraintSet::from_bool(
+                        self.constraints,
+                        classes.contains(&target_entry),
+                    );
+                };
+                Either::Left(classes.iter().filter_map(move |&entry| match entry {
+                    RelationMroEntry::Generic(origin, alias) if origin == target_origin => {
+                        Some(ClassBase::Class(ClassType::Generic(alias)))
+                    }
+                    _ => None,
+                }))
+            }
+            None => Either::Right(source.iter_mro(db)),
+        };
+        let result = bases.when_any(db, self.constraints, |base| {
             match base {
                 ClassBase::Any => ConstraintSet::from_bool(
                     self.constraints,
@@ -2717,18 +2794,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // Protocol, Generic, and TypedDict are special bases that don't match ClassType.
                 ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict(_) => self.never(),
 
-                ClassBase::Class(source) => match (source, target) {
+                ClassBase::Class(source) => match (source, target_entry) {
                     // Two non-generic classes match if they have the same class literal.
                     (
                         ClassType::NonGeneric(source_literal),
-                        ClassType::NonGeneric(target_literal),
+                        RelationMroEntry::NonGeneric(target_literal),
                     ) => {
                         ConstraintSet::from_bool(self.constraints, source_literal == target_literal)
                     }
 
                     // Two generic classes match if they have the same origin and compatible specializations.
-                    (ClassType::Generic(source), ClassType::Generic(target))
-                        if source.origin(db) == target.origin(db) =>
+                    (ClassType::Generic(source), RelationMroEntry::Generic(origin, target))
+                        if source.origin(db) == origin =>
                     {
                         generic_target = Some(target);
                         self.check_specialization_pair(
@@ -2739,8 +2816,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
 
                     // Different generic origins, or generic and non-generic classes, don't match.
-                    (ClassType::Generic(_), ClassType::Generic(_) | ClassType::NonGeneric(_))
-                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => self.never(),
+                    _ => self.never(),
                 },
             }
         });
@@ -2753,17 +2829,27 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // still establish the relation: `Child(Gradual, Concrete)` is a subtype of `Base[int]`
         // through `Concrete`, even if `Gradual` contributes `Base[Any]` to Child's MRO.
         result.or(db, self.constraints, || {
-            source
-                .iter_explicit_ancestors(db, self.env)
-                .filter_map(ClassType::into_generic_alias)
-                .filter(|ancestor| ancestor.origin(db) == target.origin(db))
-                .when_any(db, self.constraints, |ancestor| {
-                    self.check_specialization_pair(
-                        db,
-                        ancestor.specialization(db),
-                        target.specialization(db),
-                    )
-                })
+            let origin = target.origin(db);
+            let candidates = match source.explicit_generic_bases(db, self.env.program(db)) {
+                Some(bases) => Either::Left(
+                    bases
+                        .iter()
+                        .filter_map(|&(literal, alias)| (literal == origin).then_some(alias)),
+                ),
+                None => Either::Right(
+                    source
+                        .iter_explicit_ancestors(db, self.env)
+                        .filter_map(ClassType::into_generic_alias)
+                        .filter(|ancestor| ancestor.origin(db) == origin),
+                ),
+            };
+            candidates.when_any(db, self.constraints, |ancestor| {
+                self.check_specialization_pair(
+                    db,
+                    ancestor.specialization(db),
+                    target.specialization(db),
+                )
+            })
         })
     }
 }
