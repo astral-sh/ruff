@@ -1185,8 +1185,8 @@ fn evaluate_target_union<'db>(
         {
             narrowed = IntersectionBuilder::new(db, env)
                 .add_positive(narrowed)
-                .add_negative(removed)
-                .build();
+                .bounded_add_negative(removed)
+                .map_or(narrowed, IntersectionBuilder::build);
         }
         builder = builder.add(narrowed);
     }

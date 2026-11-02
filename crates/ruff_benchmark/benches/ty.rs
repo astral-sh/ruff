@@ -2075,6 +2075,36 @@ fn benchmark_gradual_literal_union_equality(criterion: &mut Criterion) {
     benchmark_micro_case(criterion, "ty_micro[gradual_literal_union_equality]", &code);
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4867>.
+///
+/// Excluding a union of intersections during equality narrowing can expand exponentially.
+fn benchmark_gradual_intersection_union_equality(criterion: &mut Criterion) {
+    let elements = (1..=20)
+        .map(|index| format!("Both[Literal[{index}]]"))
+        .join(" | ");
+    let code = format!(
+        "
+        from typing import Any, Literal
+
+        class A[T]: ...
+        class B[T]: ...
+
+        type Both[T] = A[T] & B[T]  # ty: ignore[experimental-syntax]
+        type Elements = {elements}
+
+        def check(value: Any | Elements) -> None:
+            if value == 'example':
+                repr(value)
+        "
+    );
+
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[gradual_intersection_union_equality]",
+        &code,
+    );
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/4541>.
 ///
 /// Negating a compound gradual intersection can repeatedly introduce equivalent alternatives.
@@ -2714,6 +2744,7 @@ criterion_group!(
     benchmark_enum_union_equality,
     benchmark_disjoint_membership_exclusions,
     benchmark_gradual_literal_union_equality,
+    benchmark_gradual_intersection_union_equality,
     benchmark_gradual_intersection_negation,
     benchmark_literal_or_pattern_reachability,
     benchmark_tuple_class_pattern_captures,

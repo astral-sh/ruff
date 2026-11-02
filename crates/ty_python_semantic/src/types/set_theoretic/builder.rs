@@ -1698,6 +1698,15 @@ impl<'db> IntersectionBuilder<'db> {
         self
     }
 
+    /// Add a negative element without expanding multiple disjunctions beyond the intersection budget.
+    ///
+    /// Returns `None` if the exact result exceeds the budget.
+    pub(crate) fn bounded_add_negative(mut self, ty: Type<'db>) -> Option<Self> {
+        self.add_negative_impl::<BoundedIntersection>(ty, &mut vec![])
+            .continue_value()?;
+        Some(self)
+    }
+
     pub(crate) fn add_negative_in_place(&mut self, ty: Type<'db>) {
         let ControlFlow::Continue(()) =
             self.add_negative_impl::<UnboundedIntersection>(ty, &mut vec![]);
