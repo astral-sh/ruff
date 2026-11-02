@@ -249,9 +249,9 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
           BASE_REF_NAME: ${{ github.event.pull_request.base.ref }}
         run: |
-          # Merge shard diagnostics
-          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-base-*.json > diagnostics-base.json
-          jq -s '{ outputs: [.[].outputs[]] }' diagnostics-PR-*.json   > diagnostics-PR.json
+          # jaq slurps each input file separately, so feed all shards through stdin.
+          cat diagnostics-base-*.json | uv run --locked --only-group jaq jaq -s '{ outputs: [.[].outputs[]] }' > diagnostics-base.json
+          cat diagnostics-PR-*.json   | uv run --locked --only-group jaq jaq -s '{ outputs: [.[].outputs[]] }' > diagnostics-PR.json
 
           mkdir dist
 

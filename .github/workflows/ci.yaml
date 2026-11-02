@@ -1614,9 +1614,10 @@ jobs:
       - python-package
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-2' || 'ubuntu-slim' }}
     steps:
+      - uses: $/.github/actions/setup-jaq
       - name: "Check required jobs passed"
         run: |
-          failing=$(echo "$NEEDS_JSON" | jq -r 'to_entries[] | select(.value.result != "success" and (.value.result != "skipped" or .key == "cargo-cooldowns")) | "\(.key): \(.value.result)"')
+          failing=$(echo "$NEEDS_JSON" | jaq -r 'to_entries[] | select(.value.result != "success" and (.value.result != "skipped" or .key == "cargo-cooldowns")) | "\(.key): \(.value.result)"')
           if [ -n "$failing" ]; then
             echo "$failing"
             exit 1

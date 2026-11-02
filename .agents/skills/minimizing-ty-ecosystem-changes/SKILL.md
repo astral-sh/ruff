@@ -71,7 +71,7 @@ trap 'git checkout "$original_ref"' EXIT
 artifact_dir="$PWD/target/ty-ecosystem-bins"
 build_target_dir="${CARGO_TARGET_DIR:-target}"
 export CARGO_PROFILE_PROFILING_DEBUG=line-tables-only
-jq -er '.ty_config' "$TY_ECOSYSTEM_RUN_METADATA" > "$artifact_dir/ty-ecosystem.toml"
+uv run --locked --only-group jaq jaq -er '.ty_config' "$TY_ECOSYSTEM_RUN_METADATA" > "$artifact_dir/ty-ecosystem.toml"
 
 git checkout --detach <merge-base>
 cargo build --package ty --profile profiling
@@ -127,7 +127,8 @@ ty_base="${TY_ECOSYSTEM_BASE_BINARY:-$PWD/target/ty-ecosystem-bins/ty-base}"
 ty_pr="${TY_ECOSYSTEM_PR_BINARY:-$PWD/target/ty-ecosystem-bins/ty-pr}"
 test -x "$ty_base" && test -x "$ty_pr" || exit 1
 ecosystem_analysis_mode="<strict-or-non-strict-from-detailed-report>"
-analyzer_profile="$(jq -er '.runtime.analyzer_profile' "$TY_ECOSYSTEM_RUN_METADATA")" || exit 1
+jaq=(uv run --project "$PWD" --locked --only-group jaq jaq)
+analyzer_profile="$("${jaq[@]}" -er '.runtime.analyzer_profile' "$TY_ECOSYSTEM_RUN_METADATA")" || exit 1
 case "$analyzer_profile" in
   profiling|release) checker_timeout=30 ;;
   *) checker_timeout=180 ;;
@@ -154,11 +155,11 @@ cd "$project_dir"
 ty_binary="$ty_base"
 repro_result="$repro_results/base.json"
 run_ecosystem_ty || exit 1
-base_exit_status="$(jq -r '.return_code' "$repro_result")"
+base_exit_status="$("${jaq[@]}" -r '.return_code' "$repro_result")"
 ty_binary="$ty_pr"
 repro_result="$repro_results/pr.json"
 run_ecosystem_ty || exit 1
-pr_exit_status="$(jq -r '.return_code' "$repro_result")"
+pr_exit_status="$("${jaq[@]}" -r '.return_code' "$repro_result")"
 ```
 
 Confirm the detailed report's difference exactly, including duplicate diagnostics and both exit outcomes. When reproducing an intermittent severe failure, repeat each side using its reported run count and deadline. Ordinary diagnostics can produce exit status 1; do not mistake that for a failed reproduction. For panics, identify the stable fingerprint by comparing the Rust panic site or decisive causal frame and panic payload; ignore checked Python-file paths and incidental backtrace differences.

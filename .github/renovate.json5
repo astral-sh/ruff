@@ -31,6 +31,14 @@
   },
   packageRules: [
     {
+      // The custom manager updates the jaq setup action's uv version and checksum together.
+      matchManagers: ["github-actions"],
+      matchDepTypes: ["uses-with"],
+      matchPackageNames: ["astral-sh/uv"],
+      matchFileNames: [".github/actions/setup-jaq/action.yml"],
+      enabled: false,
+    },
+    {
       // This package rule disables updates for GitHub runners:
       // we'd only pin them to a specific version
       // if there was a deliberate reason to do so
@@ -93,6 +101,17 @@
     },
   ],
   customManagers: [
+    // The shared uv version/checksum manager only covers workflow files.
+    {
+      customType: "regex",
+      managerFilePatterns: ["/^\\.github/actions/setup-jaq/action\\.yml$/"],
+      matchStrings: [
+        '# renovate: datasource=github-release-attachments depName=astral-sh/uv\\s+version: "(?<currentValue>[^"\\r\\n]+)"\\s+checksum: "(?<currentDigest>[a-f0-9]{64})"',
+      ],
+      depNameTemplate: "astral-sh/uv",
+      datasourceTemplate: "github-release-attachments",
+      versioningTemplate: "semver",
+    },
     // uv release used by the reusable security review workflow.
     {
       customType: "regex",
