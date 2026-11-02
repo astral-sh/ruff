@@ -29,6 +29,8 @@ env:
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
   PYTHON_VERSION: "3.14"
+  # The parser uses the first 501 seeds from ty's corpus.
+  FUZZ_CORPUS_SEEDS: 0-1000
   NEXTEST_PROFILE: ci
   # Enable mdtests that require external dependencies
   MDTEST_EXTERNAL: "1"
@@ -661,26 +663,11 @@ jobs:
           checksum: "f29c3e94ffabd7e6f3ba521dba169a9b7ec12100bf3257087f0f24f6123f3645"
       - run: uv run --only-dev cargo fuzz build -s none
 
-  fuzz-corpus:
-    needs: determine_changes
-    if: >-
-      !contains(github.event.pull_request.labels.*.name, 'no-test') &&
-      (needs.determine_changes.outputs.parser == 'true' ||
-       needs.determine_changes.outputs.py-fuzzer == 'true' ||
-       (github.event_name == 'pull_request' && needs.determine_changes.outputs.ty == 'true'))
-    uses: $/.github/workflows/fuzz-corpus.yml
-    permissions:
-      actions: read
-      contents: read
-
   fuzz-parser:
     name: "fuzz parser"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    needs: [determine_changes, fuzz-corpus]
-    if: >-
-      !cancelled() && needs.determine_changes.result == 'success' &&
-      !contains(github.event.pull_request.labels.*.name, 'no-test') &&
-      (needs.determine_changes.outputs.parser == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true')
+    needs: determine_changes
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.parser == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
     permissions:
       actions: read
       contents: read
@@ -711,20 +698,16 @@ jobs:
           # Line-tables-only debug info: faster builds, backtraces still work.
           CARGO_PROFILE_DEV_DEBUG: line-tables-only
         run: cargo build --bin ruff
-      - name: Download the fuzz corpus
+      - name: Prepare the fuzz corpus
         id: corpus
-        if: ${{ needs.fuzz-corpus.result == 'success' }}
-        # The artifact can expire after the prepare job selects it.
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: $/python/py-fuzzer
         with:
-          github-token: ${{ github.token }}
-          run-id: ${{ needs.fuzz-corpus.outputs.run-id }}
-          name: ${{ needs.fuzz-corpus.outputs.name }}
-          path: ${{ runner.temp }}/fuzz-corpus
+          python-version: ${{ env.PYTHON_VERSION }}
+          seeds: ${{ env.FUZZ_CORPUS_SEEDS }}
       - name: Fuzz
         env:
-          FUZZ_CORPUS: ${{ steps.corpus.outputs.download-path }}
+          FUZZ_CORPUS: ${{ steps.corpus.outputs.path }}
         run: |
           (
             uv run \
@@ -963,15 +946,11 @@ jobs:
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
     needs:
       - determine_changes
-      - fuzz-corpus
+    # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && (needs.determine_changes.outputs.ty == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
     permissions:
       actions: read
       contents: read
-    # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
-    if: >-
-      !cancelled() && needs.determine_changes.result == 'success' &&
-      !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' &&
-      (needs.determine_changes.outputs.ty == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true')
     timeout-minutes: ${{ github.repository == 'astral-sh/ruff' && 20 || 40 }}
     env:
       # Keep in sync with the job's timeout-minutes.
@@ -999,21 +978,18 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup show
-      - name: Download the fuzz corpus
+      - name: Prepare the fuzz corpus
         id: corpus
-        if: ${{ needs.fuzz-corpus.result == 'success' }}
         continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: $/python/py-fuzzer
         with:
-          github-token: ${{ github.token }}
-          run-id: ${{ needs.fuzz-corpus.outputs.run-id }}
-          name: ${{ needs.fuzz-corpus.outputs.name }}
-          path: ${{ runner.temp }}/fuzz-corpus
+          python-version: ${{ env.PYTHON_VERSION }}
+          seeds: ${{ env.FUZZ_CORPUS_SEEDS }}
       - name: Fuzz
         env:
+          FUZZ_CORPUS: ${{ steps.corpus.outputs.path }}
           FORCE_COLOR: 1
           MERGE_BASE: ${{ needs.determine_changes.outputs.comparison_base }}
-          FUZZ_CORPUS: ${{ steps.corpus.outputs.download-path }}
           # Line-tables-only debug info: faster builds, backtraces still work.
           CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
         run: |
@@ -1038,12 +1014,12 @@ jobs:
             fuzz \
             --test-executable=ty-new \
             --baseline-executable=ty-old \
-            ${FUZZ_CORPUS:+--corpus-dir="$FUZZ_CORPUS"} \
             --only-new-bugs \
+            ${FUZZ_CORPUS:+--corpus-dir="$FUZZ_CORPUS"} \
             --budget-minutes="${FUZZ_JOB_TIMEOUT_MINUTES}" \
             --job-started-at="${FUZZ_JOB_STARTED_AT}" \
             --bin=ty \
-            0-1000
+            "$FUZZ_CORPUS_SEEDS"
           )
 
   cargo-deny:
