@@ -6614,22 +6614,22 @@ impl<'db> CallInference<'_, 'db> {
                 .parameters()
                 .iter()
                 .any(Parameter::has_starred_annotation)
-            || context.variables(self.db).any(|variable| {
-                let typevar = variable.typevar(self.db);
-                let kind = typevar.kind(self.db);
-                // An explicit bound can fail during inference or require the seeded constraint
-                // builder during validation. Solve these calls once in their original builder.
-                // The implicit receiver bound on `Self` still permits sharing.
-                kind.is_paramspec()
-                    || kind.is_typevartuple()
-                    || (!matches!(kind, TypeVarKind::TypingSelf { .. })
-                        && typevar.has_bound_or_constraints(self.db))
-            })
         {
             return None;
         }
 
-        let relations = self
+        let mut has_explicit_bound = false;
+        for variable in context.variables(self.db) {
+            let typevar = variable.typevar(self.db);
+            let kind = typevar.kind(self.db);
+            if kind.is_paramspec() || kind.is_typevartuple() {
+                return None;
+            }
+            has_explicit_bound |= !matches!(kind, TypeVarKind::TypingSelf { .. })
+                && typevar.has_bound_or_constraints(self.db);
+        }
+
+        let relations: Box<[_]> = self
             .argument_relations()
             // Equal types produce no inference evidence. Two string literals also contribute
             // no mapping, whether or not the actual value will pass argument validation.
@@ -6640,6 +6640,16 @@ impl<'db> CallInference<'_, 'db> {
             })
             .map(|r| (r.declared_type, r.argument_type))
             .collect();
+        // Instance types recur across calls even when their values differ. Limit sharing for
+        // explicitly bounded variables to this case: a callback or class object can introduce
+        // bounds that require redoing inference in the source call's constraint builder.
+        if has_explicit_bound
+            && relations
+                .iter()
+                .any(|(_, actual)| !matches!(actual, Type::NominalInstance(_)))
+        {
+            return None;
+        }
         shared_call_type_arguments(
             self.db,
             self.env.program(self.db),
