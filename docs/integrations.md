@@ -57,9 +57,9 @@ Alternatively, you can include `ruff-action` as a step in any other workflow fil
 
 `ruff-action` accepts optional configuration parameters via `with:`, including:
 
-- `version`: The Ruff version to install (default: latest).
+- `version`: The Ruff version to install (default: inferred from `pyproject.toml`, falling back to latest).
 - `args`: The command-line arguments to pass to Ruff (default: `"check"`).
-- `src`: The source paths to pass to Ruff (default: `[".", "src"]`).
+- `src`: The source paths to pass to Ruff (default: `${{ github.workspace }}`, the repository workspace).
 
 For example, to run `ruff check --select B ./src` using Ruff version `0.8.0`:
 
