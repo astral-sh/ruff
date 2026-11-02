@@ -174,13 +174,13 @@ from typing import Any, Literal
 class A[T]: ...
 class B[T]: ...
 
-type Case[T] = A[T] & B[T]
+type Both[T] = A[T] & B[T]
 ```
 
 With two cases, the exact exclusions fit within the budget:
 
 ```py
-def two_cases(value: Any | Case[Literal[1]] | Case[Literal[2]]) -> None:
+def two_cases(value: Any | Both[Literal[1]] | Both[Literal[2]]) -> None:
     if value == "example":
         # revealed: (Any & ~A[Literal[1]] & ~A[Literal[2]]) | (Any & ~B[Literal[1]] & ~A[Literal[2]]) | (Any & ~A[Literal[1]] & ~B[Literal[2]]) | (Any & ~B[Literal[1]] & ~B[Literal[2]])
         reveal_type(value)
@@ -190,7 +190,7 @@ When the expansion exceeds the intersection budget, equality narrowing keeps the
 without the exclusions:
 
 ```py
-def three_cases(value: Any | Case[Literal[1]] | Case[Literal[2]] | Case[Literal[3]]) -> None:
+def three_cases(value: Any | Both[Literal[1]] | Both[Literal[2]] | Both[Literal[3]]) -> None:
     if value == "example":
         reveal_type(value)  # revealed: Any
 ```
@@ -199,26 +199,26 @@ The same fallback prevents excessive memory use with a larger union:
 
 ```py
 type Cases = (
-    Case[Literal[1]]
-    | Case[Literal[2]]
-    | Case[Literal[3]]
-    | Case[Literal[4]]
-    | Case[Literal[5]]
-    | Case[Literal[6]]
-    | Case[Literal[7]]
-    | Case[Literal[8]]
-    | Case[Literal[9]]
-    | Case[Literal[10]]
-    | Case[Literal[11]]
-    | Case[Literal[12]]
-    | Case[Literal[13]]
-    | Case[Literal[14]]
-    | Case[Literal[15]]
-    | Case[Literal[16]]
-    | Case[Literal[17]]
-    | Case[Literal[18]]
-    | Case[Literal[19]]
-    | Case[Literal[20]]
+    Both[Literal[1]]
+    | Both[Literal[2]]
+    | Both[Literal[3]]
+    | Both[Literal[4]]
+    | Both[Literal[5]]
+    | Both[Literal[6]]
+    | Both[Literal[7]]
+    | Both[Literal[8]]
+    | Both[Literal[9]]
+    | Both[Literal[10]]
+    | Both[Literal[11]]
+    | Both[Literal[12]]
+    | Both[Literal[13]]
+    | Both[Literal[14]]
+    | Both[Literal[15]]
+    | Both[Literal[16]]
+    | Both[Literal[17]]
+    | Both[Literal[18]]
+    | Both[Literal[19]]
+    | Both[Literal[20]]
 )
 
 def large(value: Any | Cases) -> None:
