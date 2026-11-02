@@ -565,12 +565,23 @@ fn implicit_attribute_cycle_recover<'db>(
     attribute_member: ImplicitAttribute<'db>,
     attribute: ImplicitAttributeName<'db>,
 ) -> ImplicitAttribute<'db> {
+    const MAX_ATTRIBUTE_ITERATIONS: u32 = 16;
+
     let env = ProgramEnvironment::from_scope(attribute.class_body_scope(db));
-    let inner =
+    let mut inner =
         attribute_member
             .member
             .inner
             .cycle_normalized(db, &env, previous.member.inner, cycle);
+
+    // Fall back to `Unknown` if the attribute type grows unboundedly.
+    if cycle.iteration() >= MAX_ATTRIBUTE_ITERATIONS
+        && let Place::Defined(current) = inner.place
+        && !current.origin.is_declared()
+        && previous.member.inner.place.raw_type() != Some(current.ty)
+    {
+        inner = inner.map_type(|_| Type::unknown());
+    }
     ImplicitAttribute {
         member: Member { inner },
         ..attribute_member
