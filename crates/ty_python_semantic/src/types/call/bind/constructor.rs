@@ -10,8 +10,9 @@ use crate::types::signatures::{Parameter, Signature};
 use crate::types::typevar::TypeVarNonceGenerator;
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicType,
+    NominalInstanceType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionType,
 };
 
 impl<'db> CallableBinding<'db> {
@@ -852,55 +853,10 @@ impl<'db> Binding<'db> {
             return None;
         }
 
-        if nominal.is_definition_generic(db) {
-            // An allocator such as `dict.__new__` leaves its class arguments to `__init__`.
-            // The receiver and the bound of `Self` must carry the same type variables in
-            // invariant positions. A covariant position can supply an upper bound instead.
-            if signature
-                .parameters()
-                .iter()
-                .skip(1)
-                .any(|parameter| parameter.annotated_type() != Type::any())
-            {
-                return None;
-            }
-            let (_, actual) = instance.class_specialization(db, env)?;
-            let self_bound = returned.typevar(db).upper_bound(db, env)?;
-            self_bound.as_nominal_instance()?;
-            let (_, bound) = self_bound.class_specialization(db, env)?;
-            let arguments = actual.types(db);
-            let variables = signature.generic_context?;
-            if arguments != bound.types(db)
-                || variables.len(db) != arguments.len() + 1
-                || actual
-                    .generic_context(db)
-                    .variables(db)
-                    .chain(bound.generic_context(db).variables(db))
-                    .any(|parameter| parameter.variance(db) != TypeVarVariance::Invariant)
-                || variables.variables(db).any(|variable| {
-                    !variable.is_same_typevar_as(db, returned)
-                        && (!arguments.contains(&Type::TypeVar(variable))
-                            || variable.is_paramspec(db)
-                            || variable.is_typevartuple(db)
-                            || variable.default_type(db).is_some()
-                            || variable
-                                .typevar(db)
-                                .bound_or_constraints(db, env)
-                                .is_some_and(|restriction| match restriction {
-                                    TypeVarBoundOrConstraints::Constraints(_) => true,
-                                    TypeVarBoundOrConstraints::UpperBound(upper) => {
-                                        any_over_type_expanding_aliases(
-                                            db,
-                                            env,
-                                            upper,
-                                            Type::is_type_var,
-                                        )
-                                    }
-                                }))
-                })
-            {
-                return None;
-            }
+        if nominal.is_definition_generic(db)
+            && !signature.can_bind_generic_new_receiver(db, env, nominal, returned)
+        {
+            return None;
         }
 
         // The stored signature still describes a `Self` return. It is used when a later
@@ -999,5 +955,83 @@ impl<'db> Binding<'db> {
             }
             _ => Some(self.signature.return_ty),
         }
+    }
+}
+
+impl<'db> Signature<'db> {
+    /// Recognizes a generic allocator whose `cls` argument can be bound before inference.
+    ///
+    /// For example, `Child[K, V]` can inherit `__new__(cls, *args: Any, **kwargs: Any) -> Self`
+    /// from `Base[K, V]`. If both classes use `K` and `V` invariantly, matching the receiver
+    /// against the bound of `Self` relates each type variable to itself. A covariant parameter
+    /// or a base such as `Base[K | V, V]` can supply additional constraints.
+    fn can_bind_generic_new_receiver(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver: NominalInstanceType<'db>,
+        self_typevar: BoundTypeVarInstance<'db>,
+    ) -> bool {
+        if self
+            .parameters()
+            .iter()
+            .skip(1)
+            .any(|parameter| parameter.annotated_type() != Type::any())
+        {
+            return false;
+        }
+        let Some(self_bound) = self_typevar
+            .typevar(db)
+            .upper_bound(db, env)
+            .and_then(Type::as_nominal_instance)
+        else {
+            return false;
+        };
+        let (ClassType::Generic(receiver), ClassType::Generic(bound)) =
+            (receiver.class(db, env), self_bound.class(db, env))
+        else {
+            return false;
+        };
+        let receiver = receiver.specialization(db);
+        let bound = bound.specialization(db);
+        let arguments = receiver.types(db);
+        if arguments != bound.types(db)
+            || receiver
+                .generic_context(db)
+                .variables(db)
+                .chain(bound.generic_context(db).variables(db))
+                .any(|parameter| parameter.variance(db) != TypeVarVariance::Invariant)
+        {
+            return false;
+        }
+
+        // Apart from `Self`, every signature variable must be a distinct class argument.
+        // A fixed upper bound such as `Hashable` is fine. Dependent bounds can tie two
+        // arguments together, and defaults, constraints and variadics have their own inference rules.
+        let Some(variables) = self.generic_context else {
+            return false;
+        };
+        if variables.len(db) != arguments.len() + 1 {
+            return false;
+        }
+        variables
+            .variables(db)
+            .filter(|variable| !variable.is_same_typevar_as(db, self_typevar))
+            .all(|variable| {
+                if !arguments.contains(&Type::TypeVar(variable))
+                    || variable.is_paramspec(db)
+                    || variable.is_typevartuple(db)
+                    || variable.default_type(db).is_some()
+                {
+                    return false;
+                }
+                match variable.typevar(db).bound_or_constraints(db, env) {
+                    None => true,
+                    Some(TypeVarBoundOrConstraints::Constraints(_)) => false,
+                    Some(TypeVarBoundOrConstraints::UpperBound(upper)) => {
+                        !any_over_type_expanding_aliases(db, env, upper, Type::is_type_var)
+                    }
+                }
+            })
     }
 }
