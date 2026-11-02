@@ -1549,6 +1549,16 @@ info: `dict[U@check, str]` is disjoint from `dict[T@check, T@check]`
 info: no specialization of the type variables makes each pair of invariant arguments equal
 ```
 
+The keys below can agree when one variable is `int` and the other is `str`. Either variable can
+provide the `int` key, but making them equal would leave just one key type.
+
+```py
+def branching[T: (int, str), U: (int, str)](source: dict[T | U, T]) -> None:
+    cast(dict[int | str, U], source)  # error: [disjoint-cast]
+    cast(dict[int | str, int], source)
+    cast(dict[int | str, str], source)
+```
+
 A variable bounded by `Any` and one constrained to `str` or `bytes` can both specialize to `str`,
 including inside a list used as the key type.
 

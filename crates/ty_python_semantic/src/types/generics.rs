@@ -2301,7 +2301,10 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             self.constraints,
             |constraint| constraint,
         );
-        let disjoint = overlap.has_no_valid_solutions(db, self.env);
+        // A union or overloaded callable can leave many possible specializations. One
+        // valid specialization is enough to establish overlap.
+        let disjoint = !overlap.has_valid_path_witness(db, self.env)
+            && overlap.has_no_valid_solutions(db, self.env);
         if disjoint && let Some(context) = self.report_context() {
             context.push(ErrorContext::ConflictingInvariantTypeArguments);
         }

@@ -7,6 +7,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 use crate::types::constraints::paths::PathAssignments;
+use crate::types::constraints::projection::SolutionBudget;
 use crate::types::constraints::sequents::SequentMap;
 use crate::types::constraints::support::Support;
 use crate::types::constraints::variables::{
@@ -15,7 +16,7 @@ use crate::types::constraints::variables::{
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, Assignment, AtomicConstraintId, BoundedSolutionLimits,
     CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, CandidateTypeVarSolver,
-    ConstraintFailureEvidence, ConstraintSetStorage, InteriorNodeData, Node, NodeId,
+    ConstraintFailureEvidence, ConstraintSet, ConstraintSetStorage, InteriorNodeData, Node, NodeId,
     SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
@@ -111,6 +112,68 @@ struct PendingCandidateSolution<'db> {
     /// The `source_orders` of the constraints in the path that this candidate solution was created
     /// from. We retain this so that our final result is sorted in a stable order.
     source_orders: Vec<usize>,
+}
+
+impl<'db> ConstraintSet<'db, '_> {
+    /// Looks for a valid specialization on one satisfiable path. For a single conjunction,
+    /// or if the first candidate does not yield a solution, leave the proof to the full solver.
+    pub(crate) fn has_valid_path_witness(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        let witness = Cell::new(None);
+        {
+            let mut storage = self.builder.storage.borrow_mut();
+            if self.node.is_single_conjunction(&mut storage) {
+                return false;
+            }
+            let Some(support) = storage.node_support(self.node).cloned() else {
+                return false;
+            };
+            let inferable =
+                TypeVarSet::from_typevars(db, support.iter().map(|id| storage.typevar_data(id)));
+            let validations = Validations::from_support(db, env, &mut storage, &support);
+            let source_orders = storage.calculate_source_orders(self.source_order);
+            let budget = SolutionBudget::default();
+            let limits = BoundedSolutionLimits {
+                remaining_visits: budget.visits,
+                remaining_paths: budget.paths,
+            };
+            let mut walker = SolutionWalker::new(
+                db,
+                &mut storage,
+                source_orders,
+                inferable,
+                limits,
+                self.node,
+            );
+            let mut path = self
+                .node
+                .path_assignments(db, env, &mut storage, self.source_order);
+            let found = walker.node_is_satisfiable_on_path_inner(
+                db,
+                env,
+                &mut storage,
+                &mut path,
+                Polarity::Positive,
+                self.node,
+                Some(&validations),
+                Some(&witness),
+            );
+            if !matches!(found, ControlFlow::Break(Break::EarlyBreak)) {
+                return false;
+            }
+        }
+
+        // Selecting the bindings can query this builder again, so release the storage borrow first.
+        witness.into_inner().is_some_and(|candidate| {
+            CandidateSolutions::solve_path_with(&candidate, &mut |_, bound| {
+                CandidateSolutions::default_solve(db, env, self.builder, bound)
+            })
+            .is_some_and(|(solution, exceeded_budget)| solution.is_valid() && !exceeded_budget)
+        })
+    }
 }
 
 impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
@@ -451,6 +514,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             polarity,
             node,
             validations,
+            None,
         );
         match result {
             ControlFlow::Break(Break::Limits(b)) => ControlFlow::Break(b),
@@ -469,6 +533,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         polarity: Polarity,
         node: NodeId,
         validations: Option<&Validations<'db>>,
+        witness: Option<&Cell<Option<CandidateSolution<'db>>>>,
     ) -> ControlFlow<Break<L::Break>, ()> {
         self.limits.visit_node().map_break(Break::Limits)?;
         let break_into_bool = |result: &ControlFlow<Break<L::Break>, ()>| match result {
@@ -505,10 +570,15 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 path,
                 validations,
                 &|this, storage, path| {
-                    let has_solution = this
-                        .pending_candidate_solution(db, env, storage, path, None)
-                        .is_some();
-                    bool_into_break(has_solution)
+                    let Some(pending) =
+                        this.pending_candidate_solution(db, env, storage, path, None)
+                    else {
+                        return ControlFlow::Continue(());
+                    };
+                    if let Some(witness) = witness {
+                        witness.set(Some(pending.candidate));
+                    }
+                    ControlFlow::Break(Break::EarlyBreak)
                 },
             )
         } else {
@@ -528,6 +598,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                         polarity,
                         child,
                         validations,
+                        witness,
                     )
                 },
             )
