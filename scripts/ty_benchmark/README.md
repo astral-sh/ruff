@@ -25,7 +25,7 @@ Measures how long it takes to type check a project without a pre-existing cache.
 Hyperfine 2.0 also reports peak resident set size (RSS) for each measured command
 in the `Memory` row. Both metrics use the same warmups and measured runs.
 
-All four CLIs receive the same list of tracked Python files. The runner applies
+All five CLIs receive the same list of tracked Python files. The runner applies
 each project's includes and excludes once and skips symlinks. When an
 implementation has an adjacent stub, the implementation is the check target.
 Standalone stubs stay in the list. If a file and a populated directory share a
@@ -52,9 +52,9 @@ uv run --python 3.15 pytest src/benchmark/test_lsp_diagnostics.py -k zuban
 
 Zuban uses mypy-compatible mode with untyped-function checking enabled and untyped
 returns treated as `Any`, matching the mypy and Pyrefly benchmark policy. Its
-generated configuration uses the shared project include/exclude lists, target
-Python version, source import roots, and project virtual environment. CLI runs use
-an isolated configuration file; LSP runs temporarily install the same settings in
+generated configuration uses the shared target Python version, source import
+roots, and project virtual environment. CLI runs use the shared file manifest in
+an isolated configuration file; LSP runs use the project's include/exclude lists in
 `pyproject.toml` and restore the original file afterwards. Upstream mypy or Zuban
 settings cannot silently narrow its workload or suppress diagnostics.
 

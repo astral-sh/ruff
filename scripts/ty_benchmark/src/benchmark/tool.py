@@ -350,9 +350,16 @@ class Zuban(Tool):
 
     @override
     def config(self, project: Project, venv: Venv) -> tuple[Path, str]:
+        settings = self._settings(project, venv)
+        # Zuban has no response-file support. Use the shared manifest as its
+        # explicit config targets, with exclusions already applied by the runner.
+        settings["files"] = (
+            (venv.project_path / FILE_LIST).read_text(encoding="utf-8").splitlines()
+        )
+        settings["exclude"] = []
         return (
             Path("zuban-benchmark.toml"),
-            tomlkit.dumps({"tool": {"zuban": self._settings(project, venv)}}),
+            tomlkit.dumps({"tool": {"zuban": settings}}),
         )
 
     @override
@@ -365,7 +372,6 @@ class Zuban(Tool):
                 "--config-file",
                 "zuban-benchmark.toml",
                 "--no-pretty",
-                *project.include,
             ],
         )
 

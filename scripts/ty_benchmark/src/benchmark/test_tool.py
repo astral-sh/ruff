@@ -10,6 +10,7 @@ from lsprotocol import types as lsp
 
 from benchmark.lsp_client import LSPClient
 from benchmark.projects import Project
+from benchmark.targets import write_cli_targets
 from benchmark.tool import Zuban
 from benchmark.venv import Venv
 
@@ -58,18 +59,19 @@ def zuban_project(tmp_path: Path) -> tuple[Project, Venv]:
         '[tool.zuban]\nignore_errors = true\npython_version = "3.14"\n'
     )
     (tmp_path / "mypy.ini").write_text("[mypy]\nignore_errors = True\nexclude = src\n")
-    return (
-        Project(
-            name="example",
-            repository="unused",
-            revision="unused",
-            install_arguments=[],
-            python_version="3.11",
-            include=["src/example"],
-            exclude=["src/**/tests/**"],
-        ),
-        venv,
+    project = Project(
+        name="example",
+        repository="unused",
+        revision="unused",
+        install_arguments=[],
+        python_version="3.11",
+        include=["src/example"],
+        exclude=["src/**/tests/**"],
     )
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "add", "src"], cwd=tmp_path, check=True)
+    write_cli_targets(project, tmp_path)
+    return project, venv
 
 
 def test_zuban_checks_scope_untyped_code_and_project_dependencies(zuban_project):
@@ -92,6 +94,30 @@ def test_zuban_checks_scope_untyped_code_and_project_dependencies(zuban_project)
     assert "outside.py" not in result.stdout
     assert "newer_python_only" not in result.stdout
     assert config.read_bytes() == original
+
+
+def test_zuban_cli_checks_implementations_beside_stubs(zuban_project):
+    project, venv = zuban_project
+    stub = venv.project_path / "src" / "example" / "main.pyi"
+    stub.write_text("def untyped() -> None: ...\n")
+    subprocess.run(["git", "add", "src"], cwd=venv.project_path, check=True)
+    write_cli_targets(project, venv.project_path)
+    tool = Zuban()
+    tool.write_config(project, venv)
+    config = tomllib.loads((venv.project_path / "zuban-benchmark.toml").read_text())
+    assert "./src/example/main.py" in config["tool"]["zuban"]["files"]
+    assert "./src/example/main.pyi" not in config["tool"]["zuban"]["files"]
+    result = subprocess.run(
+        tool.command(project, venv, single_threaded=False).command,
+        cwd=venv.project_path,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=20,
+    )
+    assert result.returncode == 1, result.stderr
+    assert 'expression has type "str", variable has type "int"' in result.stdout
+    assert "Found 1 error in 1 file" in result.stdout
 
 
 def test_zuban_lsp_checks_untyped_code_with_project_environment(zuban_project):
@@ -217,8 +243,9 @@ def test_zuban_exclusions_follow_project_globs(
     zuban_project, pattern, excluded, included
 ):
     project, venv = zuban_project
-    _, content = Zuban().config(project._replace(exclude=[pattern]), venv)
-    regex = tomllib.loads(content)["tool"]["zuban"]["exclude"][0]
+    with Zuban().configure_lsp(project._replace(exclude=[pattern]), venv):
+        content = (venv.project_path / "pyproject.toml").read_text()
+        regex = tomllib.loads(content)["tool"]["zuban"]["exclude"][0]
     assert re.search(regex, excluded)
     assert re.search(regex, excluded.replace("/", "\\"))
     assert not re.search(regex, included)
