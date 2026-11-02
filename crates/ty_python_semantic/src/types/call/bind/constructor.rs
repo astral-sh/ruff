@@ -6,7 +6,7 @@ use crate::ProgramEnvironment;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::generics::{GenericContext, Specialization};
-use crate::types::signatures::Parameter;
+use crate::types::signatures::{Parameter, Signature};
 use crate::types::typevar::TypeVarNonceGenerator;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext,
@@ -826,6 +826,37 @@ fn constructor_returns_instance<'db>(
 }
 
 impl<'db> Binding<'db> {
+    /// Bind the implicit `__new__` receiver when its bare `Self` return already means the
+    /// constructed nominal instance.
+    pub(super) fn new_inference_signature(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Signature<'db>> {
+        let context = self.constructor_context?;
+        if context.kind() != ConstructorCallableKind::New {
+            return None;
+        }
+        let instance = context.instance_type();
+        let signature = &self.signature;
+        let returned = signature.return_ty.as_typevar()?;
+        let receiver = signature.parameters().get(0)?;
+        if !matches!(instance, Type::NominalInstance(_))
+            || !receiver.inferred_annotation
+            || !returned.typevar(db).is_self(db)
+            || !matches!(receiver.annotated_type(), Type::SubclassOf(cls) if cls.into_type_var() == Some(returned))
+        {
+            return None;
+        }
+
+        // The stored signature still describes a `Self` return. It is used when a later
+        // constructor projection combines the result with a type variable or intersection.
+        signature
+            .clone()
+            .with_return_type(instance)
+            .bind_unused_self(db, env, instance)
+    }
+
     /// Is a type variable returned from a constructor method a representation of the self type?
     ///
     /// Handles `typing.Self` annotations and `__new__` methods returning `T` where `self:
