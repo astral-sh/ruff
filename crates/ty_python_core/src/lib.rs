@@ -654,9 +654,7 @@ impl<'db> SemanticIndex<'db> {
     }
 
     /// Returns an iterator over ancestors of `scope` that are visible for name resolution,
-    /// starting with `scope` itself. This follows Python's lexical scoping rules where
-    /// class scopes are skipped during name resolution (except for the starting scope
-    /// if it happens to be a class scope).
+    /// starting with `scope` itself. An enclosing class is visible through annotation scopes.
     ///
     /// For example, in this code:
     /// ```python
@@ -667,8 +665,11 @@ impl<'db> SemanticIndex<'db> {
     ///         print(x)  # Refers to global x=1, not class x=2
     /// ```
     /// The `method` function can see the global scope but not the class scope.
-    pub fn visible_ancestor_scopes(&self, scope: FileScopeId) -> VisibleAncestorsIter<'_> {
-        VisibleAncestorsIter::new(&self.scopes, scope)
+    pub fn visible_ancestor_scopes(
+        &self,
+        scope: FileScopeId,
+    ) -> impl Iterator<Item = (FileScopeId, &Scope)> {
+        self.ancestor_scopes(scope).visible()
     }
 
     /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_key`.
@@ -845,6 +846,13 @@ impl<'db> SemanticIndex<'db> {
     }
 }
 
+pub struct AncestorScope<'a> {
+    pub id: FileScopeId,
+    pub scope: &'a Scope,
+    /// Whether lexical name lookup from the starting scope can see names bound in this scope.
+    pub is_lexically_visible: bool,
+}
+
 pub struct AncestorsIter<'a> {
     scopes: &'a IndexSlice<FileScopeId, Scope>,
     next_id: Option<FileScopeId>,
@@ -856,6 +864,28 @@ impl<'a> AncestorsIter<'a> {
             scopes,
             next_id: Some(start),
         }
+    }
+
+    /// Includes the lexical visibility of each scope. A class namespace is visible in the
+    /// class itself and through any intervening annotation scopes (e.g. both the value and
+    /// the type parameters of a generic type alias).
+    pub fn with_lexical_visibility(self) -> impl Iterator<Item = AncestorScope<'a>> {
+        let mut class_visible = true;
+        self.map(move |(id, scope)| {
+            let is_lexically_visible = !scope.kind().is_class() || class_visible;
+            class_visible &= scope.kind().is_annotation();
+            AncestorScope {
+                id,
+                scope,
+                is_lexically_visible,
+            }
+        })
+    }
+
+    fn visible(self) -> impl Iterator<Item = (FileScopeId, &'a Scope)> {
+        self.with_lexical_visibility()
+            .filter(|ancestor| ancestor.is_lexically_visible)
+            .map(|ancestor| (ancestor.id, ancestor.scope))
     }
 }
 
@@ -872,53 +902,6 @@ impl<'a> Iterator for AncestorsIter<'a> {
 }
 
 impl FusedIterator for AncestorsIter<'_> {}
-
-pub struct VisibleAncestorsIter<'a> {
-    inner: AncestorsIter<'a>,
-    starting_scope_kind: ScopeKind,
-    yielded_count: usize,
-}
-
-impl<'a> VisibleAncestorsIter<'a> {
-    fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, start: FileScopeId) -> Self {
-        let starting_scope = &scopes[start];
-        Self {
-            inner: AncestorsIter::new(scopes, start),
-            starting_scope_kind: starting_scope.kind(),
-            yielded_count: 0,
-        }
-    }
-}
-
-impl<'a> Iterator for VisibleAncestorsIter<'a> {
-    type Item = (FileScopeId, &'a Scope);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let (scope_id, scope) = self.inner.next()?;
-            self.yielded_count += 1;
-
-            // Always return the first scope (the starting scope)
-            if self.yielded_count == 1 {
-                return Some((scope_id, scope));
-            }
-
-            // Skip class scopes for subsequent scopes (following Python's lexical scoping rules)
-            // Exception: type parameter scopes can see names defined in an immediately-enclosing class scope
-            if scope.kind() == ScopeKind::Class {
-                // Allow annotation scopes to see their immediately-enclosing class scope exactly once
-                if self.starting_scope_kind.is_annotation() && self.yielded_count == 2 {
-                    return Some((scope_id, scope));
-                }
-                continue;
-            }
-
-            return Some((scope_id, scope));
-        }
-    }
-}
-
-impl FusedIterator for VisibleAncestorsIter<'_> {}
 
 pub(crate) struct DescendantsIter<'a> {
     next_id: FileScopeId,

@@ -90,7 +90,7 @@ use ty_python_core::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
 use ty_python_core::scope::{NodeWithScopeKind, ScopeId, ScopeKind};
 use ty_python_core::symbol::{ScopedSymbolId, Symbol};
 use ty_python_core::{
-    AncestorsIter, BindingWithConstraintsIterator, BindingsSnapshotId, EnclosingSnapshotResult,
+    AncestorScope, BindingWithConstraintsIterator, BindingsSnapshotId, EnclosingSnapshotResult,
     FileScopeId, ProgramFile, SemanticIndex,
 };
 
@@ -180,13 +180,8 @@ impl<'db> Iterator for PlaceLoadResolutionProcedure<'db, '_> {
                 PlaceLoadResolutionNode::DecideResolutionPath => {
                     self.next_node = Some(self.decide_resolution_path());
                 }
-                PlaceLoadResolutionNode::DunderClassSource {
-                    definition,
-                    enclosing_scopes,
-                } => {
-                    self.next_node = Some(PlaceLoadResolutionNode::EnclosingScopeSource(
-                        enclosing_scopes,
-                    ));
+                PlaceLoadResolutionNode::DunderClassSource(definition) => {
+                    self.next_node = Some(PlaceLoadResolutionNode::EnclosingScopeSource);
 
                     return Some(PlaceLoadResolutionStep::Source(
                         PlaceLoadConstraints::unnarrowed_source(
@@ -197,8 +192,8 @@ impl<'db> Iterator for PlaceLoadResolutionProcedure<'db, '_> {
                         ),
                     ));
                 }
-                PlaceLoadResolutionNode::EnclosingScopeSource(mut scopes) => {
-                    let (next_node, source) = self.resolve_enclosing_scopes(&mut scopes);
+                PlaceLoadResolutionNode::EnclosingScopeSource => {
+                    let (next_node, source) = self.resolve_enclosing_scopes();
                     self.next_node = Some(next_node);
 
                     if let Some(source) = source {
@@ -370,40 +365,37 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
             };
         }
 
-        let mut scopes = self.context.index.ancestor_scopes(file_scope);
-        // The first scope is the input scope itself; skip it to arrive at the first true ancestor.
-        scopes.next();
-
         if let PlaceExprRef::Symbol(symbol) = place_expr
             && symbol.name() == "__class__"
             && let Some(definition) = self.context.dunder_class_cell_definition()
         {
-            PlaceLoadResolutionNode::DunderClassSource {
-                definition,
-                enclosing_scopes: scopes,
-            }
+            PlaceLoadResolutionNode::DunderClassSource(definition)
         } else {
-            PlaceLoadResolutionNode::EnclosingScopeSource(scopes)
+            PlaceLoadResolutionNode::EnclosingScopeSource
         }
     }
 
     fn resolve_enclosing_scopes(
         &mut self,
-        scopes: &mut AncestorsIter<'db>,
     ) -> (PlaceLoadResolutionNode<'db>, Option<PlaceLoadSource<'db>>) {
         let db = self.context.db;
         let scope = self.context.scope;
         let file_scope = scope.file_scope_id(db);
 
-        for (enclosing_file_scope, _) in scopes {
+        for AncestorScope {
+            id: enclosing_file_scope,
+            scope: enclosing_scope,
+            is_lexically_visible,
+        } in self
+            .context
+            .index
+            .ancestor_scopes(file_scope)
+            .with_lexical_visibility()
+            .skip(1)
+        {
             if enclosing_file_scope.is_global() {
                 break;
             }
-
-            let enclosing_scope = self.context.index.scope(enclosing_file_scope);
-            let is_lexical_enclosing_scope = self
-                .context
-                .is_lexical_enclosing_scope(enclosing_file_scope);
 
             let enclosing_place_table = self.context.index.place_table(enclosing_file_scope);
             let place_expr = PlaceExprRef::from(self.place_expr);
@@ -411,7 +403,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
             let enclosing_place = enclosing_place_id.map(|id| enclosing_place_table.place(id));
             // A `global` declaration forwards the place to the module instead of making this
             // enclosing scope its owner. A possibly-unbound snapshot must still fall through.
-            let forwards_to_global = is_lexical_enclosing_scope
+            let forwards_to_global = is_lexically_visible
                 && enclosing_place
                     .is_some_and(|place| place.as_symbol().is_some_and(Symbol::is_global));
             let root_place_was_reassigned = || {
@@ -482,7 +474,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
                 }
             }
 
-            if !is_lexical_enclosing_scope {
+            if !is_lexically_visible {
                 continue;
             }
 
@@ -900,12 +892,6 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
         )
     }
 
-    fn is_lexical_enclosing_scope(self, enclosing_scope: FileScopeId) -> bool {
-        self.index.scope(enclosing_scope).kind().is_function_like()
-            || (self.scope.is_annotation(self.db)
-                && self.scope.scope(self.db).parent() == Some(enclosing_scope))
-    }
-
     fn local_source(
         self,
         place_expr: PlaceExprRef,
@@ -1041,12 +1027,9 @@ enum PlaceLoadResolutionNode<'db> {
     /// scope.
     DecideResolutionPath,
     /// The implicit `__class__` source, followed by enclosing scopes.
-    DunderClassSource {
-        definition: Definition<'db>,
-        enclosing_scopes: AncestorsIter<'db>,
-    },
+    DunderClassSource(Definition<'db>),
     /// A source from the remaining enclosing scopes, if one exists.
-    EnclosingScopeSource(AncestorsIter<'db>),
+    EnclosingScopeSource,
     /// The implicit class-body source, followed by the applicable global source.
     ImplicitClassBodySource(Option<ForwardedGlobalSnapshot<'db>>),
     /// Bindings from an enclosing `global` declaration that were visible when the nested eager

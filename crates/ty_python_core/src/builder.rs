@@ -71,11 +71,11 @@ use crate::use_def::{
     LiveBindingStatus, PreviousDefinitions, ScopedDefinitionId, ScopedEnclosingSnapshotId,
     UseDefMapBuilder, UseDefMapInterner,
 };
-use crate::{Db, Statement, StatementNodeKey};
 use crate::{
-    DefinitionsByNode, EvaluationMode, ExpressionsScopeMap, LoopHeader, LoopHeaderId,
-    NarrowingAliasPredicate, PossiblyNarrowedPlaces, SemanticIndex, VisibleAncestorsIter,
+    AncestorsIter, DefinitionsByNode, EvaluationMode, ExpressionsScopeMap, LoopHeader,
+    LoopHeaderId, NarrowingAliasPredicate, PossiblyNarrowedPlaces, SemanticIndex,
 };
+use crate::{Db, Statement, StatementNodeKey};
 
 use super::place::PlaceExprRef;
 
@@ -418,22 +418,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         definitions[0]
     }
 
-    /// Returns an iterator over ancestors of `scope` that are visible for name resolution,
-    /// starting with `scope` itself. This follows Python's lexical scoping rules where
-    /// class scopes are skipped during name resolution (except for the starting scope
-    /// if it happens to be a class scope).
-    ///
-    /// For example, in this code:
-    /// ```python
-    /// x = 1
-    /// class A:
-    ///     x = 2
-    ///     def method(self):
-    ///         print(x)  # Refers to global x=1, not class x=2
-    /// ```
-    /// The `method` function can see the global scope but not the class scope.
-    fn visible_ancestor_scopes(&self, scope: FileScopeId) -> VisibleAncestorsIter<'_> {
-        VisibleAncestorsIter::new(&self.scopes, scope)
+    /// See [`SemanticIndex::visible_ancestor_scopes`].
+    fn visible_ancestor_scopes(
+        &self,
+        scope: FileScopeId,
+    ) -> impl Iterator<Item = (FileScopeId, &Scope)> {
+        AncestorsIter::new(&self.scopes, scope).visible()
     }
 
     /// Returns the scope ID of the current scope if the current scope
@@ -558,9 +548,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     // Records snapshots of the place states visible from the current eager scope.
     fn record_eager_snapshots(&mut self, popped_scope_id: FileScopeId) {
-        let popped_scope = &self.scopes[popped_scope_id];
-        let popped_scope_is_annotation_scope = popped_scope.kind().is_annotation();
-
         // If the scope that we just popped off is an eager scope, we need to "lock" our view of
         // which bindings reach each of the uses in the scope. Loop through each enclosing scope,
         // looking for any that bind each place.
@@ -573,11 +560,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         //     c.x = 1
         // reveal_type(c.x)  # revealed: Literal[1]
         // ```
-        for enclosing_scope_info in self.scope_stack.iter().rev() {
-            let enclosing_scope_id = enclosing_scope_info.file_scope_id;
-            let is_immediately_enclosing_scope = popped_scope.parent() == Some(enclosing_scope_id);
-            let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();
-            let enclosing_place_table = &self.place_tables[enclosing_scope_id];
+        for ancestor in AncestorsIter::new(&self.scopes, popped_scope_id)
+            .with_lexical_visibility()
+            .skip(1)
+        {
+            let enclosing_place_table = &self.place_tables[ancestor.id];
 
             for nested_place in self.place_tables[popped_scope_id].iter() {
                 // Skip this place if this enclosing scope doesn't contain any bindings for it.
@@ -593,24 +580,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // Snapshot the state of this place that are visible at this point in this
                 // enclosing scope.
                 let key = EnclosingSnapshotKey {
-                    enclosing_scope: enclosing_scope_id,
+                    enclosing_scope: ancestor.id,
                     enclosing_place: enclosing_place_id,
                     nested_scope: popped_scope_id,
                     nested_laziness: ScopeLaziness::Eager,
                 };
-                let eager_snapshot = self.use_def_maps[enclosing_scope_id]
-                    .snapshot_enclosing_state(
-                        enclosing_place_id,
-                        enclosing_scope_kind,
-                        enclosing_place,
-                        popped_scope_is_annotation_scope && is_immediately_enclosing_scope,
-                    );
+                let eager_snapshot = self.use_def_maps[ancestor.id].snapshot_enclosing_state(
+                    enclosing_place_id,
+                    enclosing_place,
+                    ancestor.is_lexically_visible,
+                );
                 self.enclosing_snapshots.insert(key, eager_snapshot);
             }
 
             // Lazy scopes are "sticky": once we see a lazy scope we stop doing lookups
             // eagerly, even if we would encounter another eager enclosing scope later on.
-            if !enclosing_scope_kind.is_eager() {
+            if !ancestor.scope.is_eager() {
                 break;
             }
         }
@@ -748,8 +733,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // forwarding declarations here; `snapshot_enclosing_state` stores only a
                 // constraint for those symbols. Also, if the enclosing scope allows its members to
                 // be modified from elsewhere, the snapshot will not be recorded.
-                // (In the case of class scopes, class variables can be modified from elsewhere, but this has no effect in nested scopes,
-                // as class variables are not visible to them)
+                // Lazy annotation scopes that can see class names look up their bindings when evaluated.
                 if self.scopes[enclosing_scope_id].kind().is_module() {
                     continue;
                 }
@@ -784,9 +768,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 };
                 let lazy_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_enclosing_state(
                     enclosed_symbol_id.into(),
-                    enclosing_scope_kind,
                     enclosing_place.into(),
-                    false,
+                    !enclosing_scope_kind.is_class(),
                 );
                 self.enclosing_snapshots.insert(key, lazy_snapshot);
             }
