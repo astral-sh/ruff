@@ -3930,42 +3930,55 @@ impl<'db> CallableBinding<'db> {
         // `*arg` where `arg` is a union of a 2-tuple and a 3-tuple, we shouldn't eliminate any
         // overload for arity reasons before trying argument expansion.
         let argument_expansions = call_arguments.expansions(db, env);
-        let (should_retry_after_provisional_arity, overloads_for_expansion) = if self
-            .should_retry_after_provisional_arity(&argument_expansions)
-        {
-            // We will retry all overloads after argument expansion.
-            (true, (0..self.overloads.len()).collect())
-        } else {
-            match self.matching_overload_index() {
-                MatchingOverloadIndex::None => {
-                    // If no candidate overloads remain from the arity check, we can stop here. We
-                    // still perform type checking for non-overloaded function to provide better
-                    // user experience.
-                    if let [overload] = self.overloads.as_mut_slice() {
-                        overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
+        let (should_retry_after_provisional_arity, overloads_for_expansion) =
+            if self.should_retry_after_provisional_arity(&argument_expansions) {
+                // We will retry all overloads after argument expansion.
+                (true, (0..self.overloads.len()).collect())
+            } else {
+                match self.matching_overload_index() {
+                    MatchingOverloadIndex::None => {
+                        // If no candidate overloads remain from the arity check, we can stop here. We
+                        // still perform type checking for non-overloaded function to provide better
+                        // user experience.
+                        if let [overload] = self.overloads.as_mut_slice() {
+                            overload.check_types(
+                                db,
+                                env,
+                                call_arguments.as_ref(),
+                                call_expression_tcx,
+                                None,
+                            );
+                        }
+                        return;
                     }
-                    return;
+                    MatchingOverloadIndex::Single(index) => {
+                        // If only one candidate overload remains, it is the winning match. Evaluate
+                        // it as a regular (non-overloaded) call.
+                        self.matching_overload_before_type_checking = Some(index);
+                        // Overload resolution compares the synthetic receiver in step 5.
+                        // Keep its inferable `Self` when the callable has multiple signatures.
+                        let new_signature = if let [overload] = self.overloads.as_slice() {
+                            overload.new_inference_signature(db, env)
+                        } else {
+                            None
+                        };
+                        self.overloads[index].check_types(
+                            db,
+                            env,
+                            call_arguments.as_ref(),
+                            call_expression_tcx,
+                            new_signature,
+                        );
+                        return;
+                    }
+                    MatchingOverloadIndex::Multiple(indexes) => (false, indexes),
                 }
-                MatchingOverloadIndex::Single(index) => {
-                    // If only one candidate overload remains, it is the winning match. Evaluate
-                    // it as a regular (non-overloaded) call.
-                    self.matching_overload_before_type_checking = Some(index);
-                    self.overloads[index].check_types(
-                        db,
-                        env,
-                        call_arguments.as_ref(),
-                        call_expression_tcx,
-                    );
-                    return;
-                }
-                MatchingOverloadIndex::Multiple(indexes) => (false, indexes),
-            }
-        };
+            };
 
         // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
         // whether it is compatible with the supplied argument list.
         for (_, overload) in self.matching_overloads_mut() {
-            overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
+            overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx, None);
         }
 
         tracing::trace!(
@@ -4150,7 +4163,7 @@ impl<'db> CallableBinding<'db> {
                 );
 
                 for (_, overload) in self.matching_overloads_mut() {
-                    overload.check_types(db, env, expanded_arguments, call_expression_tcx);
+                    overload.check_types(db, env, expanded_arguments, call_expression_tcx, None);
                 }
 
                 tracing::trace!(
@@ -8723,6 +8736,7 @@ impl<'db> Binding<'db> {
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
+        new_signature: Option<Signature<'db>>,
     ) {
         // Each overload is an independent inference problem. Two candidates can contain
         // typevars with the same identity but different specialized bounds, so sharing a
@@ -8756,18 +8770,18 @@ impl<'db> Binding<'db> {
             return;
         }
 
+        let signature = new_signature.as_ref().unwrap_or(&self.signature);
         let inferred = CallInference {
             db,
             env,
-            signature: &self.signature,
+            signature,
             arguments,
             argument_matches: &self.argument_matches,
             call_expression_tcx,
             return_ty: self.return_ty,
             is_partial_application: self.is_partial_application,
             is_constructor: self.constructor_context.is_some(),
-            inferable_typevars: self
-                .signature
+            inferable_typevars: signature
                 .generic_context
                 .map_or(TypeVarSet::None, |context| context.inferable_typevars(db)),
         }
@@ -8778,7 +8792,7 @@ impl<'db> Binding<'db> {
             env,
             self.signature_type,
             self.constructor_context.map(ConstructorContext::kind),
-            &self.signature,
+            signature,
             arguments,
             &self.argument_matches,
             &mut self.parameter_tys,
