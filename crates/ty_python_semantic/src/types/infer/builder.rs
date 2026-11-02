@@ -96,9 +96,7 @@ use crate::types::function::{
     FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral, report_revealed_type,
     same_module_uncached_raw_signature,
 };
-use crate::types::generics::{
-    GenericContext, Specialization, SpecializationBuilder, bind_typevar, enclosing_binding_contexts,
-};
+use crate::types::generics::{GenericContext, Specialization, SpecializationBuilder, bind_typevar};
 use crate::types::infer::builder::binary_expressions::BinaryInferenceState;
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
@@ -900,18 +898,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.scope
     }
 
-    /// Returns call bindings annotated with the call site's enclosing binding contexts.
-    ///
-    /// Call binding uses this as an optimization hint to avoid freshening generic callable
-    /// signatures when the callable's generic context cannot collide with a containing scope.
+    /// Attaches the call site's scope so generic argument matching can detect recursive calls.
     fn bindings_for_call(&self, callable_type: Type<'db>) -> Bindings<'db> {
         let db = self.db();
         callable_type
             .bindings(db, self.program_environment())
-            .with_enclosing_binding_contexts(enclosing_binding_contexts(
-                self.index,
-                self.scope().file_scope_id(db),
-            ))
+            .with_call_site_scope(self.scope())
     }
 
     fn settings(&self) -> &AnalysisSettings {

@@ -23,6 +23,8 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
+use ty_python_core::scope::ScopeId;
+
 use self::constructor::{ConstructorBinding, ConstructorContext};
 use super::ambiguous::merge_ambiguous_returns;
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
@@ -76,7 +78,7 @@ use crate::types::visitor::{
     walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BindingContext, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
+    BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
     DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, NominalInstanceType, ParamSpecValue, PropertyInstanceType, TypeContext,
@@ -628,12 +630,8 @@ pub(crate) struct Bindings<'db> {
     /// Each element may contain multiple `CallableBinding`s if it came from an intersection.
     elements: SmallVec<[BindingsElement<'db>; 1]>,
 
-    /// Binding contexts that enclose this call site, if known.
-    ///
-    /// This is an optimization hint for deciding when direct-call generic freshening is needed.
-    /// `None` means the caller did not provide lexical collision information. `Some([])` means the
-    /// caller knows there are no enclosing binding contexts.
-    enclosing_binding_contexts: Option<Box<[BindingContext<'db>]>>,
+    /// The lexical scope used to detect recursive generic calls.
+    call_site_scope: Option<ScopeId<'db>>,
 }
 
 /// The set of overload candidates at a given call-site, before argument type inference.
@@ -782,7 +780,7 @@ impl<'db> Bindings<'db> {
             mut implicit_dunder_new_is_possibly_unbound,
             mut implicit_dunder_init_is_possibly_unbound,
             mut elements,
-            enclosing_binding_contexts: _,
+            call_site_scope: _,
         } = bindings_iter.next().expect("bindings must not be empty");
 
         for bindings in bindings_iter {
@@ -799,7 +797,7 @@ impl<'db> Bindings<'db> {
             implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound,
             elements,
-            enclosing_binding_contexts: None,
+            call_site_scope: None,
         }
     }
 
@@ -833,7 +831,7 @@ impl<'db> Bindings<'db> {
             implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound,
             elements,
-            enclosing_binding_contexts: None,
+            call_site_scope: None,
         }
     }
 
@@ -896,11 +894,24 @@ impl<'db> Bindings<'db> {
         self
     }
 
-    pub(crate) fn with_enclosing_binding_contexts(
-        mut self,
-        enclosing_binding_contexts: impl IntoIterator<Item = BindingContext<'db>>,
-    ) -> Self {
-        self.enclosing_binding_contexts = Some(enclosing_binding_contexts.into_iter().collect());
+    /// Releases excess capacity in a constructor template before Salsa retains it.
+    pub(crate) fn shrink_to_fit(&mut self) {
+        self.elements.shrink_to_fit();
+        for element in &mut self.elements {
+            element.items.shrink_to_fit();
+            for item in &mut element.items {
+                item.callable_mut().overloads.shrink_to_fit();
+                if let Some(constructor) = item.as_constructor_mut()
+                    && let Some(downstream) = &mut constructor.downstream_constructor
+                {
+                    downstream.shrink_to_fit();
+                }
+            }
+        }
+    }
+
+    pub(crate) fn with_call_site_scope(mut self, scope: ScopeId<'db>) -> Self {
+        self.call_site_scope = Some(scope);
         self
     }
 
@@ -1277,7 +1288,7 @@ impl<'db> Bindings<'db> {
             callable_type: self.callable_type,
             implicit_dunder_new_is_possibly_unbound: self.implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound: self.implicit_dunder_init_is_possibly_unbound,
-            enclosing_binding_contexts: self.enclosing_binding_contexts,
+            call_site_scope: self.call_site_scope,
             elements: self
                 .elements
                 .into_iter()
@@ -1299,15 +1310,9 @@ impl<'db> Bindings<'db> {
         env: &ProgramEnvironment<'db>,
         nonce_generator: &TypeVarNonceGenerator<'db>,
     ) {
-        let enclosing_binding_contexts = self.enclosing_binding_contexts.take();
-        if let Some(enclosing_binding_contexts) = enclosing_binding_contexts.as_deref() {
-            nonce_generator
-                .record_enclosing_binding_contexts(enclosing_binding_contexts.iter().copied());
-        }
         for item in self.iter_callable_items_mut() {
             item.freshen_generic_contexts_in_place(db, env, nonce_generator);
         }
-        self.enclosing_binding_contexts = enclosing_binding_contexts;
     }
 
     /// Match the arguments of a call site against the parameters of a collection of possibly
@@ -1325,7 +1330,7 @@ impl<'db> Bindings<'db> {
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
-        let nonce_generator = TypeVarNonceGenerator::default();
+        let nonce_generator = TypeVarNonceGenerator::new(self.call_site_scope);
         self.freshen_generic_contexts_in_place(db, env, &nonce_generator);
         self.match_parameters_in_place(db, env, arguments);
         self
@@ -3438,7 +3443,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
             }],
             implicit_dunder_new_is_possibly_unbound: false,
             implicit_dunder_init_is_possibly_unbound: false,
-            enclosing_binding_contexts: None,
+            call_site_scope: None,
         }
     }
 }

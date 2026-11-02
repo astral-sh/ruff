@@ -6999,49 +6999,32 @@ impl<'db> Type<'db> {
     /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
     #[expect(
         clippy::unnecessary_wraps,
-        reason = "Salsa returns None when preparing a constructor participates in a cycle"
+        reason = "Salsa uses None if constructor preparation participates in a cycle"
     )]
     fn bindings(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Bindings<'db> {
-        // Preparing a constructor or bound method can look up descriptors and specialize
-        // receiver types. Only a top-level call starts with a fresh recursion guard.
-        #[salsa::tracked(
-            returns(ref),
-            no_eq,
-            cycle_result = |_, _, _, _| None,
-            heap_size = ruff_memory_usage::heap_size,
-        )]
+        #[salsa::tracked(returns(ref), no_eq, cycle_result=|_,_,_| None, heap_size=ruff_memory_usage::heap_size)]
         fn prepared_class_bindings<'db>(
             db: &'db dyn Db,
-            program: Program<'db>,
-            class: ClassLiteral<'db>,
+            class: StaticClassLiteral<'db>,
         ) -> Option<Bindings<'db>> {
-            let env = ProgramEnvironment::from_program(program);
-            Some(Type::ClassLiteral(class).bindings_impl(
+            let env = ProgramEnvironment::from_file(class.program_file(db));
+            let class = ClassLiteral::Static(class);
+            let mut bindings = Type::ClassLiteral(class).bindings_impl(
                 db,
                 &env,
                 &ActiveRecursionDetector::default(),
-            ))
+            );
+            bindings.shrink_to_fit();
+            Some(bindings)
         }
-
-        if let Type::ClassLiteral(class) = self
-            && let Some(bindings) = prepared_class_bindings(db, env.program(db), class)
+        // The class alone identifies the template only when the caller uses the class's program.
+        if let Type::ClassLiteral(ClassLiteral::Static(class)) = self
+            && class.program_file(db).program(db) == env.program(db)
+            && let Some(bindings) = prepared_class_bindings(db, class)
         {
-            // Argument matching and type-variable freshening mutate the per-call bindings.
+            // Argument matching and generic freshening mutate the bindings for each call.
             return bindings.clone();
         }
-
-        if let Type::BoundMethod(method) = self
-            && method.program(db) == env.program(db)
-            && let Some((signatures, receiver)) = method.cached_receiver_signatures(db)
-        {
-            return CallableBinding::from_overloads(
-                self,
-                signatures.signatures(db).overloads.iter().cloned(),
-            )
-            .with_bound_type(receiver)
-            .into();
-        }
-
         self.bindings_impl(db, env, &ActiveRecursionDetector::default())
     }
 
@@ -7122,12 +7105,19 @@ impl<'db> Type<'db> {
                 // Class-based protocol member lookup has already specialized the method for this
                 // receiver. Bake an implicit positional receiver into the signature instead of
                 // checking it structurally again during call inference.
-                if bound_method.bakes_signature_receiver(
-                    db,
-                    &signature,
-                    self_instance,
-                    signature_receiver,
-                ) {
+                let protocol_receiver_is_specialized = self_instance
+                    .as_protocol_instance()
+                    .is_some_and(|protocol| protocol.class_origin(db).is_some())
+                    && signature
+                        .overloads
+                        .iter()
+                        .all(Signature::has_implicit_positional_receiver_annotation);
+                // Synthesized signatures can contain `Self` without a function's generic
+                // context, so substitute it when capturing the receiver.
+                if bound_method.function(db).is_none()
+                    || protocol_receiver_is_specialized
+                    || signature_receiver != self_instance
+                {
                     let mut binding =
                         CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
                             .with_bound_type(signature_receiver);
@@ -7136,17 +7126,28 @@ impl<'db> Type<'db> {
                 } else {
                     // Solve exact receiver constraints before checking the other arguments, but
                     // retain the receiver itself for call inference and receiver diagnostics.
-                    CallableBinding::from_overloads(
-                        self,
-                        bound_method.receiver_specialized_overloads(
-                            db,
-                            env,
-                            &signature,
-                            self_instance,
-                        ),
-                    )
-                    .with_bound_type(self_instance)
-                    .into()
+                    let overloads = signature.overloads.iter().flat_map(|overload| {
+                        if overload.has_receiver_determined_method_typevar(db, env)
+                            && let Some(specialized) = overload.specialize_for_bound_receiver(
+                                db,
+                                env,
+                                self_instance,
+                                bound_method.typing_self_type(db),
+                            )
+                        {
+                            specialized.overloads
+                        } else if let Some(specialized) =
+                            overload.with_unused_self_upper_bound(db, env)
+                        {
+                            smallvec_inline![specialized]
+                        } else {
+                            smallvec_inline![overload.clone()]
+                        }
+                    });
+
+                    CallableBinding::from_overloads(self, overloads)
+                        .with_bound_type(self_instance)
+                        .into()
                 }
             }
 
