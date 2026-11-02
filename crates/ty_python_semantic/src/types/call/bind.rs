@@ -6608,7 +6608,9 @@ impl<'db> CallInference<'_, 'db> {
     /// Argument validation and return refinement still use the complete original call.
     fn shared_type_arguments(&self) -> Option<TypeVarInference<'db>> {
         let context = self.signature.generic_context?;
-        if self.is_partial_application
+        // Constructor return types can distinguish subclasses that inherit the same signature.
+        if self.is_constructor
+            || self.is_partial_application
             || (0..self.arguments.len()).any(|index| self.arguments.is_variadic(index))
             || self
                 .signature
@@ -6630,24 +6632,25 @@ impl<'db> CallInference<'_, 'db> {
                 && typevar.has_bound_or_constraints(self.db);
         }
 
-        let relations: Box<[_]> = self
-            .argument_relations()
-            .map(|relation| (relation.declared_type, relation.argument_type))
-            // Equal types produce no inference evidence. Two string literals also contribute
-            // no mapping, whether or not the actual value will pass argument validation.
-            .filter(|(formal, actual)| {
-                formal != actual && !(formal.is_string_literal() && actual.is_string_literal())
-            })
-            .collect();
-        // Instance types recur across calls even when their values differ. Limit sharing for
-        // explicitly bounded variables to this case: a callback or class object can introduce
-        // bounds that require redoing inference in the source call's constraint builder.
-        if has_explicit_bound
-            && relations
-                .iter()
-                .any(|(_, actual)| !matches!(actual, Type::NominalInstance(_)))
-        {
-            return None;
+        let mut relations = Vec::new();
+        for relation in self.argument_relations() {
+            let formal = relation.declared_type;
+            let actual = relation.argument_type;
+            // Equal types and pairs of string literals contribute no type-variable mapping.
+            if formal == actual || (formal.is_string_literal() && actual.is_string_literal()) {
+                continue;
+            }
+
+            // Nominal types recur across values, and bool has only two literals. Other literals,
+            // functions, and class objects can each introduce a key for a single value.
+            // Keep bounded inference in the source call's constraint builder unless all the
+            // contributing arguments are nominal instances.
+            if !matches!(actual, Type::NominalInstance(_))
+                && (has_explicit_bound || !actual.is_bool_literal())
+            {
+                return None;
+            }
+            relations.push((formal, actual));
         }
         shared_call_type_arguments(
             self.db,
@@ -6655,7 +6658,7 @@ impl<'db> CallInference<'_, 'db> {
             context,
             self.call_expression_tcx,
             self.return_ty,
-            relations,
+            relations.into_boxed_slice(),
         )
     }
 }
