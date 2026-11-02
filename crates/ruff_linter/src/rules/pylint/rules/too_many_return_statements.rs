@@ -1,8 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
-use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 
 use crate::codes::Category;
 use crate::{Violation, checkers::ast::Checker};
@@ -72,9 +71,21 @@ impl Violation for TooManyReturnStatements {
 
 /// Count the number of return statements in a function or method body.
 fn num_returns(body: &[Stmt]) -> usize {
-    let mut visitor = ReturnStatementVisitor::default();
-    visitor.visit_body(body);
-    visitor.returns.len()
+    struct ReturnCounter(usize);
+
+    impl<'a> StatementVisitor<'a> for ReturnCounter {
+        fn visit_stmt(&mut self, stmt: &'a Stmt) {
+            match stmt {
+                Stmt::Return(_) => self.0 += 1,
+                Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {}
+                _ => walk_stmt(self, stmt),
+            }
+        }
+    }
+
+    let mut counter = ReturnCounter(0);
+    counter.visit_body(body);
+    counter.0
 }
 
 /// PLR0911
