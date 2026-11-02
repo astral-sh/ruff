@@ -7,7 +7,7 @@ import pytest
 
 from benchmark.projects import Project
 from benchmark.targets import write_cli_targets
-from benchmark.tool import Zuban
+from benchmark.tool import Ty, Zuban
 from benchmark.venv import Venv
 
 
@@ -68,6 +68,37 @@ def zuban_project(tmp_path: Path) -> tuple[Project, Venv]:
     subprocess.run(["git", "add", "src"], cwd=tmp_path, check=True)
     write_cli_targets(project, tmp_path)
     return project, venv
+
+
+def test_ty_cli_checks_source_paths_with_spaces(zuban_project):
+    project, venv = zuban_project
+    root = venv.project_path
+    with (venv.path / "pyvenv.cfg").open("a") as config:
+        config.write(f"home = {Path(sys.executable).resolve().parent}\n")
+    (root / "src").rename(root / "source root")
+    (root / "source root/example/main.py").write_text(
+        'def untyped():\n    number: int = "wrong"\n'
+    )
+    project = project._replace(
+        include=["source root/example"], exclude=["source root/**/tests/**"]
+    )
+    subprocess.run(["git", "add", "--all"], cwd=root, check=True)
+    write_cli_targets(project, root)
+    tool = Ty()
+    tool.write_config(project, venv)
+    result = subprocess.run(
+        tool.command(project, venv, single_threaded=False).command,
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=20,
+    )
+    assert result.returncode == 1, result.stderr
+    assert "source root/example/main.py" in result.stdout
+    assert "invalid-assignment" in result.stdout
+    assert "excluded.py" not in result.stdout
+    assert "outside.py" not in result.stdout
 
 
 def test_zuban_cli_checks_implementations_beside_stubs(zuban_project):
