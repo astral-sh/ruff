@@ -84,7 +84,7 @@ Run with:
 uv run --python 3.15 pytest src/benchmark/test_lsp_diagnostics.py::test_incremental_edit
 ```
 
-> **Note**: This benchmark uses [pull diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_pullDiagnostics) for type checkers that support this operation (ty), and falls back to [publish diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics) otherwise (Pyright, Pyrefly, Zuban).
+> **Note**: This benchmark uses [pull diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_pullDiagnostics) for type checkers that support this operation (ty, Zuban), and falls back to [publish diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics) otherwise (Pyright, Pyrefly).
 
 ## Known limitations
 
@@ -93,6 +93,11 @@ some projects only successfully pass type checking using a specific type checker
 We benchmark against the latest version of each type checker, but some projects
 may use another version in practice, leading to different diagnostic results
 between benchmarking and reality.
+
+Zuban 0.10.2 did not finish the NumPy CLI benchmark's first warmup after ten
+minutes. Its language server returned a server-panic error for the incremental
+edits in discord.py, PyTorch, and NumPy. These cases retain the shared workload
+and assertions; a failed or interrupted run is not a benchmark result.
 
 ## Updating the benchmark
 
