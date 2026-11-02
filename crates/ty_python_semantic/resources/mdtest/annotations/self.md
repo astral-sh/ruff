@@ -584,11 +584,11 @@ class Node:
 
 class Child(Node): ...
 
-Node(Node())  # no diagnostic
-Child(Child())  # no diagnostic
-Child(Node())  # no diagnostic
-Child().__replace__(parent=Child())  # no diagnostic
-Child().__replace__(parent=Node())  # no diagnostic
+Node(Node())  # ok
+Child(Child())  # ok
+Child(Node())  # ok
+Child().__replace__(parent=Child())  # ok
+Child().__replace__(parent=Node())  # ok
 ```
 
 Attributes annotated with `Self` can be assigned on instances:
