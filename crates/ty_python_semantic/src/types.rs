@@ -7031,8 +7031,8 @@ impl<'db> Type<'db> {
         }
 
         if let Type::BoundMethod(method) = self
-            && let Some((signatures, receiver)) =
-                method.cached_receiver_signatures(db, env.program(db))
+            && method.program(db) == env.program(db)
+            && let Some((signatures, receiver)) = method.cached_receiver_signatures(db)
         {
             return CallableBinding::from_overloads(
                 self,

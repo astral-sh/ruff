@@ -254,18 +254,17 @@ impl<'db> BoundMethodType<'db> {
         })
     }
 
-    #[salsa::tracked(returns(copy), cycle_result=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), cycle_result=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn cached_receiver_signatures(
         self,
         db: &'db dyn Db,
-        program: Program<'db>,
     ) -> Option<(CallableType<'db>, Type<'db>)> {
         let signature = self.unbound_signatures_with_inferred_return_type(db)?;
         let receiver = self.self_instance(db);
         if self.bakes_signature_receiver(db, &signature, receiver, self.signature_receiver(db)) {
             return None;
         }
-        let env = ProgramEnvironment::from_program(program);
+        let env = ProgramEnvironment::from_program(self.program(db));
         let overloads = self.receiver_specialized_overloads(db, &env, &signature, receiver);
         let signatures = CallableType::new(
             db,
