@@ -35,178 +35,174 @@ Module(
                                             PatternMatchMapping {
                                                 node_index: NodeIndex(None),
                                                 range: 21..67,
-                                                keys: [
-                                                    StringLiteral(
-                                                        ExprStringLiteral {
-                                                            node_index: NodeIndex(None),
-                                                            range: 22..28,
-                                                            value: StringLiteralValue {
-                                                                inner: Single(
-                                                                    StringLiteral {
-                                                                        range: 22..28,
-                                                                        node_index: NodeIndex(None),
-                                                                        value: "lint",
-                                                                        flags: StringLiteralFlags {
-                                                                            quote_style: Double,
-                                                                            prefix: Empty,
-                                                                            triple_quoted: false,
-                                                                            unclosed: false,
+                                                items: [
+                                                    Entry {
+                                                        key: StringLiteral(
+                                                            ExprStringLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 22..28,
+                                                                value: StringLiteralValue {
+                                                                    inner: Single(
+                                                                        StringLiteral {
+                                                                            range: 22..28,
+                                                                            node_index: NodeIndex(None),
+                                                                            value: "lint",
+                                                                            flags: StringLiteralFlags {
+                                                                                quote_style: Double,
+                                                                                prefix: Empty,
+                                                                                triple_quoted: false,
+                                                                                unclosed: false,
+                                                                            },
                                                                         },
-                                                                    },
-                                                                ),
+                                                                    ),
+                                                                },
                                                             },
-                                                        },
-                                                    ),
-                                                ],
-                                                patterns: [
-                                                    MatchOr(
-                                                        PatternMatchOr {
-                                                            node_index: NodeIndex(None),
-                                                            range: 30..66,
-                                                            patterns: [
-                                                                MatchMapping(
-                                                                    PatternMatchMapping {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 30..43,
-                                                                        keys: [
-                                                                            StringLiteral(
-                                                                                ExprStringLiteral {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 31..39,
-                                                                                    value: StringLiteralValue {
-                                                                                        inner: Single(
-                                                                                            StringLiteral {
-                                                                                                range: 31..39,
-                                                                                                node_index: NodeIndex(None),
-                                                                                                value: "select",
-                                                                                                flags: StringLiteralFlags {
-                                                                                                    quote_style: Double,
-                                                                                                    prefix: Empty,
-                                                                                                    triple_quoted: false,
-                                                                                                    unclosed: false,
-                                                                                                },
+                                                        ),
+                                                        pattern: MatchOr(
+                                                            PatternMatchOr {
+                                                                node_index: NodeIndex(None),
+                                                                range: 30..66,
+                                                                patterns: [
+                                                                    MatchMapping(
+                                                                        PatternMatchMapping {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 30..43,
+                                                                            items: [
+                                                                                Entry {
+                                                                                    key: StringLiteral(
+                                                                                        ExprStringLiteral {
+                                                                                            node_index: NodeIndex(None),
+                                                                                            range: 31..39,
+                                                                                            value: StringLiteralValue {
+                                                                                                inner: Single(
+                                                                                                    StringLiteral {
+                                                                                                        range: 31..39,
+                                                                                                        node_index: NodeIndex(None),
+                                                                                                        value: "select",
+                                                                                                        flags: StringLiteralFlags {
+                                                                                                            quote_style: Double,
+                                                                                                            prefix: Empty,
+                                                                                                            triple_quoted: false,
+                                                                                                            unclosed: false,
+                                                                                                        },
+                                                                                                    },
+                                                                                                ),
                                                                                             },
-                                                                                        ),
-                                                                                    },
-                                                                                },
-                                                                            ),
-                                                                        ],
-                                                                        patterns: [
-                                                                            MatchAs(
-                                                                                PatternMatchAs {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 41..42,
-                                                                                    pattern: None,
-                                                                                    name: Some(
-                                                                                        Identifier {
-                                                                                            id: Name("x"),
+                                                                                        },
+                                                                                    ),
+                                                                                    pattern: MatchAs(
+                                                                                        PatternMatchAs {
+                                                                                            node_index: NodeIndex(None),
                                                                                             range: 41..42,
-                                                                                            node_index: NodeIndex(None),
-                                                                                        },
-                                                                                    ),
-                                                                                },
-                                                                            ),
-                                                                        ],
-                                                                        rest: None,
-                                                                    },
-                                                                ),
-                                                                MatchMapping(
-                                                                    PatternMatchMapping {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 46..66,
-                                                                        keys: [
-                                                                            StringLiteral(
-                                                                                ExprStringLiteral {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 47..62,
-                                                                                    value: StringLiteralValue {
-                                                                                        inner: Single(
-                                                                                            StringLiteral {
-                                                                                                range: 47..62,
-                                                                                                node_index: NodeIndex(None),
-                                                                                                value: "extend-select",
-                                                                                                flags: StringLiteralFlags {
-                                                                                                    quote_style: Double,
-                                                                                                    prefix: Empty,
-                                                                                                    triple_quoted: false,
-                                                                                                    unclosed: false,
+                                                                                            pattern: None,
+                                                                                            name: Some(
+                                                                                                Identifier {
+                                                                                                    id: Name("x"),
+                                                                                                    range: 41..42,
+                                                                                                    node_index: NodeIndex(None),
                                                                                                 },
-                                                                                            },
-                                                                                        ),
-                                                                                    },
-                                                                                },
-                                                                            ),
-                                                                        ],
-                                                                        patterns: [
-                                                                            MatchAs(
-                                                                                PatternMatchAs {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 64..65,
-                                                                                    pattern: None,
-                                                                                    name: Some(
-                                                                                        Identifier {
-                                                                                            id: Name("x"),
-                                                                                            range: 64..65,
-                                                                                            node_index: NodeIndex(None),
+                                                                                            ),
                                                                                         },
                                                                                     ),
                                                                                 },
-                                                                            ),
-                                                                        ],
-                                                                        rest: None,
-                                                                    },
-                                                                ),
-                                                            ],
-                                                        },
-                                                    ),
+                                                                            ],
+                                                                        },
+                                                                    ),
+                                                                    MatchMapping(
+                                                                        PatternMatchMapping {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 46..66,
+                                                                            items: [
+                                                                                Entry {
+                                                                                    key: StringLiteral(
+                                                                                        ExprStringLiteral {
+                                                                                            node_index: NodeIndex(None),
+                                                                                            range: 47..62,
+                                                                                            value: StringLiteralValue {
+                                                                                                inner: Single(
+                                                                                                    StringLiteral {
+                                                                                                        range: 47..62,
+                                                                                                        node_index: NodeIndex(None),
+                                                                                                        value: "extend-select",
+                                                                                                        flags: StringLiteralFlags {
+                                                                                                            quote_style: Double,
+                                                                                                            prefix: Empty,
+                                                                                                            triple_quoted: false,
+                                                                                                            unclosed: false,
+                                                                                                        },
+                                                                                                    },
+                                                                                                ),
+                                                                                            },
+                                                                                        },
+                                                                                    ),
+                                                                                    pattern: MatchAs(
+                                                                                        PatternMatchAs {
+                                                                                            node_index: NodeIndex(None),
+                                                                                            range: 64..65,
+                                                                                            pattern: None,
+                                                                                            name: Some(
+                                                                                                Identifier {
+                                                                                                    id: Name("x"),
+                                                                                                    range: 64..65,
+                                                                                                    node_index: NodeIndex(None),
+                                                                                                },
+                                                                                            ),
+                                                                                        },
+                                                                                    ),
+                                                                                },
+                                                                            ],
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
                                                 ],
-                                                rest: None,
                                             },
                                         ),
                                         MatchMapping(
                                             PatternMatchMapping {
                                                 node_index: NodeIndex(None),
                                                 range: 70..83,
-                                                keys: [
-                                                    StringLiteral(
-                                                        ExprStringLiteral {
-                                                            node_index: NodeIndex(None),
-                                                            range: 71..79,
-                                                            value: StringLiteralValue {
-                                                                inner: Single(
-                                                                    StringLiteral {
-                                                                        range: 71..79,
-                                                                        node_index: NodeIndex(None),
-                                                                        value: "select",
-                                                                        flags: StringLiteralFlags {
-                                                                            quote_style: Double,
-                                                                            prefix: Empty,
-                                                                            triple_quoted: false,
-                                                                            unclosed: false,
+                                                items: [
+                                                    Entry {
+                                                        key: StringLiteral(
+                                                            ExprStringLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 71..79,
+                                                                value: StringLiteralValue {
+                                                                    inner: Single(
+                                                                        StringLiteral {
+                                                                            range: 71..79,
+                                                                            node_index: NodeIndex(None),
+                                                                            value: "select",
+                                                                            flags: StringLiteralFlags {
+                                                                                quote_style: Double,
+                                                                                prefix: Empty,
+                                                                                triple_quoted: false,
+                                                                                unclosed: false,
+                                                                            },
                                                                         },
+                                                                    ),
+                                                                },
+                                                            },
+                                                        ),
+                                                        pattern: MatchAs(
+                                                            PatternMatchAs {
+                                                                node_index: NodeIndex(None),
+                                                                range: 81..82,
+                                                                pattern: None,
+                                                                name: Some(
+                                                                    Identifier {
+                                                                        id: Name("x"),
+                                                                        range: 81..82,
+                                                                        node_index: NodeIndex(None),
                                                                     },
                                                                 ),
                                                             },
-                                                        },
-                                                    ),
+                                                        ),
+                                                    },
                                                 ],
-                                                patterns: [
-                                                    MatchAs(
-                                                        PatternMatchAs {
-                                                            node_index: NodeIndex(None),
-                                                            range: 81..82,
-                                                            pattern: None,
-                                                            name: Some(
-                                                                Identifier {
-                                                                    id: Name("x"),
-                                                                    range: 81..82,
-                                                                    node_index: NodeIndex(None),
-                                                                },
-                                                            ),
-                                                        },
-                                                    ),
-                                                ],
-                                                rest: None,
                                             },
                                         ),
                                     ],

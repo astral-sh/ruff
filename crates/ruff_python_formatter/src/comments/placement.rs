@@ -1724,7 +1724,7 @@ fn handle_pattern_match_mapping_comment<'a>(
     }
 
     // If there's no rest pattern, no need to do anything special.
-    let Some(rest) = pattern.rest.as_ref() else {
+    let Some(rest) = pattern.rest() else {
         return CommentPlacement::Default(comment);
     };
 

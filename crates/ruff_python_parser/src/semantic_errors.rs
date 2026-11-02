@@ -2241,22 +2241,18 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                     self.visit_pattern(pattern);
                 }
             }
-            Pattern::MatchMapping(ast::PatternMatchMapping {
-                keys,
-                patterns,
-                rest,
-                ..
-            }) => {
-                for pattern in patterns {
+            Pattern::MatchMapping(mapping) => {
+                for (_, pattern) in mapping.entries() {
                     self.visit_pattern(pattern);
                 }
-                if let Some(rest) = rest {
+                if let Some(rest) = mapping.rest() {
                     self.insert(rest);
                 }
 
                 let mut seen = FxHashSet::default();
-                for key in keys
-                    .iter()
+                for key in mapping
+                    .entries()
+                    .map(|(key, _)| key)
                     // Signed and complex numbers are allowed as keys but are represented as unary
                     // or binary expressions rather than literals.
                     .filter(|key| {

@@ -2950,20 +2950,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
             ast::Pattern::MatchMapping(match_mapping) => {
-                let ast::PatternMatchMapping {
-                    range: _,
-                    node_index: _,
-                    keys,
-                    patterns,
-                    rest,
-                } = match_mapping;
-                for key in keys {
+                for (key, _) in match_mapping.entries() {
                     self.infer_maybe_standalone_expression(key, TypeContext::default());
                 }
-                for pattern in patterns {
+                for (_, pattern) in match_mapping.entries() {
                     self.infer_nested_match_pattern(pattern);
                 }
-                if let Some(rest) = rest {
+                if let Some(rest) = match_mapping.rest() {
                     self.infer_definition(rest);
                 }
             }

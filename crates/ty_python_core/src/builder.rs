@@ -2684,9 +2684,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             | ast::Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
                 patterns.iter().any(Self::pattern_has_bindings)
             }
-            ast::Pattern::MatchMapping(pattern) => {
-                pattern.rest.is_some() || pattern.patterns.iter().any(Self::pattern_has_bindings)
-            }
+            ast::Pattern::MatchMapping(pattern) => pattern.items.iter().any(|item| match item {
+                ast::MappingPatternItem::Entry { pattern, .. } => {
+                    Self::pattern_has_bindings(pattern)
+                }
+                ast::MappingPatternItem::Rest(_) => true,
+            }),
             ast::Pattern::MatchClass(pattern) => pattern
                 .arguments
                 .patterns
@@ -2761,15 +2764,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // Retain keyed entries for subject-aware exhaustiveness analysis.
                 PatternPredicateKind::Mapping(MappingPatternPredicateKind {
                     entries: pattern
-                        .keys
-                        .iter()
-                        .zip(&pattern.patterns)
+                        .entries()
                         .map(|(key, pattern)| MappingPatternEntryPredicateKind {
                             key: self.add_standalone_expression(key),
                             pattern: self.predicate_kind(pattern),
                         })
                         .collect(),
-                    rest: pattern.rest.as_ref().map(|name| name.id.clone()),
+                    rest: pattern.rest().map(|name| name.id.clone()),
                 })
             }
             ast::Pattern::MatchSequence(pattern) => {
@@ -5811,13 +5812,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
         walk_pattern(self, pattern);
 
-        if let ast::Pattern::MatchAs(ast::PatternMatchAs {
-            name: Some(name), ..
-        })
-        | ast::Pattern::MatchMapping(ast::PatternMatchMapping {
-            rest: Some(name), ..
-        }) = pattern
-        {
+        let name = match pattern {
+            ast::Pattern::MatchAs(pattern) => pattern.name.as_ref(),
+            ast::Pattern::MatchMapping(mapping) => mapping.rest(),
+            _ => None,
+        };
+        if let Some(name) = name {
             let symbol = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
