@@ -26,6 +26,30 @@ without a pre-existing cache.
 
 You can run the benchmark with `--single-threaded` to measure the check time when using a single thread only.
 
+### Zuban
+
+Zuban is installed from the runner's lockfile and participates in the default CLI
+and LSP suites. To run only Zuban:
+
+```shell
+uv run --python 3.15 benchmark --tool zuban
+uv run --python 3.15 pytest src/benchmark/test_lsp_diagnostics.py -k zuban
+```
+
+Zuban uses mypy-compatible mode with untyped-function checking enabled and untyped
+returns treated as `Any`, matching the mypy and Pyrefly benchmark policy. Its
+generated configuration uses the shared project include/exclude lists, target
+Python version, source import roots, and project virtual environment. CLI runs use
+an isolated configuration file; LSP runs temporarily install the same settings in
+`pyproject.toml` and restore the original file afterwards. Upstream mypy or Zuban
+settings cannot silently narrow its workload or suppress diagnostics.
+
+The language server checks the same open files and edits through the common LSP
+client, with the project interpreter supplied explicitly. `--single-threaded`
+also limits Zuban's Rayon pool through `RAYON_NUM_THREADS=1`. Checker implementations
+and diagnostic coverage still differ; these settings align the benchmark inputs
+and measurement boundaries.
+
 ### Warm check time
 
 Run with:
@@ -60,7 +84,7 @@ Run with:
 uv run --python 3.15 pytest src/benchmark/test_lsp_diagnostics.py::test_incremental_edit
 ```
 
-> **Note**: This benchmark uses [pull diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_pullDiagnostics) for type checkers that support this operation (ty), and falls back to [publish diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics) otherwise (Pyright, Pyrefly).
+> **Note**: This benchmark uses [pull diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_pullDiagnostics) for type checkers that support this operation (ty), and falls back to [publish diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics) otherwise (Pyright, Pyrefly, Zuban).
 
 ## Known limitations
 
