@@ -26,6 +26,7 @@ poit = "poit"
 BA = "BA" # acronym for "Bad Allowed", used in testing.
 jod = "jod" # e.g., `jod-thread`
 CPY = "CPY"  # it's a Ruff rule category
+SME = "SME"  # pandas frequency alias for semi-month end
 
 [default]
 extend-ignore-re = [
