@@ -8,10 +8,16 @@ use crate::{Db, ProgramEnvironment};
 #[derive(
     Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue,
 )]
-enum TypeContextKind {
+pub(in crate::types) enum TypeContextKind {
     /// A direct declared type annotation.
     #[default]
     Declared,
+
+    /// A constraint originating from inference evidence.
+    ///
+    /// During generic call inference, constraints inferred from call arguments are provided as
+    /// type context for subsequent inference attempts during fixpoint iteration.
+    Inferred,
 
     /// The declared upper bound of a type variable.
     ///
@@ -34,7 +40,7 @@ pub(crate) struct TypeContext<'db> {
 }
 
 impl<'db> TypeContext<'db> {
-    fn new(declared_type: Option<Type<'db>>, kind: TypeContextKind) -> Self {
+    pub(in crate::types) fn new(declared_type: Option<Type<'db>>, kind: TypeContextKind) -> Self {
         // During generic call argument inference, type variables that cannot yet be specialized are
         // replaced by `UnspecializedTypeVar`. This marker intentionally carries neither type-variable
         // identity nor a concrete expected type, and so it should not be treated as a useful constraint.
@@ -63,8 +69,16 @@ impl<'db> TypeContext<'db> {
         self.declared_type
     }
 
-    pub(crate) fn is_declared(self) -> bool {
-        matches!(self.kind, TypeContextKind::Declared)
+    pub(in crate::types) fn kind(self) -> TypeContextKind {
+        self.kind
+    }
+
+    pub(super) fn is_inferred(self) -> bool {
+        matches!(self.kind, TypeContextKind::Inferred)
+    }
+
+    pub(crate) fn is_validity(self) -> bool {
+        matches!(self.kind, TypeContextKind::Validity)
     }
 
     /// If the declared type is a specialized instance of the given `KnownClass`, returns the
