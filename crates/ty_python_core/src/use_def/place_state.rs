@@ -568,7 +568,70 @@ pub(crate) struct PlaceState {
     bindings: Bindings,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) struct SingletonConstraints {
+    narrowing: ScopedNarrowingConstraint,
+    reachability: ScopedReachabilityConstraintId,
+}
+
+impl From<&LiveBinding> for SingletonConstraints {
+    fn from(binding: &LiveBinding) -> Self {
+        Self {
+            narrowing: binding.narrowing_constraint,
+            reachability: binding.reachability_constraint,
+        }
+    }
+}
+
 impl PlaceState {
+    fn singleton(&self) -> Option<(&LiveBinding, &LiveDeclaration)> {
+        let [binding] = self.bindings.live_bindings.as_slice() else {
+            return None;
+        };
+        let [declaration] = self.declarations.live_declarations.as_slice() else {
+            return None;
+        };
+        (self.bindings.unbound_narrowing_constraint.is_none()
+            && binding.reachability_constraint == declaration.reachability_constraint)
+            .then_some((binding, declaration))
+    }
+
+    pub(super) fn singleton_merge_inputs(
+        &self,
+        other: &Self,
+    ) -> Option<(SingletonConstraints, SingletonConstraints)> {
+        let (left, left_decl) = self.singleton()?;
+        let (right, right_decl) = other.singleton()?;
+        (left.binding == right.binding && left_decl.declaration == right_decl.declaration)
+            .then(|| (left.into(), right.into()))
+    }
+
+    /// Merge the constraints after both matched singleton states have been materialized.
+    /// A pending path applies the same reachability to the binding and the declaration.
+    pub(super) fn merge_singleton(
+        &mut self,
+        other: &Self,
+        narrowing: &mut NarrowingConstraintsBuilder,
+        reachability: &mut ReachabilityConstraintsBuilder,
+    ) -> SingletonConstraints {
+        let a = &self.bindings.live_bindings[0];
+        let b = &other.bindings.live_bindings[0];
+        let merged = SingletonConstraints {
+            narrowing: narrowing.add_or_constraint(a.narrowing_constraint, b.narrowing_constraint),
+            reachability: reachability
+                .add_or_constraint(a.reachability_constraint, b.reachability_constraint),
+        };
+        self.set_singleton_constraints(merged);
+        merged
+    }
+
+    pub(super) fn set_singleton_constraints(&mut self, constraints: SingletonConstraints) {
+        let binding = &mut self.bindings.live_bindings[0];
+        binding.narrowing_constraint = constraints.narrowing;
+        binding.reachability_constraint = constraints.reachability;
+        self.declarations.live_declarations[0].reachability_constraint = constraints.reachability;
+    }
+
     /// Return a new [`PlaceState`] representing an unbound, undeclared place.
     pub(super) fn undefined(reachability: ScopedReachabilityConstraintId) -> Self {
         Self {
