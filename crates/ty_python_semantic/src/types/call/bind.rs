@@ -8920,7 +8920,6 @@ impl<'db> Binding<'db> {
         // create multiple instances of a single typevar identity with different
         // bounds/constraints. We should reconcile the invariants expected by the constraint solver
         // with those actually enforced by our typevar representation.
-        let constraints = &ConstraintSetBuilder::new();
         let parameters = self.signature.parameters();
 
         if parameters.is_top() {
@@ -8935,7 +8934,7 @@ impl<'db> Binding<'db> {
                 .iter()
                 .all(|parameter| parameter.is_variadic() || parameter.is_keyword_variadic())
         {
-            self.check_keyword_unpack_key_types(db, env, constraints, arguments);
+            self.check_keyword_unpack_key_types(db, env, &ConstraintSetBuilder::new(), arguments);
             return;
         }
 
@@ -9001,6 +9000,7 @@ impl<'db> Binding<'db> {
             }
         }
 
+        let constraints = &ConstraintSetBuilder::new();
         let inferred = call.infer(constraints, None);
         (self.inferable_typevars, self.inference, self.return_ty) = check(
             inferred,
