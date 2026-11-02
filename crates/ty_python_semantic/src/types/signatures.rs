@@ -5870,7 +5870,7 @@ impl<'db> std::ops::Index<usize> for Parameters<'db> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct ParameterDisplayName<N> {
     name: N,
     prefix: ParameterNamePrefix,
@@ -5892,7 +5892,7 @@ impl<N: AsRef<str>> fmt::Display for ParameterDisplayName<N> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize)]
 enum ParameterNamePrefix {
     None,
     Variadic,

@@ -5053,7 +5053,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum SpecializationError<'db> {
     MismatchedBound {
         bound_typevar: BoundTypeVarInstance<'db>,

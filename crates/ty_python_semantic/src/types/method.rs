@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use itertools::Either;
 use ruff_python_ast::name::Name;
+use smallvec::smallvec_inline;
 
 use crate::{
     Db, Program, ProgramEnvironment,
@@ -204,6 +205,74 @@ impl<'db> BoundMethodType<'db> {
             Type::Callable(callable) => Some(callable.signatures(db)),
             _ => None,
         }
+    }
+
+    pub(super) fn bakes_signature_receiver(
+        self,
+        db: &'db dyn Db,
+        signature: &CallableSignature<'db>,
+        self_instance: Type<'db>,
+        signature_receiver: Type<'db>,
+    ) -> bool {
+        let protocol_receiver_is_specialized = self_instance
+            .as_protocol_instance()
+            .is_some_and(|protocol| protocol.class_origin(db).is_some())
+            && signature
+                .overloads
+                .iter()
+                .all(Signature::has_implicit_positional_receiver_annotation);
+        self.function(db).is_none()
+            || protocol_receiver_is_specialized
+            || signature_receiver != self_instance
+    }
+
+    pub(super) fn receiver_specialized_overloads<'s>(
+        self,
+        db: &'db dyn Db,
+        env: &'s ProgramEnvironment<'db>,
+        signature: &'s CallableSignature<'db>,
+        self_instance: Type<'db>,
+    ) -> impl Iterator<Item = Signature<'db>> + 's
+    where
+        'db: 's,
+    {
+        signature.overloads.iter().flat_map(move |overload| {
+            if overload.has_receiver_determined_method_typevar(db, env)
+                && let Some(specialized) = overload.specialize_for_bound_receiver(
+                    db,
+                    env,
+                    self_instance,
+                    self.typing_self_type(db),
+                )
+            {
+                specialized.overloads
+            } else if let Some(specialized) = overload.with_unused_self_upper_bound(db, env) {
+                smallvec_inline![specialized]
+            } else {
+                smallvec_inline![overload.clone()]
+            }
+        })
+    }
+
+    #[salsa::tracked(returns(copy), cycle_result=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    pub(super) fn cached_receiver_signatures(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+    ) -> Option<(CallableType<'db>, Type<'db>)> {
+        let signature = self.unbound_signatures_with_inferred_return_type(db)?;
+        let receiver = self.self_instance(db);
+        if self.bakes_signature_receiver(db, &signature, receiver, self.signature_receiver(db)) {
+            return None;
+        }
+        let env = ProgramEnvironment::from_program(program);
+        let overloads = self.receiver_specialized_overloads(db, &env, &signature, receiver);
+        let signatures = CallableType::new(
+            db,
+            CallableSignature::from_overloads(overloads),
+            CallableTypeKind::FunctionLike,
+        );
+        Some((signatures, receiver))
     }
 
     /// The unbound signatures, including an inferred return type for Python functions.

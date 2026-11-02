@@ -46,7 +46,7 @@ impl<'db> CallableBinding<'db> {
 /// only checked if the upstream returns an instance of the class being constructed. (A downstream
 /// constructor may itself have a downstream constructor, in the case where metaclass `__call__`,
 /// `__new__`, and `__init__` are all present.)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ConstructorBinding<'db> {
     /// The `CallableBinding` for this individual constructor method.
     pub(super) entry: CallableBinding<'db>,
@@ -740,7 +740,7 @@ impl<'db> ConstructorBinding<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ConstructorContext<'db> {
     instance_type: Type<'db>,
     kind: ConstructorCallableKind,
@@ -770,7 +770,7 @@ impl<'db> ConstructorContext<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) enum ConstructorCallableKind {
     /// A metaclass `__call__` method.
     MetaclassCall,
