@@ -170,12 +170,11 @@ Excluding a union of intersections can expand into exponentially many alternativ
 
 ```py
 from typing import Any, Literal
-from ty_extensions import Intersection
 
 class A[T]: ...
 class B[T]: ...
 
-type Case[T] = Intersection[A[T], B[T]]
+type Case[T] = A[T] & B[T]
 ```
 
 With two cases, the exact exclusions fit within the budget:
