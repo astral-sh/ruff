@@ -10,6 +10,8 @@ dependencies = [
     # of the Python wrapper script (that lazily installs Pyright).
     "mslex>=1.3.0",
     "pyrefly==1.4.0",
+    "zuban==0.10.2",
+    "tomlkit>=0.13.3",
     "pytest-benchmark>=4.0.0",
     "pytest>=8.0.0",
     "pygls>=2.0.0",
@@ -77,6 +79,10 @@ build-constraint-dependencies = [
 ]
 exclude-newer = "2026-10-24T19:50:00Z"
 preview-features = ["build-dependency-hashes"]
+
+[tool.uv.exclude-newer-package]
+# Zuban was released after the cutoff used by the other benchmark dependencies.
+zuban = "2026-10-30T00:00:00Z"
 
 [tool.uv.build-backend]
 module-name = "benchmark"

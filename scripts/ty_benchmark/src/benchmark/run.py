@@ -10,13 +10,13 @@ from typing import TYPE_CHECKING, Final
 from benchmark import Hyperfine
 from benchmark.projects import ALL as ALL_PROJECTS
 from benchmark.snapshot import SnapshotRunner
-from benchmark.tool import Mypy, Pyrefly, Pyright, Tool, Ty
+from benchmark.tool import Mypy, Pyrefly, Pyright, Tool, Ty, Zuban
 from benchmark.venv import Venv
 
 if TYPE_CHECKING:
     from benchmark.tool import Tool
 
-TOOL_CHOICES: Final = ["ty", "pyrefly", "mypy", "pyright"]
+TOOL_CHOICES: Final = ["ty", "pyrefly", "mypy", "pyright", "zuban"]
 
 
 def main() -> None:
@@ -122,6 +122,8 @@ def main() -> None:
                 suites.append(Mypy(warm=False))
                 if args.warm:
                     suites.append(Mypy(warm=True))
+            case "zuban":
+                suites.append(Zuban())
             case _:
                 raise ValueError(f"Unknown tool: {tool_name}")
 
@@ -135,6 +137,7 @@ def main() -> None:
 
     if args.single_threaded:
         benchmark_env["TY_MAX_PARALLELISM"] = "1"
+        benchmark_env["RAYON_NUM_THREADS"] = "1"
 
     first = True
 

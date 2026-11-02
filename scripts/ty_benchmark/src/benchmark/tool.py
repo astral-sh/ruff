@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import abc
+import glob
 import json
 import shutil
 import sys
+from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 from textwrap import dedent
 from typing import TYPE_CHECKING, override
+
+import tomlkit
 
 from benchmark import Command
 from benchmark.projects import Project
@@ -44,6 +49,16 @@ class Tool(abc.ABC):
         We write a configuration over using CLI arguments because
         most LSPs don't accept per CLI.
         """
+        return None
+
+    @contextmanager
+    def configure_lsp(self, project: Project, venv: Venv) -> Generator[None]:
+        self.write_config(project, venv)
+        yield
+
+    def lsp_initialization_options(
+        self, project: Project, venv: Venv
+    ) -> dict[str, str] | None:
         return None
 
     @abc.abstractmethod
@@ -288,6 +303,117 @@ class Pyrefly(Tool):
         # Turn-off pyrefly's indexing mode as it results in significant load after opening the first file,
         # skewing benchmark results and we don't use any of the features that require indexing.
         return [str(self.path), "lsp", "--indexing-mode", "none"]
+
+
+class Zuban(Tool):
+    def __init__(self, *, path: Path | None = None):
+        self.path = path or which_tool("zuban")
+
+    @override
+    def name(self) -> str:
+        return "zuban"
+
+    def _settings(self, project: Project, venv: Venv) -> dict[str, object]:
+        search_paths = set()
+        for include in project.include:
+            path = venv.project_path / include
+            if path.is_file():
+                path = path.parent
+            while path != venv.project_path and (
+                (path / "__init__.py").is_file() or (path / "__init__.pyi").is_file()
+            ):
+                path = path.parent
+            search_paths.add(path)
+
+        # Zuban matches exclusions relative to each source import root.
+        excludes = list(project.exclude)
+        for path in sorted(search_paths):
+            relative_root = path.relative_to(venv.project_path).as_posix()
+            if relative_root == ".":
+                continue
+            for pattern in project.exclude:
+                if pattern == relative_root:
+                    excludes.append("**")
+                elif pattern.startswith(relative_root + "/"):
+                    excludes.append(pattern[len(relative_root) + 1 :])
+
+        return {
+            "mode": "mypy",
+            "python_version": project.python_version,
+            "python_executable": venv.python.as_posix(),
+            "mypy_path": [path.as_posix() for path in sorted(search_paths)],
+            "files": list(project.include),
+            "exclude": [
+                r"\A"
+                + glob.translate(
+                    pattern, recursive=True, include_hidden=True, seps="/\\"
+                ).removesuffix(r"\z")
+                + r"(?:[/\\].*)?\z"
+                for pattern in dict.fromkeys(excludes)
+            ],
+            "exclude_gitignore": False,
+            "check_untyped_defs": True,
+            "untyped_function_return_mode": "any",
+        }
+
+    @override
+    def config(self, project: Project, venv: Venv) -> tuple[Path, str]:
+        return (
+            Path("zuban-benchmark.toml"),
+            tomlkit.dumps({"tool": {"zuban": self._settings(project, venv)}}),
+        )
+
+    @override
+    def command(self, project: Project, venv: Venv, single_threaded: bool) -> Command:
+        return Command(
+            name="Zuban",
+            command=[
+                str(self.path),
+                "check",
+                "--config-file",
+                "zuban-benchmark.toml",
+                "--no-pretty",
+                *project.include,
+            ],
+        )
+
+    @override
+    @contextmanager
+    def configure_lsp(self, project: Project, venv: Venv) -> Generator[None]:
+        path = venv.project_path / "pyproject.toml"
+        original = path.read_bytes() if path.exists() else None
+        document = (
+            tomlkit.parse(original.decode())
+            if original is not None
+            else tomlkit.document()
+        )
+        tool = document.setdefault("tool", tomlkit.table())
+        # An empty mypy table stops Zuban's search before mypy.ini/setup.cfg.
+        # Its own settings are applied afterwards, matching the isolated CLI config.
+        tool["mypy"] = tomlkit.table()
+        tool["zuban"] = self._settings(project, venv)
+        try:
+            path.write_bytes(tomlkit.dumps(document).encode())
+            yield
+        finally:
+            if original is None:
+                path.unlink(missing_ok=True)
+            else:
+                path.write_bytes(original)
+
+    @override
+    def lsp_initialization_options(
+        self, project: Project, venv: Venv
+    ) -> dict[str, str]:
+        return {
+            "pythonExecutable": venv.python.as_posix(),
+            "typeCheckingMode": "mypy",
+            "diagnosticMode": "open-files-only",
+        }
+
+    @override
+    def lsp_command(self, project: Project, venv: Venv) -> list[str]:
+        return [str(self.path), "server"]
 
 
 def npm_bin_path(name: str) -> Path:
