@@ -267,6 +267,7 @@ fn create_parameters<'db>(
                 is_positional_only,
                 is_variadic,
                 is_keyword_variadic,
+                ..
             } = parameter;
             // Get the parameter name for documentation lookup.
             let documentation = param_docs.get(name.as_str()).cloned();

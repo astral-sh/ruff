@@ -15,7 +15,7 @@ use ty_python_semantic::ProgramEnvironment;
 use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
 use ty_python_semantic::types::{KnownInstanceType, SpecialFormType, Type, TypeVarVariance};
 
-use ty_python_semantic::{SemanticModel, TypeQualifiers};
+use ty_python_semantic::{ResolvedDefinition, SemanticModel, TypeQualifiers};
 
 pub fn hover<'db>(
     db: &'db dyn Db,
@@ -297,6 +297,16 @@ fn keyword_argument_hover_contents<'db>(
         .and_then(|docstring| documentation_for_parameter(&docstring, &parameter.name))
     {
         contents.push(HoverContent::DocstringFragment(documentation));
+    } else if let Some(definition) = parameter.definition
+        // A parameter written in a `def` gets its docs from the function docstring checked above.
+        // A generated dataclass constructor has no `def __init__` to read. In `Foo(bar=True)`,
+        // `bar` points back to the field in the class body, where a string literal immediately
+        // following the field can document it.
+        && !definition.kind(db).is_parameter_def()
+        && let Some(docstring) =
+            Definitions::new(vec![ResolvedDefinition::Definition(definition)]).docstring(db)
+    {
+        contents.push(HoverContent::Docstring(docstring));
     }
 
     Some(contents)
@@ -2353,6 +2363,84 @@ mod tests {
            |      ^^^^^- Cursor offset
            |      |
            |      source
+        ");
+    }
+
+    #[test]
+    fn hover_keyword_parameter_inherited_dataclass_field() {
+        let test = hover_test(
+            r#"
+            from dataclasses import dataclass
+
+            @dataclass
+            class Options:
+                verbose: bool
+                """Include debug messages."""
+
+            @dataclass
+            class LogOptions(Options):
+                pass
+
+            LogOptions(ver<CURSOR>bose=True)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (parameter) verbose: bool
+        ---------------------------------------------
+        Include debug messages.
+
+        ---------------------------------------------
+        ```python
+        (parameter) verbose: bool
+        ```
+        ---
+        Include debug messages.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:13:12
+           |
+        13 | LogOptions(verbose=True)
+           |            ^^^-^^^
+           |            |  |
+           |            |  Cursor offset
+           |            source
+        ");
+    }
+
+    #[test]
+    fn hover_keyword_parameter_named_tuple_field() {
+        let test = hover_test(
+            r#"
+            from typing import NamedTuple
+
+            class Point(NamedTuple):
+                x: int
+                """Horizontal coordinate."""
+
+            Point(x<CURSOR>=1)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (parameter) x: int
+        ---------------------------------------------
+        Horizontal coordinate.
+
+        ---------------------------------------------
+        ```python
+        (parameter) x: int
+        ```
+        ---
+        Horizontal coordinate.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:7
+          |
+        8 | Point(x=1)
+          |       ^- Cursor offset
+          |       |
+          |       source
         ");
     }
 
