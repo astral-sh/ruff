@@ -647,7 +647,7 @@ fn concise_diagnostics() -> anyhow::Result<()> {
 #[test_case(None,           &[("FORCE_COLOR", "0")]                         => true;  "force color")]
 #[test_case(None,           &[("FORCE_COLOR", ""), ("CLICOLOR_FORCE", "0")] => true;  "empty force color defers")]
 #[test_case(None,           &[("CLICOLOR_FORCE", "")]                       => false; "empty clicolor force")]
-#[test_case(None,           &[("CLICOLOR", "0")]                            => false; "clicolor requires a terminal")]
+#[test_case(None,           &[("CLICOLOR", "1")]                            => false; "clicolor requires a terminal")]
 #[test_case(None,           &[("NO_COLOR", "0"), ("CLICOLOR_FORCE", "1")]   => false; "no color beats clicolor force")]
 #[test_case(None,           &[("NO_COLOR", "0"), ("FORCE_COLOR", "0")]      => false; "no color wins")]
 #[test_case(Some("auto"),   &[("NO_COLOR", ""), ("FORCE_COLOR", "0")]       => true;  "empty no color")]

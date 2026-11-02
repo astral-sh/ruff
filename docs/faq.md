@@ -623,12 +623,15 @@ With `--color auto` or no flag, Ruff applies the first matching rule to its stan
 1. A non-empty `NO_COLOR` disables color.
 1. Otherwise, a non-empty `FORCE_COLOR` or `CLICOLOR_FORCE` enables color, even when piping or
    redirecting stdout.
-1. Otherwise, if stdout isn't a terminal, Ruff disables color.
-1. Otherwise, a non-empty `CLICOLOR` enables color on the terminal, even if `TERM=dumb`.
+1. Otherwise, if stdout isn't a terminal or `CLICOLOR=0` is set, Ruff disables color.
+1. Otherwise, any other non-empty `CLICOLOR` enables color on the terminal, even if `TERM=dumb`.
 1. Otherwise, Ruff uses color on the terminal unless `TERM` is exactly `dumb`.
 
-For all four color variables, an empty string has the same effect as leaving the variable unset,
-and `0` counts as non-empty. An unset or empty `TERM` allows color on a terminal.
+For all four color variables, an empty string has the same effect as leaving the variable unset.
+For `NO_COLOR`, `FORCE_COLOR`, and `CLICOLOR_FORCE`, setting the variable to `0` activates it
+just as setting it to `1` does. However, `CLICOLOR=0` disables color, following the
+[original `CLICOLOR` convention](https://github.com/jhasse/clicolors/blob/53521cee09ac53e68dd87364b9602b50ec3f364a/index.md?plain=1#L24-L25).
+An unset or empty `TERM` allows color on a terminal.
 
 ## Ruff behaves unexpectedly when using `source.*` code actions in Notebooks. What's going on? {: #source-code-actions-in-notebooks }
 

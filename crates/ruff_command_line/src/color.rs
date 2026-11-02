@@ -13,10 +13,11 @@ pub enum TerminalColor {
     ///
     /// A non-empty `NO_COLOR` environment variable disables color. Otherwise, a non-empty
     /// `FORCE_COLOR` or `CLICOLOR_FORCE` enables color even when output is redirected.
+    /// For these three variables, `0` counts as non-empty.
     ///
-    /// By default, terminals use color unless `TERM=dumb`. Set `CLICOLOR` to a non-empty
-    /// value to use color even on a dumb terminal. For all four color variables, an empty
-    /// string has the same effect as leaving the variable unset, and `0` counts as non-empty.
+    /// If all three are empty or unset, color is limited to terminals. On a terminal,
+    /// `CLICOLOR=0` disables color and any other non-empty `CLICOLOR` enables it. With
+    /// `CLICOLOR` empty or unset, terminals use color unless `TERM=dumb`.
     #[default]
     Auto,
 
@@ -41,15 +42,17 @@ impl TerminalColor {
         }
 
         if non_empty(EnvVars::NO_COLOR) {
-            Self::Never
-        } else if non_empty(EnvVars::FORCE_COLOR) || non_empty(EnvVars::CLICOLOR_FORCE) {
-            Self::Always
-        } else if !non_empty(EnvVars::CLICOLOR)
-            && env::var_os(EnvVars::TERM).as_deref() == Some(OsStr::new("dumb"))
-        {
-            Self::Never
-        } else {
-            Self::Auto
+            return Self::Never;
+        }
+        if non_empty(EnvVars::FORCE_COLOR) || non_empty(EnvVars::CLICOLOR_FORCE) {
+            return Self::Always;
+        }
+
+        match env::var_os(EnvVars::CLICOLOR) {
+            Some(value) if value == "0" => Self::Never,
+            Some(value) if !value.is_empty() => Self::Auto,
+            _ if env::var_os(EnvVars::TERM).as_deref() == Some(OsStr::new("dumb")) => Self::Never,
+            _ => Self::Auto,
         }
     }
 

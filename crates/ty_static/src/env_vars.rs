@@ -96,12 +96,13 @@ impl EnvVars {
 
     // Externally defined environment variables
 
-    /// Enables color in `ty check` diagnostics when stdout is a terminal, even if `TERM=dumb`.
+    /// Controls color in `ty check` diagnostics when stdout is a terminal.
     ///
-    /// Setting this environment variable to any non-empty value (including `0`) enables this
-    /// behavior. An empty value has the same effect as leaving the variable unset. All of the
-    /// following have higher precedence: setting the `NO_COLOR` environment variable to any
-    /// non-empty value, passing `--color=always`, or passing `--color=never`.
+    /// Setting this to `0` disables color. Any other non-empty value enables color, even if
+    /// `TERM=dumb`. An empty value has the same effect as leaving the variable unset.
+    ///
+    /// An explicit `--color=always` or `--color=never` takes precedence, as does a non-empty
+    /// `NO_COLOR`, `FORCE_COLOR`, or `CLICOLOR_FORCE` environment variable.
     pub const CLICOLOR: &'static str = "CLICOLOR";
 
     /// Alias for [`FORCE_COLOR`](#force_color).
