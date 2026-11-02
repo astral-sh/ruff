@@ -560,13 +560,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         //     c.x = 1
         // reveal_type(c.x)  # revealed: Literal[1]
         // ```
-        for (enclosing_scope_id, enclosing_scope, visible) in
-            AncestorsIter::new(&self.scopes, popped_scope_id)
-                .with_lexical_visibility()
-                .skip(1)
+        for ancestor in AncestorsIter::new(&self.scopes, popped_scope_id)
+            .with_lexical_visibility()
+            .skip(1)
         {
-            let enclosing_scope_kind = enclosing_scope.kind();
-            let enclosing_place_table = &self.place_tables[enclosing_scope_id];
+            let enclosing_place_table = &self.place_tables[ancestor.id];
 
             for nested_place in self.place_tables[popped_scope_id].iter() {
                 // Skip this place if this enclosing scope doesn't contain any bindings for it.
@@ -582,19 +580,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // Snapshot the state of this place that are visible at this point in this
                 // enclosing scope.
                 let key = EnclosingSnapshotKey {
-                    enclosing_scope: enclosing_scope_id,
+                    enclosing_scope: ancestor.id,
                     enclosing_place: enclosing_place_id,
                     nested_scope: popped_scope_id,
                     nested_laziness: ScopeLaziness::Eager,
                 };
-                let eager_snapshot = self.use_def_maps[enclosing_scope_id]
-                    .snapshot_enclosing_state(enclosing_place_id, enclosing_place, visible);
+                let eager_snapshot = self.use_def_maps[ancestor.id].snapshot_enclosing_state(
+                    enclosing_place_id,
+                    enclosing_place,
+                    ancestor.is_lexically_visible,
+                );
                 self.enclosing_snapshots.insert(key, eager_snapshot);
             }
 
             // Lazy scopes are "sticky": once we see a lazy scope we stop doing lookups
             // eagerly, even if we would encounter another eager enclosing scope later on.
-            if !enclosing_scope_kind.is_eager() {
+            if !ancestor.scope.is_eager() {
                 break;
             }
         }

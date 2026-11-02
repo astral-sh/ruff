@@ -90,8 +90,8 @@ use ty_python_core::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
 use ty_python_core::scope::{NodeWithScopeKind, ScopeId, ScopeKind};
 use ty_python_core::symbol::{ScopedSymbolId, Symbol};
 use ty_python_core::{
-    BindingWithConstraintsIterator, BindingsSnapshotId, EnclosingSnapshotResult, FileScopeId,
-    ProgramFile, SemanticIndex,
+    AncestorScope, BindingWithConstraintsIterator, BindingsSnapshotId, EnclosingSnapshotResult,
+    FileScopeId, ProgramFile, SemanticIndex,
 };
 
 use crate::Db;
@@ -382,7 +382,11 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
         let scope = self.context.scope;
         let file_scope = scope.file_scope_id(db);
 
-        for (enclosing_file_scope, enclosing_scope, is_lexical_enclosing_scope) in self
+        for AncestorScope {
+            id: enclosing_file_scope,
+            scope: enclosing_scope,
+            is_lexically_visible,
+        } in self
             .context
             .index
             .ancestor_scopes(file_scope)
@@ -399,7 +403,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
             let enclosing_place = enclosing_place_id.map(|id| enclosing_place_table.place(id));
             // A `global` declaration forwards the place to the module instead of making this
             // enclosing scope its owner. A possibly-unbound snapshot must still fall through.
-            let forwards_to_global = is_lexical_enclosing_scope
+            let forwards_to_global = is_lexically_visible
                 && enclosing_place
                     .is_some_and(|place| place.as_symbol().is_some_and(Symbol::is_global));
             let root_place_was_reassigned = || {
@@ -470,7 +474,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
                 }
             }
 
-            if !is_lexical_enclosing_scope {
+            if !is_lexically_visible {
                 continue;
             }
 

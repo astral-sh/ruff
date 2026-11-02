@@ -668,7 +668,7 @@ impl<'db> SemanticIndex<'db> {
     pub fn visible_ancestor_scopes(
         &self,
         scope: FileScopeId,
-    ) -> impl FusedIterator<Item = (FileScopeId, &Scope)> {
+    ) -> impl Iterator<Item = (FileScopeId, &Scope)> {
         self.ancestor_scopes(scope).visible()
     }
 
@@ -846,6 +846,13 @@ impl<'db> SemanticIndex<'db> {
     }
 }
 
+pub struct AncestorScope<'a> {
+    pub id: FileScopeId,
+    pub scope: &'a Scope,
+    /// Whether lexical name lookup from the starting scope can see names bound in this scope.
+    pub is_lexically_visible: bool,
+}
+
 pub struct AncestorsIter<'a> {
     scopes: &'a IndexSlice<FileScopeId, Scope>,
     next_id: Option<FileScopeId>,
@@ -862,20 +869,23 @@ impl<'a> AncestorsIter<'a> {
     /// Includes the lexical visibility of each scope. A class namespace is visible in the
     /// class itself and through any intervening annotation scopes (e.g. both the value and
     /// the type parameters of a generic type alias).
-    pub fn with_lexical_visibility(
-        self,
-    ) -> impl FusedIterator<Item = (FileScopeId, &'a Scope, bool)> {
+    pub fn with_lexical_visibility(self) -> impl Iterator<Item = AncestorScope<'a>> {
         let mut class_visible = true;
         self.map(move |(id, scope)| {
-            let visible = !scope.kind().is_class() || class_visible;
+            let is_lexically_visible = !scope.kind().is_class() || class_visible;
             class_visible &= scope.kind().is_annotation();
-            (id, scope, visible)
+            AncestorScope {
+                id,
+                scope,
+                is_lexically_visible,
+            }
         })
     }
 
-    fn visible(self) -> impl FusedIterator<Item = (FileScopeId, &'a Scope)> {
+    fn visible(self) -> impl Iterator<Item = (FileScopeId, &'a Scope)> {
         self.with_lexical_visibility()
-            .filter_map(|(id, scope, visible)| visible.then_some((id, scope)))
+            .filter(|ancestor| ancestor.is_lexically_visible)
+            .map(|ancestor| (ancestor.id, ancestor.scope))
     }
 }
 
