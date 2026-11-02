@@ -17,7 +17,7 @@ use ty_python_semantic::importer::{ImportAction, ImportRequest, Importer, Member
 use ty_python_semantic::types::ide_support::{
     inlay_hint_call_argument_details, inlay_hint_return_type,
 };
-use ty_python_semantic::types::{Type, TypeDetail, TypeDisplayDetails};
+use ty_python_semantic::types::{Type, TypeDisplayDetails};
 use ty_python_semantic::{HasType, SemanticModel};
 
 #[derive(Debug, Clone)]
@@ -65,135 +65,70 @@ impl InlayHint {
         position: TextSize,
         details: &TypeDisplayDetails<'db>,
         prefix: &str,
-        mut allow_edits: bool,
+        allow_edits: bool,
     ) -> Self {
         let InlayHintImportContext { db, file, importer } = context;
         let env = ProgramEnvironment::from_file(file);
         let mut dynamic_importer = DynamicImporter::new(importer, scope_node);
 
-        // Ok so the idea here is that we potentially have a random soup of spans here,
-        // and each byte of the string can have at most one target associate with it.
-        // Thankfully, they were generally pushed in print order, with the inner smaller types
-        // appearing before the outer bigger ones.
-        //
-        // So we record where we are in the string, and every time we find a type, we
-        // check if it's further along in the string. If it is, great, we give it the
-        // span for its range, and then advance where we are.
         let mut offset = 0;
-
-        // This edit label could be different from the original label if we need to
-        // qualify certain imported symbols. `A` could turn into `foo.A`.
-        let mut edit_label = details.label.clone();
-        let mut edit_offset: isize = 0;
-
         let mut label_parts = vec![prefix.into()];
-        for (target, detail) in details.targets.iter().zip(&details.details) {
-            match detail {
-                TypeDetail::Type(ty) => {
-                    let start = target.start().to_usize();
-                    let end = target.end().to_usize();
-                    // If we skipped over some bytes, push them with no target
-                    if start > offset {
-                        label_parts.push(details.label[offset..start].into());
-                    }
+        for (range, ty) in details.type_spans() {
+            let start = range.start().to_usize();
+            if start > offset {
+                label_parts.push(details.label[offset..start].into());
+            }
+            let target = ty.navigation_targets(db, &env).into_iter().next();
+            label_parts.push(InlayHintLabelPart::new(&details.label[range]).with_target(target));
+            offset = range.end().to_usize();
+        }
+        if offset < details.label.len() {
+            label_parts.push(details.label[offset..].into());
+        }
 
-                    // Possibly import the current type and return the qualified name
-                    let mut qualified_name = |dynamic_importer: &mut DynamicImporter<'_, 'db>| {
-                        let type_definition = ty.definition(db, &env)?;
-                        let definition = type_definition.definition()?;
-
-                        // Only module-level names can be imported with `from <module> import <name>`.
-                        // If the definition lives in a class or function body we can't produce a safe edit.
-                        if !definition.file_scope(db).is_global() {
-                            allow_edits = false;
-                            return None;
-                        }
-
-                        let module =
-                            file_to_module(db, definition.program_file(db).resolver_file(db))?;
-
-                        // Types like `ty_extensions.Unknown` only exist in stubs and cannot be
-                        // imported at runtime, so we do not provide edits.
-                        if module.is_known_stub_only(db) {
-                            allow_edits = false;
-                            return None;
-                        }
-
-                        // Don't try to import symbols in scope
-                        let definition_file = definition.file(db);
-                        if definition_file == file.file(db) {
-                            return None;
-                        }
-
-                        let definition_name = definition.name(db);
-
-                        // Fallback to the label if we cannot find the name
-                        let definition_name = definition_name
-                            .as_deref()
-                            .unwrap_or(&details.label[start..end]);
-
-                        if should_skip_import(db, module, *ty) {
-                            return None;
-                        }
-
-                        let module_name = module.name(db).as_str();
-
-                        dynamic_importer.import_symbol(
+        let mut text_edits = Vec::new();
+        if allow_edits
+            && let Some(annotation) = details.annotation_text(|ty, name| {
+                let Some(definition) = ty.definition(db, &env).and_then(|ty| ty.definition())
+                else {
+                    return Some(name.into());
+                };
+                // A name defined in a nested scope cannot be imported from the module.
+                if !definition.file_scope(db).is_global() {
+                    return None;
+                }
+                let Some(module) =
+                    file_to_module(db, definition.program_file(db).resolver_file(db))
+                else {
+                    return Some(name.into());
+                };
+                if module.is_known_stub_only(db) {
+                    return None;
+                }
+                if definition.file(db) == file.file(db) || should_skip_import(db, module, ty) {
+                    return Some(name.into());
+                }
+                let symbol = definition.name(db);
+                Some(
+                    dynamic_importer
+                        .import_symbol(
                             db,
                             &env,
-                            ty,
-                            module_name,
-                            definition_name,
-                            &details.label[start..end],
+                            &ty,
+                            module.name(db).as_str(),
+                            symbol.as_deref().unwrap_or(name),
+                            name,
                         )
-                    };
-
-                    // Ok, this is the first type that claimed these bytes, give it the target
-                    if start >= offset {
-                        // Try to import the symbol and update the edit label if required
-                        if let Some(qualified_name) = qualified_name(&mut dynamic_importer) {
-                            let edit_start = (start.cast_signed() + edit_offset).cast_unsigned();
-                            let edit_end = (end.cast_signed() + edit_offset).cast_unsigned();
-
-                            edit_label.replace_range(edit_start..edit_end, &qualified_name);
-                            edit_offset +=
-                                qualified_name.len().cast_signed() - (end - start).cast_signed();
-                        }
-
-                        let target = ty.navigation_targets(db, &env).into_iter().next();
-
-                        // Always use original text for the label part
-                        label_parts.push(
-                            InlayHintLabelPart::new(&details.label[start..end]).with_target(target),
-                        );
-                        offset = end;
-                    }
-                }
-                TypeDetail::SignatureStart
-                | TypeDetail::SignatureEnd
-                | TypeDetail::Parameter(_) => {
-                    // Don't care about these
-                }
-            }
-        }
-
-        // "flush" the rest of the label without any target
-        if offset < details.label.len() {
-            label_parts.push(details.label[offset..details.label.len()].into());
-        }
-
-        let text_edits = if details.is_valid_syntax && allow_edits {
-            let mut text_edits = vec![InlayHintTextEdit {
-                range: TextRange::new(position, position),
-                new_text: format!("{prefix}{edit_label}"),
-            }];
-
+                        .map_or_else(|| name.into(), Into::into),
+                )
+            })
+        {
+            text_edits.push(InlayHintTextEdit {
+                range: TextRange::empty(position),
+                new_text: format!("{prefix}{annotation}"),
+            });
             text_edits.extend(dynamic_importer.text_edits());
-
-            text_edits
-        } else {
-            vec![]
-        };
+        }
 
         Self {
             position,
