@@ -40,6 +40,7 @@ clap = { workspace = true, features = ["wrap_help", "string", "env"] }
 clap_complete_command = { workspace = true }
 clearscreen = { workspace = true }
 colored = { workspace = true }
+console = { workspace = true }
 crossbeam = { workspace = true }
 ctrlc = { workspace = true, default-features = false }
 indicatif = { workspace = true }
