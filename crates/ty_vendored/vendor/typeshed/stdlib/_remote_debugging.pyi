@@ -454,6 +454,11 @@ class BinaryWriter:
     def total_samples(self) -> int:
         """Total samples written"""
 
+    # Added in Python 3.15.1.
+    @property
+    def limit_reached(self) -> bool:
+        """A format limit was reached; the collected samples can still be finalized"""
+
     def write_sample(self, stack_frames: list[InterpreterInfo], timestamp_us: int) -> None:
         """Write a sample to the binary file.
 

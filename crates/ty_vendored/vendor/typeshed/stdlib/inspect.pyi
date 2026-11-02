@@ -438,7 +438,8 @@ def isbuiltin(object: object) -> TypeIs[BuiltinFunctionType]:
     Built-in functions and methods provide these attributes:
         __doc__         documentation string
         __name__        original name of this function or method
-        __self__        instance to which a method is bound, or None
+        __self__        instance to which a method is bound, or module object
+                        a function was defined in, or None
     """
 
 if sys.version_info >= (3, 11):
