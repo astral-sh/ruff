@@ -343,6 +343,11 @@ impl<'db> TypeVarInstance<'db> {
         }
     }
 
+    /// Whether this type variable has an upper bound or constraints, without evaluating either.
+    pub(super) fn has_bound_or_constraints(self, db: &'db dyn Db) -> bool {
+        self._bound_or_constraints(db).is_some()
+    }
+
     /// Returns whether this type variable has constraints without evaluating a lazy bound.
     pub(super) fn is_constrained(self, db: &'db dyn Db) -> bool {
         matches!(

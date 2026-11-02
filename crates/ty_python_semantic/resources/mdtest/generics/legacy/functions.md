@@ -581,6 +581,34 @@ info: Type variable defined here
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
+## Calls with the same inferred type arguments
+
+The tag does not contribute to the type of `value`, but each call still needs to check its tag. A
+bound violation must point to the argument that supplied the value, even when keywords are
+reordered.
+
+```py
+from typing import Literal, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S", bound=str)
+
+def tagged(value: T, *, tag: Literal["text"]) -> T:
+    return value
+
+def bounded(value: S, *, tag: Literal["text"]) -> S:
+    return value
+
+def use(text: str, number: int) -> None:
+    reveal_type(tagged(text, tag="text"))  # revealed: str
+    tagged(text, tag="other")  # error: [invalid-argument-type]
+    bounded(
+        tag="text",
+        value=number,  # error: [invalid-argument-type]
+    )
+    reveal_type(tagged(tag="text", value=text))  # revealed: str
+```
+
 ## Constrained type variables in bound method receivers
 
 The argument to `list.extend` must be valid for every possible element type of the receiver.
