@@ -2191,6 +2191,11 @@ For backwards compatibility with pre-3.11 Python, ty recognizes any function nam
 `__dataclass_transform__` as equivalent to `typing.dataclass_transform`, regardless of which module
 it is defined in. This matches [pyright's behavior].
 
+```toml
+[environment]
+python-version = "3.10"
+```
+
 ```py
 from typing import TypeVar, Callable, Any
 

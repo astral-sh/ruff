@@ -2,7 +2,7 @@
 
 ```toml
 [environment]
-python-version = "3.10"
+python-version = "3.13"
 python-platform = "linux"
 
 [project]
