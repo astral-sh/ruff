@@ -87,7 +87,7 @@ use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
 use ty_python_core::definition::Definition;
-use ty_python_core::{ProgramFile, semantic_index};
+use ty_python_core::{Program, ProgramFile, semantic_index};
 
 pub(crate) use self::constructor::ConstructorCallableKind;
 
@@ -5911,6 +5911,113 @@ fn enumerate_argument_types<'a, 'db>(
     })
 }
 
+/// The inputs to parameter specialization when the expected return type supplies no bindings.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype)]
+enum ParameterContextKey<'db> {
+    Uninferred(GenericContext<'db>),
+    Inferred(TypeVarInference<'db>),
+    Explicit(ExplicitParameterContext<'db>),
+}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct ExplicitParameterContext<'db> {
+    #[returns(copy)]
+    generic_context: GenericContext<'db>,
+    #[returns(copy)]
+    program: Program<'db>,
+    #[returns(copy)]
+    inference: TypeVarInference<'db>,
+}
+
+impl<'db> ParameterContextKey<'db> {
+    fn new(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        generic_context: GenericContext<'db>,
+        inference: Option<TypeVarInference<'db>>,
+    ) -> Self {
+        let Some(inference) = inference else {
+            return Self::Uninferred(generic_context);
+        };
+        let program = env.program(db);
+        if inference.generic_context(db) == generic_context
+            && generic_context.program(db) == program
+        {
+            Self::Inferred(inference)
+        } else {
+            Self::Explicit(ExplicitParameterContext::new(
+                db,
+                generic_context,
+                program,
+                inference,
+            ))
+        }
+    }
+}
+
+/// Combines the expected return type and the type arguments inferred so far
+/// into the context for the next argument-inference pass.
+fn parameter_context_specialization<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    generic_context: GenericContext<'db>,
+    inference: Option<TypeVarInference<'db>>,
+    return_type_solutions: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+) -> Specialization<'db> {
+    // The marker distinguishes unsolved type variables without defaults from gradual types
+    // inferred from arguments. Only the former are ignored during fixpoint iteration.
+    let argument_specialization = inference.map(|inference| {
+        inference.merged_specialization_with(db, |typevar, inferred| {
+            (inferred.is_none() && typevar.default_type(db).is_none())
+                .then_some(Type::Dynamic(DynamicType::UnspecializedTypeVar))
+        })
+    });
+
+    // TODO: Note that specializing parameter types for type context using this specialization is
+    // not strictly correct, as it requires eagerly choosing a solution for a given type variable,
+    // which may conflate upper and lower bounds when applied transitively to parameter types
+    // in which the type variable may be in invariant or contravariant position. A more correct
+    // approach would be to propagate constraint sets as type context, making bidirectional
+    // inference constraint-set-aware, or to infer constraint sets directly for argument types,
+    // and avoid the need to construct type context before call inference has completed.
+    generic_context.specialize_recursive(
+        db,
+        generic_context.variables(db).map(|typevar| {
+            let identity = typevar.identity(db);
+
+            let call_expression_constraints = return_type_solutions.get(&identity).copied();
+            let argument_constraints = argument_specialization
+                .and_then(|specialization| specialization.get(db, typevar))
+                .filter(|ty| !ty.has_provisional_marker(db, env))
+                .map(|ty| {
+                    let promoted = ty.promote(db, env);
+                    // Context for other arguments must still satisfy the type variable's
+                    // bound. For example, `Literal["a"]` satisfies `LiteralString`, but
+                    // promoting it to `str` would violate that bound.
+                    if let Some(bound) = typevar.typevar(db).upper_bound(db, env)
+                        && !promoted.is_assignable_to(db, env, bound)
+                    {
+                        ty
+                    } else {
+                        promoted
+                    }
+                });
+
+            // TODO: We should similarly combine both the call expression and argument constraints
+            // here. We currently only rely on argument constraints when there is no explicit declared
+            // type for the call expression.
+            Some(
+                call_expression_constraints
+                    .or(argument_constraints)
+                    // Default specialize any type variables to a marker type, which will be ignored
+                    // during argument inference, allowing the concrete subset of the parameter
+                    // type to still affect argument inference.
+                    .unwrap_or(Type::Dynamic(DynamicType::UnspecializedTypeVar)),
+            )
+        }),
+    )
+}
+
 /// Completed inference and its diagnostics, passed together to argument validation.
 /// The suppression flags correspond to the retained errors, including after a retry.
 struct InferredCall<'db> {
@@ -8553,6 +8660,10 @@ impl<'db> Binding<'db> {
     /// Parameter types are specialized based on the constraints from the declared type of the
     /// call expression, as well as the argument types inferred from the previous round of
     /// fixpoint iteration.
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None while the inferred parameter context is resolving a cycle"
+    )]
     pub(crate) fn argument_type_context_specialization(
         &self,
         db: &'db dyn Db,
@@ -8560,6 +8671,41 @@ impl<'db> Binding<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<Specialization<'db>> {
+        /// With no evidence from the expected return type, every call in this program
+        /// with the same generic context and inferred arguments has the same parameter context.
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial = |_, _, _| None,
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn inferred_parameter_context<'db>(
+            db: &'db dyn Db,
+            key: ParameterContextKey<'db>,
+        ) -> Option<Specialization<'db>> {
+            let (generic_context, program, inference) = match key {
+                ParameterContextKey::Uninferred(context) => {
+                    return Some(context.repeat_specialization(
+                        db,
+                        Type::Dynamic(DynamicType::UnspecializedTypeVar),
+                    ));
+                }
+                ParameterContextKey::Inferred(inference) => {
+                    let context = inference.generic_context(db);
+                    (context, context.program(db), inference)
+                }
+                ParameterContextKey::Explicit(key) => {
+                    (key.generic_context(db), key.program(db), key.inference(db))
+                }
+            };
+            Some(parameter_context_specialization(
+                db,
+                &ProgramEnvironment::from_program(program),
+                generic_context,
+                Some(inference),
+                &FxHashMap::default(),
+            ))
+        }
+
         let generic_context = self.signature.generic_context?;
 
         let mut return_type_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
@@ -8599,57 +8745,20 @@ impl<'db> Binding<'db> {
             }
         }
 
-        // The marker distinguishes unsolved type variables without defaults from gradual types
-        // inferred from arguments. Only the former are ignored during fixpoint iteration.
-        let argument_specialization = self.inference.map(|inference| {
-            inference.merged_specialization_with(db, |typevar, inferred| {
-                (inferred.is_none() && typevar.default_type(db).is_none())
-                    .then_some(Type::Dynamic(DynamicType::UnspecializedTypeVar))
-            })
-        });
-
-        // TODO: Note that specializing parameter types for type context using this specialization is
-        // not strictly correct, as it requires eagerly choosing a solution for a given type variable,
-        // which may conflate upper and lower bounds when applied transitively to parameter types
-        // in which the type variable may be in invariant or contravariant position. A more correct
-        // approach would be to propagate constraint sets as type context, making bidirectional
-        // inference constraint-set-aware, or to infer constraint sets directly for argument types,
-        // and avoid the need to construct type context before call inference has completed.
-        Some(generic_context.specialize_recursive(
+        if return_type_solutions.is_empty()
+            && let Some(specialization) = inferred_parameter_context(
+                db,
+                ParameterContextKey::new(db, env, generic_context, self.inference),
+            )
+        {
+            return Some(specialization);
+        }
+        Some(parameter_context_specialization(
             db,
-            generic_context.variables(db).map(|typevar| {
-                let identity = typevar.identity(db);
-
-                let call_expression_constraints = return_type_solutions.get(&identity).copied();
-                let argument_constraints = argument_specialization
-                    .and_then(|specialization| specialization.get(db, typevar))
-                    .filter(|ty| !ty.has_provisional_marker(db, env))
-                    .map(|ty| {
-                        let promoted = ty.promote(db, env);
-                        // Context for other arguments must still satisfy the type variable's
-                        // bound. For example, `Literal["a"]` satisfies `LiteralString`, but
-                        // promoting it to `str` would violate that bound.
-                        if let Some(bound) = typevar.typevar(db).upper_bound(db, env)
-                            && !promoted.is_assignable_to(db, env, bound)
-                        {
-                            ty
-                        } else {
-                            promoted
-                        }
-                    });
-
-                // TODO: We should similarly combine both the call expression and argument constraints
-                // here. We currently only rely on argument constraints when there is no explicit declared
-                // type for the call expression.
-                Some(
-                    call_expression_constraints
-                        .or(argument_constraints)
-                        // Default specialize any type variables to a marker type, which will be ignored
-                        // during argument inference, allowing the concrete subset of the parameter
-                        // type to still affect argument inference.
-                        .unwrap_or(Type::Dynamic(DynamicType::UnspecializedTypeVar)),
-                )
-            }),
+            env,
+            generic_context,
+            self.inference,
+            &return_type_solutions,
         ))
     }
 
