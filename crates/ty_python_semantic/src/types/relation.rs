@@ -1988,38 +1988,42 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         // With lazy evaluation, comparisons with a type variable are translated directly into a
         // constraint set.
         if self.typevar_evaluation == TypeVarEvaluation::Lazy {
+            let materialize_bound = |ty: Type<'db>, kind| {
+                if !self.relation.is_subtyping() {
+                    ty
+                } else if self
+                    .materialization_visitor
+                    .materialize_typevar_bounds_and_defaults
+                {
+                    ty.materialization(db, env, kind)
+                } else {
+                    // An overlap check must retain a variable's declared domain even when
+                    // constructing a bound that contains it, e.g. `T: Any` can be `str`.
+                    ty.materialize(db, kind, self.materialization_visitor)
+                }
+            };
             // A typevar satisfies a relation when...it satisfies the relation. Yes that's a
             // tautology! We're moving the caller's subtyping/assignability requirement into a
             // constraint set. If the typevar has an upper bound or constraints, then the relation
             // only has to hold when the typevar has a valid specialization (i.e., one that
             // satisfies the upper bound/constraints).
             if let Type::TypeVar(bound_typevar) = source {
-                let upper = if self.relation.is_subtyping() {
-                    target.bottom_materialization(db, env)
-                } else {
-                    target
-                };
                 return ConstraintSet::constrain_typevar_upper_bound(
                     db,
                     env,
                     self.constraints,
                     self.provenance,
                     bound_typevar,
-                    upper,
+                    materialize_bound(target, MaterializationKind::Bottom),
                 );
             } else if let Type::TypeVar(bound_typevar) = target {
-                let lower = if self.relation.is_subtyping() {
-                    source.top_materialization(db, env)
-                } else {
-                    source
-                };
                 return ConstraintSet::constrain_typevar_lower_bound(
                     db,
                     env,
                     self.constraints,
                     self.provenance,
                     bound_typevar,
-                    lower,
+                    materialize_bound(source, MaterializationKind::Top),
                 );
             }
         }
@@ -3412,7 +3416,7 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: TypeVarSet<'db>,
     context_tree: Option<ErrorContextTree<'db>>,
-    provenance: ConstraintProvenance,
+    pub(super) provenance: ConstraintProvenance,
     perform_expensive_checks: bool,
 
     // N.B. these fields are private to reduce the risk of

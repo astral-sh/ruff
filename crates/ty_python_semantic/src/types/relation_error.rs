@@ -83,6 +83,7 @@ pub(crate) enum ErrorContext<'db> {
         left: Type<'db>,
         right: Type<'db>,
     },
+    ConflictingInvariantTypeArguments,
     FinalClassDisjoint {
         final_type: Type<'db>,
         other: Type<'db>,
@@ -293,6 +294,10 @@ impl<'db> ErrorContext<'db> {
                     left.display_with(db, env, settings.clone()),
                     right.display_with(db, env, settings),
                 )
+            }
+            Self::ConflictingInvariantTypeArguments => {
+                "no specialization of the type variables makes each pair of invariant arguments equal"
+                    .to_string()
             }
             Self::FinalClassDisjoint { final_type, other } => {
                 let settings =

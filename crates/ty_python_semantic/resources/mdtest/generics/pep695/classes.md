@@ -1514,6 +1514,52 @@ reveal_type(PartiallyFixed.fixed)  # revealed: int
 reveal_type(PartiallyFixed.unresolved)  # revealed: Unknown
 ```
 
+## Repeated type variables in invariant arguments
+
+For `dict[T, T]` to overlap `dict[U, str]`, both the keys and the values must agree. That requires
+`T = U = str`, which violates the upper bound of `U`. With `int` as the value type, choosing
+`T = U = int` satisfies both positions.
+
+```py
+from typing import cast
+
+def check[T, U: int](repeated: dict[T, T], other: dict[U, str]) -> None:
+    # snapshot: disjoint-cast
+    cast(dict[U, str], repeated)
+    cast(dict[T, T], other)  # error: [disjoint-cast]
+    cast(dict[int, str], repeated)  # error: [disjoint-cast]
+    cast(dict[U, int], repeated)
+```
+
+```snapshot
+info[disjoint-cast]: Cast to a disjoint type
+    --> src/mdtest_snippet.py:5:5
+     |
+   5 |     cast(dict[U, str], repeated)
+     |     ^^^^^------------^^--------^
+     |          |             |
+     |          |             Inferred as `dict[T@check, T@check]`
+     |          Disjoint from the inferred type
+     |
+    ::: stdlib/builtins.pyi:3101:7
+     |
+3101 | class dict(MutableMapping[_KT, _VT]):
+     |       ---- `dict` defined here
+info: `dict[U@check, str]` is disjoint from `dict[T@check, T@check]`
+info: no specialization of the type variables makes each pair of invariant arguments equal
+```
+
+A variable bounded by `Any` and one constrained to `str` or `bytes` can both specialize to `str`,
+including inside a list used as the key type.
+
+```py
+from typing import Any
+
+def gradual[T: Any, U: (str, bytes)](repeated: dict[list[T], T], other: dict[list[U], str]) -> None:
+    cast(dict[list[U], str], repeated)
+    cast(dict[list[T], T], other)
+```
+
 ## Unions of generic intersections
 
 Sharing one class constraint does not make two intersections interchangeable. Neither of these

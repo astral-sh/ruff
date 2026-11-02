@@ -2282,6 +2282,39 @@ reveal_type(DescriptorChild.descriptor)  # revealed: Unknown
 reveal_type(DescriptorChild[int].descriptor)  # revealed: int
 ```
 
+## Repeated type variables in invariant arguments
+
+For `dict[T, T]` to overlap `dict[U, str]`, both the keys and the values must agree. That requires
+`T = U = str`, which violates the upper bound of `U`. With `int` as the value type, choosing
+`T = U = int` satisfies both positions.
+
+```py
+from typing import TypeVar, cast
+
+T = TypeVar("T")
+U = TypeVar("U", bound=int)
+
+def check(repeated: dict[T, T], other: dict[U, str]) -> None:
+    cast(dict[U, str], repeated)  # error: [disjoint-cast]
+    cast(dict[T, T], other)  # error: [disjoint-cast]
+    cast(dict[int, str], repeated)  # error: [disjoint-cast]
+    cast(dict[U, int], repeated)
+```
+
+A variable bounded by `Any` and one constrained to `str` or `bytes` can both specialize to `str`,
+including inside a list used as the key type.
+
+```py
+from typing import Any
+
+Gradual = TypeVar("Gradual", bound=Any)
+Choice = TypeVar("Choice", str, bytes)
+
+def gradual(repeated: dict[list[Gradual], Gradual], other: dict[list[Choice], str]) -> None:
+    cast(dict[list[Choice], str], repeated)
+    cast(dict[list[Gradual], Gradual], other)
+```
+
 ## Unions of generic intersections
 
 Sharing one class constraint does not make two intersections interchangeable. Neither of these

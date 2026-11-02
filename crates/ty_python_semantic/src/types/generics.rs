@@ -2184,7 +2184,9 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             right.types(db)
         );
 
-        types.when_any(
+        let mut variable_pairs = SmallVec::<[_; 2]>::new();
+        let mut overlap_constraints = SmallVec::<[_; 2]>::new();
+        let disjoint = types.when_any(
             db,
             self.constraints,
             |(bound_typevar, left_type, right_type)| match bound_typevar.variance(db) {
@@ -2206,6 +2208,9 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                         && can_choose_never(left_var)
                         && can_choose_never(right_var)
                     {
+                        if left_var != right_var {
+                            variable_pairs.push((left_var, right_var));
+                        }
                         return self.never();
                     }
 
@@ -2239,6 +2244,9 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                                 right_type,
                                 MaterializationKind::Top,
                             );
+                            if !overlap.is_trivially_always_satisfied() {
+                                overlap_constraints.push(overlap);
+                            }
                             ConstraintSet::from_bool(
                                 self.constraints,
                                 !overlap.has_no_valid_solutions(db, self.env),
@@ -2265,7 +2273,39 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 // If `Foo[T]` is bivariant in `T`, `Foo[A]` and `Foo[B]` are mutual subtypes.
                 TypeVarVariance::Bivariant => self.never(),
             },
-        )
+        );
+
+        // Bare variables can all choose `Never` unless another invariant argument restricts
+        // that choice. A single nontrivial constraint has already been checked above.
+        if disjoint.is_trivially_always_satisfied()
+            || overlap_constraints.is_empty()
+            || (overlap_constraints.len() == 1 && variable_pairs.is_empty())
+        {
+            return disjoint;
+        }
+
+        // All invariant arguments must agree under the same specialization. For example,
+        // `dict[T, T]` overlaps `dict[U, str]` only if both variables can be `str`.
+        let equalities = variable_pairs.into_iter().map(|(left, right)| {
+            ConstraintSet::constrain_typevar_equivalence_bound(
+                db,
+                self.env,
+                self.constraints,
+                self.provenance,
+                left,
+                Type::TypeVar(right),
+            )
+        });
+        let overlap = overlap_constraints.into_iter().chain(equalities).when_all(
+            db,
+            self.constraints,
+            |constraint| constraint,
+        );
+        let disjoint = overlap.has_no_valid_solutions(db, self.env);
+        if disjoint && let Some(context) = self.report_context() {
+            context.push(ErrorContext::ConflictingInvariantTypeArguments);
+        }
+        ConstraintSet::from_bool(self.constraints, disjoint)
     }
 }
 
