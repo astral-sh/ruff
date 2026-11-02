@@ -124,7 +124,9 @@ jobs:
       id-token: write
       packages: write
     steps:
-      - uses: $/.github/actions/setup-jaq
+      - uses: $/.github/actions/setup-ruff-workspace
+        with:
+          group: jaq
 
       - name: Download digests
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -304,7 +306,9 @@ jobs:
       id-token: write
       packages: write
     steps:
-      - uses: $/.github/actions/setup-jaq
+      - uses: $/.github/actions/setup-ruff-workspace
+        with:
+          group: jaq
 
       - name: Download digests
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1

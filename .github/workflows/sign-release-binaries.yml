@@ -62,7 +62,9 @@ jobs:
           path: github-archives
           merge-multiple: true
 
-      - uses: $/.github/actions/setup-jaq
+      - uses: $/.github/actions/setup-ruff-workspace
+        with:
+          group: jaq
 
       - name: "Collect built release wheels"
         shell: bash

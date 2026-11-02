@@ -13,6 +13,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/build-wasm.yml
+      - .github/actions/setup-ruff-workspace/action.yml
 
 concurrency:
   group: build-wasm-${{ github.ref }}
@@ -49,7 +50,9 @@ jobs:
       - uses: jetli/wasm-bindgen-action@20b33e20595891ab1a0ed73145d8a21fc96e7c29 # v0.2.0
       - name: "Run wasm-pack build"
         run: wasm-pack build --target ${{ matrix.target }} crates/ruff_wasm
-      - uses: $/.github/actions/setup-jaq
+      - uses: $/.github/actions/setup-ruff-workspace
+        with:
+          group: jaq
       - name: "Rename generated package"
         run: |
           jaq '.name="@astral-sh/ruff-wasm-${{ matrix.target }}"' crates/ruff_wasm/pkg/package.json > /tmp/package.json

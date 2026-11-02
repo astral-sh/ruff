@@ -27,7 +27,7 @@ paths:
       # `actionlint` does not yet recognize GitHub's `$/` syntax.
       # https://github.com/rhysd/actionlint/issues/711
       - '^reusable workflow call "\$/\.github/workflows/[^"/]+\.ya?ml" at "uses" is not following the format '
-      - '^specifying action "\$/\.github/actions/setup-jaq" in invalid format because ref is missing\.'
+      - '^specifying action "\$/\.github/actions/setup-ruff-workspace" in invalid format because ref is missing\.'
       - '^specifying action "\$/python/py-fuzzer" in invalid format because ref is missing\.'
   ".github/workflows/pull-request-reviewers.yml":
     ignore:
