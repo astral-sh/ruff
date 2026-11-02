@@ -175,14 +175,18 @@ class A[T]: ...
 class B[T]: ...
 
 type Both[T] = A[T] & B[T]
+
+class L1: ...
+class L2: ...
+class L3: ...
 ```
 
 With two cases, the exact exclusions fit within the budget:
 
 ```py
-def two_cases(value: Any | Both[Literal[1]] | Both[Literal[2]]) -> None:
+def two_cases(value: Any | Both[L1] | Both[L2]) -> None:
     if value == "example":
-        # revealed: (Any & ~A[Literal[1]] & ~A[Literal[2]]) | (Any & ~B[Literal[1]] & ~A[Literal[2]]) | (Any & ~A[Literal[1]] & ~B[Literal[2]]) | (Any & ~B[Literal[1]] & ~B[Literal[2]])
+        # revealed: (Any & ~A[L1] & ~A[L2]) | (Any & ~B[L1] & ~A[L2]) | (Any & ~A[L1] & ~B[L2]) | (Any & ~B[L1] & ~B[L2])
         reveal_type(value)
 ```
 
@@ -190,7 +194,7 @@ When the expansion exceeds the intersection budget, equality narrowing keeps the
 without the exclusions:
 
 ```py
-def three_cases(value: Any | Both[Literal[1]] | Both[Literal[2]] | Both[Literal[3]]) -> None:
+def three_cases(value: Any | Both[L1] | Both[L2] | Both[L3]) -> None:
     if value == "example":
         reveal_type(value)  # revealed: Any
 ```
