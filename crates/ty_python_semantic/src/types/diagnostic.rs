@@ -137,6 +137,9 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNBOUND_TYPE_VARIABLE);
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&MISSING_DIRECT_DEPENDENCY);
+    registry.register_lint(&MISSING_TYPE_FUNCTION_ARGUMENT);
+    registry.register_lint(&MISSING_TYPE_ARGS);
+    registry.register_lint(&MISSING_TYPE_KWARGS);
     registry.register_lint(&MISSING_TYPE_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
     registry.register_lint(&NON_CALLABLE_INIT_SUBCLASS);
@@ -833,6 +836,33 @@ declare_lint! {
         summary: "detects missing required arguments in a call",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/missing-type-function-argument.md")]
+    pub(crate) static MISSING_TYPE_FUNCTION_ARGUMENT = {
+        summary: "detects non-variadic parameters without type annotations",
+        status: LintStatus::stable("0.0.96"),
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/missing-type-args.md")]
+    pub(crate) static MISSING_TYPE_ARGS = {
+        summary: "detects variadic positional parameters without type annotations",
+        status: LintStatus::stable("0.0.96"),
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/missing-type-kwargs.md")]
+    pub(crate) static MISSING_TYPE_KWARGS = {
+        summary: "detects variadic keyword parameters without type annotations",
+        status: LintStatus::stable("0.0.96"),
+        default_level: Level::Ignore,
     }
 }
 

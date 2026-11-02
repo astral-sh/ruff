@@ -1286,9 +1286,39 @@
             }
           ]
         },
+        "missing-type-args": {
+          "title": "detects variadic positional parameters without type annotations",
+          "description": "## What it does\n\nChecks for variadic positional parameters (`*args`) without a type annotation.\n\nFor overloaded functions, ty checks the overload signatures and skips the implementation.\n\n## Why is this bad?\n\nAnnotating `*args` lets ty check the type of each positional argument collected by the parameter.\n\n## Examples\n\n```python\ndef total(*values):  # error: [missing-type-args]\n    return sum(values)\n```\n\nUse instead:\n\n```python\ndef total(*values: int):\n    return sum(values)\n```",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "missing-type-argument": {
           "title": "detects generic types used without explicit type parameters in type expressions",
           "description": "## What it does\n\nChecks for generic types used without type parameters in type expressions.\n\n## Why is this bad?\n\nUsing a generic type without specifying its type parameters results in the type parameters being\nimplicitly filled with `Unknown`, reducing the precision of type checking. Explicit type parameters\nmake the intended types clear and enable the type checker to catch more errors.\n\n## Examples\n\n```python\nimport re\n\n\ndef handle(m: re.Match) -> str:  # error: [missing-type-argument]\n    return m.string\n\n\n# Use explicit type parameters instead:\ndef handle(m: re.Match[str]) -> str:\n    return m.string\n```",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "missing-type-function-argument": {
+          "title": "detects non-variadic parameters without type annotations",
+          "description": "## What it does\n\nChecks for positional and keyword-only parameters without a type annotation.\n\nFor overloaded functions, ty checks the overload signatures and skips the implementation.\n\n## Why is this bad?\n\nWithout an annotation, ty cannot use the parameter's intended type to check calls to the function.\n\n## Examples\n\n```python\ndef greet(name):  # error: [missing-type-function-argument]\n    return f\"Hello, {name}!\"\n```\n\nUse instead:\n\n```python\ndef greet(name: str):\n    return f\"Hello, {name}!\"\n```\n\n## See also\n\n- `missing-type-args` checks variadic positional parameters (`*args`).\n- `missing-type-kwargs` checks variadic keyword parameters (`**kwargs`).",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "missing-type-kwargs": {
+          "title": "detects variadic keyword parameters without type annotations",
+          "description": "## What it does\n\nChecks for variadic keyword parameters (`**kwargs`) without a type annotation.\n\nFor overloaded functions, ty checks the overload signatures and skips the implementation.\n\n## Why is this bad?\n\nAnnotating `**kwargs` lets ty check the type of each keyword argument collected by the parameter.\n\n## Examples\n\n```python\ndef headers(**fields):  # error: [missing-type-kwargs]\n    return fields\n```\n\nUse instead:\n\n```python\ndef headers(**fields: str):\n    return fields\n```",
           "default": "ignore",
           "oneOf": [
             {
